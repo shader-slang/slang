@@ -4389,10 +4389,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 checkThrowingCallIsCovered(invoke);
 
             auto funcDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr);
+            DeclRef<CallableDecl> callableDeclRef;
             List<DeclRef<ParamDecl>> paramDeclRefs;
             if (funcDeclRefExpr)
             {
-                if (auto callableDeclRef = funcDeclRefExpr->declRef.as<CallableDecl>())
+                callableDeclRef = funcDeclRefExpr->declRef.as<CallableDecl>();
+                if (callableDeclRef)
                 {
                     paramDeclRefs =
                         getParametersForCallableSignature(m_astBuilder, callableDeclRef);
@@ -4415,12 +4417,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
                 checkGroupSharedArgumentOfParam(paramDecl, argExpr);
 
-                // A read-only `groupshared` parameter is a `ref` whose callee cannot write through
-                // it, so its argument need not be mutable: another `const groupshared` parameter is
-                // a valid argument. The check above already requires the argument to name
-                // group-shared storage.
-                if ((as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType)) &&
-                    !isReadOnlyGroupSharedParam(paramDecl))
+                if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
                     // an *exact* match on the type of the argument.
@@ -4610,6 +4607,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // Warn when the same storage is passed to two parameters that may both be references
             // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
+            checkGroupSharedArgumentsOfCopiedParams(
+                invoke,
+                funcType,
+                callableDeclRef,
+                paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
             {
@@ -7849,7 +7851,7 @@ void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr*
 // Return whether every call to `callee` is replaced by the callee's body or by an intrinsic, so
 // that no call boundary remains at which an `out`/`inout` argument would be copied. The core
 // module's compound assignments and increments (`g[i] += 1`, `g[i]++`) are such calls.
-static bool isCallAlwaysInlinedOrIntrinsic(FunctionDeclBase* callee)
+static bool isCallAlwaysInlinedOrIntrinsic(CallableDecl* callee)
 {
     return callee->hasModifier<ForceInlineAttribute>() ||
            callee->hasModifier<UnsafeForceInlineEarlyAttribute>() ||
@@ -7857,29 +7859,29 @@ static bool isCallAlwaysInlinedOrIntrinsic(FunctionDeclBase* callee)
            callee->hasModifier<TargetIntrinsicModifier>();
 }
 
-// An `out`/`inout` parameter that is not `groupshared` has copy-in/copy-out semantics, which an
-// implementation may realize by reference only because it assumes the argument is not aliased.
-// Thread-group-shared storage is aliased by every invocation in the group, so either way the callee
-// can miss the other invocations' writes or overwrite them, and we warn. The implicit `this` of a
-// `[mutating]` method is such a parameter too. A direct argument of a call that is always inlined
-// is not passed across a call boundary, but an implicitly converted one still goes through a
-// temporary.
+// An `out` or `inout` parameter has copy-in/copy-out semantics, which an implementation may realize
+// by reference only because it assumes the argument is not aliased. Thread-group-shared storage is
+// aliased by every invocation in the group, so either way the callee can miss the other
+// invocations' writes or overwrite them, and we warn. A `groupshared` parameter is a reference
+// rather than an `inout`, so it is never copied. The implicit `this` of a method whose receiver
+// mode is `inout` (a `[mutating]` method) is such a parameter too. A direct argument of a call that
+// is always inlined is not passed across a call boundary, but an implicitly converted one still
+// goes through a temporary.
 void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
     InvokeExpr* invoke,
     FuncType* funcType,
-    FunctionDeclBase* funcDeclBase)
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
 {
-    if (!funcDeclBase)
+    if (!calleeDeclRef)
         return;
 
-    bool callIsInlined = isCallAlwaysInlinedOrIntrinsic(funcDeclBase);
-    auto params = funcDeclBase->getParameters();
+    bool callIsInlined = isCallAlwaysInlinedOrIntrinsic(calleeDeclRef.getDecl());
     Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
-    for (Index i = 0; i < checkCount && i < params.getCount(); ++i)
+    for (Index i = 0; i < checkCount && i < paramDeclRefs.getCount(); ++i)
     {
-        auto paramDecl = params[i];
-        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)) ||
-            paramDecl->hasModifier<HLSLGroupSharedModifier>())
+        auto paramDecl = paramDeclRefs[i].getDecl();
+        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
             continue;
 
         auto argExpr = invoke->arguments[i];
@@ -7897,7 +7899,10 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
                 .arg = argExpr});
     }
 
-    if (callIsInlined || !funcDeclBase->hasModifier<MutatingAttribute>())
+    if (callIsInlined)
+        return;
+    auto thisParamInfo = findEffectiveThisParamInfo(calleeDeclRef);
+    if (!thisParamInfo || thisParamInfo->mode != ParamPassingMode::BorrowInOut)
         return;
     if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
     {

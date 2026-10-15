@@ -30171,7 +30171,7 @@ struct CoopMat
         let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int
-    >(__constref groupshared U[V] data, uint element, uint stride)
+    >(const groupshared U[V] data, uint element, uint stride)
     {
         if (matrixLayout == CoopMatMatrixLayout.RowMajor)
             __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::RowMajor)";

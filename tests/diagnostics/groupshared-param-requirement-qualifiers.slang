@@ -4,10 +4,11 @@
 //
 // `__ref`, `groupshared` and `const groupshared` parameters all pass by reference, but a
 // `groupshared` parameter also requires its argument to name group-shared storage (error 30711), and
-// a `const groupshared` one is read-only. A method whose parameter drops one of those guarantees
-// does not satisfy an interface requirement that has it, since a caller that goes through the
-// interface relies on the requirement's guarantees. A method whose parameter asks for less than the
-// requirement does satisfy it.
+// a `const groupshared` one is a read-only reference. A method satisfies an interface requirement
+// only if each reference parameter has the requirement's exact access (read-write or read-only),
+// as for `__ref` and `const __ref`. A method whose parameter requires group-shared storage does not
+// satisfy a requirement that does not promise it, while one that accepts any memory location does
+// satisfy a `groupshared` requirement.
 
 // --- Rejected: the implementation needs group-shared storage the requirement does not promise ---
 
@@ -24,7 +25,7 @@ struct SharedForRef : IRef
 //diag:  ^ interface requirement mismatch
 }
 
-// --- Rejected: the implementation writes through a read-only requirement's parameter ---
+// --- Rejected: a reference parameter must have the requirement's exact access ---
 
 interface IReadOnly
 {
@@ -35,11 +36,24 @@ interface IReadOnly
 struct WriterForReadOnly : IReadOnly
 {
     void f(groupshared uint a[8]) { a[0] = 1; }
-//diag:  ^ member 'f' does not match interface requirement.
-//diag:  ^ interface requirement mismatch
+//diag:                     ^ E38108
+//diag:                     ^ parameter 'a' direction 'ref' does not match interface requirement 'ref readonly'.
 }
 
-// --- Accepted: the same qualifiers, or an implementation that asks for less ---
+interface ISharedWrite
+{
+    void touch(groupshared uint a[8]);
+//diag:  ^^^^^ see interface requirement declaration of 'touch'
+}
+
+struct ReadsOnly : ISharedWrite
+{
+    void touch(const groupshared uint a[8]) {}
+//diag:                               ^ E38108
+//diag:                               ^ parameter 'a' direction 'ref readonly' does not match interface requirement 'ref'.
+}
+
+// --- Accepted: the same qualifiers, or an implementation that asks for less storage ---
 
 interface IShared
 {
@@ -57,16 +71,6 @@ struct AsksForLess : IShared
 {
     void write(__ref uint a[8]) { a[1] = 2; }
     uint read(const groupshared uint a[8]) { return a[1]; }
-}
-
-interface ISharedWrite
-{
-    void touch(groupshared uint a[8]);
-}
-
-struct ReadsOnly : ISharedWrite
-{
-    void touch(const groupshared uint a[8]) {}
 }
 
 groupshared uint sh[8];
@@ -88,7 +92,5 @@ void computeMain(uint tid: SV_DispatchThreadID)
 {
     Exact exact;
     AsksForLess asksForLess;
-    ReadsOnly readsOnly;
-    touch(readsOnly);
     output[tid] = use(exact) + use(asksForLess);
 }

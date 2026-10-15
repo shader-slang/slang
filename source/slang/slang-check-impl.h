@@ -4182,7 +4182,8 @@ public:
     void checkGroupSharedArgumentsOfCopiedParams(
         InvokeExpr* invoke,
         FuncType* funcType,
-        FunctionDeclBase* funcDeclBase);
+        DeclRef<CallableDecl> calleeDeclRef,
+        List<DeclRef<ParamDecl>> const& paramDeclRefs);
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,

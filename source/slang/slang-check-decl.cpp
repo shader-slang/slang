@@ -5763,6 +5763,13 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto satisfyingParamInfo = getParamInfo(m_astBuilder, satisfyingParam);
             if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
                 return false;
+            // `__ref` and `groupshared` parameters are both read-write references, but a
+            // `groupshared` parameter also requires its argument to be thread-group-shared memory,
+            // so a direct match needs both or neither. A synthesized witness can still forward
+            // between them where the call type-checks.
+            if (requiredParam.getDecl()->hasModifier<HLSLGroupSharedModifier>() !=
+                satisfyingParam.getDecl()->hasModifier<HLSLGroupSharedModifier>())
+                return false;
         }
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
@@ -7687,6 +7694,17 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         paramType.isLeftValue = true;
         if (paramInfo.mode == ParamPassingMode::BorrowIn)
             paramType.isLeftValue = false;
+
+        // The synthesized declaration's passing mode is copied above, but a `groupshared`
+        // parameter also requires its argument to be thread-group-shared memory. The wrapper
+        // forwards its own parameter as that argument, so the parameter keeps `groupshared`
+        // (otherwise the forwarded argument is E30711).
+        if (auto groupShared = paramDeclRef.getDecl()->findModifier<HLSLGroupSharedModifier>())
+        {
+            auto clonedModifier = m_astBuilder->create<HLSLGroupSharedModifier>();
+            clonedModifier->keywordName = groupShared->keywordName;
+            addModifier(synParamDecl, clonedModifier);
+        }
 
         // Create an expression that references the parameter for use in arguments.
         auto synArg = m_astBuilder->create<VarExpr>();
@@ -15029,11 +15047,10 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     maybeApplyLayoutModifier(paramDecl);
 
-    // A `groupshared` parameter names one thread-group-shared storage location and is therefore
-    // passed by reference, so the copy-direction modifiers are not applicable to it. Reject them at
-    // the producer rather than letting lowering revert to a per-thread copy -- the #10641 defect.
-    // `InOutModifier` derives from `OutModifier`, so it is checked first to report the most
-    // specific keyword.
+    // A `groupshared` parameter names one thread-group-shared memory location, so
+    // `getExplicitlyDeclaredParamPassingMode` gives it a reference mode and the copy-direction
+    // modifiers are not applicable to it. `InOutModifier` derives from `OutModifier`, so it is
+    // checked first to report the most specific keyword.
     if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
     {
         Modifier* directionModifier = paramDecl->findModifier<InOutModifier>();
@@ -15045,20 +15062,11 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
             getSink()->diagnose(Diagnostics::GroupsharedParameterCannotHaveDirectionModifier{
                 .modifier = directionModifier});
 
-        // Every `groupshared` parameter takes the `ref` passing mode, which passes the argument's
-        // own address and, unlike a borrow, has no copy-in fallback: a copy would leave a callee
-        // that reads after a group barrier looking at a stale snapshot. `__constref` asks for a
-        // borrow, so it is an error; we drop every `__constref` after reporting so that the rest of
-        // checking sees a well-formed `ref` parameter.
+        // Unlike a reference, a borrow may be a copy, which would leave a callee that reads after
+        // a group barrier looking at a stale snapshot, so `__constref` is an error here.
         if (auto borrowModifier = paramDecl->findModifier<BorrowModifier>())
-        {
             getSink()->diagnose(
                 Diagnostics::GroupsharedParameterCannotBeConstref{.modifier = borrowModifier});
-            while (auto extraBorrowModifier = paramDecl->findModifier<BorrowModifier>())
-                removeModifier(paramDecl, extraBorrowModifier);
-        }
-        if (!paramDecl->hasModifier<RefModifier>())
-            addModifier(paramDecl, this->getASTBuilder()->create<RefModifier>());
     }
 
     // Only texture types are allowed to have memory qualifiers on parameters

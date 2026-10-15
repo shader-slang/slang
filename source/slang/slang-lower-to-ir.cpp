@@ -3716,20 +3716,18 @@ void addCallArgsForParam(
 
 ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
-    // The checker gives every `groupshared` parameter a `RefModifier` and rejects `__constref` on
-    // it (in `SemanticsDeclHeaderVisitor::visitParamDecl`), so it always takes the `ref` branch
-    // below. Any other mode could copy thread-group-shared storage at the call boundary, so we
-    // assert in release builds too.
-    SLANG_RELEASE_ASSERT(
-        !paramDecl->hasModifier<HLSLGroupSharedModifier>() ||
-        (paramDecl->hasModifier<RefModifier>() && !paramDecl->hasModifier<BorrowModifier>()));
     if (paramDecl->hasModifier<RefReadOnlyModifier>())
         return ParamPassingMode::RefReadOnly;
     if (paramDecl->hasModifier<RefWriteOnlyModifier>())
         return ParamPassingMode::RefWriteOnly;
-    if (paramDecl->hasModifier<RefModifier>())
+    // A `groupshared` parameter names one thread-group-shared memory location, so it is a
+    // reference whatever other mode modifier it has: a copy would leave a callee that reads after a
+    // group barrier looking at a stale snapshot. Semantic checking reports the mode modifiers that
+    // conflict with it (`in`, `out`, `inout`, `__constref`).
+    if (paramDecl->hasModifier<RefModifier>() || paramDecl->hasModifier<HLSLGroupSharedModifier>())
     {
-        // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`.
+        // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`, and
+        // `const groupshared` is a read-only reference.
         if (paramDecl->hasModifier<ConstModifier>())
             return ParamPassingMode::RefReadOnly;
         return ParamPassingMode::RefReadWrite;
