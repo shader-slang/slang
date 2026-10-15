@@ -35573,20 +35573,33 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 
 //@public:
 
-/// Mark a variable as being workgroup uniform.
-/// @param v The variable to mark as workgroup uniform.
+/// Synchronize the workgroup, load a `groupshared` variable, and return its value as workgroup uniform.
+/// @param v The `groupshared` variable to load.
 /// @return The value of `v`.
-/// @remarks This intrinsic maps to `workgroupUniformLoad` when targeting WGSL and is a no-op on other targets.
-/// WGSL is strict on uniformity, and this intrinsic is needed to mark a variable as workgroup uniform in order
-// to silence uniformity errors in certain cases.
+/// @remarks This intrinsic has the semantics of the WGSL built-in `workgroupUniformLoad`, a workgroup control
+/// barrier followed by the load, so a value that one thread writes to `v` before the call is the value every
+/// thread in the workgroup gets back. Like any workgroup barrier, it must be called from uniform control flow
+/// in a compute shader. When targeting WGSL it maps to `workgroupUniformLoad`, whose result the WGSL uniformity
+/// analysis treats as uniform. On the other GPU targets it is lowered as Tint lowers the WGSL built-in: a
+/// workgroup barrier (`GroupMemoryBarrierWithGroupSync()`), the load, and a second workgroup barrier, which
+/// keeps a later write to `v` from racing with the loads of other threads. On the CPU targets it is a plain
+/// load.
 T workgroupUniformLoad<T>(__ref T v)
 {
     __target_switch
     {
+    case c:
+    case cpp:
+    case llvm:
+    case slangvm:
+        return v;
     case wgsl:
         __intrinsic_asm "workgroupUniformLoad(&($0))";
     default:
-        return v;
+        GroupMemoryBarrierWithGroupSync();
+        let result = v;
+        GroupMemoryBarrierWithGroupSync();
+        return result;
     }
 }
 
