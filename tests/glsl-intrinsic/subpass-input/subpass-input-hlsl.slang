@@ -1,5 +1,5 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/subpass-input/subpass-input-hlsl.slang -target glsl -stage fragment -entry main
-//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/subpass-input/subpass-input-hlsl.slang -target spirv -emit-spirv-directly -stage fragment -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/subpass-input/subpass-input-hlsl.slang -target spirv -emit-spirv-directly -default-image-format-unknown -stage fragment -entry main
 //TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/subpass-input/subpass-input-hlsl.slang -target hlsl -stage fragment -entry main
 
 // CHECK_SPV-DAG: OpEntryPoint
