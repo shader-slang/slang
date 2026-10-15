@@ -1739,6 +1739,12 @@ protected:
     /// The linked list of lexically surrounding statements.
     OuterStmtInfo* m_outerStmts = nullptr;
 
+    /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
+    /// is considered valid in the current context.
+    bool m_allowStaticReferenceToNonStaticMember = false;
+
+    bool m_allowDroppingDerivatives = false;
+
     /// The type of the try clause (if any) that covers the call being checked. A `try` covers only
     /// the call it wraps, so `visitInvokeExpr`, `visitIndexExpr` and `visitTypeCastExpr` check
     /// their operands under an `OperandTryCoverageRAII`, where this is `None`.
@@ -1750,15 +1756,9 @@ protected:
     /// known after `f()` has been checked. Any other kind of operand is checked with this null.
     List<InvokeExpr*>* m_pendingTryCoverage = nullptr;
 
-    /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
-    /// is considered valid in the current context.
-    bool m_allowStaticReferenceToNonStaticMember = false;
-
     /// Whether or not we are in a `no_diff` environment (and therefore should treat the call to
     /// a non-differentiable function as differentiable and not issue a diagnostic).
     TreatAsDifferentiableExpr* m_treatAsDifferentiableExpr = nullptr;
-
-    bool m_allowDroppingDerivatives = false;
 
     ASTBuilder* m_astBuilder = nullptr;
 
