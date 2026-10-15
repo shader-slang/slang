@@ -463,8 +463,8 @@ return {
 	["Decoration.nvapiSlot"] = 464,
 	["Decoration.noInline"] = 465,
 	["Decoration.noRefInline"] = 466,
-	["Decoration.DerivativeGroupQuad"] = 467,
-	["Decoration.DerivativeGroupLinear"] = 468,
+	["Decoration.DerivativeGroupDecoration.DerivativeGroupQuad"] = 467,
+	["Decoration.DerivativeGroupDecoration.DerivativeGroupLinear"] = 468,
 	["Decoration.MaximallyReconverges"] = 469,
 	["Decoration.QuadDerivatives"] = 470,
 	["Decoration.RequireFullQuads"] = 471,
@@ -880,6 +880,7 @@ return {
 	["Decoration.postDepthCoverage"] = 903,
 	["Decoration.AutodiffParameterContextTypeDecoration"] = 905,
 	["DebugLexicalBlock"] = 906,
-	["Decoration.fileOrNamespaceScopeStaticVar"] = 907,
-	["Decoration.noTargetCase"] = 908
+	["Decoration.fileOrNamespaceScopeMutableVar"] = 907,
+	["Decoration.uninitializedGlobalCheckFoundPossibleWrite"] = 908,
+	["Decoration.noTargetCase"] = 909
 }
