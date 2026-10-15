@@ -88,8 +88,15 @@ With the WGSL `subgroups` extension, these wave and quad intrinsics are supporte
 `WaveReadLaneFirst`, `QuadReadAcrossX`, `QuadReadAcrossY`, `QuadReadAcrossDiagonal` and
 `QuadReadLaneAt` (scalar, vector and matrix).
 
-The other wave intrinsics are not supported on WGSL, including `WaveMatch`, the `WaveMulti*` and
-`WaveMask*` intrinsics, `WavePrefixMin`/`WavePrefixMax` and the clustered operations.
+WGSL has no partitioned subgroup operations, so `WaveMatch`, `WaveMultiPrefixSum`,
+`WaveMultiPrefixProduct`, `WaveMultiPrefixBitAnd`, `WaveMultiPrefixBitOr`, `WaveMultiPrefixBitXor`
+(and their `Inclusive`/`Exclusive` forms) and `WaveMultiPrefixCountBits` are emulated: each reads
+every lane of the subgroup in turn with `subgroupShuffle`, so their cost grows with the subgroup
+size.
+
+The other wave intrinsics are not supported on WGSL, including the `WaveMask*` intrinsics, the
+`WaveMulti*` reductions, `WaveMultiPrefix` min/max, `WavePrefixMin`/`WavePrefixMax` and the
+clustered operations.
 
 ### Switch Fall-Through
 
