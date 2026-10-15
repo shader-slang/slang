@@ -73,7 +73,7 @@ The following table lists Slang's support for various HLSL feature sets, when ta
 | mesh shader | No |
 | tessellation shader | No |
 | geometry shader | No |
-| wave intrinsics | No |
+| wave intrinsics | Yes, with the `subgroups` extension; not `WaveMatch` or the `WaveMulti*` intrinsics |
 | barriers | Yes |
 | atomics | Yes |
 | switch fall-through | Restructured (warning 41026) |
