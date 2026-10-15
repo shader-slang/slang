@@ -36,10 +36,9 @@ enum class CodeGenTarget;
 /// On the second pass, `diagnoseWarning` is set to false to suppress warnings, ensuring that only
 /// errors are emitted. This prevents duplicate warnings from appearing in both passes.
 ///
-/// A `missingReturn` with a `NoTargetCaseDecoration` (a `__target_switch` with no case for the
-/// target) is not reported as a missing return: on targets that do not support missing returns
-/// it is reported as E41037 instead, and on other targets it is left for
-/// `diagnoseRemainingNoTargetCases`.
+/// A `missingReturn` with a `NoTargetCaseDecoration` is not reported as a missing return: on
+/// targets that do not support missing returns it is reported as E41037 instead (see
+/// `specializeTargetSwitch`).
 void checkForMissingReturns(
     IRModule* module,
     DiagnosticSink* sink,

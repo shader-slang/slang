@@ -1904,13 +1904,11 @@ local insts = {
 			{
 				noTargetCase = {
 					-- Marks the `missingReturn` that `specializeTargetSwitch` emits for a
-					-- `__target_switch` with no case for the target. It is a placeholder for code
-					-- that cannot be generated, not a missing `return`: `checkForMissingReturns`
-					-- reports E41037 for it on targets that reject missing returns, and
-					-- `diagnoseRemainingNoTargetCases` reports any left after DCE on other
-					-- targets. The operand is the display name of the function that held the
-					-- switch, kept as a string because that function may be inlined and removed.
-					-- The decoration only exists in linked IR, which is never serialized.
+					-- `__target_switch` with no case for the target, which is reported as E41037
+					-- (see that function). We reuse `missingReturn` because every CFG pass and
+					-- emitter already treats it as an unreachable terminator; only the two
+					-- missing-return consumers need to tell the two meanings apart. The operand
+					-- is the display name of the function that held the switch.
 					struct_name = "NoTargetCaseDecoration",
 					operands = { { "funcNameOperand", "IRStringLit" } },
 				},

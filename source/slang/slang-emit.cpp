@@ -2590,13 +2590,10 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.lateRequireCapability)
         SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
 
-    // This runs after the DCE above so that functions only referenced through another target's
-    // `__target_switch` case are gone. Targets that reject missing returns have already reported
-    // E41037 from `checkForMissingReturns` and stopped at the error-count check after it, unless
-    // `-disable-non-essential-validations` skipped that check. A `missingReturn` with no target
-    // case is only produced at link time, before the last `calcRequiredLoweringPassSet` scan, so
-    // the `missingReturn` flag covers it. We stop here on an error because the remaining passes
-    // would lower code that cannot be generated.
+    // E41037 is reported here, after target legalization; see `specializeTargetSwitch` for why.
+    // `NoTargetCaseDecoration` is only added at link time, before the last
+    // `calcRequiredLoweringPassSet` scan, so the `missingReturn` flag covers it. We stop on an
+    // error because the remaining passes would lower code that cannot be generated.
     if (requiredLoweringPassSet.missingReturn)
     {
         SLANG_PASS(diagnoseRemainingNoTargetCases, target, sink);

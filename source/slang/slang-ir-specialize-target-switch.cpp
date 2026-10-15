@@ -10,19 +10,16 @@
 
 namespace Slang
 {
-// Mark `missingReturn`, which replaces `targetSwitch` in `code`, as having no case for the
-// target, and give it the switch's location so that E41037 points at the switch (or, once `code`
-// is inlined, at the call). We record the function name as a string because it is needed after
-// `code` has been inlined into its callers.
+// Mark `missingReturn` as standing for a `__target_switch` in `code` with no case for the target.
+// The function name is recorded as a string because `code` may be inlined into its callers and
+// removed before the error is reported.
 static void markMissingReturnAsNoTargetCase(
     IRBuilder& builder,
-    IRMissingReturn* missingReturn,
-    IRGlobalValueWithCode* code,
-    IRTargetSwitch* targetSwitch)
+    IRInst* missingReturn,
+    IRGlobalValueWithCode* code)
 {
     StringBuilder funcName;
     printDiagnosticArg(funcName, code);
-    missingReturn->sourceLoc = targetSwitch->sourceLoc;
     builder.addDecoration(
         missingReturn,
         kIROp_NoTargetCaseDecoration,
@@ -104,15 +101,11 @@ void specializeTargetSwitch(
                         .location = targetSwitch->sourceLoc,
                     });
                 }
-                // A switch with no case at all is not diagnosed here: the function may be one
-                // that linking pulled in only through another target's case, such as
-                // `__sincos_metal`, referenced from the `metal` case of `sincos`, which DCE
-                // removes once that switch is resolved. The `failedImplies` switch is left
-                // unmarked because E41011 above is an error and `linkAndOptimizeIR` stops after
-                // linking when there are errors.
-                auto missingReturn = cast<IRMissingReturn>(builder.emitMissingReturn());
-                if (!failedImplies)
-                    markMissingReturnAsNoTargetCase(builder, missingReturn, code, targetSwitch);
+                // A switch with no case for the target is reported later, if its code is still
+                // generated; see the comment on `specializeTargetSwitch` in the header.
+                auto missingReturn = builder.emitMissingReturn();
+                missingReturn->sourceLoc = targetSwitch->sourceLoc;
+                markMissingReturnAsNoTargetCase(builder, missingReturn, code);
             }
             targetSwitch->removeAndDeallocate();
             changed = true;
@@ -136,17 +129,12 @@ void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticS
     }
 }
 
-IRNoTargetCaseDecoration* findNoTargetCaseDecoration(IRMissingReturn* missingReturn)
-{
-    return missingReturn->findDecoration<IRNoTargetCaseDecoration>();
-}
-
 void diagnoseNoTargetCase(
-    IRMissingReturn* missingReturn,
     IRNoTargetCaseDecoration* noTargetCase,
     CodeGenTarget target,
     DiagnosticSink* sink)
 {
+    auto missingReturn = noTargetCase->getParent();
     sink->diagnose(Diagnostics::TargetSwitchNoCaseForTarget{
         .funcName = noTargetCase->getFuncNameOperand()->getStringSlice(),
         .targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)),
@@ -167,8 +155,8 @@ void diagnoseRemainingNoTargetCases(IRModule* module, CodeGenTarget target, Diag
             auto missingReturn = as<IRMissingReturn>(block->getTerminator());
             if (!missingReturn)
                 continue;
-            if (auto noTargetCase = findNoTargetCaseDecoration(missingReturn))
-                diagnoseNoTargetCase(missingReturn, noTargetCase, target, sink);
+            if (auto noTargetCase = missingReturn->findDecoration<IRNoTargetCaseDecoration>())
+                diagnoseNoTargetCase(noTargetCase, target, sink);
         }
     }
 }

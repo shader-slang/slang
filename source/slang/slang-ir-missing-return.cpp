@@ -33,16 +33,12 @@ static void diagnoseMissingReturnForTarget(
     CodeGenTarget target,
     bool diagnoseWarning)
 {
-    // A `missingReturn` that replaced a `__target_switch` with no case for the target is not a
-    // missing `return` in user code. On targets that reject missing returns we report E41037 here
-    // instead of E41009, at the point where E41009 used to stop compilation: later passes such as
-    // `specializeResourceUsage` crash on a resource-returning function that falls off its end.
-    // Other targets accept the `missingReturn` until `diagnoseRemainingNoTargetCases` runs after
-    // a later DCE, which removes functions referenced only through another target's case.
-    if (auto noTargetCase = findNoTargetCaseDecoration(missingReturn))
+    // A `missingReturn` standing for a `__target_switch` with no case for the target is reported
+    // as E41037 rather than as a missing return; see `specializeTargetSwitch` for where.
+    if (auto noTargetCase = missingReturn->findDecoration<IRNoTargetCaseDecoration>())
     {
         if (!doesTargetAllowMissingReturns(target))
-            diagnoseNoTargetCase(missingReturn, noTargetCase, target, sink);
+            diagnoseNoTargetCase(noTargetCase, target, sink);
         return;
     }
 
