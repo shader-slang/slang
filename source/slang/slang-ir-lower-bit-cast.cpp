@@ -471,7 +471,8 @@ void diagnoseBitCastsToDescriptorHandle(
             // Where a handle is the native resource, casting that resource to its own handle type
             // is a same-representation cast that the target performs directly.
             if (auto handleType = as<IRDescriptorHandleType>(toType);
-                handleIsResource && handleType && isTypeEqual(fromType, handleType->getResourceType()))
+                handleIsResource && handleType &&
+                isTypeEqual(fromType, handleType->getResourceType()))
                 return;
             sink->diagnose(Diagnostics::BitCastToDescriptorHandle{
                 .fromType = fromType,
