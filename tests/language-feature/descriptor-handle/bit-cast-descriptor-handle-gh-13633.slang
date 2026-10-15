@@ -45,7 +45,7 @@ T fromBits<T>(uint2 bits)
     return bit_cast<T>(bits);
 //CHECK:              ^ error E41206
 //CHECK:              ^ cannot bit_cast 'vector<uint,2>' to 'DescriptorHandle<Texture2D>'
-//CHECK:              ^ DescriptorHandle constructor
+//CHECK:              ^ DescriptorHandle<T>(uint2)
 }
 
 [shader("compute")]
@@ -55,28 +55,28 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     let a = bit_cast<DescriptorHandle<Texture2D<float4>>>(handleBits[tid.x]);
 //CHECK:                                                 ^ error E41206
 //CHECK:                                                 ^ cannot bit_cast 'vector<uint,2>' to 'DescriptorHandle<Texture2D>'
-//CHECK:                                                 ^ DescriptorHandle constructor
+//CHECK:                                                 ^ DescriptorHandle<T>(uint2)
     let b = bit_cast<DescriptorHandle<Texture2D<float4>>>(handleBits64[tid.x]);
 //CHECK:                                                 ^ error E41206
 //CHECK:                                                 ^ cannot bit_cast 'uint64_t' to 'DescriptorHandle<Texture2D>'
-//CHECK:                                                 ^ DescriptorHandle constructor
+//CHECK:                                                 ^ DescriptorHandle<T>(uint2)
     let c = bit_cast<HandleAndIndex>(structBits[tid.x]);
 //CHECK:                            ^ error E41206
 //CHECK:                            ^ cannot bit_cast 'Bits' to 'HandleAndIndex'
-//CHECK:                            ^ DescriptorHandle constructor
+//CHECK:                            ^ DescriptorHandle<T>(uint2)
     let d = bit_cast<DescriptorHandle<Texture2D<float4>>[2]>(handlePairBits[tid.x]);
 //CHECK:                                                    ^ error E41206
 //CHECK:                                                    ^ cannot bit_cast 'vector<uint,4>' to 'array<DescriptorHandle<Texture2D>,2>'
-//CHECK:                                                    ^ DescriptorHandle constructor
+//CHECK:                                                    ^ DescriptorHandle<T>(uint2)
     let e = bit_cast<DescriptorHandle<Texture2D<float4>>>(otherHandle);
 //CHECK:                                                 ^ error E41206
 //CHECK:                                                 ^ cannot bit_cast 'DescriptorHandle<
-//CHECK:                                                 ^ DescriptorHandle constructor
+//CHECK:                                                 ^ DescriptorHandle<T>(uint2)
     let f = fromBits<DescriptorHandle<Texture2D<float4>>>(handleBits[tid.y]);
     let g = bit_cast<DescriptorHandle<Texture2D<float4>>>(textures);
 //CHECK:                                                 ^ error E41206
 //CHECK:                                                 ^ cannot bit_cast 'array<Texture2D,1>' to 'DescriptorHandle<Texture2D>'
-//CHECK:                                                 ^ DescriptorHandle constructor
+//CHECK:                                                 ^ DescriptorHandle<T>(uint2)
     outputBuffer[tid.x] = a.Load(int3(0)) + b.Load(int3(0)) + c.texture.Load(int3(c.index)) +
                           d[1].Load(int3(0)) + e.Load(int3(0)) + f.Load(int3(0)) +
                           g.Load(int3(0));
@@ -94,7 +94,7 @@ void resourceToHandle(uint3 tid: SV_DispatchThreadID)
     let h = bit_cast<DescriptorHandle<Texture2D<float4>>>(texture);
 //RESOURCE:                                              ^ error E41206
 //RESOURCE:                                              ^ cannot bit_cast 'Texture2D' to 'DescriptorHandle<Texture2D>'
-//RESOURCE:                                              ^ DescriptorHandle constructor
+//RESOURCE:                                              ^ DescriptorHandle<T>(uint2)
     outputBuffer[tid.x] = h.Load(int3(0));
 }
 
