@@ -802,6 +802,10 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
+    // A NaN or infinity literal is emitted as a call to a prelude helper (see
+    // `kWGSLBuiltinPreludeGetNan`), which is not a const-expression.
+    if (isNonFiniteFloatLit(inst))
+        return false;
     if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
