@@ -22,7 +22,7 @@
 static T scale_sample<T>(Texture3D<T> texture, int32_t3 coord)
     where T : ITexelElement, IFloat
 {
-    let value = texture.Load(int32_t4(coord, 0));
+    T value = texture.Load(int32_t4(coord, 0));
     return value * T(0.1F);
 }
 

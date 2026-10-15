@@ -2464,7 +2464,7 @@ public:                                                              \
     typedef SlangUInt32 SlangImageFormatIntegral;
     enum SlangImageFormat : SlangImageFormatIntegral
     {
-#define SLANG_FORMAT(NAME, DESC) SLANG_IMAGE_FORMAT_##NAME,
+#define SLANG_FORMAT(NAME, CODE_NAME, DESC) SLANG_IMAGE_FORMAT_##NAME,
 #include "slang-image-format-defs.h"
 #undef SLANG_FORMAT
     };
@@ -6076,6 +6076,11 @@ SLANG_EXTERN_C SLANG_API void slang_shutdown();
    - SLANG_RECORD_LAYER=1: Enable recording on startup
    - SLANG_RECORD_PATH=<path>: Use the exact path specified for recording output
      instead of generating a timestamped folder under .slang-replays/
+
+   Thread safety: enable or disable the layer only when no other thread is inside a
+   Slang API call. Enable it once during startup (or via SLANG_RECORD_LAYER) before
+   issuing concurrent calls; changing the mode while other threads are mid-call is
+   not supported.
  */
 SLANG_EXTERN_C SLANG_API void slang_enableRecordLayer(bool enable);
 
