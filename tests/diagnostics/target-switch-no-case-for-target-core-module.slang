@@ -106,6 +106,8 @@ void userHelperFromOtherTarget()
 
 RWStructuredBuffer<int> input;
 
+// The sample is the only exit of an unbounded loop. When the call compiled to nothing, the `break`
+// was dropped with it and the PTX kernel never terminated.
 [numthreads(1, 1, 1)]
 void sampleLevelInLoop()
 {

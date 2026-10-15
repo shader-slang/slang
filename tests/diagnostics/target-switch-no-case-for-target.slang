@@ -4,7 +4,6 @@
 // instead of emitting a function that falls off its end.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda -entry userFunc -stage compute -ignore-capabilities
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target ptx -entry userFunc -stage compute -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cpp -entry userFunc -stage compute -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal -entry userFunc -stage compute -ignore-capabilities
 
@@ -22,9 +21,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=METALONLY):-target spirv -entry metalOnlyVoidFunc -stage compute -ignore-capabilities -disable-non-essential-validations
 //DIAGNOSTIC_TEST:SIMPLE(diag=METALONLY):-target cuda -entry metalOnlyVoidFunc -stage compute -ignore-capabilities -disable-non-essential-validations
 
-// On targets that reject missing returns, E41037 is reported by the missing-return check, before
-// `specializeResourceUsage`, which cannot handle a resource-returning function that falls off its
-// end. Other targets report it later, once resource specialization has handled the function.
+// A function that returns a resource but has no case for the target. On SPIR-V, GLSL and WGSL
+// E41037 stops compilation before `specializeResourceUsage`, which cannot handle such a function.
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target spirv -entry resourceFunc -stage compute -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target glsl -entry resourceFunc -stage compute -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target wgsl -entry resourceFunc -stage compute -ignore-capabilities
@@ -32,7 +30,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target cpp -entry resourceFunc -stage compute -ignore-capabilities
 
 // The annotations above are shared by several targets, so the target named in the message is
-// pinned separately for each target family. PTX is generated from CUDA source and reports 'cuda'.
+// pinned separately for each target family. PTX is generated from CUDA source and reports 'cuda';
+// its lane is a FileCheck test so that it only runs where NVRTC is available.
 //TEST:SIMPLE(filecheck=PIN_CUDA):-target cuda -entry userFunc -stage compute -ignore-capabilities
 //TEST:SIMPLE(filecheck=PIN_CUDA):-target ptx -entry userFunc -stage compute -ignore-capabilities
 //TEST:SIMPLE(filecheck=PIN_CPP):-target cpp -entry userVoidFunc -stage compute -ignore-capabilities
