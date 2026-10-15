@@ -22205,8 +22205,12 @@ struct CapabilityDeclReferenceVisitor
     // because it remains part of the proof's identity.
     void visitTypePackSubtypeWitness(TypePackSubtypeWitness* witness)
     {
+        // Skip this witness if this capability checker has already visited it.
         if (!this->visitedVals.add(witness))
             return;
+
+        // Collect requirements from each element's conformance. getCount() excludes the pack
+        // type and constraint interface, so an empty pack adds no capability requirements.
         for (Index i = 0; i < witness->getCount(); i++)
             this->dispatchIfNotNull(witness->getWitness(i));
     }

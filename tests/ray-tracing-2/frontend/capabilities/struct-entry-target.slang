@@ -43,6 +43,7 @@ struct CurveHitContext : rt::IHitContext
 {
     typealias TraceContext = ::TraceContext;
     typealias Payload = ::Payload;
+    // CurvePrimitive is a Metal-only feature, so CurveHitContext requires Metal 3.1 or later.
     typealias Primitive = rt::CurvePrimitive;
     typealias Record = ::Record;
 }
