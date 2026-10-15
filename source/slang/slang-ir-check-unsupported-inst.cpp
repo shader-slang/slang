@@ -437,6 +437,9 @@ void checkUnsupportedPhysicalPointers(IRModule* module, TargetRequest* target, D
     for (auto globalInst : module->getGlobalInsts())
     {
         auto func = as<IRFunc>(globalInst);
+        // Also scan the function a module-level generic returns, as `checkUnsupportedInst` does.
+        if (auto generic = as<IRGeneric>(globalInst))
+            func = as<IRFunc>(findGenericReturnVal(generic));
         if (!func)
             continue;
         for (auto block : func->getBlocks())
