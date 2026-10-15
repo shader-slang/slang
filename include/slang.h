@@ -1375,6 +1375,12 @@ typedef uint32_t SlangSizeT;
         // target has no downstream tool.
         ValidateWithDownstreamCompiler = 165,
 
+        // WGSL only. stringValue0: severity (`error`, `warning`, `info` or `off`); stringValue1:
+        // diagnostic rule name (e.g. `subgroup_uniformity`). Repeatable. Emits a
+        // `diagnostic(<severity>, <rule>);` global directive; for a repeated rule the last one
+        // wins. CLI spelling: `-wgsl-diagnostic <severity>:<rule>`.
+        WGSLDiagnostic = 166,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
