@@ -2098,14 +2098,14 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // `legalizeMatrixTypes` turns the matrices a target cannot express into arrays of row
+    // vectors. Buffer element lowering must see those matrices first, because it is what stores a
+    // matrix with its declared row- or column-major layout; afterwards they are indistinguishable
+    // from arrays. LLVM has no matrix types at all and lowers every matrix right away, so its
+    // buffer lowering runs here; the other targets run theirs, and then `legalizeMatrixTypes`,
+    // later in this function.
     if (isCPUTargetViaLLVM(targetRequest))
     {
-        // The LLVM targets are special in that we always lower all matrices
-        // into arrays of vectors, because matrices aren't (yet?) built-in types
-        // in LLVM. Due to this, lowerBufferElementTypeToStorageType needs to
-        // occur earlier than usual, because otherwise it no longer knows what
-        // is a matrix and can't generate proper code for column/row-major
-        // matrix loads/stores.
         BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::LLVM;
@@ -2113,9 +2113,9 @@ Result linkAndOptimizeIR(
             lowerBufferElementTypeToStorageType,
             targetProgram,
             bufferElementTypeLoweringOptions);
-    }
 
-    SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
+        SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
+    }
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
@@ -2651,6 +2651,22 @@ Result linkAndOptimizeIR(
         lowerBufferElementTypeToStorageType,
         targetProgram,
         bufferElementTypeLoweringOptions);
+
+    if (isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest) ||
+        isMetalTarget(targetRequest))
+    {
+        SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
+
+        // An int/uint/bool matrix with a single row or column is now an array of 1-vectors,
+        // both in its storage type and as a value, and those were already turned into scalars
+        // everywhere else by the earlier `legalizeVectorTypes`.
+        SLANG_PASS(legalizeVectorTypes, sink);
+
+        // A function returning an int/uint/bool matrix returns an array after
+        // `legalizeMatrixTypes`, which the earlier `legalizeArrayReturnType` did not see.
+        if (!isMetalTarget(targetRequest) && !isSPIRV(target))
+            SLANG_PASS(legalizeArrayReturnType);
+    }
 
     // If we are generating code for glsl or metal, perform address space propagation now.
     // For SPIRV, we will do that during spirv legalization that happens after
