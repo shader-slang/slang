@@ -319,6 +319,60 @@ SourceLoc findBestSourceLocFromUses(IRInst* inst)
 
     return inst->sourceLoc;
 }
+
+// Diagnose `bufferType` as a structured buffer whose element type cannot be legalized, once at
+// each declaration that holds it, so that the user sees the variables they wrote rather than a use.
+// A buffer type reaches a declaration either directly (a parameter, global variable or struct
+// field) or through a type that contains it, such as the `Ptr` type of a `static` global or the
+// outer buffer of `StructuredBuffer<StructuredBuffer<S>>`; only when there is no declaration at all
+// is the first use reported instead.
+static void diagnoseUnlegalizableStructuredBuffer(
+    TypeLegalizationContext* context,
+    IRHLSLStructuredBufferTypeBase* bufferType)
+{
+    bool anyDiagnosed = false;
+    HashSet<IRInst*> visited;
+    // Buffer element lowering can clone a struct (`Leaf` into `Leaf_default`, say), leaving two
+    // fields for one declaration, so each location is reported once.
+    HashSet<SourceLoc::RawValue> reportedLocs;
+    List<IRInst*> workList;
+    workList.add(bufferType);
+    for (Index i = 0; i < workList.getCount(); i++)
+    {
+        for (auto use = workList[i]->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (as<IRGlobalParam>(user) || as<IRGlobalVar>(user) || as<IRParam>(user) ||
+                as<IRStructField>(user))
+            {
+                // A struct field is located at its struct, but its key is located at the
+                // field declaration itself.
+                SourceLoc loc = user->sourceLoc;
+                if (auto field = as<IRStructField>(user);
+                    field && field->getKey()->sourceLoc.isValid())
+                    loc = field->getKey()->sourceLoc;
+                if (loc.isValid() && visited.add(user) && reportedLocs.add(loc.getRaw()))
+                {
+                    context->m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
+                        .type = bufferType->getElementType(),
+                        .location = loc});
+                    anyDiagnosed = true;
+                }
+            }
+            else if (as<IRType>(user) && visited.add(user))
+            {
+                workList.add(user);
+            }
+        }
+    }
+    if (!anyDiagnosed)
+    {
+        context->m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
+            .type = bufferType->getElementType(),
+            .location = findBestSourceLocFromUses(bufferType)});
+    }
+}
+
 // Helper wrapper function around isResourceType that checks if the given
 // type is a pointer to a resource type or a physical storage buffer.
 bool isPointerToResourceType(IRType* type)
@@ -1414,6 +1468,11 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             newElementType = context->getBuilder()->getIntType();
             break;
         default:
+            // A buffer element is stored by value, so an element that legalization splits
+            // into a tuple, such as a struct with a texture field, has no legal form.
+            // `legalizeResourceTypes` legalizes every structured buffer type before any value
+            // and stops if this was reported, so its loads are never rewritten.
+            diagnoseUnlegalizableStructuredBuffer(context, bufferType);
             return LegalType::simple(bufferType);
         }
         ShortList<IRInst*> operands;

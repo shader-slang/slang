@@ -2046,7 +2046,7 @@ Result linkAndOptimizeIR(
         // What used to be individual variables/parameters/arguments/etc.
         // then become multiple variables/parameters/arguments/etc.
         //
-        SLANG_PASS(legalizeResourceTypes, targetProgram, sink);
+        SLANG_RETURN_ON_FAIL(SLANG_PASS(legalizeResourceTypes, targetProgram, sink));
 
         // We also need to legalize empty types for Metal targets.
         switch (target)

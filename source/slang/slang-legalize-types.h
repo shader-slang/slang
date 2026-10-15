@@ -686,7 +686,7 @@ LegalType createLegalUniformBufferTypeForExistentials(
 
 void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
-void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
+Result legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 

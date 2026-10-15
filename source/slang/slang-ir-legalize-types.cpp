@@ -4199,12 +4199,30 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 // wrappers around `legalizeTypes()` that pick an appropriately
 // specialized context type to use to get the job done.
 
-void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
+Result legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
 
     IRResourceTypeLegalizationContext context(target, module, sink);
+
+    // A structured buffer whose element this pass would split into a tuple has no legal
+    // form, and `legalizeTypeImpl` diagnoses it. Legalizing every buffer type before any
+    // value means such a module is rejected with one diagnostic per buffer declaration,
+    // instead of being rewritten with loads that silently lose their result.
+    List<IRHLSLStructuredBufferTypeBase*> bufferTypes;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(inst))
+            bufferTypes.add(bufferType);
+    }
+    const auto errorCountBefore = sink->getErrorCount();
+    for (auto bufferType : bufferTypes)
+        legalizeType(&context, bufferType);
+    if (sink->getErrorCount() != errorCountBefore)
+        return SLANG_FAIL;
+
     legalizeTypes(&context);
+    return SLANG_OK;
 }
 
 void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
