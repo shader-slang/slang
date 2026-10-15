@@ -1,7 +1,7 @@
-// A `__target_switch` without a case for the current target has no code to generate. When that
-// code is still reachable (here because `-ignore-capabilities` disables the capability check that
-// would otherwise reject the entry point), the compiler reports E41037 instead of silently
-// emitting a function that falls off its end.
+// A `__target_switch` without a case for the current target has no code to generate. When a
+// function containing one would still be generated (here because `-ignore-capabilities` disables
+// the capability check that would otherwise reject the entry point), the compiler reports E41037
+// instead of emitting a function that falls off its end.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda -entry userFunc -stage compute -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target ptx -entry userFunc -stage compute -ignore-capabilities
@@ -13,16 +13,23 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC):-target cuda -entry userGenericFunc -stage compute -ignore-capabilities
 
-// On SPIR-V the switch below has no `spirv` case. E41037 replaces the generic missing-return error
-// E41009, which would point at no source location and call the void function "non-void".
-//DIAGNOSTIC_TEST:SIMPLE(diag=SPIRV):-target spirv -entry spirvVoidFunc -stage compute -ignore-capabilities
-//DIAGNOSTIC_TEST:SIMPLE(diag=SPIRV):-target wgsl -entry spirvVoidFunc -stage compute -ignore-capabilities
+// On every target, including those that reject missing returns (SPIR-V, GLSL, WGSL), a switch
+// with no case reports E41037 and never the generic missing-return error E41009. E41037 is also
+// reported when `-disable-non-essential-validations` skips the missing-return check.
+//DIAGNOSTIC_TEST:SIMPLE(diag=METALONLY):-target spirv -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
+//DIAGNOSTIC_TEST:SIMPLE(diag=METALONLY):-target wgsl -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
+//DIAGNOSTIC_TEST:SIMPLE(diag=METALONLY):-target hlsl -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
+//DIAGNOSTIC_TEST:SIMPLE(diag=METALONLY):-target spirv -entry metalOnlyVoidFunc -stage compute -ignore-capabilities -disable-non-essential-validations
+//DIAGNOSTIC_TEST:SIMPLE(diag=METALONLY):-target cuda -entry metalOnlyVoidFunc -stage compute -ignore-capabilities -disable-non-essential-validations
 
-// On these targets the error is reported before the passes that follow it, which cannot handle a
-// function that returns a resource but falls off its end.
+// On targets that reject missing returns, E41037 is reported by the missing-return check, before
+// `specializeResourceUsage`, which cannot handle a resource-returning function that falls off its
+// end. Other targets report it later, once resource specialization has handled the function.
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target spirv -entry resourceFunc -stage compute -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target glsl -entry resourceFunc -stage compute -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target wgsl -entry resourceFunc -stage compute -ignore-capabilities
+//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target cuda -entry resourceFunc -stage compute -ignore-capabilities
+//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target cpp -entry resourceFunc -stage compute -ignore-capabilities
 
 RWStructuredBuffer<float> output;
 
@@ -97,7 +104,7 @@ void userGenericFunc()
 void metalOnlySet(inout float x)
 {
     __target_switch
-/*SPIRV:
+/*METALONLY:
     ^^^^^^^^^^^^^^^ E41037
     ^^^^^^^^^^^^^^^ 'metalOnlySet' contains a __target_switch with no case for target
 */
@@ -108,11 +115,11 @@ void metalOnlySet(inout float x)
 }
 
 [numthreads(1, 1, 1)]
-void spirvVoidFunc()
+void metalOnlyVoidFunc()
 {
     float v = 1;
     metalOnlySet(v);
-//SPIRV:        ^ see call to 'metalOnlySet'
+//METALONLY:    ^ see call to 'metalOnlySet'
     output[0] = v;
 }
 
