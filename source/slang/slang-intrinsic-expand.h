@@ -29,8 +29,8 @@ struct CUDASurfaceAccessInfo
 
     /// The `_convert` call performs the conversion correctly. The prelude's converting read
     /// reinterprets the texel as `half`, so it is correct only for `r16f`, `rg16f` and `rgba16f`;
-    /// it has no converting read for array textures, and its converting writes for array textures
-    /// do nothing. Always true when `isFormatConversion` is false.
+    /// it has no converting read for array textures. Always true when `isFormatConversion` is
+    /// false.
     bool isConversionAvailable = true;
 
     /// The emitted call uses the CUDA `half` type, so the caller must enable it. Only converting

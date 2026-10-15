@@ -6200,7 +6200,7 @@ err(
     "cuda-surface-format-conversion-unavailable",
     56021,
     "CUDA surface access cannot convert this texture's format",
-    span { loc = "location", message = "this write to a texel is lowered to a CUDA surface ~access:String that converts between the texture's [format(...)] and its element type, which the CUDA prelude does not do correctly. It converts on read only from 'r16f', 'rg16f' and 'rgba16f', and converts neither reads nor writes for array textures." }
+    span { loc = "location", message = "this write to a texel is lowered to a CUDA surface ~access:String that converts between the texture's [format(...)] and its element type, which the CUDA prelude does not do correctly. It converts on read only from 'r16f', 'rg16f' and 'rgba16f', and has no converting read for array textures." }
 )
 
 err(

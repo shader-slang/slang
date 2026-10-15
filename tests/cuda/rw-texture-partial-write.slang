@@ -15,6 +15,10 @@ RWTexture2D<float2> t2DFloat2;
 RWTexture2D<uint> t2DUint;
 [format("rgba16f")]
 RWTexture2D<float4> t2DHalf;
+[format("r16f")]
+RWTexture2DArray<float> t2DArrayHalfScalar;
+[format("rgba8")]
+RWTexture2DArray<float4> t2DArrayUnorm;
 RWStructuredBuffer<float4> values;
 
 [numthreads(1, 1, 1)]
@@ -109,6 +113,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // CHECK-NOT: surf2Dread
     // CHECK: surf2Dwrite<float4 >({{.*}}[[V]].w, [[V]].x, [[V]].y, [[V]].z{{.*}}, {{.*}}t2D_{{[0-9]+}}, ({{.*}}).x * 16, ({{.*}}).y, SLANG_CUDA_BOUNDARY_MODE);
     t2D[tid.xy].yzwx = values[2];
+
+    // A whole-texel write to a layered surface uses the converting layered write, whether it is
+    // spelled through a component or a full swizzle, as `t[i] = v` is.
+    // CHECK-NOT: surf2DLayeredread
+    // CHECK: surf2DLayeredwrite_convert<float>(10.0f, {{.*}}t2DArrayHalfScalar_{{[0-9]+}}, ({{.*}}).x * 1, ({{.*}}).y, ({{.*}}).z, SLANG_CUDA_BOUNDARY_MODE);
+    t2DArrayHalfScalar[tid].x = 10.0f;
+
+    // CHECK-NOT: surf2DLayeredread
+    // CHECK: surf2DLayeredwrite_convert<float4 >({{.*}}, {{.*}}t2DArrayUnorm_{{[0-9]+}}, ({{.*}}).x * 1, ({{.*}}).y, ({{.*}}).z, SLANG_CUDA_BOUNDARY_MODE);
+    t2DArrayUnorm[tid].xyzw = values[3];
 }
 
 // No surface handle is ever subscripted like an array.

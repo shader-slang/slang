@@ -322,7 +322,6 @@ CUDASurfaceAccessInfo getCUDASurfaceAccessInfo(IRInst* resourceInst, bool isWrit
     const bool isLayered = textureType->isArray();
     if (isWrite)
     {
-        info.isConversionAvailable = !isLayered;
         info.xScale = 1;
         return info;
     }
