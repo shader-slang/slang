@@ -2,7 +2,8 @@
 // that must stay bare.
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=FINITE): -target wgsl -entry computeMain -stage compute
-// USER checks a user intrinsic that shares the `unpack2x16float` spelling with two arguments.
+// USER checks user intrinsics that share the `unpack2x16float` spelling but take two arguments or
+// an `int`.
 //TEST:SIMPLE(filecheck=USER): -target wgsl -entry userMain -stage compute
 // SPEC and SPECINF check module-scope `override` initializers of specialization constants.
 //TEST:SIMPLE(filecheck=SPEC): -target wgsl -entry specMain -stage compute
@@ -121,8 +122,9 @@ void specNonFiniteMain(uint3 tid: SV_DispatchThreadID)
     outputBuffer[tid.x] = kSpecInf;
 }
 
-// A user `__intrinsic_asm` can start with `unpack2x16float` and take any number of arguments.
-// The rule applies only to the one-argument shape, so this call is emitted as written.
+// A user `__intrinsic_asm` can start with `unpack2x16float` and take any number or type of
+// arguments. The rule applies only to a single `uint` argument, which `_slang_nonConstU32` accepts,
+// so these calls are emitted as written, even the non-finite `int` one.
 float2 userUnpack(uint lo, uint hi)
 {
     __target_switch
@@ -131,12 +133,21 @@ float2 userUnpack(uint lo, uint hi)
     }
 }
 
+float userUnpackSigned(int packed)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "unpack2x16float(bitcast<u32>($0)).x";
+    }
+}
+
 // USER-NOT: _slang_nonConstU32
-// USER: unpack2x16float((({{[^)]*}})) | (((u32(15360))) << 16u))
+// USER-DAG: unpack2x16float((({{[^)]*}})) | (((u32(15360))) << 16u))
+// USER-DAG: unpack2x16float(bitcast<u32>((i32(31744)))).x
 // USER-NOT: _slang_nonConstU32
 
 [numthreads(1, 1, 1)]
 void userMain(uint3 tid: SV_DispatchThreadID)
 {
-    outputBuffer[tid.x] = userUnpack(tid.x, 0x3C00u).y;
+    outputBuffer[tid.x] = userUnpack(tid.x, 0x3C00u).y + userUnpackSigned(int(0x7C00));
 }
