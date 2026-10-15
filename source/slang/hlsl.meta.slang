@@ -17658,6 +17658,9 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
         };
     case wgsl:
         {
+            // `quadBroadcast` takes no bool: broadcast it as 0/1.
+            if (__isBool<T>())
+                return __wgslUIntToBool<T>(QuadReadLaneAt(__wgslBoolToUInt(sourceValue), quadLaneID));
             // The lane may differ between invocations: read all four lanes in uniform control
             // flow and select.
             const uint lane = quadLaneID & 3u;
@@ -17693,6 +17696,10 @@ vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
         };
     case wgsl:
         {
+            // `quadBroadcast` takes no bool: broadcast it as 0/1.
+            if (__isBool<T>())
+                return __wgslUIntToBool<T, N>(
+                    QuadReadLaneAt(__wgslBoolToUInt(sourceValue), quadLaneID));
             // The lane may differ between invocations: read all four lanes in uniform control
             // flow and select.
             const uint lane = quadLaneID & 3u;
@@ -18151,6 +18158,25 @@ vector<uint, N> __wgslBoolToUInt(vector<T, N> value)
     __target_switch
     {
     case wgsl: __intrinsic_asm "select($TR(0u), $TR(1u), $0)";
+    }
+}
+// The inverse of `__wgslBoolToUInt`: T is bool.
+__generic<T : __BuiltinType>
+[require(wgsl)]
+T __wgslUIntToBool(uint value)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "$TR($0)";
+    }
+}
+__generic<T : __BuiltinType, let N : int>
+[require(wgsl)]
+vector<T, N> __wgslUIntToBool(vector<uint, N> value)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "$TR($0)";
     }
 }
 
