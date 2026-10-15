@@ -139,8 +139,10 @@ public:
     /// parameters)
     void addOverridableDeclPath(const DeclRef<Decl>& declRef);
 
-    /// Add just the parameters from a declaration.
-    /// Will output the generic parameters (if it's a generic) in <> before the parameters ()
+    /// Add a declaration's parameters and any trailing receiver qualifier.
+    ///
+    /// Prints generic parameters in <> for a generic declaration, or ordinary parameters in ()
+    /// for a callable declaration.
     void addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>* outParamRange = nullptr);
 
     /// Add a prefix that describes the kind of declaration

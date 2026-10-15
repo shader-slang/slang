@@ -1630,6 +1630,11 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
     else
     {
     }
+
+    if (maybeGetInner(declRef.getDecl())->hasModifier<CppStyleTrailingThisParamConstModifier>())
+    {
+        sb << " const";
+    }
 }
 
 void ASTPrinter::addDeclKindPrefix(Decl* decl)

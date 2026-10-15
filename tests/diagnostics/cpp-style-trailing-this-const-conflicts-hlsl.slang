@@ -61,7 +61,28 @@ struct GenericReceiver
 struct SignatureDisplay
 {
     int read(int value) const
-//CHECK:^^^^ candidate: func SignatureDisplay.read(int) -> int
+//CHECK:^^^^ candidate: func SignatureDisplay.read(int) const -> int
+    {
+        return value;
+    }
+
+    T readGeneric<T>(T value) const
+    /*CHECK:
+      ^^^^^^^^^^^ candidate: func SignatureDisplay.readGeneric<int>(int) const -> int
+      ^^^^^^^^^^^ candidate: func SignatureDisplay.readGeneric<T> const -> T
+    */
+    {
+        return value;
+    }
+
+    func readModern(value: int) const -> int
+//CHECK: ^^^^^^^^^^ candidate: func SignatureDisplay.readModern(int) const -> int
+    {
+        return value;
+    }
+
+    func readModernGeneric<T>(value: T) const -> T
+//CHECK: ^^^^^^^^^^^^^^^^^ candidate: func SignatureDisplay.readModernGeneric<int>(int) const -> int
     {
         return value;
     }
@@ -71,6 +92,18 @@ struct SignatureDisplay
         read();
 //CHECK:    ^ not enough arguments to call
 //CHECK:    ^ not enough arguments to call (got 0, expected 1)
+        readGeneric<int>();
+//CHECK:                ^ not enough arguments to call
+//CHECK:                ^ not enough arguments to call (got 0, expected 1)
+        readGeneric<int, int>(0);
+//CHECK:^^^^^^^^^^^ too many arguments to call
+//CHECK:^^^^^^^^^^^ too many arguments to call (got 2, expected 1)
+        readModern();
+//CHECK:          ^ not enough arguments to call
+//CHECK:          ^ not enough arguments to call (got 0, expected 1)
+        readModernGeneric<int>();
+//CHECK:                      ^ not enough arguments to call
+//CHECK:                      ^ not enough arguments to call (got 0, expected 1)
     }
 };
 
