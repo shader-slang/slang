@@ -330,7 +330,20 @@ public:
     {
     }
 
-    Session* createSession(int compileTarget);
+    // `desc` is either a compile target (a number, as returned by getCompileTargets()), or an
+    // object mirroring slang::SessionDesc:
+    //   {
+    //     target: number,                       // required
+    //     profile?: string,                     // e.g. "sm_6_6"; HLSL defaults to sm_6_6
+    //     preprocessorMacros?: [{name: string, value: string}],
+    //     searchPaths?: [string],               // paths in the Emscripten file system
+    //     defaultMatrixLayoutMode?: number,     // SlangMatrixLayoutMode
+    //     compilerOptions?: [{name: number,     // slang::CompilerOptionName
+    //                         intValue0?: number, intValue1?: number,
+    //                         stringValue0?: string, stringValue1?: string}],
+    //   }
+    // An option is passed as a string option when it has a stringValue0 or stringValue1.
+    Session* createSession(emscripten::val desc);
 
     // Returns the source of the builtin module "core" or "glsl". The name is matched by prefix,
     // so "core-extra" also selects core. Any other name returns an empty string and does not

@@ -161,6 +161,53 @@ async function runSmokeTest() {
         }
         console.log('Builtin module source smoke test passed');
 
+        // Session options: macros, search paths and compiler options apply to every module of
+        // the session, including one imported from a search path.
+        module.FS.mkdirTree('/session-options/lib');
+        module.FS.writeFile('/session-options/lib/helper.slang',
+            'module helper;\npublic uint helperValue() { return HELPER_VALUE; }\n');
+        const wgslTarget = targets.find(target => target.name === 'WGSL').value;
+        const optionsSession = globalSession.createSession({
+            target: wgslTarget,
+            preprocessorMacros: [{ name: 'HELPER_VALUE', value: '7' }, { name: 'MAIN_VALUE', value: '5' }],
+            searchPaths: ['/session-options/lib'],
+            compilerOptions: [
+                // slang::CompilerOptionName::MacroDefine (0): stringValue0 = name, stringValue1 = value.
+                { name: 0, stringValue0: 'OPTION_VALUE', stringValue1: '3' },
+                // slang::CompilerOptionName::IgnoreCapabilities (11).
+                { name: 11, intValue0: 1 },
+            ],
+        });
+        if (!optionsSession) {
+            throw new Error('Failed to create a session from a descriptor');
+        }
+        const optionsModule = optionsSession.loadModuleFromSource(
+            'import helper;\n' +
+            'RWStructuredBuffer<uint> outputBuffer;\n' +
+            '[shader("compute")] [numthreads(1, 1, 1)]\n' +
+            'void computeMain() { outputBuffer[0] = helperValue() * 1000 + MAIN_VALUE * 10 + OPTION_VALUE; }\n',
+            'session-options', '/session-options/main.slang');
+        if (!optionsModule) {
+            const error = module.getLastError();
+            throw new Error(`Session options: failed to load module: ${error ? error.message : 'Unknown error'}`);
+        }
+        // The module only compiles if all three macros reached it and `helper` was found.
+        const optionsProgram = optionsSession.createCompositeComponentType([optionsModule]).link();
+        const wgsl = optionsProgram ? optionsProgram.getTargetCode(0) : '';
+        if (!wgsl || !wgsl.includes('@compute')) {
+            const error = module.getLastError();
+            throw new Error(`Session options: no WGSL generated: ${error ? error.message : ''}`);
+        }
+        const badSession = globalSession.createSession({ profile: 'sm_6_6' });
+        if (badSession) {
+            throw new Error('A descriptor without a target should not create a session');
+        }
+        module.getLastError();
+        optionsProgram.delete();
+        optionsModule.delete();
+        optionsSession.delete();
+        console.log('Session options smoke test passed');
+
         // Clean up
         linkedProgram.delete();
         program.delete();
