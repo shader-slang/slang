@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang hlsl tests/diagnostics/cpp-style-trailing-this-const-conflicts-hlsl.slang -no-codegen
 
-// A declaration can have at most one receiver-mode spelling. Error recovery uses HLSL's default
-// `inout` receiver, so both method bodies remain writable after the invalid spellings are rejected.
+// A declaration can have at most one receiver-mode spelling. Error recovery uses the first
+// specifier, so both method bodies keep their explicitly nonmutating receiver after diagnosis.
 
 struct Counter
 {
@@ -15,7 +15,10 @@ struct Counter
     */
     void repeatedAttribute()
     {
-        value++;
+        value = 0;
+//CHECK:^^^^^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+//CHECK:      ^ left of '=' is not an l-value
+//CHECK:      ^ left of '=' is not an l-value.
     }
 
     [nonmutating]
@@ -25,7 +28,10 @@ struct Counter
                                      ^^^^^ modifier 'const' is redundant or conflicting with existing modifier 'nonmutating'
     */
     {
-        value++;
+        value = 0;
+//CHECK:^^^^^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+//CHECK:      ^ left of '=' is not an l-value
+//CHECK:      ^ left of '=' is not an l-value.
     }
 };
 

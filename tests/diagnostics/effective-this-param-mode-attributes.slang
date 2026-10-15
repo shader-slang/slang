@@ -33,10 +33,8 @@ struct Value
     */
     void conflictingReceiverModes()
     {
+        // Error recovery uses the first specifier, so the receiver remains mutating.
         value = 0;
-//CHECK:^^^^^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
-//CHECK:      ^ left of '=' is not an l-value
-//CHECK:      ^ left of '=' is not an l-value.
     }
 }
 

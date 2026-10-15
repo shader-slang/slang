@@ -17451,17 +17451,13 @@ void SemanticsVisitor::checkThisParamModeSpecifiers(Decl* decl)
 
 /// Calculate the receiver parameter mode specified directly on `decl`.
 ///
-/// Returns `fallbackMode` when no specifier is present. The fallback is the declaration's default
-/// mode or, while folding an enclosing declaration, the mode carried from its child.
-/// Modifier checking diagnoses multiple specifiers, including identical repeats. We ignore those
-/// invalid combinations so error recovery does not depend on the order of rejected spellings.
-static ParamPassingMode _calcReceiverParamModeFromSpecifiers(
-    Decl* decl,
-    ParamPassingMode fallbackMode)
+/// Returns no mode when no specifier is present. Modifier checking diagnoses multiple specifiers,
+/// including identical repeats; error recovery uses the first specifier in the order written.
+static std::optional<ParamPassingMode> _calcReceiverParamModeFromSpecifiers(Decl* decl)
 {
     auto specifiers = _getReceiverParamModeSpecifiers(decl);
-    if (specifiers.getCount() != 1)
-        return fallbackMode;
+    if (specifiers.getCount() == 0)
+        return std::nullopt;
 
     auto specifier = specifiers[0];
     if (as<MutatingAttribute>(specifier))
@@ -17500,16 +17496,17 @@ ParamPassingMode SemanticsVisitor::getDefaultReceiverParamMode(Decl* decl)
     return ParamPassingMode::In;
 }
 
-static ParamPassingMode _foldThisParamModePolicies(
-    List<Decl*> const& policyDecls,
-    ParamPassingMode defaultMode)
+/// Return the mode specified by the outermost declaration in `policyDecls` that has a specifier.
+///
+/// Requires innermost-to-outermost declaration order. Returns no mode if none is specified.
+static std::optional<ParamPassingMode> _foldThisParamModePolicies(List<Decl*> const& policyDecls)
 {
-    // Fold from the innermost declaration toward its transparent parents. An outer declaration's
-    // specifier replaces the mode carried from its child; no specifier or conflicting specifiers
-    // preserve that mode.
-    auto mode = defaultMode;
+    std::optional<ParamPassingMode> mode;
     for (auto policyDecl : policyDecls)
-        mode = _calcReceiverParamModeFromSpecifiers(policyDecl, mode);
+    {
+        if (auto specifiedMode = _calcReceiverParamModeFromSpecifiers(policyDecl))
+            mode = specifiedMode;
+    }
     return mode;
 }
 
@@ -17698,7 +17695,10 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
     }
     else if (!hasDeclarationOwnedMode)
     {
-        mode = _foldThisParamModePolicies(policyDecls, getDefaultReceiverParamMode(decl));
+        if (auto specifiedMode = _foldThisParamModePolicies(policyDecls))
+            mode = *specifiedMode;
+        else
+            mode = getDefaultReceiverParamMode(decl);
         mode = adjustParamPassingModeBasedOnParamType(mode, receiverType);
     }
 

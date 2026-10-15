@@ -1056,11 +1056,16 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                 //         void replace(int[elementCount] values) {}
                 //     };
                 //
-                // Checking the parameter type needs an implicit `this` before checking has attached
-                // `replace`'s effective receiver parameter. We check implicit and explicit `this`
-                // expressions through the same routine, so both use the HLSL receiver mode even
-                // during header checking. We defer lambda capture until the surrounding member
-                // expression has been constructed.
+                // Checking the parameter type currently constructs an implicit `this` before
+                // checking has attached `replace`'s effective receiver parameter. We check implicit
+                // and explicit `this` expressions through the same routine. We defer lambda capture
+                // until the surrounding member expression has been constructed.
+                //
+                // TODO(tfoley): We should use stored receiver information for implicit `this`.
+                // We currently compute it during signature checking even for a static member such
+                // as `elementCount`, which needs no receiver value. Issue #13674 tracks separating
+                // visibility from accessibility so we can remove that early receiver computation:
+                // https://github.com/shader-slang/slang/issues/13674
                 bb = checkThisExprWithoutCapturing(thisExpr);
 
                 // This direct helper call bypasses `CheckTerm`, which normally marks the returned
@@ -9477,12 +9482,17 @@ Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
                 //         func f(values: int[this.N]) {}
                 //     }
                 //
-                // Checking `this.N` must use the same effective-parameter computation that will
-                // publish the callable's checked information at the end of the transition. Asking
-                // the ordinary semantic query here would instead try to ensure the in-progress
-                // callable to `SignatureChecked` and report a spurious cyclic reference. Defer
-                // diagnostics to the publishing call so each invalid modifier is still reported
-                // exactly once.
+                // Checking `this.N` currently reaches this branch before the callable's checked
+                // receiver information is published. The ordinary semantic query would try to
+                // ensure the in-progress callable to `SignatureChecked` and report a cyclic
+                // reference. We defer diagnostics to the publishing call so each invalid modifier
+                // is reported exactly once.
+                //
+                // TODO(tfoley): We should remove this workaround and read `ThisParamInfoAttribute`
+                // instead of recomputing receiver information while checking a signature. Issue
+                // #13674 tracks deciding where a visible `this` binding is accessible, so signature
+                // checking can reject unavailable receiver uses before requiring their mode:
+                // https://github.com/shader-slang/slang/issues/13674
                 thisParamInfo = checkEffectiveThisParamInfo(
                     funcDeclBase,
                     /* shouldDiagnoseModeAttributes */ false);
