@@ -2194,7 +2194,7 @@ static LegalVal legalizeInst(
         // empty types are removed, so we need to make sure that we're still
         // loading a none type when we try and load from a to-be-optimized
         // out structured buffer
-        SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
+        SLANG_RELEASE_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
         if (type.flavor == LegalType::Flavor::none)
