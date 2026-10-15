@@ -5952,6 +5952,13 @@ err(
 )
 
 err(
+    "physical-pointer-not-supported-on-target",
+    55219,
+    "pointers to memory addresses are not supported on this target",
+    span { loc = "location", message = "this creates a pointer from an address or uses 'nullptr', but the current code generation target has no pointers to memory addresses" }
+)
+
+err(
     "func-type-not-supported-on-target",
     55216,
     "function-typed value is not supported on this target",
