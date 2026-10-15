@@ -2920,12 +2920,18 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         List<IRInst*> operands;
+        auto resourceType = as<ResourceType>(type);
         // If there are any substitutions attached to the declRef,
         // add them as operands of the IR type.
         SubstitutionSet(type->getDeclRef())
             .forEachSubstitutionArg(
                 [&](Val* arg)
                 {
+                    // The AST preserves the original texel argument for inference and
+                    // reflection. IR texture operand zero is the load/store data type:
+                    // for example, `Texture2D<RGBA16F>` lowers with `float4` here.
+                    if (resourceType && operands.getCount() == 0)
+                        arg = resourceType->getElementType();
                     auto argVal = lowerVal(context, arg).val;
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);
@@ -11583,7 +11589,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (isGlobalDecl(decl))
         {
             if (decl->hasModifier<HLSLStaticModifier>())
-                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeMutableVarDecoration);
         }
 
         if (auto initExpr = decl->initExpr)
@@ -11654,12 +11660,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Mutable shadows have the storage rules of file/namespace `static` variables.
         // We record that category for validation of types resolved during linking.
-        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeMutableVarDecoration);
 
         // Next, we emit the initializer's return value. `getSimpleVal` obtains an ordinary
-        // parameter value directly, or loads the contents of a legacy `cbuffer`. The
-        // `MoveGlobalVarInitializationToEntryPointsPass` later emits a store at each entry point;
-        // on HLSL paths it may instead leave initialization for emission in the declaration.
+        // parameter value directly, or loads the contents of a legacy `cbuffer`.
+        // `moveGlobalVarInitializationToEntryPoints` examines all global initializers before
+        // resource-global replacement. It moves the shadow's initializer into entry points when
+        // the shadow will be replaced or the target requires per-entry-point initialization.
+        // Otherwise, emission retains the initializer at module scope.
         beginGlobalVarInitializer(builder, storage);
         builder->emitReturn(getSimpleVal(subContext, initialValue));
 

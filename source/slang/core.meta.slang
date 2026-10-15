@@ -422,7 +422,9 @@ interface __BuiltinScalarType : __BuiltinType
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement
+// Arithmetic constraints imply ITexelData, with Element supplied by each nominal
+// scalar's conformance. Thus (unorm float).Element is float even through a generic constraint.
+interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement, ITexelData
 {
 }
 

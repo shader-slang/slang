@@ -2247,11 +2247,11 @@ public:
     // supported when their AST and IR representations are compatible with the reader.
     //
     // Adding `ReadOnlyModifier` and `WriteOnlyModifier` shifts the sequential `ASTNodeType`
-    // values, so a version-34 module's later AST nodes would be decoded as different classes.
-    // Version 35 is the earliest module version with the updated AST node numbering, and with
+    // values, so a version-35 module's later AST nodes would be decoded as different classes.
+    // Version 36 is the earliest module version with the updated AST node numbering, and with
     // the `QualType::isReadOnlyLocation` field in serialized expressions.
-    const static UInt k_minSupportedModuleVersion = 35;
-    const static UInt k_maxSupportedModuleVersion = 35;
+    const static UInt k_minSupportedModuleVersion = 36;
+    const static UInt k_maxSupportedModuleVersion = 36;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.
