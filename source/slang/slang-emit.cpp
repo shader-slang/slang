@@ -1817,11 +1817,13 @@ Result linkAndOptimizeIR(
         SLANG_PASS(expandAutodiffParameterContexts);
     }
 
-    // AnyValue marshalling builds a DescriptorHandle with a `BitCast` on CUDA and CPU, so the
-    // user's `bit_cast`s to handles are rejected before it runs.
+    // AnyValue marshalling (on CUDA and CPU) and byte-address-buffer legalization (on WGSL and
+    // Metal) build a DescriptorHandle with a `BitCast`. Nothing in the IR marks those casts as
+    // compiler-generated, so the user's `bit_cast`s into a handle are rejected here, after
+    // specialization and before either of those passes runs.
     if (requiredLoweringPassSet.bitcast)
     {
-        SLANG_PASS(diagnoseBitCastsToDescriptorHandle, sink);
+        SLANG_PASS(diagnoseBitCastsToDescriptorHandle, targetProgram, sink);
         if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
     }
