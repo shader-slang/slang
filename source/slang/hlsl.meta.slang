@@ -35573,33 +35573,50 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 
 //@public:
 
-/// Synchronize the workgroup, load a `groupshared` variable, and return its value as workgroup uniform.
+/// Load a `groupshared` variable at a workgroup barrier and return the same value to every thread of the
+/// workgroup.
 /// @param v The `groupshared` variable to load.
-/// @return The value of `v`.
-/// @remarks This intrinsic has the semantics of the WGSL built-in `workgroupUniformLoad`, a workgroup control
-/// barrier followed by the load, so a value that one thread writes to `v` before the call is the value every
-/// thread in the workgroup gets back. Like any workgroup barrier, it must be called from uniform control flow
-/// in a compute shader. When targeting WGSL it maps to `workgroupUniformLoad`, whose result the WGSL uniformity
-/// analysis treats as uniform. On the other GPU targets it is lowered as Tint lowers the WGSL built-in: a
-/// workgroup barrier (`GroupMemoryBarrierWithGroupSync()`), the load, and a second workgroup barrier, which
-/// keeps a later write to `v` from racing with the loads of other threads. On the CPU targets it is a plain
-/// load.
+/// @return The value of `v` once every thread of the workgroup has reached the call, the same in every thread.
+/// @remarks This intrinsic has the semantics of the WGSL built-in `workgroupUniformLoad`: it executes a workgroup
+/// control barrier, so a value that one thread writes to `v` before the call is the value every thread gets back,
+/// and a write to `v` after the call does not affect the value another thread gets back. On Metal the second
+/// guarantee is not yet reliable (shader-slang/slang#13409). Like any workgroup barrier, the call must be reached
+/// by every thread of the workgroup in uniform control flow; Slang does not diagnose a divergent call, which is
+/// undefined behavior on targets other than WGSL. When targeting WGSL it maps to the built-in. On the other GPU
+/// targets the synchronization applies in compute, mesh and amplification shaders and requires the
+/// `memorybarrier` capability, so a caller declared with only a target, such as `[require(spirv)]`, must also
+/// require `memorybarrier`. In other shader stages on those targets, and on the CPU targets, which run a
+/// workgroup's threads one after another, the call is a plain load of `v` without synchronization. For the
+/// Slang VM target, a compute entry point that calls it does not currently compile.
 T workgroupUniformLoad<T>(__ref T v)
 {
+    // On targets other than WGSL we use the lowering Tint uses for the WGSL built-in: a barrier, the load, and
+    // a second barrier that keeps a later write to `v` from racing with other threads' loads. The barrier form
+    // is the `default:` case so that a GPU target gets it unless it is listed here as having no workgroup
+    // barrier, and the stage switch keeps it out of stages without a workgroup, where a workgroup control
+    // barrier is invalid. On Metal, the emit-time load deferral can still move the load past the second barrier
+    // when nothing between them writes `v` (shader-slang/slang#13409).
     __target_switch
     {
     case c:
     case cpp:
     case llvm:
-    case slangvm:
         return v;
     case wgsl:
         __intrinsic_asm "workgroupUniformLoad(&($0))";
     default:
-        GroupMemoryBarrierWithGroupSync();
-        let result = v;
-        GroupMemoryBarrierWithGroupSync();
-        return result;
+        __stage_switch
+        {
+        case compute:
+        case _mesh:
+        case _amplification:
+            GroupMemoryBarrierWithGroupSync();
+            let result = v;
+            GroupMemoryBarrierWithGroupSync();
+            return result;
+        default:
+            return v;
+        }
     }
 }
 
