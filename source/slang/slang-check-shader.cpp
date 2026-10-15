@@ -1849,10 +1849,15 @@ void diagnoseUnsizedOrdinaryDataAfterSpecialization(
     ComponentType::SpecializationInfo* specializationInfo,
     DiagnosticSink* sink)
 {
+    // Walking the fields of a generic struct such as `S<float4>` needs a current AST builder. The
+    // end-to-end compile request specializes its program outside the front end's builder scope,
+    // and only the thread that created the global session has a default one, so we set it here.
+    auto linkage = componentType->getLinkage();
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
     UnsizedOrdinaryDataSpecializationCollector collector;
     componentType->acceptVisitor(&collector, specializationInfo);
 
-    auto linkage = componentType->getLinkage();
     SharedSemanticsContext shared(linkage, linkage->m_optionSet.getLanguageVersion(), sink);
     SemanticsVisitor visitor(&shared);
     if (collector.globalGenericArgs.getCount())

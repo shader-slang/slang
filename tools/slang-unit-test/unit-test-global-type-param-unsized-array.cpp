@@ -5,6 +5,7 @@
 #include "unit-test/slang-unit-test.h"
 
 #include <string.h>
+#include <thread>
 
 using namespace Slang;
 
@@ -265,6 +266,67 @@ static ComPtr<slang::IComponentType> specializeWithoutEntryPoint(
     return specialized;
 }
 
+// `ICompileRequest::compile` specializes its program after the front end has finished checking
+// it. On a thread other than the one that created the global session, the check after
+// specialization runs with no default AST builder, and it needs one to walk the fields of a
+// generic struct such as `S<float4>`.
+static const char* kWorkerThreadSource = R"(
+    struct S<T>
+    {
+        float4 a;
+        T values[];
+    }
+
+    type_param TA;
+
+    uniform TA globalValue;
+    RWStructuredBuffer<float4> output;
+
+    [shader("compute")]
+    [numthreads(1, 1, 1)]
+    void computeMain<U>(uniform U entryPointValue)
+    {
+        output[0] = 1;
+    }
+    )";
+
+static String compileOnWorkerThread(
+    slang::IGlobalSession* globalSession,
+    const char* globalTypeArg,
+    const char* entryPointTypeArg)
+{
+    String diagnostics;
+    std::thread worker(
+        [&]()
+        {
+            SLANG_ALLOW_DEPRECATED_BEGIN
+            ComPtr<slang::ICompileRequest> request;
+            if (SLANG_FAILED(globalSession->createCompileRequest(request.writeRef())))
+                return;
+            request->addCodeGenTarget(SLANG_SPIRV);
+            int translationUnit =
+                request->addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, "worker");
+            request->addTranslationUnitSourceString(
+                translationUnit,
+                "worker.slang",
+                kWorkerThreadSource);
+            const char* entryPointArgs[] = {entryPointTypeArg};
+            request->addEntryPointEx(
+                translationUnit,
+                "computeMain",
+                SLANG_STAGE_COMPUTE,
+                1,
+                entryPointArgs);
+            const char* globalArgs[] = {globalTypeArg};
+            request->setGlobalGenericArgs(1, globalArgs);
+            request->compile();
+            diagnostics = request->getDiagnosticOutput();
+            SLANG_ALLOW_DEPRECATED_END
+        });
+    worker.join();
+    return diagnostics;
+}
+
 static int countOccurrences(const char* text, const char* pattern)
 {
     int count = 0;
@@ -379,5 +441,24 @@ SLANG_UNIT_TEST(globalTypeParamUnsizedArray)
         ComPtr<slang::IBlob> code;
         linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
         SLANG_CHECK(code != nullptr && code->getBufferSize() != 0);
+    }
+}
+
+SLANG_UNIT_TEST(globalTypeParamUnsizedArrayOnWorkerThread)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    {
+        String diagnostics = compileOnWorkerThread(globalSession, "S<float4>", "float4");
+        SLANG_CHECK(countOccurrences(diagnostics.getBuffer(), "error[E31215]") == 1);
+        SLANG_CHECK(strstr(diagnostics.getBuffer(), "globalValue") != nullptr);
+    }
+
+    {
+        String diagnostics = compileOnWorkerThread(globalSession, "float4", "S<float4>");
+        SLANG_CHECK(countOccurrences(diagnostics.getBuffer(), "error[E31215]") == 1);
+        SLANG_CHECK(strstr(diagnostics.getBuffer(), "entryPointValue") != nullptr);
     }
 }
