@@ -29,8 +29,8 @@ QualType::QualType(Type* type)
                 isReadOnlyLocation = true;
                 break;
 
-            // Checking rejects a write-only `Ref`, but a write-only memory location
-            // may still be assigned.
+            // E30035 rejects `Ref<T, Access.WriteOnly>` in user code, but a write-only
+            // memory location may still be assigned.
             case AccessQualifier::WriteOnly:
                 isLeftValue = true;
                 break;

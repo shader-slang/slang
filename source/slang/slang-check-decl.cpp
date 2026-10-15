@@ -7448,8 +7448,8 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
 }
 
 /// Add the modifiers that spell `mode` to `paramDecl`. A parameter built from a
-/// function type has only its effective mode, and several spellings (`const __ref`
-/// and `__ref_readonly`, a legacy alias, an inferred mode) produce the same mode, so
+/// function type has only its effective mode, and several spellings can produce the
+/// same mode (for example, `__ref_readonly` and its legacy alias `const __ref`), so
 /// we spell each mode one canonical way.
 static void addModifiersForParamPassingMode(
     ASTBuilder* astBuilder,

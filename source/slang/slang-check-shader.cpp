@@ -39,8 +39,8 @@ static EntryPointParamDirections getEntryPointParamDirections(ParamDecl* param)
     EntryPointParamDirections directions;
     directions.isInput = doesParamPassingModeReadArgument(mode);
     // `__ref_writeonly` is a reference, not a stage output. Both flags stay false for that
-    // mode, and the validation loop's final branch checks it as an input, the same way a
-    // `__ref` entry point is checked.
+    // mode, so its semantics are validated as an input and its diagnostics call it
+    // "input/output", the same as a `__ref` entry-point parameter.
     directions.isOutput = mode == ParamPassingMode::Out || mode == ParamPassingMode::BorrowInOut;
 
     // Mesh output types encode stage-output direction even when passed with mode In.
