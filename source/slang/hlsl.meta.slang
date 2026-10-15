@@ -35587,7 +35587,7 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 /// `memorybarrier` capability, so a caller declared with only a target, such as `[require(spirv)]`, must also
 /// require `memorybarrier`. In other shader stages on those targets, and on the CPU targets, which run a
 /// workgroup's threads one after another, the call is a plain load of `v` without synchronization. For the
-/// Slang VM target, a compute entry point that calls it does not currently compile.
+/// Slang VM target, a compute entry point that calls it does not currently compile (shader-slang/slang#13675).
 T workgroupUniformLoad<T>(__ref T v)
 {
     // On targets other than WGSL we use the lowering Tint uses for the WGSL built-in: a barrier, the load, and
