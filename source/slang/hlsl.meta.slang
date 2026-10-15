@@ -17612,11 +17612,34 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 // Information for GLSL wave/subgroup support
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
 
+// WGSL's `quadBroadcast` takes its quad lane as a const-expression.
+__generic<T : __BuiltinType>
+__wgsl_extension(subgroups)
+[require(wgsl, subgroup_quad)]
+T __wgslQuadBroadcast(T value, constexpr uint quadLaneID)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "quadBroadcast($0, $1)";
+    }
+}
+__generic<T : __BuiltinType, let N : int>
+__wgsl_extension(subgroups)
+[require(wgsl, subgroup_quad)]
+vector<T, N> __wgslQuadBroadcast(vector<T, N> value, constexpr uint quadLaneID)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "quadBroadcast($0, $1)";
+    }
+}
+
 /// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_metal_spirv, subgroup_quad)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 {
     __target_switch
@@ -17633,6 +17656,17 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
             OpCapability GroupNonUniformQuad;
             result:$$T = OpGroupNonUniformQuadBroadcast Subgroup $sourceValue $quadLaneID;
         };
+    case wgsl:
+        {
+            // The lane may differ between invocations: read all four lanes in uniform control
+            // flow and select.
+            const uint lane = quadLaneID & 3u;
+            const T q0 = __wgslQuadBroadcast(sourceValue, 0);
+            const T q1 = __wgslQuadBroadcast(sourceValue, 1);
+            const T q2 = __wgslQuadBroadcast(sourceValue, 2);
+            const T q3 = __wgslQuadBroadcast(sourceValue, 3);
+            return lane == 0 ? q0 : (lane == 1 ? q1 : (lane == 2 ? q2 : q3));
+        }
     case cuda:
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, (_getLaneId() & 0xFFFFFFFC) | ($1 & 3))";
     }
@@ -17640,7 +17674,8 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_metal_spirv, subgroup_quad)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
 {
     __target_switch
@@ -17656,6 +17691,17 @@ vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
             OpCapability GroupNonUniformQuad;
             result:$$vector<T,N> = OpGroupNonUniformQuadBroadcast Subgroup $sourceValue $quadLaneID;
         };
+    case wgsl:
+        {
+            // The lane may differ between invocations: read all four lanes in uniform control
+            // flow and select.
+            const uint lane = quadLaneID & 3u;
+            const vector<T, N> q0 = __wgslQuadBroadcast(sourceValue, 0);
+            const vector<T, N> q1 = __wgslQuadBroadcast(sourceValue, 1);
+            const vector<T, N> q2 = __wgslQuadBroadcast(sourceValue, 2);
+            const vector<T, N> q3 = __wgslQuadBroadcast(sourceValue, 3);
+            return lane == 0 ? q0 : (lane == 1 ? q1 : (lane == 2 ? q2 : q3));
+        }
     case cuda:
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, (_getLaneId() & 0xFFFFFFFC) | ($1 & 3))";
     }
@@ -18088,11 +18134,32 @@ ${
 } // WaveActiveProduct/WaveActiveProductSum.
 $}
 
+// A WGSL bool (or vector of bool) as 0/1 in u32.
+__generic<T : __BuiltinType>
+[require(wgsl)]
+uint __wgslBoolToUInt(T value)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "select($TR(0u), $TR(1u), $0)";
+    }
+}
+__generic<T : __BuiltinType, let N : int>
+[require(wgsl)]
+vector<uint, N> __wgslBoolToUInt(vector<T, N> value)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "select($TR(0u), $TR(1u), $0)";
+    }
+}
+
 /// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_vote)]
 bool WaveActiveAllEqual(T value)
 {
     __target_switch
@@ -18101,6 +18168,14 @@ bool WaveActiveAllEqual(T value)
         __intrinsic_asm "subgroupAllEqual($0)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual";
+    case wgsl:
+        if (__isBool<T>())
+        {
+            // `subgroupBroadcastFirst` takes no bool: compare as 0/1.
+            const uint asUint = __wgslBoolToUInt(value);
+            return WaveActiveAllTrue(asUint == WaveReadLaneFirst(asUint));
+        }
+        return WaveActiveAllTrue(value == WaveReadLaneFirst(value));
     case spirv:
         return spirv_asm
         {
@@ -18115,7 +18190,8 @@ bool WaveActiveAllEqual(T value)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_vote)]
 bool WaveActiveAllEqual(vector<T,N> value)
 {
     __target_switch
@@ -18124,6 +18200,14 @@ bool WaveActiveAllEqual(vector<T,N> value)
         __intrinsic_asm "subgroupAllEqual($0)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual";
+    case wgsl:
+        if (__isBool<T>())
+        {
+            // `subgroupBroadcastFirst` takes no bool: compare as 0/1.
+            const vector<uint, N> asUint = __wgslBoolToUInt(value);
+            return WaveActiveAllTrue(all(asUint == WaveReadLaneFirst(asUint)));
+        }
+        return WaveActiveAllTrue(all(value == WaveReadLaneFirst(value)));
     case spirv:
         return spirv_asm
         {
@@ -18245,7 +18329,8 @@ uint4 WaveActiveBallot(bool condition)
 }
 
 /// @category wave
-[require(cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic_ballot)]
 uint WaveActiveCountBits(bool value)
 {
     __target_switch
@@ -18255,6 +18340,13 @@ uint WaveActiveCountBits(bool value)
     case spirv:
     case metal:
         return _WaveCountBits(WaveActiveBallot(value));
+    case wgsl:
+        {
+            // A WGSL ballot has 0 for inactive invocations and for lanes past the subgroup size.
+            const uint4 ballot = WaveActiveBallot(value);
+            return countbits(ballot.x) + countbits(ballot.y) + countbits(ballot.z) +
+                   countbits(ballot.w);
+        }
     default:
         return WaveMaskCountBits(WaveGetActiveMask(), value);
     }
@@ -19421,10 +19513,30 @@ matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
     }
 }
 
+// The number of bits of `ballot` set for the lanes below `lane`.
+[ForceInline]
+uint __ballotCountBitsBelowLane(uint4 ballot, uint lane)
+{
+    uint count = 0;
+    [ForceUnroll]
+    for (uint i = 0; i < 4; i++)
+    {
+        const uint firstLane = i * 32;
+        uint below = 0;
+        if (lane >= firstLane + 32)
+            below = 0xFFFFFFFFu;
+        else if (lane > firstLane)
+            below = (1u << (lane - firstLane)) - 1u;
+        count += countbits(ballot[i] & below);
+    }
+    return count;
+}
+
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 uint WavePrefixCountBits(bool value)
 {
     __target_switch
@@ -19432,6 +19544,8 @@ uint WavePrefixCountBits(bool value)
     case glsl:
         __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
+    case wgsl:
+        return __ballotCountBitsBelowLane(WaveActiveBallot(value), WaveGetLaneIndex());
     case spirv:
         return spirv_asm
         {
