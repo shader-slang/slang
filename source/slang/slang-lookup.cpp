@@ -782,8 +782,12 @@ static bool _isDeclOverloadable(Decl* decl)
     return false;
 }
 
-/// Returns whether lookup outside `decl`'s scope must use an enclosing `This` type.
-static bool _isThisTypeOnlyScope(Decl* decl)
+/// Returns whether leaving `decl`'s scope blocks implicit use of an enclosing `this` value.
+///
+/// A true result requires a type base for members found in farther-out type scopes.
+/// A false result leaves the existing lookup state unchanged; it does not establish that a
+/// `this` value is available.
+static bool _doesScopeBlockUseOfEnclosingThisExpr(Decl* decl)
 {
     // We classify a generic declaration by the declaration it wraps. During parsing, `inner` can
     // still be null; none of the declaration-kind tests below match that incomplete wrapper.
@@ -796,8 +800,7 @@ static bool _isThisTypeOnlyScope(Decl* decl)
         return false;
 
     // Members of a nested type or extension belong to that type or extension target, so lookup
-    // outside that declaration cannot use an instance of the enclosing type. Extensions need
-    // this rule even though `isEffectivelyStatic` does not classify them as static members.
+    // outside that declaration cannot use an instance of the enclosing type.
     if (as<AggTypeDeclBase>(decl))
         return true;
 
@@ -1000,9 +1003,9 @@ static void _lookUpInScopes(
                 break;
             }
 
-            // Once lookup crosses a static callable or a nested type, enclosing instance members
-            // can only be referenced through a `This` type.
-            if (_isThisTypeOnlyScope(containerDecl))
+            // We use a type base for members found in farther-out type scopes once a scope blocks
+            // implicit use of the enclosing `this` value.
+            if (_doesScopeBlockUseOfEnclosingThisExpr(containerDecl))
             {
                 thisBreadcrumbKind = LookupResultItem::Breadcrumb::Kind::ThisType;
                 thisBreadcrumbScope = nullptr;
