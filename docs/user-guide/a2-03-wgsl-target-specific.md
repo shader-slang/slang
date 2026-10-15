@@ -73,10 +73,23 @@ The following table lists Slang's support for various HLSL feature sets, when ta
 | mesh shader | No |
 | tessellation shader | No |
 | geometry shader | No |
-| wave intrinsics | No |
+| wave intrinsics | Partial, with the `subgroups` extension (see [Wave Intrinsics](#wave-intrinsics)) |
 | barriers | Yes |
 | atomics | Yes |
 | switch fall-through | Restructured (warning 41026) |
+
+### Wave Intrinsics
+
+With the WGSL `subgroups` extension, these wave and quad intrinsics are supported:
+`WaveGetLaneIndex`, `WaveGetLaneCount`, `WaveIsFirstLane`, `WaveActiveSum`, `WaveActiveProduct`,
+`WaveActiveMin`, `WaveActiveMax`, `WaveActiveBitAnd`, `WaveActiveBitOr`, `WaveActiveBitXor`,
+`WaveActiveAllTrue`, `WaveActiveAnyTrue`, `WaveActiveBallot`, `WaveActiveCountBits`,
+`WaveActiveAllEqual`, `WavePrefixSum`, `WavePrefixProduct`, `WavePrefixCountBits`, `WaveReadLaneAt`,
+`WaveReadLaneFirst`, `QuadReadAcrossX`, `QuadReadAcrossY`, `QuadReadAcrossDiagonal` and
+`QuadReadLaneAt` (scalar, vector and matrix).
+
+The other wave intrinsics are not supported on WGSL, including `WaveMatch`, the `WaveMulti*` and
+`WaveMask*` intrinsics, `WavePrefixMin`/`WavePrefixMax` and the clustered operations.
 
 ### Switch Fall-Through
 
