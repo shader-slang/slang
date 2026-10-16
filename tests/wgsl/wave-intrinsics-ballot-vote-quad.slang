@@ -8,6 +8,7 @@
 //TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry allEqualMain -stage compute
 //TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry quadReadLaneAtMain -stage compute
 //TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry quadReadLaneAtMatrixMain -stage compute
+//TEST:SIMPLE(filecheck=QUADMATSPV): -target spirv-asm -entry quadReadLaneAtMatrixMain -stage compute
 
 // WGSL lowering of WaveActiveCountBits, WavePrefixCountBits, WaveActiveAllEqual and
 // QuadReadLaneAt through WGSL subgroup and quad built-ins (#9972).
@@ -18,9 +19,11 @@
 RWStructuredBuffer<uint> outputBuffer;
 RWStructuredBuffer<float4> floatBuffer;
 
+// All four words of the ballot are counted.
 // COUNT: enable subgroups;
-// COUNT: subgroupBallot(
-// COUNT: countOneBits(
+// COUNT: fn WaveActiveCountBits_{{[0-9]+}}( [[V:value_[0-9]+]] : bool
+// COUNT: var [[B:ballot_[0-9]+]] : vec4<u32> = subgroupBallot([[V]]);
+// COUNT: return countOneBits([[B]].x) + countOneBits([[B]].y) + countOneBits([[B]].z) + countOneBits([[B]].w);
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void countBitsMain(uint3 tid: SV_DispatchThreadID)
@@ -28,9 +31,15 @@ void countBitsMain(uint3 tid: SV_DispatchThreadID)
     outputBuffer[tid.x] = WaveActiveCountBits(outputBuffer[tid.x] > 3);
 }
 
+// The ballot is masked with WaveGetLaneLtMask (the lanes below the invocation's own, so the count
+// is exclusive), and all four words are counted.
 // PREFIX: enable subgroups;
-// PREFIX: subgroupBallot(
-// PREFIX: countOneBits(
+// PREFIX: fn WavePrefixCountBits_{{[0-9]+}}( [[V:value_[0-9]+]] : bool
+// PREFIX: = subgroupBallot([[V]]);
+// PREFIX: >> (u32(5))
+// PREFIX: = ((u32(1) << ((({{.*}} & (u32(31))))))) - u32(1);
+// PREFIX: var [[BELOW:below_[0-9]+]] : vec4<u32> =
+// PREFIX: return countOneBits([[BELOW]].x) + countOneBits([[BELOW]].y) + countOneBits([[BELOW]].z) + countOneBits([[BELOW]].w);
 // PREFIX: @builtin(subgroup_invocation_id)
 [shader("compute")]
 [numthreads(64, 1, 1)]
@@ -41,10 +50,16 @@ void prefixCountBitsMain(uint3 tid: SV_DispatchThreadID)
 
 // `subgroupBroadcastFirst` takes no bool, so bools are compared as 0/1.
 // EQUAL: enable subgroups;
-// EQUAL-DAG: subgroupBroadcastFirst(value
-// EQUAL-DAG: subgroupBroadcastFirst(asUint
-// EQUAL-DAG: subgroupAll(
-// EQUAL-NOT: subgroupBroadcastFirst({{.*}}bool
+// EQUAL: fn WaveActiveAllEqual_{{[0-9]+}}( [[BV:value_[0-9]+]] : vec2<bool>) -> bool
+// EQUAL-NEXT: {
+// EQUAL-NEXT: var [[UV:asUint_[0-9]+]] : vec2<u32> = (select(vec2<u32>(0u), vec2<u32>(1u), ([[BV]])));
+// EQUAL-NEXT: = subgroupBroadcastFirst([[UV]]);
+// EQUAL: fn WaveActiveAllEqual_{{[0-9]+}}( [[B:value_[0-9]+]] : bool) -> bool
+// EQUAL-NEXT: {
+// EQUAL-NEXT: var [[U:asUint_[0-9]+]] : u32 = (select(u32(0u), u32(1u), ([[B]])));
+// EQUAL-NEXT: = subgroupBroadcastFirst([[U]]);
+// EQUAL: subgroupBroadcastFirst(value
+// EQUAL: subgroupAll(
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void allEqualMain(uint3 tid: SV_DispatchThreadID)
@@ -80,11 +95,14 @@ void allEqualMain(uint3 tid: SV_DispatchThreadID)
 // QUAD: else
 // QUAD-NEXT: {
 // QUAD-NEXT: = [[Q3]];
-// QUAD-NOT: quadBroadcast({{.*}}bool
-// QUAD-DAG: = (select(u32(0u), u32(1u), (sourceValue_{{[0-9]+}})));
-// QUAD-DAG: = (select(vec2<u32>(0u), vec2<u32>(1u), (sourceValue_{{[0-9]+}})));
-// QUAD-DAG: = (bool((
-// QUAD-DAG: = (vec2<bool>((
+// QUAD: fn QuadReadLaneAt_{{[0-9]+}}( [[BV:sourceValue_[0-9]+]] : vec2<bool>,  [[LV:quadLaneID_[0-9]+]] : u32) -> vec2<bool>
+// QUAD: = (select(vec2<u32>(0u), vec2<u32>(1u), ([[BV]])));
+// QUAD-NEXT: = QuadReadLaneAt_{{[0-9]+}}({{.*}}, [[LV]]);
+// QUAD-NEXT: = (vec2<bool>((
+// QUAD: fn QuadReadLaneAt_{{[0-9]+}}( [[B:sourceValue_[0-9]+]] : bool,  [[L:quadLaneID_[0-9]+]] : u32) -> bool
+// QUAD: = (select(u32(0u), u32(1u), ([[B]])));
+// QUAD-NEXT: = QuadReadLaneAt_{{[0-9]+}}({{.*}}, [[L]]);
+// QUAD-NEXT: = (bool((
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void quadReadLaneAtMain(uint3 tid: SV_DispatchThreadID)
@@ -96,7 +114,9 @@ void quadReadLaneAtMain(uint3 tid: SV_DispatchThreadID)
     floatBuffer[tid.x] = QuadReadLaneAt(floatBuffer[tid.x], 2);
 }
 
-// A matrix is read row by row through the vector overload.
+// A matrix is read row by row through the vector overload, on WGSL and the other targets.
+// QUADMATSPV: OpGroupNonUniformQuadBroadcast %v2float
+// QUADMATSPV: OpGroupNonUniformQuadBroadcast %v2float
 // QUADMAT: fn [[VEC:QuadReadLaneAt_[0-9]+]]( sourceValue_{{[0-9]+}} : vec2<f32>,  quadLaneID_{{[0-9]+}} : u32) -> vec2<f32>
 // QUADMAT: quadBroadcast(
 // QUADMAT: fn QuadReadLaneAt_{{[0-9]+}}( sourceValue_{{[0-9]+}} : mat2x2<f32>,  quadLaneID_{{[0-9]+}} : u32) -> mat2x2<f32>
