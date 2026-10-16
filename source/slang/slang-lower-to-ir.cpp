@@ -15688,7 +15688,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                         func,
                         nullptr,
                         compileRequest->getSink());
-                    changed |= peepholeOptimize(nullptr, func);
+                    changed |= peepholeOptimize(
+                        nullptr,
+                        func,
+                        PeepholeOptimizationOptions::getPrelinking());
                     changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
                     eliminateDeadCode(func, dceOptions);
                 }

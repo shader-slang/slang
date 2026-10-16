@@ -1675,15 +1675,31 @@ struct PeepholeContext : InstPassBase
                     paramIndex++;
                 }
                 IRInst* argValue = nullptr;
+                bool hasPredecessor = false;
+                bool allArgsUndefined = true;
+                bool allArgsPoison = true;
                 for (auto pred : block->getPredecessors())
                 {
+                    hasPredecessor = true;
                     auto terminator = as<IRUnconditionalBranch>(pred->getTerminator());
                     if (!terminator)
+                    {
+                        allArgsUndefined = false;
                         continue;
+                    }
                     SLANG_ASSERT(terminator->getArgCount() > paramIndex);
                     auto arg = terminator->getArg(paramIndex);
-                    if (as<IRUndefined>(arg))
+                    // A loop back-edge that passes the param to itself contributes no
+                    // new value.
+                    if (arg == inst)
                         continue;
+                    if (as<IRUndefined>(arg))
+                    {
+                        if (!as<IRPoison>(arg))
+                            allArgsPoison = false;
+                        continue;
+                    }
+                    allArgsUndefined = false;
                     if (argValue == nullptr)
                         argValue = arg;
                     else if (argValue == arg)
@@ -1695,7 +1711,40 @@ struct PeepholeContext : InstPassBase
                         break;
                     }
                 }
-                if (argValue)
+                if (hasPredecessor && allArgsUndefined && !isPrelinking)
+                {
+                    // Consider `Texture2D t; if (c) { Texture2D r; t = r; }`: the merge
+                    // block's param receives two distinct undefined values, so it is
+                    // undefined too, and we replace it with one fresh undefined value.
+                    // Otherwise phi elimination would create a `Texture2D` local, which
+                    // Khronos targets reject. A `LoadFromUninitializedMemory` is a valid
+                    // refinement of any mix of undefined values; `Poison` is valid only
+                    // when every incoming value is `Poison`.
+                    //
+                    // The front-end's uninitialized-use check runs after the prelinking
+                    // peephole passes and reports each undefined value separately, so
+                    // we keep the param there to preserve its per-variable warnings.
+                    if (inst->hasUses())
+                    {
+                        IRBuilder builder(module);
+                        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                        builder.setInsertBefore(block->getFirstOrdinaryInst());
+                        auto type = inst->getFullType();
+                        IRInst* undefinedValue = nullptr;
+                        if (allArgsPoison)
+                        {
+                            undefinedValue = builder.getPoison(type);
+                        }
+                        else
+                        {
+                            undefinedValue = builder.emitLoadFromUninitializedMemory(type);
+                            copyNameHintAndDebugDecorations(undefinedValue, inst);
+                        }
+                        inst->replaceUsesWith(undefinedValue);
+                        changed = true;
+                    }
+                }
+                else if (argValue)
                 {
                     if (inst->hasUses())
                     {
