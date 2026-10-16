@@ -9,10 +9,7 @@ import os
 import re
 import statistics
 import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
+import tempfile
 from pathlib import Path
 
 from lib.buckets import TREE, SOURCE_TREE, API_TREE, buckets, tree_for
@@ -191,50 +188,37 @@ def timestamp(value):
     datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Never forward the write credential to a redirect destination."""
+def write_atomic(path, content):
+    """Replace a file only after its complete contents have been written and closed."""
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        """Reject redirects even when the target is on the same host."""
-        return None
 
-
-def submit(payload, base_url, key, allow_insecure=False):
-    """Retry transient transport failures with the exact same idempotency key."""
-    parsed = urllib.parse.urlsplit(base_url)
-    if (parsed.scheme not in ("http", "https") or not parsed.hostname
-            or parsed.username or parsed.password or parsed.query or parsed.fragment):
-        raise ValueError("Expected a BenchView HTTP(S) base URL without credentials or query")
-    if parsed.scheme == "http" and not (
-            allow_insecure and parsed.hostname in ("127.0.0.1", "::1")):
-        raise ValueError("Remote submission requires HTTPS; --allow-insecure permits only loopback HTTP")
-    request = urllib.request.Request(
-        base_url.rstrip("/") + "/api/v1/submissions", data=encode(payload),
-        headers={"Content-Type": "application/json", "Authorization": "Bearer " + key})
-    # Local test credentials must stay local even when proxy environment variables are set.
-    handlers = [NoRedirect()]
-    if parsed.scheme == "http":
-        handlers.append(urllib.request.ProxyHandler({}))
-    opener = urllib.request.build_opener(*handlers)
-    for attempt in range(3):
-        try:
-            with opener.open(request, timeout=30) as response:
-                if response.status not in (200, 201):
-                    raise RuntimeError(f"Unexpected BenchView status: {response.status}")
-                return
-        except urllib.error.HTTPError as error:
-            status = error.code
-            error.close()
-            if status not in (408, 429, 500, 502, 503, 504) or attempt == 2:
-                raise RuntimeError(f"BenchView submission failed: HTTP {status}") from None
-        except (urllib.error.URLError, TimeoutError, OSError):
-            if attempt == 2:
-                raise RuntimeError("BenchView submission failed: connection error") from None
-        time.sleep(2 ** attempt)
+def export(payloads, output):
+    """Publish a bounded host-collector bundle, then its ready marker; never send credentials."""
+    output.mkdir(parents=True, exist_ok=True)
+    ready = output / "submissions.ready"
+    ready.unlink(missing_ok=True)
+    if not 1 <= len(payloads) <= 64:
+        raise ValueError("An export requires 1 to 64 submission batches")
+    wrapper = {"schemaVersion": 1, "kind": "slang-compile-perf-benchview-export",
+               "submissionSchema": "benchmark-submission-v1", "submissions": payloads}
+    content = encode(wrapper) + b"\n"
+    if len(content) > 8 * 1024 * 1024:
+        raise ValueError("Collector export exceeds the 8 MiB limit")
+    write_atomic(output / "submissions.json", content)
+    write_atomic(ready, b"ready\n")
 
 
 def main():
-    """Save reviewable payloads and optionally submit using BENCHVIEW_WRITE_KEY."""
+    """Export results for collection and delivery by the benchmark host."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results", required=True, type=Path)
     parser.add_argument("--meta", required=True, type=Path)
@@ -244,11 +228,11 @@ def main():
     parser.add_argument("--branch")
     parser.add_argument("--release", help="Slang version tested, e.g. v2026.19")
     parser.add_argument("--released-at", help="Actual release timestamp, if known")
-    parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--url", help="Omit to export without submitting")
-    parser.add_argument("--allow-insecure", action="store_true",
-                        help="Allow local HTTP testing at 127.0.0.1 or ::1 only")
+    parser.add_argument("--output", required=True, type=Path,
+                        help="Directory for submissions.json and its submissions.ready marker")
     args = parser.parse_args()
+    # Invalidate a previous export before reading inputs or converting any observations.
+    (args.output / "submissions.ready").unlink(missing_ok=True)
     if args.released_at and not args.release:
         parser.error("--released-at requires --release")
     release = {"label": args.release} if args.release else None
@@ -257,17 +241,8 @@ def main():
     payloads = submissions(json.loads(args.results.read_text(encoding="utf-8")),
                            json.loads(args.meta.read_text(encoding="utf-8")), args.os,
                            args.observed_at, args.execution_id, release, args.branch)
-    args.output.mkdir(parents=True, exist_ok=True)
-    for i, payload in enumerate(payloads):
-        (args.output / f"submission-{i + 1:04d}.json").write_bytes(encode(payload) + b"\n")
+    export(payloads, args.output)
     print(f"Exported {sum(len(p['observations']) for p in payloads)} observations")
-    if args.url:
-        key = os.environ.get("BENCHVIEW_WRITE_KEY")
-        if not key:
-            raise ValueError("BENCHVIEW_WRITE_KEY is required for submission")
-        for payload in payloads:
-            submit(payload, args.url, key, allow_insecure=args.allow_insecure)
-        print(f"Submitted {len(payloads)} batch(es) to BenchView")
 
 
 if __name__ == "__main__":

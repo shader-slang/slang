@@ -1,4 +1,4 @@
-"""Exercise conversion, API limits and credential-safe submission failures."""
+"""Exercise conversion, API limits and atomic host-collector exports."""
 
 import copy
 import io
@@ -7,9 +7,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
-import urllib.error
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import benchview
 
@@ -100,6 +99,8 @@ class BenchViewTests(unittest.TestCase):
             malformed = copy.deepcopy(self.record)
             malformed['timers']['compileInner'] = 5
             for records in ([None], [malformed]):
+                (root / 'out').mkdir(exist_ok=True)
+                (root / 'out' / 'submissions.ready').write_text('ready\n')
                 (root / 'results.json').write_text(json.dumps(records))
                 result = subprocess.run(
                     [sys.executable, str(Path(benchview.__file__)),
@@ -110,6 +111,7 @@ class BenchViewTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1)
                 self.assertEqual(len(result.stderr.splitlines()), 1)
                 self.assertIn('BenchView export failed:', result.stderr)
+                self.assertFalse((root / 'out' / 'submissions.ready').exists())
         with self.assertRaises(ValueError):
             benchview.timestamp(123)
 
@@ -168,52 +170,49 @@ class BenchViewTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Duplicate"):
             self.convert([self.record, copy.deepcopy(self.record)])
 
-    @patch("benchview.time.sleep")
-    @patch("benchview.urllib.request.build_opener")
-    def test_retry_uses_same_request(self, build_opener, sleep):
-        """An uncertain transport outcome retries identical bytes and identity."""
-        opener = build_opener.return_value
-        response = MagicMock()
-        response.__enter__.return_value.status = 201
-        opener.open.side_effect = [urllib.error.URLError("offline"), response]
-        benchview.submit(self.convert()[0], "https://example.test/benchview", "secret")
-        self.assertEqual(opener.open.call_count, 2)
-        self.assertIs(opener.open.call_args_list[0].args[0],
-                      opener.open.call_args_list[1].args[0])
-        self.assertEqual(opener.open.call_args.args[0].full_url,
-                         "https://example.test/benchview/api/v1/submissions")
+    def test_export_preserves_batches_and_replay(self):
+        """Collector delivery reuses the exact submissions and release metadata."""
+        payloads = self.convert(release={"label": "v2026.19"})
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp)
+            benchview.export(payloads, output)
+            first = (output / 'submissions.json').read_bytes()
+            self.assertEqual(json.loads(first), {
+                'schemaVersion': 1, 'kind': 'slang-compile-perf-benchview-export',
+                'submissionSchema': 'benchmark-submission-v1', 'submissions': payloads})
+            self.assertEqual((output / 'submissions.ready').read_bytes(), b'ready\n')
+            benchview.export(payloads, output)
+            self.assertEqual((output / 'submissions.json').read_bytes(), first)
 
-    @patch("benchview.urllib.request.build_opener")
-    def test_auth_error_not_retried_or_echoed(self, build_opener):
-        """Neither an error body nor its URL should expose server-reflected credentials."""
-        build_opener.return_value.open.side_effect = urllib.error.HTTPError(
-            "http://example.test/secret", 401, "secret", {}, io.BytesIO(b"secret"))
-        with self.assertRaisesRegex(RuntimeError, "^BenchView submission failed: HTTP 401$"):
-            benchview.submit(self.convert()[0], "https://example.test", "secret")
-        self.assertEqual(build_opener.return_value.open.call_count, 1)
-        self.assertIsNone(benchview.NoRedirect().redirect_request(None, None, 302, "", {},
-                                                                 "http://other.test"))
+    def test_export_failure_never_leaves_ready_marker(self):
+        """Failed payload or marker replacement invalidates old readiness and cleans temp files."""
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp)
+            for failed_name in ('submissions.json', 'submissions.ready'):
+                benchview.export(self.convert(), output)
+                replace = benchview.os.replace
 
-    @patch("benchview.urllib.request.build_opener")
-    def test_http_requires_loopback_and_explicit_opt_in(self, build_opener):
-        """Remote HTTP never constructs a request, even with the local-testing flag."""
-        for url in ("http://example.test", "http://127.0.0.1.example.test",
-                    "http://localhost", "http://10.0.0.1"):
-            for allow in (False, True):
-                with self.subTest(url=url, allow=allow):
-                    with self.assertRaisesRegex(ValueError, "requires HTTPS"):
-                        benchview.submit(self.convert()[0], url, "secret", allow_insecure=allow)
-        with self.assertRaisesRegex(ValueError, "requires HTTPS"):
-            benchview.submit(self.convert()[0], "http://127.0.0.1", "secret")
-        build_opener.assert_not_called()
-        build_opener.return_value.open.return_value.__enter__.return_value.status = 201
-        for url in ("http://127.0.0.1:30417", "http://[::1]:30417"):
-            benchview.submit(self.convert()[0], url, "secret", allow_insecure=True)
-            handlers = build_opener.call_args.args
-            self.assertTrue(any(isinstance(h, benchview.NoRedirect) for h in handlers))
-            self.assertEqual(next(h.proxies for h in handlers
-                                  if isinstance(h, benchview.urllib.request.ProxyHandler)), {})
-        self.assertEqual(build_opener.return_value.open.call_count, 2)
+                def fail_replace(source, destination):
+                    """Inject a disk failure at either publication boundary."""
+                    if destination.name == failed_name:
+                        raise OSError('disk failure')
+                    replace(source, destination)
+
+                with patch('benchview.os.replace', side_effect=fail_replace):
+                    with self.assertRaises(OSError):
+                        benchview.export(self.convert(), output)
+                self.assertFalse((output / 'submissions.ready').exists())
+                self.assertEqual({p.name for p in output.iterdir()}, {'submissions.json'})
+
+    def test_export_limits_clear_stale_readiness(self):
+        """Reject empty, excessive-batch and oversized bundles before publishing readiness."""
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp)
+            for payloads in ([], [{}] * 65, [{'oversized': 'x' * (8 * 1024 * 1024)}]):
+                (output / 'submissions.ready').write_text('ready\n')
+                with self.assertRaises(ValueError):
+                    benchview.export(payloads, output)
+                self.assertFalse((output / 'submissions.ready').exists())
 
 
 if __name__ == "__main__":

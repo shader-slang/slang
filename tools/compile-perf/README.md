@@ -420,10 +420,9 @@ via `--results <checkout-path>`.
 | `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
 | `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
 
-The publishing nightly also exports compile-performance results to BenchView
-when configured. Export failures do not block existing reports. For local or
-historical exports, see `python3 benchview.py --help`. Remote submission requires
-HTTPS; `--allow-insecure` is restricted to local loopback testing.
+The publishing nightly also exports compile-performance results for BenchView;
+the benchmark host handles collection and delivery. Export failures do not block
+existing reports. For local or historical exports, see `python3 benchview.py --help`.
 
 ---
 
