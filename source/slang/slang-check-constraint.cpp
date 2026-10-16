@@ -1781,12 +1781,22 @@ private:
         if (!typeConstraintDecl)
             return WitnessConstraintInferenceResult::NotApplicable;
 
-        // The subject side must be ready before the shape comparison is useful.
-        // In `T : IFoo<U>`, comparing before `T` is known would only restate the
-        // source constraint; after `T` is solved to a concrete type, the subtype
-        // system can find its actual `IFoo<X>` facet and unification can
-        // discover `U = X`.
-        if (hasUnreadyDependenciesForVal(typeConstraintDecl->sub.type))
+        // In `T : IFoo<U>`, the subject must be known before its conformance
+        // can infer `U`. Equality is symmetric: either `T.Data == U` or
+        // `U == T.Data` can infer `U` once `T.Data` is ready. If neither side
+        // is ready, wait for another constraint to supply an ordinary answer.
+        bool subHasUnreadyDependencies = hasUnreadyDependenciesForVal(typeConstraintDecl->sub.type);
+        bool supHasUnreadyDependencies = typeConstraintDecl->isEqualityConstraint &&
+                                         hasUnreadyDependenciesForVal(typeConstraintDecl->sup.type);
+        if (subHasUnreadyDependencies &&
+            (!typeConstraintDecl->isEqualityConstraint || supHasUnreadyDependencies))
+            return WitnessConstraintInferenceResult::NoNewOrdinaryConstraint;
+
+        // Once both sides of an equality are ready, no ordinary argument remains to infer.
+        // The witness check still resolves any deferred associated-type projections and proves
+        // the equality; unifying the same already-fixed types cannot contribute another answer.
+        if (typeConstraintDecl->isEqualityConstraint && !subHasUnreadyDependencies &&
+            !supHasUnreadyDependencies)
             return WitnessConstraintInferenceResult::NoNewOrdinaryConstraint;
 
         // Substitute the source constraint through the current argument list.
@@ -1797,6 +1807,25 @@ private:
             buildSubstDeclRef(typeConstraintDecl).as<GenericTypeConstraintDecl>();
         auto sub = getSub(m_astBuilder, constraintDeclRef);
         auto sup = getSup(m_astBuilder, constraintDeclRef);
+
+        if (typeConstraintDecl->isEqualityConstraint)
+        {
+            // Consider `read<T : IProvider, U>(T value) where T.Data == U`.
+            // Once `T.Data` resolves to `float`, exact unification can infer
+            // the still-unsolved `U`. Already-solved arguments stay substituted:
+            // a constraint such as `float == int` must not search for numeric
+            // conversions or a common type. The ordinary witness check below
+            // remains responsible for proving the resulting equality.
+            UnificationOptions options;
+            options.equalityConstraint = true;
+            options.optionalConstraint =
+                typeConstraintDecl->hasModifier<OptionalConstraintModifier>();
+            auto previousConstraintCount = m_context.discoveredConstraints.getCount();
+            m_visitor->TryUnifyTypes(m_context, options, QualType(sub), QualType(sup));
+            return m_context.discoveredConstraints.getCount() != previousConstraintCount
+                       ? WitnessConstraintInferenceResult::AddedOrdinaryConstraint
+                       : WitnessConstraintInferenceResult::NoNewOrdinaryConstraint;
+        }
 
         // `TryJoinTypes()` is the existing path that compares a concrete type
         // against an interface shape and uses facet unification to append
