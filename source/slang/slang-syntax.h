@@ -112,25 +112,26 @@ inline int getVectorSize(VectorExpressionType* vecType)
     return 0;
 }
 
-// Tests the immediate element types of an array, pointer, optional, tuple or concrete type pack.
-// For a modified type, tests its base type. Returns true at the first matching element.
+// Unwraps one level of an array, pointer, optional, tuple or concrete type pack, passing each
+// element type to the callback. For a modified type, passes its base type. Stops and returns true
+// when the callback returns true; otherwise returns false.
 //
-// Consider `Optional<Ptr<int>>`: the predicate receives `Ptr<int>`, and can call this helper
+// Consider `Optional<Ptr<int>>`: the callback receives `Ptr<int>`, and can call this helper
 // again to inspect `int`. Keeping recursion in the caller lets it stop at a container it accepts.
 // Tuple members come from its concrete type pack. This helper does not expand abstract packs.
 // This helper does not inspect struct fields or start declaration checking. Types outside the
-// cases listed above return false without calling the predicate.
+// cases listed above return false without calling the callback.
 template<typename F>
-bool anyTypeElementMatches(Type* type, const F& predicate)
+bool unwrapTypeElements(Type* type, const F& callback)
 {
     if (auto modifiedType = as<ModifiedType>(type))
-        return predicate(modifiedType->getBase());
+        return callback(modifiedType->getBase());
     if (auto arrayType = as<ArrayExpressionType>(type))
-        return predicate(arrayType->getElementType());
+        return callback(arrayType->getElementType());
     if (auto optionalType = as<OptionalType>(type))
-        return predicate(optionalType->getValueType());
+        return callback(optionalType->getValueType());
     if (auto pointerType = as<PtrTypeBase>(type))
-        return predicate(pointerType->getValueType());
+        return callback(pointerType->getValueType());
 
     // A tuple stores its members in a type pack, so both cases share the same loop.
     if (auto tupleType = as<TupleType>(type))
@@ -139,7 +140,7 @@ bool anyTypeElementMatches(Type* type, const F& predicate)
     {
         for (Index i = 0; i < typePack->getTypeCount(); ++i)
         {
-            if (predicate(typePack->getElementType(i)))
+            if (callback(typePack->getElementType(i)))
                 return true;
         }
     }

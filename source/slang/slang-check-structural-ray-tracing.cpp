@@ -635,7 +635,7 @@ static RestrictedRayTracingTypeKind _getRestrictedRayTracingTypeKind(Type* type)
             return RestrictedRayTracingTypeKind::None;
     }
 
-    anyTypeElementMatches(
+    unwrapTypeElements(
         type,
         [&](Type* elementType)
         {
