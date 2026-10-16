@@ -1677,7 +1677,6 @@ struct PeepholeContext : InstPassBase
                 IRInst* argValue = nullptr;
                 bool hasPredecessor = false;
                 bool allArgsUndefined = true;
-                bool allArgsPoison = true;
                 for (auto pred : block->getPredecessors())
                 {
                     hasPredecessor = true;
@@ -1694,11 +1693,7 @@ struct PeepholeContext : InstPassBase
                     if (arg == inst)
                         continue;
                     if (as<IRUndefined>(arg))
-                    {
-                        if (!as<IRPoison>(arg))
-                            allArgsPoison = false;
                         continue;
-                    }
                     allArgsUndefined = false;
                     if (argValue == nullptr)
                         argValue = arg;
@@ -1717,9 +1712,9 @@ struct PeepholeContext : InstPassBase
                     // block's param receives two distinct undefined values, so it is
                     // undefined too, and we replace it with one fresh undefined value.
                     // Otherwise phi elimination would create a `Texture2D` local, which
-                    // Khronos targets reject. A `LoadFromUninitializedMemory` is a valid
-                    // refinement of any mix of undefined values; `Poison` is valid only
-                    // when every incoming value is `Poison`.
+                    // Khronos targets reject. The fold treats undefined incoming values
+                    // as carrying no identity, the same assumption `eliminatePhis` makes
+                    // when it skips storing them.
                     //
                     // The front-end's uninitialized-use check runs after the prelinking
                     // peephole passes and reports each undefined value separately, so
@@ -1729,17 +1724,9 @@ struct PeepholeContext : InstPassBase
                         IRBuilder builder(module);
                         IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                         builder.setInsertBefore(block->getFirstOrdinaryInst());
-                        auto type = inst->getFullType();
-                        IRInst* undefinedValue = nullptr;
-                        if (allArgsPoison)
-                        {
-                            undefinedValue = builder.getPoison(type);
-                        }
-                        else
-                        {
-                            undefinedValue = builder.emitLoadFromUninitializedMemory(type);
-                            copyNameHintAndDebugDecorations(undefinedValue, inst);
-                        }
+                        auto undefinedValue =
+                            builder.emitLoadFromUninitializedMemory(inst->getFullType());
+                        copyNameHintAndDebugDecorations(undefinedValue, inst);
                         inst->replaceUsesWith(undefinedValue);
                         changed = true;
                     }
