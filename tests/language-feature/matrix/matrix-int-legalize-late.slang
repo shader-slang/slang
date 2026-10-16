@@ -9,6 +9,7 @@
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=WGSLSPIRV):-target wgsl-spirv-asm -entry computeMain -stage compute -matrix-layout-column-major
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -output-using-type -shaderobj -xslang -matrix-layout-column-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -output-using-type -shaderobj -emit-spirv-via-glsl -xslang -matrix-layout-column-major
@@ -26,7 +27,7 @@ struct Narrow
 //TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12], stride=48):name input
 RWStructuredBuffer<Narrow> input;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name output
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name output
 RWStructuredBuffer<int> output;
 
 // A function that is not inlined and returns an integer matrix returns an array once the matrix is
@@ -36,6 +37,14 @@ int2x3 shifted(int2x3 m, uint amount)
 {
     // Metal and WGSL give a matrix shift a shift amount of the matrix's shape.
     return (m << amount) >> 1;
+}
+
+// Integer matrix division and shifts by a matrix are row-wise operations on these targets; only
+// a float matrix is divided as a matrix, which Metal and WGSL reject.
+[noinline]
+int2x3 divideAndShift(int2x3 m, int2x3 n, int s)
+{
+    return (m / n) + (s / n) + (m / s) + (m << n) + (m >> n);
 }
 
 [numthreads(1, 1, 1)]
@@ -48,6 +57,9 @@ void computeMain()
 
     int2x3 m = int2x3(input[0].k, 1, 2, 3, 4, 5);
     output[4] = shifted(m, 2)[0][0];
+
+    int2x3 n = int2x3(2, 1, 1, 1, 1, 2);
+    output[5] = divideAndShift(m, n, 4)[1][2];
 }
 
 // SPV-NOT: OpTypeVector %int 1
@@ -61,6 +73,9 @@ void computeMain()
 // WGSL: vec3<u32> = vec3<u32>(amount
 
 // METAL: uint3 {{.*}} = uint3(amount
+// METAL-NOT: division by matrix
+
+// WGSLSPIRV: OpEntryPoint
 
 // BUF: type: int32_t
 // BUF-NEXT: 3
@@ -68,3 +83,4 @@ void computeMain()
 // BUF-NEXT: 9
 // BUF-NEXT: 11
 // BUF-NEXT: 22
+// BUF-NEXT: 26

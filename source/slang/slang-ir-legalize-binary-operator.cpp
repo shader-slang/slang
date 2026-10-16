@@ -2,6 +2,8 @@
 
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-matrix-types.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -19,21 +21,31 @@ static bool isVectorOrMatrix(IRType* type)
     }
 };
 
-static bool isDivisionByMatrix(IRInst* inst)
+// Return whether `type` is a matrix that the target emits as a matrix. An int/uint/bool matrix is
+// still a matrix here but becomes an array of row vectors later, and its operations become
+// operations on those rows, which Metal and WGSL support.
+static bool isNativeMatrix(TargetProgram* targetProgram, IRType* type)
 {
-    return (inst->getOp() == kIROp_Div) && (as<IRMatrixType>(inst->getOperand(1)->getDataType()));
+    auto matrixType = as<IRMatrixType>(type);
+    return matrixType && !isMatrixTypeLoweredToArray(targetProgram->getTargetReq(), matrixType);
 }
 
-static bool isMatrixDividedByScalar(IRInst* inst)
+static bool isDivisionByMatrix(IRInst* inst, TargetProgram* targetProgram)
 {
-    return (inst->getOp() == kIROp_Div) && (as<IRMatrixType>(inst->getOperand(0)->getDataType())) &&
+    return (inst->getOp() == kIROp_Div) &&
+           isNativeMatrix(targetProgram, inst->getOperand(1)->getDataType());
+}
+
+static bool isMatrixDividedByScalar(IRInst* inst, TargetProgram* targetProgram)
+{
+    return (inst->getOp() == kIROp_Div) &&
+           isNativeMatrix(targetProgram, inst->getOperand(0)->getDataType()) &&
            (as<IRBasicType>(inst->getOperand(1)->getDataType()));
 }
 
-// Return a composite type with the shape of the shifted operand `compositeType` and the element
-// type `scalarType` of the scalar shift amount, because a shift keeps the amount's own element
-// type. For example, `int2x3 << uint` shifts by a `matrix<uint,2,3>`.
-static IRType* getShiftAmountCompositeType(
+// Return a composite type with the shape of `compositeType` and the element type `scalarType`.
+// For example, `matrix<int,2,3>` and `uint` give `matrix<uint,2,3>`.
+static IRType* getCompositeTypeWithElementType(
     IRBuilder& builder,
     IRType* compositeType,
     IRType* scalarType)
@@ -65,7 +77,7 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
         // Retain the scalar type for shifts
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
             compositeType =
-                getShiftAmountCompositeType(builder, compositeType, scalarValue->getDataType());
+                getCompositeTypeWithElementType(builder, compositeType, scalarValue->getDataType());
         auto newRhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands() + 1, newRhs);
     }
@@ -80,7 +92,7 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
         // Retain the scalar type for shifts
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
             compositeType =
-                getShiftAmountCompositeType(builder, compositeType, scalarValue->getDataType());
+                getCompositeTypeWithElementType(builder, compositeType, scalarValue->getDataType());
         auto newLhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands(), newLhs);
     }
@@ -88,9 +100,9 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
 
 // Replaces a division by scalar operation by a multiplication.
 // This is done for WGSL where matrix divided by scalar operations are not supported.
-static void replaceMatrixDividedByScalarWithMul(IRInst* inst)
+static void replaceMatrixDividedByScalarWithMul(IRInst* inst, TargetProgram* targetProgram)
 {
-    SLANG_ASSERT(isMatrixDividedByScalar(inst));
+    SLANG_ASSERT(isMatrixDividedByScalar(inst, targetProgram));
 
     IRBuilder builder(inst);
     builder.setInsertBefore(inst);
@@ -110,7 +122,7 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
     builder.setInsertBefore(inst);
 
     // Division by matrix is not supported on Metal and WGSL.
-    if (isDivisionByMatrix(inst))
+    if (isDivisionByMatrix(inst, targetProgram))
     {
         sink->diagnose(Diagnostics::DivisionByMatrixNotSupported{.location = inst->sourceLoc});
         return;
@@ -122,19 +134,20 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
     {
         IRInst* shiftAmount = inst->getOperand(1);
         IRType* shiftAmountType = shiftAmount->getDataType();
-        if (auto shiftAmountVectorType = as<IRVectorType>(shiftAmountType))
+        if (as<IRVectorType>(shiftAmountType) || as<IRMatrixType>(shiftAmountType))
         {
-            IRType* shiftAmountElementType = shiftAmountVectorType->getElementType();
+            IRType* shiftAmountElementType =
+                getMatrixElementType(getVectorElementType(shiftAmountType));
             IntInfo opIntInfo =
                 getIntTypeInfo(targetProgram->getTargetReq(), shiftAmountElementType);
             if (opIntInfo.isSigned)
             {
                 opIntInfo.isSigned = false;
-                shiftAmountElementType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
-                shiftAmountVectorType = builder.getVectorType(
-                    shiftAmountElementType,
-                    shiftAmountVectorType->getElementCount());
-                IRInst* newShiftAmount = builder.emitCast(shiftAmountVectorType, shiftAmount);
+                auto unsignedShiftAmountType = getCompositeTypeWithElementType(
+                    builder,
+                    shiftAmountType,
+                    builder.getType(getIntTypeOpFromInfo(opIntInfo)));
+                IRInst* newShiftAmount = builder.emitCast(unsignedShiftAmountType, shiftAmount);
                 builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
             }
         }
@@ -153,14 +166,14 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
 
     // For matrix divided by scalar operations, do not convert scalar divisor to dividend's matrix
     // type. Division by matrix is not supported on Metal and WGSL.
-    if (!isMatrixDividedByScalar(inst))
+    if (!isMatrixDividedByScalar(inst, targetProgram))
     {
         legalizeScalarOperandsToMatchComposite(inst);
     }
     else if (isWGPUTarget(targetProgram->getTargetReq()->getTarget()))
     {
         // WGSL does not support matrix division by scalar, convert it to multiplication.
-        replaceMatrixDividedByScalarWithMul(inst);
+        replaceMatrixDividedByScalarWithMul(inst, targetProgram);
     }
     else
     {
