@@ -17612,12 +17612,14 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 // Information for GLSL wave/subgroup support
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
 
-// WGSL's `quadBroadcast` takes its quad lane as a const-expression.
+// WGSL's `quadBroadcast` takes its quad lane as a const-expression, and no bool: `QuadReadLaneAt`
+// converts a bool to 0/1 once before its four broadcasts, so `T` is never bool here.
 __generic<T : __BuiltinType>
 __wgsl_extension(subgroups)
 [require(wgsl, subgroup_quad)]
 T __wgslQuadBroadcast(T value, constexpr uint quadLaneID)
 {
+    static_assert(!(T is bool), "quadBroadcast takes no bool");
     __target_switch
     {
     case wgsl: __intrinsic_asm "quadBroadcast($0, $1)";
@@ -17628,6 +17630,7 @@ __wgsl_extension(subgroups)
 [require(wgsl, subgroup_quad)]
 vector<T, N> __wgslQuadBroadcast(vector<T, N> value, constexpr uint quadLaneID)
 {
+    static_assert(!(T is bool), "quadBroadcast takes no bool");
     __target_switch
     {
     case wgsl: __intrinsic_asm "quadBroadcast($0, $1)";
@@ -17661,8 +17664,11 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
             // `quadBroadcast` takes no bool: broadcast it as 0/1.
             if (__isBool<T>())
                 return __wgslUIntToBool<T>(QuadReadLaneAt(__wgslBoolToUInt(sourceValue), quadLaneID));
-            // The lane may differ between invocations: read all four lanes in uniform control
-            // flow and select.
+            // `quadBroadcast` needs a const-expression lane, and `quadLaneID` may differ between
+            // invocations. None of the four broadcasts depends on `quadLaneID`, so every
+            // invocation of the quad that reaches this call runs all four, and then selects. This
+            // costs four broadcasts even for a constant lane. `& 3u` wraps an out-of-range lane
+            // as the CUDA case does (HLSL leaves it undefined).
             const uint lane = quadLaneID & 3u;
             const T q0 = __wgslQuadBroadcast(sourceValue, 0);
             const T q1 = __wgslQuadBroadcast(sourceValue, 1);
@@ -17700,8 +17706,11 @@ vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
             if (__isBool<T>())
                 return __wgslUIntToBool<T, N>(
                     QuadReadLaneAt(__wgslBoolToUInt(sourceValue), quadLaneID));
-            // The lane may differ between invocations: read all four lanes in uniform control
-            // flow and select.
+            // `quadBroadcast` needs a const-expression lane, and `quadLaneID` may differ between
+            // invocations. None of the four broadcasts depends on `quadLaneID`, so every
+            // invocation of the quad that reaches this call runs all four, and then selects. This
+            // costs four broadcasts even for a constant lane. `& 3u` wraps an out-of-range lane
+            // as the CUDA case does (HLSL leaves it undefined).
             const uint lane = quadLaneID & 3u;
             const vector<T, N> q0 = __wgslQuadBroadcast(sourceValue, 0);
             const vector<T, N> q1 = __wgslQuadBroadcast(sourceValue, 1);
@@ -17714,22 +17723,25 @@ vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
 __wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID)
 {
     __target_switch
     {
-    case wgsl:
+    case hlsl:
+        __intrinsic_asm "QuadReadLaneAt";
+    default:
         {
-            // Row by row through the vector overload (quadBroadcast takes no matrix).
+            // Row by row through the vector overload, as `WaveReadLaneFirst` does for matrices.
             matrix<T, N, M> result;
             [ForceUnroll]
             for (int i = 0; i < N; i++)
                 result[i] = QuadReadLaneAt(sourceValue[i], quadLaneID);
             return result;
         }
-    default:
-        __intrinsic_asm "QuadReadLaneAt";
     }
 }
 
@@ -18159,11 +18171,14 @@ ${
 } // WaveActiveProduct/WaveActiveProductSum.
 $}
 
-// A WGSL bool (or vector of bool) as 0/1 in u32.
+// A WGSL bool (or vector of bool) as 0/1 in u32, and back. They are generic because their callers
+// are generic over `T` and know only that `__isBool<T>()` holds; `T` must be bool. They emit
+// `select` and `bool(...)` directly because a generic `T` cannot be cast with `uint(value)`.
 __generic<T : __BuiltinType>
 [require(wgsl)]
 uint __wgslBoolToUInt(T value)
 {
+    static_assert(T is bool, "T must be bool");
     __target_switch
     {
     case wgsl: __intrinsic_asm "select($TR(0u), $TR(1u), $0)";
@@ -18173,16 +18188,17 @@ __generic<T : __BuiltinType, let N : int>
 [require(wgsl)]
 vector<uint, N> __wgslBoolToUInt(vector<T, N> value)
 {
+    static_assert(T is bool, "T must be bool");
     __target_switch
     {
     case wgsl: __intrinsic_asm "select($TR(0u), $TR(1u), $0)";
     }
 }
-// The inverse of `__wgslBoolToUInt`: T is bool.
 __generic<T : __BuiltinType>
 [require(wgsl)]
 T __wgslUIntToBool(uint value)
 {
+    static_assert(T is bool, "T must be bool");
     __target_switch
     {
     case wgsl: __intrinsic_asm "$TR($0)";
@@ -18192,6 +18208,7 @@ __generic<T : __BuiltinType, let N : int>
 [require(wgsl)]
 vector<T, N> __wgslUIntToBool(vector<uint, N> value)
 {
+    static_assert(T is bool, "T must be bool");
     __target_switch
     {
     case wgsl: __intrinsic_asm "$TR($0)";
@@ -18386,7 +18403,9 @@ uint WaveActiveCountBits(bool value)
         return _WaveCountBits(WaveActiveBallot(value));
     case wgsl:
         {
-            // A WGSL ballot has 0 for inactive invocations and for lanes past the subgroup size.
+            // A WGSL ballot has 0 for inactive invocations and for lanes past the subgroup size, so
+            // all four words can be summed. `_WaveCountBits` would instead read the subgroup size
+            // (a `subgroup_size` input) to skip words, which this does not need.
             const uint4 ballot = WaveActiveBallot(value);
             return countbits(ballot.x) + countbits(ballot.y) + countbits(ballot.z) +
                    countbits(ballot.w);
@@ -19557,23 +19576,12 @@ matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
     }
 }
 
-// The number of bits of `ballot` set for the lanes below `lane`.
+// The number of bits of `ballot` set for the lanes below the current one.
 [ForceInline]
-uint __ballotCountBitsBelowLane(uint4 ballot, uint lane)
+uint __ballotCountBitsBelowLane(uint4 ballot)
 {
-    uint count = 0;
-    [ForceUnroll]
-    for (uint i = 0; i < 4; i++)
-    {
-        const uint firstLane = i * 32;
-        uint below = 0;
-        if (lane >= firstLane + 32)
-            below = 0xFFFFFFFFu;
-        else if (lane > firstLane)
-            below = (1u << (lane - firstLane)) - 1u;
-        count += countbits(ballot[i] & below);
-    }
-    return count;
+    const uint4 below = ballot & WaveGetLaneLtMask();
+    return countbits(below.x) + countbits(below.y) + countbits(below.z) + countbits(below.w);
 }
 
 /// @category wave
@@ -19589,7 +19597,7 @@ uint WavePrefixCountBits(bool value)
         __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
     case wgsl:
-        return __ballotCountBitsBelowLane(WaveActiveBallot(value), WaveGetLaneIndex());
+        return __ballotCountBitsBelowLane(WaveActiveBallot(value));
     case spirv:
         return spirv_asm
         {
