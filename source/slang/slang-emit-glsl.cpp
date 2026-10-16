@@ -4,6 +4,7 @@
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-call-graph.h"
+#include "slang-ir-check-push-constant-blocks.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
@@ -90,6 +91,14 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
 void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
 {
     buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
+
+    // We count push-constant blocks with the same reference graph that decides which globals this
+    // emitter declares.
+    checkForMultiplePushConstantBlocksPerEntryPoint(
+        module,
+        m_referencingEntryPoints,
+        isPushConstantBlockByLayout,
+        getSink());
 
     IRBuilder builder(module);
     for (auto globalInst : module->getGlobalInsts())
@@ -1480,6 +1489,12 @@ void GLSLSourceEmitter::emitParameterGroupImpl(
     IRGlobalParam* varDecl,
     IRUniformParameterGroupType* type)
 {
+    // glslang allows one `layout(push_constant)` block per stage and counts every block we
+    // declare, so we omit a push-constant block that no entry point reads. Such a block is left in
+    // the module only by `-preserve-params`.
+    if (isPushConstantBlockByLayout(varDecl) &&
+        !getReferencingEntryPoints(m_referencingEntryPoints, varDecl))
+        return;
     _emitGLSLParameterGroup(varDecl, type);
 }
 
