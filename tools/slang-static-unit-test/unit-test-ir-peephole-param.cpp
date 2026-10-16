@@ -139,8 +139,8 @@ SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenFrozenInputIsObservedElsewhere)
 }
 
 // Consider `int p; if (c) { int a; p = a; } else { int b; p = b; } return p;`. Nothing but `p`
-// observes `a` or `b`, so `p` is undefined on every path and becomes one fresh value. We place it in
-// the entry block, which runs once per invocation and dominates every use of `p`.
+// observes `a` or `b`, so `p` is undefined on every path and becomes one fresh value. We place it
+// in the entry block, which runs once per invocation and dominates every use of `p`.
 SLANG_UNIT_TEST(irPeepholeParamReplacesUnobservedFrozenInputsWithEntryValue)
 {
     for (bool withTarget : {true, false})
@@ -188,10 +188,8 @@ SLANG_UNIT_TEST(irPeepholeParamIgnoresDebugOnlyUsesOfFrozenInputs)
     auto intType = builder.getIntType();
 
     builder.setInsertInto(fixture.getModule());
-    auto debugSource = builder.emitDebugSource(
-        UnownedStringSlice("test.slang"),
-        UnownedStringSlice(),
-        false);
+    auto debugSource =
+        builder.emitDebugSource(UnownedStringSlice("test.slang"), UnownedStringSlice(), false);
     auto line = builder.getIntValue(builder.getUIntType(), 1);
     auto col = builder.getIntValue(builder.getUIntType(), 1);
 

@@ -10,64 +10,27 @@
 
 namespace Slang
 {
-enum class IncomingValueKind
-{
-    AllUndefined,
-    SingleValue,
-    Other,
-};
-
-struct IncomingValues
-{
-    IncomingValueKind kind;
-    /// The defined value when `kind` is `SingleValue`, and null otherwise.
-    IRInst* singleValue;
-};
-
-/// Classify the values that the predecessors of `block` pass to `param`, the param at
-/// `paramIndex`, by looking at each incoming value in turn:
+/// Return whether every use of `value` other than a debug-info use is as the argument that a branch
+/// into `block` passes to the param at `paramIndex`.
 ///
-/// - `param` itself adds no value. A loop back edge can pass the param to itself, so a
-///   loop-header param that receives `x` and itself is a `SingleValue` of `x`, and one that
-///   receives an undefined value and itself is `AllUndefined`. Counting the self value
-///   instead would make the second case a `SingleValue` of `param`, which the caller would
-///   replace with itself forever.
-/// - An undefined value, including `Poison`, adds no value either.
-/// - A defined value makes the result `SingleValue` if it is the only distinct one, and
-///   `Other` once a second distinct one appears.
-///
-/// When only `param` and undefined values come in, the result is `AllUndefined`, except in
-/// two cases that give `Other`. A block with no predecessors may be the entry block, whose
-/// params are the function's params and get their values from callers. A predecessor whose
-/// terminator is not an unconditional branch passes a value we cannot read, and we only
-/// report `AllUndefined` after seeing every incoming value.
-static IncomingValues classifyIncomingValues(IRBlock* block, UInt paramIndex, IRInst* param)
+/// For a `LoadFromUninitializedMemory`, such uses do not observe which arbitrary value it yields
+/// except through that one param, so the param may be replaced by an independent fresh value
+/// without breaking correlation. Passing the same value to another param slot, on the same branch
+/// or another one, is another observing use.
+static bool isUsedOnlyAsArgForParam(IRInst* value, IRBlock* block, UInt paramIndex)
 {
-    bool hasPredecessor = false;
-    bool hasUnreadableEdge = false;
-    IRInst* singleValue = nullptr;
-    for (auto pred : block->getPredecessors())
+    for (auto use = value->firstUse; use; use = use->nextUse)
     {
-        hasPredecessor = true;
-        auto terminator = as<IRUnconditionalBranch>(pred->getTerminator());
-        if (!terminator)
-        {
-            hasUnreadableEdge = true;
+        auto user = use->getUser();
+        if (isDebugInfoInst(user))
             continue;
-        }
-        SLANG_ASSERT(terminator->getArgCount() > paramIndex);
-        auto arg = terminator->getArg(paramIndex);
-        if (arg == param || as<IRUndefined>(arg))
-            continue;
-        if (singleValue && singleValue != arg)
-            return {IncomingValueKind::Other, nullptr};
-        singleValue = arg;
+        auto branch = as<IRUnconditionalBranch>(user);
+        if (!branch || branch->getTargetBlock() != block)
+            return false;
+        if (paramIndex >= branch->getArgCount() || use != branch->getArgs() + paramIndex)
+            return false;
     }
-    if (singleValue)
-        return {IncomingValueKind::SingleValue, singleValue};
-    if (!hasPredecessor || hasUnreadableEdge)
-        return {IncomingValueKind::Other, nullptr};
-    return {IncomingValueKind::AllUndefined, nullptr};
+    return true;
 }
 
 struct PeepholeContext : InstPassBase
@@ -86,29 +49,123 @@ struct PeepholeContext : InstPassBase
 
     TargetProgram* targetProgram;
 
-    /// Replace the uses of `param`, a param of `block`, with one fresh undefined value when
-    /// `incoming` is `AllUndefined`, and return whether we took that case.
+    /// Replace the uses of `param` with `value` if `value` is visible at `param`, and return
+    /// whether we did.
     ///
-    /// Consider `Texture2D t; if (c) { Texture2D r; t = r; }`: the merge block's param receives
-    /// two distinct undefined values, so it is undefined too. Without the fold, phi elimination
-    /// would create a `Texture2D` local, which Khronos targets reject. The fold treats undefined
-    /// incoming values as carrying no identity, the same assumption `eliminatePhis` makes when
-    /// it skips storing them. Prelinking runs keep the param, because the front end's
-    /// uninitialized-use check still has to see each undefined value.
-    bool tryReplaceParamWithUndefined(IRBlock* block, IRInst* param, IncomingValues const& incoming)
+    /// A value outside every block (a constant, a global, a `Poison`) is visible whenever `param`
+    /// is nested in its parent. A value defined in a block is visible only if it dominates `param`,
+    /// which we check only when `useFastAnalysis` is off.
+    bool tryForwardParam(IRParam* param, IRInst* value)
     {
-        if (isPrelinking || incoming.kind != IncomingValueKind::AllUndefined)
+        if (!param->hasUses())
             return false;
-        if (param->hasUses())
+        if (!as<IRBlock>(value->getParent()) && isChildInstOf(param, value->getParent()))
         {
-            IRBuilder builder(module);
-            IRBuilderSourceLocRAII srcLocRAII(&builder, param->sourceLoc);
-            builder.setInsertBefore(block->getFirstOrdinaryInst());
-            auto undefinedValue = builder.emitLoadFromUninitializedMemory(param->getFullType());
-            copyNameHintAndDebugDecorations(undefinedValue, param);
-            param->replaceUsesWith(undefinedValue);
-            changed = true;
+            param->replaceUsesWith(value);
+            return true;
         }
+        if (useFastAnalysis)
+            return false;
+        auto parentFunc = getParentFunc(param);
+        if (!parentFunc)
+            return false;
+        auto domTree = parentFunc->getModule()->findOrCreateDominatorTree(parentFunc);
+        if (!domTree->dominates(value, param))
+            return false;
+        param->replaceUsesWith(value);
+        return true;
+    }
+
+    /// Simplify `param`, a block param, using the values that the predecessors of its block pass
+    /// to it. The param itself is never removed; at most its uses are replaced.
+    ///
+    /// A `LoadFromUninitializedMemory` is like LLVM's `freeze(undef)`: one arbitrary but fixed
+    /// value, which may differ from another instance. Consider:
+    ///
+    ///     int p;
+    ///     if (c) { int a; p = a; } else { int b; p = b; }
+    ///
+    /// On the `a` edge `p` equals `a`. Replacing `p` with an independent fresh value is only valid
+    /// when nothing else observes `a` or `b`, which `isUsedOnlyAsArgForParam` checks. We consider
+    /// the distinct incoming values, ignoring `param` itself (a loop back edge):
+    ///
+    /// - One distinct value is forwarded, including a frozen value that every edge shares. A loop
+    ///   header that receives `a` from the entry and itself from the back edge thus sees the same
+    ///   `a` on every iteration, and no value is created in the header.
+    /// - Otherwise, one distinct defined value among undefined ones is forwarded, if every
+    ///   frozen input is unobserved elsewhere.
+    /// - Otherwise, if every value is undefined and every frozen input is unobserved elsewhere, the
+    ///   param becomes one fresh `LoadFromUninitializedMemory` in the function's entry block. That
+    ///   block runs once per invocation and dominates every use, so the value is stable across
+    ///   loop iterations. Without this, phi elimination would create a local of the param's type,
+    ///   which Khronos targets reject for a texture.
+    ///
+    /// Prelinking runs forward only defined values. The front end's uninitialized-use check runs
+    /// after them and reports each undefined value separately.
+    ///
+    /// Slang's SSA form has no critical edges, so every predecessor of a block with params ends
+    /// in an unconditional branch that passes one argument per param.
+    bool trySimplifyBlockParam(IRParam* param)
+    {
+        auto block = as<IRBlock>(param->getParent());
+        if (!block)
+            return false;
+        auto code = as<IRGlobalValueWithCode>(block->getParent());
+        if (!code)
+            return false;
+        auto paramIndexInBlock = getParamIndexInBlock(param);
+        SLANG_ASSERT(paramIndexInBlock >= 0);
+        auto paramIndex = UInt(paramIndexInBlock);
+
+        ShortList<IRInst*> values;
+        IRInst* definedValue = nullptr;
+        Index definedValueCount = 0;
+        for (auto pred : block->getPredecessors())
+        {
+            auto branch = cast<IRUnconditionalBranch>(pred->getTerminator());
+            SLANG_ASSERT(branch->getArgCount() > paramIndex);
+            auto arg = branch->getArg(paramIndex);
+            if (arg == param || values.contains(arg))
+                continue;
+            values.add(arg);
+            if (!as<IRUndefined>(arg))
+            {
+                definedValue = arg;
+                definedValueCount++;
+            }
+        }
+        if (values.getCount() == 0)
+            return false;
+
+        if (values.getCount() == 1)
+        {
+            if (isPrelinking && !definedValue)
+                return false;
+            return tryForwardParam(param, values[0]);
+        }
+
+        if (definedValueCount > 1 || (isPrelinking && definedValueCount == 0))
+            return false;
+        for (auto value : values)
+        {
+            if (as<IRLoadFromUninitializedMemory>(value) &&
+                !isUsedOnlyAsArgForParam(value, block, paramIndex))
+                return false;
+        }
+        if (definedValue)
+            return tryForwardParam(param, definedValue);
+
+        // The fresh value is placed in the entry block, so its type must not be defined inside
+        // this function's body.
+        auto type = param->getFullType();
+        if (isChildInstOf(type, code) || !param->hasUses())
+            return false;
+        IRBuilder builder(module);
+        IRBuilderSourceLocRAII srcLocRAII(&builder, param->sourceLoc);
+        builder.setInsertBefore(code->getFirstBlock()->getFirstOrdinaryInst());
+        auto undefinedValue = builder.emitLoadFromUninitializedMemory(type);
+        copyNameHintAndDebugDecorations(undefinedValue, param);
+        param->replaceUsesWith(undefinedValue);
         return true;
     }
 
@@ -1749,55 +1806,7 @@ struct PeepholeContext : InstPassBase
             changed |= tryOptimizeArithmeticInst(inst);
             break;
         case kIROp_Param:
-            {
-                auto block = as<IRBlock>(inst->parent);
-                if (!block)
-                    break;
-                UInt paramIndex = 0;
-                auto prevParam = inst->getPrevInst();
-                while (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(prevParam))
-                {
-                    prevParam = prevParam->getPrevInst();
-                    paramIndex++;
-                }
-                auto incoming = classifyIncomingValues(block, paramIndex, inst);
-                if (tryReplaceParamWithUndefined(block, inst, incoming))
-                    break;
-                if (auto argValue = incoming.singleValue)
-                {
-                    if (inst->hasUses())
-                    {
-                        // Is argValue not a local value, i.e. it's not a child
-                        // of a block, and it's 'visible' from inst because
-                        // inst is a descendent of argValue's parent
-                        if (!as<IRBlock>(argValue->getParent()) &&
-                            isChildInstOf(inst, argValue->getParent()))
-                        {
-                            inst->replaceUsesWith(argValue);
-                            // Never remove param inst.
-                            changed = true;
-                        }
-                        else if (!useFastAnalysis)
-                        {
-                            // If argValue is defined locally,
-                            // we can replace only if argVal dominates inst.
-                            auto parentFunc = getParentFunc(inst);
-                            if (!parentFunc)
-                                break;
-
-                            auto domTree =
-                                parentFunc->getModule()->findOrCreateDominatorTree(parentFunc);
-
-                            if (domTree->dominates(argValue, inst))
-                            {
-                                inst->replaceUsesWith(argValue);
-                                // Never remove param inst.
-                                changed = true;
-                            }
-                        }
-                    }
-                }
-            }
+            changed |= trySimplifyBlockParam(cast<IRParam>(inst));
             break;
         case kIROp_Swizzle:
             {
