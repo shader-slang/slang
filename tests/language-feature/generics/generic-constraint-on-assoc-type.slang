@@ -22,6 +22,21 @@ int transform<T : IProvider>(T provider, int multiplier)
     return provider.getData() * multiplier + 1;
 }
 
+// The result type is inferred from the associated-type equality, without a
+// value argument or explicit type argument supplying U. Both orientations of
+// the equality describe the same requirement.
+U inferPayload<T : IProvider, U>(T provider)
+    where T.DataType == U
+{
+    return provider.getData();
+}
+
+U inferPayloadReversed<T : IProvider, U>(T provider)
+    where U == T.DataType
+{
+    return provider.getData();
+}
+
 struct IntProvider : IProvider
 {
     typealias DataType = int;
@@ -40,4 +55,8 @@ void computeMain()
 
     outputBuffer[0] = transform(p, 10);
     // CHECK: 51
+    outputBuffer[1] = inferPayload(p);
+    // CHECK: 5
+    outputBuffer[2] = inferPayloadReversed(p);
+    // CHECK: 5
 }

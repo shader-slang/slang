@@ -24,13 +24,18 @@ bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* p
 }
 
 SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
-    List<DeclRef<ParamDecl>> const& params)
+    List<DeclRef<ParamDecl>> const& params,
+    List<QualType> const& paramTypes)
 {
+    SLANG_ASSERT(params.getCount() == paramTypes.getCount());
     ParamCounts counts = {0, 0};
-    for (auto param : params)
+    for (Index i = 0; i < params.getCount(); i++)
     {
+        auto param = params[i];
         Index allowedArgCountToAdd = 1;
-        auto paramType = unwrapModifiedType(getParamValueType(m_astBuilder, param));
+        // Arity ignores parameter modifiers, including the no_diff modifier added by
+        // getParamValueType, so reuse the signature's already-substituted value type.
+        auto paramType = unwrapModifiedType(paramTypes[i].type);
         if (isTypePack(paramType))
         {
             if (auto typePack = as<ConcreteTypePack>(paramType))
@@ -151,9 +156,10 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
     switch (candidate.flavor)
     {
     case OverloadCandidate::Flavor::Func:
-        paramCounts = CountParameters(getParametersForCallableSignature(
-            m_astBuilder,
-            candidate.item.declRef.as<CallableDecl>()));
+        {
+            auto signature = getCallableSignatureInfo(candidate.item.declRef.as<CallableDecl>());
+            paramCounts = {signature->requiredArgCount, signature->allowedArgCount};
+        }
         break;
 
     case OverloadCandidate::Flavor::Generic:
@@ -772,6 +778,46 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
     return QualType(paramType, isLVal);
 }
 
+RefPtr<CallableSignatureInfo> SemanticsVisitor::getCallableSignatureInfo(
+    DeclRef<CallableDecl> declRef)
+{
+    auto epoch = m_astBuilder->getEpoch();
+    // Resolving a declaration's parameter types can replace their stored type expressions
+    // without changing the AST epoch. Wait until that phase is complete before caching them.
+    // An accessor's signature also contains parameters from its callable parent.
+    bool canCache = declRef.getDecl()->isChecked(DeclCheckState::TypesFullyResolved);
+    if (declRef.as<AccessorDecl>())
+    {
+        if (auto parent = declRef.getParent().as<CallableDecl>())
+            canCache = canCache && parent.getDecl()->isChecked(DeclCheckState::TypesFullyResolved);
+    }
+    if (canCache)
+    {
+        if (auto signature = getShared()->tryGetCallableSignatureInfo(declRef))
+        {
+            if (signature->epoch == epoch)
+                return signature;
+        }
+    }
+
+    // Consider repeated calls to a constructor inside `f<T>()`. Each call needs its own
+    // argument conversions, but the same specialized constructor has the same parameters.
+    // Reuse the canonical signature enumeration so accessors include their parent's parameters,
+    // and retain the AST epoch because associated types can resolve as checking progresses.
+    RefPtr<CallableSignatureInfo> signature = new CallableSignatureInfo();
+    signature->epoch = epoch;
+    signature->resultType = getResultType(m_astBuilder, declRef);
+    signature->paramDecls = getParametersForCallableSignature(m_astBuilder, declRef);
+    for (auto param : signature->paramDecls)
+        signature->paramTypes.add(getParamQualType(m_astBuilder, param));
+    auto counts = CountParameters(signature->paramDecls, signature->paramTypes);
+    signature->requiredArgCount = counts.required;
+    signature->allowedArgCount = counts.allowed;
+    if (canCache)
+        getShared()->cacheCallableSignatureInfo(declRef, signature);
+    return signature;
+}
+
 static QualType getParamQualType(Type* paramType)
 {
     // TODO(tfoley): This function probably shouldn't exist, and instead
@@ -811,18 +857,16 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
 {
     Index argCount = context.getArgCount();
 
-    List<QualType> paramTypes;
-    List<DeclRef<ParamDecl>> paramDecls;
+    RefPtr<CallableSignatureInfo> signature;
+    List<QualType> exprParamTypes;
+    ConstArrayView<QualType> paramTypes;
+    ConstArrayView<DeclRef<ParamDecl>> paramDecls;
     switch (candidate.flavor)
     {
     case OverloadCandidate::Flavor::Func:
-        for (auto param : getParametersForCallableSignature(
-                 m_astBuilder,
-                 candidate.item.declRef.as<CallableDecl>()))
-        {
-            paramDecls.add(param);
-            paramTypes.add(getParamQualType(m_astBuilder, param));
-        }
+        signature = getCallableSignatureInfo(candidate.item.declRef.as<CallableDecl>());
+        paramDecls = signature->paramDecls.getArrayView();
+        paramTypes = signature->paramTypes.getArrayView();
         break;
 
     case OverloadCandidate::Flavor::Expr:
@@ -832,8 +876,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             for (Index i = 0; i < paramCount; ++i)
             {
                 auto paramType = getParamQualType(funcType->getParamTypeWithModeWrapper(i));
-                paramTypes.add(paramType);
+                exprParamTypes.add(paramType);
             }
+            paramTypes = exprParamTypes.getArrayView();
         }
         break;
 
@@ -2596,7 +2641,7 @@ void SemanticsVisitor::AddFuncOverloadCandidate(
         OverloadCandidate candidate;
         candidate.flavor = OverloadCandidate::Flavor::Func;
         candidate.item = item;
-        candidate.resultType = getResultType(m_astBuilder, funcDeclRef);
+        candidate.resultType = getCallableSignatureInfo(funcDeclRef)->resultType;
 
         AddOverloadCandidate(context, candidate, baseCost);
     }
@@ -2933,18 +2978,14 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
         DeclRef<CallableDecl> funcDeclRef =
             m_astBuilder->getMemberDeclRef(genericDeclRef, innerCallableDecl);
 
-        List<QualType> paramTypes;
+        RefPtr<CallableSignatureInfo> signature;
         if (!innerParameterTypes)
         {
             // Most callers let this routine compute parameter types from the
             // generic's inner callable. A caller that already computed them can
             // pass the list to avoid repeating that work.
-            auto params = getParametersForCallableSignature(m_astBuilder, funcDeclRef);
-            for (auto param : params)
-            {
-                paramTypes.add(getParamQualType(m_astBuilder, param));
-            }
-            innerParameterTypes = &paramTypes;
+            signature = getCallableSignatureInfo(funcDeclRef);
+            innerParameterTypes = &signature->paramTypes;
         }
 
         ShortList<OverloadResolveContext::MatchedArg> matchedArgs;

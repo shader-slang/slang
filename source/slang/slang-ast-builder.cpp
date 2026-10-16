@@ -130,17 +130,12 @@ Type* SharedASTBuilder::getDiffInterfaceType()
     return m_diffInterfaceType;
 }
 
-// Finds a top-level interface declaration of the core module named `name`, recursing into both
-// the `FileDecl`s the eager core module source is organized into (core.meta.slang,
-// hlsl.meta.slang, autodiff-base.meta.slang all land in the same `Core` module; see
-// `Session::getBuiltinModuleSource`) and any `NamespaceDecl`s nested within them. Returns null
-// before the core module has been compiled or loaded, which callers must tolerate (see
-// `SharedASTBuilder::getBuiltinIntegerInterfaceType` and its siblings). Asserts the found
-// declaration is actually an `InterfaceDecl`: the three names this is used for (see the accessors
-// below) are
-// `[sealed]` interfaces declared once in the core module, so a name collision with some other
-// declaration kind would be a core-module authoring bug, not a shape this function should
-// silently tolerate and hand to `DeclRefType::create` regardless.
+// Find a top-level interface declaration in the core module. Session::getBuiltinModuleSource
+// concatenates the core library sources into one translation unit, so these marker interfaces
+// are direct module members in both source and serialized form. Use the existing name index:
+// enumerating all members would deserialize the whole core AST just to find one interface.
+// Return null before the module is available. The queried names uniquely identify interfaces;
+// a declaration of another kind with the same name would be a core-module authoring bug.
 static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
 {
     auto coreModule = session->getBuiltinModule(slang::BuiltinModuleName::Core);
@@ -150,22 +145,10 @@ static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
     if (!moduleDecl)
         return nullptr;
 
-    List<ContainerDecl*> workList;
-    workList.add(moduleDecl);
-    for (Index i = 0; i < workList.getCount(); i++)
+    if (auto decl = moduleDecl->findLastDirectMemberDeclOfName(name))
     {
-        for (auto member : workList[i]->getDirectMemberDecls())
-        {
-            if (member->getName() == name)
-            {
-                SLANG_RELEASE_ASSERT(as<InterfaceDecl>(member));
-                return member;
-            }
-            if (auto fileDecl = as<FileDecl>(member))
-                workList.add(fileDecl);
-            else if (auto namespaceDecl = as<NamespaceDecl>(member))
-                workList.add(namespaceDecl);
-        }
+        SLANG_RELEASE_ASSERT(as<InterfaceDecl>(decl));
+        return decl;
     }
     return nullptr;
 }
@@ -193,8 +176,8 @@ static Decl* _findCoreModuleDeclByName(Session* session, Name* name)
 // simpler question than lookup is built for: "does the core module declare a top-level interface
 // with exactly this name". `_findCoreModuleDeclByName` answers that directly from the module's
 // own declarations, the same declarations `T : __BuiltinFloatingPointType` itself resolves
-// against, and each accessor below caches the result once found so the scan (linear in the size
-// of the core module) runs at most once per session.
+// against. Each accessor below caches the result once found, and the module's name index lets
+// the first lookup preserve on-demand deserialization of unrelated declarations.
 Type* SharedASTBuilder::getBuiltinIntegerInterfaceType()
 {
     if (!m_builtinIntegerType)

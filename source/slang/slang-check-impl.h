@@ -829,6 +829,19 @@ struct ImplicitCastMethod
     bool isAmbiguous = false;
 };
 
+/// Signature information for one callable declaration reference in one AST epoch.
+/// Entries have shared ownership because checking an argument can recursively check another call
+/// and replace a cache entry while the outer call still uses its parameter lists.
+struct CallableSignatureInfo : RefObject
+{
+    Index epoch = 0;
+    List<DeclRef<ParamDecl>> paramDecls;
+    List<QualType> paramTypes;
+    Type* resultType = nullptr;
+    Count requiredArgCount = 0;
+    Count allowedArgCount = 0;
+};
+
 struct ImplicitCastMethodKey
 {
     Type* fromType; // nullptr means default construct.
@@ -1030,6 +1043,12 @@ struct SharedSemanticsContext : public RefObject
     Dictionary<WitnessTable*, RefPtr<ConformanceInterfaceCheckingState>>
         m_mapWitnessTableToConformanceInterfaceCheckingState;
 
+    // Imported modules cannot acquire new direct conformances to their sealed interfaces.
+    // Keep the declaration inventory once per module; interpretation of its checked witness
+    // tables remains specific to the queried nominal type and associated requirement.
+    HashSet<ModuleDecl*> m_modulesWithSealedConformanceInventory;
+    Dictionary<InterfaceDecl*, List<InheritanceDecl*>> m_sealedInterfaceConformanceCandidates;
+
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
@@ -1228,6 +1247,20 @@ public:
     void cacheImplicitCastMethod(ImplicitCastMethodKey key, ImplicitCastMethod candidate)
     {
         m_mapTypePairToImplicitCastMethod[key] = candidate;
+    }
+
+    RefPtr<CallableSignatureInfo> tryGetCallableSignatureInfo(DeclRef<CallableDecl> declRef)
+    {
+        if (auto entry = m_mapCallableDeclRefToSignatureInfo.tryGetValue(declRef))
+            return *entry;
+        return nullptr;
+    }
+
+    void cacheCallableSignatureInfo(
+        DeclRef<CallableDecl> declRef,
+        RefPtr<CallableSignatureInfo> signature)
+    {
+        m_mapCallableDeclRefToSignatureInfo[declRef] = signature;
     }
 
     bool* isCStyleType(Type* type) { return m_isCStyleTypeCache.tryGetValue(type); }
@@ -1430,6 +1463,8 @@ private:
     Dictionary<SpecializeInterfaceInheritanceWitnessKey, SubtypeWitness*>
         m_specializeInterfaceInheritanceWitnessCache;
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
+    Dictionary<DeclRef<CallableDecl>, RefPtr<CallableSignatureInfo>>
+        m_mapCallableDeclRefToSignatureInfo;
     Dictionary<Type*, bool> m_isCStyleTypeCache;
     Dictionary<Decl*, UInt> m_mapDeclToExtensionEpoch;
     UInt m_nextInheritanceInfoCacheGeneration = 1;
@@ -3675,6 +3710,11 @@ public:
         return isSubtype(subType, superType, IsSubTypeOptions::None);
     }
 
+    /// Collect associated-type bounds that an assumed generic conformance proves for its subject.
+    void getAssociatedBoundsFromGenericConstraint(
+        DeclaredSubtypeWitness* witness,
+        List<SubtypeWitness*>& outBounds);
+
     /// Check whether `type` conforms to `interfaceDeclRef`,
     /// and return a witness to the conformance if it holds
     /// (return null otherwise).
@@ -3839,8 +3879,13 @@ public:
         Count allowed;
     };
 
-    // count the number of parameters required/allowed for a callable
-    ParamCounts CountParameters(List<DeclRef<ParamDecl>> const& params);
+    // Count required and allowed arguments using the callable's substituted parameter types.
+    ParamCounts CountParameters(
+        List<DeclRef<ParamDecl>> const& params,
+        List<QualType> const& paramTypes);
+
+    /// Get a substituted signature and arity, caching them after declaration type resolution.
+    RefPtr<CallableSignatureInfo> getCallableSignatureInfo(DeclRef<CallableDecl> declRef);
 
     // count the number of parameters required/allowed for a generic
     ParamCounts CountParameters(DeclRef<GenericDecl> genericRef);

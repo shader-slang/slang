@@ -22,4 +22,11 @@ void computeMain()
 {
     // CHECK: 11
     outputBuffer[0] = test<int>(5, 1, 2, 3);
+    // Reuse the same generic with both repeated and different inferred pack lengths.
+    // CHECK: 30
+    outputBuffer[1] = test<int>(6, 2, 3, 4);
+    // CHECK: 8
+    outputBuffer[2] = test<int>(7);
+    // CHECK: 28
+    outputBuffer[3] = test<int>(8, 4, 5);
 }

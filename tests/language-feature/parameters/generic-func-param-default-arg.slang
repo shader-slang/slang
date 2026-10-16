@@ -33,7 +33,9 @@ struct Simple : IValue
 int test(int val)
 {
     let s = Simple(val);
-    return sum<Simple>(s).val + 16*sum(s).val;
+    // Repeated calls to the same specialization omit different numbers of defaults.
+    return sum<Simple>(s).val + 16*sum(s, Simple(1)).val +
+        256*sum<Simple>(s, Simple(2), 3).val;
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gBuffer
