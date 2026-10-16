@@ -10,6 +10,65 @@
 
 namespace Slang
 {
+/// The values that flow into a block param, classified by `classifyIncomingValues`.
+enum class IncomingValueKind
+{
+    /// Every incoming value is undefined.
+    AllUndefined,
+    /// Exactly one distinct defined value comes in; any other incoming values are undefined.
+    SingleValue,
+    /// Anything else, e.g. two distinct defined values.
+    Other,
+};
+
+struct IncomingValues
+{
+    IncomingValueKind kind;
+    /// The one defined value when `kind` is `SingleValue`, and null otherwise.
+    IRInst* singleValue;
+};
+
+/// Classify the values that the predecessors of `block` pass to `param`, the param at
+/// `paramIndex`.
+///
+/// We skip an incoming value that is `param` itself, because a loop back edge that passes
+/// the param to itself adds no new value. Consider a loop-header param whose incoming values
+/// are an undefined value and the param itself: it is `AllUndefined`. Without the skip, it would
+/// be a `SingleValue` of itself, and the caller would replace the param with itself forever.
+///
+/// We cannot read the value that a predecessor passes when its terminator is not an unconditional
+/// branch. Such an edge rules out `AllUndefined`, but `SingleValue` ignores it. A block with no
+/// predecessors is never `AllUndefined` either: that is the entry block, whose params are the
+/// function's params, and those receive their values from callers.
+static IncomingValues classifyIncomingValues(IRBlock* block, UInt paramIndex, IRInst* param)
+{
+    bool hasPredecessor = false;
+    bool hasUnreadableEdge = false;
+    IRInst* singleValue = nullptr;
+    for (auto pred : block->getPredecessors())
+    {
+        hasPredecessor = true;
+        auto terminator = as<IRUnconditionalBranch>(pred->getTerminator());
+        if (!terminator)
+        {
+            hasUnreadableEdge = true;
+            continue;
+        }
+        SLANG_ASSERT(terminator->getArgCount() > paramIndex);
+        auto arg = terminator->getArg(paramIndex);
+        if (arg == param || as<IRUndefined>(arg))
+            continue;
+        if (singleValue && singleValue != arg)
+            return {IncomingValueKind::Other, nullptr};
+        singleValue = arg;
+    }
+    if (singleValue)
+        return {IncomingValueKind::SingleValue, singleValue};
+    if (!hasPredecessor || hasUnreadableEdge)
+        return {IncomingValueKind::Other, nullptr};
+    return {IncomingValueKind::AllUndefined, nullptr};
+}
+
 struct PeepholeContext : InstPassBase
 {
     PeepholeContext(IRModule* inModule)
@@ -1674,39 +1733,8 @@ struct PeepholeContext : InstPassBase
                     prevParam = prevParam->getPrevInst();
                     paramIndex++;
                 }
-                IRInst* argValue = nullptr;
-                bool hasPredecessor = false;
-                bool allArgsUndefined = true;
-                for (auto pred : block->getPredecessors())
-                {
-                    hasPredecessor = true;
-                    auto terminator = as<IRUnconditionalBranch>(pred->getTerminator());
-                    if (!terminator)
-                    {
-                        allArgsUndefined = false;
-                        continue;
-                    }
-                    SLANG_ASSERT(terminator->getArgCount() > paramIndex);
-                    auto arg = terminator->getArg(paramIndex);
-                    // A loop back-edge that passes the param to itself contributes no
-                    // new value.
-                    if (arg == inst)
-                        continue;
-                    if (as<IRUndefined>(arg))
-                        continue;
-                    allArgsUndefined = false;
-                    if (argValue == nullptr)
-                        argValue = arg;
-                    else if (argValue == arg)
-                    {
-                    }
-                    else
-                    {
-                        argValue = nullptr;
-                        break;
-                    }
-                }
-                if (hasPredecessor && allArgsUndefined && !isPrelinking)
+                auto incoming = classifyIncomingValues(block, paramIndex, inst);
+                if (incoming.kind == IncomingValueKind::AllUndefined && !isPrelinking)
                 {
                     // Consider `Texture2D t; if (c) { Texture2D r; t = r; }`: the merge
                     // block's param receives two distinct undefined values, so it is
@@ -1715,10 +1743,6 @@ struct PeepholeContext : InstPassBase
                     // Khronos targets reject. The fold treats undefined incoming values
                     // as carrying no identity, the same assumption `eliminatePhis` makes
                     // when it skips storing them.
-                    //
-                    // The front-end's uninitialized-use check runs after the prelinking
-                    // peephole passes and reports each undefined value separately, so
-                    // we keep the param there to preserve its per-variable warnings.
                     if (inst->hasUses())
                     {
                         IRBuilder builder(module);
@@ -1731,7 +1755,7 @@ struct PeepholeContext : InstPassBase
                         changed = true;
                     }
                 }
-                else if (argValue)
+                else if (auto argValue = incoming.singleValue)
                 {
                     if (inst->hasUses())
                     {
