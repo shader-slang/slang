@@ -116,12 +116,11 @@ interface IComparable
 // that choice, so on its own it cannot reach the concrete overload written for a scalar, vector or
 // matrix shape. The core `min`/`max` overloads for `IFloat` and `IInteger` therefore call
 // `x.__min(y)` / `x.__max(y)`, and the builtin scalar, vector and float matrix conformances
-// implement these by calling `min`/`max` on their own operands (the matrix conformance converts
-// them to the default layout first). That call is resolved when each builtin conformance is
-// checked, where the operand shape is known, so it binds the concrete overload for that shape,
-// which ranks above the generic ones that would call back into `__min`/`__max` without end. Each
-// target then gets its native vector operation where it has one, and the same per-element code as a
-// direct call on cpp/cuda.
+// implement these by calling `min`/`max` on their own operands. That call is resolved when each
+// builtin conformance is checked, where the operand shape is known, so it binds the concrete
+// overload for that shape, which ranks above the generic ones that would call back into
+// `__min`/`__max` without end. Each target then gets its native vector operation where it has one,
+// and the same per-element code as a direct call on cpp/cuda.
 //
 // `x.__min(y)` and `x.__max(y)` return what `min(x, y)` and `max(x, y)` mean for the type. The
 // defaults order whole values with `lessThan`, as the `IComparable` overloads do, which suits a
@@ -423,7 +422,9 @@ interface __BuiltinScalarType : __BuiltinType
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement
+// Arithmetic constraints imply ITexelData, with Element supplied by each nominal
+// scalar's conformance. Thus (unorm float).Element is float even through a generic constraint.
+interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement, ITexelData
 {
 }
 
@@ -2539,24 +2540,19 @@ extension matrix<T,N,M,L> : IFloat
     [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
 
-    // The concrete matrix overloads take the default layout. We convert to it explicitly because
-    // an implicit layout conversion at the call would cost more than the conversion-free generic
-    // `min<T : IFloat>`, which would win and call back into `__min` without end. Layout conversions
-    // preserve element values, so converting the result back to `This` returns the same matrix.
+    // The concrete floating-point matrix overloads accept layout `L` directly. Overload resolution
+    // therefore selects the shaped overload without a layout conversion or a recursive call to
+    // the whole-type `IFloat` forwarder.
     [__unsafeForceInlineEarly]
     override This __min(This other)
     {
-        matrix<T, N, M> x = this;
-        matrix<T, N, M> y = other;
-        return min(x, y);
+        return min(this, other);
     }
 
     [__unsafeForceInlineEarly]
     override This __max(This other)
     {
-        matrix<T, N, M> x = this;
-        matrix<T, N, M> y = other;
-        return max(x, y);
+        return max(this, other);
     }
 
     [Differentiable]
@@ -4789,7 +4785,7 @@ attribute_syntax [mutating] : MutatingAttribute;
 /// it to be called with a non-mutating value of `S`.
 /// @see `[mutating]`.
 ///
-__attributeTarget(AccessorDecl)
+__attributeTarget(FunctionDeclBase)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
 /// Marks a function whose return value should not be discarded. When a call to a
@@ -5072,14 +5068,16 @@ __attributeTarget(FunctionDeclBase)
 attribute_syntax [NonUniformReturn] : NonDynamicUniformAttribute;
 
 /// Mark a compute shader entry point to allow it to use implicit derivatives.
-/// @remarks This attributes causes Slang to emit `DerivativeGroupQuadsNV` execution mode when producing SPIR-V. The attribute has no
-/// effect on other targets.
+/// @remarks This attribute emits the `DerivativeGroupQuadsKHR` execution mode for SPIR-V
+/// and the `derivative_group_quadsNV` layout qualifier for GLSL.
+/// It has no effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
 
 /// Mark a compute shader entry point to allow it to use implicit derivatives.
-/// @remarks This attributes causes Slang to emit `DerivativeGroupLinearNV` execution mode when producing SPIR-V. The attribute has no
-/// effect on other targets.
+/// @remarks This attribute emits the `DerivativeGroupLinearKHR` execution mode for SPIR-V
+/// and the `derivative_group_linearNV` layout qualifier for GLSL.
+/// It has no effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
 

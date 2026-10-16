@@ -171,7 +171,8 @@ public:
     List<String> additionalSearchPaths;
     OrderedHashSet<String> workspaceSearchPaths;
     List<OwnedPreprocessorMacroDefinition> predefinedMacros;
-    bool searchInWorkspace = true;
+    static constexpr bool kDefaultSearchInWorkspace = true;
+    bool searchInWorkspace = kDefaultSearchInWorkspace;
     WorkspaceFlavor workspaceFlavor = WorkspaceFlavor::Standard;
 
     // Language version assumed for files with no `#language` directive, from the
@@ -194,6 +195,7 @@ public:
     bool updateSearchPaths(List<String> searchPaths);
     bool updateSearchInWorkspace(bool value);
     bool updatePredefinedLanguageVersion(SlangLanguageVersion version);
+    bool updateWorkspaceFlavor(WorkspaceFlavor flavor);
 
     void init(List<URI> rootDirURI, slang::IGlobalSession* globalSession);
     void invalidate();

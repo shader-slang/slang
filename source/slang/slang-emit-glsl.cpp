@@ -68,12 +68,20 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
             SLANG_ASSERT(requireComputeDerivative);
             SLANG_ASSERT(m_entryPointStage == Stage::Compute);
 
-            // Compute derivatives are quad by default, add the decoration if entry point
-            // does not not explicit linear decoration.
-            bool isQuad = !entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
-            if (isQuad)
+            // Grouping may be explicit or already inferred for an earlier derivative operation.
+            if (!entryPoint->findDecoration<IRDerivativeGroupDecoration>())
             {
-                builder.addDecoration(entryPoint, kIROp_DerivativeGroupQuadDecoration);
+                switch (inferDerivativeGroupMode(entryPoint))
+                {
+                case DerivativeGroupMode::Quad:
+                    builder.addDecoration(entryPoint, kIROp_DerivativeGroupQuadDecoration);
+                    break;
+                case DerivativeGroupMode::Linear:
+                    builder.addDecoration(entryPoint, kIROp_DerivativeGroupLinearDecoration);
+                    break;
+                default:
+                    SLANG_UNEXPECTED("unexpected derivative-group mode");
+                }
             }
         }
     }
@@ -644,14 +652,28 @@ static bool isImageFormatSupportedByGLSL(ImageFormat format)
 
 void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType)
 {
-    SLANG_UNUSED(resourceType);
-
-    // If the user specified a format manually, using `[format(...)]`,
-    // then we will respect that format and emit a matching `layout` modifier.
-    //
-    if (auto formatDecoration = var->findDecoration<IRFormatDecoration>())
+    ImageFormat explicitFormat = ImageFormat::unknown;
+    bool hasExplicitFormat = false;
+    if (resourceType->hasFormat())
     {
-        auto format = formatDecoration->getFormat();
+        explicitFormat = (ImageFormat)getIntVal(resourceType->getFormat());
+        hasExplicitFormat = explicitFormat != ImageFormat::unknown;
+    }
+
+    // If the texture type carries a concrete format, it is the source of truth.
+    // Otherwise, keep supporting the older `[format(...)]` attribute path.
+    if (!hasExplicitFormat)
+    {
+        if (auto formatDecoration = var->findDecoration<IRFormatDecoration>())
+        {
+            explicitFormat = formatDecoration->getFormat();
+            hasExplicitFormat = true;
+        }
+    }
+
+    if (hasExplicitFormat)
+    {
+        auto format = explicitFormat;
         const auto formatInfo = getImageFormatInfo(format);
         if (!isImageFormatSupportedByGLSL(format))
         {
@@ -694,8 +716,8 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
             m_writer->emit(")\n");
         }
 
-        // No matter what, if an explicit `[format(...)]` was given,
-        // then we don't need to emit anything else.
+        // No matter where the explicit format came from, we don't need to infer
+        // a layout from the element type.
         //
         return;
     }
