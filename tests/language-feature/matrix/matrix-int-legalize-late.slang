@@ -11,9 +11,9 @@
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute -matrix-layout-row-major
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute -matrix-layout-column-major
-//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute -matrix-layout-column-major
-//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute -matrix-layout-column-major
-//TEST:SIMPLE(filecheck=WGSLSPIRV):-target wgsl-spirv-asm -entry computeMain -stage compute -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute -matrix-layout-column-major -DSHIFT_SCALAR_BY_MATRIX
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute -matrix-layout-column-major -DSHIFT_SCALAR_BY_MATRIX
+//TEST:SIMPLE(filecheck=WGSLSPIRV):-target wgsl-spirv-asm -entry computeMain -stage compute -matrix-layout-column-major -DSHIFT_SCALAR_BY_MATRIX
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -output-using-type -shaderobj -xslang -matrix-layout-column-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -output-using-type -shaderobj -emit-spirv-via-glsl -xslang -matrix-layout-column-major
@@ -51,6 +51,14 @@ int2x3 divideAndShift(int2x3 m, int2x3 n, int s)
     return (m / n) + (s / n) + (m / s) + (m << n) + (m >> n);
 }
 
+// A scalar shifted by a matrix broadcasts the scalar to the matrix's rows. GLSL has no
+// `int << ivec3`, so only the WGSL and Metal legs call this function.
+[noinline]
+int2x3 shiftScalarByMatrix(int s, int2x3 n)
+{
+    return s << n;
+}
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
@@ -64,6 +72,9 @@ void computeMain()
 
     int2x3 n = int2x3(2, 1, 1, 1, 1, 2);
     output[5] = divideAndShift(m, n, 4)[1][2];
+#ifdef SHIFT_SCALAR_BY_MATRIX
+    output[3] += shiftScalarByMatrix(4, n)[1][2] - 16;
+#endif
 }
 
 // SPV: OpEntryPoint
@@ -76,9 +87,13 @@ void computeMain()
 // WGSL: fn shifted_0(
 // WGSL-SAME: ptr<function, array<vec3<i32>, i32(2)>>
 // WGSL: vec3<u32> = vec3<u32>(amount
+// WGSL: fn shiftScalarByMatrix_0(
+// WGSL: << (vec3<u32>(
 
 // METAL: uint3 {{.*}} = uint3(amount
 // METAL-NOT: division by matrix
+// METAL: shiftScalarByMatrix_0(
+// METAL: << uint3(
 
 // WGSLSPIRV: OpEntryPoint
 
