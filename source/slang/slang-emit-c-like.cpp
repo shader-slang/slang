@@ -1926,24 +1926,37 @@ bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesUncached(IRInst* inst)
             if (as<IRUnconditionalBranch>(ii))
                 return false;
 
-            // If the user is always folded, then the text for `inst` is emitted wherever the
-            // user is emitted, not at the user. Consider:
+            // When `ii` is always folded, its text is not emitted at `ii`. It is emitted inside
+            // each user of `ii`, so `inst` is evaluated there, not at `ii`. Consider this
+            // example:
             //
             //     uint f = s.a[s.top];
             //     s.top -= 1;
             //     return f / 16u;
             //
-            // After `simplifyForEmit` defers the load of `s.a[...]` to its use, the IR is
-            // `%i = load(%top); %p = getElementPtr(%a, %i); store(%top, ...); %f = load(%p)`.
-            // `getElementPtr` is always folded, so `%p` is emitted inside `%f`, after the
-            // store, and folding `%i` into `%p` would read the decremented `s.top`. The
-            // recursive check applies every condition of this function at those points,
-            // including that they are in the same block and are not unconditional branches.
+            // After `simplifyForEmit` defers the load of `s.a[...]` to its use, the IR is:
             //
-            // A user whose policy is `WhenSafe` needs no further check. It is only folded if
+            //     %i = load(%top)               // `inst`: the candidate we want to fold
+            //     %p = getElementPtr(%a, %i)    // `ii`: the first user of `inst`
+            //     store(%top, ...)              // `s.top -= 1`
+            //     %f = load(%p)                 // the user of `ii`
+            //
+            // The scan from `%i` reaches `%p` before it reaches the `store`, so looking only at
+            // `inst` and `ii` finds no side effect between them. But `getElementPtr` is always
+            // folded, so `%p` is not emitted at its own position. It is emitted inside `%f`,
+            // which comes after the `store`. If we fold `%i` into `%p`, the emitted code is
+            // `s.a[s.top]` evaluated after `s.top -= 1`, and it reads the decremented value.
+            //
+            // To catch this, we ask whether `ii` is itself safe to fold into its own users.
+            // For `%p`, that scan runs from `%p` to `%f`, meets the `store`, and returns false.
+            // Then `%i` is not folded and keeps its own variable. The recursive call applies
+            // every condition of this function to `ii`, including that its users are in the
+            // same block and are not unconditional branches.
+            //
+            // If `ii` is not always folded, no further check is needed. It is folded only if
             // it passes this same test itself, because an override of
-            // `shouldFoldInstIntoUseSites` may only decline a fold, so nothing with side effects
-            // lies between it and its own emission points either.
+            // `shouldFoldInstIntoUseSites` may only decline a fold. In both cases, nothing
+            // with side effects lies between `ii` and the point where it is emitted.
             if (getFoldPolicy(ii) == FoldPolicy::Always && !isSafeToFoldIntoUseSites(ii))
                 return false;
 
