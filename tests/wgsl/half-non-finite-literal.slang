@@ -15,11 +15,18 @@
 // NOBARE: result code = 0
 // NOBARE-NOT: {{infh|nanh}}
 
+// The helpers reinterpret bit patterns rather than divide by zero at run time (issue #13658).
 // WGSL: enable f16;
 // WGSL-DAG: fn _slang_getInfinityHalf(positive: bool) -> f16
+// WGSL-DAG: let bits = select(0xfc00u, 0x7c00u, positive);
+// WGSL-DAG: return bitcast<vec2<f16>>(bits).x;
 // WGSL-DAG: fn _slang_getNanHalf() -> f16
+// WGSL-DAG: let bits = 0x7e00u;
 // WGSL-DAG: fn _slang_getInfinity(positive: bool) -> f32
+// WGSL-DAG: let bits = select(0xff800000u, 0x7f800000u, positive);
+// WGSL-DAG: return bitcast<f32>(bits);
 // WGSL-DAG: fn _slang_getNan() -> f32
+// WGSL-DAG: let bits = 0x7fc00000u;
 
 RWStructuredBuffer<half> outputBuffer;
 RWStructuredBuffer<float> floatBuffer;

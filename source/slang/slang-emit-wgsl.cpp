@@ -31,43 +31,42 @@
 namespace Slang
 {
 
-// WGSL has no NaN or infinity literal, and a const-expression such as `1.0 / 0.0` that evaluates
-// to one is a shader-creation error. These f32 and f16 helpers build the value from `let`
-// bindings, so `a / b` is a runtime expression rather than a const-expression. See
+// WGSL has no NaN or infinity literal, and a const-expression such as `1.0 / 0.0` that evaluates to
+// one is a shader-creation error. These f32 and f16 helpers reinterpret the IEEE bit pattern held
+// in a `let`, which is a runtime expression rather than a const-expression; without the `let`,
+// `bitcast` of a literal is a const-expression and is rejected. We use bit patterns rather than a
+// runtime `0.0 / 0.0` because the NVIDIA Vulkan driver crashes creating a pipeline whose
+// function-local array holds such a division and is indexed at run time (issue #13658). See
 // `emitFloatLitValue` for where they are used.
 static const char* kWGSLBuiltinPreludeGetInfinity = R"(
 fn _slang_getInfinity(positive: bool) -> f32
 {
-    let a = select(f32(-1.0), f32(1.0), positive);
-    let b = f32(0.0);
-    return a / b;
+    let bits = select(0xff800000u, 0x7f800000u, positive);
+    return bitcast<f32>(bits);
 }
 )";
 
 static const char* kWGSLBuiltinPreludeGetNan = R"(
 fn _slang_getNan() -> f32
 {
-    let a = f32(0.0);
-    let b = f32(0.0);
-    return a / b;
+    let bits = 0x7fc00000u;
+    return bitcast<f32>(bits);
 }
 )";
 
 static const char* kWGSLBuiltinPreludeGetInfinityHalf = R"(
 fn _slang_getInfinityHalf(positive: bool) -> f16
 {
-    let a = select(f16(-1.0), f16(1.0), positive);
-    let b = f16(0.0);
-    return a / b;
+    let bits = select(0xfc00u, 0x7c00u, positive);
+    return bitcast<vec2<f16>>(bits).x;
 }
 )";
 
 static const char* kWGSLBuiltinPreludeGetNanHalf = R"(
 fn _slang_getNanHalf() -> f16
 {
-    let a = f16(0.0);
-    let b = f16(0.0);
-    return a / b;
+    let bits = 0x7e00u;
+    return bitcast<vec2<f16>>(bits).x;
 }
 )";
 
