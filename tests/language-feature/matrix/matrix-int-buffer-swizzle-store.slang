@@ -6,8 +6,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -xslang -matrix-layout-row-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -emit-spirv-via-glsl -xslang -matrix-layout-column-major
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -xslang -matrix-layout-column-major
-//TEST:SIMPLE(filecheck=COMPILES):-target metal -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=COMPILES):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 struct Matrices
 {
@@ -67,4 +67,8 @@ void computeMain()
 // CHECK-NEXT: 0
 // CHECK-NEXT: 0
 
-// COMPILES: computeMain
+// In column-major storage `c[1].xz` writes element 1 of columns 0 and 2.
+// METAL: ->c_0)->data_{{[0-9]+}}[int(0)][int(1)] = int(5);
+// METAL: ->c_0)->data_{{[0-9]+}}[int(2)][int(1)] = int(6);
+// WGSL: .c_0.data_{{[0-9]+}}[i32(0)][i32(1)] = i32(5);
+// WGSL: .c_0.data_{{[0-9]+}}[i32(2)][i32(1)] = i32(6);

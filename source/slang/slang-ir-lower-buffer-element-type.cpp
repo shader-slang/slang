@@ -2378,7 +2378,10 @@ struct LoweredElementTypeContext
                                 auto vectorAddr = builder.emitElementAddress(dataPtr, i);
                                 auto elementAddr =
                                     builder.emitElementAddress(vectorAddr, majorGEP->getIndex());
-                                auto element = builder.emitElementExtract(storeInst->getVal(), i);
+                                IRInst* row = storeInst->getVal();
+                                IRInst* element = as<IRVectorType>(row->getDataType())
+                                                      ? builder.emitElementExtract(row, i)
+                                                      : row;
                                 builder.emitStore(
                                     elementAddr,
                                     builder.emitCast(
