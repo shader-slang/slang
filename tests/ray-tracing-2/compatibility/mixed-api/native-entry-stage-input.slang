@@ -25,6 +25,6 @@ struct HitContext : rt::IHitContext
 void nativeClosestHit(in rt::ClosestHitInput<HitContext> input) {}
 /*CHECK:
      ^^^^^^^^^^^^^^^^ cannot mix legacy and structural ray-tracing APIs in one module
-     ^^^^^^^^^^^^^^^^ this declaration uses the structural API
-     ^^^^^^^^^^^^^^^^ the same module also uses the legacy API
+     ^^^^^^^^^^^^^^^^ this declaration uses the legacy API
+     ^^^^^^^^^^^^^^^^ the same module also uses the structural API
 */

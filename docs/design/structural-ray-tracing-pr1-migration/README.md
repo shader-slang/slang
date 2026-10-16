@@ -380,8 +380,13 @@ argument. That normalization and native adapters remain work for the full implem
 
 Only shader declarations choose the module's API family; dispatch calls do not. A structural stage
 conformance or a function parameter using a structural stage input records structural use. A
-native hit, miss, intersection or callable entry records legacy use, including an entry selected
-later through the command line. Declaring both families in one module remains an error.
+native hit, miss, intersection or callable entry records legacy use when normal entry-point
+validation selects or discovers it. Both families recorded in one module remain an error.
+Explicit entry requests validate the named entries; without them, normal discovery validates
+attributed entries. For example, selecting only a structural stage allows an unselected
+`[shader("miss")]` function beside it. Selecting that function, or discovering it when no entry
+is requested, reports the conflict. Reuse `validateEntryPoint` for this check instead of adding
+another traversal of the module's declarations. This also covers serialized modules.
 
 Remove the call-level API bookkeeping, including name recognition for core `TraceRay`,
 `TraceMotionRay` and `CallShader`. A structural shader may call a native tracing function, and

@@ -221,9 +221,9 @@ static void _checkStructuralRayTracingStageImplementationType(
 }
 
 // Rejects a module that uses both pipeline APIs under the current interoperability contract.
-// For example, an rt::IMissShader implementation and a separate [shader("miss")] function in
-// the same module conflict. Dispatch calls do not select the module's API family: an ordinary
-// library wrapper such as rt::RayTracer.trace may call TraceRay in its native target branch.
+// For example, an rt::IMissShader implementation conflicts with a legacy miss entry point
+// selected or discovered in the same module. Dispatch calls do not select the module's API family:
+// a library wrapper such as rt::RayTracer.trace may call TraceRay in its native target branch.
 // The compiler handles the resulting intrinsic operation without treating that implementation
 // detail as a legacy shader declaration.
 // This is an explicit compatibility policy, not a consequence of ordinary interface conformance.
@@ -289,39 +289,6 @@ static bool _isLegacyRayTracingStage(Stage stage)
         return true;
     default:
         return false;
-    }
-}
-
-static void _checkAttributedLegacyEntryPoints(
-    Module* module,
-    ContainerDecl* containerDecl,
-    DiagnosticSink* sink)
-{
-    // A legacy ray-tracing entry point can be present without being named on the command line.
-    // Walk the checked declarations before module diagnostics finish so a structural conformance
-    // elsewhere in the same module cannot evade the mixed-API rule merely because the legacy
-    // function was not selected for the current compile request.
-    for (auto member : containerDecl->getDirectMemberDecls())
-    {
-        auto innerMember = member;
-        if (auto genericDecl = as<GenericDecl>(innerMember))
-            innerMember = genericDecl->inner;
-
-        if (auto functionDecl = as<FuncDecl>(innerMember))
-        {
-            if (auto entryPointAttr = functionDecl->findModifier<EntryPointAttribute>())
-            {
-                auto stage =
-                    getStageFromAtom(CapabilitySet{entryPointAttr->capabilitySet}.getTargetStage());
-                if (_isLegacyRayTracingStage(stage))
-                {
-                    _checkRayTracingAPIUse(module, RayTracingAPIFamily::Legacy, functionDecl, sink);
-                }
-            }
-        }
-
-        if (auto childContainer = as<ContainerDecl>(innerMember))
-            _checkAttributedLegacyEntryPoints(module, childContainer, sink);
     }
 }
 
@@ -1099,9 +1066,11 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     return result;
 }
 
-// Includes command-line-selected native stages in the module's API-family check.
+// Checks the module's API family when a native entry point is validated. Explicit native entry
+// selection and automatic discovery call validateEntryPoint, including for a serialized module.
 // For example, `-entry ordinaryMiss -stage miss` selects a legacy entry even without [shader].
-// Retaining the first source use on the module also preserves this rule after serialization.
+// With no explicit entry request, discovery finds [shader("miss")] functions instead. Reusing
+// that validation covers both paths without a separate walk over the module's declarations.
 void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink)
 {
     if (!_isLegacyRayTracingStage(entryPoint->getStage()))
@@ -1437,12 +1406,11 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
     }
 }
 
-// Finishes stage and module-wide rules after checked conformance witnesses are available.
+// Finishes stage checks after checked conformance witnesses are available.
 // For example, a generic extension can supply Miss.invoke; checking its selected stage before
 // ordinary conformance and capability inference finish would inspect an incomplete signature.
 void SemanticsVisitor::checkStructuralRayTracingModule(ModuleDecl* moduleDecl)
 {
-    _checkAttributedLegacyEntryPoints(getModule(moduleDecl), moduleDecl, getSink());
     _diagnoseStructuralStageDeclarations(this, moduleDecl);
 }
 
