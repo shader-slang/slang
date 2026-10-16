@@ -69,7 +69,7 @@ int constLocal()
 }
 
 // The local `g` hides the global `g` from the local type, so the reference is an error rather
-// than a silent reference to the global. C++ also rejects this.
+// than a silent reference to the global. C++ also rejects this; `::g` names the global.
 static const int g = 7;
 int shadowedGlobal()
 {
@@ -108,15 +108,51 @@ int lambdaParameter()
     return f(1);
 }
 
-// A function-local `cbuffer` is a local whose fields lookup finds through it.
-int localCBufferField()
+// A function-local `cbuffer` is a local whose fields lookup finds through it. Lookup from a
+// local type inside a lambda reaches the `cbuffer` field through that local.
+int localCBufferFieldInLambda()
 {
     cbuffer CB { int c; };
-    struct L { int get() { return c; } };
+    let f = () => { struct L { int get() { return c; } }; L l; return l.get(); };
+//CHECK:                                          ^ undefined identifier
+//CHECK:                                          ^ undefined identifier 'c'.
+    return f();
+}
+
+// A `const` local is still a non-static local, so a local type cannot use it in a type
+// position or a `static const` initializer either. `static const` is the spelling that stays
+// visible.
+int constLocalInTypePosition()
+{
+    const int N = 4;
+    struct L { static const int M = N; };
+//CHECK:                            ^ undefined identifier
+//CHECK:                            ^ undefined identifier 'N'.
+    return L::M;
+}
+
+// `visitBlockStmt` checks local types before the rest of the block, so a local declared after
+// the type also hides the global of the same name from it.
+static const int h = 7;
+int laterLocalHidesGlobal()
+{
+    struct L { int get() { return h; } };
 //CHECK:                          ^ undefined identifier
-//CHECK:                          ^ undefined identifier 'c'.
+//CHECK:                          ^ undefined identifier 'h'.
     L l;
-    return l.get();
+    int h = l.get();
+    return h;
+}
+
+// No "did you mean" note suggests a local that the local type cannot use.
+int noSuggestionOfHiddenLocal()
+{
+    int total = buf[0];
+    struct L { int get() { return totl; } };
+//CHECK:                          ^^^^ undefined identifier
+//CHECK:                          ^^^^ undefined identifier 'totl'.
+    L l;
+    return l.get() + total;
 }
 
 struct S

@@ -6,6 +6,8 @@
 // and non-static local variables are inaccessible (see
 // tests/diagnostics/local-type-enclosing-locals-13435.slang).
 
+// The example from shader-slang/slang#13435 only needs to compile; `localTypes()` below checks
+// the same lookups at run time.
 void f()
 {
     struct A { static const int K = 3; };
