@@ -240,16 +240,28 @@ struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
     }
 };
 
-// A module-scope variable that holds an entry-point input: each entry point sets it once, before
-// anything else runs, from its parameter (e.g. the `subgroup_size` built-in, which
-// `translateGlobalVaryingVar` stores into a `var<private>` so that callees can read it).
+// Rewrites the module-scope variables that hold entry-point inputs so that the inputs are passed
+// as function parameters ("threaded" through the call graph) instead of being read from the
+// variables.
 //
-// WGSL's uniformity analysis treats every read of a module-scope `var<private>` as possibly
-// non-uniform. A loop bound computed from `WaveGetLaneCount()` read that way makes a subgroup
-// operation in the loop fail validation (issue #8774), although the built-in is uniform. Pass the
-// value instead: entry points use the stored value directly, and every function that reads the
-// variable (directly or through its callees) receives it as an extra parameter. Values passed as
-// parameters keep their uniformity in WGSL's analysis.
+// `translateGlobalVaryingVar` gives every entry-point input that a function other than the entry
+// point reads (such as the `subgroup_size` built-in behind `WaveGetLaneCount()`) a module-scope
+// variable, which each entry point sets from its parameter. On WGSL that variable is a
+// `var<private>`, and WGSL's uniformity analysis treats every read of a `var<private>` as possibly
+// non-uniform: a subgroup operation in a loop bounded by `WaveGetLaneCount()` fails validation
+// (issue #8774), although the built-in is uniform. Values passed as parameters keep their
+// uniformity, so we rewrite the variable: entry points use the stored value directly, and every
+// function that reads the variable, directly or through its callees, receives the value as an
+// extra parameter.
+//
+// The rewrite is done here rather than in `translateGlobalVaryingVar` because that pass is shared
+// by all targets, and only WGSL's uniformity analysis needs the parameter form. It runs at the end
+// of WGSL legalization, after `GlobalInstInliningContext`, and after
+// `moveGlobalVarInitializationToEntryPoints` has put the calls of module-scope initializers at the
+// start of each entry point, before the stores of the inputs.
+//
+// A variable whose uses do not have the expected shape is left as it is; the output is then the
+// same as without this rewrite.
 struct EntryPointGlobalThreadingContext
 {
     explicit EntryPointGlobalThreadingContext(IRModule* inModule)
@@ -259,9 +271,10 @@ struct EntryPointGlobalThreadingContext
 
     IRModule* module;
 
-    // The value each entry point stores into the variable.
+    // State for the variable being rewritten, cleared for each one: the value each entry point
+    // stores into the variable,
     Dictionary<IRFunc*, IRInst*> valueByEntryPoint;
-    // The parameter added to each other function that needs the value.
+    // and the parameter added to each other function that needs the value.
     Dictionary<IRFunc*, IRParam*> paramByFunc;
 
     static bool isEntryPoint(IRFunc* func)
@@ -277,9 +290,12 @@ struct EntryPointGlobalThreadingContext
         return func && block == func->getFirstBlock() && isEntryPoint(func);
     }
 
-    // Does nothing before `store` in its block read the variable, directly or through a call to
-    // a function that needs it (e.g. a module-scope initializer that the entry point calls first
-    // only needs to be left alone if it does not reach the variable)?
+    // Whether nothing before `store` reads the variable, directly or through a call, so that
+    // replacing the reads by the stored value keeps what they read. `store` is in the entry block,
+    // which has no predecessors, so the instructions before it in the block are everything that
+    // runs before it. A call to a function in `neededSet` can read the variable, and so can a call
+    // whose callee is not a known function. `neededSet` must already contain every function that
+    // reads the variable, directly or through its callees.
     static bool isInitialStore(
         IRStore* store,
         IRGlobalVar* globalVar,
@@ -303,6 +319,8 @@ struct EntryPointGlobalThreadingContext
         return true;
     }
 
+    // Rewrites `globalVar` if it holds an entry-point input and all its uses have the expected
+    // shape, and returns whether it did. Returning false leaves the module unchanged.
     bool tryThread(IRGlobalVar* globalVar)
     {
         // A variable with an initializer is set before the entry point runs.
@@ -317,7 +335,9 @@ struct EntryPointGlobalThreadingContext
         paramByFunc.clear();
         List<IRLoad*> loads;
         List<IRStore*> stores;
-        bool holdsEntryPointInput = false;
+        // The entry-point parameter that declares the input, for each entry point that has one.
+        Dictionary<IRFunc*, IRParam*> inputParamByEntryPoint;
+        IRInst* nameHintSource = nullptr;
         for (auto use = globalVar->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
@@ -331,7 +351,14 @@ struct EntryPointGlobalThreadingContext
             // variable.
             if (user->getOp() == kIROp_GlobalVariableShadowingGlobalParameterDecoration)
             {
-                holdsEntryPointInput = true;
+                // The decoration is on the entry-point parameter that declares the input.
+                auto param = as<IRParam>(user->getParent());
+                auto block = param ? as<IRBlock>(param->getParent()) : nullptr;
+                auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
+                if (!func || block != func->getFirstBlock())
+                    return false;
+                inputParamByEntryPoint[func] = param;
+                nameHintSource = param;
                 continue;
             }
             auto store = as<IRStore>(user);
@@ -346,46 +373,59 @@ struct EntryPointGlobalThreadingContext
         }
         // Only variables that hold an entry-point input (a built-in or varying input that
         // `translateGlobalVaryingVar` stores); other module-scope variables keep their storage.
-        if (!holdsEntryPointInput || loads.getCount() == 0)
+        if (!nameHintSource || loads.getCount() == 0)
             return false;
 
         // The functions that need the value: the ones that read the variable, and transitively
         // every caller up to an entry point. Every use of such a function must be a direct call.
         List<IRFunc*> needed;
         HashSet<IRFunc*> neededSet;
-        auto addNeeded = [&](IRFunc* func) -> bool
+        // Accepts `func`, which reads the variable or calls a function that needs the value. An
+        // entry point already has the value if it stores it; any other function is added to
+        // `needed`. Returns false, so that the variable is left alone, for an entry point that
+        // does not store the variable (it reads an input that it does not declare, which happens
+        // when several entry points are compiled into one module) and for a read outside a
+        // function.
+        auto acceptReader = [&](IRFunc* func) -> bool
         {
             if (!func)
                 return false;
             if (isEntryPoint(func))
                 return valueByEntryPoint.containsKey(func);
-            if (!func->getFirstBlock())
-                return false;
+            SLANG_ASSERT(func->getFirstBlock());
             if (neededSet.add(func))
                 needed.add(func);
             return true;
         };
         for (auto load : loads)
         {
-            if (!addNeeded(getParentFunc(load)))
+            if (!acceptReader(getParentFunc(load)))
                 return false;
         }
         for (Index i = 0; i < needed.getCount(); i++)
         {
             for (auto use = needed[i]->firstUse; use; use = use->nextUse)
             {
+                // A function used other than by a direct call (its address taken, for example)
+                // cannot get a parameter.
                 auto call = as<IRCall>(use->getUser());
                 if (!call || call->getCalleeUse() != use)
                     return false;
-                if (!addNeeded(getParentFunc(call)))
+                if (!acceptReader(getParentFunc(call)))
                     return false;
             }
         }
 
-        // The store must come before anything in its entry point that can read the variable.
+        // An entry point that declares the input passes its parameter, which is available from the
+        // start (a module-scope initializer that reads the input can run before the store).
+        // Otherwise the store must come before anything in its entry point that can read the
+        // variable.
         for (auto store : stores)
         {
-            if (!isInitialStore(store, globalVar, neededSet))
+            auto entryPoint = as<IRFunc>(store->getParent()->getParent());
+            if (auto param = inputParamByEntryPoint.tryGetValue(entryPoint))
+                valueByEntryPoint[entryPoint] = *param;
+            else if (!isInitialStore(store, globalVar, neededSet))
                 return false;
         }
 
@@ -399,7 +439,7 @@ struct EntryPointGlobalThreadingContext
             else
                 builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
             auto param = builder.emitParam(valueType);
-            if (auto nameHint = globalVar->findDecoration<IRNameHintDecoration>())
+            if (auto nameHint = nameHintSource->findDecoration<IRNameHintDecoration>())
                 builder.addNameHintDecoration(param, nameHint->getName());
             paramByFunc[func] = param;
             fixUpFuncType(func);
@@ -411,7 +451,10 @@ struct EntryPointGlobalThreadingContext
         {
             if (auto value = valueByEntryPoint.tryGetValue(func))
                 return *value;
-            return paramByFunc[func];
+            // Every function that reads the value was added to `needed` and given a parameter.
+            auto param = paramByFunc.tryGetValue(func);
+            SLANG_ASSERT(param);
+            return *param;
         };
         for (auto func : needed)
         {
