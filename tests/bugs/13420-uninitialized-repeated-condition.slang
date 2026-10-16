@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//TEST:SIMPLE: -target spirv -no-codegen -warnings-as-errors all
 
 extern static const int MODE = 1;
 static const bool ENABLED = MODE == 1;

@@ -1,8 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//TEST:SIMPLE: -target spirv -no-codegen -warnings-as-errors all
 
-// Check 128 variables so the analysis needs more than one mask word. Assigning the
-// first 127 or 63 variables on both branches leaves 1 or 65 needing condition tracking.
-// Every read remains initialized after the surviving variables receive new bit positions.
+// Check that reads of 128 variables remain warning-free when some are initialized
+// on both branches and the others are initialized and read under the same condition.
 struct Data { float value; };
 
 #define FIRST_63(M) \

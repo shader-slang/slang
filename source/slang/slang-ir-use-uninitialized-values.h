@@ -1,4 +1,4 @@
-// slang-ir-use-uninitialized-out-param.h
+// slang-ir-use-uninitialized-values.h
 #pragma once
 
 #include "core/slang-dictionary.h"
@@ -13,11 +13,12 @@ struct IRInst;
 struct IRGlobalValueWithCode;
 
 // The loads still needing an initialization check for one variable, together with
-// its store blocks and loop breaks suppressed by the diagnostic policy.
+// its store blocks and loop exits treated as initialization barriers.
 // A load here means an instruction classified as Load by this pass, including
 // IRLoad and calls with input arguments.
 // Preparation removes loads after a same-block store, exempt wave broadcasts, and
 // may-init violations (loads with no reaching store) before these records are analyzed.
+// Remaining loads must be instructions directly owned by a block.
 struct VariableInitializationInfo
 {
     HashSet<IRBlock*> blocksWithStore;
@@ -25,17 +26,18 @@ struct VariableInitializationInfo
     List<IRInst*> loads;
 };
 
-// Remove candidate loads unreachable without a preceding store under the diagnostic rules.
+// Remove loads that cannot be reached without a preceding store, after preparation.
+// func must have a body. Only the loads lists are modified; no IR is changed.
 // List indices remain fixed so callers can associate surviving loads with their variables.
-// First run without condition tracking, then track one repeated SSA condition at a time.
-// The initial walk has one work limit; all condition walks share a second limit.
-// Both count scalar operations and mask word visits and are capped by nonnegative maxWork.
-// If the first shared walk cannot finish, use unlimited per-variable walks. An incomplete condition
-// walk leaves loads unchanged, retaining the results of earlier completed walks.
+// A store to any part counts as initializing the whole variable; component coverage is not checked.
+// maxRefinementWork is a nonnegative test override for the condition-walk and discovery
+// allowances. Production uses the default CFG-scaled limits. Zero disables refinement.
+// The condition-independent result is always computed. Incomplete condition walks
+// leave loads unchanged, retaining the results of earlier completed walks.
 void removeInitializedLoads(
     IRGlobalValueWithCode* func,
     List<VariableInitializationInfo>& variables,
-    Index maxWork = kMaxIndex);
+    Index maxRefinementWork = kMaxIndex);
 
 void checkForUsingUninitializedValues(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang

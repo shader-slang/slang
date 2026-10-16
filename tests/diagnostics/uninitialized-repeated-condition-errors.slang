@@ -83,7 +83,7 @@ void loopCondition(bool initialized, bool again, float* output)
 }
 
 // Check that many unrelated repeated guards do not suppress a required warning.
-void refinementBudget(bool initialized, uint flags, float* output)
+void unrelatedRepeatedConditions(bool initialized, uint flags, float* output)
 {
     Data data;
     if (initialized)

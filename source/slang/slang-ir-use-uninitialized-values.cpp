@@ -330,14 +330,15 @@ static void collectPhiMergeStores(
         if (!block)
             continue;
         Index paramIndex = getParamIndexInBlock(param);
-        if (paramIndex < 0)
-            continue;
+        SLANG_RELEASE_ASSERT(paramIndex >= 0);
 
         for (auto pred : block->getPredecessors())
         {
-            auto branch = as<IRUnconditionalBranch>(pred->getTerminator());
-            if (!branch || UInt(paramIndex) >= branch->getArgCount())
-                continue;
+            // Predecessors of blocks with parameters end in unconditional branches.
+            // tryCall is an exception, but lowerErrorHandling removes it before this
+            // pass, replacing success parameters and branching with failure arguments.
+            auto branch = cast<IRUnconditionalBranch>(pred->getTerminator());
+            SLANG_RELEASE_ASSERT(UInt(paramIndex) < branch->getArgCount());
             auto arg = branch->getArg(UInt(paramIndex));
             // Only an argument that does not derive from the tracked uninitialized value is
             // a genuine definition reaching this merge point.
@@ -563,14 +564,15 @@ static IRBlock* getInfeasibleBranchFromPredecessor(IRBlock* block, IRBlock* from
         return nullptr;
 
     int paramIndex = getParamIndexInBlock(condParam);
-    if (paramIndex < 0)
-        return nullptr;
+    SLANG_RELEASE_ASSERT(paramIndex >= 0);
 
     // Get the branch argument supplied for that parameter along the edge from
     // `fromPred`.
-    auto branch = as<IRUnconditionalBranch>(fromPred->getTerminator());
-    if (!branch || UInt(paramIndex) >= branch->getArgCount())
-        return nullptr;
+    // Predecessors of blocks with parameters end in unconditional branches.
+    // tryCall is an exception, but lowerErrorHandling removes it before this
+    // pass, replacing success parameters and branching with failure arguments.
+    auto branch = cast<IRUnconditionalBranch>(fromPred->getTerminator());
+    SLANG_RELEASE_ASSERT(UInt(paramIndex) < branch->getArgCount());
 
     auto argVal = as<IRBoolLit>(branch->getArg(paramIndex));
     if (!argVal)
@@ -583,13 +585,18 @@ static IRBlock* getInfeasibleBranchFromPredecessor(IRBlock* block, IRBlock* from
 // The repeated branch conditions and CFG-derived work limit for one function.
 struct InitializationAnalysisContext
 {
+    // Heuristic refinement allowance per CFG edge and mask word, not a convergence bound.
+    // Exhaustion keeps unresolved warnings. The exact multiplier is a tuning choice.
     static constexpr Index kWorkLimitMultiplier = 32;
 
     List<IRInst*> repeatedConditions;
     Index maxWorkPerWord = 0;
 };
 
-// A scalar-operation and mask-word allowance shared by one or more walks.
+// A work unit is one scalar visit or one mask-word visit, including initialization,
+// copying, and propagation. This bounds the loops charged below, not elapsed time:
+// mask construction, dominance computation, and phi-argument scans are excluded.
+// Counting words keeps a wide batch from costing the same as a single variable.
 struct InitializationWorkBudget
 {
     Index remainingWork;
@@ -599,15 +606,12 @@ struct InitializationWorkBudget
     {
     }
 
-    // Reserve work before performing it. Failure exhausts the allowance.
+    // Reserve work before performing it. Failure leaves the allowance unchanged.
     bool tryConsumeWork(Index wordVisits, Index scalarVisits = 0)
     {
         Index work = wordVisits + scalarVisits;
         if (remainingWork < work)
-        {
-            remainingWork = 0;
             return false;
-        }
         remainingWork -= work;
         return true;
     }
@@ -628,77 +632,21 @@ static InitializationAnalysisContext collectInitializationAnalysisContext(
     {
         edgeCountIncludingEntry += block->getSuccessors().getCount();
         auto branch = as<IRIfElse>(block->getTerminator());
-        if (!branch || as<IRBoolLit>(branch->getCondition()))
+        if (!branch)
+            continue;
+        // A literal already has a known value and needs no remembered branch result.
+        if (as<IRBoolLit>(branch->getCondition()))
             continue;
         auto condition = branch->getCondition();
-        if (!seenConditions.add(condition) && repeatedConditions.add(condition))
+        if (seenConditions.add(condition))
+            continue;
+        if (repeatedConditions.add(condition))
             result.repeatedConditions.add(condition);
     }
     result.maxWorkPerWord =
         InitializationAnalysisContext::kWorkLimitMultiplier * edgeCountIncludingEntry;
     return result;
 }
-
-// The blocks reachable from function entry without a preceding store to one variable.
-// Reachability is recorded at block entry, so a load before a store remains visible.
-// Suppressed loop-break blocks and edges excluded by a predecessor's constant phi
-// argument are not traversed. These are initialization diagnostic rules, rather
-// than a proof that every recorded path can execute.
-// This per-variable walk has no work limit and serves as the shared walk's fallback.
-struct StoreFreeReachability
-{
-    // The incoming edge determines the block's phi arguments.
-    struct Edge
-    {
-        IRBlock* predecessor;
-        IRBlock* block;
-    };
-
-    const HashSet<IRBlock*>& blocksWithStore;
-    const HashSet<IRBlock*>& suppressedBreakBlocks;
-    HashSet<IRBlock*> reachable;
-    HashSet<KeyValuePair<IRBlock*, IRBlock*>> visited;
-    List<Edge> worklist;
-
-    StoreFreeReachability(
-        const HashSet<IRBlock*>& stores,
-        const HashSet<IRBlock*>& suppressedBreaks)
-        : blocksWithStore(stores), suppressedBreakBlocks(suppressedBreaks)
-    {
-    }
-
-    // Record a permitted block entry once for each predecessor.
-    void enqueue(IRBlock* predecessor, IRBlock* block, IRBlock* infeasibleBlock = nullptr)
-    {
-        if (block == infeasibleBlock || suppressedBreakBlocks.contains(block))
-            return;
-        if (visited.add(KeyValuePair<IRBlock*, IRBlock*>(predecessor, block)))
-        {
-            reachable.add(block);
-            worklist.add(Edge{predecessor, block});
-        }
-    }
-
-    // Find reachable block entries, stopping propagation after a block with a store.
-    void compute(IRGlobalValueWithCode* func)
-    {
-        if (auto entry = func->getFirstBlock())
-            enqueue(nullptr, entry);
-        while (worklist.getCount())
-        {
-            auto edge = worklist.getLast();
-            worklist.removeLast();
-            auto block = edge.block;
-            if (blocksWithStore.contains(block))
-                continue;
-            auto infeasibleBlock = edge.predecessor
-                                       ? getInfeasibleBranchFromPredecessor(block, edge.predecessor)
-                                       : nullptr;
-            for (auto successor : block->getSuccessors())
-                enqueue(block, successor, infeasibleBlock);
-        }
-    }
-};
 
 // A `if (WaveIsFirstLane()) { ... }` guard found in the function being analyzed, recorded
 // once per function rather than once per tracked variable (see `WaveElectionContext` below).
@@ -743,26 +691,45 @@ static List<WaveElectionGuard> collectWaveElectionGuards(IRGlobalValueWithCode* 
     return guards;
 }
 
+// A dominator tree for one function, computed on first use and owned by a single
+// analysis invocation.
+struct LazyDominatorTree
+{
+    IRGlobalValueWithCode* func;
+    RefPtr<IRDominatorTree> tree;
+
+    explicit LazyDominatorTree(IRGlobalValueWithCode* func)
+        : func(func)
+    {
+    }
+
+    // Return the tree for this invocation without consulting the module cache.
+    IRDominatorTree* get()
+    {
+        if (!tree)
+            tree = computeDominatorTree(func);
+        return tree;
+    }
+};
+
 // Function-wide context for the `WaveIsFirstLane()`/`WaveReadLaneFirst()` must-init relaxation.
 // Computed once per function and threaded through by reference (mirroring how
 // `ReachabilityContext` is built once in `checkUninitializedValues`), because both `guards` and
 // `dominatorTree` are variable-independent -- rebuilding them per tracked variable would be
-// wasted work. `dominatorTree` is only built when `guards` is non-empty, since the
-// overwhelming majority of functions contain no `WaveIsFirstLane()` guard at all and shouldn't
-// pay for a dominator tree they'll never query.
+// wasted work. The analysis invocation owns the lazy tree, sharing it with condition grouping,
+// and outlives this context.
 struct WaveElectionContext
 {
     List<WaveElectionGuard> guards;
-    RefPtr<IRDominatorTree> dominatorTree;
+    LazyDominatorTree& dominatorTree;
 };
 
-static WaveElectionContext collectWaveElectionContext(IRGlobalValueWithCode* func)
+// Collect wave guards, borrowing the invocation's lazy dominator tree.
+static WaveElectionContext collectWaveElectionContext(
+    IRGlobalValueWithCode* func,
+    LazyDominatorTree& dominatorTree)
 {
-    WaveElectionContext context;
-    context.guards = collectWaveElectionGuards(func);
-    if (context.guards.getCount() != 0)
-        context.dominatorTree = computeDominatorTree(func);
-    return context;
+    return {collectWaveElectionGuards(func), dominatorTree};
 }
 
 // Is `to` reachable from `from` at all, ignoring `blocksWithStore` entirely? Used by
@@ -942,7 +909,7 @@ static void prepareVariableInitializationInfo(
 
     // Wave-broadcast relaxation for https://github.com/shader-slang/slang/issues/12545: a load
     // that is read back only through `WaveReadLaneFirst()` is exempted from the must-init walk
-    // when every store-free path out of some `WaveIsFirstLane()` guard's true-branch is
+    // below when every store-free path out of some `WaveIsFirstLane()` guard's true-branch is
     // blocked by a store before it can leave the guard, and the load itself is only reachable
     // after that guard has reconverged. Such a load is not actually reachable while
     // uninitialized: `WaveReadLaneFirst` broadcasts from the first active lane, which is
@@ -951,7 +918,7 @@ static void prepareVariableInitializationInfo(
     // Known, accepted scope limit: this is a single-thread CFG proof (see
     // `isEveryPathFromBlockedByStore` and `isWaveReadLaneFirstUse` for the two halves of it).
     // It does not model whether the wave's active-lane mask could shift between the guard and
-    // the load -- e.g. an intervening `discard`/`return` taken by only some lanes -- since
+    // the read -- e.g. an intervening `discard`/`return` taken by only some lanes -- since
     // Slang has no dynamic-uniformity/wave-reconvergence analysis anywhere, and this relaxation
     // does not add one.
     for (auto& guard : waveElection.guards)
@@ -962,7 +929,9 @@ static void prepareVariableInitializationInfo(
         {
             auto load = loads[i];
             auto block = as<IRBlock>(load->getParent());
-            if (block && waveElection.dominatorTree->dominates(guard.mergeBlock, block) &&
+            // Only block-local reads that broadcast from the first lane after
+            // the guard's reconvergence qualify for this exemption.
+            if (block && waveElection.dominatorTree.get()->dominates(guard.mergeBlock, block) &&
                 isWaveReadLaneFirstUse(load))
             {
                 loads.fastRemoveAt(i);
@@ -1018,13 +987,13 @@ static void prepareVariableInitializationInfo(
     // false positives (this is what previously forced large parts of the core module
     // and many tests to disable the warning).
     //
-    // To suppress those while still catching genuine first-iteration loads (the #10658
+    // To suppress those while still catching genuine first-iteration reads (the #10658
     // motivating bug, where the use appears *inside* the loop before any store), we
     // treat a loop whose body contains a store as initializing the variable by the time
     // control reaches the loop-exit (break) block: that break block is never marked
-    // clean-reachable. The break block is the loop's reconvergence point, so every path
+    // reachable without a store. The break block is the loop's reconvergence point, so every path
     // that reaches it first goes through the loop; excluding it does not hide store-free
-    // paths that bypass the loop entirely. Clean state still flows into the loop body, so
+    // paths that bypass the loop entirely. Store-free state still flows into the loop body, so
     // uses that precede the store inside the body are still reported.
     HashSet<IRBlock*> suppressedBreakBlocks;
     for (auto block : func->getBlocks())
@@ -1078,11 +1047,17 @@ static void prepareVariableInitializationInfo(
 
     // Loads after a same-block store are already initialized. The CFG walk
     // records reachability at block entry, so it cannot distinguish those loads.
+    // SPIRVAsmOperandConvertTexel and SPIRVAsmOperandRayPayloadFromLocation can
+    // fall through to the default Load classification, but their parent is SPIRVAsm,
+    // not a block. (SPIRVAsmOperandInst is instead classified as StoreParent.)
+    // These nested reads remain excluded and receive no must-init diagnostic;
+    // the earlier may-init check still applies. TODO: account for their containing
+    // instruction so the CFG analysis can check conditional initialization too.
     for (Index loadIndex = 0; loadIndex < loads.getCount();)
     {
         auto block = as<IRBlock>(loads[loadIndex]->getParent());
-        bool definitelyAssigned = !block || loadHasPriorStoreInBlock.contains(loads[loadIndex]);
-        if (definitelyAssigned)
+        bool excludedFromWalk = !block || loadHasPriorStoreInBlock.contains(loads[loadIndex]);
+        if (excludedFromWalk)
         {
             // fastRemoveAt moves the last load here, so check this index again.
             loads.fastRemoveAt(loadIndex);
@@ -1123,6 +1098,26 @@ struct VariableInitializationBatch
         rebuild(_Move(selectedVariableIndices));
     }
 
+    // Return whether any selected variable still has candidate loads.
+    bool hasUnresolvedLoads() const
+    {
+        for (auto variableIndex : variableIndices)
+            if (variables[variableIndex].loads.getCount())
+                return true;
+        return false;
+    }
+
+    // Drop resolved variables and rebuild masks only when the selection changes.
+    void removeResolvedVariables()
+    {
+        List<Index> unresolvedVariables;
+        for (auto variableIndex : variableIndices)
+            if (variables[variableIndex].loads.getCount())
+                unresolvedVariables.add(variableIndex);
+        if (unresolvedVariables.getCount() != variableIndices.getCount())
+            rebuild(_Move(unresolvedVariables));
+    }
+
     // Select variables for the walk and rebuild every mask from that selection.
     void rebuild(List<Index> selectedVariableIndices)
     {
@@ -1156,10 +1151,14 @@ struct VariableInitializationBatch
 // the result of one repeated SSA branch condition.
 //
 // This is a forward bit-vector dataflow analysis. A set bit means a variable can
-// reach the state without a preceding store under the diagnostic rules. Incoming
+// reach the state without a preceding store or a suppressed loop exit. Incoming
 // sets merge by union; stores remove bits before propagation to successors. A
 // completed worklist traversal reaches a fixed point. Remembering one condition
 // gives limited path sensitivity.
+// Definite assignment requires a store on every path, not one dominating store:
+// different arms of an if/else can initialize the same variable. Preparation removes
+// exempt wave-broadcast loads and records loop exits that stop store-free propagation
+// in VariableInitializationInfo::suppressedBreakBlocks.
 //
 // Consider this example:
 //
@@ -1180,10 +1179,10 @@ struct VariableInitializationBatch
 //
 // Each state records a predecessor, block, and condition value. The predecessor
 // determines phi arguments; the condition value excludes contradictory branches.
-// A null condition gives the same traversal as StoreFreeReachability. Store and
+// A null condition considers both arms of each nonconstant branch. Store and
 // loop-break masks act independently on each bit. Their transfer functions
 // distribute over union, so a completed shared walk computes the same results
-// as separate walks under the same diagnostic rules.
+// as separate walks with the same stores, suppressed loop exits, and tracked condition.
 struct SharedStoreFreeReachability
 {
     using Word = UIntSet::Element;
@@ -1210,8 +1209,10 @@ struct SharedStoreFreeReachability
 
     const VariableInitializationBatch& batch;
     IRInst* condition;
-    InitializationWorkBudget& workBudget;
-    Dictionary<KeyValuePair<IRBlock*, IRBlock*>, Index> stateIndices[3];
+    InitializationWorkBudget* workBudget;
+    using Edge = KeyValuePair<IRBlock*, IRBlock*>;
+    using StateKey = KeyValuePair<Edge, ConditionValue>;
+    Dictionary<StateKey, Index> mapStateToIndex;
     List<State> states;
     List<Index> worklist;
     // Union of reached variables across all states entering each block.
@@ -1220,9 +1221,17 @@ struct SharedStoreFreeReachability
     SharedStoreFreeReachability(
         const VariableInitializationBatch& batch,
         IRInst* trackedCondition,
-        InitializationWorkBudget& workBudget)
+        InitializationWorkBudget* workBudget)
         : batch(batch), condition(trackedCondition), workBudget(workBudget)
     {
+    }
+
+    // A null budget explicitly requests an unbounded walk.
+    bool tryConsumeWork(Index wordVisits, Index scalarVisits = 0)
+    {
+        if (!workBudget)
+            return true;
+        return workBudget->tryConsumeWork(wordVisits, scalarVisits);
     }
 
     // Return zero for words beyond the set's storage, since those bits are unset.
@@ -1243,7 +1252,7 @@ struct SharedStoreFreeReachability
         const Mask& variables,
         IRBlock* infeasibleBlock = nullptr)
     {
-        if (!workBudget.tryConsumeWork(0, 1))
+        if (!tryConsumeWork(0, 1))
             return false;
         if (block == infeasibleBlock)
             return true;
@@ -1252,12 +1261,12 @@ struct SharedStoreFreeReachability
         if (condition && condition->getParent() == block)
             conditionValue = ConditionValue::Unknown;
 
-        auto key = KeyValuePair<IRBlock*, IRBlock*>(predecessor, block);
+        auto key = StateKey(Edge(predecessor, block), conditionValue);
         Index stateIndex;
-        if (!stateIndices[Index(conditionValue)].tryGetValue(key, stateIndex))
+        if (!mapStateToIndex.tryGetValue(key, stateIndex))
         {
             // Account for explicitly zeroing the two state masks.
-            if (!workBudget.tryConsumeWork(2 * batch.wordCount))
+            if (!tryConsumeWork(2 * batch.wordCount))
                 return false;
             State state;
             state.predecessor = predecessor;
@@ -1267,18 +1276,18 @@ struct SharedStoreFreeReachability
             state.pending = Mask::makeRepeated(Word(0), batch.wordCount);
             stateIndex = states.getCount();
             states.add(_Move(state));
-            stateIndices[Index(conditionValue)].add(key, stateIndex);
+            mapStateToIndex.add(key, stateIndex);
         }
         auto reachedAtBlock = reachable.tryGetValue(block);
         if (!reachedAtBlock)
         {
-            if (!workBudget.tryConsumeWork(batch.wordCount))
+            if (!tryConsumeWork(batch.wordCount))
                 return false;
             Mask mask = Mask::makeRepeated(Word(0), batch.wordCount);
             reachable.add(block, _Move(mask));
             reachedAtBlock = reachable.tryGetValue(block);
         }
-        if (!workBudget.tryConsumeWork(batch.wordCount))
+        if (!tryConsumeWork(batch.wordCount))
             return false;
         auto blockBarriers = batch.barriers.tryGetValue(block);
         auto& state = states[stateIndex];
@@ -1320,7 +1329,7 @@ struct SharedStoreFreeReachability
             // tryEnqueue can reallocate states, so successor traversal uses a copy.
             // reached grows monotonically; pending propagates each new bit at most once
             // per state, including on paths through loops.
-            if (!workBudget.tryConsumeWork(2 * batch.wordCount, 1))
+            if (!tryConsumeWork(2 * batch.wordCount, 1))
                 return false;
             Mask variables = states[stateIndex].pending;
             states[stateIndex].queued = false;
@@ -1340,22 +1349,31 @@ struct SharedStoreFreeReachability
             auto infeasibleBlock =
                 predecessor ? getInfeasibleBranchFromPredecessor(block, predecessor) : nullptr;
             auto branch = as<IRIfElse>(block->getTerminator());
-            if (condition && branch && branch->getCondition() == condition)
+            // Only a branch on this walk's condition can reuse or establish its value.
+            const bool isBranchOnTrackedCondition =
+                condition && branch && branch->getCondition() == condition;
+            if (isBranchOnTrackedCondition)
             {
-                if (conditionValue != ConditionValue::False && !tryEnqueue(
-                                                                   block,
-                                                                   branch->getTrueBlock(),
-                                                                   ConditionValue::True,
-                                                                   variables,
-                                                                   infeasibleBlock))
-                    return false;
-                if (conditionValue != ConditionValue::True && !tryEnqueue(
-                                                                  block,
-                                                                  branch->getFalseBlock(),
-                                                                  ConditionValue::False,
-                                                                  variables,
-                                                                  infeasibleBlock))
-                    return false;
+                if (conditionValue != ConditionValue::False)
+                {
+                    if (!tryEnqueue(
+                            block,
+                            branch->getTrueBlock(),
+                            ConditionValue::True,
+                            variables,
+                            infeasibleBlock))
+                        return false;
+                }
+                if (conditionValue != ConditionValue::True)
+                {
+                    if (!tryEnqueue(
+                            block,
+                            branch->getFalseBlock(),
+                            ConditionValue::False,
+                            variables,
+                            infeasibleBlock))
+                        return false;
+                }
             }
             else
             {
@@ -1371,31 +1389,33 @@ struct SharedStoreFreeReachability
 };
 
 // Remove candidate loads not reached by a completed shared store-free walk.
-// Return false without changing loads if none remain or the work allowance is exhausted.
+// A null budget runs to completion; exhaustion leaves loads unchanged.
 static bool tryRemoveInitializedLoads(
     IRGlobalValueWithCode* func,
     VariableInitializationBatch& batch,
     IRInst* condition,
-    InitializationWorkBudget& workBudget)
+    InitializationWorkBudget* workBudget)
 {
     using Walk = SharedStoreFreeReachability;
+    Walk walk(batch, condition, workBudget);
     const Index variableCount = batch.variableIndices.getCount();
-    if (!workBudget.tryConsumeWork(batch.wordCount, variableCount))
+    if (!walk.tryConsumeWork(batch.wordCount, variableCount))
         return false;
-    auto active = Walk::Mask::makeRepeated(Walk::Word(0), batch.wordCount);
+    UIntSet active;
+    active.resize(UInt(variableCount));
     Index loadCount = 0;
     for (Index bitIndex = 0; bitIndex < variableCount; bitIndex++)
     {
         auto count = batch.variables[batch.variableIndices[bitIndex]].loads.getCount();
         loadCount += count;
         if (count)
-            active[bitIndex / UIntSet::kElementSize] |= Walk::Word(1)
-                                                        << (bitIndex % UIntSet::kElementSize);
+            active.add(UInt(bitIndex));
     }
     if (!loadCount)
+        return true;
+    if (!walk.tryCompute(func, active.getBuffer()))
         return false;
-    Walk walk(batch, condition, workBudget);
-    if (!walk.tryCompute(func, active) || !workBudget.tryConsumeWork(0, loadCount + variableCount))
+    if (!walk.tryConsumeWork(0, loadCount + variableCount))
         return false;
 
     // The result scan has already been included in the work limit. Applying all
@@ -1407,8 +1427,9 @@ static bool tryRemoveInitializedLoads(
         Walk::Word maskBit = Walk::Word(1) << (bitIndex % UIntSet::kElementSize);
         for (Index loadIndex = 0; loadIndex < loads.getCount();)
         {
-            auto block = as<IRBlock>(loads[loadIndex]->getParent());
+            auto block = cast<IRBlock>(loads[loadIndex]->getParent());
             auto mask = walk.reachable.tryGetValue(block);
+            // A missing block entry or unset bit means no store-free path reaches the load.
             if (!mask || !((*mask)[wordIndex] & maskBit))
                 loads.fastRemoveAt(loadIndex);
             else
@@ -1418,77 +1439,215 @@ static bool tryRemoveInitializedLoads(
     return true;
 }
 
-// Remove loads unreachable without a store, using an unlimited walk per variable.
-// Preparation has already applied instruction-order, wave, and loop rules.
-static void removeInitializedLoadsIndividually(
+// Remove loads proved initialized without correlating repeated branch conditions.
+static void removeDefinitelyAssignedLoads(
     IRGlobalValueWithCode* func,
-    List<VariableInitializationInfo>& variables)
+    VariableInitializationBatch& batch)
 {
-    for (auto& variable : variables)
+    // This walk runs to completion so an analysis cutoff cannot cause a warning
+    // for a load initialized on every path. Later walks can use a work limit because
+    // they only remove additional warnings by correlating branch conditions.
+    const bool completed = tryRemoveInitializedLoads(func, batch, nullptr, nullptr);
+    SLANG_RELEASE_ASSERT(completed);
+}
+
+// Return whether entering this branch successor is required to reach block.
+static bool doesBranchEdgeDominateBlock(
+    IRDominatorTree* dominatorTree,
+    IRBlock* successor,
+    IRBlock* block)
+{
+    // The caller supplies an outgoing branch target. A single incoming edge makes
+    // reaching that target equivalent to taking this edge, including an empty arm.
+    if (successor->getPredecessors().getCount() != 1)
+        return false;
+    return dominatorTree->dominates(successor, block);
+}
+
+// Group variables by repeated conditions enclosing their candidate loads.
+// Return a partial grouping if discovery exhausts its allowance. No loads are removed.
+static Dictionary<IRInst*, List<Index>> collectPreferredInitializationVariables(
+    LazyDominatorTree& lazyDominatorTree,
+    const VariableInitializationBatch& batch,
+    const InitializationAnalysisContext& context,
+    Index maxRefinementWork)
+{
+    Dictionary<IRInst*, List<Index>> mapConditionToVariables;
+    // With one condition, the shared walk already gives every variable an attempt.
+    if (context.repeatedConditions.getCount() <= 1)
+        return mapConditionToVariables;
+    auto dominatorTree = lazyDominatorTree.get();
+    InitializationWorkBudget discoveryBudget(
+        Math::Min(context.maxWorkPerWord * batch.wordCount, maxRefinementWork));
+
+    // Consider this example:
+    //
+    //     void use(bool a, bool b, float* output)
+    //     {
+    //         float x, y;
+    //         if (a) x = 1;
+    //         if (b) y = 2;
+    //         if (a) output[0] = x;
+    //         if (b) output[1] = y;
+    //     }
+    //
+    // Lowering preserves each parameter as the same SSA condition at its two branches.
+    // The condition-independent walk cannot connect those branches. Grouping by the
+    // conditions enclosing each load gives y an attempt tracking b without sharing
+    // its allowance with x's attempt tracking a. Variables guarded by the same
+    // condition still share a walk. Only the completed walks can remove loads.
+    //
+    // Dominance only schedules work here; it never proves initialization. A load
+    // reached only through one branch edge gets an attempt tracking that condition.
+    // This includes `if (a) {} else return; use(x);`, where the true edge targets
+    // the merge block directly. Reconverged arms do not qualify.
+    // The per-variable cap bounds these extra attempts; remaining conditions still
+    // get the final shared allowance. Discovery also has its own allowance so repeated
+    // loads cannot cause an unbounded quadratic scan through dominator ancestors.
+    // Four is a heuristic cap on separately budgeted attempts per variable, not
+    // a semantic threshold. Further conditions can use the final shared allowance;
+    // if no completed walk proves the load safe, its warning remains.
+    static constexpr Index kMaxPreferredConditionsPerVariable = 4;
+    HashSet<IRInst*> repeatedConditionSet;
+    for (auto condition : context.repeatedConditions)
+        repeatedConditionSet.add(condition);
+    for (auto variableIndex : batch.variableIndices)
     {
-        if (!variable.loads.getCount())
-            continue;
-        StoreFreeReachability baseline(variable.blocksWithStore, variable.suppressedBreakBlocks);
-        baseline.compute(func);
-        for (Index loadIndex = 0; loadIndex < variable.loads.getCount();)
+        HashSet<IRInst*> selectedConditions;
+        for (auto load : batch.variables[variableIndex].loads)
         {
-            auto block = as<IRBlock>(variable.loads[loadIndex]->getParent());
-            if (!baseline.reachable.contains(block))
-                variable.loads.fastRemoveAt(loadIndex);
-            else
-                loadIndex++;
+            auto loadBlock = cast<IRBlock>(load->getParent());
+            for (auto block = dominatorTree->getImmediateDominator(loadBlock); block;
+                 block = dominatorTree->getImmediateDominator(block))
+            {
+                if (selectedConditions.getCount() == kMaxPreferredConditionsPerVariable)
+                    break;
+                if (!discoveryBudget.tryConsumeWork(0, 1))
+                    return mapConditionToVariables;
+                auto branch = as<IRIfElse>(block->getTerminator());
+                if (!branch)
+                    continue;
+                if (!repeatedConditionSet.contains(branch->getCondition()))
+                    continue;
+                const bool trueEdgeDominates =
+                    doesBranchEdgeDominateBlock(dominatorTree, branch->getTrueBlock(), loadBlock);
+                const bool falseEdgeDominates =
+                    doesBranchEdgeDominateBlock(dominatorTree, branch->getFalseBlock(), loadBlock);
+                if (!trueEdgeDominates && !falseEdgeDominates)
+                    continue;
+                if (selectedConditions.add(branch->getCondition()))
+                    mapConditionToVariables[branch->getCondition()].add(variableIndex);
+            }
+            if (selectedConditions.getCount() == kMaxPreferredConditionsPerVariable)
+                break;
         }
+    }
+    return mapConditionToVariables;
+}
+
+// Give each preferred guard group its own bounded initialization proof attempt.
+static void removeLoadsInitializedUnderPreferredConditions(
+    IRGlobalValueWithCode* func,
+    List<VariableInitializationInfo>& variables,
+    const InitializationAnalysisContext& context,
+    const Dictionary<IRInst*, List<Index>>& mapConditionToVariables,
+    Index maxRefinementWork)
+{
+    for (auto condition : context.repeatedConditions)
+    {
+        auto preferredVariables = mapConditionToVariables.tryGetValue(condition);
+        if (!preferredVariables)
+            continue;
+        List<Index> unresolvedPreferredVariables;
+        for (auto variableIndex : *preferredVariables)
+            if (variables[variableIndex].loads.getCount())
+                unresolvedPreferredVariables.add(variableIndex);
+        if (!unresolvedPreferredVariables.getCount())
+            continue;
+        VariableInitializationBatch preferredBatch(variables, _Move(unresolvedPreferredVariables));
+        InitializationWorkBudget preferredBudget(
+            Math::Min(context.maxWorkPerWord * preferredBatch.wordCount, maxRefinementWork));
+        // An exhausted preferred walk changes no loads. Other groups still
+        // receive their attempt, and the shared refinement remains available.
+        tryRemoveInitializedLoads(func, preferredBatch, condition, &preferredBudget);
     }
 }
 
-void removeInitializedLoads(
+// Try the remaining conditions with one shared allowance, stopping when all loads are resolved.
+static void removeLoadsInitializedUnderRepeatedConditions(
+    IRGlobalValueWithCode* func,
+    VariableInitializationBatch& batch,
+    const InitializationAnalysisContext& context,
+    Index maxRefinementWork)
+{
+    // Each walk considers paths allowed by its tracked condition and the batch's
+    // store and loop-exit barriers. A load not reached by any such store-free path
+    // can be removed after that walk completes. Removed loads do not become
+    // assumptions for later walks. Proofs requiring multiple conditions together
+    // can be missed. A failed walk leaves results from completed walks intact.
+    InitializationWorkBudget conditionBudget(
+        Math::Min(context.maxWorkPerWord * batch.wordCount, maxRefinementWork));
+    for (auto condition : context.repeatedConditions)
+    {
+        if (!batch.hasUnresolvedLoads())
+            break;
+        if (!tryRemoveInitializedLoads(func, batch, condition, &conditionBudget))
+            break;
+    }
+}
+
+// Analyze prepared loads, sharing the fresh tree owned by this invocation.
+static void removeInitializedLoads(
     IRGlobalValueWithCode* func,
     List<VariableInitializationInfo>& variables,
-    Index maxWork)
+    Index maxRefinementWork,
+    LazyDominatorTree& dominatorTree)
 {
-    SLANG_RELEASE_ASSERT(maxWork >= 0);
-    auto context = collectInitializationAnalysisContext(func);
+    SLANG_RELEASE_ASSERT(maxRefinementWork >= 0);
     if (!variables.getCount())
         return;
+    SLANG_RELEASE_ASSERT(func->getFirstBlock());
     List<Index> variableIndices;
     for (Index variableIndex = 0; variableIndex < variables.getCount(); variableIndex++)
         variableIndices.add(variableIndex);
     VariableInitializationBatch batch(variables, _Move(variableIndices));
 
-    // Each allowance scales with CFG edges and mask words using kWorkLimitMultiplier.
-    // Mask construction and phi-argument scans are outside the allowance.
-    // First compute the baseline without tracking a condition. Failure falls back
-    // to unlimited individual walks, preserving the baseline diagnostic results.
-    InitializationWorkBudget baselineBudget(
-        Math::Min(context.maxWorkPerWord * batch.wordCount, maxWork));
-    const bool sharedBaselineCompleted =
-        tryRemoveInitializedLoads(func, batch, nullptr, baselineBudget);
-    if (!sharedBaselineCompleted)
-        removeInitializedLoadsIndividually(func, variables);
-
+    // The condition-independent walk always finishes.
+    removeDefinitelyAssignedLoads(func, batch);
+    if (!maxRefinementWork)
+        return;
+    batch.removeResolvedVariables();
+    if (!batch.variableIndices.getCount())
+        return;
+    auto context = collectInitializationAnalysisContext(func);
     if (!context.repeatedConditions.getCount())
         return;
 
-    // Only unresolved variables need condition tracking; rebuild their masks together.
-    List<Index> unresolvedVariables;
-    for (auto variableIndex : batch.variableIndices)
-        if (variables[variableIndex].loads.getCount())
-            unresolvedVariables.add(variableIndex);
-    if (!unresolvedVariables.getCount())
-        return;
-    if (unresolvedVariables.getCount() != batch.variableIndices.getCount())
-        batch.rebuild(_Move(unresolvedVariables));
+    // Enclosing guard edges identify likely useful conditions for each load.
+    auto mapConditionToVariables =
+        collectPreferredInitializationVariables(dominatorTree, batch, context, maxRefinementWork);
 
-    // Refine with one repeated condition at a time. All conditions share this budget.
-    // A failed walk keeps the results of earlier completed walks.
-    InitializationWorkBudget conditionBudget(
-        Math::Min(context.maxWorkPerWord * batch.wordCount, maxWork));
-    for (auto condition : context.repeatedConditions)
-    {
-        if (!conditionBudget.remainingWork ||
-            !tryRemoveInitializedLoads(func, batch, condition, conditionBudget))
-            break;
-    }
+    // Separate allowances prevent unrelated conditions from starving these proofs.
+    removeLoadsInitializedUnderPreferredConditions(
+        func,
+        variables,
+        context,
+        mapConditionToVariables,
+        maxRefinementWork);
+
+    // Only unresolved variables contribute to the shared remainder's masks and allowance.
+    batch.removeResolvedVariables();
+    removeLoadsInitializedUnderRepeatedConditions(func, batch, context, maxRefinementWork);
+}
+
+// Provide the isolated analysis entry point used by tests.
+void removeInitializedLoads(
+    IRGlobalValueWithCode* func,
+    List<VariableInitializationInfo>& variables,
+    Index maxRefinementWork)
+{
+    LazyDominatorTree dominatorTree(func);
+    removeInitializedLoads(func, variables, maxRefinementWork, dominatorTree);
 }
 
 static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List<IRInst*>& loads)
@@ -1498,6 +1657,9 @@ static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List
 
     for (auto alias : addresses)
     {
+        // A write to any field or element counts as initializing the whole variable.
+        // Condition refinement can therefore remove a warning even when another
+        // component remains unwritten.
         // TODO: Mark specific parts assigned to for partial initialization checks
         for (auto use = alias->firstUse; use; use = use->nextUse)
             collectInstructionByUsage(stores, loads, use->getUser(), alias);
@@ -1539,7 +1701,7 @@ static List<IRInst*> getUnresolvedParamLoads(
 // These sets are disjoint; candidates still need the shared analysis before diagnosis.
 struct UninitializedUseLoads
 {
-    // Loads with no reaching store (may-init violations, 41016/41033).
+    // Loads with NO store reaching them at all (the may-init violations, 41016/41033).
     List<IRInst*> mayInit;
 
     // Index into the function's VariableInitializationInfo list, or -1 if no
@@ -1557,19 +1719,19 @@ static UninitializedUseLoads collectUninitializedUseLoads(
     const WaveElectionContext& waveElection,
     List<VariableInitializationInfo>& variables)
 {
-    // One collection supplies the known violations and the remaining candidate loads.
+    // Collect the aliasable loads/stores once and derive both violation sets from it.
     List<IRInst*> stores;
     List<IRInst*> allLoads;
     collectAliasableLoadStores(inst, stores, allLoads);
 
     UninitializedUseLoads result;
 
-    // May-init violations are loads not reachable from any store.
+    // May-init violations: loads not reachable from any store.
     result.mayInit = allLoads;
     cancelLoads(reachability, stores, result.mayInit);
 
-    // Must-init adds information only when there is at least one store and one load.
-    // Without a store, every load is already a may-init violation.
+    // Must-init only adds information when there is at least one store (otherwise every
+    // load is already a may-init violation) and at least one load.
     if (stores.getCount() == 0 || allLoads.getCount() == 0)
         return result;
 
@@ -1833,8 +1995,8 @@ static void checkParameterAsOut(
 
 // Check parameters, ordinary values, and constructor initialization.
 // Ordinary values are collected before diagnosis so their must-init candidates can
-// share CFG traversal, first with the baseline rules and then with repeated-condition
-// tracking. Final diagnostics retain the original variable and diagnostic-class order.
+// share CFG traversal, first without correlating branches and then with repeated-condition
+// tracking. Diagnostics follow collection order, with may-init before must-init for each value.
 static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
 {
     auto firstBlock = func->getFirstBlock();
@@ -1843,9 +2005,11 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
 
     ReachabilityContext reachability(func);
 
-    // Computed once per function (not once per tracked variable) -- see the comment on
-    // `WaveElectionContext` for why.
-    auto waveElection = collectWaveElectionContext(func);
+    // A fresh tree for this invocation avoids depending on every earlier
+    // CFG-changing pass invalidating the module cache. Wave handling and condition
+    // grouping request the same tree lazily, with one owner for its lifetime.
+    LazyDominatorTree dominatorTree(func);
+    auto waveElection = collectWaveElectionContext(func, dominatorTree);
     List<VariableInitializationInfo> variables;
 
     // Used for a further analysis and to skip usual return checks
@@ -1904,10 +2068,10 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
         }
     }
 
-    removeInitializedLoads(func, variables);
+    removeInitializedLoads(func, variables, kMaxIndex, dominatorTree);
     for (auto& pending : pendingDiagnostics)
     {
-        // Retain the original variable and diagnostic-class order after refinement.
+        // May-init: the variable is read on a path where no store reaches it at all.
         diagnoseUninitializedUses<
             Diagnostics::UsingUninitializedVariable,
             Diagnostics::UsingUninitializedValue>(
@@ -1919,6 +2083,8 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
         if (variableIndex < 0)
             continue;
         const auto& mustInit = variables[variableIndex].loads;
+        // Must-init: some store reaches the use, but a store-free path from entry can
+        // still reach it — the variable is only conditionally initialized.
         diagnoseUninitializedUses<
             Diagnostics::PossiblyUsingUninitializedVariable,
             Diagnostics::PossiblyUsingUninitializedValue>(
