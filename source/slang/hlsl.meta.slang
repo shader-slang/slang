@@ -18104,20 +18104,24 @@ uint64_t __metalLaneBallot(bool condition)
     return __metal_simd_ballot(condition) & validLanes;
 }
 
-// The lanes below `lane` (a SIMD lane ID, so less than 64) as a 64-bit lane mask.
+// The lanes below `lane` as a 64-bit lane mask. `lane` is a SIMD lane ID, so less than 64, which
+// keeps the shift `1 << lane` defined.
 [ForceInline]
 uint64_t __metalLanesBelow(uint lane)
 {
     return (uint64_t(1) << uint64_t(lane)) - uint64_t(1);
 }
 
-// A `uint4` wave mask as a 64-bit lane mask. Metal SIMD-groups have at most 64 lanes.
+// A `uint4` wave mask as a 64-bit lane mask. Metal SIMD-groups have at most 64 lanes, so the bits
+// of `.z` and `.w` name lanes that cannot exist; they are dropped, not reported.
 [ForceInline]
 uint64_t __metalWaveMaskToLanes(uint4 mask)
 {
     return uint64_t(mask.x) | (uint64_t(mask.y) << uint64_t(32));
 }
 
+// The number of lanes set in a 64-bit lane mask, counted as two 32-bit halves so that the emitted
+// `popcount` calls take and return `uint`.
 [ForceInline]
 uint __metalCountLanes(uint64_t lanes)
 {
@@ -18126,6 +18130,9 @@ uint __metalCountLanes(uint64_t lanes)
 
 // Metal's SIMD-group permute functions take no bool (MSL spec 4.1, section 6.10.2): compare bools
 // as 0/1.
+// Call these only for `bool` (callers guard them with `__isBool<T>()`). They are generic only so
+// that the branch not taken for other types still type-checks; for a non-bool `T`, `uint($0)` would
+// convert or truncate the value.
 __generic<T : __BuiltinType>
 [require(metal)]
 uint __metalBoolToUInt(T value)
@@ -18150,7 +18157,10 @@ vector<uint, N> __metalBoolToUInt(vector<T, N> value)
 // A thread keeps the ballot of the iteration where `lane` is its own lane: that is the set of
 // threads with the same value as itself. When `lane` is inactive, `simd_shuffle` returns an
 // undefined value, but that ballot is always discarded, since `lane == self` only holds for an
-// active thread. The cost is one `simd_shuffle` and one `simd_ballot` per lane of the SIMD-group.
+// active thread. The current lane's bit is ORed in, because WaveMatch always includes the current
+// lane and a NaN component compares unequal to itself. The cost is one `simd_shuffle` and one
+// `simd_ballot` per lane of the SIMD-group.
+// The vector overload differs from the scalar one only by the `all(...)` around the comparison.
 // Precondition: `T` is not `bool` (callers convert bools to 0/1 `uint`).
 __generic<T : __BuiltinType>
 [ForceInline]
@@ -18163,7 +18173,7 @@ uint4 __metalWaveMatch(T value)
     {
         const uint64_t matching = __metalLaneBallot(value == WaveReadLaneAt(value, int(lane)));
         if (lane == self)
-            result = matching;
+            result = matching | (uint64_t(1) << uint64_t(self));
     }
     return __metal_simd_vote_mask_to_uint4(result);
 }
@@ -18179,7 +18189,7 @@ uint4 __metalWaveMatch(vector<T, N> value)
         const uint64_t matching =
             __metalLaneBallot(all(value == WaveReadLaneAt(value, int(lane))));
         if (lane == self)
-            result = matching;
+            result = matching | (uint64_t(1) << uint64_t(self));
     }
     return __metal_simd_vote_mask_to_uint4(result);
 }
@@ -18193,7 +18203,9 @@ uint4 __metalWaveMatch(vector<T, N> value)
 // one `simd_ballot`.
 
 // The operation and kind of a scan, named as in the scan tables' `spirvName` and
-// `spirvGroupOperation` columns, so each table row selects them by its existing entries.
+// `spirvGroupOperation` columns (`kWaveMultiPrefixSumProductNames`, `kWaveMultiPrefixBitwiseNames`),
+// so each table row selects them by its existing entries. Renaming a value in those columns needs
+// the matching enumerator renamed here.
 enum __MetalScanArithmeticOp
 {
     Add,
@@ -18212,6 +18224,9 @@ enum __MetalScanKind
 };
 
 // True if `lane` takes part in the scan of the thread at `currentLane`.
+// Precondition: `partitionLanes` is already intersected with the active lanes
+// (`__metalWaveMaskToLanes(mask) & __metalLaneBallot(true)`), so the undefined `simd_shuffle`
+// result of an inactive lane never enters the scan.
 [ForceInline]
 bool __metalScanIncludesLane(
     uint64_t partitionLanes,
@@ -18224,27 +18239,25 @@ bool __metalScanIncludesLane(
     return inPartition && (lane < currentLane || (isInclusive && lane == currentLane));
 }
 
-__generic<T : __BuiltinArithmeticType>
+__generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
-[require(metal, subgroup_shuffle)]
-T __metalWaveMultiPrefixArithmetic(
-    T value,
-    uint4 mask,
+vector<T, N> __metalScanArithmeticCombine(
     __MetalScanArithmeticOp op,
-    __MetalScanKind kind)
+    vector<T, N> a,
+    vector<T, N> b)
 {
-    const uint currentLane = WaveGetLaneIndex();
-    const uint64_t partitionLanes = __metalWaveMaskToLanes(mask) & __metalLaneBallot(true);
-    // The identity of the operation: 0 for Add, 1 for Mul.
-    T result = op == __MetalScanArithmeticOp.Mul ? T(1) : T(0);
-    for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
+    switch (op)
     {
-        const T other = WaveReadLaneAt(value, int(lane));
-        if (__metalScanIncludesLane(partitionLanes, lane, currentLane, kind))
-            result = op == __MetalScanArithmeticOp.Mul ? result * other : result + other;
+    case __MetalScanArithmeticOp.Add:
+        return a + b;
+    case __MetalScanArithmeticOp.Mul:
+        return a * b;
     }
-    return result;
+    return a;
 }
+
+// Both scans (arithmetic and bitwise) are written once, for vectors; the scalar overloads forward
+// through `vector<T, 1>`, which Metal emits as a scalar.
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(metal, subgroup_shuffle)]
@@ -18256,14 +18269,26 @@ vector<T, N> __metalWaveMultiPrefixArithmetic(
 {
     const uint currentLane = WaveGetLaneIndex();
     const uint64_t partitionLanes = __metalWaveMaskToLanes(mask) & __metalLaneBallot(true);
+    // The identity of the operation: 0 for Add, 1 for Mul.
     vector<T, N> result = vector<T, N>(op == __MetalScanArithmeticOp.Mul ? T(1) : T(0));
     for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
     {
         const vector<T, N> other = WaveReadLaneAt(value, int(lane));
         if (__metalScanIncludesLane(partitionLanes, lane, currentLane, kind))
-            result = op == __MetalScanArithmeticOp.Mul ? result * other : result + other;
+            result = __metalScanArithmeticCombine(op, result, other);
     }
     return result;
+}
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(metal, subgroup_shuffle)]
+T __metalWaveMultiPrefixArithmetic(
+    T value,
+    uint4 mask,
+    __MetalScanArithmeticOp op,
+    __MetalScanKind kind)
+{
+    return __metalWaveMultiPrefixArithmetic(vector<T, 1>(value), mask, op, kind)[0];
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -18276,9 +18301,10 @@ vector<T, N> __metalScanBitwiseCombine(__MetalScanBitwiseOp op, vector<T, N> a, 
         return a & b;
     case __MetalScanBitwiseOp.Or:
         return a | b;
-    default:
+    case __MetalScanBitwiseOp.Xor:
         return a ^ b;
     }
+    return a;
 }
 
 // Metal's SIMD-group functions take no bool, so `T` is an integer type here.
@@ -18380,11 +18406,21 @@ bool WaveActiveAllEqual(vector<T,N> value)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_hlsl, subgroup_vote)]
+[require(metal, subgroup_vote)]
 bool WaveActiveAllEqual(matrix<T, N, M> value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveActiveAllEqual";
+    case metal:
+        {
+            // Every thread gets the same answer for each row, so all threads run the same votes.
+            bool result = true;
+            [ForceUnroll]
+            for (int i = 0; i < N; i++)
+                result = WaveActiveAllEqual(value[i]) && result;
+            return result;
+        }
     default:
         return WaveMaskAllEqual(WaveGetActiveMask(), value);
     }
@@ -20106,6 +20142,8 @@ ${
 struct WaveMultiPrefixSumProductEntry
 {
     const char* name;
+    // The Metal path also uses these two as enumerator names of `__MetalScanArithmeticOp` and
+    // `__MetalScanKind`; keep them in sync.
     const char* spirvName;
     const char* spirvGroupOperation;
     const char* glslName;
@@ -20482,6 +20520,8 @@ ${
 struct WaveMultiPrefixBitwiseEntry
 {
     const char* name;
+    // The Metal path also uses these two as enumerator names of `__MetalScanBitwiseOp` and
+    // `__MetalScanKind`; keep them in sync.
     const char* spirvName;
     const char* spirvGroupOperation;
     const char* glslName;

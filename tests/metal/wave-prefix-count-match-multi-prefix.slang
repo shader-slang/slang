@@ -14,6 +14,9 @@
 //TEST:SIMPLE(filecheck=BALLOT): -target metal -stage compute -entry ballotMain
 //TEST:SIMPLE(filecheck=MATCH): -target metal -stage compute -entry matchMain
 //TEST:SIMPLE(filecheck=SCAN): -target metal -stage compute -entry scanMain
+//TEST:SIMPLE(filecheck=NO_HLSL): -target metal -stage compute -entry ballotMain
+//TEST:SIMPLE(filecheck=NO_HLSL): -target metal -stage compute -entry matchMain
+//TEST:SIMPLE(filecheck=NO_HLSL): -target metal -stage compute -entry scanMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry ballotMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry matchMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry scanMain
@@ -31,11 +34,10 @@ void ballotMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     result += WaveActiveAllEqual(index > 100) ? 1u << 17 : 0u;
     result += WaveActiveAllEqual(uint2(index & 1, 7)) ? 1u << 18 : 0u;
     result += WaveActiveAllEqual(bool2(index > 100, true)) ? 1u << 19 : 0u;
+    result += WaveActiveAllEqual(float2x2(index & 1, 0, 1, 1)) ? 1u << 20 : 0u;
     outputBuffer[index] = result;
 }
 
-// No call is left to an HLSL intrinsic that MSL lacks (the emitted helpers are named `Name_N`).
-// BALLOT-NOT: {{(WavePrefixCountBits|WaveActiveAllEqual|WaveMultiPrefixCountBits)\(}}
 // BALLOT-DAG: simd_ballot
 // BALLOT-DAG: popcount
 // BALLOT-DAG: simd_broadcast_first
@@ -52,7 +54,6 @@ void matchMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     outputBuffer[index] = result.x + result.y;
 }
 
-// MATCH-NOT: {{WaveMatch\(}}
 // MATCH-DAG: simd_shuffle
 // MATCH-DAG: simd_ballot
 
@@ -77,9 +78,13 @@ void scanMain(uint3 dispatchThreadID: SV_DispatchThreadID)
                          WaveMultiPrefixSum(float2x4(value, value), partition)[1];
 }
 
-// SCAN-NOT: {{WaveMultiPrefix[A-Za-z]*\(}}
 // SCAN: simd_shuffle
 
-// The Metal compiler is not available everywhere; METALLIB runs only check that compilation
-// succeeds when it is.
-// METALLIB: {{.*}}
+// No call is left to an HLSL intrinsic that MSL lacks, anywhere in the output. The emitted helpers
+// are named `Name_N`, which is why the pattern ends in `\(`: it matches only an HLSL name called
+// directly.
+// NO_HLSL: result code = 0
+// NO_HLSL-NOT: {{(WavePrefixCountBits|WaveActiveAllEqual|WaveMatch|WaveMultiPrefix[A-Za-z]*)\(}}
+
+// The metallib runs are reported as ignored where the Metal compiler is missing.
+// METALLIB: result code = 0
