@@ -56,8 +56,10 @@ jobs:
       windows-runner-labels: ${{ inputs.windows-runner-labels }}
       backend: ${{ inputs.runtime-backend }}
       cases: ${{ inputs.runtime-cases }}
-      adapter: ${{ inputs.runtime-adapter }}
-      max-spread: ${{ inputs.runtime-max-spread }}
+      # API/manual dispatch may supply numeric inputs as strings. Normalize
+      # them before passing to the reusable workflow's typed number inputs.
+      adapter: ${{ fromJSON(format('{0}', inputs.runtime-adapter)) }}
+      max-spread: ${{ fromJSON(format('{0}', inputs.runtime-max-spread)) }}
 
   check-python-core:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
