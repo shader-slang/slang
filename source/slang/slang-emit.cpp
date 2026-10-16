@@ -2101,9 +2101,10 @@ Result linkAndOptimizeIR(
     // `legalizeMatrixTypes` turns the matrices a target cannot express into arrays of row
     // vectors. Buffer element lowering must see those matrices first, because it is what stores a
     // matrix with its declared row- or column-major layout; afterwards they are indistinguishable
-    // from arrays. LLVM has no matrix types at all and lowers every matrix right away, so its
-    // buffer lowering runs here; the other targets run theirs, and then `legalizeMatrixTypes`,
-    // later in this function.
+    // from arrays. On LLVM every matrix is lowered, and the passes below assume LLVM has no
+    // matrices left, so its buffer lowering and `legalizeMatrixTypes` both run here. On SPIR-V,
+    // GLSL, WGSL and Metal only int/uint/bool matrices are lowered, and they stay matrices until
+    // after the main buffer lowering below, so the passes in between handle them as matrices.
     if (isCPUTargetViaLLVM(targetRequest))
     {
         BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
@@ -2622,7 +2623,8 @@ Result linkAndOptimizeIR(
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
-    if (!isMetalTarget(targetRequest) && !isSPIRV(target))
+    const bool shouldLegalizeArrayReturnType = !isMetalTarget(targetRequest) && !isSPIRV(target);
+    if (shouldLegalizeArrayReturnType)
         SLANG_PASS(legalizeArrayReturnType);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
@@ -2652,19 +2654,16 @@ Result linkAndOptimizeIR(
         targetProgram,
         bufferElementTypeLoweringOptions);
 
-    if (isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest) ||
-        isMetalTarget(targetRequest))
+    if (!isCPUTargetViaLLVM(targetRequest))
     {
         SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
 
-        // An int/uint/bool matrix with a single row or column is now an array of 1-vectors,
-        // both in its storage type and as a value, and those were already turned into scalars
-        // everywhere else by the earlier `legalizeVectorTypes`.
+        // No 1-vector reaches emit on these targets. An int/uint/bool matrix with a single column
+        // has just become an array of 1-vectors, so the 1-vector legalization runs again.
         SLANG_PASS(legalizeVectorTypes, sink);
 
-        // A function returning an int/uint/bool matrix returns an array after
-        // `legalizeMatrixTypes`, which the earlier `legalizeArrayReturnType` did not see.
-        if (!isMetalTarget(targetRequest) && !isSPIRV(target))
+        // A function returning an int/uint/bool matrix now returns an array.
+        if (shouldLegalizeArrayReturnType)
             SLANG_PASS(legalizeArrayReturnType);
     }
 

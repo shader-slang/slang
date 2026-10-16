@@ -14,7 +14,8 @@ class TargetRequest;
 /// those element types, and every matrix on LLVM.
 bool isMatrixTypeLoweredToArray(TargetRequest* targetRequest, IRMatrixType* matrixType);
 
-// Lower int/uint/bool matrix types to arrays for SPIRV, WGSL, GLSL, and Metal targets
+/// Lower every matrix for which `isMatrixTypeLoweredToArray` holds to an array of row vectors.
+/// Buffer element lowering must run first, because it stores a matrix with its layout.
 void legalizeMatrixTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 } // namespace Slang

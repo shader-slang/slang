@@ -2267,7 +2267,9 @@ struct LoweredElementTypeContext
         return builder.emitCast(logicalRowType, row);
     }
 
-    // Lower all getElementPtr insts of a lowered matrix out of existance.
+    // Lower all getElementPtr insts of a lowered matrix out of existance. An element address whose
+    // storage type differs from the logical element type becomes a `CastStorageToLogical`, which
+    // is appended to `castInstWorkList` so the caller defers it like any other cast.
     void lowerMatrixAddresses(
         IRModule* module,
         MatrixAddrWorkItem workItem,
@@ -2960,20 +2962,20 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
     {
-        // For spirv, we generally want to lower all matrix types, because SPIRV does not support
-        // specifying matrix layout/stride if the matrix type is used in places other than
-        // defining a struct field. This means that if a matrix is used to define a varying
-        // parameter, we always want to wrap it in a struct.
-        // Matrices within uniform and storage buffers are already members in the overall buffer
-        // struct type, hence do not need to be lowered.
-        //
         // SPIR-V and GLSL have no matrix type for int/uint/bool elements, so such a matrix in
         // memory always needs a storage type that records its layout; otherwise
-        // `legalizeMatrixTypes` turns it into row vectors regardless of `column_major`. In the
-        // stage interface it keeps those row vectors.
+        // `legalizeMatrixTypes` turns it into row vectors regardless of `column_major`. A stage
+        // input or output (both use `AddressSpace::Input` here) has no memory layout and keeps
+        // those row vectors.
         if (isMatrixTypeLoweredToArray(target->getTargetReq(), matrixType))
             return config.addressSpace != AddressSpace::Input;
 
+        // For spirv, we generally want to lower all float matrix types, because SPIRV does not
+        // support specifying matrix layout/stride if the matrix type is used in places other than
+        // defining a struct field. This means that if a matrix is used to define a varying
+        // parameter, we always want to wrap it in a struct.
+        // Float matrices within uniform and storage buffers are already members in the overall
+        // buffer struct type, hence do not need to be lowered.
         if (target->shouldEmitSPIRVDirectly())
         {
             switch (config.addressSpace)
