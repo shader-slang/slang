@@ -11,7 +11,7 @@
 //TEST:SIMPLE(filecheck=SAMPLERS): -target wgsl -stage fragment -entry samplerMain
 //TEST:SIMPLE(filecheck=HEAP): -target wgsl -stage compute -entry heapMain
 
-// SIZED: var textures_0 : binding_array<texture_2d<f32>, {{.*}}8{{.*}}>;
+// SIZED: var textures_0 : binding_array<texture_2d<f32>, i32(8)>;
 // SIZED-NOT: array<texture_2d
 // SIZED: textureSample({{.*}}textures_0[
 
@@ -19,7 +19,7 @@
 // UNSIZED-NOT: array<texture_2d
 // UNSIZED: textureSample({{.*}}unboundedTextures_0[
 
-// SAMPLERS: var samplers_0 : binding_array<sampler, {{.*}}4{{.*}}>;
+// SAMPLERS: var samplers_0 : binding_array<sampler, i32(4)>;
 // SAMPLERS: textureSample({{.*}}samplers_0[
 
 // The default `DescriptorHandle` lookup on WGSL indexes a global descriptor array.
