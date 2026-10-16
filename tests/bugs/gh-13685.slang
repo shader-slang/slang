@@ -14,6 +14,9 @@
 // SPIRV: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage
 // SPIRV: OpUndef %[[IMG]]
 
+// The GLSL and WGSL lines only guard against E56004/E56019 coming back. The code
+// emitted for a lone undefined texture is still rejected by glslang and Tint, with
+// or without a merge.
 // GLSL-NOT: {{E56004|E56019}}
 // GLSL: void main()
 
@@ -59,8 +62,8 @@ float4 readLocal(float2 uv)
     return float4(0, 0, 0, 1);
 }
 
-// The same merge at a loop header: the param's incoming values are an undefined
-// value and the param itself, from the back edge.
+// The same merge inside a loop. Once the inner merge is forwarded, the loop-header
+// param's incoming values are an undefined value and the param itself.
 float4 readInLoop(float2 uv)
 {
     Texture2D<float4> t;
