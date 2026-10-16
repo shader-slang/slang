@@ -3,6 +3,7 @@
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_5 -shaderobj
+//TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj
 
