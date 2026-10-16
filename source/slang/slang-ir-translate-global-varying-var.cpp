@@ -381,12 +381,17 @@ struct GlobalVarTranslationContext
             }
             if (entryPointLayout)
             {
+                // Entry points with identical original layouts share one hoisted
+                // `EntryPointLayout`, so we build a new layout for this entry point instead of
+                // modifying the shared one in place.
+                IRVarLayout* newParamsLayout = entryPointLayout->getParamsLayout();
                 if (paramLayout)
                 {
                     // We try to respect the original entry point type layout when replacing it
                     // below. The IRParameterGroupTypeLayout type layout is used when there are
                     // things like uniform entry point params, otherwise the IRStructTypeLayout type
                     // layout will normally represent the entry point type layout.
+                    IRTypeLayout* newParamsTypeLayout = nullptr;
                     if (auto paramGroupTypeLayout =
                             as<IRParameterGroupTypeLayout>(entryPointParamsStructLayout))
                     {
@@ -399,23 +404,28 @@ struct GlobalVarTranslationContext
                             paramGroupTypeLayout->getContainerVarLayout());
                         paramGroupTypeLayoutBuilder.setElementVarLayout(paramLayout);
                         paramGroupTypeLayoutBuilder.setOffsetElementTypeLayout(paramTypeLayout);
-                        builder.replaceOperand(
-                            entryPointLayout->getParamsLayout()->getOperands(),
-                            paramGroupTypeLayoutBuilder.build());
+                        newParamsTypeLayout = paramGroupTypeLayoutBuilder.build();
                     }
                     else if (as<IRStructTypeLayout>(entryPointParamsStructLayout))
                     {
-                        builder.replaceOperand(
-                            entryPointLayout->getParamsLayout()->getOperands(),
-                            paramTypeLayout);
+                        newParamsTypeLayout = paramTypeLayout;
                     }
                     else
                     {
                         SLANG_UNEXPECTED("uhandled global-scope binding layout");
                     }
+                    List<IRInst*> paramsLayoutOperands;
+                    paramsLayoutOperands.add(newParamsTypeLayout);
+                    for (UInt i = 1; i < newParamsLayout->getOperandCount(); i++)
+                        paramsLayoutOperands.add(newParamsLayout->getOperand(i));
+                    newParamsLayout = builder.getVarLayout(paramsLayoutOperands);
                 }
-                if (resultVarLayout)
-                    builder.replaceOperand(entryPointLayout->getOperands() + 1, resultVarLayout);
+                IRVarLayout* newResultLayout =
+                    resultVarLayout ? resultVarLayout : entryPointLayout->getResultLayout();
+                entryPointLayoutDecor->removeAndDeallocate();
+                builder.addLayoutDecoration(
+                    entryPointFunc,
+                    builder.getEntryPointLayout(newParamsLayout, newResultLayout));
             }
             // Update func type for the entry point.
             List<IRType*> paramTypes;
