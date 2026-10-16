@@ -1,7 +1,6 @@
-// NonUniformResourceIndex compiles for Metal and WGSL and returns its argument unchanged:
-// neither target has a non-uniform qualifier. Metal handles non-uniform indices into resource
-// arrays itself, and the WebGPU binding-array proposals allow non-uniform indexing without an
-// annotation.
+// NonUniformResourceIndex compiles for Metal and WGSL, and the emitter drops the call: neither
+// target has a non-uniform annotation. See the note at the top of
+// source/slang/slang-ir-float-non-uniform-resource-index.cpp for when that is correct.
 
 // Run 1 (Metal) and run 2 (WGSL) index a sized array.
 // Run 3 indexes an unsized array on WGSL, emitted as a runtime-sized `array<texture_2d<f32>>`.
@@ -10,7 +9,7 @@
 
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -DUNBOUNDED
+//TEST:SIMPLE(filecheck=WGSL_UNBOUNDED): -target wgsl -stage compute -entry computeMain -DUNBOUNDED
 
 #ifdef UNBOUNDED
 Texture2D textures[];
@@ -35,5 +34,11 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // METAL-NOT: NonUniformResourceIndex
 
 // WGSL-NOT: NonUniformResourceIndex
+// WGSL: textures_{{[0-9]+}} : array<texture_2d<f32>, i32(8)>;
 // WGSL: textureSampleLevel((textures_{{[0-9]+}}[materialIndices_{{[0-9]+}}[
 // WGSL-NOT: NonUniformResourceIndex
+
+// WGSL_UNBOUNDED-NOT: NonUniformResourceIndex
+// WGSL_UNBOUNDED: textures_{{[0-9]+}} : array<texture_2d<f32>>;
+// WGSL_UNBOUNDED: textureSampleLevel((textures_{{[0-9]+}}[materialIndices_{{[0-9]+}}[
+// WGSL_UNBOUNDED-NOT: NonUniformResourceIndex
