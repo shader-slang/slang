@@ -15005,9 +15005,16 @@ T __copyObject<T>(T v)
 
 /// `NonUniformResourceIndex` function is used to indicate if the resource index is
 /// divergent, and ensure scalarization happens correctly for each divergent lane.
+///
+/// Metal and WGSL have no such qualifier, and the call returns `index` unchanged:
+/// Metal handles a non-uniform index into an array of resources itself (MSL spec,
+/// "The Need for a Uniform Type"), and the WebGPU binding-array proposals allow
+/// non-uniform indexing without an annotation.
 __generic<T:__BuiltinArithmeticType>
 __intrinsic_op($(kIROp_NonUniformResourceIndex))
 [require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
+[require(metal)]
+[require(wgsl)]
 T NonUniformResourceIndex(T index);
 
 /// HLSL allows NonUniformResourceIndex around non int/uint types.
