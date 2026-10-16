@@ -460,7 +460,7 @@ Notice that of the entry point parameters `dispatchThreadID` is not part of Unif
 ```    
 
 
-Resource types become pointers to interfaces that implement their features. For example `Texture2D` become a pointer to a `ITexture2D` interface that has to be implemented in client side code. Similarly SamplerState and SamplerComparisonState become `ISamplerState` and `ISamplerComparisonState`.  
+Resource types become pointers to interfaces that implement their features. For example `Texture2D` become a pointer to a `ITexture2D` interface that has to be implemented in client side code. Similarly SamplerState and SamplerComparisonState become `ISamplerState` and `ISamplerComparisonState`. `RaytracingAccelerationStructure` becomes a struct holding one pointer to the opaque `IRaytracingAccelerationStructure`; ray tracing is not supported on CPU, so a shader can declare or pass one but not trace against it, and the host can leave it null.  
  
 The actual definitions for the interfaces for resource types, and types are specified in 'slang-cpp-types.h' in the `prelude` directory.
 
