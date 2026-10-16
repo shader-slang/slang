@@ -246,15 +246,23 @@ struct SamplerComparisonState
     ISamplerComparisonState* state;
 };
 
-// The CPU targets do not implement ray tracing, so nothing reads this handle. We still define the
-// type because a shader that only declares or passes an acceleration structure keeps it in its
-// parameters (the layout reserves one pointer for it), and the emitted C++ names this type.
+// A shader that only declares or passes an acceleration structure keeps it in its parameters, and
+// the emitted C++ names this type, so the CPU targets define it even though they do not implement
+// ray tracing. Its size and alignment must match the single pointer that
+// `CPUObjectLayoutRulesImpl` reserves for `ShaderParameterKind::AccelerationStructure`, or every
+// parameter after it would sit at a different offset than reflection reports. The handle type is
+// opaque here; it is named to match the CPU ray-query provider interface proposed in PR #12282.
 struct IRaytracingAccelerationStructure;
 
 struct RaytracingAccelerationStructure
 {
     IRaytracingAccelerationStructure* handle;
 };
+
+static_assert(
+    sizeof(RaytracingAccelerationStructure) == sizeof(void*) &&
+        alignof(RaytracingAccelerationStructure) == alignof(void*),
+    "RaytracingAccelerationStructure must match the CPU layout of one pointer");
 
 #ifndef SLANG_RESOURCE_SHAPE
 #define SLANG_RESOURCE_SHAPE
