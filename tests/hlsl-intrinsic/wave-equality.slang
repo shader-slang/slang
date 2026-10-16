@@ -2,6 +2,7 @@
 //TEST:COMPARE_COMPUTE(targets=dx12):-profile cs_6_0
 //TEST:COMPARE_COMPUTE(targets=vk):
 //TEST:COMPARE_COMPUTE(targets=cuda):-capability cuda_sm_7_0
+//TEST:COMPARE_COMPUTE(targets=wgpu):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
