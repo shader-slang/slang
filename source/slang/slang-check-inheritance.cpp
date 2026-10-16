@@ -8,6 +8,59 @@
 
 namespace Slang
 {
+// Recover associated bounds that constrain the subject after an associated type reduces to it.
+// Keep the original requirement lookup as the proof instead of selecting an implementation.
+void SemanticsVisitor::getAssociatedBoundsFromGenericConstraint(
+    DeclaredSubtypeWitness* witness,
+    List<SubtypeWitness*>& outBounds)
+{
+    auto constraint = witness->getDeclRef().as<GenericTypeConstraintDecl>();
+    SLANG_RELEASE_ASSERT(constraint);
+    auto table = constraint.getDecl()->pathResolutionTable;
+    if (!table)
+        return;
+
+    // Most generic constraints only store inherited-interface paths. An associated binding
+    // that reduces to the subject can also make an associated bound constrain that subject.
+    bool hasAssociatedBinding = false;
+    for (auto& entry : table->getRequirementDictionary())
+    {
+        if (as<AssocTypeDecl>(entry.key))
+        {
+            hasAssociatedBinding = true;
+            break;
+        }
+    }
+    if (!hasAssociatedBinding)
+        return;
+
+    auto interfaceDecl = isDeclRefTypeOf<InterfaceDecl>(witness->getSup());
+    SLANG_RELEASE_ASSERT(interfaceDecl);
+    for (auto requirement : interfaceDecl.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
+    {
+        if (requirement->isEqualityConstraint ||
+            requirement->hasModifier<OptionalConstraintModifier>())
+            continue;
+        auto requirementRef =
+            m_astBuilder->getLookupDeclRef(witness, requirement).as<GenericTypeConstraintDecl>();
+        auto boundSubject = getSub(m_astBuilder, requirementRef);
+        if (!boundSubject || !boundSubject->equals(witness->getSub()))
+            continue;
+        auto bound = getSup(m_astBuilder, requirementRef);
+        if (!isDeclRefTypeOf<InterfaceDecl>(bound) || bound->equals(witness->getSup()))
+            continue;
+
+        // Consider `IValue { associatedtype Value : IData; }` and a constraint
+        // `Box<T> : IValue` whose Value binding is Box<T>. Its assumed IValue witness
+        // already contains proof of `Box<T> : IData` under the associated-bound key.
+        // Preserve that exact lookup path when the associated type reduces to Box<T>.
+        // This is only valid for an assumed GenericTypeConstraintDecl: applying the same
+        // reasoning to a concrete conformance being checked could prove it circularly.
+        outBounds.add(
+            m_astBuilder->getDeclaredSubtypeWitness(witness->getSub(), bound, requirementRef));
+    }
+}
+
 UInt SharedSemanticsContext::getDeclExtensionEpoch(Decl* decl) const
 {
     if (!decl)
@@ -1445,6 +1498,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             auto satisfyingWitness =
                 _getASTBuilder()->getDeclaredSubtypeWitness(selfType, superType, constraintDeclRef);
             addDirectBaseType(superType, satisfyingWitness);
+
+            List<SubtypeWitness*> associatedBounds;
+            visitor.getAssociatedBoundsFromGenericConstraint(satisfyingWitness, associatedBounds);
+            for (auto bound : associatedBounds)
+                addDirectBaseType(bound->getSup(), bound);
         }
     }
 

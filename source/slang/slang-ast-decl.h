@@ -1044,9 +1044,9 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
 
     // After checking, this dictionary will map members required by the
     // super-type interface to their witnesses. This is used to store
-    // canonical inheritance paths, but does not store any concrete
-    // requirements (e.g. functions/assoc-types/etc..), only references
-    // to lookup paths (represented as LookupDeclRefs)
+    // canonical inheritance paths and associated bindings proved independent of
+    // which conditional conformance satisfies this constraint. It never provides
+    // a concrete method implementation for an abstract conformance.
     //
     FIDDLE() RefPtr<WitnessTable> pathResolutionTable;
 

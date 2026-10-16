@@ -1030,6 +1030,12 @@ struct SharedSemanticsContext : public RefObject
     Dictionary<WitnessTable*, RefPtr<ConformanceInterfaceCheckingState>>
         m_mapWitnessTableToConformanceInterfaceCheckingState;
 
+    // Imported modules cannot acquire new direct conformances to their sealed interfaces.
+    // Keep the declaration inventory once per module; interpretation of its checked witness
+    // tables remains specific to the queried nominal type and associated requirement.
+    HashSet<ModuleDecl*> m_modulesWithSealedConformanceInventory;
+    Dictionary<InterfaceDecl*, List<InheritanceDecl*>> m_sealedInterfaceConformanceCandidates;
+
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
@@ -3674,6 +3680,11 @@ public:
     {
         return isSubtype(subType, superType, IsSubTypeOptions::None);
     }
+
+    /// Collect associated-type bounds that an assumed generic conformance proves for its subject.
+    void getAssociatedBoundsFromGenericConstraint(
+        DeclaredSubtypeWitness* witness,
+        List<SubtypeWitness*>& outBounds);
 
     /// Check whether `type` conforms to `interfaceDeclRef`,
     /// and return a witness to the conformance if it holds

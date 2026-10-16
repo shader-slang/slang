@@ -12536,11 +12536,134 @@ void SemanticsVisitor::_fillInGenericConstraintPathResolutionTableForInheritance
     }
 }
 
+// Inventory the direct conformances in a completed module, including interface inheritance.
+// A sealed interface can still have an open derived interface whose conformers live elsewhere.
+// Retaining those declarations lets the projection proof below reject that open-world case.
+static void _collectSealedInterfaceConformanceCandidates(
+    SharedSemanticsContext* shared,
+    ModuleDecl* moduleDecl)
+{
+    if (!shared->m_modulesWithSealedConformanceInventory.add(moduleDecl))
+        return;
+
+    iterateAST(
+        moduleDecl,
+        [](DeclBase*) { return true; },
+        [&](SyntaxNode* node)
+        {
+            auto inheritance = as<InheritanceDecl>(node);
+            if (!inheritance)
+                return;
+            auto interfaceDecl = isDeclRefTypeOf<InterfaceDecl>(inheritance->base.type);
+            if (!interfaceDecl || !interfaceDecl.getDecl()->hasModifier<SealedAttribute>())
+                return;
+            shared->m_sealedInterfaceConformanceCandidates[interfaceDecl.getDecl()].add(
+                inheritance);
+        });
+}
+
+// Determine whether an associated requirement always denotes the complete subject type.
+// Consider this example in an imported module:
+//
+//     [sealed] interface IValue { associatedtype Value; }
+//     interface IMarker {}
+//     struct Box<T> {}
+//     extension Box<int> : IMarker {}
+//     extension<T : IMarker> T : IValue { typealias Value = T; }
+//
+// A caller's `where Box<U> : IValue` supplies a conformance without proving IMarker directly.
+// Nevertheless, every implementation that can satisfy that constraint maps Value to Box<U>.
+// Read the checked conformance entries, not same-named members of Box: an extension may
+// deliberately implement an associated requirement with a different alias from Box's own.
+//
+// This proof only handles identity bindings. No extension is instantiated with missing witness
+// arguments: each comparison uses its original checked declaration context. Unknown target
+// shapes or bindings are retained as possible alternatives and prevent the projection.
+static bool _isUniformIdentityAssociatedRequirement(
+    SemanticsVisitor* visitor,
+    Type* subType,
+    InterfaceDecl* interfaceDecl,
+    AssocTypeDecl* requirement)
+{
+    if (!interfaceDecl->hasModifier<SealedAttribute>())
+        return false;
+
+    auto nominalDecl = isDeclRefTypeOf<StructDecl>(subType);
+    if (!nominalDecl || nominalDecl.getDecl()->aliasedType.type)
+        return false;
+    for (auto base : nominalDecl.getDecl()->getMembersOfType<InheritanceDecl>())
+    {
+        // Concrete inheritance would also introduce the base type's conformances.
+        if (!isDeclRefTypeOf<InterfaceDecl>(base->base.type))
+            return false;
+    }
+
+    auto shared = visitor->getShared();
+    auto moduleDecl = getModuleDecl(interfaceDecl);
+    // During this module's own checking, later declarations can still add conformances or
+    // complete their witness tables. Do not cache a closed-world conclusion in that phase.
+    if (!moduleDecl || !moduleDecl->isChecked(DeclCheckState::DefinitionChecked) ||
+        getModule(interfaceDecl) == shared->getModule())
+        return false;
+    _collectSealedInterfaceConformanceCandidates(shared, moduleDecl);
+    auto candidates = shared->m_sealedInterfaceConformanceCandidates.tryGetValue(interfaceDecl);
+    if (!candidates)
+        return false;
+
+    bool foundPossibleConformance = false;
+    for (auto inheritance : *candidates)
+    {
+        auto parent = as<AggTypeDeclBase>(inheritance->parentDecl);
+        // Even an otherwise unrelated open child interface can admit a new implementation
+        // for Box<int> in a different module. Conservatively decline all derived interfaces.
+        if (!parent || as<InterfaceDecl>(parent))
+            return false;
+
+        if (auto extension = as<ExtensionDecl>(parent))
+        {
+            auto target = extension->targetType.type;
+            auto targetDecl = isDeclRefTypeOf<Decl>(target);
+            if (!targetDecl)
+                return false;
+            if (!targetDecl.as<GenericTypeParamDecl>())
+            {
+                // Different nominal roots cannot become the same struct after substitution.
+                // In particular, a format descriptor's nonidentity mapping says nothing about
+                // a vector's mapping. Do not exclude candidates by their unsolved constraints.
+                if (!targetDecl.as<AggTypeDecl>())
+                    return false;
+                if (targetDecl.getDecl() != nominalDecl.getDecl())
+                    continue;
+            }
+        }
+        else
+        {
+            if (parent != nominalDecl.getDecl())
+                continue;
+        }
+
+        auto table = inheritance->witnessTable;
+        if (!table || table->isExtern || inheritance->witnessVal)
+            return false;
+        RequirementWitness binding;
+        if (!table->tryGetRequirementWitness(InterfaceRequirementKey(requirement), binding) ||
+            binding.getFlavor() != RequirementWitness::Flavor::val)
+            return false;
+        auto valueType = as<Type>(binding.getVal());
+        if (!valueType || !valueType->equals(table->witnessedType))
+            return false;
+        foundPossibleConformance = true;
+    }
+    return foundPossibleConformance;
+}
+
 void SemanticsVisitor::checkGenericConstraintConformances(GenericDecl* genericDecl)
 {
     // For each generic type constraint like `T : IFoo` where `IFoo` is an interface,
     // we need to build a witness table that establishes canonical inheritance paths
-    // for diamond conformance patterns.
+    // for diamond conformance patterns and records invariant associated-type bindings.
+    // These bindings also let inheritance lookup retain the associated requirements' bounds
+    // when an associated type reduces to the constrained subject itself.
     //
     // This is similar to what we do in `findWitnessForInterfaceRequirement` when
     // handling `InheritanceDecl` requirements, but here we apply it to generic
@@ -12586,6 +12709,28 @@ void SemanticsVisitor::checkGenericConstraintConformances(GenericDecl* genericDe
             subType,
             superType,
             pathResolutionTable);
+
+        // Publish the binding at the constraint that owns the abstract conformance. Normal
+        // requirement lookup and substitution then reduce its associated type, including when
+        // the projection is the return type of another generic declaration such as Texture.
+        bool addedAssociatedBinding = false;
+        for (auto requirement : superInterfaceDecl.getDecl()->getMembersOfType<AssocTypeDecl>())
+        {
+            if (_isUniformIdentityAssociatedRequirement(
+                    this,
+                    subType,
+                    superInterfaceDecl.getDecl(),
+                    requirement))
+            {
+                pathResolutionTable->add(requirement, RequirementWitness(subType));
+                addedAssociatedBinding = true;
+            }
+        }
+        if (addedAssociatedBinding)
+        {
+            m_astBuilder->incrementEpoch();
+            getShared()->invalidateInheritanceInfo(subType);
+        }
     }
 }
 
