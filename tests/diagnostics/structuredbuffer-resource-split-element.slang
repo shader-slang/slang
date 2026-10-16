@@ -1,8 +1,8 @@
-// Type legalization reports E38204 for a `StructuredBuffer` whose element type
-// it would split, at each declaration of the buffer, or at a use when no
-// declaration remains (DH_SPIRV, below). These buffers are ones the
-// up-front validator does not reject: on Metal it skips every buffer, and on
-// every target it skips `static` buffers (#13654).
+// Type legalization reports E38204 at each declaration of a `StructuredBuffer`
+// whose element type it would split. These buffers are ones the up-front
+// validator does not reject: on Metal it skips every buffer, and on every
+// target it does not look inside `static` buffers, nested buffers or
+// `DescriptorHandle`s (#13654).
 
 // -warnings-disable 41017: every entry point compiles the uninitialized `static`
 // buffer below. 31106/31107: `ConstantBuffer<CBMaterial>` moves its texture to
@@ -12,8 +12,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -target metal -warnings-disable 41017 -entry main_static -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -target spirv -warnings-disable 41017 -entry main_static -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -target hlsl -warnings-disable 41017 -entry main_static -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -target glsl -warnings-disable 41017 -entry main_static -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -target wgsl -warnings-disable 41017 -entry main_static -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=DH):     -target metal -warnings-disable 41017 -entry main_dh -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=DH_SPIRV): -target spirv -warnings-disable 41017 -entry main_dh -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=DH):     -target spirv -warnings-disable 41017 -entry main_dh -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=DH):     -target hlsl -warnings-disable 41017 -entry main_dh -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=APPEND): -target metal -warnings-disable 41017 -entry main_append -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=FN):     -target metal -warnings-disable 41017 -entry main_fn -stage compute
 
 RWStructuredBuffer<float4> outBuf;
@@ -43,6 +47,12 @@ struct DHMaterial
 }
 
 struct FnMaterial
+{
+    Texture2D t;
+    float4 c;
+}
+
+struct AppendMaterial
 {
     Texture2D t;
     float4 c;
@@ -89,11 +99,7 @@ uniform DescriptorHandle<StructuredBuffer<DHMaterial>> dhMaterials;
 [numthreads(1, 1, 1)]
 void main_dh(uint3 tid : SV_DispatchThreadID)
 {
-    // On SPIR-V, `dhMaterials` is moved into the compiler-synthesized `GlobalParams`
-    // struct, which has no source location, so the read is reported instead.
     outBuf[tid.x] = dhMaterials[tid.x].t.Load(int3(0));
-//DH_SPIRV:         ^^^^^^^^^^^ resource type in StructuredBuffer
-//DH_SPIRV:         ^^^^^^^^^^^ StructuredBuffer element type 'DHMaterial' must not be a resource type or contain an opaque handle type
 }
 
 // A function parameter is reported as a declaration. The local `b` merges the
@@ -119,4 +125,20 @@ void main_fn(uint3 tid : SV_DispatchThreadID)
 {
     StructuredBuffer<FnMaterial> b = (tid.x > 3) ? fnA : fnB;
     outBuf[tid.x] = readMaterial(b, tid.x);
+}
+
+// `AppendStructuredBuffer<S>` is lowered to a generated struct whose `elements`
+// field has no location of its own; the report still names the declaration.
+AppendStructuredBuffer<AppendMaterial> appendMaterials;
+//APPEND:                              ^^^^^^^^^^^^^^^ resource type in StructuredBuffer
+//APPEND:                              ^^^^^^^^^^^^^^^ StructuredBuffer element type 'AppendMaterial' must not be a resource type or contain an opaque handle type
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main_append(uint3 tid : SV_DispatchThreadID)
+{
+    AppendMaterial m;
+    m.c = float4(0);
+    appendMaterials.Append(m);
+    appendMaterials.Append(m);
 }
