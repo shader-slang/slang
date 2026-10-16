@@ -1525,7 +1525,6 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     if (!declRef.as<ExtensionDecl>())
     {
-        HashSet<Type*> supTypesConsideredForExtensionApplication;
         Dictionary<Type*, SubtypeWitness*> additionalSubtypeWitnesses;
         for (;;)
         {
@@ -1540,6 +1539,12 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 {
                     if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
                     {
+                        // An extension can add bases that require another iteration. Keep the
+                        // first witness for each interface, as before, without constructing and
+                        // specializing discarded witnesses when revisiting earlier base facets.
+                        if (additionalSubtypeWitnesses.containsKey(facet->origin.type))
+                            continue;
+
                         SubtypeWitness* transitiveWitness;
                         if (auto baseInterfaceDeclRef =
                                 baseFacet->origin.declRef.as<InterfaceDecl>())
@@ -1555,16 +1560,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                                 baseFacet->subtypeWitness,
                                 facet->subtypeWitness);
                         }
-                        additionalSubtypeWitnesses.addIfNotExists(
+                        additionalSubtypeWitnesses.add(
                             facet->origin.type,
                             visitor.getSubtypeWitnessForType(
                                 extensionApplicationType,
                                 facet->origin.type,
                                 transitiveWitness));
-                        if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
-                        {
-                            supTypeWorkList.add(interfaceDeclRef);
-                        }
+                        supTypeWorkList.add(interfaceDeclRef);
                     }
                 }
                 ++base;
