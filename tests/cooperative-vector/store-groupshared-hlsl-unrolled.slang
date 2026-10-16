@@ -1,5 +1,6 @@
 // Verify that storing a CoopVec to groupshared memory on HLSL unrolls into constant-index
-// element stores rather than a loop that dynamically indexes the vector.
+// element stores rather than a loop that dynamically indexes the vector, and that the
+// `N > __kMaxUnrolledElements` test is constant folded so no trace of it remains.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -profile cs_6_10 -entry main_cs -stage compute
 
@@ -18,6 +19,8 @@ void main_cs(uint gi : SV_GroupIndex)
 }
 
 // HLSL-NOT: for(
+// HLSL-NOT: if (
+// HLSL-NOT: 1024
 // HLSL: s_Stage_0[{{.*}}] = {{.*}}[int(0)];
 // HLSL: s_Stage_0[{{.*}}] = {{.*}}[int(1)];
 // HLSL: s_Stage_0[{{.*}}] = {{.*}}[int(2)];

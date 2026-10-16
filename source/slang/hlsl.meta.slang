@@ -32230,6 +32230,19 @@ linalg.CoopMat<T, S, M, N, R> operator *<
     return rhs * lhs;
 }
 
+${
+// On HLSL a CoopVec is a per-lane vector, and DXC implements a dynamic index into a vector by
+// spilling it to an indexable local. Every loop over the elements of a CoopVec therefore has to
+// be unrolled so that each index is a constant. `emitUnrollableLoop` emits `loop` (the source of
+// one `for` statement over `i < N`) twice: as a plain loop for vectors longer than
+// `__kMaxUnrolledElements`, and under `[ForceUnroll]` otherwise. The `N` test folds to a constant,
+// so only one of the two copies survives in the IR.
+auto emitUnrollableLoop = [&](char const* loop)
+{
+    sb << "if (N > __kMaxUnrolledElements)\n{\n" << loop << "\n}\nelse\n{\n[ForceUnroll]\n" << loop << "\n}\n";
+};
+$}
+
 //
 // Cooperative Vector
 //
@@ -32243,6 +32256,10 @@ __intrinsic_type($(kIROp_CoopVectorType))
 [require(cooperative_vector)]
 struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmetic
 {
+    // Shader Model 6.9 limits a vector to 1024 elements, so every CoopVec that DXC accepts is
+    // unrolled; a longer vector falls back to a plain loop instead of failing the unroll.
+    static const int __kMaxUnrolledElements = 1024;
+
     //
     // Initialization
     //
@@ -32331,8 +32348,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case hlsl:
              __intrinsic_asm "$0 = $1";
         default:
-            for(int i = 0; i < N; ++i)
-                this[i] = t;
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    this[i] = t;
+            )SLANG");
+$}
             return;
         }
     }
@@ -32355,8 +32376,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case hlsl:
             __intrinsic_asm "$1.Store< vector<$[0], $[1]> >($2, $0)", T, N;
         default:
-            for(int i = 0; i < N; ++i)
-                buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
+            )SLANG");
+$}
             return;
         }
     }
@@ -32374,8 +32399,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
             return;
         default:
-            for(int i = 0; i < N; ++i)
-                buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+            )SLANG");
+$}
         }
     }
 
@@ -32418,11 +32447,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
             return;
         case hlsl:
-            __Store(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+            )SLANG");
+$}
             return;
         default:
-            for(int i = 0; i < N; ++i)
-                data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+            )SLANG");
+$}
             return;
         }
     }
@@ -32479,8 +32517,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+            )SLANG");
+$}
             return vec;
         }
         return CoopVec<T, N>();
@@ -32503,8 +32545,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+            )SLANG");
+$}
             return vec;
         }
         return CoopVec<T, N>();
@@ -32524,8 +32570,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+            )SLANG");
+$}
             return vec;
         }
         return CoopVec<T, N>();
@@ -32545,8 +32595,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+            )SLANG");
+$}
             return vec;
         }
     }
@@ -32600,8 +32654,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             CoopVec<T,N> result;
-            for(int i = 0; i < N; ++i)
-                result[i] = data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    result[i] = data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)];
+            )SLANG");
+$}
             return result;
         }
     }
@@ -32714,13 +32772,17 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @return True if all corresponding elements are equal, false otherwise.
     bool equals(This other)
     {
-        for (int i = 0; i < N; i++)
-        {
-            if (this[i] != other[i])
+${
+        emitUnrollableLoop(R"SLANG(
+            for (int i = 0; i < N; i++)
             {
-                return false;
+                if (this[i] != other[i])
+                {
+                    return false;
+                }
             }
-        }
+        )SLANG");
+$}
         return true;
     }
 
@@ -32732,17 +32794,21 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// parallel computation rather than ordering.
     bool lessThan(This other)
     {
-        for (int i = 0; i < N; i++)
-        {
-            if (this[i] < other[i])
+${
+        emitUnrollableLoop(R"SLANG(
+            for (int i = 0; i < N; i++)
             {
-                return true;
+                if (this[i] < other[i])
+                {
+                    return true;
+                }
+                else if (this[i] > other[i])
+                {
+                    return false;
+                }
             }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
+        )SLANG");
+$}
         return false;
     }
 
@@ -32754,17 +32820,21 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// parallel computation rather than ordering.
     bool lessThanOrEquals(This other)
     {
-        for (int i = 0; i < N; i++)
-        {
-            if (this[i] < other[i])
+${
+        emitUnrollableLoop(R"SLANG(
+            for (int i = 0; i < N; i++)
             {
-                return true;
+                if (this[i] < other[i])
+                {
+                    return true;
+                }
+                else if (this[i] > other[i])
+                {
+                    return false;
+                }
             }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
+        )SLANG");
+$}
         return true;
     }
 
@@ -32919,8 +32989,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "$0 % $1";
         default:
             This ret;
-            for(int i = 0; i < N; ++i)
-                ret[i] = this[i] % other[i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    ret[i] = this[i] % other[i];
+            )SLANG");
+$}
             return ret;
         }
     }
@@ -33021,9 +33095,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         __target_switch
         {
         case hlsl:
-            [ForceUnroll]
-            for(int i = 0; i < N; ++i)
-                this[i] = buffer[i + elemOffset];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    this[i] = buffer[i + elemOffset];
+            )SLANG");
+$}
             return;
         }
     }
@@ -33042,14 +33119,9 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     // Careful, this takes the offset in elements
     void __Store(__ref groupshared T buffer[M], uint elemOffset)
     {
-        static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
         __target_switch
         {
-        case hlsl:
-            [ForceUnroll]
-            for(int i = 0; i < N; ++i)
-                buffer[i + elemOffset] = this[i];
-            return;
+        case hlsl: static_assert(false, "Not supported");
         }
     }
 
