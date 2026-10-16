@@ -3,9 +3,12 @@
 // per target because the emitter picks the hitObject type (and thus the builtin/opcode) from the
 // requested capability, and the two must stay paired. HLSL/DXR lowering is covered by the DXR-native
 // tests and CUDA/OptiX by hit-object-get-ray-tcurrent-cuda.slang, which have no such NV/EXT split.
+// SPIR-V with no SER capability defaults to EXT, as TraceRay and the other accessors do, so that
+// run shares the EXT checks.
 
 //TEST:SIMPLE(filecheck=NV):      -target spirv-asm -entry rayGenShader -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
 //TEST:SIMPLE(filecheck=EXT):     -target spirv-asm -entry rayGenShader -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderEXT
+//TEST:SIMPLE(filecheck=EXT):     -target spirv-asm -entry rayGenShader -stage raygeneration -emit-spirv-directly
 //TEST:SIMPLE(filecheck=GLSL_NV): -target glsl -entry rayGenShader -stage raygeneration -capability GL_NV_shader_invocation_reorder -line-directive-mode none
 //TEST:SIMPLE(filecheck=GLSL_EXT):-target glsl -entry rayGenShader -stage raygeneration -capability GL_EXT_shader_invocation_reorder -line-directive-mode none
 
