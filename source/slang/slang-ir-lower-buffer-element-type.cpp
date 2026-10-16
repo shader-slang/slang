@@ -2254,9 +2254,14 @@ struct LoweredElementTypeContext
         auto logicalVectorType = as<IRVectorType>(logicalRowType);
         auto storageVectorType = as<IRVectorType>(storageRow->getDataType());
         IRInst* row = storageRow;
-        if (logicalVectorType && storageVectorType &&
-            getIntVal(storageVectorType->getElementCount()) !=
-                getIntVal(logicalVectorType->getElementCount()))
+        if (storageVectorType && !logicalVectorType)
+        {
+            // A row of a matrix with one column is a scalar after 1-vector legalization.
+            row = builder.emitVectorReshape(storageVectorType->getElementType(), row);
+        }
+        else if (
+            storageVectorType && getIntVal(storageVectorType->getElementCount()) !=
+                                     getIntVal(logicalVectorType->getElementCount()))
         {
             row = builder.emitVectorReshape(
                 builder.getVectorType(
@@ -2406,8 +2411,8 @@ struct LoweredElementTypeContext
                     }
                 case kIROp_SwizzledStore:
                     {
-                        // `m[row].xz = v` stores each selected element at its own storage
-                        // address, as `m[row][c] = v[i]` does.
+                        // A column-major row spans several storage columns, so a row swizzle
+                        // cannot be stored as one vector; each element is stored on its own.
                         auto swizzledStore = cast<IRSwizzledStore>(user);
                         SLANG_ASSERT(swizzledStore->getDest() == majorAddr);
                         auto dataPtr = builder.emitFieldAddress(

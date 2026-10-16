@@ -27,14 +27,16 @@ struct Matrices
     column_major int2x3 a[2];
     row_major int2x3 r;
     column_major uint2x2 u;
+    row_major int3x1 n;
+    row_major float2x3 f;
 }
 
 // clang-format off
-//TEST_INPUT:cbuffer(data=[500 510 520 0 501 511 521 0 502 512 522 0 100 110 0 0 101 111 0 0 102 112 0 0 200 210 0 0 201 211 0 0 202 212 0 0 300 310 0 0 301 311 0 0 302 312 0 0 400 401 402 0 410 411 412 0 600 610 0 0 601 611 0 0]):name input
+//TEST_INPUT:cbuffer(data=[500 510 520 0 501 511 521 0 502 512 522 0 100 110 0 0 101 111 0 0 102 112 0 0 200 210 0 0 201 211 0 0 202 212 0 0 300 310 0 0 301 311 0 0 302 312 0 0 400 401 402 0 410 411 412 0 600 610 0 0 601 611 0 0 800 0 0 0 810 0 0 0 820 0 0 0 900.0 901.0 902.0 0 910.0 911.0 912.0 0]):name input
 // clang-format on
 ConstantBuffer<Matrices> input;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name output
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name output
 RWStructuredBuffer<int> output;
 
 [noinline]
@@ -66,6 +68,9 @@ void computeMain()
     output[12] = square[0][2];
     output[13] = input.r[0][0];
     output[14] = input.r[1].z;
+    int1 nRow = input.n[2];
+    output[15] = nRow.x;
+    output[16] = int(input.f[1].z);
 }
 
 // CHECK: type: int32_t
@@ -84,6 +89,8 @@ void computeMain()
 // CHECK-NEXT: 502
 // CHECK-NEXT: 400
 // CHECK-NEXT: 412
+// CHECK-NEXT: 820
+// CHECK-NEXT: 912
 
 // The std140 offsets are the ones reflection reports: each column of `q`, `m` and `a[k]` and each
 // row of `r` is a 16-byte vector.
@@ -102,6 +109,10 @@ void computeMain()
 
 // A whole row of `r` is a padded `vec4` in storage; reading it as an `int3` takes `.xyz`.
 // WGSL: .r_0.data_{{[0-9]+}}[i32(1)].xyz.z;
+// A row of the one-column `n` is a scalar held in a padded `vec4`, and a `float2x3` row is padded
+// the same way.
+// WGSL: .n_0.data_{{[0-9]+}}[i32(2)].x;
+// WGSL: .f_0.data_{{[0-9]+}}[i32(1)].xyz.z
 
 // WGSLSPIRV: OpEntryPoint
 
