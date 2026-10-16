@@ -20,7 +20,6 @@ void main_cs(uint gi : SV_GroupIndex)
 
 // HLSL-NOT: for(
 // HLSL-NOT: if (
-// HLSL-NOT: 1024
 // HLSL: s_Stage_0[{{.*}}] = {{.*}}[int(0)];
 // HLSL: s_Stage_0[{{.*}}] = {{.*}}[int(1)];
 // HLSL: s_Stage_0[{{.*}}] = {{.*}}[int(2)];

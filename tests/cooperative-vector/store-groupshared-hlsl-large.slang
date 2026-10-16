@@ -2,6 +2,8 @@
 // constant folded: for a vector longer than the unroll limit only the plain loop survives. The
 // length is above the 4096-iteration cap of [ForceUnroll], so if the dead [ForceUnroll] copy were
 // still present when the loop unroller ran, compilation would fail with an un-unrollable loop.
+// The test needs a length above both that cap and `__kMaxUnrolledElements`; it does not depend on
+// the exact value of either.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -profile cs_6_10 -entry main_cs -stage compute
 
@@ -20,7 +22,6 @@ void main_cs(uint gi : SV_GroupIndex)
     u_Out.Store(0, asuint(float(w[5])));
 }
 
-// HLSL-NOT: 1024
 // HLSL: for(;;)
 // HLSL: if(i_0 < int(8192))
 // HLSL: s_Stage_0[i_0] = {{.*}}[i_0];
