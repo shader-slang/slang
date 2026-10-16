@@ -154,11 +154,21 @@ public:
 
     void PushScope(ContainerDecl* containerDecl)
     {
+        pushLookupScope(containerDecl);
+        containerDecl->ownedScope = currentScope;
+    }
+
+    // Push a new scope that makes the members of `containerDecl` visible to lookup,
+    // without replacing the scope that `containerDecl` owns. The semantic checker
+    // attaches scopes to `ownedScope` (for example, the namespaces of the same name
+    // that a module imports), so code that only needs lookup into an existing
+    // container uses this function to leave those attachments in place.
+    void pushLookupScope(ContainerDecl* containerDecl)
+    {
         Scope* newScope = astBuilder->create<Scope>();
         newScope->containerDecl = containerDecl;
         newScope->parent = currentScope;
         currentScope = newScope;
-        containerDecl->ownedScope = newScope;
         resetLookupScope();
     }
 
