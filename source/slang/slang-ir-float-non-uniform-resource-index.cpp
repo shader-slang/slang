@@ -51,6 +51,12 @@
 //           . CUDA/CPU have no descriptor-array / bindless concept at all.
 //         There is nothing to propagate, so doing more here would have no
 //         target syntax to emit it into.
+//         So dropping the wrapper is correct whenever the target accepts a
+//         non-uniform index into a resource array without an annotation, which
+//         is the case for Metal argument buffers and for the WebGPU binding-array
+//         proposal. If a WebGPU runtime gates non-uniform indexing behind an
+//         optional feature, the application has to enable it: Slang has no
+//         annotation to emit and does not diagnose a missing feature.
 //
 // So the decoration machinery below is intentionally SPIR-V-only: every other
 // target either delegates propagation to its downstream compiler (HLSL, GLSL)
