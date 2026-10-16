@@ -2394,6 +2394,24 @@ static void parseOptionalGenericConstraints(
     }
 }
 
+/// Parses an optional C++-style `const` after a `FuncDecl` parameter list.
+///
+/// Attaches a receiver-mode modifier to `decl` when `const` follows its parameter list.
+/// Constructors and accessors do not accept trailing `const`.
+static void parseOptionalCppStyleTrailingReceiverParamConstModifier(Parser* parser, FuncDecl* decl)
+{
+    Token constToken;
+    if (!AdvanceIf(parser, "const", &constToken))
+        return;
+
+    // We use a distinct modifier because prefix `const` qualifies a variable rather than a
+    // method's receiver. For example, `int read() const` has a nonmutating receiver.
+    auto modifier = parser->astBuilder->create<CppStyleTrailingReceiverParamConstModifier>();
+    modifier->keywordName = constToken.getName();
+    modifier->loc = constToken.getLoc();
+    addModifier(decl, modifier);
+}
+
 static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
 {
     if (AdvanceIf(parser, TokenType::Colon))
@@ -2448,6 +2466,7 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
+            parseOptionalCppStyleTrailingReceiverParamConstModifier(parser, decl);
 
             if (AdvanceIf(parser, "throws"))
             {
@@ -5321,6 +5340,7 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            parseOptionalCppStyleTrailingReceiverParamConstModifier(parser, decl);
             auto funcScope = parser->currentScope;
             parser->PopScope();
             if (AdvanceIf(parser, "throws"))
