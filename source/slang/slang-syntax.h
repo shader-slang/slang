@@ -121,7 +121,7 @@ inline int getVectorSize(VectorExpressionType* vecType)
 // This helper does not inspect struct fields or start declaration checking. Types outside the
 // cases listed above return false without calling the predicate.
 template<typename F>
-bool anyImmediateTypeElementMatches(Type* type, const F& predicate)
+bool anyTypeElementMatches(Type* type, const F& predicate)
 {
     if (auto modifiedType = as<ModifiedType>(type))
         return predicate(modifiedType->getBase());
