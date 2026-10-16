@@ -2109,8 +2109,14 @@ bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizat
 
 bool peepholeOptimize(TargetProgram* target, IRInst* func)
 {
+    return peepholeOptimize(target, func, PeepholeOptimizationOptions());
+}
+
+bool peepholeOptimize(TargetProgram* target, IRInst* func, PeepholeOptimizationOptions options)
+{
     PeepholeContext context = PeepholeContext(func->getModule());
     context.targetProgram = target;
+    context.isPrelinking = options.isPrelinking;
     context.useFastAnalysis =
         target ? target->getOptionSet().shouldPerformMinimumOptimizations() : true;
     return context.processFunc(func);
