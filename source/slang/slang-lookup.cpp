@@ -812,6 +812,82 @@ static bool _doesScopeBlockUseOfEnclosingThisExpr(Decl* decl)
     return false;
 }
 
+/// Returns whether `decl` is a value that exists only during a call of its function: a
+/// parameter, or a local variable that is not `static`.
+///
+/// A member of a function-local type does not run as part of a call of the enclosing function,
+/// so it cannot use these values. Consider this example:
+///
+/// ```
+/// void f(int p)
+/// {
+///     int x = p;
+///     static const int k = 3;
+///     struct L { int get() { return x + p + k; } };
+/// }
+/// ```
+///
+/// `L::get` has no access to the `x` and `p` of a particular call of `f`; capturing such values
+/// is what lambdas are for. The `static const` local `k` is not tied to a call, so `L` can use it.
+static bool _isFunctionCallValue(Decl* decl)
+{
+    if (as<ParamDecl>(decl))
+        return true;
+    return isLocalVar(decl) && !decl->hasModifier<HLSLStaticModifier>();
+}
+
+/// Returns whether the lookup result `item` refers to a function call value (see
+/// `_isFunctionCallValue`), either directly or through one. In a function-local
+/// `cbuffer CB { int a; }`, lookup of `a` finds the field `a` through the transparent local `CB`,
+/// so the result names `a` while its breadcrumbs record `CB`.
+static bool _refersToFunctionCallValue(LookupResultItem const& item)
+{
+    if (_isFunctionCallValue(item.declRef.getDecl()))
+        return true;
+    for (auto breadcrumb = item.breadcrumbs.get(); breadcrumb; breadcrumb = breadcrumb->next)
+    {
+        if (breadcrumb->kind == LookupResultItem::Breadcrumb::Kind::Member &&
+            _isFunctionCallValue(breadcrumb->declRef.getDecl()))
+            return true;
+    }
+    return false;
+}
+
+/// Look up `name` among the direct members of `containerDeclRef`, a scope of a function that
+/// encloses the function-local type where lookup started. Every result except the function's
+/// parameters and non-static locals, and members reached through them, is added to `result`.
+///
+/// Returns whether a parameter or non-static local was left out.
+static bool _lookUpInScopeOfEnclosingFunction(
+    ASTBuilder* astBuilder,
+    Name* name,
+    DeclRef<ContainerDecl> containerDeclRef,
+    LookupRequest const& request,
+    LookupResult& result)
+{
+    LookupResult scopeResult;
+    _lookUpDirectAndTransparentMembers(
+        astBuilder,
+        name,
+        containerDeclRef.getDecl(),
+        containerDeclRef,
+        request,
+        scopeResult,
+        nullptr);
+
+    bool leftOutCallValue = false;
+    for (auto item : scopeResult)
+    {
+        if (_refersToFunctionCallValue(item))
+        {
+            leftOutCallValue = true;
+            continue;
+        }
+        AddToLookupResult(result, item);
+    }
+    return leftOutCallValue;
+}
+
 static void _lookUpInScopes(
     ASTBuilder* astBuilder,
     Name* name,
@@ -828,8 +904,16 @@ static void _lookUpInScopes(
     // The file decl that this scope is in.
     FileDecl* thisFileDecl = nullptr;
 
+    // We set this flag once lookup leaves a type declaration. A block or callable scope reached
+    // after that point belongs to a function enclosing a function-local type, so lookup leaves
+    // out that function's parameters and non-static locals (see `_isFunctionCallValue`). Other
+    // scopes, such as files and namespaces, declare neither, so they take the ordinary path.
+    bool hasLeftTypeDecl = false;
+
     for (; scope != endScope; scope = scope->parent)
     {
+        bool isHiddenByCallValue = false;
+
         // Note that we consider all "peer" scopes together,
         // so that a hit in one of them does not preclude
         // also finding a hit in another
@@ -958,6 +1042,18 @@ static void _lookUpInScopes(
                     result,
                     breadcrumbPtr);
             }
+            else if (
+                hasLeftTypeDecl &&
+                (as<ScopeDecl>(containerDecl) || as<CallableDecl>(containerDecl)))
+            {
+                if (_lookUpInScopeOfEnclosingFunction(
+                        astBuilder,
+                        name,
+                        containerDeclRef,
+                        request,
+                        result))
+                    isHiddenByCallValue = true;
+            }
             else
             {
                 // The default case is when the scope doesn't represent a
@@ -1010,7 +1106,17 @@ static void _lookUpInScopes(
                 thisBreadcrumbKind = LookupResultItem::Breadcrumb::Kind::ThisType;
                 thisBreadcrumbScope = nullptr;
             }
+
+            if (as<AggTypeDeclBase>(containerDecl))
+                hasLeftTypeDecl = true;
         }
+
+        // A parameter or non-static local that lookup left out still hides declarations of the
+        // same name in farther-out scopes. Lookup stops here, so a reference to the name is an
+        // undefined identifier rather than a silent reference to an outer declaration. C++ also
+        // rejects a reference from a local class to a local that hides a global.
+        if (isHiddenByCallValue && !result.isValid() && !request.isCompletionRequest())
+            break;
 
         if (result.isValid())
         {
