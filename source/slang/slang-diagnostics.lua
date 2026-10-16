@@ -5952,20 +5952,6 @@ err(
 )
 
 err(
-    "physical-pointer-not-supported-on-target",
-    55219,
-    "pointers to memory addresses are not supported on this target",
-    span { loc = "location", message = "this creates a pointer from an address, reads one from memory or uses 'nullptr', but the current code generation target has no pointers to memory addresses" }
-)
-
-err(
-    "bfloat16-not-supported-on-target",
-    55220,
-    "'BFloat16' is not supported on this target",
-    span { loc = "location", message = "this creates a 'BFloat16' value, but the current code generation target has no bfloat16 type" }
-)
-
-err(
     "func-type-not-supported-on-target",
     55216,
     "function-typed value is not supported on this target",
@@ -6075,6 +6061,20 @@ err(
     55218,
     "hit attribute exceeds the OptiX attribute register limit",
     span { loc = "location", message = "the hit attribute passed to 'ReportHit' requires ~registerCount:int 32-bit attribute registers, but OptiX supports at most 8 (32 bytes)." }
+)
+
+err(
+    "physical-pointer-not-supported-on-target",
+    55219,
+    "pointers to memory addresses are not supported on this target",
+    span { loc = "location", message = "this uses a pointer to a memory address, which the current code generation target cannot represent" }
+)
+
+err(
+    "bfloat16-not-supported-on-target",
+    55220,
+    "'BFloat16' is not supported on this target",
+    span { loc = "location", message = "this uses a 'BFloat16' value, and the current code generation target has no bfloat16 type" }
 )
 
 err(
