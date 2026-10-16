@@ -8,10 +8,10 @@
 // bundled with slang-test predates the extension, so `wgsl-spirv-asm` cannot validate it here.
 
 //TEST:SIMPLE(filecheck=TABLE): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table
+//TEST:SIMPLE(filecheck=NOHEAP): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table
 //TEST:SIMPLE(filecheck=HEAP): -target wgsl -stage compute -entry main
 
 // TABLE: enable chromium_experimental_resource_table;
-// TABLE-NOT: _slang_resource_heap
 // TABLE-DAG: tex_0 : vec2<u32>
 // TABLE-DAG: smp_0 : vec2<u32>
 // TABLE-DAG: gTex_0 : vec2<u32>
@@ -21,6 +21,9 @@
 // TABLE: shade_0([[TEX]], {{.*}}getResource<sampler>({{.*}}smp_0.x{{.*}}textureLoad({{.*}}[[TEX]]
 // TABLE: textureDimensions({{.*}}getResource<texture_2d<f32>>({{.*}}gTex_0.x
 // TABLE: getResource<texture_2d<f32>>({{.*}}heapIndex
+
+// No heap declaration anywhere in the resource-table output.
+// NOHEAP-NOT: _slang_resource_heap
 
 // HEAP-NOT: enable chromium_experimental_resource_table;
 // HEAP-NOT: getResource
