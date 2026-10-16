@@ -22,6 +22,17 @@
 // NOCONST: result code = 0
 // NOCONST-NOT: const {{.*}}_slang_get
 
+// The helpers build NaN and infinity from bit patterns, not from a runtime `0.0 / 0.0`: the NVIDIA
+// Vulkan driver crashes creating a pipeline for a sunk table that holds such a division.
+// WGSL: fn _slang_getNan() -> f32
+// WGSL-NEXT: {
+// WGSL-NEXT: let bits = 0x7fc00000u;
+// WGSL-NEXT: return bitcast<f32>(bits);
+// WGSL: fn _slang_getInfinity(positive: bool) -> f32
+// WGSL-NEXT: {
+// WGSL-NEXT: let bits = select(0xff800000u, 0x7f800000u, positive);
+// WGSL-NEXT: return bitcast<f32>(bits);
+
 static const float kTable[3] = { 0.0 / 0.0, 1.0 / 0.0, 2.0 };
 static const float kNested[2][2] = { { -1.0 / 0.0, 1.0 }, { 2.0, 3.0 } };
 static const float2x2 kMats[2] = { float2x2(1.0 / 0.0, 0.0, 0.0, 1.0), float2x2(1.0, 0.0, 0.0, 1.0) };
