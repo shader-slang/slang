@@ -607,24 +607,24 @@ SLANG_CUDA_VECTOR_TRAITS(__half4, bool4, 4, false, false)
    the same width, as in `int3 >> uint3`. The `T, U` overload below handles the mixed case; for two
    operands of the same type, the `T, T` overload above is more specialized and is chosen instead.
    The result keeps the left operand's signedness, so an `int` vector stays an arithmetic shift. */
-#define SLANG_CUDA_VECTOR_SHIFT_OP(op)                                                  \
-    template<                                                                           \
-        typename T,                                                                     \
-        typename U,                                                                     \
-        typename SlangCudaVectorEnableIf<                                               \
+#define SLANG_CUDA_VECTOR_SHIFT_OP(op)                                                        \
+    template<                                                                                 \
+        typename T,                                                                           \
+        typename U,                                                                           \
+        typename SlangCudaVectorEnableIf<                                                     \
             SlangCudaVectorTraits<T>::kIsIntegral && SlangCudaVectorTraits<U>::kIsIntegral && \
-            SlangCudaVectorTraits<T>::kWidth == SlangCudaVectorTraits<U>::kWidth>::Type* = \
-            nullptr>                                                                    \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator op(T thisVal, U other)                \
-    {                                                                                   \
-        T result;                                                                       \
-        result.x = thisVal.x op other.x;                                                \
-        result.y = thisVal.y op other.y;                                                \
-        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 3)                            \
-            result.z = thisVal.z op other.z;                                            \
-        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 4)                            \
-            result.w = thisVal.w op other.w;                                            \
-        return result;                                                                  \
+            SlangCudaVectorTraits<T>::kWidth == SlangCudaVectorTraits<U>::kWidth>::Type* =    \
+            nullptr>                                                                          \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator op(T thisVal, U other)                      \
+    {                                                                                         \
+        T result;                                                                             \
+        result.x = thisVal.x op other.x;                                                      \
+        result.y = thisVal.y op other.y;                                                      \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 3)                                  \
+            result.z = thisVal.z op other.z;                                                  \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 4)                                  \
+            result.w = thisVal.w op other.w;                                                  \
+        return result;                                                                        \
     }
 #define SLANG_CUDA_VECTOR_COMPARE_OP(op)                                                          \
     template<typename T, SLANG_CUDA_VECTOR_ENABLE_IF>                                             \

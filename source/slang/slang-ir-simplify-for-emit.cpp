@@ -390,8 +390,9 @@ struct SimplifyForEmitContext : public InstPassBase
                                                               operandType,
                                                               resultVectorType->getElementCount())
                                                         : inst->getOperand(1 - a)->getDataType();
-                                auto v =
-                                    builder.emitMakeVectorFromScalar(splatType, inst->getOperand(a));
+                                auto v = builder.emitMakeVectorFromScalar(
+                                    splatType,
+                                    inst->getOperand(a));
                                 inst->setOperand(a, v);
                             }
                         }
