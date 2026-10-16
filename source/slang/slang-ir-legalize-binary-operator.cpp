@@ -223,7 +223,7 @@ void legalizeLogicalAndOr(IRInst* inst, TargetProgram* targetProgram)
 
             SLANG_ASSERT(
                 as<IRMatrixType>(operandDataType) || as<IRVectorType>(operandDataType) ||
-                as<IRArrayType>(operandDataType) || as<IRBoolType>(operandDataType));
+                as<IRBoolType>(operandDataType));
 
             if (auto vecType = as<IRVectorType>(operandDataType))
             {
@@ -250,8 +250,7 @@ void legalizeLogicalAndOr(IRInst* inst, TargetProgram* targetProgram)
         IRInst* newInst = nullptr;
 
         SLANG_ASSERT(
-            as<IRMatrixType>(dataType) || as<IRVectorType>(dataType) || as<IRBoolType>(dataType) ||
-            as<IRArrayType>(dataType));
+            as<IRMatrixType>(dataType) || as<IRVectorType>(dataType) || as<IRBoolType>(dataType));
         if (auto vecType = as<IRVectorType>(dataType))
         {
             if (!as<IRBoolType>(vecType->getElementType()))
@@ -271,54 +270,6 @@ void legalizeLogicalAndOr(IRInst* inst, TargetProgram* targetProgram)
                 newInst = builder.emitCast(dataType, newInst);
             }
         }
-        else if (auto arrayType = as<IRArrayType>(dataType))
-        {
-            // Handle lowered matrices (arrays of vectors)
-            auto arrayVecType = as<IRVectorType>(arrayType->getElementType());
-            SLANG_ASSERT(arrayVecType);
-
-            // At this point, lhs and rhs should already be converted to bool arrays
-            auto lhsArrayType = as<IRArrayType>(lhs->getDataType());
-            auto rhsArrayType = as<IRArrayType>(rhs->getDataType());
-            SLANG_ASSERT(lhsArrayType && rhsArrayType);
-
-            auto lhsVecType = as<IRVectorType>(lhsArrayType->getElementType());
-            auto rhsVecType = as<IRVectorType>(rhsArrayType->getElementType());
-            SLANG_ASSERT(lhsVecType && rhsVecType);
-
-            SLANG_ASSERT(
-                as<IRBoolType>(lhsVecType->getElementType()) &&
-                as<IRBoolType>(rhsVecType->getElementType()));
-
-            auto arraySize = arrayType->getElementCount();
-            List<IRInst*> resultElements;
-
-            // Extract each vector from both arrays, perform AND/OR, collect results
-            for (IRIntegerValue i = 0; i < getIntVal(arraySize); i++)
-            {
-                auto indexVal = builder.getIntValue(builder.getIntType(), i);
-                auto lhsElement = builder.emitElementExtract(lhs, indexVal);
-                auto rhsElement = builder.emitElementExtract(rhs, indexVal);
-
-                IRInst* resultElement;
-                if (inst->getOp() == kIROp_And)
-                {
-                    resultElement =
-                        builder.emitAnd(lhsElement->getDataType(), lhsElement, rhsElement);
-                }
-                else
-                {
-                    resultElement =
-                        builder.emitOr(lhsElement->getDataType(), lhsElement, rhsElement);
-                }
-                resultElements.add(resultElement);
-            }
-
-            // Construct the result array from the individual vector results
-            newInst =
-                builder.emitMakeArray(dataType, getIntVal(arraySize), resultElements.getBuffer());
-        }
-
         if (newInst && inst != newInst)
         {
             inst->replaceUsesWith(newInst);
