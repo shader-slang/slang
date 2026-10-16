@@ -797,11 +797,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         if (!varLayout)
             return AddressSpace::Generic;
 
-        auto typeLayout = varLayout->getTypeLayout()->unwrapArray();
-        if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
-        {
-            varLayout = parameterGroupTypeLayout->getContainerVarLayout();
-        }
+        varLayout = getGlobalParamBindingVarLayout(varLayout);
 
         auto result = AddressSpace::Generic;
         for (auto rr : varLayout->getOffsetAttrs())
