@@ -19,7 +19,6 @@ using namespace Slang;
 namespace
 {
 
-/// Validate `module` and report whether it has no errors.
 bool isValidModule(IRModule* module)
 {
     DiagnosticSink sink;
@@ -27,7 +26,6 @@ bool isValidModule(IRModule* module)
     return sink.getErrorCount() == 0;
 }
 
-/// Count the `LoadFromUninitializedMemory` instructions directly in `block`.
 Index countUninitializedLoads(IRBlock* block)
 {
     Index count = 0;
@@ -561,9 +559,9 @@ SLANG_UNIT_TEST(irPeepholeParamLeavesSelfOnlyParamAlone)
     }
 }
 
-// The single defined value of a param is forwarded when its undefined inputs are unobserved, as
-// before. When an undefined input is also observed elsewhere, the param is kept: on that edge `p`
-// equals the frozen input, which the defined value need not.
+// A param with one defined value and unobserved undefined inputs is forwarded to the defined value.
+// An observed undefined input keeps the param: on that edge `p` equals the frozen input, which the
+// defined value need not.
 SLANG_UNIT_TEST(irPeepholeParamForwardsSingleDefinedValueOnlyWhenUncorrelated)
 {
     for (bool observed : {false, true})
