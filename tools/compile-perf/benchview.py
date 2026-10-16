@@ -154,7 +154,8 @@ def submissions(records, meta, os_name, observed, execution, release=None, branc
         run["vcs"]["branch"] = branch
     if release:
         run["metadata"] = {"release": release}
-    envelope = {"schemaVersion": 1, "project": {"id": "slang", "name": "Slang"},
+    envelope = {"schemaVersion": 1, "project": {"id": "slang", "name": "Slang",
+                "metadata": {"defaultBranch": "master", "breakdownTooltipMaxItems": 1}},
                 "producer": {"name": "slang-compile-perf", "version": "1"},
                 "run": run, "execution": {"id": execution, "metadata": meta}}
     batches, batch, identities = [], [], set()

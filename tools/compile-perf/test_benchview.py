@@ -33,7 +33,8 @@ class BenchViewTests(unittest.TestCase):
         """Release metadata belongs to the Slang version, and daily runs omit it."""
         daily = self.convert()[0]
         release = self.convert(release={"label": "v2026.19"})[0]
-        self.assertEqual(daily["project"], {"id": "slang", "name": "Slang"})
+        self.assertEqual(daily["project"], {"id": "slang", "name": "Slang",
+                         "metadata": {"defaultBranch": "master", "breakdownTooltipMaxItems": 1}})
         self.assertNotIn("metadata", daily["run"])
         self.assertEqual(release["run"]["metadata"]["release"]["label"], "v2026.19")
         self.assertNotEqual(daily["run"]["key"], release["run"]["key"])

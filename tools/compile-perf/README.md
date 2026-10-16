@@ -399,6 +399,8 @@ The publishing nightly also exports results through `benchview.py` to the
 Configure the Actions secret `BENCHVIEW_WRITE_KEY`; the optional repository
 variable `BENCHVIEW_URL` overrides that server. Without the key, the job only
 archives submission payloads. Upload failures do not block existing reports.
+The exporter sets Slang's default branch to `master` and Breakdown popup limit
+to one series through project metadata.
 The current internal server uses HTTP: the write key and results cross the
 network **unencrypted**. The CLI requires `--allow-insecure` for HTTP; the nightly
 explicitly opts in only for the default internal endpoint. Prefer HTTPS when
