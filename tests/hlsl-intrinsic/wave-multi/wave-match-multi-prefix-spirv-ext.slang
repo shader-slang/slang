@@ -1,7 +1,8 @@
 // The partitioned subgroup operations (WaveMatch, WaveMaskMatch and the WaveMulti* reductions and
 // scans) declare SPV_NV_shader_subgroup_partitioned by default and
 // SPV_EXT_shader_subgroup_partitioned when the target requests spvGroupNonUniformPartitionedEXT.
-// The two extensions define the same opcodes, operands and capability.
+// The two extensions define the same opcodes, operands and capability, and the disassembler prints
+// the EXT spelling of each in both cases, so only the OpExtension line tells the runs apart.
 
 //TEST:SIMPLE(filecheck=NV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly
 //TEST:SIMPLE(filecheck=NV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly -capability spvGroupNonUniformPartitionedNV
