@@ -19580,12 +19580,21 @@ void shader_subgroup_preamble()
 
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_rotate)
-[require(cuda_glsl_metal_spirv, subgroup_rotate)]
+[require(cuda_glsl_metal_spirv_wgsl, subgroup_rotate)]
 T WaveRotate(T value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case wgsl:
+        // WGSL has no subgroup rotate: shuffle from lane (self + delta) mod the subgroup size.
+        // `subgroupShuffle` takes no bool, so bools are shuffled as 0/1 `uint`.
+        {
+            const int lane = int((WaveGetLaneIndex() + delta) % WaveGetLaneCount());
+            if (__isBool<T>())
+                return __intCast<T>(WaveShuffle(__intCast<uint>(value), lane));
+            return WaveShuffle(value, lane);
+        }
     case glsl:
         __intrinsic_asm "subgroupRotate";
     case cuda:
@@ -19604,12 +19613,26 @@ T WaveRotate(T value, uint delta)
 
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_rotate)
-[require(cuda_glsl_metal_spirv, subgroup_rotate)]
+[require(cuda_glsl_metal_spirv_wgsl, subgroup_rotate)]
 vector<T, N> WaveRotate(vector<T, N> value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case wgsl:
+        // See the scalar overload.
+        {
+            const int lane = int((WaveGetLaneIndex() + delta) % WaveGetLaneCount());
+            if (__isBool<T>())
+            {
+                vector<T, N> result;
+                [ForceUnroll]
+                for (int i = 0; i < N; i++)
+                    result[i] = __intCast<T>(WaveShuffle(__intCast<uint>(value[i]), lane));
+                return result;
+            }
+            return WaveShuffle(value, lane);
+        }
     case glsl:
         __intrinsic_asm "subgroupRotate";
     case cuda:
@@ -20249,6 +20272,121 @@ ${
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
 $}
 
+//@hidden:
+// Metal and WGSL emulation of the clustered reductions (neither has clustered subgroup operations).
+// A thread combines the values of the active lanes of its cluster in lane order, so every lane of a
+// cluster gets the same result. `clusterSize` is a power of two, as for the SPIR-V operation. Each
+// lane of the cluster is read with a shuffle outside any branch, so the shuffles stay in uniform
+// control flow. The cost is one shuffle per lane of the cluster, plus one ballot.
+enum __WaveClusteredOp
+{
+    Add,
+    Mul,
+    Min,
+    Max,
+    And,
+    Or,
+    Xor,
+};
+
+[ForceInline]
+bool __waveLaneIsSet(uint4 lanes, uint lane)
+{
+    return ((lanes[lane / 32] >> (lane % 32)) & 1u) != 0u;
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(metal, subgroup_shuffle)]
+[require(wgsl, subgroup_shuffle)]
+vector<T, N> __waveClusteredReduceArithmetic(
+    vector<T, N> value,
+    uint clusterSize,
+    __WaveClusteredOp op)
+{
+    const uint clusterBase = WaveGetLaneIndex() & ~(clusterSize - 1u);
+    const uint4 activeLanes = WaveActiveBallot(true);
+    vector<T, N> result = value;
+    bool isFirst = true;
+    for (uint i = 0; i < clusterSize; i++)
+    {
+        const uint lane = clusterBase + i;
+        const vector<T, N> other = WaveShuffle(value, int(lane));
+        if (__waveLaneIsSet(activeLanes, lane))
+        {
+            if (isFirst)
+                result = other;
+            else if (op == __WaveClusteredOp.Add)
+                result = result + other;
+            else if (op == __WaveClusteredOp.Mul)
+                result = result * other;
+            else if (op == __WaveClusteredOp.Min)
+                result = min(result, other);
+            else
+                result = max(result, other);
+            isFirst = false;
+        }
+    }
+    return result;
+}
+
+// `T` is an integer type here (see `__waveClusteredReduceBitwise`).
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(metal, subgroup_shuffle)]
+[require(wgsl, subgroup_shuffle)]
+vector<T, N> __waveClusteredReduceBitwiseInt(
+    vector<T, N> value,
+    uint clusterSize,
+    __WaveClusteredOp op)
+{
+    const uint clusterBase = WaveGetLaneIndex() & ~(clusterSize - 1u);
+    const uint4 activeLanes = WaveActiveBallot(true);
+    vector<T, N> result = value;
+    bool isFirst = true;
+    for (uint i = 0; i < clusterSize; i++)
+    {
+        const uint lane = clusterBase + i;
+        const vector<T, N> other = WaveShuffle(value, int(lane));
+        if (__waveLaneIsSet(activeLanes, lane))
+        {
+            if (isFirst)
+                result = other;
+            else if (op == __WaveClusteredOp.And)
+                result = result & other;
+            else if (op == __WaveClusteredOp.Or)
+                result = result | other;
+            else
+                result = result ^ other;
+            isFirst = false;
+        }
+    }
+    return result;
+}
+
+// The shuffles take no bool, so bools are reduced as 0/1 `uint`.
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(metal, subgroup_shuffle)]
+[require(wgsl, subgroup_shuffle)]
+vector<T, N> __waveClusteredReduceBitwise(vector<T, N> value, uint clusterSize, __WaveClusteredOp op)
+{
+    if (__isBool<T>())
+    {
+        vector<uint, N> asUint;
+        [ForceUnroll]
+        for (int i = 0; i < N; i++)
+            asUint[i] = __intCast<uint>(value[i]);
+        const vector<uint, N> reduced = __waveClusteredReduceBitwiseInt(asUint, clusterSize, op);
+        vector<T, N> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; i++)
+            result[i] = __intCast<T>(reduced[i]);
+        return result;
+    }
+    return __waveClusteredReduceBitwiseInt(value, clusterSize, op);
+}
+
 //@public:
 
 //
@@ -20260,12 +20398,15 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public T WaveClusteredSum(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceArithmetic(vector<T, 1>(value), clusterSize, __WaveClusteredOp.Add)[0];
     case glsl:
         __intrinsic_asm "subgroupClusteredAdd($0, $1)";
     case spirv:
@@ -20281,12 +20422,15 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public vector<T,N> WaveClusteredSum(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceArithmetic(value, clusterSize, __WaveClusteredOp.Add);
     case glsl:
         __intrinsic_asm "subgroupClusteredAdd($0, $1)";
     case spirv:
@@ -20304,12 +20448,15 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public T WaveClusteredProduct(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceArithmetic(vector<T, 1>(value), clusterSize, __WaveClusteredOp.Mul)[0];
     case glsl:
         __intrinsic_asm "subgroupClusteredMul($0, $1)";
     case spirv:
@@ -20325,12 +20472,15 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public vector<T,N> WaveClusteredProduct(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceArithmetic(value, clusterSize, __WaveClusteredOp.Mul);
     case glsl:
         __intrinsic_asm "subgroupClusteredMul($0, $1)";
     case spirv:
@@ -20347,12 +20497,15 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public T WaveClusteredMin(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceArithmetic(vector<T, 1>(value), clusterSize, __WaveClusteredOp.Min)[0];
     case glsl:
         __intrinsic_asm "subgroupClusteredMin($0, $1)";
     case spirv:
@@ -20370,12 +20523,15 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public vector<T,N> WaveClusteredMin(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceArithmetic(value, clusterSize, __WaveClusteredOp.Min);
     case glsl:
         __intrinsic_asm "subgroupClusteredMin($0, $1)";
     case spirv:
@@ -20394,12 +20550,15 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public T WaveClusteredMax(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceArithmetic(vector<T, 1>(value), clusterSize, __WaveClusteredOp.Max)[0];
     case glsl:
         __intrinsic_asm "subgroupClusteredMax($0, $1)";
     case spirv:
@@ -20417,12 +20576,15 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public vector<T,N> WaveClusteredMax(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceArithmetic(value, clusterSize, __WaveClusteredOp.Max);
     case glsl:
         __intrinsic_asm "subgroupClusteredMax($0, $1)";
     case spirv:
@@ -20441,12 +20603,15 @@ __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public T WaveClusteredBitAnd(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceBitwise(vector<T, 1>(value), clusterSize, __WaveClusteredOp.And)[0];
     case glsl:
         __intrinsic_asm "subgroupClusteredAnd($0, $1)";
     case spirv:
@@ -20459,12 +20624,15 @@ __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public vector<T,N> WaveClusteredBitAnd(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceBitwise(value, clusterSize, __WaveClusteredOp.And);
     case glsl:
         __intrinsic_asm "subgroupClusteredAnd($0, $1)";
     case spirv:
@@ -20478,12 +20646,15 @@ __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public T WaveClusteredBitOr(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceBitwise(vector<T, 1>(value), clusterSize, __WaveClusteredOp.Or)[0];
     case glsl:
         __intrinsic_asm "subgroupClusteredOr($0, $1)";
     case spirv:
@@ -20496,12 +20667,15 @@ __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public vector<T,N> WaveClusteredBitOr(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceBitwise(value, clusterSize, __WaveClusteredOp.Or);
     case glsl:
         __intrinsic_asm "subgroupClusteredOr($0, $1)";
     case spirv:
@@ -20515,12 +20689,15 @@ __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public T WaveClusteredBitXor(T value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceBitwise(vector<T, 1>(value), clusterSize, __WaveClusteredOp.Xor)[0];
     case glsl:
         __intrinsic_asm "subgroupClusteredXor($0, $1)";
     case spirv:
@@ -20533,12 +20710,15 @@ __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
-[require(glsl_spirv, subgroup_clustered)]
+[require(glsl_metal_spirv_wgsl, subgroup_clustered)]
 public vector<T,N> WaveClusteredBitXor(vector<T,N> value, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case metal:
+    case wgsl:
+        return __waveClusteredReduceBitwise(value, clusterSize, __WaveClusteredOp.Xor);
     case glsl:
         __intrinsic_asm "subgroupClusteredXor($0, $1)";
     case spirv:
@@ -20563,13 +20743,23 @@ __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
 __spirv_version(1.3)
 [ForceInline]
-[require(cuda_glsl_hlsl_metal_spirv, quad_control)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, quad_control)]
 bool QuadAny(bool expr)
 {
     __requireMaximallyReconverges();
     __requireQuadDerivatives();
     __target_switch
     {
+    case wgsl:
+        // WGSL has no quad vote: combine the quad with two swaps. `quadSwapX` and `quadSwapY` take
+        // no bool, so the vote is a 0/1 `uint`. As with the other WGSL quad operations, a lane of
+        // the quad that is not active gives an indeterminate value.
+        {
+            uint vote = expr ? 1u : 0u;
+            vote = vote | QuadReadAcrossX(vote);
+            vote = vote | QuadReadAcrossY(vote);
+            return vote != 0u;
+        }
     case hlsl: __intrinsic_asm "QuadAny";
     case glsl: __intrinsic_asm "subgroupQuadAny";
     case metal: __intrinsic_asm "quad_any";
@@ -20589,13 +20779,23 @@ __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
 __spirv_version(1.3)
 [ForceInline]
-[require(cuda_glsl_hlsl_metal_spirv, quad_control)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, quad_control)]
 bool QuadAll(bool expr)
 {
     __requireMaximallyReconverges();
     __requireQuadDerivatives();
     __target_switch
     {
+    case wgsl:
+        // WGSL has no quad vote: combine the quad with two swaps. `quadSwapX` and `quadSwapY` take
+        // no bool, so the vote is a 0/1 `uint`. As with the other WGSL quad operations, a lane of
+        // the quad that is not active gives an indeterminate value.
+        {
+            uint vote = expr ? 1u : 0u;
+            vote = vote & QuadReadAcrossX(vote);
+            vote = vote & QuadReadAcrossY(vote);
+            return vote != 0u;
+        }
     case hlsl: __intrinsic_asm "QuadAll";
     case glsl: __intrinsic_asm "subgroupQuadAll";
     case metal: __intrinsic_asm "quad_all";
