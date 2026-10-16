@@ -2242,6 +2242,31 @@ struct LoweredElementTypeContext
         }
     }
 
+    // Return the logical row of type `logicalRowType` held in `storageRow`, a row loaded from a
+    // `_MatrixStorage` type. The storage row can be wider than the logical one, as when std140
+    // pads an `int3` row to an `int4`, and can hold another element type, as when SPIR-V stores
+    // a `bool` as an `int`.
+    IRInst* loadStorageRowAsLogicalRow(
+        IRBuilder& builder,
+        IRType* logicalRowType,
+        IRInst* storageRow)
+    {
+        auto logicalVectorType = as<IRVectorType>(logicalRowType);
+        auto storageVectorType = as<IRVectorType>(storageRow->getDataType());
+        IRInst* row = storageRow;
+        if (logicalVectorType && storageVectorType &&
+            getIntVal(storageVectorType->getElementCount()) !=
+                getIntVal(logicalVectorType->getElementCount()))
+        {
+            row = builder.emitVectorReshape(
+                builder.getVectorType(
+                    storageVectorType->getElementType(),
+                    logicalVectorType->getElementCount()),
+                row);
+        }
+        return builder.emitCast(logicalRowType, row);
+    }
+
     // Lower all getElementPtr insts of a lowered matrix out of existance.
     void lowerMatrixAddresses(
         IRModule* module,
@@ -2318,7 +2343,10 @@ struct LoweredElementTypeContext
                             }
                             else
                             {
-                                resultInst = builder.emitCast(user->getDataType(), resultInst);
+                                resultInst = loadStorageRowAsLogicalRow(
+                                    builder,
+                                    user->getDataType(),
+                                    resultInst);
                             }
                         }
                         user->replaceUsesWith(resultInst);
@@ -2372,6 +2400,41 @@ struct LoweredElementTypeContext
                             builder.emitStore(rowAddr, value);
                             user->removeAndDeallocate();
                         }
+                        break;
+                    }
+                case kIROp_SwizzledStore:
+                    {
+                        // `m[row].xz = v` stores each selected element at its own storage
+                        // address, as `m[row][c] = v[i]` does.
+                        auto swizzledStore = cast<IRSwizzledStore>(user);
+                        SLANG_ASSERT(swizzledStore->getDest() == majorAddr);
+                        auto dataPtr = builder.emitFieldAddress(
+                            getLoweredPtrLikeType(
+                                majorAddr->getDataType(),
+                                matrixTypeInfo->loweredInnerArrayType),
+                            storageBase,
+                            matrixTypeInfo->loweredInnerStructKey);
+                        bool isColMajor =
+                            getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+                        auto source = swizzledStore->getSource();
+                        for (UInt i = 0; i < swizzledStore->getElementCount(); i++)
+                        {
+                            IRInst* vectorIndex = majorGEP->getIndex();
+                            IRInst* elementIndex = swizzledStore->getElementIndex(i);
+                            if (isColMajor)
+                                Swap(vectorIndex, elementIndex);
+                            auto vectorAddr = builder.emitElementAddress(dataPtr, vectorIndex);
+                            auto elementAddr = builder.emitElementAddress(vectorAddr, elementIndex);
+                            IRInst* value = source;
+                            if (as<IRVectorType>(source->getDataType()))
+                                value = builder.emitElementExtract(source, (IRIntegerValue)i);
+                            builder.emitStore(
+                                elementAddr,
+                                builder.emitCast(
+                                    tryGetPointedToType(&builder, elementAddr->getDataType()),
+                                    value));
+                        }
+                        user->removeAndDeallocate();
                         break;
                     }
                 case kIROp_GetElementPtr:

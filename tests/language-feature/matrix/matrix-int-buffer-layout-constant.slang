@@ -12,6 +12,7 @@
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute -matrix-layout-row-major
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute -matrix-layout-row-major
+//TEST:SIMPLE(filecheck=WGSLSPIRV):-target wgsl-spirv-asm -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute -matrix-layout-row-major
 
@@ -33,7 +34,7 @@ struct Matrices
 // clang-format on
 ConstantBuffer<Matrices> input;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name output
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name output
 RWStructuredBuffer<int> output;
 
 [noinline]
@@ -64,6 +65,7 @@ void computeMain()
     output[11] = square[2][0];
     output[12] = square[0][2];
     output[13] = input.r[0][0];
+    output[14] = input.r[1].z;
 }
 
 // CHECK: type: int32_t
@@ -81,6 +83,7 @@ void computeMain()
 // CHECK-NEXT: 520
 // CHECK-NEXT: 502
 // CHECK-NEXT: 400
+// CHECK-NEXT: 412
 
 // The std140 offsets are the ones reflection reports: each column of `q`, `m` and `a[k]` and each
 // row of `r` is a 16-byte vector.
@@ -96,6 +99,11 @@ void computeMain()
 // WGSL: .m_0.data_{{[0-9]+}}[i32(2)][i32(1)];
 // WGSL: .a_0.data_{{[0-9]+}}[i32(1)].data_{{[0-9]+}}[i32(2)][i32(0)];
 // WGSL: .r_0.data_{{[0-9]+}}[i32(1)][i32(2)];
+
+// A whole row of `r` is a padded `vec4` in storage; reading it as an `int3` takes `.xyz`.
+// WGSL: = {{.*}}.r_0.data_{{[0-9]+}}[i32(1)].xyz;
+
+// WGSLSPIRV: OpEntryPoint
 
 // A Metal constant buffer keeps native vectors: `int2` columns, so `m` is 24 bytes.
 // METAL: array<int2, int(3)> data
