@@ -668,14 +668,19 @@ static bool _diagnoseRestrictedRayTracingValueType(
     switch (_getRestrictedRayTracingTypeKind(type))
     {
     case RestrictedRayTracingTypeKind::StageInterface:
+        // The interface itself, e.g. IMissShader, cannot be a runtime value. A concrete struct
+        // implementing IMissShader is an ordinary type and does not enter this branch.
         visitor->getSink()->diagnose(
             Diagnostics::StructuralRayTracingStageRuntimeValue{.type = type, .location = location});
         return true;
     case RestrictedRayTracingTypeKind::StageInput:
+        // Allowed input parameters and local copies return from the variable checker before
+        // reaching this helper. Here the context forbids an input, even in an array or pointer.
         visitor->getSink()->diagnose(
             Diagnostics::StructuralRayTracingInputStorage{.type = type, .location = location});
         return true;
     default:
+        // Ordinary types and Optional<Input> need no diagnostic from this check.
         return false;
     }
 }
@@ -1466,10 +1471,14 @@ void SemanticsVisitor::checkStructuralRayTracingModule(ModuleDecl* moduleDecl)
 void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl)
 {
     auto type = varDecl->getType();
+    // Recognize the input type itself, such as MissInput<C>. Count means it is not a stage input.
     if (_getDirectStageInputKind(type) != StructuralRayTracingStageKind::Count)
     {
         if (auto param = as<ParamDecl>(varDecl))
         {
+            // checkCallableDeclCommon also calls this helper for function parameters. An in
+            // parameter receives an existing input from its caller; uniform would instead request
+            // a host binding. Uniform parameters and other directions reach the rejection below.
             if (getExplicitlyDeclaredParamPassingMode(param) == ParamPassingMode::In &&
                 !param->hasModifier<HLSLUniformModifier>())
                 return;
@@ -1477,12 +1486,22 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBa
         else if (
             isLocalVar(varDecl) && !varDecl->hasModifier<HLSLStaticModifier>() && varDecl->initExpr)
         {
-            // Normal expression checking handles written initializers. Variable body checking
-            // can also insert a call to a default constructor; it must not manufacture an input.
+            // Only an initialized, non-static local can copy an input. Having an initializer is
+            // not enough: `MissInput<C> copy = input` is allowed, but `MissInput<C> fresh = {}`
+            // creates a new input and is rejected by the expression check.
+            //
+            // For `MissInput<C> fresh;`, variable checking may insert a default-constructor call.
+            // Check that inserted expression too, even though no initializer was written.
             diagnoseInvalidStructuralRayTracingExpression(varDecl->initExpr);
+            // The local declaration is allowed; any initializer error was reported above.
             return;
         }
     }
+    // Reject input declarations that were not accepted above: globals, fields, static locals,
+    // disallowed parameters, and `MissInput<C> fresh;` when no initializer was inserted. This also
+    // checks restricted types inside built-in containers and the stage interface itself.
+    // Reaching this call does not imply an error: ordinary types, including concrete stage
+    // structs, pass without a diagnostic.
     _diagnoseRestrictedRayTracingValueType(this, type, varDecl->loc);
 }
 
