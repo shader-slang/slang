@@ -812,11 +812,13 @@ static bool _doesScopeBlockUseOfEnclosingThisExpr(Decl* decl)
     return false;
 }
 
-/// Returns whether `decl` is a value that exists only during a call of its function: a
-/// parameter, or a local variable that is not `static`.
+/// Returns whether `decl` is a declaration with automatic storage in its function: a function
+/// parameter (`ParamDecl`), or a local variable that is not `static`. Generic value parameters
+/// such as `N` in `f<let N : int>()` are `GenericValueParamDecl`s, not `ParamDecl`s, so they are
+/// not included.
 ///
 /// A member of a function-local type does not run as part of a call of the enclosing function,
-/// so it cannot use these values. Consider this example:
+/// so it cannot use these declarations. Consider this example:
 ///
 /// ```
 /// void f(int p)
@@ -828,36 +830,39 @@ static bool _doesScopeBlockUseOfEnclosingThisExpr(Decl* decl)
 /// ```
 ///
 /// `L::get` has no access to the `x` and `p` of a particular call of `f`; capturing such values
-/// is what lambdas are for. The `static const` local `k` is not tied to a call, so `L` can use it.
-static bool _isFunctionCallValue(Decl* decl)
+/// is what lambdas are for. The `static` local `k` is not tied to a call, so `L` can use it.
+bool isAutomaticStorageDecl(Decl* decl)
 {
     if (as<ParamDecl>(decl))
         return true;
     return isLocalVar(decl) && !decl->hasModifier<HLSLStaticModifier>();
 }
 
-/// Returns whether the lookup result `item` refers to a function call value (see
-/// `_isFunctionCallValue`), either directly or through one. In a function-local
-/// `cbuffer CB { int a; }`, lookup of `a` finds the field `a` through the transparent local `CB`,
-/// so the result names `a` while its breadcrumbs record `CB`.
-static bool _refersToFunctionCallValue(LookupResultItem const& item)
+/// Returns whether the lookup result `item` names an automatic-storage declaration (see
+/// `isAutomaticStorageDecl`) or a member reached through one. A function-local `cbuffer` is
+/// parsed into a transparent local variable, so lookup of one of its fields returns the field
+/// with a `Member` breadcrumb naming that variable; checking the breadcrumbs keeps such fields
+/// out of a local type too.
+static bool _refersToAutomaticStorageDecl(LookupResultItem const& item)
 {
-    if (_isFunctionCallValue(item.declRef.getDecl()))
+    if (isAutomaticStorageDecl(item.declRef.getDecl()))
         return true;
     for (auto breadcrumb = item.breadcrumbs.get(); breadcrumb; breadcrumb = breadcrumb->next)
     {
         if (breadcrumb->kind == LookupResultItem::Breadcrumb::Kind::Member &&
-            _isFunctionCallValue(breadcrumb->declRef.getDecl()))
+            isAutomaticStorageDecl(breadcrumb->declRef.getDecl()))
             return true;
     }
     return false;
 }
 
 /// Look up `name` among the direct members of `containerDeclRef`, a scope of a function that
-/// encloses the function-local type where lookup started. Every result except the function's
-/// parameters and non-static locals, and members reached through them, is added to `result`.
+/// encloses the function-local type where lookup started, and add every result to `result`
+/// except automatic-storage declarations and members reached through them.
 ///
-/// Returns whether a parameter or non-static local was left out.
+/// Returns true if at least one result was excluded. The caller uses this to stop the scope
+/// walk, because an excluded declaration still hides declarations of the same name in
+/// farther-out scopes.
 static bool _lookUpInScopeOfEnclosingFunction(
     ASTBuilder* astBuilder,
     Name* name,
@@ -875,17 +880,17 @@ static bool _lookUpInScopeOfEnclosingFunction(
         scopeResult,
         nullptr);
 
-    bool leftOutCallValue = false;
+    bool excludedAny = false;
     for (auto item : scopeResult)
     {
-        if (_refersToFunctionCallValue(item))
+        if (_refersToAutomaticStorageDecl(item))
         {
-            leftOutCallValue = true;
+            excludedAny = true;
             continue;
         }
         AddToLookupResult(result, item);
     }
-    return leftOutCallValue;
+    return excludedAny;
 }
 
 static void _lookUpInScopes(
@@ -906,13 +911,13 @@ static void _lookUpInScopes(
 
     // We set this flag once lookup leaves a type declaration. A block or callable scope reached
     // after that point belongs to a function enclosing a function-local type, so lookup leaves
-    // out that function's parameters and non-static locals (see `_isFunctionCallValue`). Other
-    // scopes, such as files and namespaces, declare neither, so they take the ordinary path.
+    // out that function's automatic-storage declarations (see `isAutomaticStorageDecl`). Other
+    // scopes, such as files and namespaces, declare none, so they take the ordinary path.
     bool hasLeftTypeDecl = false;
 
     for (; scope != endScope; scope = scope->parent)
     {
-        bool isHiddenByCallValue = false;
+        bool excludedAutomaticStorageDecl = false;
 
         // Note that we consider all "peer" scopes together,
         // so that a hit in one of them does not preclude
@@ -1052,7 +1057,7 @@ static void _lookUpInScopes(
                         containerDeclRef,
                         request,
                         result))
-                    isHiddenByCallValue = true;
+                    excludedAutomaticStorageDecl = true;
             }
             else
             {
@@ -1111,11 +1116,16 @@ static void _lookUpInScopes(
                 hasLeftTypeDecl = true;
         }
 
-        // A parameter or non-static local that lookup left out still hides declarations of the
-        // same name in farther-out scopes. Lookup stops here, so a reference to the name is an
-        // undefined identifier rather than a silent reference to an outer declaration. C++ also
-        // rejects a reference from a local class to a local that hides a global.
-        if (isHiddenByCallValue && !result.isValid() && !request.isCompletionRequest())
+        // An excluded parameter or local still hides declarations of the same name in farther-out
+        // scopes, so a reference from the local type to that name is an undefined identifier
+        // rather than a silent reference to, say, a global. We stop only when nothing has been
+        // found yet; otherwise the rules below decide whether to keep walking, and a completion
+        // request keeps walking to list every visible name.
+        //
+        // `visitBlockStmt` checks local types before it hides the block's later locals from
+        // lookup, so a local declared after the type also hides a global of the same name here,
+        // although C++ would bind the global in that order.
+        if (excludedAutomaticStorageDecl && !result.isValid() && !request.isCompletionRequest())
             break;
 
         if (result.isValid())

@@ -5447,6 +5447,10 @@ static Name* findClosestInScopeName(
     // only when this set ends up with exactly one name.
     HashSet<Name*> bestNames;
 
+    // Lookup from a member of a function-local type does not find the enclosing function's
+    // parameters and non-static locals, so we don't suggest them once the walk has left a type.
+    bool hasLeftTypeDecl = false;
+
     for (Scope* s = scope; s; s = s->parent)
     {
         for (Scope* sib = s; sib; sib = sib->nextSibling)
@@ -5476,6 +5480,9 @@ static Name* findClosestInScopeName(
                 // applies: suggesting it would name something the same lookup
                 // path still cannot resolve.
                 if (candidateDecl == declToExclude)
+                    continue;
+
+                if (hasLeftTypeDecl && isAutomaticStorageDecl(candidateDecl))
                     continue;
 
                 const UnownedStringSlice candidateText = getUnownedStringSliceText(candidateName);
@@ -5509,6 +5516,8 @@ static Name* findClosestInScopeName(
                     bestNames.add(candidateName);
                 }
             }
+            if (as<AggTypeDeclBase>(containerDecl))
+                hasLeftTypeDecl = true;
         }
     }
 
