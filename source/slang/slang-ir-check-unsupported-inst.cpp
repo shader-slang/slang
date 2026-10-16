@@ -426,12 +426,69 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     }
 }
 
+// A user pointer (`T*`). Only `Ptr` is checked: parameter-passing types such as `RefParam` also
+// use the `UserPointer` address space, but they are not pointers to memory addresses.
+static bool isPhysicalPointerType(IRInst* type)
+{
+    auto ptrType = as<IRPtrType>(type);
+    return ptrType && ptrType->hasAddressSpace() &&
+           ptrType->getAddressSpace() == AddressSpace::UserPointer;
+}
+
+static bool isBFloat16ScalarOrVectorType(IRInst* type)
+{
+    if (auto vectorType = as<IRVectorType>(type))
+        type = vectorType->getElementType();
+    else if (auto matrixType = as<IRMatrixType>(type))
+        type = matrixType->getElementType();
+    return type && type->getOp() == kIROp_BFloat16Type;
+}
+
+// True if `inst` brings a value of a type that `isOfType` matches into the function, rather than
+// passing one along: none of its operands has such a type. Parameters and call results are
+// skipped, since the value is diagnosed where it was first created (in the caller or the callee).
+// Loads from function-local variables and addresses derived from another pointer are skipped for
+// the same reason. (Address-space specialization can rewrite a parameter's pointer type, so the
+// operand of a derived address does not always have the matched type.)
+static bool isFirstValueOfType(IRInst* inst, bool (*isOfType)(IRInst*))
+{
+    if (!isOfType(inst->getDataType()))
+        return false;
+    switch (inst->getOp())
+    {
+    case kIROp_Param:
+    case kIROp_Call:
+    case kIROp_GetOffsetPtr:
+    case kIROp_GetElementPtr:
+    case kIROp_FieldAddress:
+        return false;
+    case kIROp_Load:
+        {
+            auto addressType = as<IRPtrTypeBase>(inst->getOperand(0)->getDataType());
+            if (addressType && addressType->hasAddressSpace() &&
+                (addressType->getAddressSpace() == AddressSpace::Function ||
+                 addressType->getAddressSpace() == AddressSpace::ThreadLocal))
+                return false;
+            break;
+        }
+    default:
+        break;
+    }
+    for (UInt i = 0; i < inst->getOperandCount(); i++)
+    {
+        if (isOfType(inst->getOperand(i)->getDataType()))
+            return false;
+    }
+    return true;
+}
+
 void checkUnsupportedPhysicalPointers(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
-    // WGSL and HLSL have no pointers to memory addresses. Without this check, `nullptr` aborted
-    // the emitter and a pointer cast from an integer address was emitted as invalid code
-    // (issue #13632).
-    if (!isWGPUTarget(target) && !isD3DTarget(target))
+    // WGSL and HLSL have no pointers to memory addresses, and WGSL has no bfloat16 type. Without
+    // this check, `nullptr` aborted the emitter, and a pointer cast from an integer address, a
+    // pointer read from memory or a bfloat16 value was emitted as invalid code (issue #13632).
+    const bool isWGPU = isWGPUTarget(target);
+    if (!isWGPU && !isD3DTarget(target))
         return;
 
     for (auto globalInst : module->getGlobalInsts())
@@ -450,10 +507,19 @@ void checkUnsupportedPhysicalPointers(IRModule* module, TargetRequest* target, D
                 bool usesPhysicalPointer = inst->getOp() == kIROp_CastIntToPtr;
                 for (UInt i = 0; !usesPhysicalPointer && i < inst->getOperandCount(); i++)
                     usesPhysicalPointer = inst->getOperand(i)->getOp() == kIROp_PtrLit;
+                // A pointer read from memory, such as a pointer field of a constant buffer.
                 if (!usesPhysicalPointer)
+                    usesPhysicalPointer = isFirstValueOfType(inst, isPhysicalPointerType);
+                const bool usesBFloat16 =
+                    isWGPU && isFirstValueOfType(inst, isBFloat16ScalarOrVectorType);
+                if (!usesPhysicalPointer && !usesBFloat16)
                     continue;
                 auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
-                sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = loc});
+                if (usesPhysicalPointer)
+                    sink->diagnose(
+                        Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = loc});
+                else
+                    sink->diagnose(Diagnostics::Bfloat16NotSupportedOnTarget{.location = loc});
             }
         }
     }

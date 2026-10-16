@@ -5955,7 +5955,14 @@ err(
     "physical-pointer-not-supported-on-target",
     55219,
     "pointers to memory addresses are not supported on this target",
-    span { loc = "location", message = "this creates a pointer from an address or uses 'nullptr', but the current code generation target has no pointers to memory addresses" }
+    span { loc = "location", message = "this creates a pointer from an address, reads one from memory or uses 'nullptr', but the current code generation target has no pointers to memory addresses" }
+)
+
+err(
+    "bfloat16-not-supported-on-target",
+    55220,
+    "'BFloat16' is not supported on this target",
+    span { loc = "location", message = "this creates a 'BFloat16' value, but the current code generation target has no bfloat16 type" }
 )
 
 err(
