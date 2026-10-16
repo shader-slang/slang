@@ -30,11 +30,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[i] = classify(v);
 }
 
-// CHECK: 1
-// CHECK-NEXT: 2
-// CHECK-NEXT: 12
-// CHECK-NEXT: 3
-// CHECK-NEXT: 11
-// CHECK-NEXT: 12
-// CHECK-NEXT: 1
-// CHECK-NEXT: 2
+// CHECK: {{^}}1{{$}}
+// CHECK-NEXT: {{^}}2{{$}}
+// CHECK-NEXT: {{^}}12{{$}}
+// CHECK-NEXT: {{^}}3{{$}}
+// CHECK-NEXT: {{^}}11{{$}}
+// CHECK-NEXT: {{^}}12{{$}}
+// CHECK-NEXT: {{^}}1{{$}}
+// CHECK-NEXT: {{^}}2{{$}}
