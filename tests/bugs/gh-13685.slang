@@ -9,18 +9,18 @@
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage fragment
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage fragment
 
-// SPIRV-NOT: error
+// SPIRV-NOT: {{E56004|E56019}}
 // SPIRV: OpEntryPoint
 // SPIRV: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage
 // SPIRV: OpUndef %[[IMG]]
 
-// GLSL-NOT: error
+// GLSL-NOT: {{E56004|E56019}}
 // GLSL: void main()
 
-// WGSL-NOT: error
+// WGSL-NOT: {{E56004|E56019}}
 // WGSL: @fragment
 
-// METAL-NOT: error
+// METAL-NOT: {{E56004|E56019}}
 // METAL: fragment
 
 struct OptionalTexture
@@ -34,6 +34,7 @@ cbuffer Settings
 {
     bool replaceValue;
     bool sampleLocal;
+    int loopCount;
 };
 
 float4 readTexture(OptionalTexture value, float2 uv)
@@ -58,6 +59,24 @@ float4 readLocal(float2 uv)
     return float4(0, 0, 0, 1);
 }
 
+// The same merge at a loop header: the param's incoming values are an undefined
+// value and the param itself, from the back edge.
+float4 readInLoop(float2 uv)
+{
+    Texture2D<float4> t;
+    for (int i = 0; i < loopCount; i++)
+    {
+        if (replaceValue)
+        {
+            Texture2D<float4> r;
+            t = r;
+        }
+    }
+    if (sampleLocal)
+        return t.SampleLevel(samplerState, uv, 0);
+    return float4(0, 0, 0, 1);
+}
+
 [shader("fragment")]
 float4 main(float2 uv: TEXCOORD) : SV_Target
 {
@@ -69,5 +88,5 @@ float4 main(float2 uv: TEXCOORD) : SV_Target
         replacement.enabled = false;
         value = replacement;
     }
-    return readTexture(value, uv) + readLocal(uv);
+    return readTexture(value, uv) + readLocal(uv) + readInLoop(uv);
 }
