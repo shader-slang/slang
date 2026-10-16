@@ -1,11 +1,15 @@
-// Regression for shader-slang/slang#13446: integer matrices stay matrices until buffer element
-// lowering has stored them with their layout, and only then become arrays of row vectors. The
-// passes that now see them as matrices must still handle the shapes they used to see as arrays.
-
-// A matrix with one row or column has no matrix type on these targets, but as an array of
-// vectors it is legal; storing it with its layout must not produce 1-component vectors.
-//TEST:SIMPLE(filecheck=SPV):-target spirv -entry computeMain -stage compute -matrix-layout-column-major
-//TEST:SIMPLE(filecheck=SPV):-target spirv -entry computeMain -stage compute -matrix-layout-row-major
+// Regression for shader-slang/slang#13446: on SPIR-V, GLSL, WGSL and Metal, integer matrices are
+// matrices until after buffer element lowering and arrays of row vectors from then on. Each leg
+// pins one pass that handles them:
+// - validateVectorsAndMatrices accepts integer matrices with one row or column (every leg);
+// - the second legalizeVectorTypes leaves no 1-component vector (SPV);
+// - the second legalizeArrayReturnType returns an integer matrix through an `out` array (GLSL,
+//   WGSL);
+// - legalizeBinaryOp gives a matrix shift an unsigned matrix-shaped amount and leaves integer
+//   matrix division to the row-wise lowering (WGSL, METAL, WGSLSPIRV);
+// - the Vulkan legs check the values.
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute -matrix-layout-row-major
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute -matrix-layout-column-major
@@ -62,8 +66,9 @@ void computeMain()
     output[5] = divideAndShift(m, n, 4)[1][2];
 }
 
-// SPV-NOT: OpTypeVector %int 1
 // SPV: OpEntryPoint
+// SPV-NOT: OpTypeVector %int 1
+// SPV: OpFunctionEnd
 
 // GLSL: void shifted_0(
 // GLSL-SAME: out ivec3 {{.*}}[2])

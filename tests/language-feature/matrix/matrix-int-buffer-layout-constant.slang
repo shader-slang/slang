@@ -101,7 +101,7 @@ void computeMain()
 // WGSL: .r_0.data_{{[0-9]+}}[i32(1)][i32(2)];
 
 // A whole row of `r` is a padded `vec4` in storage; reading it as an `int3` takes `.xyz`.
-// WGSL: = {{.*}}.r_0.data_{{[0-9]+}}[i32(1)].xyz;
+// WGSL: .r_0.data_{{[0-9]+}}[i32(1)].xyz.z;
 
 // WGSLSPIRV: OpEntryPoint
 

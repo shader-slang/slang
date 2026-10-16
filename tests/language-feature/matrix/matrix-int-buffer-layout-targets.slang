@@ -9,7 +9,7 @@
 //TEST:SIMPLE(filecheck=GLSL_ROW):-target glsl -entry computeMain -stage compute -matrix-layout-row-major
 //TEST:SIMPLE(filecheck=WGSL_COL):-target wgsl -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=WGSL_ROW):-target wgsl -entry computeMain -stage compute -matrix-layout-row-major
-//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=METAL_COL):-target metal -entry computeMain -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=METAL_ROW):-target metal -entry computeMain -stage compute -matrix-layout-row-major
 
 struct Matrices
@@ -86,14 +86,14 @@ void computeMain()
 // WGSL_ROW: .u_0.data_{{[0-9]+}}[i32(0)][i32(1)];
 
 // Metal device buffers store the rows or columns as packed vectors.
-// METAL: struct _MatrixStorage_int2x3_ColMajornatural
-// METAL-NEXT: {
-// METAL-NEXT: array<packed_int2, int(3)> data
-// METAL: ->m_0)->data_{{[0-9]+}}[int(1)][int(0)];
-// METAL: ->a_0)->data_{{[0-9]+}}[int(1)])->data_{{[0-9]+}}[int(2)][int(1)];
-// METAL: ->r_0)->data_{{[0-9]+}}[int(1)][int(2)];
-// METAL: ->q_0)->data_{{[0-9]+}}[int(0)][int(2)]
-// METAL: ->u_0)->data_{{[0-9]+}}[int(1)][int(0)];
+// METAL_COL: struct _MatrixStorage_int2x3_ColMajornatural
+// METAL_COL-NEXT: {
+// METAL_COL-NEXT: array<packed_int2, int(3)> data
+// METAL_COL: ->m_0)->data_{{[0-9]+}}[int(1)][int(0)];
+// METAL_COL: ->a_0)->data_{{[0-9]+}}[int(1)])->data_{{[0-9]+}}[int(2)][int(1)];
+// METAL_COL: ->r_0)->data_{{[0-9]+}}[int(1)][int(2)];
+// METAL_COL: ->q_0)->data_{{[0-9]+}}[int(0)][int(2)]
+// METAL_COL: ->u_0)->data_{{[0-9]+}}[int(1)][int(0)];
 
 // METAL_ROW: ->m_0)->data_{{[0-9]+}}[int(1)][int(0)];
 // METAL_ROW: ->u_0)->data_{{[0-9]+}}[int(0)][int(1)];
