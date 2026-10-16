@@ -341,40 +341,6 @@ struct SimplifyForEmitContext : public InstPassBase
             processInst(followUpWorkList[i]);
     }
 
-    // Splat each scalar operand of the vector shift `inst` to a vector of that operand's own type.
-    // Operands that are already vectors, and shifts with a non-vector result, are left alone.
-    //
-    // A shift's operands may have different integer types, and its result has the type of the left
-    // operand. Consider this example:
-    //
-    //     int s = -8;
-    //     int3 r = s >> uint3(1, 2, 3);
-    //
-    // The other binary operators splat `s` to the type of the other operand, `uint3`, but that
-    // would turn this arithmetic shift into a logical one. We splat it to `int3` instead, and rely
-    // on the CUDA and C++ preludes for the mixed-type vector shift operator `int3 >> uint3`.
-    void splatScalarOperandsOfVectorShift(IRBuilder& builder, IRInst* inst)
-    {
-        SLANG_ASSERT(inst->getOperandCount() == 2);
-        auto resultVectorType = as<IRVectorType>(inst->getDataType());
-        if (!resultVectorType)
-            return;
-
-        builder.setInsertBefore(inst);
-        for (UInt a = 0; a < 2; a++)
-        {
-            auto operandType = inst->getOperand(a)->getDataType();
-            if (as<IRBasicType>(operandType))
-            {
-                auto splatType =
-                    builder.getVectorType(operandType, resultVectorType->getElementCount());
-                inst->setOperand(
-                    a,
-                    builder.emitMakeVectorFromScalar(splatType, inst->getOperand(a)));
-            }
-        }
-    }
-
     void unifyBinaryExprOperands(IRGlobalValueWithCode* func)
     {
         IRBuilder builder(func->getModule());
@@ -434,7 +400,36 @@ struct SimplifyForEmitContext : public InstPassBase
                     break;
                 case kIROp_Lsh:
                 case kIROp_Rsh:
-                    splatScalarOperandsOfVectorShift(builder, inst);
+                    // A shift's operands may have different integer types, and its result has the
+                    // type of the left operand. Consider this example:
+                    //
+                    //     int s = -8;
+                    //     int3 r = s >> uint3(1, 2, 3);
+                    //
+                    // The other binary operators splat `s` to the type of the other operand,
+                    // `uint3`, but that would turn this arithmetic shift into a logical one. We
+                    // splat each scalar operand to a vector of its own type instead, and rely on
+                    // the CUDA and C++ preludes for the mixed-type vector shift operators.
+                    SLANG_ASSERT(inst->getOperandCount() == 2);
+                    if (auto resultVectorType = as<IRVectorType>(inst->getDataType()))
+                    {
+                        builder.setInsertBefore(inst);
+                        for (UInt a = 0; a < 2; a++)
+                        {
+                            auto operandType = inst->getOperand(a)->getDataType();
+                            if (as<IRBasicType>(operandType))
+                            {
+                                auto splatType = builder.getVectorType(
+                                    operandType,
+                                    resultVectorType->getElementCount());
+                                inst->setOperand(
+                                    a,
+                                    builder.emitMakeVectorFromScalar(
+                                        splatType,
+                                        inst->getOperand(a)));
+                            }
+                        }
+                    }
                     break;
                 }
             }
