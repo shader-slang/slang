@@ -2115,13 +2115,14 @@ Result linkAndOptimizeIR(
             bufferElementTypeLoweringOptions);
     }
 
-    SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
-
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
     // to see if we can clean up any temporaries created by legalization.
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
+    //
+    // Matrix types are the exception: `legalizeMatrixTypes` runs later, after
+    // `lowerBufferElementTypeToStorageType`, so int/uint/bool matrices are still matrices here.
     if (fastIRSimplificationOptions.minimalOptimization)
         SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     else
@@ -2513,12 +2514,6 @@ Result linkAndOptimizeIR(
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with
         // direct pointers
         SLANG_PASS(undoParameterCopy);
-        // Transform struct parameters to use ConstRef for better performance
-        if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
-            isMetalTarget(targetRequest))
-        {
-            SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
-        }
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];
     case CodeGenTarget::ShaderLLVMIR:
@@ -2620,11 +2615,6 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.bitcast)
         SLANG_PASS(lowerBitCast, targetProgram, sink);
 
-    // Rewrite functions that return arrays to return them via `out` parameter,
-    // since our target languages doesn't allow returning arrays.
-    if (!isMetalTarget(targetRequest) && !isSPIRV(target))
-        SLANG_PASS(legalizeArrayReturnType);
-
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {
         SLANG_PASS(legalizeUniformBufferLoad);
@@ -2651,6 +2641,40 @@ Result linkAndOptimizeIR(
         lowerBufferElementTypeToStorageType,
         targetProgram,
         bufferElementTypeLoweringOptions);
+
+    // On SPIR-V, GLSL, WGSL and Metal, `legalizeMatrixTypes` rewrites an int/uint/bool matrix into
+    // an array of row vectors, because the int/uint/bool types are not allowed as the matrix
+    // element type on those targets. The vector types no longer keep the information of
+    // matrix-major-ness. `lowerBufferElementTypeToStorageType()` needs the information of the
+    // matrix-major-ness and it must run before `legalizeMatrixTypes()` removes the information.
+    //
+    // Consider this example:
+    //
+    //     struct S { column_major int2x3 m; int tail; }
+    //     RWStructuredBuffer<S> b;
+    //
+    // `lowerBufferElementTypeToStorageType` sees `m` as a matrix and stores it as three column
+    // vectors, which is the layout that reflection reports. If this pass ran first, it would
+    // change `m` into two row vectors, and `tail` would be at a different offset than reflection
+    // says.
+    SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
+
+    // Transform struct and array parameters to use ConstRef for better performance on Metal, C++
+    // and CUDA. This runs after `legalizeMatrixTypes`, because the pass transforms struct and
+    // array parameters but not matrix parameters. A parameter of an int/uint/bool matrix type is
+    // an array only after `legalizeMatrixTypes`, and Metal requires an array parameter to be
+    // passed by reference. SPIR-V does the same transformation earlier, because the pass changes
+    // how `lowerBufferElementTypeToStorageType` sees array parameters.
+    if ((isCPUTarget(targetRequest) && !isCPUTargetViaLLVM(targetRequest)) ||
+        isCUDATarget(targetRequest) || isMetalTarget(targetRequest))
+        SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+
+    // Rewrite functions that return arrays to return them via `out` parameter,
+    // since our target languages doesn't allow returning arrays. This runs after
+    // `legalizeMatrixTypes`, because a function that returns an int/uint/bool matrix returns an
+    // array once the matrix is lowered.
+    if (!isMetalTarget(targetRequest) && !isSPIRV(target))
+        SLANG_PASS(legalizeArrayReturnType);
 
     // If we are generating code for glsl or metal, perform address space propagation now.
     // For SPIRV, we will do that during spirv legalization that happens after
