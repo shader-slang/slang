@@ -19637,9 +19637,25 @@ uint4 WaveGetActiveMulti()
 // Shader model 6.5 stuff
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md
 
-// WGSL has no partitioned subgroup operations. Compare with each lane in turn: the loop runs to
-// the subgroup size, which is uniform, so every subgroup operation stays in uniform control flow.
-// The cost is one shuffle and one ballot per lane of the subgroup.
+// WGSL emulation of WaveMatch (WGSL has no partitioned subgroup operations).
+//
+// Why the loop gives each invocation its WaveMatch result:
+// - On iteration `lane`, every active invocation ballots whether its value equals the value of
+//   `lane`, so the ballot is the set of invocations whose value matches that lane's value. An
+//   invocation keeps the ballot of the iteration where `lane` is its own lane; that ballot is the
+//   set of invocations with the same value as itself, i.e. its WaveMatch result.
+// - When `lane` is inactive or past the end of the subgroup, `subgroupShuffle` returns an
+//   indeterminate value and the ballot is meaningless, but it is always discarded: `lane == self`
+//   only holds for the lane of an active invocation.
+//
+// The loop runs to `WaveGetLaneCount()` and is in uniform control flow, as WGSL requires for
+// subgroup operations, only because the subgroup size reaches the function as a value (WGSL
+// legalization passes entry-point inputs to callees as parameters instead of through a
+// module-scope `var<private>`). The cost is one `subgroupShuffle` and one `subgroupBallot` per lane
+// of the subgroup.
+//
+// Precondition (both overloads): `T` is not `bool`; `subgroupShuffle` takes only numeric values.
+// WaveMatch converts bools to 0/1 `uint` first.
 __generic<T : __BuiltinType>
 [ForceInline]
 [require(wgsl, subgroup_ballot)]
@@ -19710,6 +19726,7 @@ uint4 WaveMatch(vector<T,N> value)
     {
     case hlsl: __intrinsic_asm "WaveMatch";
     case wgsl:
+        // `subgroupShuffle` takes no bool: compare as 0/1.
         if (__isBool<T>())
             return __wgslWaveMatch(__wgslBoolToUInt(value));
         return __wgslWaveMatch(value);
@@ -20045,32 +20062,67 @@ ${
 $}
 
 
-// WGSL has no partitioned subgroup operations. These read each lane in turn and combine the
-// values of the lanes in this invocation's partition (`mask`) below it, and its own value for an
-// inclusive scan. The loop runs to the subgroup size, which is uniform, so every subgroup
-// operation stays in uniform control flow. The cost is one shuffle per lane of the subgroup.
+// WGSL emulation of the WaveMultiPrefix scans (WGSL has no partitioned subgroup operations).
+//
+// An invocation's scan combines the values of the lanes in its partition: the lanes set in
+// `mask` that are also active. `mask` may name inactive lanes (e.g. a constant mask), and
+// `subgroupShuffle` from an inactive lane is indeterminate, so the partition is `mask` intersected
+// with `WaveActiveBallot(true)`. An exclusive scan combines the partition lanes below the
+// invocation's lane; an inclusive scan also combines the invocation's own lane.
+//
+// Each helper reads every lane in turn with `subgroupShuffle` (through `WaveReadLaneAt`), in a
+// loop bounded by `WaveGetLaneCount()`. The loop is in uniform control flow, as WGSL requires for
+// subgroup operations, only because the subgroup size reaches the function as a value: WGSL
+// legalization passes entry-point inputs to callees as parameters instead of through a
+// module-scope `var<private>`, which WGSL's uniformity analysis would treat as non-uniform. The
+// cost is one `subgroupBallot` plus one `subgroupShuffle` per lane of the subgroup.
+//
+// Precondition: `T` is not `bool`; `subgroupShuffle` takes only numeric values. Callers convert
+// bools to 0/1 `uint` first.
 
-// True if `lane` is in this invocation's partition and before it (or it, when inclusive).
-[ForceInline]
-bool __wgslMultiPrefixIncludesLane(uint4 lanes, uint lane, uint self, bool isInclusive)
+// The operation and kind of a scan, named as in the scan tables' `spirvName` and
+// `spirvGroupOperation` columns, so each table row selects them by its existing entries.
+enum __WGSLArithmeticScanOp
 {
-    const bool inPartition = ((lanes[lane / 32] >> (lane % 32)) & 1u) != 0;
-    return inPartition && (lane < self || (isInclusive && lane == self));
+    Add,
+    Mul,
+};
+enum __WGSLBitwiseScanOp
+{
+    And,
+    Or,
+    Xor,
+};
+enum __WGSLScanKind
+{
+    PartitionedInclusiveScanNV,
+    PartitionedExclusiveScanNV,
+};
+
+// True if `lane` takes part in the scan of the invocation at `currentLane`: it is in
+// `partitionLanes` and below `currentLane`, or is `currentLane` itself for an inclusive scan.
+[ForceInline]
+bool __wgslScanIncludesLane(uint4 partitionLanes, uint lane, uint currentLane, __WGSLScanKind kind)
+{
+    const bool inPartition = ((partitionLanes[lane / 32] >> (lane % 32)) & 1u) != 0;
+    const bool isInclusive = kind == __WGSLScanKind.PartitionedInclusiveScanNV;
+    return inPartition && (lane < currentLane || (isInclusive && lane == currentLane));
 }
 
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(wgsl, subgroup_shuffle)]
-T __wgslWaveMultiPrefixArithmetic(T value, uint4 mask, bool isProduct, bool isInclusive)
+T __wgslWaveMultiPrefixArithmetic(T value, uint4 mask, __WGSLArithmeticScanOp op, __WGSLScanKind kind)
 {
-    const uint self = WaveGetLaneIndex();
-    const uint4 lanes = mask & WaveActiveBallot(true);
-    T result = isProduct ? T(1) : T(0);
+    const uint currentLane = WaveGetLaneIndex();
+    const uint4 partitionLanes = mask & WaveActiveBallot(true);
+    // The identity of the operation: 0 for Add, 1 for Mul.
+    T result = op == __WGSLArithmeticScanOp.Mul ? T(1) : T(0);
     for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
     {
         const T other = WaveReadLaneAt(value, int(lane));
-        if (__wgslMultiPrefixIncludesLane(lanes, lane, self, isInclusive))
-            result = isProduct ? result * other : result + other;
+        if (__wgslScanIncludesLane(partitionLanes, lane, currentLane, kind))
+            result = op == __WGSLArithmeticScanOp.Mul ? result * other : result + other;
     }
     return result;
 }
@@ -20080,36 +20132,51 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 vector<T, N> __wgslWaveMultiPrefixArithmetic(
     vector<T, N> value,
     uint4 mask,
-    bool isProduct,
-    bool isInclusive)
+    __WGSLArithmeticScanOp op,
+    __WGSLScanKind kind)
 {
-    const uint self = WaveGetLaneIndex();
-    const uint4 lanes = mask & WaveActiveBallot(true);
-    vector<T, N> result = vector<T, N>(isProduct ? T(1) : T(0));
+    const uint currentLane = WaveGetLaneIndex();
+    const uint4 partitionLanes = mask & WaveActiveBallot(true);
+    vector<T, N> result = vector<T, N>(op == __WGSLArithmeticScanOp.Mul ? T(1) : T(0));
     for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
     {
         const vector<T, N> other = WaveReadLaneAt(value, int(lane));
-        if (__wgslMultiPrefixIncludesLane(lanes, lane, self, isInclusive))
-            result = isProduct ? result * other : result + other;
+        if (__wgslScanIncludesLane(partitionLanes, lane, currentLane, kind))
+            result = op == __WGSLArithmeticScanOp.Mul ? result * other : result + other;
     }
     return result;
 }
 
-// `op`: 0 = and, 1 = or, 2 = xor. Bitwise on u32 (bools are passed as 0/1).
+// The bitwise scans run on `uint`: WGSL's only integer scalars are 32-bit; `int` is bit-cast and
+// `bool` is passed as 0/1 by the callers.
+[ForceInline]
+uint __wgslBitwiseScanIdentity(__WGSLBitwiseScanOp op)
+{
+    return op == __WGSLBitwiseScanOp.And ? 0xFFFFFFFFu : 0u;
+}
+__generic<let N : int>
+[ForceInline]
+vector<uint, N> __wgslBitwiseScanCombine(
+    __WGSLBitwiseScanOp op,
+    vector<uint, N> a,
+    vector<uint, N> b)
+{
+    switch (op)
+    {
+    case __WGSLBitwiseScanOp.And:
+        return a & b;
+    case __WGSLBitwiseScanOp.Or:
+        return a | b;
+    default:
+        return a ^ b;
+    }
+}
+
 [ForceInline]
 [require(wgsl, subgroup_shuffle)]
-uint __wgslWaveMultiPrefixBitwise(uint value, uint4 mask, int op, bool isInclusive)
+uint __wgslWaveMultiPrefixBitwise(uint value, uint4 mask, __WGSLBitwiseScanOp op, __WGSLScanKind kind)
 {
-    const uint self = WaveGetLaneIndex();
-    const uint4 lanes = mask & WaveActiveBallot(true);
-    uint result = op == 0 ? 0xFFFFFFFFu : 0u;
-    for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
-    {
-        const uint other = WaveReadLaneAt(value, int(lane));
-        if (__wgslMultiPrefixIncludesLane(lanes, lane, self, isInclusive))
-            result = op == 0 ? (result & other) : (op == 1 ? (result | other) : (result ^ other));
-    }
-    return result;
+    return __wgslWaveMultiPrefixBitwise(vector<uint, 1>(value), mask, op, kind)[0];
 }
 __generic<let N : int>
 [ForceInline]
@@ -20117,17 +20184,17 @@ __generic<let N : int>
 vector<uint, N> __wgslWaveMultiPrefixBitwise(
     vector<uint, N> value,
     uint4 mask,
-    int op,
-    bool isInclusive)
+    __WGSLBitwiseScanOp op,
+    __WGSLScanKind kind)
 {
-    const uint self = WaveGetLaneIndex();
-    const uint4 lanes = mask & WaveActiveBallot(true);
-    vector<uint, N> result = vector<uint, N>(op == 0 ? 0xFFFFFFFFu : 0u);
+    const uint currentLane = WaveGetLaneIndex();
+    const uint4 partitionLanes = mask & WaveActiveBallot(true);
+    vector<uint, N> result = vector<uint, N>(__wgslBitwiseScanIdentity(op));
     for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
     {
         const vector<uint, N> other = WaveReadLaneAt(value, int(lane));
-        if (__wgslMultiPrefixIncludesLane(lanes, lane, self, isInclusive))
-            result = op == 0 ? (result & other) : (op == 1 ? (result | other) : (result ^ other));
+        if (__wgslScanIncludesLane(partitionLanes, lane, currentLane, kind))
+            result = __wgslBitwiseScanCombine(op, result, other);
     }
     return result;
 }
@@ -20152,23 +20219,19 @@ struct WaveMultiPrefixSumProductEntry
     // They are implemented here by calling the exclusive implementation and performing an additional operations
     // with the current invocation's value. This works for all cases except for element-wise matrix multiplication.
     bool cudaMatrixVariantSupport;
-
-    // WGSL: multiply instead of add; include the current invocation's value.
-    const char* wgslIsProduct;
-    const char* wgslIsInclusive;
 };
 
 const WaveMultiPrefixSumProductEntry kWaveMultiPrefixSumProductNames[] =
 {
     // name               spirvName  spirvGroupOperation         glslName        hlslName                         cudaName     cudaExtraOperation   cudaMatrixVariantSupport
-    { "InclusiveSum",     "Add",     "PartitionedInclusiveScanNV", "InclusiveAdd", "Sum($0, $1) + $0",              "Sum",       "+ $0",            false, "false", "true"  },
-    { "InclusiveProduct", "Mul",     "PartitionedInclusiveScanNV", "InclusiveMul", "Product($0, $1) * $0",          "Product",   "* $0",            false, "true",  "true"  },
-    { "ExclusiveSum",     "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true,  "false", "false" },
-    { "ExclusiveProduct", "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true,  "true",  "false" },
+    { "InclusiveSum",     "Add",     "PartitionedInclusiveScanNV", "InclusiveAdd", "Sum($0, $1) + $0",              "Sum",       "+ $0",            false },
+    { "InclusiveProduct", "Mul",     "PartitionedInclusiveScanNV", "InclusiveMul", "Product($0, $1) * $0",          "Product",   "* $0",            false },
+    { "ExclusiveSum",     "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true  },
+    { "ExclusiveProduct", "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true  },
 
     // These are HLSL SM 6.5 intrinsics and are equal to the exclusive variants.
-    { "Sum",              "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true,  "false", "false" },
-    { "Product",          "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true,  "true",  "false" },
+    { "Sum",              "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true  },
+    { "Product",          "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true  },
 };
 
 for (auto opName : kWaveMultiPrefixSumProductNames) {
@@ -20187,7 +20250,10 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     {
     case wgsl:
         return __wgslWaveMultiPrefixArithmetic(
-            value, mask, $(opName.wgslIsProduct), $(opName.wgslIsInclusive));
+            value,
+            mask,
+            __WGSLArithmeticScanOp.$(opName.spirvName),
+            __WGSLScanKind.$(opName.spirvGroupOperation));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -20217,7 +20283,10 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     {
     case wgsl:
         return __wgslWaveMultiPrefixArithmetic(
-            value, mask, $(opName.wgslIsProduct), $(opName.wgslIsInclusive));
+            value,
+            mask,
+            __WGSLArithmeticScanOp.$(opName.spirvName),
+            __WGSLScanKind.$(opName.spirvGroupOperation));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -20524,27 +20593,22 @@ struct WaveMultiPrefixBitwiseEntry
     const char* cudaExtraOperation;
 
     bool cudaMatrixVariantSupport;
-
-    // WGSL: the operation for __wgslWaveMultiPrefixBitwise (0 = and, 1 = or, 2 = xor), and
-    // whether the current invocation's value is included.
-    const char* wgslOp;
-    const char* wgslIsInclusive;
 };
 
 const WaveMultiPrefixBitwiseEntry kWaveMultiPrefixBitwiseNames[] =
 {
     // name           spirvName     spirvGroupOperation            glslName       hlslName              cudaExtraOperation  cudaMatrixVariantSupport
-    { "InclusiveBitAnd", "And",     "PartitionedInclusiveScanNV", "InclusiveAnd", "And($0, $1) & $0",      "& $0",          false, "0", "true"  },
-    { "InclusiveBitOr",  "Or",      "PartitionedInclusiveScanNV", "InclusiveOr",  "Or($0, $1) | $0",       "| $0",          false, "1", "true"  },
-    { "InclusiveBitXor", "Xor",     "PartitionedInclusiveScanNV", "InclusiveXor", "Xor($0, $1) ^ $0",      "^ $0",          false, "2", "true"  },
-    { "ExclusiveBitAnd", "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true,  "0", "false" },
-    { "ExclusiveBitOr",  "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true,  "1", "false" },
-    { "ExclusiveBitXor", "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true,  "2", "false" },
+    { "InclusiveBitAnd", "And",     "PartitionedInclusiveScanNV", "InclusiveAnd", "And($0, $1) & $0",      "& $0",          false },
+    { "InclusiveBitOr",  "Or",      "PartitionedInclusiveScanNV", "InclusiveOr",  "Or($0, $1) | $0",       "| $0",          false },
+    { "InclusiveBitXor", "Xor",     "PartitionedInclusiveScanNV", "InclusiveXor", "Xor($0, $1) ^ $0",      "^ $0",          false },
+    { "ExclusiveBitAnd", "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true  },
+    { "ExclusiveBitOr",  "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true  },
+    { "ExclusiveBitXor", "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true  },
 
     // These are HLSL SM 6.5 intrinsics and are equal to the exclusive variants.
-    { "BitAnd",          "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true,  "0", "false" },
-    { "BitOr",           "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true,  "1", "false" },
-    { "BitXor",          "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true,  "2", "false" },
+    { "BitAnd",          "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true  },
+    { "BitOr",           "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true  },
+    { "BitXor",          "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true  },
 };
 
 for (auto opName : kWaveMultiPrefixBitwiseNames) {
@@ -20565,9 +20629,15 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
         // Computed on u32: WGSL's only integer scalars are 32-bit, and bools are passed as 0/1.
         if (__isBool<T>())
             return __wgslUIntToBool<T>(__wgslWaveMultiPrefixBitwise(
-                __wgslBoolToUInt(value), mask, $(opName.wgslOp), $(opName.wgslIsInclusive)));
+                __wgslBoolToUInt(value),
+                mask,
+                __WGSLBitwiseScanOp.$(opName.spirvName),
+                __WGSLScanKind.$(opName.spirvGroupOperation)));
         return bit_cast<T>(__wgslWaveMultiPrefixBitwise(
-            bit_cast<uint>(value), mask, $(opName.wgslOp), $(opName.wgslIsInclusive)));
+            bit_cast<uint>(value),
+            mask,
+            __WGSLBitwiseScanOp.$(opName.spirvName),
+            __WGSLScanKind.$(opName.spirvGroupOperation)));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -20596,12 +20666,15 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     case wgsl:
         if (__isBool<T>())
             return __wgslUIntToBool<T, N>(__wgslWaveMultiPrefixBitwise(
-                __wgslBoolToUInt(value), mask, $(opName.wgslOp), $(opName.wgslIsInclusive)));
+                __wgslBoolToUInt(value),
+                mask,
+                __WGSLBitwiseScanOp.$(opName.spirvName),
+                __WGSLScanKind.$(opName.spirvGroupOperation)));
         return bit_cast<vector<T, N>>(__wgslWaveMultiPrefixBitwise(
             bit_cast<vector<uint, N>>(value),
             mask,
-            $(opName.wgslOp),
-            $(opName.wgslIsInclusive)));
+            __WGSLBitwiseScanOp.$(opName.spirvName),
+            __WGSLScanKind.$(opName.spirvGroupOperation)));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
