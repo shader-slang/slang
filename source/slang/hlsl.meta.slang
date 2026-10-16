@@ -26247,7 +26247,7 @@ struct HitObject
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float = OpHitObjectGetRayTMaxNV &this;
             };
-        case spvShaderInvocationReorderEXT:
+        case spirv:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
