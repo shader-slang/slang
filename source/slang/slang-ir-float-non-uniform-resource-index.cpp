@@ -52,9 +52,13 @@
 //         There is nothing to propagate, so doing more here would have no
 //         target syntax to emit it into.
 //         So dropping the wrapper is correct whenever the target accepts a
-//         non-uniform index into a resource array without an annotation, which
-//         is the case for Metal argument buffers and for the WebGPU binding-array
-//         proposal. If a WebGPU runtime gates non-uniform indexing behind an
+//         non-uniform index into a resource array without an annotation. Metal
+//         does for every binding form: MSL indices are non-uniform unless declared
+//         `uniform<T>`, and the spec's example (MSL 2.14.1, "The Need for a Uniform
+//         Type") indexes a direct `array<texture2d<float>, 10>` kernel argument --
+//         the form Slang emits for an ordinary resource array -- as well as
+//         argument-buffer arrays. The WebGPU binding-array proposal does too. If
+//         a WebGPU runtime gates non-uniform indexing behind an
 //         optional feature, the application has to enable it: Slang has no
 //         annotation to emit and does not diagnose a missing feature.
 //
