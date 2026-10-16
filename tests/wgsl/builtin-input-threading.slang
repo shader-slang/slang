@@ -14,6 +14,7 @@
 //   inputs; it does not read them, so the rewrite still applies.
 
 // A-NOT: var<private> {{.*}} : u32;{{$}}
+// A-NOT: var<private> {{.*}} : vec3<u32>;
 // A: fn threadIndex_{{[0-9]+}}( {{[A-Za-z0-9_]+}} : vec3<u32>) -> u32
 // A: var<private> g_{{[0-9]+}} : u32;
 // A: fn laneCount_{{[0-9]+}}( {{[A-Za-z0-9_]+}} : u32) -> u32
@@ -28,6 +29,7 @@
 // B-NOT: var<private>
 // B: fn leaf_{{[0-9]+}}( v_{{[0-9]+}} : u32,  {{[A-Za-z0-9_]+}} : u32) -> u32
 // B: fn mainB(@builtin(global_invocation_id) [[TID:[A-Za-z0-9_]+]] : vec3<u32>, @builtin(subgroup_size) [[SIZE:[A-Za-z0-9_]+]] : u32)
+// B: threadIndex_{{[0-9]+}}([[TID]])
 // B: leaf_{{[0-9]+}}({{.*}}, [[SIZE]])
 
 // TINT: OpGroupNonUniformIAdd
