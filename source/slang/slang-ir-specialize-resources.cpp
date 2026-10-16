@@ -1571,10 +1571,12 @@ static void emitResourceIndexSelects(
         }
         auto trueValue = select->getTrueResult();
         auto falseValue = select->getFalseResult();
+        auto trueIndex = mapResourceToIndex.tryGetValue(trueValue);
+        auto falseIndex = mapResourceToIndex.tryGetValue(falseValue);
         IRInst* missingValue = nullptr;
-        if (!mapResourceToIndex.containsKey(trueValue))
+        if (!trueIndex)
             missingValue = trueValue;
-        else if (!mapResourceToIndex.containsKey(falseValue))
+        else if (!falseIndex)
             missingValue = falseValue;
         if (missingValue)
         {
@@ -1585,10 +1587,7 @@ static void emitResourceIndexSelects(
         }
         IRBuilder builder(select);
         builder.setInsertBefore(select);
-        IRInst* operands[] = {
-            select->getCondition(),
-            mapResourceToIndex.getValue(trueValue),
-            mapResourceToIndex.getValue(falseValue)};
+        IRInst* operands[] = {select->getCondition(), *trueIndex, *falseIndex};
         auto index = builder.emitIntrinsicInst(indexType, kIROp_Select, 3, operands);
         index->sourceLoc = select->sourceLoc;
         mapResourceToIndex.add(select, index);
@@ -1596,8 +1595,10 @@ static void emitResourceIndexSelects(
     }
 }
 
-// Incoming branch arguments become integer indices when their target parameters belong
-// to the current selection graph.
+// Incoming branch arguments for parameters in mapResourceToIndex are replaced with their
+// mapped integer indices; other arguments remain unchanged. Every replaced argument must
+// also have an entry in mapResourceToIndex. originalParams holds the parameter lists from
+// before integer parameters were inserted, so params[i] still identifies argument i.
 static void rewriteResourceSelectionBranchArgs(
     const Dictionary<IRBlock*, List<IRParam*>>& originalParams,
     const Dictionary<IRInst*, IRInst*>& mapResourceToIndex)
@@ -1907,6 +1908,8 @@ static bool specializeResourceSelection(
             auto index = builder.createParam(commonIndexType);
             index->insertBefore(inst);
             index->sourceLoc = inst->sourceLoc;
+            // The reconstruction step below moves the name hint to this integer parameter.
+            // Other decorations follow the reconstructed resource, which retains the original type.
             mapResourceToIndex.add(inst, index);
         }
         else
