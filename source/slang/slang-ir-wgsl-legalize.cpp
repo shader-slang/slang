@@ -252,6 +252,11 @@ struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
 // parameters keep their uniformity in WGSL's analysis.
 struct EntryPointGlobalThreadingContext
 {
+    explicit EntryPointGlobalThreadingContext(IRModule* inModule)
+        : module(inModule)
+    {
+    }
+
     IRModule* module;
 
     // The value each entry point stores into the variable.
@@ -488,7 +493,7 @@ void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, Diagnosti
 
     // Pass entry-point inputs that were stored in module-scope variables as values, so that
     // WGSL's uniformity analysis can see that uniform built-ins are uniform.
-    EntryPointGlobalThreadingContext{module}.processModule();
+    EntryPointGlobalThreadingContext(module).processModule();
 }
 
 struct WGSLAddressSpaceAssigner : InitialAddressSpaceAssigner
