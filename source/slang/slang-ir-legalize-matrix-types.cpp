@@ -9,7 +9,7 @@
 namespace Slang
 {
 
-static bool targetLegalizesMatrixTypes(TargetRequest* targetRequest)
+bool targetLegalizesMatrixTypes(TargetRequest* targetRequest)
 {
     if (isCPUTargetViaLLVM(targetRequest))
         return true;

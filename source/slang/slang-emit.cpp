@@ -2654,7 +2654,7 @@ Result linkAndOptimizeIR(
         targetProgram,
         bufferElementTypeLoweringOptions);
 
-    if (!isCPUTargetViaLLVM(targetRequest))
+    if (targetLegalizesMatrixTypes(targetRequest) && !isCPUTargetViaLLVM(targetRequest))
     {
         SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
 
@@ -2662,7 +2662,8 @@ Result linkAndOptimizeIR(
         // has just become an array of 1-vectors, so the 1-vector legalization runs again.
         SLANG_PASS(legalizeVectorTypes, sink);
 
-        // A function returning an int/uint/bool matrix now returns an array.
+        // The first array-return legalization ran before int/uint/bool matrix return types became
+        // arrays.
         if (shouldLegalizeArrayReturnType)
             SLANG_PASS(legalizeArrayReturnType);
     }
