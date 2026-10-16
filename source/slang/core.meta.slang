@@ -4707,6 +4707,11 @@ __attributeTarget(FuncDecl)
 attribute_syntax [NumThreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
 
 /// Indicate a compute shader entry point is only compatible with the specified wave size.
+/// On HLSL this is emitted as `[WaveSize(N)]`, and on WGSL as `@subgroup_size(N)` (with the
+/// `subgroups` and `subgroup_size_control` extensions). SPIR-V and GLSL have no in-shader form:
+/// the size is requested when the pipeline is created (`VK_EXT_subgroup_size_control`), and
+/// reflection reports it through `EntryPointReflection::getComputeWaveSize`. Metal cannot request
+/// a SIMD-group width, so the attribute is ignored there with a warning.
 /// @param numLanes The wave size this shader entrypoint is compatible with. Must be one of 4, 8, 16, 32, 64, 128.
 __attributeTarget(FuncDecl)
 attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
