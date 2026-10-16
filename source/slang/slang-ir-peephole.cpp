@@ -10,36 +10,37 @@
 
 namespace Slang
 {
-/// The values that flow into a block param, classified by `classifyIncomingValues`.
 enum class IncomingValueKind
 {
-    /// Every incoming value is undefined.
     AllUndefined,
-    /// Exactly one distinct defined value comes in; any other incoming values are undefined.
     SingleValue,
-    /// Anything else, e.g. two distinct defined values.
     Other,
 };
 
 struct IncomingValues
 {
     IncomingValueKind kind;
-    /// The one defined value when `kind` is `SingleValue`, and null otherwise.
+    /// The defined value when `kind` is `SingleValue`, and null otherwise.
     IRInst* singleValue;
 };
 
 /// Classify the values that the predecessors of `block` pass to `param`, the param at
-/// `paramIndex`.
+/// `paramIndex`, by looking at each incoming value in turn:
 ///
-/// We skip an incoming value that is `param` itself, because a loop back edge that passes
-/// the param to itself adds no new value. Consider a loop-header param whose incoming values
-/// are an undefined value and the param itself: it is `AllUndefined`. Without the skip, it would
-/// be a `SingleValue` of itself, and the caller would replace the param with itself forever.
+/// - `param` itself adds no value. A loop back edge can pass the param to itself, so a
+///   loop-header param that receives `x` and itself is a `SingleValue` of `x`, and one that
+///   receives an undefined value and itself is `AllUndefined`. Counting the self value
+///   instead would make the second case a `SingleValue` of `param`, which the caller would
+///   replace with itself forever.
+/// - An undefined value, including `Poison`, adds no value either.
+/// - A defined value makes the result `SingleValue` if it is the only distinct one, and
+///   `Other` once a second distinct one appears.
 ///
-/// We cannot read the value that a predecessor passes when its terminator is not an unconditional
-/// branch. Such an edge rules out `AllUndefined`, but `SingleValue` ignores it. A block with no
-/// predecessors is never `AllUndefined` either: that is the entry block, whose params are the
-/// function's params, and those receive their values from callers.
+/// When only `param` and undefined values come in, the result is `AllUndefined`, except in
+/// two cases that give `Other`. A block with no predecessors may be the entry block, whose
+/// params are the function's params and get their values from callers. A predecessor whose
+/// terminator is not an unconditional branch passes a value we cannot read, and we only
+/// report `AllUndefined` after seeing every incoming value.
 static IncomingValues classifyIncomingValues(IRBlock* block, UInt paramIndex, IRInst* param)
 {
     bool hasPredecessor = false;
@@ -84,6 +85,32 @@ struct PeepholeContext : InstPassBase
     bool useFastAnalysis = false;
 
     TargetProgram* targetProgram;
+
+    /// Replace the uses of `param`, a param of `block`, with one fresh undefined value when
+    /// `incoming` is `AllUndefined`, and return whether we took that case.
+    ///
+    /// Consider `Texture2D t; if (c) { Texture2D r; t = r; }`: the merge block's param receives
+    /// two distinct undefined values, so it is undefined too. Without the fold, phi elimination
+    /// would create a `Texture2D` local, which Khronos targets reject. The fold treats undefined
+    /// incoming values as carrying no identity, the same assumption `eliminatePhis` makes when
+    /// it skips storing them. Prelinking runs keep the param, because the front end's
+    /// uninitialized-use check still has to see each undefined value.
+    bool tryReplaceParamWithUndefined(IRBlock* block, IRInst* param, IncomingValues const& incoming)
+    {
+        if (isPrelinking || incoming.kind != IncomingValueKind::AllUndefined)
+            return false;
+        if (param->hasUses())
+        {
+            IRBuilder builder(module);
+            IRBuilderSourceLocRAII srcLocRAII(&builder, param->sourceLoc);
+            builder.setInsertBefore(block->getFirstOrdinaryInst());
+            auto undefinedValue = builder.emitLoadFromUninitializedMemory(param->getFullType());
+            copyNameHintAndDebugDecorations(undefinedValue, param);
+            param->replaceUsesWith(undefinedValue);
+            changed = true;
+        }
+        return true;
+    }
 
     void maybeRemoveOldInst(IRInst* inst)
     {
@@ -1734,28 +1761,9 @@ struct PeepholeContext : InstPassBase
                     paramIndex++;
                 }
                 auto incoming = classifyIncomingValues(block, paramIndex, inst);
-                if (incoming.kind == IncomingValueKind::AllUndefined && !isPrelinking)
-                {
-                    // Consider `Texture2D t; if (c) { Texture2D r; t = r; }`: the merge
-                    // block's param receives two distinct undefined values, so it is
-                    // undefined too, and we replace it with one fresh undefined value.
-                    // Otherwise phi elimination would create a `Texture2D` local, which
-                    // Khronos targets reject. The fold treats undefined incoming values
-                    // as carrying no identity, the same assumption `eliminatePhis` makes
-                    // when it skips storing them.
-                    if (inst->hasUses())
-                    {
-                        IRBuilder builder(module);
-                        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
-                        builder.setInsertBefore(block->getFirstOrdinaryInst());
-                        auto undefinedValue =
-                            builder.emitLoadFromUninitializedMemory(inst->getFullType());
-                        copyNameHintAndDebugDecorations(undefinedValue, inst);
-                        inst->replaceUsesWith(undefinedValue);
-                        changed = true;
-                    }
-                }
-                else if (auto argValue = incoming.singleValue)
+                if (tryReplaceParamWithUndefined(block, inst, incoming))
+                    break;
+                if (auto argValue = incoming.singleValue)
                 {
                     if (inst->hasUses())
                     {
