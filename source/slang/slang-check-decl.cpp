@@ -3081,7 +3081,11 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         validateArraySizeForVariable(varDecl);
     }
 
-    diagnoseInvalidStructuralRayTracingVariableType(varDecl);
+    // Inferred variables and initialized unsized arrays finish here and skip body checking.
+    // Check their input-view use now; explicit declarations are checked after the body visitor
+    // has chosen their initializer, including any automatic initialization.
+    if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
+        diagnoseInvalidStructuralRayTracingVariableType(varDecl);
 
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
@@ -3842,6 +3846,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         //
         OverloadResolveContext overloadContext;
         overloadContext.loc = varDecl->nameAndLoc.loc;
+        // The implicit call has no written callee. Attribute its constructor reference to the
+        // variable too, so diagnostics on the selected constructor have a source location.
+        overloadContext.funcLoc = varDecl->nameAndLoc.loc;
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
         overloadContext.sourceScope = m_outerScope;
 
@@ -3920,6 +3927,10 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             }
         }
     }
+
+    // An input local must receive an existing view. Check after initialization has been chosen:
+    // `let copy = input` is valid, while an inserted default constructor still creates a new input.
+    diagnoseInvalidStructuralRayTracingVariableType(varDecl);
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
 
@@ -5448,8 +5459,6 @@ void discoverNamespaceDecls(List<NamespaceDecl*>& decls, Decl* parent)
 
 void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
 {
-    beginStructuralRayTracingModule();
-
     // When we are dealing with code from the core modules,
     // there is a potential problem where we might need to look
     // up built-in types like `Int` through the session (e.g.,
@@ -5670,7 +5679,6 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // Furthermore, because a fully checked function will have checked
     // its body, this also means that all function bodies and the
     // declarations they contain should be fully checked.
-    diagnosePendingRayTracingStageOrInputUses();
     checkStructuralRayTracingModule(moduleDecl);
 }
 

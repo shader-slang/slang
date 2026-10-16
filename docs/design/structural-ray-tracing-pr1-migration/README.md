@@ -236,8 +236,9 @@ registration should use the existing builtin mechanisms described in section 9.
 
 Schemas, hit groups, and shader lists can be constructed, stored, and used by ordinary generics.
 A value such as `MySchema schema = {};` neither constructs shader instances nor allocates an SBT.
-Shader implementation types still have no ordinary runtime values. Stage inputs allow `in`
-parameters and initialized local copies:
+Concrete shader implementation structs are ordinary value types. Stage inputs are different:
+they refer to data supplied by a shader invocation and allow `in` parameters and initialized local
+copies:
 
 ```slang
 void helper(in rt::MissInput<SkyContext> input)
@@ -259,11 +260,30 @@ closest-hit, any-hit, intersection, miss and callable implementation in demos an
 still has no method. Ordinary Slang conformance checking rejects an instance method for this
 static requirement.
 
-A static method has no `this`. Keep the separate compiler restriction forbidding instance fields
-on stage structs: `static` alone does not forbid declaring fields. Per-invocation data still comes
-from the stage input. Generated adapters must call the static implementation with its input;
-they must not construct or pass a stage receiver. The source method's IR therefore has an input
-parameter and no receiver parameter.
+A static method has no `this`. A stage struct may contain fields, constructors and instance methods,
+and ordinary code may construct, copy, return or use it as a generic argument. For example:
+
+```slang
+struct SkyMiss : rt::IMissShader
+{
+    uint state;
+    typealias Context = SkyContext;
+    static void invoke(in rt::MissInput<Context> input) {}
+}
+
+void forward(in rt::MissInput<SkyContext> input)
+{
+    SkyMiss local = {1};
+    local.invoke(input);
+    SkyMiss::invoke(input);
+}
+```
+
+Both calls pass only `input`; neither passes `local` or makes its `state` available inside `invoke`.
+The method can explicitly create an object and read that object's fields, like any other static
+method. Selecting `SkyMiss` as an entry point or listing it in a schema does not create an object
+or run a constructor. Generated adapters must call the static implementation with its input. The
+function's IR therefore has an input parameter and no hidden `this` parameter.
 
 An `invoke` method can be called as an ordinary static function with an existing input. For example:
 
@@ -287,8 +307,8 @@ struct SkyMiss : rt::IMissShader
 }
 ```
 
-The type-qualified call uses the current invocation's input; it does not dispatch a new shader
-or select a new SBT record. The restriction on constructing stage objects remains separate.
+The call uses the current invocation's input; it does not dispatch a new shader or select a new
+SBT record. Constructing a stage object does not supply the input that `invoke` requires.
 
 The adapter implementation must preserve an ordinary callable body when generating a native
 entry wrapper. Keep `StructuralRayTracingEntryPointInfo` on the entry wrapper, not on an ordinary
@@ -297,12 +317,17 @@ but does not currently remove this structural metadata. PR1 still stops code gen
 structural entry has no adapter; the positive tests here check frontend acceptance only.
 
 Fresh construction (`MissInput<C>()` or `{}`), uninitialized locals, global variables, `uniform`
-parameters, fields, writable/reference parameters, returned views, and arbitrary stage/input generic
+parameters, fields, writable/reference parameters, returned views, and arbitrary input generic
 arguments retain their checks. Normal initializer checking and same-type coercion handle copies;
 the RT checker uses the checked variable declaration and existing parameter-direction/scope helpers.
-The generic restriction prevents a deferred generic body such as
+The generic restriction prevents a generic body such as
 `make<T>() { T local = T(); }` from manufacturing an input after frontend checking. Supporting
-broader type-only uses would require validating the eventual specialized body.
+broader type-only uses would require validating the eventual specialized body. An associated type
+can hide the input from this direct argument check: an ordinary `Carrier` can define
+`typealias Item = MissInput<C>`, while a generic function constructs `T.Item()` or a generic struct
+stores a `T.Item` field. Those uses need checking once T becomes Carrier. The compiler does not
+inspect ordinary structs' fields recursively to discover such specializations. This limitation is
+tracked in [#13686](https://github.com/shader-slang/slang/issues/13686).
 
 `Optional<MissInput<C>>` can hold an alias to an existing invocation's input, or `none`:
 
@@ -319,8 +344,8 @@ void inspect<C : rt::IPayloadContext>(in rt::MissInput<C> input)
 ```
 
 The optional does not allocate an invocation's payload or shader record. Creating a fresh
-`MissInput<C>()` or fresh `MissInput` initializer remains invalid. The separate restrictions on
-shader implementation values and direct global stage-input storage still apply.
+`MissInput<C>()` or fresh `MissInput` initializer remains invalid. Direct global stage-input storage
+is also invalid.
 
 An empty struct is a valid explicit payload. Allow both `trace(..., emptyPayload)` and
 `input.payload` when its type is empty. Remove the old explicit-empty diagnostics and property
@@ -455,8 +480,7 @@ operand.
 Remove the trace source-operation decoration and its `Trace` enum value from the full
 implementation, together with `__RayTracingTrace`. Shader declarations now choose the API family,
 so the library's native `TraceRay` calls need no annotation-based exemption. Keep
-`__RayTracingCallShader` for its callable IR decoration and existing generic-argument exception;
-it has no API-family role. The serialized name for `metalTraceRay` has stable ID 912.
+`__RayTracingCallShader` for its callable IR decoration; it has no API-family role. The serialized name for `metalTraceRay` has stable ID 912.
 
 After `linkIR` selects target-switch branches, the centralized unfinished-operation check walks
 functions reachable from entry points and looks for the actual `IRMetalTraceRay` instruction.

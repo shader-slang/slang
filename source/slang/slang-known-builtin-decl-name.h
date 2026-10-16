@@ -24,7 +24,6 @@ enum class KnownBuiltinDeclName : uint32_t
     WaveReadLaneFirst,
     CallShader,
     ReportHit = 16,
-    RayTracingShaderList,
     RayTracingClosestHitInput,
     RayTracingAnyHitInput,
     RayTracingIntersectionInput,

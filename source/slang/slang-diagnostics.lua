@@ -4628,13 +4628,6 @@ err(
 )
 
 err(
-    "structural-ray-tracing-stage-instance-field",
-    38056,
-    "stateful structural ray-tracing stage",
-    span { loc = "field:Decl", message = "instance field '~field' is not allowed because structural ray-tracing stage implementations must be stateless" }
-)
-
-err(
     "mixed-ray-tracing-apis",
     38057,
     "cannot mix legacy and structural ray-tracing APIs in one module",

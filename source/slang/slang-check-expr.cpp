@@ -4383,14 +4383,14 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         if (expr->arguments.getCount() == 1 && invoke == expr->arguments[0])
             return rs;
 
-        // Check constructor calls and ordinary call results. A user-defined constructor cannot
-        // create a fresh MissInput<C>; makeValue<rt::MissInput<C>>() cannot return one either.
-        if (diagnoseInvalidStructuralRayTracingExpression(invoke))
-            return CreateErrorExpr(invoke);
-
         // Check generic arguments even when the result is void. A call to make<MissInput<C>>()
         // could otherwise hide construction inside a generic body such as void make<T>() { T(); }.
         if (diagnoseInvalidStructuralRayTracingGenericArguments(invoke))
+            return CreateErrorExpr(invoke);
+
+        // Check constructor calls and ordinary call results. A user-defined constructor cannot
+        // create a fresh MissInput<C>; a substituted call result cannot supply one either.
+        if (diagnoseInvalidStructuralRayTracingExpression(invoke))
             return CreateErrorExpr(invoke);
 
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))

@@ -1,4 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry ClosestHit -stage closesthit -no-codegen
+// A field-bearing stage is a valid entry point. Dispatch calls its static function with input.
+//TEST:SIMPLE: -experimental-feature -entry ClosestHit -stage closesthit -no-codegen
 
 import slang.raytracing;
 
@@ -23,8 +24,6 @@ struct ClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
     uint state;
-//CHECK: ^^^^^ stateful structural ray-tracing stage
-//CHECK: ^^^^^ instance field 'state' is not allowed because structural ray-tracing stage implementations must be stateless
 
     static void invoke(rt::ClosestHitInput<HitContext> input) {}
 }

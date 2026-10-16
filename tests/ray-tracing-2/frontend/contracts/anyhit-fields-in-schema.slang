@@ -1,6 +1,5 @@
-// An any-hit stage selected through an explicit hit-group list must be stateless, just like
-// a stage selected directly with `-entry StructName`, even though invoke is static.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -no-codegen
+// Selecting an any-hit stage through a hit group does not construct its ordinary object fields.
+//TEST:SIMPLE: -experimental-feature -entry main -stage raygeneration -no-codegen
 
 import slang.raytracing;
 
@@ -27,8 +26,6 @@ struct StatefulAnyHit : rt::IAnyHitShader
 {
     typealias Context = HitContext;
     bool alphaTestEnabled;
-//CHECK: ^^^^^^^^^^^^^^^^ stateful structural ray-tracing stage
-//CHECK: ^^^^^^^^^^^^^^^^ instance field 'alphaTestEnabled' is not allowed because structural ray-tracing stage implementations must be stateless
 
     static void invoke(rt::AnyHitInput<Context> input) {}
 }

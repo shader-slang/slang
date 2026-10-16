@@ -1,9 +1,6 @@
-// A stage selected only through a closed schema must obey the same stateless contract as a struct
-// selected directly with `-entry StructName`. Making invoke static does not permit instance
-// fields: the stage implementation must remain stateless, including any inherited fields.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -no-codegen
-
-#pragma warning(disable: 30816)
+// Fields on a stage struct are ordinary object data. Selecting the stage through a schema
+// calls its static invoke function and does not supply an object containing those fields.
+//TEST:SIMPLE: -experimental-feature -entry main -stage raygeneration -no-codegen
 
 import slang.raytracing;
 
@@ -26,26 +23,19 @@ struct HitContext : rt::IHitContext
     typealias Record = void;
 }
 
-struct StatefulStageBase
-{
-    uint state;
-//CHECK: ^^^^^ stateful structural ray-tracing stage
-//CHECK: ^^^^^ instance field 'state' is not allowed because structural ray-tracing stage implementations must be stateless
-}
-
-struct StatefulClosestHit : StatefulStageBase,
-                            rt::IClosestHitShader
+struct StatefulClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
+    uint state;
 
     static void invoke(rt::ClosestHitInput<Context> input) {}
 }
 
-// Sharing one invalid base between stages must not duplicate the diagnostic on `state`.
-struct SecondStatefulClosestHit : StatefulStageBase,
-                                  rt::IClosestHitShader
+// Each listed stage selects a static function. Neither stage object is constructed by dispatch.
+struct SecondStatefulClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
+    uint state;
 
     static void invoke(rt::ClosestHitInput<Context> input) {}
 }

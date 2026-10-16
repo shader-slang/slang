@@ -100,7 +100,6 @@ public interface ICallableShaderList
 ///
 /// @par Constraints
 /// Every type in `Group` must conform to `IHitGroup`. This list conforms to `IHitGroupList`.
-[KnownBuiltin(__RayTracingBuiltin.ShaderList)]
 public struct HitGroupList<each Group> : IHitGroupList
     where expand each Group : IHitGroup
 {
@@ -120,7 +119,6 @@ public struct HitGroupList<each Group> : IHitGroupList
 ///
 /// @par Constraints
 /// Every type in `Shader` must conform to `IMissShader`. This list conforms to `IMissShaderList`.
-[KnownBuiltin(__RayTracingBuiltin.ShaderList)]
 public struct MissShaderList<each Shader> : IMissShaderList
     where expand each Shader : IMissShader
 {
@@ -139,7 +137,6 @@ public struct MissShaderList<each Shader> : IMissShaderList
 /// @par Constraints
 /// Every type in `Shader` must conform to `ICallableShader`. This list conforms to
 /// `ICallableShaderList`.
-[KnownBuiltin(__RayTracingBuiltin.ShaderList)]
 public struct CallableShaderList<each Shader> : ICallableShaderList
     where expand each Shader : ICallableShader
 {

@@ -43,6 +43,8 @@ namespace Stages
 struct main : rt::IClosestHitShader
 {
     typealias Context = ::HitContext;
+    // This ordinary field does not add a receiver to the selected static function.
+    uint state;
 
     static void invoke(rt::ClosestHitInput<::HitContext> input)
     {

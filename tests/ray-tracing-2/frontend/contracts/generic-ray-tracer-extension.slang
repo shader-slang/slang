@@ -1,5 +1,4 @@
 //TEST:SIMPLE(filecheck=HLSL): -experimental-feature -ignore-capabilities -entry main -stage compute -target hlsl
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=STAGE): -experimental-feature -ignore-capabilities -DINVALID_STAGE -entry main -stage compute -no-codegen
 // HLSL: void main()
 
 import slang.raytracing;
@@ -33,8 +32,7 @@ struct TestSchema : rt::ITraceProgramSchema
 
 extension<S> rt::RayTracer<S> where S : rt::ITraceProgramSchema
 {
-    // A schema is an ordinary generic argument. Stage/input arguments remain restricted on
-    // ordinary methods because their bodies could construct or store those compiler-supplied types.
+    // An ordinary generic helper accepts both a schema and a concrete stage struct.
     static uint helper<T>() { return 1; }
 }
 
@@ -43,11 +41,7 @@ RWStructuredBuffer<uint> output;
 [numthreads(1, 1, 1)]
 void main()
 {
-#if defined(INVALID_STAGE)
-    output[0] = rt::RayTracer<TestSchema>.helper<TestMiss>();
-// STAGE: structural ray-tracing stage type 'TestMiss' has no runtime representation
-#else
     output[0] = rt::RayTracer<TestSchema>.helper<TestSchema>();
     output[1] = rt::RayTracer<TestSchema>.helper<uint>();
-#endif
+    output[2] = rt::RayTracer<TestSchema>.helper<TestMiss>();
 }

@@ -10,7 +10,6 @@ namespace rt
 // neither the containing context interface nor its implementations need a special AST type.
 public enum __RayTracingBuiltin : int
 {
-    ShaderList = $((int)KnownBuiltinDeclName::RayTracingShaderList),
     ClosestHitInput = $((int)KnownBuiltinDeclName::RayTracingClosestHitInput),
     AnyHitInput = $((int)KnownBuiltinDeclName::RayTracingAnyHitInput),
     IntersectionInput = $((int)KnownBuiltinDeclName::RayTracingIntersectionInput),

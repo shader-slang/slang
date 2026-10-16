@@ -11,8 +11,8 @@ namespace rt
 ///
 /// @par Constraints
 /// Requires the `structural_raytracing_closesthit` capability.
-/// Implementations must be user-defined structs without instance fields. `invoke` is static;
-/// per-invocation state is supplied through its input.
+/// Implementations must be user-defined structs. Stage dispatch calls static `invoke` without
+/// constructing an object; per-invocation state is supplied through its input.
 [require(structural_raytracing_closesthit)]
 __magic_type(ClosestHitShaderType)
 public interface IClosestHitShader
@@ -41,8 +41,8 @@ public interface IClosestHitShader
 ///
 /// @par Constraints
 /// Requires the `structural_raytracing_anyhit` capability.
-/// Implementations must be user-defined structs without instance fields. `invoke` is static;
-/// per-invocation state is supplied through its input.
+/// Implementations must be user-defined structs. Stage dispatch calls static `invoke` without
+/// constructing an object; per-invocation state is supplied through its input.
 [require(structural_raytracing_anyhit)]
 __magic_type(AnyHitShaderType)
 public interface IAnyHitShader
@@ -105,8 +105,8 @@ public interface IIntersectionStage
 /// Inherits `Context : IHitContext` from `IIntersectionStage` and further requires
 /// `Context.Primitive : ICustomIntersectionPrimitive`. Requires the
 /// `structural_raytracing_intersection` capability.
-/// Implementations must be user-defined structs without instance fields. `invoke` is static;
-/// per-invocation state is supplied through its input.
+/// Implementations must be user-defined structs. Stage dispatch calls static `invoke` without
+/// constructing an object; per-invocation state is supplied through its input.
 [require(structural_raytracing_intersection)]
 __magic_type(IntersectionShaderType)
 public interface IIntersectionShader : IIntersectionStage
@@ -125,8 +125,8 @@ public interface IIntersectionShader : IIntersectionStage
 ///
 /// @par Constraints
 /// Requires the `structural_raytracing_miss` capability.
-/// Implementations must be user-defined structs without instance fields. `invoke` is static;
-/// per-invocation state is supplied through its input.
+/// Implementations must be user-defined structs. Stage dispatch calls static `invoke` without
+/// constructing an object; per-invocation state is supplied through its input.
 [require(structural_raytracing_miss)]
 __magic_type(MissShaderType)
 public interface IMissShader
@@ -153,8 +153,8 @@ public interface IMissShader
 ///
 /// @par Constraints
 /// Requires the `structural_raytracing_callable` capability.
-/// Implementations must be user-defined structs without instance fields. `invoke` is static;
-/// per-invocation state is supplied through its input.
+/// Implementations must be user-defined structs. Stage dispatch calls static `invoke` without
+/// constructing an object; per-invocation state is supplied through its input.
 [require(structural_raytracing_callable)]
 __magic_type(CallableShaderType)
 public interface ICallableShader

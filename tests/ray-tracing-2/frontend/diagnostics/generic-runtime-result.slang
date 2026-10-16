@@ -38,6 +38,4 @@ void main()
     output[0] = makeValue<rt::ClosestHitInput<HitContext>>().payload.value;
 //CHECK:        ^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
 //CHECK:        ^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' cannot be used as a generic type argument
-//CHECK:                                                  ^ storage of a structural ray-tracing stage input
-//CHECK:                                                  ^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 }

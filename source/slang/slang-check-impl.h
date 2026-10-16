@@ -5,7 +5,6 @@
 // the various `slang-check-*` files that provide
 // the semantic checking infrastructure.
 
-#include "slang-check-structural-ray-tracing.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-visitor.h"
@@ -1034,11 +1033,6 @@ struct SharedSemanticsContext : public RefObject
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
-
-    /// Defer checks for stage and stage-input uses until the module's signatures and conformances
-    /// are complete. When this is false, each use is checked immediately instead of being queued.
-    bool m_deferRayTracingStageOrInputUses = false;
-    List<RayTracingStageOrInputUse> m_pendingRayTracingStageOrInputUses;
 
     /// Whether semantic checking has imported the `glsl` module.
     bool m_hasImportedGLSLModule = false;
@@ -3059,7 +3053,6 @@ public:
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
 
-    void beginStructuralRayTracingModule();
     void checkStructuralRayTracingModule(ModuleDecl* moduleDecl);
     void checkStructuralRayTracingStageRestrictions(
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
@@ -3071,7 +3064,6 @@ public:
         Type* schemaType,
         SourceLoc satisfyingDeclLoc);
     void diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl);
-    void diagnosePendingRayTracingStageOrInputUses();
     void diagnoseInvalidStructuralRayTracingReturnType(CallableDecl* decl);
     void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
     bool diagnoseInvalidStructuralRayTracingExpression(Expr* expr);

@@ -3454,7 +3454,7 @@ Expr* SemanticsVisitor::coerce(
         return CreateImplicitCastExpr(m_astBuilder->getErrorType(), fromExpr);
     }
 
-    // Check whether the conversion creates a forbidden RT stage or stage input. For example:
+    // Check whether the conversion creates a forbidden stage input or stage interface value.
     //
     //     void helper(in rt::MissInput<C> input) {}
     //     helper({}); // Converting {} to MissInput<C> creates a fresh input.

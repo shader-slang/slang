@@ -31,6 +31,30 @@ static rt::MissInput<Context> staticInput;
 //CHECK:                      ^^^^^^^^^^^ storage of a structural ray-tracing stage input
 //CHECK:                      ^^^^^^^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' may only be used as an 'in' parameter or an initialized local copy
 
+// Unwrapping an optional gives type inference an Input without calling an Input constructor.
+// Global and field declarations still cannot keep it, regardless of whether the type is written.
+static Optional<rt::MissInput<Context>> absent = none;
+static let inferredGlobal = absent.value;
+//CHECK:   ^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
+//CHECK:   ^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' may only be used as an 'in' parameter or an initialized local copy
+
+struct InvalidFields : rt::IMissShader
+{
+    typealias Context = ::Context;
+    uint ordinaryField;
+    rt::MissInput<::Context> explicitInputField;
+//CHECK:                     ^^^^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
+//CHECK:                     ^^^^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:^^^^^^^^^ construction of a structural ray-tracing type
+//CHECK:^^^^^^^^^ structural ray-tracing type 'rt.MissInput<Context>' cannot be constructed by user code
+
+    let inferredField = absent.value;
+//CHECK:^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
+//CHECK:^^^^^^^^^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' may only be used as an 'in' parameter or an initialized local copy
+
+    static void invoke(in rt::MissInput<::Context> input) {}
+}
+
 void uniformParameter(uniform rt::MissInput<Context> input) {}
 //CHECK:                                             ^^^^^ storage of a structural ray-tracing stage input
 //CHECK:                                             ^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' may only be used as an 'in' parameter or an initialized local copy
