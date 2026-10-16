@@ -861,6 +861,35 @@ entries are unaffected.
 > drivers expose acceleration structure descriptors in the heap (as device addresses), and requires either
 > the `SPV_KHR_ray_tracing` or `SPV_KHR_ray_query` extension.
 
+### WGSL with `wgsl_chromium_experimental_resource_table`
+
+On WGSL, `DescriptorHandle<T>` is a `vec2<u32>`. By default Slang looks the handle up in a global
+array of descriptors, as on SPIR-V, but core WGSL cannot declare an array of textures or samplers.
+
+When the `wgsl_chromium_experimental_resource_table` capability is requested (for example with
+`-capability wgsl_chromium_experimental_resource_table`), Slang instead lowers each lookup to the resource
+table of Chromium's experimental bindless extension: the handle's `.x` component is the table index, and
+the lookup becomes `getResource<T>(index)`. The output starts with
+`enable chromium_experimental_resource_table;` and declares no heap bindings.
+
+```slang
+struct Material { Texture2D.Handle albedo; SamplerState.Handle sampler; };
+StructuredBuffer<Material> materials;
+// ...
+float4 c = materials[i].albedo.Sample(materials[i].sampler, uv);
+```
+
+becomes
+
+```wgsl
+textureSample(getResource<texture_2d<f32>>(m.albedo.x), getResource<sampler>(m.sampler.x), uv)
+```
+
+The resource table holds sampled textures (including depth and multisampled textures) and samplers.
+A handle to any other kind of resource (a storage texture, a buffer or a combined texture-sampler) is a
+compile-time error under this capability. The extension is experimental: Dawn exposes it behind the
+`chromium-experimental-sampling-resource-table` feature, which needs unsafe APIs to be allowed.
+
 ### Custom Descriptor Fetch
 
 If none of the above behaviors are desired, users can customize the conversion logic from descriptor handle
