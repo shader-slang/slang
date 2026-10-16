@@ -5,14 +5,24 @@
 // merged value is undefined, so SPIR-V should use an `OpUndef` of the image type.
 
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage fragment
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage fragment -g
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage fragment
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage fragment
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage fragment
+//TEST:SIMPLE(filecheck=MINOPT):-target spirv -entry main -stage fragment -minimum-slang-optimization -DNO_LOOP
 
 // SPIRV-NOT: {{E56004|E56019}}
 // SPIRV: OpEntryPoint
 // SPIRV: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage
+// SPIRV-NOT: OpTypePointer Function %[[IMG]]
 // SPIRV: OpUndef %[[IMG]]
+
+// With -minimum-slang-optimization, peephole forwards a block-local value only after a
+// dominance check, which that mode skips. The loop case keeps its texture param there,
+// so this line covers the merges outside a loop.
+// MINOPT: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage
+// MINOPT-NOT: OpTypePointer Function %[[IMG]]
+// MINOPT: OpUndef %[[IMG]]
 
 // The GLSL and WGSL lines only guard against E56004/E56019 coming back. The code
 // emitted for a lone undefined texture is still rejected by glslang and Tint, with
@@ -62,6 +72,7 @@ float4 readLocal(float2 uv)
     return float4(0, 0, 0, 1);
 }
 
+#ifndef NO_LOOP
 // The same merge inside a loop. Once the inner merge is forwarded, the loop-header
 // param's incoming values are an undefined value and the param itself.
 float4 readInLoop(float2 uv)
@@ -79,6 +90,7 @@ float4 readInLoop(float2 uv)
         return t.SampleLevel(samplerState, uv, 0);
     return float4(0, 0, 0, 1);
 }
+#endif
 
 [shader("fragment")]
 float4 main(float2 uv: TEXCOORD) : SV_Target
@@ -91,5 +103,9 @@ float4 main(float2 uv: TEXCOORD) : SV_Target
         replacement.enabled = false;
         value = replacement;
     }
-    return readTexture(value, uv) + readLocal(uv) + readInLoop(uv);
+    float4 result = readTexture(value, uv) + readLocal(uv);
+#ifndef NO_LOOP
+    result += readInLoop(uv);
+#endif
+    return result;
 }

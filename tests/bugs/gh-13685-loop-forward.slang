@@ -7,6 +7,7 @@
 // does not take the `if`, and the result must be `x`.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -g
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 //TEST_INPUT: set inputBuffer = ubuffer(data=[7 4 -1], stride=4)
