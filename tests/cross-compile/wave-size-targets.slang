@@ -37,3 +37,18 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // METAL: {{\[\[kernel\]\]}}
 // METAL-NOT: WaveSize
 
+
+// WGSL requires the workgroup's x dimension to be a multiple of the subgroup size.
+//DIAGNOSTIC_TEST:SIMPLE(diag=XDIM): -target wgsl -stage compute -entry badWorkgroupMain
+
+[shader("compute")]
+[WaveSize(32)]
+[numthreads(8, 8, 1)]
+void badWorkgroupMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+/*XDIM:
+     ^^^^^^^^^^^^^^^^ the workgroup's x dimension (8) must be a multiple of the 'WaveSize' (32) on target 'wgsl'
+     ^^^^^^^^^^^^^^^^ WGSL's '@subgroup_size' requires the x dimension of '@workgroup_size' to be a multiple of the subgroup size; otherwise pipeline creation fails
+*/
+{
+    outputBuffer[dispatchThreadID.x] = WaveActiveSum(dispatchThreadID.x);
+}
