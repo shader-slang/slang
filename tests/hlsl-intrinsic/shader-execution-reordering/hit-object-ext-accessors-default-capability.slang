@@ -7,10 +7,12 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderEXT
 //TEST:SIMPLE(filecheck=POS): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvRayTracingPositionFetchKHR -DPOSITION_FETCH
+//TEST:SIMPLE(filecheck=NONV): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly
+//TEST:SIMPLE(filecheck=NONV): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderEXT
+//TEST:SIMPLE(filecheck=NONV): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvRayTracingPositionFetchKHR -DPOSITION_FETCH
 
 // CHECK-DAG: OpExtension "SPV_EXT_shader_invocation_reorder"
 // CHECK-DAG: OpCapability ShaderInvocationReorderEXT
-// CHECK-NOT: ShaderInvocationReorderNV
 // CHECK-DAG: OpHitObjectSetShaderBindingTableRecordIndexEXT
 // CHECK-DAG: OpHitObjectGetRayFlagsEXT
 // CHECK-DAG: OpHitObjectGetRayTMinEXT
@@ -20,6 +22,9 @@
 // POS-DAG: OpCapability ShaderInvocationReorderEXT
 // POS-DAG: OpCapability RayTracingPositionFetchKHR
 // POS-DAG: OpHitObjectGetIntersectionTriangleVertexPositionsEXT
+
+// No run uses the NV extension anywhere in the module.
+// NONV-NOT: ShaderInvocationReorderNV
 
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;
