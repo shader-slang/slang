@@ -4073,7 +4073,7 @@ static void legalizeTypes(IRTypeLegalizationContext* context)
 //
 // If no holder of the buffer type has a location, a use with a location is reported instead
 // (`findBestSourceLocFromUses` visits the most recently created use first, which is not
-// source order). The tests reach no such shape.
+// source order).
 static void diagnoseStructuredBufferWithSplitElement(
     DiagnosticSink* sink,
     IRHLSLStructuredBufferTypeBase* bufferType)

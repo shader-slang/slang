@@ -655,9 +655,8 @@ struct IRTypeLegalizationContext
     ///
     /// An override must report an error, and its pass must stop before rewriting any value.
     /// The resource context reports E38204, and `legalizeResourceTypes` legalizes every buffer
-    /// type before any value and returns `SLANG_FAIL` on error. The default fails loudly:
-    /// the empty-type context never splits anything, and no input that reaches the existential
-    /// context with a split buffer element is known.
+    /// type before any value and returns `SLANG_FAIL` on error. The empty-type context never splits
+    /// anything; the default fails loudly if the existential context splits a buffer element.
     virtual void handleStructuredBufferWithSplitElement(IRHLSLStructuredBufferTypeBase* bufferType)
     {
         SLANG_UNUSED(bufferType);
