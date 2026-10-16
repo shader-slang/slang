@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // API tests for record-replay functionality
 // These tests verify that the record layer wrapper classes correctly wrap Slang API calls.
 // They exercise methods on SessionRecorder, ModuleRecorder, EntryPointRecorder, and
@@ -267,3 +268,4 @@ SLANG_UNIT_TEST(RecordReplayApiParameterSerialization)
     SLANG_CHECK(targetCode != nullptr);
     SLANG_CHECK(targetCode->getBufferSize() > 0);
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

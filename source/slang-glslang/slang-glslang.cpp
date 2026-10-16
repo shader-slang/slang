@@ -20,6 +20,10 @@
 
 // This is a wrapper to allow us to run the `glslang` compiler
 // in a controlled fashion.
+//
+// A new exported entry point must also be added to slang-glslang.version-script, or ELF and macOS
+// builds will not export it (both derive their export list from that file); the client's lookup
+// then returns null and that entry point is silently unavailable.
 
 #define UNLIMITED 9999
 

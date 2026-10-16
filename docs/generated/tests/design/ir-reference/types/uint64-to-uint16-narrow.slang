@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#basic-scalar-types
-//META: doc_section_digest=b3e088ac3dc9706ad8749cb8f9a4f8033e0bd510147eb7d3d1d0a3563b2dd6ca
+//META: doc_section_digest=68c1541af3d471fceb3efd100d4811264b41226d1023362e44bf1166be1fb329
 //META: purpose=Expansion: narrowing from UInt64 to UInt16 yields a UInt16-typed cast value, distinguishing the two unsigned widths.
 //META: intent=expansion
 //META: pipeline_stage=lower
@@ -14,7 +14,7 @@
 // `uint64_t` value produces a `Cast` instruction whose result type is
 // `UInt16`, pulling the value down from the largest unsigned scalar.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint64_t v;
 uniform RWStructuredBuffer<uint> buf;

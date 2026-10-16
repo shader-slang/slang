@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "cb",
@@ -303,10 +304,335 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "constantBuffer",
+        "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0},
+        "parameters": [
+            {
+                "name": "cb",
+                "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0},
+                "type": {
+                    "kind": "constantBuffer",
+                    "elementType": {
+                        "kind": "struct",
+                        "name": "StructWithArray",
+                        "fields": [
+                            {
+                                "name": "a",
+                                "type": {
+                                    "kind": "array",
+                                    "elementCount": 1,
+                                    "elementType": {
+                                        "kind": "struct",
+                                        "name": "PadLadenStruct",
+                                        "fields": [
+                                            {
+                                                "name": "a",
+                                                "type": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float64",
+                                                    "sizes": [
+                                                        {"kind": "uniform", "value": 8, "alignment": 8}
+                                                    ]
+                                                },
+                                                "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
+                                            },
+                                            {
+                                                "name": "b",
+                                                "type": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "uint8",
+                                                    "sizes": [
+                                                        {"kind": "uniform", "value": 1, "alignment": 1}
+                                                    ]
+                                                },
+                                                "binding": {"kind": "uniform", "offset": 8, "size": 1, "elementStride": 0}
+                                            }
+                                        ],
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 16, "alignment": 8}
+                                        ]
+                                    },
+                                    "uniformStride": 16,
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 8}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 16}
+                            },
+                            {
+                                "name": "c",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "uint8",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 1, "alignment": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 16, "size": 1, "elementStride": 0}
+                            },
+                            {
+                                "name": "d",
+                                "type": {
+                                    "kind": "matrix",
+                                    "rowCount": 3,
+                                    "columnCount": 3,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float16"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 24, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 20, "size": 24, "elementStride": 0}
+                            },
+                            {
+                                "name": "e",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "uint8",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 1, "alignment": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 44, "size": 1, "elementStride": 0}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 48, "alignment": 8}
+                        ]
+                    },
+                    "containerVarLayout": {
+                        "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "name": "StructWithArray",
+                            "fields": [
+                                {
+                                    "name": "a",
+                                    "type": {
+                                        "kind": "array",
+                                        "elementCount": 1,
+                                        "elementType": {
+                                            "kind": "struct",
+                                            "name": "PadLadenStruct",
+                                            "fields": [
+                                                {
+                                                    "name": "a",
+                                                    "type": {
+                                                        "kind": "scalar",
+                                                        "scalarType": "float64",
+                                                        "sizes": [
+                                                            {"kind": "uniform", "value": 8, "alignment": 8}
+                                                        ]
+                                                    },
+                                                    "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
+                                                },
+                                                {
+                                                    "name": "b",
+                                                    "type": {
+                                                        "kind": "scalar",
+                                                        "scalarType": "uint8",
+                                                        "sizes": [
+                                                            {"kind": "uniform", "value": 1, "alignment": 1}
+                                                        ]
+                                                    },
+                                                    "binding": {"kind": "uniform", "offset": 8, "size": 1, "elementStride": 0}
+                                                }
+                                            ],
+                                            "sizes": [
+                                                {"kind": "uniform", "value": 16, "alignment": 8}
+                                            ]
+                                        },
+                                        "uniformStride": 16,
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 16, "alignment": 8}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 16}
+                                },
+                                {
+                                    "name": "c",
+                                    "type": {
+                                        "kind": "scalar",
+                                        "scalarType": "uint8",
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 1, "alignment": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 16, "size": 1, "elementStride": 0}
+                                },
+                                {
+                                    "name": "d",
+                                    "type": {
+                                        "kind": "matrix",
+                                        "rowCount": 3,
+                                        "columnCount": 3,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float16"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 24, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 20, "size": 24, "elementStride": 0}
+                                },
+                                {
+                                    "name": "e",
+                                    "type": {
+                                        "kind": "scalar",
+                                        "scalarType": "uint8",
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 1, "alignment": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 44, "size": 1, "elementStride": 0}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "uniform", "value": 48, "alignment": 8}
+                            ]
+                        },
+                        "binding": {"kind": "uniform", "offset": 0, "size": 48, "elementStride": 0}
+                    },
+                    "sizes": [
+                        {"kind": "uniform", "value": 8, "alignment": 8}
+                    ]
+                }
+            },
+            {
+                "name": "sb",
+                "binding": {"kind": "uniform", "offset": 8, "size": 16, "elementStride": 0},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "structuredBuffer",
+                    "access": "readWrite",
+                    "resultType": {
+                        "kind": "struct",
+                        "name": "StructWithArray",
+                        "fields": [
+                            {
+                                "name": "a",
+                                "type": {
+                                    "kind": "array",
+                                    "elementCount": 1,
+                                    "elementType": {
+                                        "kind": "struct",
+                                        "name": "PadLadenStruct",
+                                        "fields": [
+                                            {
+                                                "name": "a",
+                                                "type": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float64",
+                                                    "sizes": [
+                                                        {"kind": "uniform", "value": 8, "alignment": 8}
+                                                    ]
+                                                },
+                                                "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
+                                            },
+                                            {
+                                                "name": "b",
+                                                "type": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "uint8",
+                                                    "sizes": [
+                                                        {"kind": "uniform", "value": 1, "alignment": 1}
+                                                    ]
+                                                },
+                                                "binding": {"kind": "uniform", "offset": 8, "size": 1, "elementStride": 0}
+                                            }
+                                        ],
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 16, "alignment": 8}
+                                        ]
+                                    },
+                                    "uniformStride": 16,
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 8}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 16}
+                            },
+                            {
+                                "name": "c",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "uint8",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 1, "alignment": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 16, "size": 1, "elementStride": 0}
+                            },
+                            {
+                                "name": "d",
+                                "type": {
+                                    "kind": "matrix",
+                                    "rowCount": 3,
+                                    "columnCount": 3,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float16"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 24, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 20, "size": 24, "elementStride": 0}
+                            },
+                            {
+                                "name": "e",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "uint8",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 1, "alignment": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 44, "size": 1, "elementStride": 0}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 48, "alignment": 8}
+                        ]
+                    },
+                    "sizes": [
+                        {"kind": "uniform", "value": 16, "alignment": 8}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "compute",
+            "scope": {
+                "kind": "constantBuffer",
+                "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0},
+                "parameters": [
+                    {
+                        "name": "dispatchThreadID",
+                        "semanticName": "SV_DISPATCHTHREADID",
+                        "type": {
+                            "kind": "vector",
+                            "elementCount": 3,
+                            "elementType": {
+                                "kind": "scalar",
+                                "scalarType": "uint32"
+                            },
+                            "sizes": [
+
+                            ]
+                        }
+                    }
+                ]
+            },
             "parameters": [
                 {
                     "name": "dispatchThreadID",

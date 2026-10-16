@@ -200,7 +200,7 @@ FIDDLE() namespace Slang
 
     enum class ImageFormat
     {
-#define SLANG_FORMAT(NAME, OTHER) NAME,
+#define SLANG_FORMAT(NAME, CODE_NAME, OTHER) NAME,
 #include "slang-image-format-defs.h"
 #undef SLANG_FORMAT
     };
@@ -238,6 +238,10 @@ FIDDLE() namespace Slang
         IBwdCallable,
         NullDifferential,
         OperatorAddressOf,
+        WaveIsFirstLane,
+        WaveReadLaneFirst,
+        CallShader,
+        ReportHit = 16,
         COUNT
     };
 
@@ -1361,28 +1365,18 @@ FIDDLE() namespace Slang
             // instead.
             SuperType,
 
-            // The lookup process considered a member of an
-            // enclosing type as being in scope, so that any
-            // reference to that member needs to use a `this`
-            // expression as appropriate.
-            This,
+            // A member of an enclosing type is referenced through an implicit `this` expression.
+            // Expression checking determines its type and mutability, including for
+            // constructor-local `this`.
+            ThisExpr,
+
+            // A member of an enclosing type is referenced through its `This` type, as in a
+            // static method or a reference from a nested type to an enclosing type's member.
+            ThisType,
         };
 
         // The kind of lookup step that was performed
         Kind kind;
-
-        // For the `Kind::This` case, what does the implicit
-        // `this` or `This` parameter refer to?
-        //
-        enum class ThisParameterMode : uint8_t
-        {
-            ImmutableValue, // An immutable `this` value
-            MutableValue,   // A mutable `this` value
-            Type,           // A `This` type
-
-            Default = ImmutableValue,
-        };
-        ThisParameterMode thisParameterMode = ThisParameterMode::Default;
 
         // As needed, a reference to the declaration that faciliated
         // the lookup step.
@@ -1406,18 +1400,28 @@ FIDDLE() namespace Slang
             DeclRef<Decl> declRef,
             Val* val,
             RefPtr<LookupResultItem_Breadcrumb> next,
-            ThisParameterMode thisParameterMode = ThisParameterMode::Default)
-            : kind(kind)
-            , thisParameterMode(thisParameterMode)
-            , declRef(declRef)
-            , val(val)
-            , next(next)
+            Scope* thisExprScope = nullptr)
+            : kind(kind), declRef(declRef), val(val), next(next), thisExprScope(thisExprScope)
         {
+            SLANG_RELEASE_ASSERT((kind == Kind::ThisExpr) == (thisExprScope != nullptr));
+        }
+
+        Scope* getThisExprScope() const
+        {
+            SLANG_RELEASE_ASSERT(kind == Kind::ThisExpr);
+            SLANG_RELEASE_ASSERT(thisExprScope);
+            return thisExprScope;
         }
 
     protected:
         // Needed for serialization
         LookupResultItem_Breadcrumb() = default;
+
+    private:
+        // The scope where lookup began for a `Kind::ThisExpr` step. `ConstructLookupResultExpr`
+        // checks an implicit `ThisExpr` in this scope to determine its type and mutability.
+        // Other breadcrumb kinds leave this field null.
+        Scope* thisExprScope = nullptr;
     };
 
     // Represents one item found during lookup
@@ -1632,7 +1636,64 @@ FIDDLE() namespace Slang
         Val* m_val = nullptr;
     };
 
+    /// Identifies one requirement entry in a specific, already known interface witness table.
+    ///
+    /// The key intentionally carries no substitution context: the table's interface type provides
+    /// that context. Under the current AST representation a generic requirement is stored under
+    /// its innermost non-generic declaration rather than its wrapping `GenericDecl`; construction
+    /// performs that normalization in one place. Code that identifies a requirement independently
+    /// of one known table must keep its `DeclRef` instead of using this key.
+    struct InterfaceRequirementKey
+    {
+        explicit InterfaceRequirementKey(Decl* requirementDecl);
+
+        /// Creates a key and reports how many generic wrappers were removed from its declaration.
+        static InterfaceRequirementKey createWithGenericWrapperCount(
+            Decl* requirementDecl,
+            UCount& outGenericWrapperCount);
+
+        Decl* getDecl() const { return m_decl; }
+
+    private:
+        InterfaceRequirementKey(Decl* requirementDecl, UCount* outGenericWrapperCount);
+
+        Decl* m_decl;
+    };
+
     typedef OrderedDictionary<Decl*, RequirementWitness> RequirementDictionary;
+
+    /// Records the semantic-checking state of one requirement in a witness table.
+    ///
+    /// Ordinary checking follows `Unchecked -> Checking -> Succeeded|Failed`. An inherited-
+    /// interface requirement may instead follow `Unchecked -> WitnessReady -> Checking` so that
+    /// lookup can traverse its nested table before every requirement in that table has been
+    /// validated. A `Succeeded` or `WitnessReady` requirement always has a dictionary entry;
+    /// `Failed` never does. `Unchecked` may already have an entry synthesized by another semantic
+    /// operation, which the per-requirement checker adopts as a successful result.
+    ///
+    /// This state cannot be encoded by `RequirementWitness::Flavor`: `Flavor::none` is also the
+    /// valid dictionary value of a successfully satisfied optional requirement.
+    /// `ConformanceInterfaceCheckStatus` separately records whole-table traversal. Its state is not
+    /// an aggregate of these entry states: on-demand checking may finish entries while the table is
+    /// still `Unchecked`, and a failed whole-table traversal retains entries that succeeded before
+    /// another requirement failed so later diagnostics can keep using those structural answers.
+    enum class RequirementCheckState
+    {
+        /// No per-requirement check has started.
+        Unchecked,
+
+        /// An inherited-interface table is available for lookup but has not been validated.
+        WitnessReady,
+
+        /// One semantic operation owns the attempt to produce or validate this entry.
+        Checking,
+
+        /// The requirement was satisfied and its dictionary entry is final.
+        Succeeded,
+
+        /// The requirement could not be satisfied and has no dictionary entry.
+        Failed,
+    };
 
     FIDDLE()
     class WitnessTable : public RefObject
@@ -1640,7 +1701,27 @@ FIDDLE() namespace Slang
         FIDDLE(...)
         const RequirementDictionary& getRequirementDictionary() { return m_requirementDictionary; }
 
-        void add(Decl* decl, RequirementWitness const& witness);
+        /// Adds a witness while normalizing `requirementDecl` to its table-local requirement key.
+        void add(Decl* requirementDecl, RequirementWitness const& witness);
+
+        /// Adds the witness for an already-normalized table-local requirement key.
+        void add(InterfaceRequirementKey key, RequirementWitness const& witness);
+
+        /// Returns whether this table contains a witness for `key`.
+        bool containsRequirement(InterfaceRequirementKey key) const
+        {
+            return m_requirementDictionary.containsKey(key.getDecl());
+        }
+
+        /// Looks up the witness for `key` without performing semantic checking.
+        bool tryGetRequirementWitness(InterfaceRequirementKey key, RequirementWitness& outWitness)
+            const
+        {
+            return m_requirementDictionary.tryGetValue(key.getDecl(), outWitness);
+        }
+
+        /// Removes a requirement witness and forgets its semantic-checking state.
+        void removeRequirement(InterfaceRequirementKey key);
 
         // The type that the witness table witnesses conformance to (e.g. an Interface)
         FIDDLE() Type* baseType;
@@ -1653,6 +1734,24 @@ FIDDLE() namespace Slang
 
         // Cached dictionary for looking up satisfying values.
         FIDDLE() RequirementDictionary m_requirementDictionary;
+
+        /// Returns the semantic-checking state for `key`.
+        RequirementCheckState getRequirementCheckState(InterfaceRequirementKey key) const
+        {
+            if (auto state = m_requirementCheckStates.tryGetValue(key.getDecl()))
+                return *state;
+            return RequirementCheckState::Unchecked;
+        }
+
+        /// Updates the semantic-checking state for `key`.
+        void setRequirementCheckState(InterfaceRequirementKey key, RequirementCheckState state)
+        {
+            m_requirementCheckStates[key.getDecl()] = state;
+        }
+
+        // Semantic-checking state is deliberately not serialized. A serialized witness table is
+        // already complete, while a specialized copy can derive completion from its entries.
+        Dictionary<Decl*, RequirementCheckState> m_requirementCheckStates;
 
         RefPtr<WitnessTable> specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst);
     };
@@ -1812,9 +1911,53 @@ FIDDLE() namespace Slang
         Ref,
     };
 
+    /// Combined semantic information about a parameter's type and parameter-passing mode.
+    ///
+    /// The two fields deliberately use the same decomposition as a parameter type with a
+    /// parameter-passing-mode wrapper: `type` is the value type *inside* that wrapper, while
+    /// `mode` identifies the wrapper. Thus `type` never contains an `OutParamType`,
+    /// `BorrowInOutParamType`, `BorrowInParamType`, or `RefParamType`.
+    ///
+    /// Other modifiers that are part of the parameter's semantic value type remain encoded in
+    /// `type`. In particular, a `no_diff` parameter uses a `ModifiedType` carrying
+    /// `NoDiffModifierVal`. Producers and consumers must preserve this decomposition so that a
+    /// `ParamInfo` and its wrapped parameter-type representation encode the same information.
+    FIDDLE()
+    struct ParamInfo
+    {
+        FIDDLE(...)
+
+        /// The effective parameter value type, including semantic type modifiers such as
+        /// `no_diff`, but excluding any parameter-passing-mode wrapper.
+        FIDDLE() Type* type = nullptr;
+
+        /// The effective parameter-passing mode, stored separately from `type`.
+        FIDDLE() ParamPassingMode mode = ParamPassingMode::In;
+    };
+
+    /// Returns whether `mode` passes writable storage to the callee.
+    inline bool doesParamPassingModeIndicateWritableStorage(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::Out:
+        case ParamPassingMode::BorrowInOut:
+        case ParamPassingMode::Ref:
+            return true;
+
+        case ParamPassingMode::In:
+        case ParamPassingMode::BorrowIn:
+            return false;
+
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN(false);
+        }
+    }
+
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 
-    /// The kind of a builtin interface requirement that can be automatically synthesized.
+    /// The role of a builtin type member or interface requirement known to the compiler.
     enum class BuiltinRequirementKind
     {
         DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
@@ -1858,6 +2001,8 @@ FIDDLE() namespace Slang
         BwdCallableContextWitness, ///< The `IBackwardDifferentiable.BwdCallable : IBwdCallable`
                                    ///< conformance (witness that the backward-callable context type
                                    ///< conforms to `IBwdCallable`)
+
+        TextureElementType, ///< The `_Texture.T` alias for the loaded and stored texel data type.
     };
 
     enum class FunctionDifferentiableLevel

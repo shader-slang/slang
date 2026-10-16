@@ -5,8 +5,8 @@
 // Check that key opcodes are generated.
 
 // CHECK-DAG: OpCooperativeMatrixMulAdd
-// CHECK-DAG: OpCooperativeMatrixPerElementOpNV
-// CHECK-DAG: OpCooperativeMatrixReduceNV
+// CHECK-DAG: OpCooperativeMatrixPerElementOpEXT
+// CHECK-DAG: OpCooperativeMatrixReduceEXT
 // CHECK-DAG: OpCooperativeMatrixLoadTensorNV
 // CHECK-DAG: OpCreateTensorLayoutNV
 // CHECK-DAG: OpTensorLayoutSetDimensionNV
@@ -14,7 +14,7 @@
 // CHECK-DAG: OpCreateTensorViewNV
 // CHECK-DAG: OpTensorLayoutSetClampValueNV
 // CHECK-DAG: OpTypeTensorLayoutNV
-// CHECK-DAG: OpCooperativeMatrixConvertNV
+// CHECK-DAG: OpCooperativeMatrixConvertUseEXT
 
 struct FlashAttentionCmStandaloneParams
 {

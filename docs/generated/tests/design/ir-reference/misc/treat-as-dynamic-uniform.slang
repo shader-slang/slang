@@ -17,7 +17,7 @@
 // the emitted code assigning the unwrapped thread id with no trace of the
 // marker.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o /dev/null -stage compute -entry main -validate-uniformity
+//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o - -stage compute -entry main -validate-uniformity
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main -validate-uniformity
 
 RWStructuredBuffer<int> outputBuffer;

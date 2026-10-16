@@ -13,7 +13,7 @@
 // identity<T>(T x)` declaration shows `param %T : type_t` inside the
 // surrounding `generic` instruction.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 T identity<T>(T x) { return x; }
 

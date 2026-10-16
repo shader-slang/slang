@@ -13,7 +13,7 @@
 // A local struct variable accessed by field address keeps its `var`
 // form and the result is typed `Ptr(<StructName>)` in the dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Foo { int x; int y; }
 

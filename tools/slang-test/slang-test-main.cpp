@@ -562,6 +562,30 @@ static void applyMacroSubstitution(String filePath, TestDetails& details)
     }
 }
 
+// Normalizes and validates the output-path arguments of a parsed test directive, reporting any
+// rejection (an absolute `-o` / `-separate-debug-info-output` path) as a run error against
+// `filePath` so the test fails rather than silently running with an unportable path.
+static SlangResult _normalizeTestOutputPaths(
+    const String& filePath,
+    List<String>& args,
+    TestContext* context)
+{
+    String error;
+    const SlangResult res = normalizeTestOutputPathsForTestFile(filePath, args, error);
+    if (SLANG_FAILED(res))
+    {
+        // Every path that reaches directive parsing installs a reporter first, so a missing one is
+        // a programming error rather than a case to handle.
+        SLANG_ASSERT(context && context->getTestReporter());
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "Invalid test directive in file '%s': %s",
+            filePath.getBuffer(),
+            error.getBuffer());
+    }
+    return res;
+}
+
 // Try to read command-line options from the test file itself
 static SlangResult _gatherTestsForFile(
     TestCategorySet* categorySet,
@@ -742,7 +766,8 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
-            normalizeTestOutputPathsForTestFile(filePath, testDetails.options.args);
+            SLANG_RETURN_ON_FAIL(
+                _normalizeTestOutputPaths(filePath, testDetails.options.args, context));
 
             outTestList->tests.add(testDetails);
         }
@@ -773,7 +798,8 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
-            normalizeTestOutputPathsForTestFile(filePath, testDetails.options.args);
+            SLANG_RETURN_ON_FAIL(
+                _normalizeTestOutputPaths(filePath, testDetails.options.args, context));
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
@@ -1447,19 +1473,21 @@ static Result _executeRPC(
         return SLANG_OK;
     }
 
-    // A lost server earns a second attempt; a failed SPAWN earns one too, since a transient
-    // resource shortage is worth one more try. They are kept distinct because only the first
-    // can be attributed to the test: nothing ran on a server that never started.
+    // Lost and StartFailed retry, kept distinct because only Lost can be charged to the test:
+    // nothing ran on a server that never started.
     //
-    // The rest do not retry, deliberately:
+    // ProtocolError retries too. This used to reason that a wire-format disagreement would
+    // repeat on a new process, but the errors seen are not that: ~7 per 6300-test run, on
+    // different tests each time, each passing on other runs (#12534). They are replies
+    // corrupted in flight, which a fresh server discriminates -- and a real disagreement
+    // still repeats and is charged to the test below.
     //
-    // - A timeout is re-paid in full (another connectionTimeOutInMs) and a fresh server has
-    //   to recompile the core module first, so retrying a slow request is the one way to
-    //   turn a two-minute problem into a five-minute one.
-    // - A protocol or send failure means the two sides disagree about the wire format, which
-    //   a new process will disagree about identically.
-    const bool isRetryable =
-        first == RPCAttemptOutcome::Lost || first == RPCAttemptOutcome::StartFailed;
+    // The rest do not:
+    // - TimedOut re-pays connectionTimeOutInMs plus a core-module recompile on the new server.
+    // - SendFailed never got a reply to corrupt; the request was never written.
+    const bool isRetryable = first == RPCAttemptOutcome::Lost ||
+                             first == RPCAttemptOutcome::StartFailed ||
+                             first == RPCAttemptOutcome::ProtocolError;
     if (!isRetryable)
     {
         return SLANG_FAIL;
@@ -1471,16 +1499,36 @@ static Result _executeRPC(
     // was doing) does not reproduce on a virgin process, while an input that genuinely kills
     // the compiler kills this one too -- and then the failure is reported against the test,
     // where it belongs, instead of being retried until it looks green.
-    // Worded to cover both causes it is reached for. A repeated StartFailed is NOT charged
-    // to the test -- that needs `second == Lost && first == Lost` below -- so promising that
-    // "a second loss will be reported against this test" would be false on the spawn path.
-    context->getTestReporter()->message(
-        TestMessageType::RunError,
-        first == RPCAttemptOutcome::StartFailed
-            ? "no test server could be spawned; retrying once, and a second failure to spawn "
-              "will fail this test without blaming its input"
-            : "retrying once on a freshly spawned test server; a second loss will be reported "
-              "against this test");
+    //
+    // One message per cause: only Lost and ProtocolError can be charged to the test, so the
+    // spawn path must not promise that a second failure will be.
+    const char* retryMessage = nullptr;
+    switch (first)
+    {
+    case RPCAttemptOutcome::StartFailed:
+        retryMessage =
+            "no test server could be spawned; retrying once, and a second failure to spawn "
+            "will fail this test without blaming its input";
+        break;
+    case RPCAttemptOutcome::ProtocolError:
+        retryMessage =
+            "retrying once on a freshly spawned test server; a second unreadable reply will "
+            "be reported against this test";
+        break;
+    case RPCAttemptOutcome::Lost:
+        retryMessage =
+            "retrying once on a freshly spawned test server; a second loss will be reported "
+            "against this test";
+        break;
+    default:
+        // Unreachable: isRetryable above admits exactly the three cases handled here. Listed
+        // rather than defaulted so that adding a fourth retryable outcome fails here instead
+        // of silently inheriting one of these messages.
+        SLANG_ASSERT(!"unhandled retryable outcome");
+        retryMessage = "retrying once on a freshly spawned test server";
+        break;
+    }
+    context->getTestReporter()->message(TestMessageType::RunError, retryMessage);
 
     // Straight into outRes, as the first attempt does: _executeRPCOnce writes it only on
     // success, so a second loss leaves the caller's own init() value intact rather than a
@@ -1497,6 +1545,10 @@ static Result _executeRPC(
         {
             context->getTestReporter()->recordTestServerLoss();
         }
+        else if (first == RPCAttemptOutcome::ProtocolError)
+        {
+            context->getTestReporter()->recordTestServerProtocolError();
+        }
         return SLANG_OK;
     }
 
@@ -1508,6 +1560,17 @@ static Result _executeRPC(
             TestMessageType::TestFailure,
             "this test killed a freshly spawned test server twice in a row; treating it as a "
             "crash caused by this input rather than as an unrelated server loss");
+    }
+
+    // Likewise a repeated PROTOCOL ERROR: two fresh servers failing to frame a reply to this
+    // one request reproduces, so it is the test's to answer for.
+    if (second == RPCAttemptOutcome::ProtocolError && first == RPCAttemptOutcome::ProtocolError)
+    {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::TestFailure,
+            "this test drew an unreadable reply from a freshly spawned test server twice in a "
+            "row; treating it as caused by this input rather than as an unrelated malformed "
+            "response");
     }
 
     return SLANG_FAIL;
@@ -2634,6 +2697,15 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
+// Inspect the raw result kind: deserializing into a zero-field struct via getMessage() accepts `{}`
+// but rejects JSON `null`, so it cannot detect a null result.
+static bool receivedNullResult(JSONRPCConnection* connection)
+{
+    JSONResultResponse resultResponse;
+    return SLANG_SUCCEEDED(connection->getRPC(&resultResponse)) &&
+           resultResponse.result.getKind() == JSONValue::Kind::Null;
+}
+
 TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 {
     // We don't support running language server tests in parallel yet.
@@ -2658,7 +2730,53 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     String fullPath;
     Path::getCanonical(input.filePath, fullPath);
     wsFolder.uri = URI::fromLocalFilePath(Path::getParentDirectory(fullPath).getUnownedSlice()).uri;
-    initParams.workspaceFolders.add(wsFolder);
+    if (input.testOptions->commandOptions.containsKey("workspace-search-path-order"))
+    {
+        // Keep the fixture roots outside the opened document's directory. Opening a document adds
+        // that directory as a search path, and putting the roots below it verifies their explicit
+        // workspaceFolders order without relying on recursive directory enumeration order.
+        auto fixtureDir = Path::getParentDirectory(fullPath);
+        wsFolder.name = "first";
+        wsFolder.uri =
+            URI::fromLocalFilePath(Path::combine(fixtureDir, "first-root").getUnownedSlice()).uri;
+        initParams.workspaceFolders.add(wsFolder);
+        wsFolder.name = "second";
+        wsFolder.uri =
+            URI::fromLocalFilePath(Path::combine(fixtureDir, "second-root").getUnownedSlice()).uri;
+        initParams.workspaceFolders.add(wsFolder);
+    }
+    else if (
+        input.testOptions->commandOptions.containsKey("additional-search-path-order") ||
+        input.testOptions->commandOptions.containsKey("workspace-search-toggle"))
+    {
+        auto fixtureDir = Path::getParentDirectory(fullPath);
+        wsFolder.name = "workspace";
+        wsFolder.uri =
+            URI::fromLocalFilePath(Path::combine(fixtureDir, "workspace-root").getUnownedSlice())
+                .uri;
+        initParams.workspaceFolders.add(wsFolder);
+    }
+    else if (input.testOptions->commandOptions.containsKey("root-uri-only"))
+        initParams.rootUri = wsFolder.uri;
+    else if (input.testOptions->commandOptions.containsKey("root-path-only"))
+        initParams.rootPath = Path::getParentDirectory(fullPath);
+    else
+    {
+        initParams.workspaceFolders.add(wsFolder);
+        if (input.testOptions->commandOptions.containsKey("multi-root"))
+        {
+            // Put an empty root last so the test detects implementations that retain only the
+            // final workspace folder's search paths.
+            LanguageServerProtocol::WorkspaceFolder emptyFolder;
+            emptyFolder.name = "empty";
+            emptyFolder.uri =
+                URI::fromLocalFilePath(
+                    Path::combine(Path::getParentDirectory(fullPath), "__empty_workspace_root__")
+                        .getUnownedSlice())
+                    .uri;
+            initParams.workspaceFolders.add(emptyFolder);
+        }
+    }
     if (SLANG_FAILED(connection->sendCall(
             LanguageServerProtocol::InitializeParams::methodName,
             &initParams,
@@ -2677,7 +2795,29 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         return TestResult::Fail;
     }
 
-    // Send open document call.
+    // Configuration changes ask the client to refresh semantic tokens and inlay hints. Drain
+    // those requests before reading the response to a subsequent completion request.
+    auto sendConfig = [&](const char* key, JSONValue value) -> SlangResult
+    {
+        auto container = connection->getContainer();
+        JSONValue settingsValue = container->createObject(nullptr, 0);
+        container->setKeyValue(settingsValue, container->getKey(UnownedStringSlice(key)), value);
+
+        LanguageServerProtocol::DidChangeConfigurationParams configParams;
+        configParams.settings = settingsValue;
+        SLANG_RETURN_ON_FAIL(connection->sendCall(
+            LanguageServerProtocol::DidChangeConfigurationParams::methodName,
+            &configParams));
+
+        for (Index i = 0; i < 2; ++i)
+        {
+            SLANG_RETURN_ON_FAIL(connection->waitForResult(-1));
+            JSONRPCCall refreshCall;
+            SLANG_RETURN_ON_FAIL(connection->getRPC(&refreshCall));
+        }
+        return SLANG_OK;
+    };
+
     String testFileContent;
 
     if (SLANG_FAILED(File::readAllText(input.filePath, testFileContent)))
@@ -2685,6 +2825,139 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         return TestResult::Fail;
     }
 
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(testFileContent.getUnownedSlice(), lines);
+
+    // A `//CONFIG_REPLY:<section>=<json>` or `//CONFIG:<key>=<json>` directive holds a JSON value.
+    // It is parsed into the connection's container right before use, because the container is
+    // reset whenever a message is read.
+    auto parseConfigValue = [&](UnownedStringSlice text, JSONValue& outValue) -> SlangResult
+    {
+        return JSONRPCUtil::parseJSON(
+            text.trim(),
+            connection->getContainer(),
+            connection->getSink(),
+            outValue);
+    };
+
+    auto reportDirectiveError = [&](UnownedStringSlice line, const char* problem)
+    {
+        StringBuilder lineText;
+        lineText << line;
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "Invalid LANG_SERVER directive in '%s': %s: %s",
+            input.filePath.getBuffer(),
+            problem,
+            lineText.getBuffer());
+        return TestResult::Fail;
+    };
+
+    Dictionary<String, UnownedStringSlice> configReplies;
+    for (auto line : lines)
+    {
+        line = line.trimStart();
+        if (!line.startsWith("//"))
+            continue;
+        line = line.tail(2).trimStart();
+        if (!line.startsWith("CONFIG_REPLY:"))
+            continue;
+        if (!input.testOptions->commandOptions.containsKey("config-pull"))
+            return reportDirectiveError(line, "CONFIG_REPLY requires the config-pull option");
+        auto reply = line.tail(UnownedStringSlice("CONFIG_REPLY:").getLength());
+        Index eqIndex = reply.indexOf('=');
+        if (eqIndex < 0)
+            return reportDirectiveError(line, "expected <section>=<json>");
+        String section = reply.head(eqIndex).trim();
+        if (configReplies.containsKey(section))
+            return reportDirectiveError(line, "duplicate section");
+        configReplies[section] = reply.tail(eqIndex + 1);
+    }
+
+    List<LanguageServerProtocol::PublishDiagnosticsParams> diagnostics;
+    bool diagnosticsReceived = false;
+    // Every LANG_SERVER test shares one language server process, so a call the server sends must
+    // be read before the test ends or the next test reads it in place of its own response. A
+    // configuration message makes the server send zero or more refresh requests, depending on the
+    // setting and whether it changed. We set this flag whenever one is sent, and `waitForResponse`
+    // clears it, because the server sends those requests before it answers any later request.
+    bool mayHaveUnreadServerCalls = false;
+    // Record a `textDocument/publishDiagnostics` notification, or skip any other server-to-client
+    // call. The server never blocks on a reply to the calls it sends, so skipping is safe.
+    auto handleServerCall = [&](const JSONRPCCall& call) -> SlangResult
+    {
+        if (call.method != "textDocument/publishDiagnostics")
+            return SLANG_OK;
+        diagnosticsReceived = true;
+        LanguageServerProtocol::PublishDiagnosticsParams arg;
+        SLANG_RETURN_ON_FAIL(connection->getMessage(&arg));
+        diagnostics.add(arg);
+        return SLANG_OK;
+    };
+
+    // The harness answers the server's `workspace/configuration` request with one value per
+    // requested section, taken from `//CONFIG_REPLY:` lines, and JSON null for every other section.
+    // LSP requires null for a setting the client cannot provide, so this is the reply an editor
+    // without Slang-specific defaults (such as Zed) sends. Other server calls that arrive first are
+    // handled as `handleServerCall` does, and a request among them, such as
+    // `client/registerCapability`, is answered with a null result.
+    auto answerConfigRequest = [&]() -> SlangResult
+    {
+        for (;;)
+        {
+            SLANG_RETURN_ON_FAIL(connection->waitForResult(-1));
+            JSONRPCCall call;
+            SLANG_RETURN_ON_FAIL(connection->getRPC(&call));
+            if (call.method != LanguageServerProtocol::ConfigurationParams::methodName)
+            {
+                SLANG_RETURN_ON_FAIL(handleServerCall(call));
+                if (call.id.isValid())
+                    SLANG_RETURN_ON_FAIL(connection->sendNullResult(call.id));
+                continue;
+            }
+
+            LanguageServerProtocol::ConfigurationParams configParams;
+            SLANG_RETURN_ON_FAIL(
+                connection->toNativeArgsOrSendError(call.params, &configParams, call.id));
+            List<JSONValue> values;
+            for (auto& item : configParams.items)
+            {
+                JSONValue value = JSONValue::makeNull();
+                UnownedStringSlice replyText;
+                if (configReplies.tryGetValue(item.section, replyText))
+                    SLANG_RETURN_ON_FAIL(parseConfigValue(replyText, value));
+                values.add(value);
+            }
+            JSONResultResponse response;
+            response.id = call.id;
+            response.result =
+                connection->getContainer()->createArray(values.getBuffer(), values.getCount());
+            mayHaveUnreadServerCalls = true;
+            return connection->sendRPC(&response);
+        }
+    };
+
+    if (input.testOptions->commandOptions.containsKey("config-pull"))
+    {
+        if (SLANG_FAILED(connection->sendCall(UnownedStringSlice("initialized"))) ||
+            SLANG_FAILED(answerConfigRequest()))
+            return TestResult::Fail;
+    }
+
+    if (input.testOptions->commandOptions.containsKey("additional-search-path-order"))
+    {
+        // Configured search paths intentionally precede auto-discovered workspace paths. Exercise
+        // that contract through the same notification a real editor sends.
+        auto container = connection->getContainer();
+        auto fixtureDir = Path::getParentDirectory(fullPath);
+        auto additionalPath = Path::combine(fixtureDir, "additional-root");
+        JSONValue pathValue = container->createString(additionalPath.getUnownedSlice());
+        JSONValue pathsValue = container->createArray(&pathValue, 1);
+        if (SLANG_FAILED(sendConfig("slang.additionalSearchPaths", pathsValue)))
+            return TestResult::Fail;
+    }
+
+    // Send open document call.
     LanguageServerProtocol::DidOpenTextDocumentParams openDocParams;
     openDocParams.textDocument.version = 0;
     openDocParams.textDocument.uri = URI::fromLocalFilePath(fullPath.getUnownedSlice()).uri;
@@ -2693,32 +2966,50 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         LanguageServerProtocol::DidOpenTextDocumentParams::methodName,
         &openDocParams,
         JSONValue::makeInt(1));
-    List<LanguageServerProtocol::PublishDiagnosticsParams> diagnostics;
-    bool diagnosticsReceived = false;
-    auto waitForNonDiagnosticResponse = [&]() -> SlangResult
+    auto waitForResponse = [&]() -> SlangResult
     {
-        repeat:
-            if (SLANG_FAILED(connection->waitForResult(-1)))
-                return SLANG_FAIL;
-            if (connection->getMessageType() == JSONRPCMessageType::Call)
+        for (;;)
+        {
+            SLANG_RETURN_ON_FAIL(connection->waitForResult(-1));
+            if (connection->getMessageType() != JSONRPCMessageType::Call)
             {
-                JSONRPCCall call;
-                connection->getRPC(&call);
-                if (call.method == "textDocument/publishDiagnostics")
-                {
-                    diagnosticsReceived = true;
-                    LanguageServerProtocol::PublishDiagnosticsParams arg;
-                    if (SLANG_FAILED(connection->getMessage(&arg)))
-                        return SLANG_FAIL;
-                    diagnostics.add(arg);
-                    goto repeat;
-                }
+                mayHaveUnreadServerCalls = false;
+                return SLANG_OK;
             }
-            return SLANG_OK;
+            JSONRPCCall call;
+            SLANG_RETURN_ON_FAIL(connection->getRPC(&call));
+            SLANG_RETURN_ON_FAIL(handleServerCall(call));
+        }
     };
 
-    List<UnownedStringSlice> lines;
-    StringUtil::calcLines(testFileContent.getUnownedSlice(), lines);
+    // Send a `//CONFIG:<key>=<json>` directive as a `workspace/didChangeConfiguration`
+    // notification. Any refresh requests it causes are read by the next `waitForResponse`. The
+    // server keeps formatting, inlay-hint, commit-character and trace options across `initialize`,
+    // so a test that changes one of them sets it back to its default before the test ends.
+    auto sendConfigNotification = [&](UnownedStringSlice directive) -> SlangResult
+    {
+        Index eqIndex = directive.indexOf('=');
+        if (eqIndex < 0)
+        {
+            reportDirectiveError(directive, "expected CONFIG:<key>=<json>");
+            return SLANG_FAIL;
+        }
+        JSONValue value;
+        SLANG_RETURN_ON_FAIL(parseConfigValue(directive.tail(eqIndex + 1), value));
+        auto container = connection->getContainer();
+        JSONValue settingsValue = container->createObject(nullptr, 0);
+        container->setKeyValue(
+            settingsValue,
+            container->getKey(directive.head(eqIndex).trim()),
+            value);
+
+        LanguageServerProtocol::DidChangeConfigurationParams configParams;
+        configParams.settings = settingsValue;
+        mayHaveUnreadServerCalls = true;
+        return connection->sendCall(
+            LanguageServerProtocol::DidChangeConfigurationParams::methodName,
+            &configParams);
+    };
 
     StringBuilder actualOutputSB;
     auto parseLocation = [&](UnownedStringSlice text, Index startPos, Int& linePos, Int& colPos)
@@ -2752,12 +3043,11 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
             List<LanguageServerProtocol::CompletionItem> completionItems;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2767,11 +3057,99 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 {
                     actualOutputSB << item.label << ": " << item.kind << " " << item.detail << " ";
                     for (auto ch : item.commitCharacters)
-                        actualOutputSB << ch;
+                    {
+                        if (ch == " ")
+                            actualOutputSB << "<space>";
+                        else
+                            actualOutputSB << ch;
+                    }
                     if (item.sortText.hasValue)
                         actualOutputSB << " sort(" << item.sortText.value << ")";
                     actualOutputSB << "\n";
                 }
+            }
+        }
+        else if (line.startsWith("DISABLE_WORKSPACE_SEARCH"))
+        {
+            if (SLANG_FAILED(sendConfig(
+                    "slang.searchInAllWorkspaceDirectories",
+                    JSONValue::makeBool(false))))
+                return TestResult::Fail;
+            actualOutputSB << "--------\nsearchInAllWorkspaceDirectories: false\n";
+        }
+        else if (line.startsWith("CONFIG:"))
+        {
+            auto arg = line.tail(UnownedStringSlice("CONFIG:").getLength());
+            if (SLANG_FAILED(sendConfigNotification(arg)))
+                return TestResult::Fail;
+            actualOutputSB << "--------\nconfig: " << arg.trim() << "\n";
+        }
+        else if (line.trim() == "CONFIG_REPULL")
+        {
+            if (!input.testOptions->commandOptions.containsKey("config-pull"))
+                return reportDirectiveError(line, "CONFIG_REPULL requires the config-pull option");
+            // A `settings: null` notification asks the server to pull every setting again.
+            LanguageServerProtocol::DidChangeConfigurationParams configParams;
+            configParams.settings = JSONValue::makeNull();
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::DidChangeConfigurationParams::methodName,
+                    &configParams)) ||
+                SLANG_FAILED(answerConfigRequest()))
+                return TestResult::Fail;
+            mayHaveUnreadServerCalls = true;
+            actualOutputSB << "--------\nconfig: re-pulled\n";
+        }
+        else if (line.startsWith("ON_TYPE_FORMAT:"))
+        {
+            // Only whether on-type formatting is enabled is reported: a disabled server answers
+            // null, and an enabled one answers a list of edits, which is empty when clang-format
+            // is unavailable.
+            auto arg = line.tail(UnownedStringSlice("ON_TYPE_FORMAT:").getLength());
+            Int linePos, colPos;
+            parseLocation(arg, 0, linePos, colPos);
+
+            LanguageServerProtocol::DocumentOnTypeFormattingParams params;
+            params.textDocument.uri = openDocParams.textDocument.uri;
+            params.position.line = int(linePos - 1);
+            params.position.character = int(colPos - 1);
+            params.ch = "}";
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::DocumentOnTypeFormattingParams::methodName,
+                    &params,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\non-type formatting: "
+                           << (receivedNullResult(connection) ? "disabled" : "enabled") << "\n";
+        }
+        else if (line.trim() == "INLAY")
+        {
+            LanguageServerProtocol::InlayHintParams params;
+            params.textDocument.uri = openDocParams.textDocument.uri;
+            params.range.start.line = 0;
+            params.range.start.character = 0;
+            params.range.end.line = int(lines.getCount());
+            params.range.end.character = 0;
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::InlayHintParams::methodName,
+                    &params,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\ninlay hints:\n";
+            List<LanguageServerProtocol::InlayHint> hints;
+            if (!receivedNullResult(connection) && SLANG_FAILED(connection->getMessage(&hints)))
+                return TestResult::Fail;
+            for (auto& hint : hints)
+            {
+                actualOutputSB << hint.position.line << "," << hint.position.character << " "
+                               << hint.label << "\n";
             }
         }
         else if (line.startsWith("SIGNATURE:"))
@@ -2791,12 +3169,11 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
             LanguageServerProtocol::SignatureHelp sigInfo;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2838,12 +3215,11 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
-            LanguageServerProtocol::NullResponse nullResponse;
             LanguageServerProtocol::Hover hover;
-            if (SLANG_SUCCEEDED(connection->getMessage(&nullResponse)))
+            if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
@@ -2855,11 +3231,48 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 actualOutputSB << "\ncontent:\n" << hover.contents.value << "\n";
             }
         }
+        else if (line.startsWith("RESOLVE"))
+        {
+            // Drive completionItem/resolve for an item that carries a textEdit but no `data`
+            // (the file/import completion shape). LSP requires resolve to answer with the item,
+            // never null, so the server must echo it back with its textEdit preserved.
+            LanguageServerProtocol::TextEditCompletionItem item;
+            item.label = "resolveItem";
+            item.textEdit.newText = "resolveItem";
+            item.textEdit.range.start.line = 5;
+            item.textEdit.range.start.character = 0;
+            item.textEdit.range.end.line = 5;
+            item.textEdit.range.end.character = 3;
+            if (SLANG_FAILED(connection->sendCall(
+                    UnownedStringSlice("completionItem/resolve"),
+                    &item,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\n";
+            LanguageServerProtocol::TextEditCompletionItem resolved;
+            if (receivedNullResult(connection))
+            {
+                actualOutputSB << "null\n";
+            }
+            else if (SLANG_SUCCEEDED(connection->getMessage(&resolved)))
+            {
+                actualOutputSB << "label: " << resolved.label << "\n";
+                actualOutputSB << "textEdit: " << resolved.textEdit.newText << "\n";
+                actualOutputSB << "range: " << resolved.textEdit.range.start.line << ","
+                               << resolved.textEdit.range.start.character << " - "
+                               << resolved.textEdit.range.end.line << ","
+                               << resolved.textEdit.range.end.character << "\n";
+            }
+        }
         else if (line.startsWith("DIAGNOSTICS"))
         {
             if (!diagnosticsReceived)
             {
-                waitForNonDiagnosticResponse();
+                waitForResponse();
             }
             actualOutputSB << "--------\n";
             for (auto item : diagnostics)
@@ -2874,6 +3287,21 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             }
         }
     }
+    // A configuration message sent after the last request may have left server calls unread (see
+    // `mayHaveUnreadServerCalls`). A document symbol request has no side effects, and the server
+    // answers it only after handling every message sent before it.
+    if (mayHaveUnreadServerCalls)
+    {
+        LanguageServerProtocol::DocumentSymbolParams params;
+        params.textDocument.uri = openDocParams.textDocument.uri;
+        if (SLANG_FAILED(connection->sendCall(
+                LanguageServerProtocol::DocumentSymbolParams::methodName,
+                &params,
+                JSONValue::makeInt(callId++))) ||
+            SLANG_FAILED(waitForResponse()))
+            return TestResult::Fail;
+    }
+
     LanguageServerProtocol::DidCloseTextDocumentParams closeDocParams;
     closeDocParams.textDocument.uri = URI::fromLocalFilePath(fullPath.getUnownedSlice()).uri;
     connection->sendCall(
@@ -4858,6 +5286,670 @@ TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
     return TestResult::Ignored;
 }
 
+// ---------------------------------------------------------------------------
+// SPVDB_DEBUGGER: compile a .slang file to SPIR-V, then execute debugger
+// commands embedded in the source file as "// SPVDB-CMD: ..." comments
+// in-process via libspvdb, and validate the output with FileCheck.
+//
+// Test directive syntax:
+//   //TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute
+//
+// The args are forwarded to slangc (after -target spirv -g2 -o <stem>.spv).
+// libspvdb is vendored at tests/spvdb and is always linked in when slang-test
+// is built (see the SLANG_ENABLE_SPVDB block in tools/CMakeLists.txt).
+// ---------------------------------------------------------------------------
+
+#ifdef SLANG_ENABLE_SPVDB
+#include "api/spvdb.h"
+#include "api/spvdb_session.h"
+
+#include <cstring>
+#include <fstream>
+#include <sstream>
+#include <vector>
+
+// Format a spvdb Value as a human-readable string.
+static std::string spvdb_value_str(const spvdb::Value& v)
+{
+    using Kind = spvdb::Value::Kind;
+    switch (v.kind)
+    {
+    case Kind::Bool:
+        return v.scalar.b ? "true" : "false";
+    case Kind::Int32:
+        return std::to_string(v.scalar.i32);
+    case Kind::UInt32:
+        return std::to_string(v.scalar.u32);
+    case Kind::Int64:
+        return std::to_string(v.scalar.i64);
+    case Kind::UInt64:
+        return std::to_string(v.scalar.u64);
+    case Kind::Float32:
+        {
+            std::ostringstream os;
+            os << v.scalar.f32;
+            return os.str();
+        }
+    case Kind::Float64:
+        {
+            std::ostringstream os;
+            os << v.scalar.f64;
+            return os.str();
+        }
+    case Kind::Composite:
+        {
+            bool named = !v.member_names.empty() && v.member_names.size() == v.elements.size();
+            std::string s = named ? "{" : "(";
+            for (size_t i = 0; i < v.elements.size(); ++i)
+            {
+                if (i)
+                    s += ", ";
+                if (named && !v.member_names[i].empty())
+                    s += v.member_names[i] + "=";
+                s += spvdb_value_str(v.elements[i]);
+            }
+            return s + (named ? "}" : ")");
+        }
+    default:
+        return "<complex>";
+    }
+}
+
+static std::string spvdb_stop_reason_str(spvdb::StopReason r)
+{
+    using SR = spvdb::StopReason;
+    switch (r)
+    {
+    case SR::Breakpoint:
+        return "Breakpoint";
+    case SR::Step:
+        return "Step";
+    case SR::EntryReached:
+        return "EntryReached";
+    case SR::EntryFinished:
+        return "EntryFinished";
+    case SR::Panic:
+        return "Panic";
+    }
+    return "Unknown";
+}
+
+// Split a line into whitespace-separated tokens.
+static std::vector<std::string> spvdb_tokenize(const std::string& line)
+{
+    std::vector<std::string> tokens;
+    std::istringstream ss(line);
+    std::string tok;
+    while (ss >> tok)
+        tokens.push_back(tok);
+    return tokens;
+}
+
+// Scan a source file for "// SPVDB-CMD: <command>" directives.
+static std::vector<std::string> spvdb_extract_commands(const std::string& path)
+{
+    std::vector<std::string> cmds;
+    std::ifstream f(path);
+    if (!f.is_open())
+        return cmds;
+    std::string line;
+    while (std::getline(f, line))
+    {
+        // Strip leading whitespace.
+        size_t start = line.find_first_not_of(" \t");
+        if (start == std::string::npos)
+            continue;
+        std::string trimmed = line.substr(start);
+
+        const std::string prefix = "// SPVDB-CMD:";
+        if (trimmed.size() < prefix.size())
+            continue;
+        if (trimmed.compare(0, prefix.size(), prefix) != 0)
+            continue;
+
+        std::string cmd = trimmed.substr(prefix.size());
+        // Strip leading whitespace from the command itself.
+        size_t cs = cmd.find_first_not_of(" \t");
+        if (cs != std::string::npos)
+            cmds.push_back(cmd.substr(cs));
+    }
+    return cmds;
+}
+
+// Parse `str` as an unsigned 32-bit integer, returning false instead of throwing on
+// invalid input (empty string, non-numeric text, or a value that overflows). Directive
+// tokens come from `// SPVDB-CMD:` lines in user-authored .slang test files, so a typo
+// there must fail that one test gracefully rather than let std::stoul's
+// std::invalid_argument/std::out_of_range propagate uncaught and abort the whole
+// slang-test process.
+static bool spvdb_parse_uint32(const std::string& str, uint32_t* out)
+{
+    try
+    {
+        size_t pos = 0;
+        unsigned long val = std::stoul(str, &pos);
+        if (pos != str.size())
+            return false;
+        *out = static_cast<uint32_t>(val);
+        return true;
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
+}
+
+// Parse `str` as a float, returning false instead of throwing on invalid input. See
+// spvdb_parse_uint32 for why this must not throw.
+static bool spvdb_parse_float(const std::string& str, float* out)
+{
+    try
+    {
+        size_t pos = 0;
+        float val = std::stof(str, &pos);
+        if (pos != str.size())
+            return false;
+        *out = val;
+        return true;
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
+}
+
+// Execute a list of SPVDB-CMD directives against a loaded SPIR-V module.
+// Returns the collected output as a string suitable for FileCheck validation.
+// On error, sets *error_out and returns "".
+static std::string spvdb_run_commands(
+    const std::string& spv_path,
+    const std::vector<std::string>& commands,
+    std::string* error_out)
+{
+    auto mod_result = spvdb::load_module_from_file(spv_path);
+    if (!mod_result)
+    {
+        *error_out = std::string("spvdb: failed to load SPIR-V: ") + spv_path;
+        return "";
+    }
+    auto mod = *mod_result;
+
+    std::string entry_name = "main";
+    std::unique_ptr<spvdb::Session> sess;
+    std::ostringstream out;
+
+    auto ensure_session = [&]() -> bool
+    {
+        if (!sess)
+        {
+            auto r = spvdb::create_session(mod, entry_name);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: create_session failed: ") + r.error().message;
+                return false;
+            }
+            sess = std::move(*r);
+        }
+        return true;
+    };
+
+    for (const auto& cmd_line : commands)
+    {
+        auto tokens = spvdb_tokenize(cmd_line);
+        if (tokens.empty())
+            continue;
+        const std::string& cmd = tokens[0];
+
+        if (cmd == "entry")
+        {
+            if (tokens.size() < 2)
+            {
+                *error_out = "spvdb: entry requires <name>";
+                return "";
+            }
+            entry_name = tokens[1];
+            sess.reset();
+        }
+        else if (cmd == "descriptor")
+        {
+            if (tokens.size() < 4)
+            {
+                *error_out = "spvdb: descriptor requires <set> <binding> <json>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+            uint32_t set = 0, binding = 0;
+            if (!spvdb_parse_uint32(tokens[1], &set) || !spvdb_parse_uint32(tokens[2], &binding))
+            {
+                *error_out =
+                    "spvdb: descriptor: invalid <set>/<binding>: " + tokens[1] + " " + tokens[2];
+                return "";
+            }
+            std::string json;
+            for (size_t i = 3; i < tokens.size(); ++i)
+            {
+                if (i > 3)
+                    json += " ";
+                json += tokens[i];
+            }
+            auto r = spvdb::set_descriptor_json(*sess, set, binding, json);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: set_descriptor_json failed: ") + r.error().message;
+                return "";
+            }
+        }
+        else if (cmd == "inputloc")
+        {
+            // inputloc <location> <json>  — bind a vertex/fragment Input variable by Location.
+            if (tokens.size() < 3)
+            {
+                *error_out = "spvdb: inputloc requires <location> <json>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+            uint32_t loc = 0;
+            if (!spvdb_parse_uint32(tokens[1], &loc))
+            {
+                *error_out = "spvdb: inputloc: invalid <location>: " + tokens[1];
+                return "";
+            }
+            std::string json;
+            for (size_t i = 2; i < tokens.size(); ++i)
+            {
+                if (i > 2)
+                    json += " ";
+                json += tokens[i];
+            }
+            auto r = spvdb::set_input_location_json(*sess, loc, json);
+            if (!r)
+            {
+                *error_out =
+                    std::string("spvdb: set_input_location_json failed: ") + r.error().message;
+                return "";
+            }
+        }
+        else if (cmd == "outputs")
+        {
+            if (!ensure_session())
+                return "";
+            auto vars = spvdb::output_variables(*sess);
+            for (const auto& lv : vars)
+                out << "output: " << lv.name << " = " << spvdb_value_str(lv.value) << "\n";
+            if (vars.empty())
+                out << "outputs: (none)\n";
+        }
+        else if (cmd == "break")
+        {
+            if (tokens.size() < 3)
+            {
+                *error_out = "spvdb: break requires <file_suffix> <line>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+            std::string file = tokens[1];
+            uint32_t line = 0;
+            if (!spvdb_parse_uint32(tokens[2], &line))
+            {
+                *error_out = "spvdb: break: invalid <line>: " + tokens[2];
+                return "";
+            }
+            auto r = spvdb::set_breakpoint(*sess, file, line);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: set_breakpoint failed: ") + r.error().message;
+                return "";
+            }
+        }
+        else if (cmd == "run" || cmd == "continue")
+        {
+            if (!ensure_session())
+                return "";
+            spvdb::StopReason reason = spvdb::run(*sess);
+            out << "stopped: " << spvdb_stop_reason_str(reason);
+            if (reason == spvdb::StopReason::Panic)
+                out << ": " << spvdb::panic_message(*sess);
+            out << "\n";
+        }
+        else if (cmd == "step")
+        {
+            if (!ensure_session())
+                return "";
+            spvdb::StopReason reason = spvdb::step(*sess);
+            out << "stopped: " << spvdb_stop_reason_str(reason);
+            if (reason == spvdb::StopReason::Panic)
+                out << ": " << spvdb::panic_message(*sess);
+            out << "\n";
+        }
+        else if (cmd == "stepi")
+        {
+            if (!ensure_session())
+                return "";
+            spvdb::StopReason reason = spvdb::step_instruction(*sess);
+            out << "stopped: " << spvdb_stop_reason_str(reason);
+            if (reason == spvdb::StopReason::Panic)
+                out << ": " << spvdb::panic_message(*sess);
+            out << "\n";
+        }
+        else if (cmd == "next")
+        {
+            if (!ensure_session())
+                return "";
+            spvdb::StopReason reason = spvdb::step_over(*sess);
+            out << "stopped: " << spvdb_stop_reason_str(reason);
+            if (reason == spvdb::StopReason::Panic)
+                out << ": " << spvdb::panic_message(*sess);
+            out << "\n";
+        }
+        else if (cmd == "finish")
+        {
+            if (!ensure_session())
+                return "";
+            spvdb::StopReason reason = spvdb::step_out(*sess);
+            out << "stopped: " << spvdb_stop_reason_str(reason);
+            if (reason == spvdb::StopReason::Panic)
+                out << ": " << spvdb::panic_message(*sess);
+            out << "\n";
+        }
+        else if (cmd == "print")
+        {
+            if (tokens.size() < 2)
+            {
+                *error_out = "spvdb: print requires <name>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+            auto r = spvdb::evaluate_variable(*sess, tokens[1]);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: evaluate_variable failed: ") + r.error().message;
+                return "";
+            }
+            out << "print: " << r->name << " = " << spvdb_value_str(r->value) << "\n";
+        }
+        else if (cmd == "builtin")
+        {
+            // builtin <name> <val0> [val1] [val2] [val3]
+            if (tokens.size() < 3)
+            {
+                *error_out = "spvdb: builtin requires <name> <val...>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+
+            // Map common builtin names to SpvBuiltIn enum values.
+            static const struct
+            {
+                const char* name;
+                uint32_t id;
+            } kBuiltins[] = {
+                {"GlobalInvocationID", SpvBuiltInGlobalInvocationId},
+                {"LocalInvocationID", SpvBuiltInLocalInvocationId},
+                {"WorkgroupID", SpvBuiltInWorkgroupId},
+                {"LocalInvocationIndex", SpvBuiltInLocalInvocationIndex},
+                {"VertexIndex", SpvBuiltInVertexIndex},
+                {"InstanceIndex", SpvBuiltInInstanceIndex},
+                {"Position", SpvBuiltInPosition},
+                {"PointSize", SpvBuiltInPointSize},
+                {"FragCoord", SpvBuiltInFragCoord},
+                {"FrontFacing", SpvBuiltInFrontFacing},
+                {"FragDepth", SpvBuiltInFragDepth},
+                {"NumWorkgroups", SpvBuiltInNumWorkgroups},
+                {"SubgroupSize", SpvBuiltInSubgroupSize},
+            };
+            uint32_t bi = 0;
+            bool found = false;
+            for (const auto& kb : kBuiltins)
+            {
+                if (tokens[1] == kb.name)
+                {
+                    bi = kb.id;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                *error_out = std::string("spvdb: unknown builtin: ") + tokens[1];
+                return "";
+            }
+
+            spvdb::Value bval;
+            size_t nvals = tokens.size() - 2; // number of value tokens
+            bool parseOk = true;
+            if (nvals >= 2)
+            {
+                // Two, three, or four components — build a composite. (A genuinely
+                // scalar builtin only ever supplies one value token; anything with
+                // 2+ must be kept as a composite so no component is silently
+                // dropped.)
+                std::vector<spvdb::Value> elems;
+                bool as_float = false;
+                for (size_t i = 2; i < tokens.size(); ++i)
+                {
+                    if (tokens[i].find('.') != std::string::npos)
+                    {
+                        as_float = true;
+                        break;
+                    }
+                }
+                for (size_t i = 2; i < tokens.size() && parseOk; ++i)
+                {
+                    if (as_float)
+                    {
+                        float fv = 0.0f;
+                        parseOk = spvdb_parse_float(tokens[i], &fv);
+                        if (parseOk)
+                            elems.push_back(spvdb::Value::make_f32(fv));
+                    }
+                    else
+                    {
+                        uint32_t uv = 0;
+                        parseOk = spvdb_parse_uint32(tokens[i], &uv);
+                        if (parseOk)
+                            elems.push_back(spvdb::Value::make_u32(uv));
+                    }
+                }
+                if (parseOk)
+                    bval = spvdb::Value::make_composite(std::move(elems));
+            }
+            else
+            {
+                // Single scalar — try uint first, then float.
+                const std::string& sv = tokens[2];
+                if (sv.find('.') != std::string::npos)
+                {
+                    float fv = 0.0f;
+                    parseOk = spvdb_parse_float(sv, &fv);
+                    if (parseOk)
+                        bval = spvdb::Value::make_f32(fv);
+                }
+                else
+                {
+                    uint32_t uv = 0;
+                    parseOk = spvdb_parse_uint32(sv, &uv);
+                    if (parseOk)
+                        bval = spvdb::Value::make_u32(uv);
+                }
+            }
+            if (!parseOk)
+            {
+                *error_out = "spvdb: builtin: invalid numeric value in: " + cmd_line;
+                return "";
+            }
+
+            auto r = spvdb::set_builtin(*sess, bi, bval);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: set_builtin failed: ") + r.error().message;
+                return "";
+            }
+        }
+        else if (cmd == "location")
+        {
+            if (!ensure_session())
+                return "";
+            auto loc = spvdb::current_location(*sess);
+            out << "location: " << loc.file << ":" << loc.line << "\n";
+        }
+        else if (cmd == "locals")
+        {
+            if (!ensure_session())
+                return "";
+            auto vars = spvdb::local_variables(*sess);
+            for (const auto& lv : vars)
+                out << "local: " << lv.name << " = " << spvdb_value_str(lv.value) << "\n";
+            if (vars.empty())
+                out << "locals: (none)\n";
+        }
+        else if (cmd == "backtrace")
+        {
+            if (!ensure_session())
+                return "";
+            auto bt = spvdb::backtrace(*sess);
+            for (size_t i = 0; i < bt.size(); ++i)
+            {
+                out << "frame[" << i << "]: " << bt[i].function_name << " at " << bt[i].loc.file
+                    << ":" << bt[i].loc.line << "\n";
+            }
+            if (bt.empty())
+                out << "backtrace: (empty)\n";
+        }
+        else if (cmd == "read")
+        {
+            if (tokens.size() < 3)
+            {
+                *error_out = "spvdb: read requires <set> <binding>";
+                return "";
+            }
+            if (!ensure_session())
+                return "";
+            uint32_t set = 0, binding = 0;
+            if (!spvdb_parse_uint32(tokens[1], &set) || !spvdb_parse_uint32(tokens[2], &binding))
+            {
+                *error_out = "spvdb: read: invalid <set>/<binding>: " + tokens[1] + " " + tokens[2];
+                return "";
+            }
+            auto r = spvdb::read_descriptor(*sess, set, binding);
+            if (!r)
+            {
+                *error_out = std::string("spvdb: read_descriptor failed: ") + r.error().message;
+                return "";
+            }
+            const auto& bytes = *r;
+            size_t n_u32 = bytes.size() / sizeof(uint32_t);
+            out << "read[" << set << "][" << binding << "]: [";
+            for (size_t i = 0; i < n_u32; ++i)
+            {
+                if (i)
+                    out << ", ";
+                uint32_t val;
+                std::memcpy(&val, bytes.data() + i * sizeof(uint32_t), sizeof(uint32_t));
+                out << val;
+            }
+            out << "]\n";
+        }
+        else
+        {
+            *error_out = std::string("spvdb: unknown command: ") + cmd;
+            return "";
+        }
+    }
+
+    return out.str();
+}
+#endif // SLANG_ENABLE_SPVDB
+
+TestResult runSpvdbDebuggerTest(TestContext* context, TestInput& input)
+{
+    if (context->isCollectingRequirements())
+        return TestResult::Pass;
+
+#ifndef SLANG_ENABLE_SPVDB
+    // libspvdb not linked in this build of slang-test (see the
+    // SLANG_ENABLE_SPVDB block in tools/CMakeLists.txt).
+    auto reporter = context->getTestReporter();
+    if (reporter)
+        reporter->message(
+            TestMessageType::Info,
+            "SPVDB_DEBUGGER test skipped: spvdb not available in this slang-test build");
+    return TestResult::Ignored;
+#else
+    auto outputStem = input.outputStem;
+    String spvPath = outputStem + ".spvdb.spv";
+
+    // --- Step 1: compile the source file to SPIR-V with debug info ---
+    {
+        CommandLine slangcCmdLine;
+        slangcCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangc"));
+        slangcCmdLine.addArg(input.filePath);
+        slangcCmdLine.addArg("-target");
+        slangcCmdLine.addArg("spirv");
+        slangcCmdLine.addArg("-g2");
+        slangcCmdLine.addArg("-o");
+        slangcCmdLine.addArg(spvPath);
+
+        for (auto arg : input.testOptions->args)
+            slangcCmdLine.addArg(arg);
+
+        SlangTest::addDefaultSlangOptimization(
+            slangcCmdLine,
+            context->options.defaultOptimizationLevel);
+
+        ExecuteResult slangcRes;
+        TEST_RETURN_ON_DONE(
+            spawnAndWait(context, outputStem, SpawnType::UseExe, slangcCmdLine, slangcRes));
+
+        if (slangcRes.resultCode != 0)
+        {
+            auto reporter = context->getTestReporter();
+            if (reporter)
+                reporter->message(
+                    TestMessageType::TestFailure,
+                    String("slangc failed:\n") + getOutput(slangcRes));
+            return TestResult::Fail;
+        }
+    }
+
+    // --- Step 2: run SPVDB-CMD directives in-process via libspvdb ---
+    String actualOutput;
+    {
+        std::string sourcePath(input.filePath.getBuffer());
+        std::string spvPathStd(spvPath.getBuffer());
+
+        auto commands = spvdb_extract_commands(sourcePath);
+        if (commands.empty())
+        {
+            auto reporter = context->getTestReporter();
+            if (reporter)
+                reporter->message(
+                    TestMessageType::TestFailure,
+                    String("spvdb: no SPVDB-CMD directives found in: ") + input.filePath);
+            return TestResult::Fail;
+        }
+
+        std::string error;
+        std::string output = spvdb_run_commands(spvPathStd, commands, &error);
+        if (!error.empty())
+        {
+            auto reporter = context->getTestReporter();
+            if (reporter)
+                reporter->message(TestMessageType::TestFailure, error.c_str());
+            return TestResult::Fail;
+        }
+        actualOutput = output.c_str();
+    }
+
+    // --- Step 3: validate output via FileCheck / comparison ---
+    return _validateOutput(context, input, actualOutput);
+#endif // SLANG_ENABLE_SPVDB
+}
+
 // based on command name, dispatch to an appropriate callback
 struct TestCommandInfo
 {
@@ -4894,7 +5986,8 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"COMPILE_TARGET", &runCompileTarget, 0},
     {"DOC", &runDocTest, 0},
     {"LANG_SERVER", &runLanguageServerTest, 0},
-    {"EXECUTABLE", &runExecutableTest, RenderApiFlag::CPU}};
+    {"EXECUTABLE", &runExecutableTest, RenderApiFlag::CPU},
+    {"SPVDB_DEBUGGER", &runSpvdbDebuggerTest, 0}};
 
 const TestCommandInfo* _findTestCommandInfoByCommand(const UnownedStringSlice& name)
 {

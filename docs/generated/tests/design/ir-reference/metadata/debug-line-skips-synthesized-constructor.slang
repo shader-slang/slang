@@ -17,7 +17,7 @@
 // the user's own entry point to be marked -- so the absence is attributable to
 // the constructor being synthesized rather than to debug info being off.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
 
 struct Point
 {

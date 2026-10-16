@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#breadcrumbs
-//META: doc_section_digest=48d49844973ad09b45a6acd124d2e1aaf5f16e02ec5ca18dda08dfb5f469bf11
+//META: doc_section_digest=ee50f893f900a92b30aa33a0f0d7c293ea38bc4b91c473a3c0f9e511f4700f32
 //META: purpose=An unqualified name inside a method that names a field of the enclosing type records a This navigation step, so the expression behaves as if it were written this.field.
 //META: intent=functional
 //META: pipeline_stage=check

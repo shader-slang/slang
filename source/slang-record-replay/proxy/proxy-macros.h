@@ -22,17 +22,17 @@ namespace SlangRecord
         ReplayContext::get().marker(label); \
     } while (0)
 
-// Begins a recorded instance method call - locks context, records signature and 'this'
-// Uses compiler-specific macro for full signature including type name
+// Begins a recorded instance method call. The process-wide mutex is taken only when
+// the record layer is active, so the idle default path does not serialize callers.
 #define RECORD_CALL()                  \
     auto& _ctx = ReplayContext::get(); \
-    auto _lock = _ctx.lock();          \
+    auto _lock = _ctx.lockIfActive();  \
     _ctx.beginCall(SLANG_FUNC_SIG, this)
 
 // For static/free functions (no 'this' pointer)
 #define RECORD_STATIC_CALL()           \
     auto& _ctx = ReplayContext::get(); \
-    auto _lock = _ctx.lock();          \
+    auto _lock = _ctx.lockIfActive();  \
     _ctx.beginStaticCall(SLANG_FUNC_SIG)
 
 // Record an input parameter
@@ -103,7 +103,7 @@ struct BlobOutputTempReleaser
 // The temporary is named `_temp_<arg>` and is zero-initialized. Besides the null-redirect above,
 // call sites may redirect `arg` to `&_temp_<arg>` on a failure path so a subsequent RECORD_OUTPUT
 // serializes a defined 0 rather than dereferencing caller memory the wrapped API left unwritten on
-// failure (see GlobalSessionProxy::getDownstreamCompilerVersion, issue #11865).
+// failure (see GlobalSessionProxy::getDownstreamCompilerPath, issue #11865).
 // A BlobOutputTempReleaser is attached so a blob left in `_temp_<arg>` on the
 // replay path is released at scope exit rather than leaked (issue #11936).
 // Usage: PREPARE_POINTER_OUTPUT(outBlob) where outBlob is ISlangBlob**

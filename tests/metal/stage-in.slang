@@ -36,7 +36,7 @@
 // METAL-NEXT:    float4 color{{.*}} {{\[\[}}attribute(1){{\]\]}};
 // METAL-NEXT:};
 
-// METAL: {{\[\[}}vertex{{\]\]}} [[vertexOutput]] main_vertex(vertexInput{{.*}}{{\[\[}}stage_in{{\]\]}}, uint vid{{.*}}{{\[\[}}vertex_id{{\]\]}}, uint instanceID{{.*}} {{\[\[}}instance_id{{\]\]}})
+// METAL: {{\[\[}}vertex{{\]\]}} [[vertexOutput]] main_vertex(vertexInput{{.*}}{{\[\[}}stage_in{{\]\]}}, uint vid{{.*}}{{\[\[}}vertex_id{{\]\]}}, uint instanceID{{.*}} {{\[\[}}instance_id{{\]\]}}, uint base_instance{{.*}} {{\[\[}}base_instance{{\]\]}})
 
 // METALLIB: define {{.*}} @main_vertex
 // METALLIB: define {{.*}} @main_fragment

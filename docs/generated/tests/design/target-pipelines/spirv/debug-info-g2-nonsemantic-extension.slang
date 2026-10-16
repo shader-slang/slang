@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#debug-levels-and--debug-info-include-source
-//META: doc_section_digest=a465c2bb21f120c8c3458404a567b476edc5f751bce03ff4c08b17bf8f2b2163
+//META: doc_section_digest=46c841188c3bbdcae45aa555dae9dd7af5392dd9527bd76ccfe0d72521e0b817
 //META: purpose=At -g2 the emitter switches to the NonSemantic.Shader.DebugInfo.100 extended instruction set and records the entry point's command line.
 //META: intent=boundary
 //META: pipeline_stage=emit

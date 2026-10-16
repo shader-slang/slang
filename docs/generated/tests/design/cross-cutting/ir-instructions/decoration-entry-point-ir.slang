@@ -14,7 +14,7 @@
 // function carries an `[entryPoint(...)]` decoration in the IR dump; on
 // SPIR-V that decoration lowers to `OpEntryPoint GLCompute %main "main"`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;

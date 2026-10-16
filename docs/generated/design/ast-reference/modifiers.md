@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:46:37Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 00900db2297740a4e95ed1bd166180aeec693f1bbb14d06c300bedcc1eff4d63
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 26c05154a110122a39a294dc2a0648428fe004995143e86fc2c091a60bc719c7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -357,7 +357,7 @@ inversion is observable today.
 | `ForceCaseAttribute` | `Attribute` | (no additional state) | (none) | `[forcecase]`. |
 | `CallAttribute` | `Attribute` | (no additional state) | (none) | `[call]`. |
 | `UnscopedEnumAttribute` | `Attribute` | (no additional state) | (none) | `[UnscopedEnum]`; the enum's cases are not scoped within the enum type and resolve unqualified, because the parser also adds a `static const` alias for each case to the enclosing container. Added from the user-written attribute, or implicitly when a non-generic plain `enum` is compiled with `-unscoped-enum`. |
-| `EnumClassModifier` | `Modifier` | (no additional state) | (none) | Marker the parser adds for the `enum class` spelling; the conflicting shape it exists to detect is an explicit `[UnscopedEnum]` on an `enum class`, since the implicit attachment above happens only for an enum *not* written as `enum class`. |
+| `EnumClassModifier` | `Modifier` | (no additional state) | (none) | Marker the parser adds for the `enum class` spelling; the conflicting shape it exists to detect is an explicit `[UnscopedEnum]` on an `enum class`, since the implicit attachment above happens only for an enum *not* written as `enum class`. The conflict is an error, not a precedence rule: `getModifierConflictGroupKind` maps both `EnumClassModifier` and `UnscopedEnumAttribute` to the same group ([slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp) lines 1666-1668), so the second one to land reports `E31202` (*duplicate modifier*) with the message "modifier 'UnscopedEnum' is redundant or conflicting with existing modifier 'class'". |
 | `FlagsAttribute` | `Attribute` | (no additional state) | (none) | `[Flags]`; cases without an explicit initialiser are numbered with successive powers of two (1, 2, 4, ...) rather than consecutive integers. |
 | `NonDynamicUniformAttribute` | `Attribute` | (no additional state) | (none) | `[NonUniformReturn]`. |
 | `UnsafeForceInlineEarlyAttribute` | `Attribute` | (no additional state) | (none) | `[__unsafeForceInlineEarly]`. |

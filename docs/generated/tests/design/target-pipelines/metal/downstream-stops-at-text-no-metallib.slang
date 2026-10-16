@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#downstream-apple-metal-compiler
-//META: doc_section_digest=65e900d0cbf2c6b34b856edc81e93bce49e3fc22fad6946b0d7bc5d0b4974910
+//META: doc_section_digest=a3046473c0484e96989947066db50f7473521aa41eb25ead13bba827af504a1c
 //META: purpose=Negative: bare `-target metal` stops at the Metal text artifact -- no Apple `metal` compile and no `.metallib` step run.
 //META: intent=negative
 //META: pipeline_stage=emit

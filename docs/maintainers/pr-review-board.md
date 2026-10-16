@@ -28,17 +28,18 @@ sometimes a reviewer). Treat that as a starting point — change it if it's wron
   team under it), or on a `source-internal-*` team whose description lists this
   repo in `Scope: [...]` (for example `Scope: [slangpy, slang-rhi]`). The author
   is assigned and no reviewer is auto-requested; they should find one themselves.
-- **Community** — a human author who isn't Internal. A shepherd is chosen from
-  `pr-owners`, asked to review (unless they *are* the author), and a short
-  comment is posted on the PR. If someone else looks like a better reviewer
-  from recent commits on the changed files, the comment names them — without
-  `@`-mentioning or auto-requesting them.
+- **Community** — a human author who isn't Internal. A shepherd is chosen (see
+  below), asked to review (unless they *are* the author), and a short comment is
+  posted on the PR. If someone else looks like a better reviewer from recent
+  commits on the changed files, the comment names them — without `@`-mentioning
+  or auto-requesting them.
 - **Bot** — same shepherd / review / comment behavior as Community, but the
-  allowlist is `bot-pr-owners` instead of `pr-owners`.
+  committer-signal allowlist is `bot-pr-owners` instead of `pr-owners`.
 
-**How the Community/Bot shepherd is chosen:** linked-issue assignee on the
-owners team, else whoever on that team has the strongest recent commit signal
-on the PR's files, else the maintainer fallback.
+**How the Community/Bot shepherd is chosen:** linked-issue assignee who is
+source-internal for this repo (same criteria as Source Internal above), else
+whoever on the owners team (`pr-owners` / `bot-pr-owners`) has the strongest
+recent commit signal on the PR's files, else the maintainer fallback.
 
 If the team rosters can't be read, Source and assignee stay blank and the
 nightly sweep retries. Internal membership is org-wide (with optional per-repo

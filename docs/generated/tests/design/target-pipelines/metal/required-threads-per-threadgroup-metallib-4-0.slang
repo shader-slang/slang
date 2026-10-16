@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#entry-point-shape
-//META: doc_section_digest=6840c04e5449d96826b3b300b825e82111aff2cddc60c36c5c9944110ef35fdf
+//META: doc_section_digest=27c98476eacf1aa69354e7c15ce32accdae39eea29937e504490cde8d6401552
 //META: purpose=Under a `metallib_4_0` capability set the compute stage attribute is prefixed with `[[required_threads_per_threadgroup(X, Y, Z)]]` built from the Slang thread-group size.
 //META: intent=expansion
 //META: pipeline_stage=emit

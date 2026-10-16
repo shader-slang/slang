@@ -14,6 +14,7 @@ struct DebugValueStoreContext
 {
     Dictionary<IRType*, bool> m_mapTypeToDebugability;
     bool isDebuggableType(IRType* type);
+    bool isDebugVarTypeSupported(IRType* type);
     void insertDebugValueStore(IRFunc* func);
     bool isTypeKind(IRInst* inst);
 };

@@ -13,7 +13,7 @@
 // the synthesized merge block. The optimizer marks that block with
 // `unreachable` — the assertion that no path arrives there.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

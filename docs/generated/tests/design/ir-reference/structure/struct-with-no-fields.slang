@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#struct-internals
-//META: doc_section_digest=b9a3eeb4f30459f951dba340f8e24ccd1d1bf7aa9598b948a2a6457d2453d958
+//META: doc_section_digest=b871e2962a95e96c84a703476e43156ec5587bfd3644b38de82139c5af3ebfaa
 //META: purpose=A struct with no members lowers to a childless struct parent, printed as a declaration terminated by a semicolon rather than a brace-delimited body.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -14,7 +14,7 @@
 // terminating the header with `;` instead of opening a `{ ... }` block. CHECK
 // pins that spelling, so a stray synthesized field would fail the match.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 uniform int seed;

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#module-level-outputs
-//META: doc_section_digest=d246c5b26aea56aab3063bb078408e447e5266c12518eab4e032ae8f4ee5812b
+//META: doc_section_digest=f8561fc2ad6dee3455d62d72f0d7eee4f8a8254c3b4628aad794dd6cd769e81e
 //META: purpose=Requesting an entry-point name that does not exist in the translation unit fires a "no function found matching entry point name 'main'" diagnostic before any IR module can be produced.
 //META: intent=negative
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // "no function found matching entry point name 'main'" fires
 // (attached to the first source line of the translation unit).
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 /*CHECK:

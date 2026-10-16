@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#modifiers
-//META: doc_section_digest=f7b0ae9b07f0675cd756d6bc3597c976e818c75e0b93ae38cb59ab21c210ef82
+//META: doc_section_digest=62c5ab5b3369626ddfff4ef9a04078345deb0feb7a2dca8f821cfbac3ba44d82
 //META: purpose=`ModifierKeyword` includes `inout`, which attaches to a `Param`.
 //META: intent=functional
 //META: pipeline_stage=parse

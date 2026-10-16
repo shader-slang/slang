@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:08:24Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: f7a15e0c6c76a34adccaa06e7b5b78d535a56cd4684735b60b3fa360f894a2de
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: d094acf8ee07e8b883c42d90aeebbe61a4b7c8e7ad8381e4a6aae62849a95031
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -88,8 +88,8 @@ above without ordinary `LINK_WITH_*` edges:
 - **`source/standard-modules/`** — its
   [CMakeLists.txt](../../../../source/standard-modules/CMakeLists.txt)
   only `configure_file`s a config header and `add_subdirectory`s the
-  `neural` and `experimental` modules; it does not declare a link
-  target of its own. The module products are shipped as standalone
+  `neural`, `experimental` and `numerics` modules; it does not declare
+  a link target of its own. The module products are shipped as standalone
   `.slang-module` files.
 - **`source/slang-record-replay/`** — has no `CMakeLists.txt` of
   its own; the sources are pulled directly into `slang` via the
@@ -206,6 +206,30 @@ specific build file.
 - **`slang-rt` does not depend on the compiler.** The runtime is
   shipped alongside emitted CPU-target output, and its
   `LINK_WITH_PRIVATE` list contains no compiler internals.
+- **`slang-glslang`'s exported surface is bounded by a file, not by
+  the compiler's visibility settings.** `CXX_VISIBILITY_PRESET hidden`
+  and `-Wl,--exclude-libs,ALL` hide the shim's own non-exported symbols
+  and the statically linked dependencies' symbols respectively, but
+  neither bounds the final export list irrespective of where a symbol
+  came from. `slang-glslang.version-script` does, and is the single
+  source of truth for the exported names
+  ([source/slang-glslang/CMakeLists.txt](../../../../source/slang-glslang/CMakeLists.txt)).
+  ELF consumes that file directly. Mach-O has no version-script
+  concept, so on Apple the same CMake file parses the script's
+  `global:` block at configure time and derives an
+  `-exported_symbols_list` — a bare list of names each carrying the
+  leading underscore ld64 prefixes to C symbols, so `glslang_compile`
+  becomes `_glslang_compile`. Deriving rather than hand-maintaining a
+  second list is what keeps the two formats from drifting, and the
+  parse is written to fail loudly instead of silently under-exporting:
+  it `message(FATAL_ERROR)`s both when it extracts no names at all and
+  when anything other than whitespace survives removing the `name;`
+  entries, since a residue means some entry was not in the expected
+  form and would have been quietly dropped. The practical consequence
+  for a contributor is the one recorded in the shim's own header
+  comment — a new exported entry point must be added to the version
+  script as well as to the C++, or it will not be exported on either
+  ELF or macOS.
 - **Public headers in [include/](../../../../include) must not include
   private headers from [source/](../../../../source).** This is not a
   build-system constraint but a project rule (see

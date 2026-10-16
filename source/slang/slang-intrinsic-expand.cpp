@@ -231,6 +231,34 @@ static IRFormatDecoration* _findImageFormatDecoration(IRInst* resourceInst)
     return resourceInst->findDecoration<IRFormatDecoration>();
 }
 
+static bool _tryGetImageFormatFromTextureType(IRInst* resourceInst, ImageFormat& outFormat)
+{
+    auto textureType = as<IRTextureTypeBase>(resourceInst->getDataType());
+    if (!textureType || !textureType->hasFormat())
+        return false;
+
+    auto format = (ImageFormat)textureType->getFormat();
+    if (format == ImageFormat::unknown)
+        return false;
+
+    outFormat = format;
+    return true;
+}
+
+static bool _tryGetImageFormat(IRInst* resourceInst, ImageFormat& outFormat)
+{
+    if (_tryGetImageFormatFromTextureType(resourceInst, outFormat))
+        return true;
+
+    if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+    {
+        outFormat = formatDecoration->getFormat();
+        return true;
+    }
+
+    return false;
+}
+
 // Returns true if dataType and imageFormat are compatible - that they have the same representation,
 // and no conversion is required.
 static bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
@@ -269,10 +297,12 @@ static bool _isConvertRequired(ImageFormat imageFormat, IRInst* callee)
 
 static size_t _calcBackingElementSizeInBytes(IRInst* resourceInst)
 {
-    // First see if there is a format associated with the resource
-    if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+    // First see if there is a format associated with the resource. The texture type is the source
+    // of truth when it carries a concrete format; `[format(...)]` is the fallback for older code.
+    ImageFormat imageFormat = ImageFormat::unknown;
+    if (_tryGetImageFormat(resourceInst, imageFormat))
     {
-        return getImageFormatInfo(formatDecoration->getFormat()).sizeInBytes;
+        return getImageFormatInfo(imageFormat).sizeInBytes;
     }
     else
     {
@@ -365,7 +395,13 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
     case '9':
         {
             --cursor;
-            Index argIndex = parseNat() + m_argIndexOffset;
+            Index argIndex = parseNat();
+            // For a texture-only query on a combined texture-sampler that was lowered into a
+            // `{texture, sampler}` pair, skip over the injected sampler operand at index 1 so the
+            // positional output args line up. `$0` (the texture) is intentionally left unshifted.
+            if (m_skipCombinedSamplerOperand && argIndex >= 1)
+                argIndex += 1;
+            argIndex += m_argIndexOffset;
             // Simple case: emit one of the direct arguments to the call
             SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < m_argCount));
             m_writer->emit("(");
@@ -459,6 +495,33 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             m_emitter->emitSimpleType(underlyingType);
         }
         break;
+
+    case 'q':
+        {
+            // Marker that emits nothing; used by a texture-only query (`GetDimensions`) on a
+            // combined texture-sampler. It is the mirror of `$p` below: `$p` compensates for a
+            // string numbered *with* a sampler slot that is absent, while `$q` compensates for a
+            // string numbered *without* the sampler that lowering injected.
+            //
+            // When a combined `Sampler2D`-style value is lowered into a `{texture, sampler}` pair
+            // (HLSL/Metal/WGSL/CPU; see `lowerCombinedTextureSamplers`), the lowered call gains an
+            // injected sampler operand at
+            // index 1 that a texture-only query never consumes. Without compensation the positional
+            // `$N` accessors in the query's intrinsic string would address the sampler and shift
+            // every output argument by one (see shader-slang/slang#11669). Setting this flag makes
+            // `$N` for N >= 1 skip the injected sampler so the operands line up again; `$0` (the
+            // texture) is left unshifted.
+            //
+            // The sampler operand is only present when the receiver was a combined texture-sampler,
+            // so we detect it by type rather than assume it: on a plain texture the operand at
+            // index 1 is the first output and the flag stays false.
+            if (m_argCount >= 2 && as<IRSamplerStateTypeBase>(m_args[1].get()->getDataType()))
+            {
+                m_skipCombinedSamplerOperand = true;
+            }
+        }
+        break;
+
     case 'p':
         {
             // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
@@ -529,9 +592,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             {
                 IRInst* resourceInst = m_callInst->getArg(0);
 
-                if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+                ImageFormat imageFormat = ImageFormat::unknown;
+                if (_tryGetImageFormat(resourceInst, imageFormat))
                 {
-                    const ImageFormat imageFormat = formatDecoration->getFormat();
                     if (_isConvertRequired(imageFormat, resourceInst))
                     {
                         // If the function returns something it's a reader so we may need to convert
@@ -577,9 +640,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             size_t elemSizeInBytes = _calcBackingElementSizeInBytes(resourceInst);
 
             // If we have a format converstion and its a *write* we don't need to scale
-            if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+            ImageFormat imageFormat = ImageFormat::unknown;
+            if (_tryGetImageFormat(resourceInst, imageFormat))
             {
-                const ImageFormat imageFormat = formatDecoration->getFormat();
                 if (_isConvertRequired(imageFormat, resourceInst) && _isResourceWrite(m_callInst))
                 {
                     // If there is a conversion *and* it's a write we don't need to scale.

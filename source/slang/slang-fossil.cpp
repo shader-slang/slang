@@ -30,6 +30,32 @@ Fossil::AnyValPtr getRootValue(ISlangBlob* blob)
     return getRootValue(blob->getBufferPointer(), blob->getBufferSize());
 }
 
+#if SLANG_ENABLE_VALIDATION_FOSSIL
+
+/// Return true if the `byteCount` bytes starting at `ptr` lie entirely within the
+/// `blobSize` bytes starting at `blobBegin`. `ptr` comes from resolving a relative
+/// pointer read out of a file, so the arithmetic is ordered so it cannot wrap.
+///
+static bool _isRangeWithinBlob(
+    void const* ptr,
+    Size byteCount,
+    void const* blobBegin,
+    Size blobSize)
+{
+    auto address = uintptr_t(ptr);
+    auto begin = uintptr_t(blobBegin);
+    if (address < begin)
+        return false;
+
+    auto offset = Size(address - begin);
+    if (offset > blobSize)
+        return false;
+
+    return byteCount <= blobSize - offset;
+}
+
+#endif
+
 Fossil::AnyValPtr getRootValue(void const* data, Size size)
 {
     if (!data)
@@ -72,6 +98,29 @@ Fossil::AnyValPtr getRootValue(void const* data, Size size)
         SLANG_UNEXPECTED("bad format for fossil");
     }
 
+#if SLANG_ENABLE_VALIDATION_FOSSIL
+    // Bound against `size` rather than `reportedSize`: `size` is the extent of
+    // the buffer we were handed, while `reportedSize` is self-reported by the
+    // file, and reads zero in blobs written before the writer populated it.
+    //
+    // A variant keeps the relative pointer to its content layout in the word
+    // *before* its own address, where its content starts, so checking that slot
+    // also covers the start of the content.
+    //
+    using ContentLayoutPtr = FossilizedPtr<FossilizedValLayout>;
+    auto contentLayoutPtrPtr = (Byte const*)rootValueVariant - sizeof(ContentLayoutPtr);
+    SLANG_SERIALIZE_FOSSIL_VALIDATE(
+        _isRangeWithinBlob(contentLayoutPtrPtr, sizeof(ContentLayoutPtr), data, size));
+
+    // The reader immediately reads `layout->kind`. Only the root of the layout is
+    // checked here, not the graph reachable from it.
+    //
+    auto contentLayout = rootValueVariant->getContentLayout();
+    SLANG_SERIALIZE_FOSSIL_VALIDATE(contentLayout != nullptr);
+    SLANG_SERIALIZE_FOSSIL_VALIDATE(
+        _isRangeWithinBlob(contentLayout, sizeof(FossilizedValLayout), data, size));
+#endif
+
     return getVariantContentPtr(rootValueVariant);
 }
 
@@ -79,8 +128,8 @@ Fossil::AnyValPtr getRootValue(void const* data, Size size)
 
 Fossil::AnyValRef Fossil::ValRef<FossilizedContainerObjBase>::getElement(Index index) const
 {
-    SLANG_ASSERT(index >= 0);
-    SLANG_ASSERT(index < getElementCount());
+    SLANG_SERIALIZE_FOSSIL_VALIDATE(index >= 0);
+    SLANG_SERIALIZE_FOSSIL_VALIDATE(index < getElementCount());
 
     auto containerLayout = getLayout();
     auto elementLayout = containerLayout->elementLayout.get();
@@ -93,8 +142,8 @@ Fossil::AnyValRef Fossil::ValRef<FossilizedContainerObjBase>::getElement(Index i
 
 FossilizedRecordElementLayout* FossilizedRecordLayout::getField(Index index) const
 {
-    SLANG_ASSERT(index >= 0);
-    SLANG_ASSERT(index < fieldCount);
+    SLANG_SERIALIZE_FOSSIL_VALIDATE(index >= 0);
+    SLANG_SERIALIZE_FOSSIL_VALIDATE(index < fieldCount);
 
     auto fieldsPtr = (FossilizedRecordElementLayout*)(this + 1);
     return fieldsPtr + index;
@@ -102,8 +151,8 @@ FossilizedRecordElementLayout* FossilizedRecordLayout::getField(Index index) con
 
 Fossil::AnyValRef Fossil::ValRef<FossilizedRecordVal>::getField(Index index) const
 {
-    SLANG_ASSERT(index >= 0);
-    SLANG_ASSERT(index < getFieldCount());
+    SLANG_SERIALIZE_FOSSIL_VALIDATE(index >= 0);
+    SLANG_SERIALIZE_FOSSIL_VALIDATE(index < getFieldCount());
 
     auto recordLayout = getLayout();
     auto fieldInfo = recordLayout->getField(index);

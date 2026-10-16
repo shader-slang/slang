@@ -18,8 +18,8 @@ Your PR needs to be formatted according to our coding style.
 
 The formatting script requires these tools:
 
-- **clang-format** 17-18 (for C++ files)
-- **gersemi** 0.21-0.22 (for CMake files)
+- **clang-format** 17.x only (>= 17, < 18) (for C++ files)
+- **gersemi** 0.21.x only (>= 0.21, < 0.22) (for CMake files)
 - **prettier** 3+ (for YAML/JSON/Markdown files)
 - **shfmt** 3+ (for shell scripts)
 
@@ -39,9 +39,17 @@ Note: If pip install fails with externally-managed-environment error, use `--bre
 
 **macOS (Homebrew):**
 
+Homebrew's default `clang-format` and `gersemi` formulas track upstream latest, which is usually newer than the pinned versions above. Install the pinned versions explicitly:
+
 ```bash
-brew install clang-format gersemi prettier shfmt
+brew install llvm@17 python3 prettier shfmt
+export PATH="$(brew --prefix llvm@17)/bin:$PATH"
+python3 -m pip install gersemi==0.21.0
 ```
+
+Note: `llvm@17` is keg-only, so its `clang-format` binary is not symlinked onto your default `PATH` — prepend `$(brew --prefix llvm@17)/bin` as shown above (or add it to your shell profile) before running `./extras/formatting.sh`.
+
+Note: If pip install fails with externally-managed-environment error, use `--break-system-packages` flag or create a virtual environment.
 
 You can also use `./extras/formatting.sh --check-only` to verify formatting without modifying files.
 
@@ -76,6 +84,17 @@ change.)
 - **Comment functions as complete sentences: what, then why.** Say what the function does first;
   then, if non-obvious, why it exists. Include a concrete example for non-trivial behavior; avoid
   terse fragment/bullet-only function comments.
+- **Write comments as declarative statements, not imperatives.** State how the code is structured
+  and why, in the present tense ("We split X into Y because Z"), not as an instruction ("Keep X in
+  Y") — imperative phrasing tends to state what without why. Don't open a paragraph with an
+  unattached "This."
+- **Keep comments proportionate; land on a conclusion.** A comment records durable state — an
+  invariant, a constraint, an unusual shape — not the edits or review rounds that produced it (a
+  renumbering note belongs in the commit message). Prefer one "if X, then Y, because Z" sentence
+  over a paragraph of premises with no stated point. If justifying one line takes several
+  paragraphs, restructure the code instead — extract a named helper, assert the invariant, simplify
+  the condition. This is about ordinary comments; a genuinely subtle cross-pass invariant can still
+  warrant a fuller worked example — that is the exception, not the default.
 - **Reuse before you write; then extract.** Before adding a helper, check shared headers
   (`slang-ast-type.h`, `slang-ir-util.h`, the `*-util.h` files) for an existing one (e.g.
   `isDeclRefTypeOf<T>`). When the logic is genuinely new, extract it into a named, documented helper

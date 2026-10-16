@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#nonuniformresourceindex
-//META: doc_section_digest=859fd0b1dec68bc497f01fa8ca7af8a2359da36472f25c5cff70bfe0da629789
+//META: doc_section_digest=ef8d770f4788964d5cfeac4fb1d3f6392b6bcd29865d077f002116dfe5c0ca66
 //META: purpose=`NonUniformResourceIndex(i)` surfaces as `nonUniformResourceIndex(%i)` — a no-op at the value level whose operand and result share the same type.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -15,7 +15,7 @@
 // wrapper in `func %main` — evidence that the information is carried to
 // the backend rather than discarded during checking.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<uint> rwbuf;
 

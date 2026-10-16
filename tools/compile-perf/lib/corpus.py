@@ -197,7 +197,8 @@ def _selfcheck():
 
         # Re-preparing must REPLACE, not accumulate: an orphan left by an
         # earlier run is indistinguishable from a source once it is on disk.
-        with open(os.path.join(dest, "orphan.slang"), "w", encoding="utf-8") as fh:
+        with open(os.path.join(dest, "orphan.slang"), "w", encoding="utf-8",
+                  newline="\n") as fh:
             fh.write("// stale\n")
         assert "orphan.slang" in prepared_files(dest), "self-check setup failed"
         assert "orphan.slang" not in materialize(StubSpec, 1, dest), \
@@ -258,9 +259,21 @@ def _selfcheck():
         # determinism guard is a promise about our generators, not about input.
         static = os.path.join(tmp, "static_root", "stat")
         os.makedirs(static)
-        for fn, src in (("m2.slang", "// a\n"), ("m10.slang", "// b\n"),
+        # newline="\n" for the same reason materialize() writes that way: with
+        # the default newline=None, text mode translates \n to \r\n on Windows,
+        # while read_corpus reads BINARY and decodes verbatim — so the uni.slang
+        # content assertion below compared "// é\r\n" against "// é\n" and the
+        # import aborted, taking the whole nightly with it. The fixture must
+        # put the bytes on disk that it claims to.
+        # m10.slang carries a DELIBERATE CRLF: real third-party corpora are
+        # checked out with native line endings, and read_corpus promises to
+        # return whatever bytes are there. Asserted below on every platform, so
+        # the verbatim contract is pinned where CI actually runs it — the
+        # newline="\n" above only misbehaves on Windows, which is nightly-only.
+        for fn, src in (("m2.slang", "// a\n"), ("m10.slang", "// b\r\n"),
                         ("notes.txt", "not a source\n"), ("uni.slang", "// é\n")):
-            with open(os.path.join(static, fn), "w", encoding="utf-8") as fh:
+            with open(os.path.join(static, fn), "w", encoding="utf-8",
+                      newline="\n") as fh:
                 fh.write(src)
 
         class StaticSpec:
@@ -285,6 +298,10 @@ def _selfcheck():
             # workload page straight from sources(), in this order.
             assert list(sources(StaticSpec, 0)) == expected, \
                 "sources() must return a static corpus sorted, for breakdown.py"
+            assert sources(StaticSpec, 0)["m10.slang"] == "// b\r\n", \
+                ("read_corpus must return CRLF sources verbatim: it reads "
+                 "binary precisely so a corpus checked out with native line "
+                 "endings is not silently rewritten under the compiler")
             assert sources(StaticSpec, 0)["uni.slang"] == "// é\n", \
                 ("read_corpus must decode third-party bytes tolerantly and "
                  "return them verbatim; a stricter codec would mangle the "

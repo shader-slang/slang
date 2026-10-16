@@ -17,6 +17,7 @@
 #include "test-server-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <limits>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,6 +27,8 @@
 #endif
 
 #if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
 #include <slang-rhi/agility-sdk.h>
 #include <windows.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
@@ -675,7 +678,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 ///
 /// Returns 0 (disabled) for anything unset or unparseable, so a typo in the variable name
 /// leaves the server behaving normally rather than dying on request one. Shared by the
-/// exit-on-request and kill-on-request hooks.
+/// exit-on-request, kill-on-request and garble-on-request hooks.
 static int _requestOrdinalFromEnv(const char* name)
 {
     StringBuilder value;
@@ -684,7 +687,11 @@ static int _requestOrdinalFromEnv(const char* name)
         return 0;
     }
     Int64 ordinal = 0;
-    if (SLANG_FAILED(StringUtil::parseInt64(value.getUnownedSlice(), ordinal)) || ordinal <= 0)
+    // The upper bound is part of "unparseable": the return narrows to int, so a larger value
+    // would come back negative and the `ordinal - 1` comparisons at the call sites would then
+    // overflow -- disabled is the only safe reading of a request number no run can reach.
+    if (SLANG_FAILED(StringUtil::parseInt64(value.getUnownedSlice(), ordinal)) || ordinal <= 0 ||
+        ordinal > Int64(std::numeric_limits<int>::max()))
     {
         return 0;
     }
@@ -760,6 +767,12 @@ SlangResult TestServer::execute()
     // way. Without it the headline diagnostic of this change has no test driving it, and a
     // regression in the WTERMSIG recording would pass CI in silence.
     const int killOnRequest = _requestOrdinalFromEnv("SLANG_TEST_SERVER_KILL_ON_REQUEST");
+
+    // Third of the family and the only one where the server stays alive: it writes non-message
+    // bytes into the channel before the Nth reply, so the client reads something it cannot
+    // frame. That is the malformed-response shape (#12534) the protocol-error retry exists
+    // for, and neither hook above can produce it.
+    const int garbleOnRequest = _requestOrdinalFromEnv("SLANG_TEST_SERVER_GARBLE_ON_REQUEST");
     int servedCount = 0;
 
     while (m_connection->isActive() && !m_quit)
@@ -789,6 +802,17 @@ SlangResult TestServer::execute()
 #else
             _Exit(1);
 #endif
+        }
+
+        // Written to stdout directly rather than through m_connection, which would frame it
+        // correctly -- the one thing this must not do. The flush is load-bearing: it puts
+        // these bytes ahead of the reply the connection writes next, which is what makes the
+        // client read them as the start of that reply.
+        if (garbleOnRequest && servedCount == garbleOnRequest - 1)
+        {
+            const char garbage[] = "this-is-not-a-jsonrpc-header\r\n\r\n";
+            fwrite(garbage, 1, sizeof(garbage) - 1, stdout);
+            fflush(stdout);
         }
 
         // Failure doesn't make the execution terminate
@@ -895,6 +919,20 @@ int main(int argc, const char* const* argv)
     // Ignore SIGPIPE so that writing to a broken pipe returns EPIPE
     // instead of killing this process.
     signal(SIGPIPE, SIG_IGN);
+#endif
+
+#if defined(_WIN32)
+    // stdout is the JSON-RPC transport, so keep it in binary mode. The framed replies already
+    // bypass the CRT (Process::getStdStream(Out) -> WinPipeStream -> ::WriteFile, no CRLF
+    // translation), so they are unaffected; this guards the one writer that does go through the
+    // CRT stdout -- the SLANG_TEST_SERVER_GARBLE_ON_REQUEST hook's fwrite of a literal "\r\n\r\n"
+    // (see execute()), which text mode would mangle to "\r\r\n\r\r\n" and defeat the client's
+    // header framing.
+    if (_setmode(_fileno(stdout), _O_BINARY) == -1)
+    {
+        fputs("test-server: failed to set stdout to binary mode\n", stderr);
+        return 1;
+    }
 #endif
 
     return (int)Slang::TestToolUtil::getReturnCode(TestServer::_execute(argc, argv));

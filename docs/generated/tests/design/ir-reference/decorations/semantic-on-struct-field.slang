@@ -14,7 +14,7 @@
 // `("TEXCOORD0", -1 : Int)` operand pair on a field of a plain struct used
 // as a local value.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<float> buf;
 
