@@ -25426,7 +25426,7 @@ struct HitObject
             __intrinsic_asm "hitObjectSetShaderBindingTableRecordIndexEXT($0, $RecordIndex)";
         case spvShaderInvocationReorderNV:
             static_assert(false, "SetShaderTableIndex() has no SPIRV NV equivalent (OpHitObjectSetShaderBindingTableRecordIndexNV does not exist). Use SPV_EXT_shader_invocation_reorder instead.");
-        case spvShaderInvocationReorderEXT:
+        case spirv:
             spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -26076,7 +26076,7 @@ struct HitObject
                 "GetTriangleVertexPositions() has no SPIRV NV equivalent. "
                 "Use the spvShaderInvocationReorderEXT capability instead.");
             return float3Arr3();
-        case spvShaderInvocationReorderEXT:
+        case spirv:
             return spirv_asm
             {
                 OpExtension "SPV_KHR_ray_tracing_position_fetch";
@@ -26121,7 +26121,7 @@ struct HitObject
         case spvShaderInvocationReorderNV:
             static_assert(false, "GetRayFlags() has no SPIRV NV equivalent (OpHitObjectGetRayFlagsNV does not exist). Use GetRayDesc() or SPV_EXT_shader_invocation_reorder instead.");
             return 0u;
-        case spvShaderInvocationReorderEXT:
+        case spirv:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -26152,7 +26152,7 @@ struct HitObject
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float = OpHitObjectGetRayTMinNV &this;
             };
-        case spvShaderInvocationReorderEXT:
+        case spirv:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -26197,7 +26197,7 @@ struct HitObject
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float3 = OpHitObjectGetWorldRayOriginNV &this;
             };
-        case spvShaderInvocationReorderEXT:
+        case spirv:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -26228,7 +26228,7 @@ struct HitObject
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float3 = OpHitObjectGetWorldRayDirectionNV &this;
             };
-        case spvShaderInvocationReorderEXT:
+        case spirv:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
