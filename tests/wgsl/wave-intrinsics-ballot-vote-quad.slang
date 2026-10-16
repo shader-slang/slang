@@ -3,9 +3,17 @@
 //TEST:SIMPLE(filecheck=EQUAL): -target wgsl -entry allEqualMain -stage compute
 //TEST:SIMPLE(filecheck=QUAD): -target wgsl -entry quadReadLaneAtMain -stage compute
 //TEST:SIMPLE(filecheck=QUADMAT): -target wgsl -entry quadReadLaneAtMatrixMain -stage compute
+//TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry countBitsMain -stage compute
+//TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry prefixCountBitsMain -stage compute
+//TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry allEqualMain -stage compute
+//TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry quadReadLaneAtMain -stage compute
+//TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry quadReadLaneAtMatrixMain -stage compute
 
 // WGSL lowering of WaveActiveCountBits, WavePrefixCountBits, WaveActiveAllEqual and
 // QuadReadLaneAt through WGSL subgroup and quad built-ins (#9972).
+
+// The bundled Tint compiles each entry point's WGSL to SPIR-V.
+// TINT: OpCapability GroupNonUniform
 
 RWStructuredBuffer<uint> outputBuffer;
 RWStructuredBuffer<float4> floatBuffer;
