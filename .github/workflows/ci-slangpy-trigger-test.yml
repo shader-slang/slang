@@ -208,8 +208,6 @@ jobs:
   mark-slangpy-tests-skipped:
     needs: [filter]
     runs-on: ubuntu-latest
-    # The condition is on the step, not the job, so that this job reports "success"
-    # instead of "skipped" when SlangPy tests run normally and no status is needed.
 
     steps:
       - name: Post skipped status
