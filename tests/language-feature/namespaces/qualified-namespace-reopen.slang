@@ -2,9 +2,10 @@
 //
 // A qualified namespace declaration `namespace A::B { ... }` (or `namespace A.B { ... }`)
 // expands as if the user had written `namespace A { namespace B { ... } }`. Unqualified
-// lookup inside the body therefore sees the members of every enclosing namespace,
-// including the enclosing namespaces that already existed before the qualified
-// declaration reopened them.
+// lookup inside the body therefore sees the members that this module declares in every
+// enclosing namespace, including the enclosing namespaces that already existed before
+// the qualified declaration reopened them. Imported members of an existing enclosing
+// namespace are not covered here; see #13714.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
@@ -35,10 +36,18 @@ int getWithDotSeparator()
 }
 
 static const int globalOrA = 1000;
+int pick()
+{
+    return 1000;
+}
 
 namespace A
 {
 static const int globalOrA = 30;
+int pick()
+{
+    return 40;
+}
 static const int aValue = 10;
 static const int shadowed = 100;
 namespace B
@@ -62,7 +71,8 @@ int getFromB()
 {
     return bValue;
 }
-// The innermost enclosing namespace wins, as it does for the nested spelling.
+// The innermost enclosing namespace that declares the name wins, as it does for the
+// nested spelling.
 int getShadowed()
 {
     return shadowed;
@@ -71,6 +81,11 @@ int getShadowed()
 int getGlobalOrA()
 {
     return globalOrA;
+}
+// A function of an enclosing namespace hides a global function of the same name.
+int getPick()
+{
+    return pick();
 }
 }
 
@@ -95,7 +110,7 @@ int getFromBInsideBody()
 }
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -109,6 +124,7 @@ void computeMain()
     outputBuffer[5] = A::B::D::getFromA();
     outputBuffer[6] = A::B::C::getFromBInsideBody();
     outputBuffer[7] = A::B::C::getGlobalOrA();
+    outputBuffer[8] = A::B::C::getPick();
 }
 
 // CHECK: type: int32_t
@@ -120,3 +136,4 @@ void computeMain()
 // CHECK-NEXT: {{^}}11{{$}}
 // CHECK-NEXT: {{^}}21{{$}}
 // CHECK-NEXT: {{^}}30{{$}}
+// CHECK-NEXT: {{^}}40{{$}}
