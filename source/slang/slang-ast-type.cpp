@@ -1409,43 +1409,17 @@ void BorrowInOutParamType::_toTextOverride(StringBuilder& out)
 
 void RefParamType::_toTextOverride(StringBuilder& out)
 {
-    switch (getParamPassingMode())
-    {
-    case ParamPassingMode::RefReadWrite:
-        out << toSlice("ref ");
-        break;
-    case ParamPassingMode::RefReadOnly:
-        out << toSlice("ref readonly ");
-        break;
-    case ParamPassingMode::RefWriteOnly:
-        out << toSlice("ref writeonly ");
-        break;
-    default:
-        SLANG_UNEXPECTED("ref parameter type with a non-reference passing mode");
-        break;
-    }
-    out << getValueType();
+    out << toSlice("ref ") << getValueType();
 }
 
-ParamPassingMode RefParamType::getParamPassingMode()
+void RefReadOnlyParamType::_toTextOverride(StringBuilder& out)
 {
-    // Only a constant `Read` or `Immutable` access makes the reference read-only,
-    // and only a constant `WriteOnly` makes it write-only. Any other access is
-    // symbolic (as in `RefParam<int, A>`) or out of range; neither restricts
-    // access, so we treat it as read-write.
-    auto accessQualifier = tryGetAccessQualifierValue();
-    if (!accessQualifier)
-        return ParamPassingMode::RefReadWrite;
-    switch (*accessQualifier)
-    {
-    case AccessQualifier::Read:
-    case AccessQualifier::Immutable:
-        return ParamPassingMode::RefReadOnly;
-    case AccessQualifier::WriteOnly:
-        return ParamPassingMode::RefWriteOnly;
-    default:
-        return ParamPassingMode::RefReadWrite;
-    }
+    out << toSlice("ref readonly ") << getValueType();
+}
+
+void RefWriteOnlyParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("ref writeonly ") << getValueType();
 }
 
 void BorrowInParamType::_toTextOverride(StringBuilder& out)
@@ -1521,9 +1495,17 @@ ParamPassingMode getDifferentiatedThisParamMode(ParamPassingMode effectiveMode)
 
 ParamPassingMode getParamPassingModeFromPossiblyWrappedParamType(Type* paramType)
 {
-    if (auto refParamType = as<RefParamType>(paramType))
+    if (as<RefParamType>(paramType))
     {
-        return refParamType->getParamPassingMode();
+        return ParamPassingMode::RefReadWrite;
+    }
+    else if (as<RefReadOnlyParamType>(paramType))
+    {
+        return ParamPassingMode::RefReadOnly;
+    }
+    else if (as<RefWriteOnlyParamType>(paramType))
+    {
+        return ParamPassingMode::RefWriteOnly;
     }
     else if (as<BorrowInParamType>(paramType))
     {

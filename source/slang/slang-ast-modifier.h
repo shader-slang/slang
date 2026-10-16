@@ -394,20 +394,18 @@ class BorrowModifier : public Modifier
     FIDDLE(...)
 };
 
-// Reference-access modifier on a `__ref` parameter: the callee may only read
-// through the reference. It is distinct from `GLSLReadOnlyModifier`, which is
-// the GLSL `readonly` memory qualifier on any declaration.
+// The `__ref_readonly` modifier: pass by reference, and the callee may only read
+// through the reference.
 FIDDLE()
-class ReadOnlyModifier : public Modifier
+class RefReadOnlyModifier : public Modifier
 {
     FIDDLE(...)
 };
 
-// Reference-access modifier on a `__ref` parameter: the callee may only write
-// through the reference. It is distinct from `GLSLWriteOnlyModifier`, which is
-// the GLSL `writeonly` memory qualifier on any declaration.
+// The `__ref_writeonly` modifier: pass by reference, and the callee may only write
+// through the reference.
 FIDDLE()
-class WriteOnlyModifier : public Modifier
+class RefWriteOnlyModifier : public Modifier
 {
     FIDDLE(...)
 };

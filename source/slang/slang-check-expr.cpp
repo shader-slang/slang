@@ -4222,7 +4222,7 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
 static bool _isOutInOutOrRefParam(FuncType* funcType, Index paramIndex)
 {
     auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
-    return as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType);
+    return as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType);
 }
 
 static const char* _getDirectionString(FuncType* funcType, Index paramIndex)
@@ -4232,7 +4232,7 @@ static const char* _getDirectionString(FuncType* funcType, Index paramIndex)
         return "out";
     if (as<BorrowInOutParamType>(paramType))
         return "inout";
-    if (as<RefParamType>(paramType))
+    if (as<RefParamTypeBase>(paramType))
         return "ref";
     return "in";
 }
@@ -4352,7 +4352,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
 
-                if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
+                if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
                     // an *exact* match on the type of the argument.
@@ -4363,10 +4363,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                     //
                     // A `__ref_readonly` parameter only reads its argument, so the argument
                     // may also be a memory location that the caller cannot write.
-                    auto refParamType = as<RefParamType>(paramType);
                     const bool acceptsReadOnlyMemoryLocation =
-                        refParamType &&
-                        refParamType->getParamPassingMode() == ParamPassingMode::RefReadOnly;
+                        as<RefReadOnlyParamType>(paramType) != nullptr;
                     if (argExpr)
                     {
                         if (!argExpr->type.isLeftValue && !(acceptsReadOnlyMemoryLocation &&
@@ -4479,7 +4477,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1)
                                 {
                                     // Try and determine reason for failure
-                                    if (as<RefParamType>(paramType))
+                                    if (as<RefParamTypeBase>(paramType))
                                     {
                                         // Ref types are not allowed to use this mechanism
                                         // because it breaks atomics
@@ -5708,7 +5706,7 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
         // support autodiff, but it is not clear what a correct
         // one-size-fits-all behavior should be in that case.
         //
-        if (as<RefParamType>(primalParamType))
+        if (as<RefParamTypeBase>(primalParamType))
             return primalParamWrapperType;
 
         // Given a primal type that is a wrapper like `Out<T>`, we can

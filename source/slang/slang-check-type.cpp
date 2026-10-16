@@ -466,28 +466,6 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         result = type;
     }
 
-    // A constant access on a `RefParam` must name an `Access` value, since the
-    // access decides the parameter's passing mode.
-    if (auto refParamType = as<RefParamType>(result))
-    {
-        auto accessQualifier = refParamType->tryGetAccessQualifierValue();
-        if (accessQualifier && *accessQualifier != AccessQualifier::ReadWrite &&
-            *accessQualifier != AccessQualifier::Read &&
-            *accessQualifier != AccessQualifier::Immutable &&
-            *accessQualifier != AccessQualifier::WriteOnly)
-        {
-            if (diagSink)
-            {
-                diagSink->diagnose(Diagnostics::InvalidRefParamAccess{
-                    .access = (int64_t)*accessQualifier,
-                    .type = result,
-                    .typeExp = typeExp.exp});
-            }
-            *outProperType = getASTBuilder()->getErrorType();
-            return false;
-        }
-    }
-
     // Check for invalid types.
     // We don't allow pointers to managed types.
     if (auto ptrType = as<PtrType>(result))

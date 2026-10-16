@@ -7651,12 +7651,10 @@ static void addModifiersForParamPassingMode(
         addModifier(paramDecl, astBuilder->create<RefModifier>());
         break;
     case ParamPassingMode::RefReadOnly:
-        addModifier(paramDecl, astBuilder->create<RefModifier>());
-        addModifier(paramDecl, astBuilder->create<ReadOnlyModifier>());
+        addModifier(paramDecl, astBuilder->create<RefReadOnlyModifier>());
         break;
     case ParamPassingMode::RefWriteOnly:
-        addModifier(paramDecl, astBuilder->create<RefModifier>());
-        addModifier(paramDecl, astBuilder->create<WriteOnlyModifier>());
+        addModifier(paramDecl, astBuilder->create<RefWriteOnlyModifier>());
         break;
     default:
         SLANG_UNEXPECTED("unhandled parameter-passing mode");
@@ -15001,7 +14999,8 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         for (auto modifier : paramDecl->modifiers)
         {
             if (as<OutModifier>(modifier) || as<InOutModifier>(modifier) ||
-                as<RefModifier>(modifier) || as<BorrowModifier>(modifier))
+                as<RefModifier>(modifier) || as<RefReadOnlyModifier>(modifier) ||
+                as<RefWriteOnlyModifier>(modifier) || as<BorrowModifier>(modifier))
             {
                 // TODO(tfoley): The diagnostic in this case should probably not refer
                 // to the `const` modifier at all (since that is not actually what is

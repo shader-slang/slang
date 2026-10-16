@@ -1854,7 +1854,17 @@ struct BorrowInOutParam<T>
 
 __magic_type(RefParamType)
 __intrinsic_type($(kIROp_RefParamType))
-struct RefParam<T, Access access = Access::ReadWrite>
+struct RefParam<T>
+{};
+
+__magic_type(RefReadOnlyParamType)
+__intrinsic_type($(kIROp_RefParamType))
+struct RefReadOnlyParam<T>
+{};
+
+__magic_type(RefWriteOnlyParamType)
+__intrinsic_type($(kIROp_RefParamType))
+struct RefWriteOnlyParam<T>
 {};
 
 __magic_type(BorrowInParamType)

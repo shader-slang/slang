@@ -2942,6 +2942,18 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             operands.getBuffer());
     }
 
+    // The AST encodes a reference parameter's access in the class of its wrapper type, while
+    // `IRRefParamType` records it as an operand after the value type.
+    IRType* visitRefParamTypeBase(RefParamTypeBase* type)
+    {
+        auto paramInfo = getParamInfoFromTypeWithModeWrapper(type);
+        auto access = getRefParamPassingModeAccess(paramInfo.mode);
+        IRInst* operands[] = {
+            lowerType(context, paramInfo.type),
+            getBuilder()->getIntValue(getBuilder()->getUInt64Type(), (IRIntegerValue)access)};
+        return getBuilder()->getType(kIROp_RefParamType, 2, operands);
+    }
+
     IRType* visitResourceType(ResourceType* type) { return lowerSimpleIntrinsicType(type); }
 
     IRType* visitSamplerStateType(SamplerStateType* type) { return lowerSimpleIntrinsicType(type); }
@@ -3711,13 +3723,15 @@ void addCallArgsForParam(
 
 ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
+    if (paramDecl->hasModifier<RefReadOnlyModifier>())
+        return ParamPassingMode::RefReadOnly;
+    if (paramDecl->hasModifier<RefWriteOnlyModifier>())
+        return ParamPassingMode::RefWriteOnly;
     if (paramDecl->hasModifier<RefModifier>())
     {
         // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`.
-        if (paramDecl->hasModifier<ReadOnlyModifier>() || paramDecl->hasModifier<ConstModifier>())
+        if (paramDecl->hasModifier<ConstModifier>())
             return ParamPassingMode::RefReadOnly;
-        if (paramDecl->hasModifier<WriteOnlyModifier>())
-            return ParamPassingMode::RefWriteOnly;
         return ParamPassingMode::RefReadWrite;
     }
     if (paramDecl->hasModifier<BorrowModifier>() || paramDecl->hasModifier<HLSLPayloadModifier>())

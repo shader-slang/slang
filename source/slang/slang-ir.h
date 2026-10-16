@@ -2246,8 +2246,9 @@ public:
     // Adding an IR instruction requires a new writer version. Earlier modules can remain
     // supported when their AST and IR representations are compatible with the reader.
     //
-    // Adding `ReadOnlyModifier` and `WriteOnlyModifier` shifts the sequential `ASTNodeType`
-    // values, so a version-35 module's later AST nodes would be decoded as different classes.
+    // Adding `RefReadOnlyModifier`, `RefWriteOnlyModifier` and the reference parameter type
+    // classes shifts the sequential `ASTNodeType` values, so a version-35 module's later AST
+    // nodes would be decoded as different classes.
     // Version 36 is the earliest module version with the updated AST node numbering, and with
     // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
     const static UInt k_minSupportedModuleVersion = 36;

@@ -660,13 +660,19 @@ BorrowInOutParamType* ASTBuilder::getBorrowInOutParamType(Type* valueType)
     return dynamicCast<BorrowInOutParamType>(getPtrType(valueType, "BorrowInOutParamType"));
 }
 
-RefParamType* ASTBuilder::getRefParamType(Type* valueType, AccessQualifier accessQualifier)
+RefParamType* ASTBuilder::getRefParamType(Type* valueType)
 {
-    Val* args[] = {
-        valueType,
-        getIntVal(getMagicEnumType("AccessQualifier"), (IntegerLiteralValue)accessQualifier)};
-    return dynamicCast<RefParamType>(
-        getSpecializedBuiltinType(makeArrayView(args), "RefParamType"));
+    return dynamicCast<RefParamType>(getPtrType(valueType, "RefParamType"));
+}
+
+RefReadOnlyParamType* ASTBuilder::getRefReadOnlyParamType(Type* valueType)
+{
+    return dynamicCast<RefReadOnlyParamType>(getPtrType(valueType, "RefReadOnlyParamType"));
+}
+
+RefWriteOnlyParamType* ASTBuilder::getRefWriteOnlyParamType(Type* valueType)
+{
+    return dynamicCast<RefWriteOnlyParamType>(getPtrType(valueType, "RefWriteOnlyParamType"));
 }
 
 BorrowInParamType* ASTBuilder::getConstRefParamType(Type* valueType)

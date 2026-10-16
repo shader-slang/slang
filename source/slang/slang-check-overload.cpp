@@ -809,7 +809,7 @@ static QualType getParamQualType(Type* paramType)
             isLVal = true;
         if (as<OutParamType>(paramDirType))
             isLVal = true;
-        if (as<RefParamType>(paramDirType))
+        if (as<RefParamTypeBase>(paramDirType))
             isLVal = true;
     }
     return QualType(unwrapModifiedType(valueType), isLVal);
