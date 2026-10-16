@@ -1416,9 +1416,9 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             break;
         default:
             // The element legalized to a split form (a tuple, pair, implicit deref or
-            // wrapped buffer), which this pass cannot store in a buffer element. Keeping the
-            // old buffer type would mismatch every load from it, so the context decides; see
-            // `handleStructuredBufferWithSplitElement`.
+            // wrapped buffer), which this pass cannot store in a buffer element. The old buffer
+            // type is kept only so that the hook's caller can stop before any load from it is
+            // rewritten; see `handleStructuredBufferWithSplitElement`.
             context->handleStructuredBufferWithSplitElement(bufferType);
             return LegalType::simple(bufferType);
         }

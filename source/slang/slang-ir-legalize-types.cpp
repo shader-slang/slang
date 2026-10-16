@@ -2191,10 +2191,12 @@ static LegalVal legalizeInst(
         // GpuForeach
         return LegalVal();
     case kIROp_StructuredBufferLoad:
-        // A load reaches here only when its result type, the element type, is non-simple.
-        // An empty element legalizes to none, and the load with it. Any other flavor is a
-        // split element, which `legalizeResourceTypes` rejects before rewriting any value and
-        // which `handleStructuredBufferWithSplitElement` rejects in every other context.
+        // A load reaches here when an operand or its result type, the element type, is
+        // non-simple. The buffer operand is always simple, because `legalizeTypeImpl` returns
+        // a simple type for every buffer type. An empty element legalizes to none, and the
+        // load with it. Any other flavor is a split element, which `legalizeResourceTypes`
+        // rejects in its up-front scan of buffer types and every other context rejects in
+        // `handleStructuredBufferWithSplitElement`.
         SLANG_RELEASE_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
@@ -4069,10 +4071,9 @@ static void legalizeTypes(IRTypeLegalizationContext* context)
 // `DescriptorHandle`). A buffer type has no location of its own, so this search recovers the
 // declarations that the user wrote.
 //
-// If no declaration holds the buffer type, the first use with a location is reported instead.
-// Consider a `uniform DescriptorHandle<StructuredBuffer<S>> h;` on SPIR-V: by this pass, `h` has
-// become a field of the compiler-synthesized `GlobalParams` struct, whose key has no location,
-// so the diagnostic points at the read of `h`.
+// If no holder of the buffer type has a location, a use with a location is reported instead
+// (`findBestSourceLocFromUses` visits the most recently created use first, which is not
+// source order). The tests reach no such shape.
 static void diagnoseStructuredBufferWithSplitElement(
     DiagnosticSink* sink,
     IRHLSLStructuredBufferTypeBase* bufferType)
@@ -4095,9 +4096,17 @@ static void diagnoseStructuredBufferWithSplitElement(
         for (auto use = workList[i]->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
-            // A struct field is located at its struct; its key is located at the field.
+            // A struct field is located at its struct; its key is located at the field. A
+            // compiler-generated field (the `elements` buffer that wraps an
+            // `AppendStructuredBuffer`, say) has a key without a location, so the search moves
+            // on to the struct type that holds it.
             if (auto field = as<IRStructField>(user))
-                report(field->getKey()->sourceLoc);
+            {
+                if (field->getKey()->sourceLoc.isValid())
+                    report(field->getKey()->sourceLoc);
+                else if (visitedTypes.add(field->getParent()))
+                    workList.add(field->getParent());
+            }
             // Only entry-block parameters are function parameters; the parameters of other
             // blocks are SSA phis located at the expression they merge.
             else if (
@@ -4267,15 +4276,20 @@ Result legalizeResourceTypes(IRModule* module, TargetProgram* target, Diagnostic
     IRResourceTypeLegalizationContext context(target, module, sink);
 
     // A structured buffer whose element this pass would split is reported by
-    // `handleStructuredBufferWithSplitElement` as soon as its type is legalized. Legalizing
-    // every module-level buffer type before any value means such a module is rejected with one
-    // diagnostic per buffer declaration, instead of being rewritten with loads that silently
-    // lose their result. Every type that values use is a module-level instruction by the time
-    // this pass runs, after specialization, so the scan covers every buffer type in use.
+    // `handleStructuredBufferWithSplitElement` when its type is legalized. Legalizing every
+    // module-level buffer type here, before any value, keeps the invariant that `legalizeTypes`
+    // never sees such a buffer: a load from it would legalize to nothing (see the
+    // `StructuredBufferLoad` case). A buffer type that is not module-level stays inside an
+    // `IRGeneric` because its element depends on a generic parameter, and such an element
+    // legalizes as simple. Any error reported while legalizing these types stops the pass.
+    // A buffer type with no uses (such as the `AppendStructuredBuffer<S>` left behind once
+    // `lowerAppendConsumeStructuredBuffers` has replaced its uses) declares nothing, and is
+    // skipped.
     List<IRHLSLStructuredBufferTypeBase*> bufferTypes;
     for (auto inst : module->getGlobalInsts())
     {
-        if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(inst))
+        if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(inst);
+            bufferType && inst->hasUses())
             bufferTypes.add(bufferType);
     }
     const auto errorCountBefore = sink->getErrorCount();

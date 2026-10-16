@@ -649,12 +649,15 @@ struct IRTypeLegalizationContext
     /// type should be legalized. Not all legalization passes need to legalize parameter block.
     virtual bool shouldLegalizeParameterBlockElementType() { return false; }
 
-    /// Customization point for a structured buffer whose element type legalized to a non-simple
-    /// form, which `legalizeTypeImpl` cannot represent as a buffer element.
+    /// Customization point for a structured buffer whose element type legalized to a split
+    /// form (neither simple nor none), which `legalizeTypeImpl` cannot represent as a buffer
+    /// element; `legalizeTypeImpl` then returns the unchanged buffer type.
     ///
-    /// Only the resource context splits a buffer element: it reports E38204 here, and
-    /// `legalizeResourceTypes` stops before any value is rewritten. An existential or empty-type
-    /// context reaching here is a compiler bug.
+    /// An override must report an error, and its pass must stop before rewriting any value.
+    /// The resource context reports E38204, and `legalizeResourceTypes` legalizes every buffer
+    /// type before any value and returns `SLANG_FAIL` on error. The default fails loudly:
+    /// the empty-type context never splits anything, and no input that reaches the existential
+    /// context with a split buffer element is known.
     virtual void handleStructuredBufferWithSplitElement(IRHLSLStructuredBufferTypeBase* bufferType)
     {
         SLANG_UNUSED(bufferType);

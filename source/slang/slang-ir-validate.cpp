@@ -928,9 +928,10 @@ void StructuredBufferValidationContext::validateStructuredBufferVariable(
 bool StructuredBufferValidationContext::validate(IRModule* module)
 {
     // A bindless target can store a resource handle in a buffer element, so the structural rule
-    // below does not apply there. Where such a target still runs `legalizeResourceTypes` (Metal),
-    // that pass reports the elements it cannot keep in place, such as a struct with a texture
-    // field.
+    // below does not apply there. `legalizeResourceTypes` reports the elements it cannot keep in
+    // place, such as a struct with a texture field, for the buffers this check skips: every
+    // buffer on Metal, and on every target the `static` buffers and nested or
+    // `DescriptorHandle`-wrapped buffers that the walk below does not visit.
     if (m_targetRequest && areResourceTypesBindlessOnTarget(m_targetRequest))
         return true;
 
