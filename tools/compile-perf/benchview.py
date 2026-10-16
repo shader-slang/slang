@@ -205,12 +205,17 @@ def submit(payload, base_url, key, allow_insecure=False):
     if (parsed.scheme not in ("http", "https") or not parsed.hostname
             or parsed.username or parsed.password or parsed.query or parsed.fragment):
         raise ValueError("Expected a BenchView HTTP(S) base URL without credentials or query")
-    if parsed.scheme == "http" and not allow_insecure:
-        raise ValueError("HTTP sends the write key unencrypted; use HTTPS or --allow-insecure")
+    if parsed.scheme == "http" and not (
+            allow_insecure and parsed.hostname in ("127.0.0.1", "::1")):
+        raise ValueError("Remote submission requires HTTPS; --allow-insecure permits only loopback HTTP")
     request = urllib.request.Request(
         base_url.rstrip("/") + "/api/v1/submissions", data=encode(payload),
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + key})
-    opener = urllib.request.build_opener(NoRedirect())
+    # Local test credentials must stay local even when proxy environment variables are set.
+    handlers = [NoRedirect()]
+    if parsed.scheme == "http":
+        handlers.append(urllib.request.ProxyHandler({}))
+    opener = urllib.request.build_opener(*handlers)
     for attempt in range(3):
         try:
             with opener.open(request, timeout=30) as response:
@@ -242,7 +247,7 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--url", help="Omit to export without submitting")
     parser.add_argument("--allow-insecure", action="store_true",
-                        help="Allow HTTP submission with an unencrypted write key")
+                        help="Allow local HTTP testing at 127.0.0.1 or ::1 only")
     args = parser.parse_args()
     if args.released_at and not args.release:
         parser.error("--released-at requires --release")

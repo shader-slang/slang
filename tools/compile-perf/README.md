@@ -422,8 +422,8 @@ via `--results <checkout-path>`.
 
 The publishing nightly also exports compile-performance results to BenchView
 when configured. Export failures do not block existing reports. For local or
-historical exports, see `python3 benchview.py --help`. HTTP submission requires
-`--allow-insecure` because it sends credentials and results unencrypted.
+historical exports, see `python3 benchview.py --help`. Remote submission requires
+HTTPS; `--allow-insecure` is restricted to local loopback testing.
 
 ---
 

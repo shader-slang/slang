@@ -195,14 +195,25 @@ class BenchViewTests(unittest.TestCase):
                                                                  "http://other.test"))
 
     @patch("benchview.urllib.request.build_opener")
-    def test_http_requires_explicit_opt_in(self, build_opener):
-        """Reject cleartext before creating a credential-bearing network request."""
-        with self.assertRaisesRegex(ValueError, "unencrypted"):
-            benchview.submit(self.convert()[0], "http://example.test", "secret")
+    def test_http_requires_loopback_and_explicit_opt_in(self, build_opener):
+        """Remote HTTP never constructs a request, even with the local-testing flag."""
+        for url in ("http://example.test", "http://127.0.0.1.example.test",
+                    "http://localhost", "http://10.0.0.1"):
+            for allow in (False, True):
+                with self.subTest(url=url, allow=allow):
+                    with self.assertRaisesRegex(ValueError, "requires HTTPS"):
+                        benchview.submit(self.convert()[0], url, "secret", allow_insecure=allow)
+        with self.assertRaisesRegex(ValueError, "requires HTTPS"):
+            benchview.submit(self.convert()[0], "http://127.0.0.1", "secret")
         build_opener.assert_not_called()
         build_opener.return_value.open.return_value.__enter__.return_value.status = 201
-        benchview.submit(self.convert()[0], "http://example.test", "secret", allow_insecure=True)
-        build_opener.return_value.open.assert_called_once()
+        for url in ("http://127.0.0.1:30417", "http://[::1]:30417"):
+            benchview.submit(self.convert()[0], url, "secret", allow_insecure=True)
+            handlers = build_opener.call_args.args
+            self.assertTrue(any(isinstance(h, benchview.NoRedirect) for h in handlers))
+            self.assertEqual(next(h.proxies for h in handlers
+                                  if isinstance(h, benchview.urllib.request.ProxyHandler)), {})
+        self.assertEqual(build_opener.return_value.open.call_count, 2)
 
 
 if __name__ == "__main__":
