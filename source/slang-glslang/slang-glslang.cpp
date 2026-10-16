@@ -7,6 +7,7 @@
 #include "spirv-tools/libspirv.h"
 #include "spirv-tools/linker.hpp"
 #include "spirv-tools/optimizer.hpp"
+#include "core/slang-exception.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1107,7 +1108,7 @@ extern "C"
     if (!request || !request->modules || request->linkResult)
         return false;
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         spvtools::Context context(SPV_ENV_UNIVERSAL_1_5);
         spvtools::LinkerOptions options = {};
@@ -1156,8 +1157,10 @@ extern "C"
 
         return success == SPV_SUCCESS;
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         return false;
     }
+#endif
 }

@@ -77,13 +77,13 @@ SpvWord readWordOrWordLiteral(Misc::TokenReader& reader)
                 else
                 {
                     reader.Back(1);
-                    throw Misc::TextFormatException(
+                    Misc::throwTextFormatException(
                         "Text parsing error: Unrecognized SPIR-V enum: " + i);
                 }
             }
             break;
         default:
-            throw Misc::TextFormatException("Text parsing error: Expected int or SPIR-V enum");
+            Misc::throwTextFormatException("Text parsing error: Expected int or SPIR-V enum");
         }
     } while (reader.AdvanceIf(Misc::TokenType::OpBitOr));
     return ret;
@@ -94,7 +94,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
     UnownedStringSlice definition)
 {
     RefPtr<SpvSnippet> snippet = new SpvSnippet();
-    try
+    SLANG_EXCEPTION_TRY
     {
         Dictionary<String, SpvWord> mapInstNameToIndex;
         Slang::Misc::TokenReader tokenReader(definition);
@@ -126,14 +126,14 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                     const auto opCodeMaybe = spirvGrammar.opcodes.lookup(opName.getUnownedSlice());
                     if (!opCodeMaybe)
                     {
-                        throw Misc::TextFormatException(
+                        Misc::throwTextFormatException(
                             "Text parsing error: Unrecognized SPIR-V opcode: " + opName);
                     }
                     opCode = *opCodeMaybe;
                     break;
                 }
             default:
-                throw Misc::TextFormatException("Text parsing error: SPIR-V intrinsics must "
+                Misc::throwTextFormatException("Text parsing error: SPIR-V intrinsics must "
                                                 "begin with an integer or opcode name");
             }
             inst.opCode = opCode;
@@ -155,7 +155,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                             GLSLstd450 glslOpcode;
                             if (!lookupGLSLstd450(opName.getUnownedSlice(), glslOpcode))
                             {
-                                throw Misc::TextFormatException(
+                                Misc::throwTextFormatException(
                                     "Text parsing error: Unrecognized SPIR-V GLSLstd450 opcode: " +
                                     opName);
                             }
@@ -164,7 +164,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                     }
                 // fallthrough
                 default:
-                    throw Misc::TextFormatException(
+                    Misc::throwTextFormatException(
                         "Text parsing error: Failed to read SPIR-V ExtInst Opcode");
                 }
             };
@@ -315,10 +315,12 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             snippet->instructions.add(inst);
         }
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const Slang::Misc::TextFormatException&)
     {
         return nullptr;
     }
+#endif
     return snippet;
 }
 
