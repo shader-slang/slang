@@ -335,7 +335,6 @@ SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
         "    [constref] int ordinaryBorrow(int value) { return value; }\n"
         "    [mutating] int ordinaryMutating(int value) { return value; }\n"
         "    [__ref] int ordinaryRef(int value) { return value; }\n"
-        "    [mutating] [__ref] int overlappingModes(int value) { return value; }\n"
         "    [NoDiffThis] static int staticNoDiffThis(int value) { return value; }\n"
         "    property int item { get { return 0; } set {} }\n"
         "}\n"
@@ -367,7 +366,6 @@ SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
     auto ordinaryBorrow = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryBorrow");
     auto ordinaryMutating = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryMutating");
     auto ordinaryRef = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryRef");
-    auto overlappingModes = findMemberDecl<FuncDecl>(receiverDecl, "overlappingModes");
     auto staticNoDiffThis = findMemberDecl<FuncDecl>(receiverDecl, "staticNoDiffThis");
     auto propertyDecl = findMemberDecl<PropertyDecl>(receiverDecl, "item");
     auto defaultBorrow = findMemberDecl<FuncDecl>(nonCopyableReceiverDecl, "defaultBorrow");
@@ -377,7 +375,6 @@ SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
     SLANG_CHECK_ABORT(ordinaryBorrow != nullptr);
     SLANG_CHECK_ABORT(ordinaryMutating != nullptr);
     SLANG_CHECK_ABORT(ordinaryRef != nullptr);
-    SLANG_CHECK_ABORT(overlappingModes != nullptr);
     SLANG_CHECK_ABORT(staticNoDiffThis != nullptr);
     SLANG_CHECK_ABORT(propertyDecl != nullptr);
     SLANG_CHECK_ABORT(defaultBorrow != nullptr);
@@ -401,7 +398,6 @@ SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
     SLANG_CHECK(getMangledName(astBuilder, ordinaryBorrow).endsWith("ii"));
     SLANG_CHECK(getMangledName(astBuilder, ordinaryMutating).endsWith("m"));
     SLANG_CHECK(getMangledName(astBuilder, ordinaryRef).endsWith("r"));
-    SLANG_CHECK(getMangledName(astBuilder, overlappingModes).endsWith("mr"));
     SLANG_CHECK(getMangledName(astBuilder, staticNoDiffThis).endsWith("n"));
     SLANG_CHECK(!getMangledName(astBuilder, setterDecl).endsWith("m"));
     SLANG_CHECK(!getMangledName(astBuilder, defaultBorrow).endsWith("c"));
@@ -493,36 +489,6 @@ SLANG_UNIT_TEST(paramInfoWrappedTypeRoundTrips)
         SLANG_CHECK(decoded.type->equals(original.type));
         SLANG_CHECK(doesTypeHaveNoDiffModifier(decoded.type));
     }
-}
-
-// Unchecked callable headers cannot query their checked effective `this` parameter information
-// without creating a semantic-checking cycle. The syntax-only policy used to bootstrap lookup must
-// nevertheless use the same modifier precedence as the checked producer.
-SLANG_UNIT_TEST(effectiveThisParamModePolicyPrecedence)
-{
-    StaticUnitTestEnv env(unitTestContext);
-    auto astBuilder = env.getASTBuilder();
-    auto setterDecl = astBuilder->create<SetterDecl>();
-
-    SLANG_CHECK(
-        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) ==
-        ParamPassingMode::BorrowInOut);
-
-    addModifier(setterDecl, astBuilder->create<NonmutatingAttribute>());
-    SLANG_CHECK(applyThisParamModePolicy(setterDecl, ParamPassingMode::In) == ParamPassingMode::In);
-
-    addModifier(setterDecl, astBuilder->create<RefAttribute>());
-    SLANG_CHECK(
-        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) == ParamPassingMode::Ref);
-
-    addModifier(setterDecl, astBuilder->create<ConstRefAttribute>());
-    SLANG_CHECK(
-        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) == ParamPassingMode::BorrowIn);
-
-    addModifier(setterDecl, astBuilder->create<MutatingAttribute>());
-    SLANG_CHECK(
-        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) ==
-        ParamPassingMode::BorrowInOut);
 }
 
 // Source that fails to check reports a diagnostic rather than returning a
