@@ -501,8 +501,9 @@ static bool isAnyPointerType(IRType* type)
 //   the callee returns; both are reported in the function that introduced them. The parameters of
 //   an entry point have no caller, so they are introductions.
 // - An uninitialized value holds nothing yet.
-// - A load introduces the value it reads, except from a function-local variable (which reads back
-//   a value stored there earlier) and through a physical pointer (already reported). The root
+// - A module-scope constant is an introduction; its uses pass it along.
+// - A load introduces the value it reads, except from a local or module-scope variable (which reads
+//   back a value stored there earlier) and through a physical pointer (already reported). The root
 //   address is checked rather than the address space of the pointer type, because some locals have
 //   none: every local on HLSL, and the temporaries that phi elimination creates.
 // Addresses derived from logical storage (`&buffer[i]`, `groupshared` variables) are not
@@ -520,6 +521,8 @@ static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*
             return func && func->getFirstBlock() == block &&
                    func->findDecoration<IREntryPointDecoration>();
         }
+    case kIROp_GlobalConstant:
+        return true;
     case kIROp_Call:
     // An uninitialized value holds no pointer or `BFloat16` value yet, such as a local struct with
     // a pointer field that is never set.
@@ -529,7 +532,8 @@ static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*
     case kIROp_Load:
         {
             auto address = inst->getOperand(0);
-            return !as<IRVar>(getRootAddr(address)) &&
+            auto root = getRootAddr(address);
+            return !as<IRVar>(root) && !as<IRGlobalVar>(root) &&
                    !isPhysicalPointerType(address->getDataType());
         }
     default:
@@ -543,29 +547,46 @@ static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*
     return true;
 }
 
-// Calls `report(inst, loc)` for each global parameter and each instruction of each function
-// (including the function a module-level generic returns, as `checkUnsupportedInst` does).
-// `report` returns whether it diagnosed `inst`. Specialization and inlining copy an instruction's
-// location to every copy, so an instruction at a location already diagnosed is skipped. An
-// instruction without a location is still reported, without one: emitting it would produce invalid
-// code or abort the emitter.
-template<typename Report>
-static void reportOncePerLocation(IRModule* module, const Report& report)
+// Calls `diagnose(loc)` for each instruction that `introduces` matches, among the global
+// parameters, the module-scope constants, the instructions of global variable initializers and
+// those of each function (including the function a module-level generic returns, as
+// `checkUnsupportedInst` does). Specialization and inlining copy an instruction's location to
+// every copy, so each location is diagnosed once. Instructions without a location (some are
+// created by legalization) are diagnosed once, without a location, and only if nothing else was:
+// emitting them would produce invalid code or abort the emitter.
+template<typename Introduces, typename Diagnose>
+static void reportOncePerLocation(
+    IRModule* module,
+    const Introduces& introduces,
+    const Diagnose& diagnose)
 {
     HashSet<SourceLoc::RawValue> diagnosedLocations;
+    bool foundWithoutLocation = false;
     auto visit = [&](IRInst* inst)
     {
-        auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
-        if (loc.isValid() && diagnosedLocations.contains(loc.getRaw()))
+        if (!introduces(inst))
             return;
-        if (report(inst, loc) && loc.isValid())
-            diagnosedLocations.add(loc.getRaw());
+        auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+        if (!loc.isValid())
+            foundWithoutLocation = true;
+        else if (diagnosedLocations.add(loc.getRaw()))
+            diagnose(loc);
     };
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (as<IRGlobalParam>(globalInst))
+        if (as<IRGlobalParam>(globalInst) || as<IRGlobalConstant>(globalInst))
         {
             visit(globalInst);
+            continue;
+        }
+        if (auto globalVar = as<IRGlobalVar>(globalInst))
+        {
+            // The instructions of an initializer that is still attached to its variable.
+            for (auto block : globalVar->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                    visit(inst);
+            }
             continue;
         }
         auto func = as<IRFunc>(globalInst);
@@ -579,6 +600,8 @@ static void reportOncePerLocation(IRModule* module, const Report& report)
                 visit(inst);
         }
     }
+    if (foundWithoutLocation && diagnosedLocations.getCount() == 0)
+        diagnose(SourceLoc());
 }
 
 void checkUnsupportedPhysicalPointers(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
@@ -591,24 +614,24 @@ void checkUnsupportedPhysicalPointers(IRModule* module, TargetRequest* target, D
 
     reportOncePerLocation(
         module,
-        [&](IRInst* inst, SourceLoc loc)
+        [](IRInst* inst)
         {
             // A physical pointer is introduced by a cast from an integer address, by `nullptr` (a
             // hoisted `PtrLit` constant, so it is found among the operands), or as any other value
             // that `introducesValueOfType` finds, such as a pointer loaded from memory.
-            bool introduces = inst->getOp() == kIROp_CastIntToPtr;
-            for (UInt i = 0; !introduces && i < inst->getOperandCount(); i++)
+            if (inst->getOp() == kIROp_CastIntToPtr)
+                return true;
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
                 auto operand = inst->getOperand(i);
-                introduces = operand->getOp() == kIROp_PtrLit &&
-                             isPhysicalPointerType(operand->getDataType());
+                if (operand->getOp() == kIROp_PtrLit &&
+                    isPhysicalPointerType(operand->getDataType()))
+                    return true;
             }
-            if (!introduces)
-                introduces = introducesValueOfType(inst, isPhysicalPointerType, isAnyPointerType);
-            if (introduces)
-                sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = loc});
-            return introduces;
-        });
+            return introducesValueOfType(inst, isPhysicalPointerType, isAnyPointerType);
+        },
+        [&](SourceLoc loc)
+        { sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = loc}); });
 }
 
 void checkUnsupportedBFloat16(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
@@ -619,16 +642,15 @@ void checkUnsupportedBFloat16(IRModule* module, TargetRequest* target, Diagnosti
 
     reportOncePerLocation(
         module,
-        [&](IRInst* inst, SourceLoc loc)
+        [](IRInst* inst)
         {
-            const bool introduces = introducesValueOfType(
+            return introducesValueOfType(
                 inst,
                 isBFloat16ScalarVectorOrMatrixType,
                 isBFloat16ScalarVectorOrMatrixType);
-            if (introduces)
-                sink->diagnose(Diagnostics::Bfloat16NotSupportedOnTarget{.location = loc});
-            return introduces;
-        });
+        },
+        [&](SourceLoc loc)
+        { sink->diagnose(Diagnostics::Bfloat16NotSupportedOnTarget{.location = loc}); });
 }
 
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
