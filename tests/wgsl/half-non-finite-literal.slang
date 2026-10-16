@@ -1,4 +1,8 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=HINF): -target wgsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=HNAN): -target wgsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=FINF): -target wgsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=FNAN): -target wgsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=NOBARE): -target wgsl -stage compute -entry computeMain
 // Validate the emitted WGSL through Tint on CI (ignored where the downstream compiler is absent).
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm -stage compute -entry computeMain
@@ -18,18 +22,22 @@
 // These spellings are pinned because division-based helpers crash NVIDIA Vulkan pipeline creation
 // (issue #13658).
 // WGSL: enable f16;
-// WGSL-DAG: fn _slang_getInfinityHalf(positive: bool) -> f16
-// WGSL-DAG: let bits = select(0xfc00u, 0x7c00u, positive);
-// WGSL-DAG: return bitcast<vec2<f16>>(bits).x;
-// WGSL-DAG: fn _slang_getNanHalf() -> f16
-// WGSL-DAG: let bits = 0x7e00u;
-// WGSL-DAG: return bitcast<vec2<f16>>(bits).x;
-// WGSL-DAG: fn _slang_getInfinity(positive: bool) -> f32
-// WGSL-DAG: let bits = select(0xff800000u, 0x7f800000u, positive);
-// WGSL-DAG: return bitcast<f32>(bits);
-// WGSL-DAG: fn _slang_getNan() -> f32
-// WGSL-DAG: let bits = 0x7fc00000u;
-// WGSL-DAG: return bitcast<f32>(bits);
+// HINF: fn _slang_getInfinityHalf(positive: bool) -> f16
+// HINF-NEXT: {
+// HINF-NEXT: let bits = select(0xfc00u, 0x7c00u, positive);
+// HINF-NEXT: return bitcast<vec2<f16>>(bits).x;
+// HNAN: fn _slang_getNanHalf() -> f16
+// HNAN-NEXT: {
+// HNAN-NEXT: let bits = 0x7e00u;
+// HNAN-NEXT: return bitcast<vec2<f16>>(bits).x;
+// FINF: fn _slang_getInfinity(positive: bool) -> f32
+// FINF-NEXT: {
+// FINF-NEXT: let bits = select(0xff800000u, 0x7f800000u, positive);
+// FINF-NEXT: return bitcast<f32>(bits);
+// FNAN: fn _slang_getNan() -> f32
+// FNAN-NEXT: {
+// FNAN-NEXT: let bits = 0x7fc00000u;
+// FNAN-NEXT: return bitcast<f32>(bits);
 
 RWStructuredBuffer<half> outputBuffer;
 RWStructuredBuffer<float> floatBuffer;
