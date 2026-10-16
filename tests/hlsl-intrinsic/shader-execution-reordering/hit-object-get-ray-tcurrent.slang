@@ -3,7 +3,7 @@
 // per target because the emitter picks the hitObject type (and thus the builtin/opcode) from the
 // requested capability, and the two must stay paired. HLSL/DXR lowering is covered by the DXR-native
 // tests and CUDA/OptiX by hit-object-get-ray-tcurrent-cuda.slang, which have no such NV/EXT split.
-// SPIR-V with no SER capability defaults to EXT, as TraceRay and the other accessors do, so that
+// SPIR-V with no SER capability defaults to EXT, as TraceRay and GetInstanceIndex() do, so that
 // run shares the EXT checks.
 
 //TEST:SIMPLE(filecheck=NV):      -target spirv-asm -entry rayGenShader -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
