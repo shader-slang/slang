@@ -4698,6 +4698,7 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
     NamespaceDecl* result = nullptr;
     NamespaceDecl* namespaceDecl = nullptr;
     List<NamespaceDecl*> nestedNamespaceDecls;
+    Index lookupScopeCount = 0;
     do
     {
         namespaceDecl = nullptr;
@@ -4768,6 +4769,18 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
                     nestedNamespaceDecls.add(parentNamespace);
                 }
             }
+            else if (result)
+            {
+                // Consider `namespace A::B { ... }` where both `A` and `B` already
+                // exist. The body must see the members of `A`, as it does when the
+                // user writes `namespace A { namespace B { ... } }`, so we push a
+                // scope for `A`. The checker attaches the imported namespaces named
+                // `A` to the scope that `A` owns, and the code in the earlier body of
+                // `A` finds imported names through that scope, so the scope we push
+                // here does not replace it.
+                parser->pushLookupScope(parentDecl);
+                lookupScopeCount++;
+            }
         }
         if (!result)
         {
@@ -4789,6 +4802,8 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
         ns->closingSourceLoc = namespaceDecl->closingSourceLoc;
         parser->PopScope();
     }
+    for (Index i = 0; i < lookupScopeCount; i++)
+        parser->PopScope();
     return result;
 }
 
