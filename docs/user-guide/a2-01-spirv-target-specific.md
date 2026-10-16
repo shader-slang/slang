@@ -207,6 +207,9 @@ By default, a `uniform` parameter defined in the parameter list of an entrypoint
 All `uniform` parameters defined in global scope are grouped together and placed in a default constant buffer. You can make a global uniform parameter laid out as a push constant by using the `[vk::push_constant]` attribute
 on the uniform parameter. All push constants follow the std430 layout by default.
 
+Vulkan allows an entry point to statically use at most one push-constant block, and Slang lays out each block from offset 0.
+The compiler reports error 39033 when the SPIR-V or GLSL it generates for an entry point would use more than one, for example a global `[vk::push_constant]` parameter together with the entry point's own `uniform` parameters.
+
 ## Specialization Constants
 
 You can specify a global constant to translate into a SPIR-V specialization constant with the `[SpecializationConstant]` attribute.
