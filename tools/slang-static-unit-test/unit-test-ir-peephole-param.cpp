@@ -73,14 +73,12 @@ struct Diamond
         builder.setInsertInto(entry);
     }
 
-    /// Terminate the entry block with the branch into `left` and `right`.
     void finishEntry(IRBuilder& builder)
     {
         builder.setInsertInto(entry);
         builder.emitIfElse(condition, left, right, merge);
     }
 
-    /// Terminate `block` with a branch into `merge` that passes `args`.
     void finishArm(IRBuilder& builder, IRBlock* block, List<IRInst*> const& args)
     {
         builder.setInsertInto(block);
