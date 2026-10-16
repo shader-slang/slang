@@ -7,10 +7,14 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST:SIMPLE(filecheck=SHAREDLIB):-target shader-sharedlib -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HOSTCALLABLE):-target host-callable -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 // SHAREDLIB: result code = 0
 // HOSTCALLABLE: result code = 0
 
+// `unusedScene` is the shape from the issue: declared, never read. The CPP row pins that it
+// stays in the emitted parameters, so the other rows keep exercising it.
+// CPP: RaytracingAccelerationStructure unusedScene
 RaytracingAccelerationStructure unusedScene;
 RaytracingAccelerationStructure scene;
 RaytracingAccelerationStructure sceneArray[2];
