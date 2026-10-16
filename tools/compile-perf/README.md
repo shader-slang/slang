@@ -393,11 +393,6 @@ python3 sweep_report.py --label dev         # -> results/dev/sweep/sweep_report.
 
 ### Generated outputs (gitignored)
 
-The publishing nightly also exports compile-performance results to BenchView
-when configured. Export failures do not block existing reports. For local or
-historical exports, see `python3 benchview.py --help`. HTTP submission requires
-`--allow-insecure` because it sends credentials and results unencrypted.
-
 The first group is stored in `slang-compile-perf` (the CI results repo). The
 second group is regenerable on demand and is gitignored from that repo — generate
 them locally by pointing the report scripts at a checkout of `slang-compile-perf`
@@ -424,6 +419,11 @@ via `--results <checkout-path>`.
 | `results/releases/<tag>/sweep/`                         | complexity-sweep report for swept releases                                                                       |
 | `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
 | `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
+
+The publishing nightly also exports compile-performance results to BenchView
+when configured. Export failures do not block existing reports. For local or
+historical exports, see `python3 benchview.py --help`. HTTP submission requires
+`--allow-insecure` because it sends credentials and results unencrypted.
 
 ---
 
