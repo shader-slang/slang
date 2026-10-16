@@ -112,6 +112,40 @@ inline int getVectorSize(VectorExpressionType* vecType)
     return 0;
 }
 
+// Tests the immediate element types of an array, pointer, optional, tuple or concrete type pack.
+// For a modified type, tests its base type. Returns true at the first matching element.
+//
+// Consider `Optional<Ptr<int>>`: the predicate receives `Ptr<int>`, and can call this helper
+// again to inspect `int`. Keeping recursion in the caller lets it stop at a container it accepts.
+// Tuple members come from its concrete type pack. This helper does not expand abstract packs.
+// This helper does not inspect struct fields or start declaration checking. Types outside the
+// cases listed above return false without calling the predicate.
+template<typename F>
+bool anyImmediateTypeElementMatches(Type* type, const F& predicate)
+{
+    if (auto modifiedType = as<ModifiedType>(type))
+        return predicate(modifiedType->getBase());
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return predicate(arrayType->getElementType());
+    if (auto optionalType = as<OptionalType>(type))
+        return predicate(optionalType->getValueType());
+    if (auto pointerType = as<PtrTypeBase>(type))
+        return predicate(pointerType->getValueType());
+
+    // A tuple stores its members in a type pack, so both cases share the same loop.
+    if (auto tupleType = as<TupleType>(type))
+        type = tupleType->getTypePack();
+    if (auto typePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < typePack->getTypeCount(); ++i)
+        {
+            if (predicate(typePack->getElementType(i)))
+                return true;
+        }
+    }
+    return false;
+}
+
 /// Represents what the compiler can currently prove about a variadic pack's cardinality.
 /// This is intentionally coarse-grained: we only track whether a pack is known to be empty,
 /// known to be non-empty, or still unknown.

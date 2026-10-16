@@ -626,36 +626,23 @@ static RestrictedRayTracingTypeKind _getRestrictedRayTracingTypeKind(Type* type)
     if (kind != RestrictedRayTracingTypeKind::None)
         return kind;
 
-    if (auto arrayType = as<ArrayExpressionType>(type))
-        return _getRestrictedRayTracingTypeKind(arrayType->getElementType());
+    // Optional can hold an existing input or none. Stop here instead of checking its input type
+    // as a standalone declaration; other containers still need their element types checked.
     if (auto optionalType = as<OptionalType>(type))
     {
         if (_getDirectStageInputKind(optionalType->getValueType()) !=
             StructuralRayTracingStageKind::Count)
             return RestrictedRayTracingTypeKind::None;
-        return _getRestrictedRayTracingTypeKind(optionalType->getValueType());
     }
-    if (auto pointerType = as<PtrTypeBase>(type))
-        return _getRestrictedRayTracingTypeKind(pointerType->getValueType());
-    if (auto tupleType = as<TupleType>(type))
-    {
-        for (Index i = 0; i < tupleType->getMemberCount(); ++i)
+
+    anyImmediateTypeElementMatches(
+        type,
+        [&](Type* elementType)
         {
-            auto memberKind = _getRestrictedRayTracingTypeKind(tupleType->getMember(i));
-            if (memberKind != RestrictedRayTracingTypeKind::None)
-                return memberKind;
-        }
-    }
-    if (auto typePack = as<ConcreteTypePack>(type))
-    {
-        for (Index i = 0; i < typePack->getTypeCount(); ++i)
-        {
-            auto elementKind = _getRestrictedRayTracingTypeKind(typePack->getElementType(i));
-            if (elementKind != RestrictedRayTracingTypeKind::None)
-                return elementKind;
-        }
-    }
-    return RestrictedRayTracingTypeKind::None;
+            kind = _getRestrictedRayTracingTypeKind(elementType);
+            return kind != RestrictedRayTracingTypeKind::None;
+        });
+    return kind;
 }
 
 // Reports an invalid use of an RT builtin type: a stage input or the stage interface itself.
