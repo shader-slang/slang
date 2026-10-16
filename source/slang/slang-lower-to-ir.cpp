@@ -15688,6 +15688,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                         func,
                         nullptr,
                         compileRequest->getSink());
+                    // This run is before linking and before the uninitialized-use check
+                    // below, so it uses the prelinking options like the run above.
                     changed |= peepholeOptimize(
                         nullptr,
                         func,
