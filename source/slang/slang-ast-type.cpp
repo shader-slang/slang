@@ -897,10 +897,15 @@ Val* BwdDiffFuncType::_resolveImplOverride()
             case ParamPassingMode::RefReadOnly:
             case ParamPassingMode::RefWriteOnly:
                 {
-                    // A `no_diff` `ref` parameter legitimately uses this no-diff type; the same
-                    // mapping also keeps an unsupported differentiable `ref` parameter (which
-                    // autodiff cannot lower) from aborting here.
-                    newParamTypes.add(_getNoDiffType(astBuilder, paramInfo.type));
+                    // Automatic differentiation propagates no derivative through a reference
+                    // parameter, so a reference that carries no derivative passes through as a
+                    // `no_diff` reference with the same access.
+                    if (diffWitness)
+                        SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                    newParamTypes.add(getParamTypeWithModeWrapper(
+                        astBuilder,
+                        _getNoDiffType(astBuilder, paramInfo.type),
+                        paramInfo.mode));
                     break;
                 }
             default:

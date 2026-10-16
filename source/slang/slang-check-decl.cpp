@@ -16005,26 +16005,26 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
                     addModifier(paramDecl, noDiffModifier);
                 }
             }
-            // A differentiable `groupshared` parameter is passed by reference, and current autodiff
-            // lowering has no backward-diff signature for a by-reference differentiable value, so
-            // it is rejected here rather than failing later in lowering. `no_diff` (excluded from
-            // differentiation) and a non-differentiable element type (no derivative expected) need
-            // no gradient through the parameter, so this check skips them. The diagnostic is
-            // spanned on the `groupshared` modifier the user wrote, because the reference modifier
-            // is injected during parameter checking and carries no source location.
-            if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
+            // A `groupshared` parameter refers to memory that other invocations share, and only
+            // the user knows where its derivative would live and how updates to it are
+            // synchronized. Automatic differentiation therefore treats the parameter as
+            // `no_diff`. A user who needs gradients for shared memory passes a
+            // pointer-differentiable handle instead. Because a user may not expect the implicit
+            // `no_diff`, we warn when they did not write it. A parameter whose type has no
+            // derivative was already marked `no_diff` above and loses nothing, so it gets no
+            // warning.
+            if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>();
+                groupSharedModifier && !paramDecl->hasModifier<NoDiffModifier>())
             {
-                if (isTypeDifferentiable(paramDecl->type.type) &&
-                    !paramDecl->hasModifier<NoDiffModifier>())
-                {
-                    getSink()->diagnose(
-                        Diagnostics::CannotUseGroupsharedOnDifferentiableFunctionParameter{
-                            .spelling = paramDecl->hasModifier<ConstModifier>()
-                                            ? UnownedStringSlice("const groupshared")
-                                            : UnownedStringSlice("groupshared"),
-                            .modifier = groupSharedModifier});
-                    continue;
-                }
+                getSink()->diagnose(
+                    Diagnostics::GroupsharedParameterOfDifferentiableFunctionTreatedAsNoDiff{
+                        .spelling = paramDecl->hasModifier<ConstModifier>()
+                                        ? UnownedStringSlice("const groupshared")
+                                        : UnownedStringSlice("groupshared"),
+                        .modifier = groupSharedModifier});
+                auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
+                addModifier(paramDecl, noDiffModifier);
             }
             if (!paramDecl->hasModifier<NoDiffModifier>())
             {

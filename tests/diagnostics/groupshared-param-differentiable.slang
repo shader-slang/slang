@@ -1,40 +1,41 @@
-// A `groupshared` parameter of a differentiable function is passed by reference, which autodiff
-// cannot currently lower, so both the bare and `const groupshared` spellings are rejected. A
-// `no_diff` parameter (excluded from differentiation) and a non-differentiable element type (no
-// derivative expected) need no gradient through the parameter and compile.
+// A `groupshared` parameter of a differentiable function is passed by reference, and autodiff
+// propagates no derivative through a reference, so both the bare and `const groupshared` spellings
+// are treated as `no_diff`. Because a user may not expect that, we warn unless the parameter is
+// explicitly marked `no_diff` or its element type has no derivative to lose.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute
 
 static const uint N = 8;
 groupshared float sharedFloats[N];
 groupshared uint sharedUInts[N];
 
-// Rejected: a bare (read-write) `groupshared` parameter with a differentiable element type.
+// Warned: a bare (read-write) `groupshared` parameter with a differentiable element type.
 [Differentiable]
 float readWrite(uint tid, groupshared float s[N])
-//CHECK:                  ^^^^^^^^^^^ error E38038
+//CHECK:                  ^^^^^^^^^^^ 'groupshared' parameter of a differentiable function is treated as 'no_diff'
+//CHECK:                  ^^^^^^^^^^^ a 'groupshared' parameter is passed by reference, so no derivative is propagated through it; mark it 'no_diff' to make that explicit.
 {
     return s[tid];
 }
 
-// Rejected: a read-only `const groupshared` parameter with a differentiable element type is likewise
-// unlowerable in backward-diff today.
+// Warned: a read-only `const groupshared` parameter with a differentiable element type.
 [Differentiable]
 float readOnly(uint tid, const groupshared float s[N])
-//CHECK:                       ^^^^^^^^^^^ error E38038
+//CHECK:                       ^^^^^^^^^^^ 'const groupshared' parameter of a differentiable function is treated as 'no_diff'
+//CHECK:                       ^^^^^^^^^^^ a 'groupshared' parameter is passed by reference, so no derivative is propagated through it; mark it 'no_diff' to make that explicit.
 {
     return s[tid];
 }
 
-// Accepted: `no_diff` excludes the parameter from differentiation, so its passing mode is irrelevant.
+// Not warned: the user already wrote `no_diff`.
 [Differentiable]
 float noDiff(uint tid, no_diff const groupshared float s[N])
 {
     return s[tid];
 }
 
-// Accepted: a non-differentiable element type expects no derivative -- `uint[N]` does not conform to
-// `IDifferentiable`.
+// Not warned: a non-differentiable element type has no derivative to lose -- `uint[N]` does not
+// conform to `IDifferentiable`.
 [Differentiable]
 float nonDifferentiableElement(uint tid, const groupshared uint s[N])
 {

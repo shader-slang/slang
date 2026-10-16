@@ -4834,11 +4834,11 @@ err(
     span { loc = "modifier:Modifier", message = "cannot use 'borrow in' on a differentiable parameter." }
 )
 
-err(
-    "cannot-use-groupshared-on-differentiable-function-parameter",
+warning(
+    "groupshared-parameter-of-differentiable-function-treated-as-no-diff",
     38038,
-    "'~spelling' on a parameter of a differentiable function",
-    span { loc = "modifier:Modifier", message = "a 'groupshared' parameter is passed by reference, so no derivative can be propagated back through it; mark it 'no_diff' to exclude it from differentiation." }
+    "'~spelling' parameter of a differentiable function is treated as 'no_diff'",
+    span { loc = "modifier:Modifier", message = "a 'groupshared' parameter is passed by reference, so no derivative is propagated through it; mark it 'no_diff' to make that explicit." }
 )
 
 err(

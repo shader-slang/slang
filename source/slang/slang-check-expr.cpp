@@ -6061,13 +6061,17 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
         case ParamPassingMode::RefReadOnly:
         case ParamPassingMode::RefWriteOnly:
             {
-                // A `no_diff` `ref` parameter legitimately uses this no-diff type; the same mapping
-                // also keeps an unsupported differentiable `ref` parameter (which autodiff cannot
-                // lower) from aborting here.
-                paramTypes.add(m_astBuilder->getModifiedType(
-                    paramValType,
-                    {m_astBuilder->getNoDiffModifierVal()}));
-
+                // Automatic differentiation propagates no derivative through a reference
+                // parameter, so a reference that carries no derivative passes through as a
+                // `no_diff` reference with the same access.
+                if (tryGetDifferentialPairType(paramValType))
+                    SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                paramTypes.add(getParamTypeWithModeWrapper(
+                    m_astBuilder,
+                    m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()}),
+                    paramPassingMode));
                 break;
             }
         }
