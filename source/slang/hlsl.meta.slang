@@ -32446,14 +32446,6 @@ $}
                 OpCooperativeVectorStoreNV &data $byteOffset16ByteAligned $this None;
             };
             return;
-        case hlsl:
-${
-            emitUnrollableLoop(R"SLANG(
-                for(int i = 0; i < N; ++i)
-                    data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
-            )SLANG");
-$}
-            return;
         default:
 ${
             emitUnrollableLoop(R"SLANG(
