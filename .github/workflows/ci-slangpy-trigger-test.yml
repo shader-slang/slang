@@ -208,10 +208,12 @@ jobs:
   mark-slangpy-tests-skipped:
     needs: [filter]
     runs-on: ubuntu-latest
-    if: needs.filter.outputs.should-run == 'false'
+    # The condition is on the step, not the job, so that this job reports "success"
+    # instead of "skipped" when SlangPy tests run normally and no status is needed.
 
     steps:
       - name: Post skipped status
+        if: needs.filter.outputs.should-run == 'false'
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
