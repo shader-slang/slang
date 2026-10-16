@@ -3082,8 +3082,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
 
     // Inferred variables and initialized unsized arrays finish here and skip body checking.
-    // Check their input-view use now; explicit declarations are checked after the body visitor
-    // has chosen their initializer, including any automatic initialization.
+    // Therefore, the body visitor will not check them for invalid RT builtin type use.
+    // Run that check here instead, now that their types and initializers are known.
     if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
         diagnoseInvalidStructuralRayTracingVariableType(varDecl);
 
