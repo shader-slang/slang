@@ -264,18 +264,31 @@ struct EntryPointGlobalThreadingContext
         return func->findDecoration<IREntryPointDecoration>() != nullptr;
     }
 
-    // Is `store` in the entry block of an entry point, with no call and no other access to the
-    // variable before it?
-    static bool isInitialStore(IRStore* store, IRGlobalVar* globalVar)
+    // Is `store` in the entry block of an entry point?
+    static bool isEntryBlockStore(IRStore* store)
     {
         auto block = as<IRBlock>(store->getParent());
         auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
-        if (!func || block != func->getFirstBlock() || !isEntryPoint(func))
-            return false;
+        return func && block == func->getFirstBlock() && isEntryPoint(func);
+    }
+
+    // Does nothing before `store` in its block read the variable, directly or through a call to
+    // a function that needs it (e.g. a module-scope initializer that the entry point calls first
+    // only needs to be left alone if it does not reach the variable)?
+    static bool isInitialStore(
+        IRStore* store,
+        IRGlobalVar* globalVar,
+        const HashSet<IRFunc*>& neededSet)
+    {
+        auto block = as<IRBlock>(store->getParent());
         for (auto inst = block->getFirstInst(); inst && inst != store; inst = inst->getNextInst())
         {
-            if (as<IRCall>(inst))
-                return false;
+            if (auto call = as<IRCall>(inst))
+            {
+                auto callee = as<IRFunc>(call->getCallee());
+                if (!callee || neededSet.contains(callee))
+                    return false;
+            }
             for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
                 if (inst->getOperand(i) == globalVar)
@@ -298,6 +311,7 @@ struct EntryPointGlobalThreadingContext
         valueByEntryPoint.clear();
         paramByFunc.clear();
         List<IRLoad*> loads;
+        List<IRStore*> stores;
         bool holdsEntryPointInput = false;
         for (auto use = globalVar->firstUse; use; use = use->nextUse)
         {
@@ -316,13 +330,14 @@ struct EntryPointGlobalThreadingContext
                 continue;
             }
             auto store = as<IRStore>(user);
-            if (!store || store->getPtr() != globalVar || !isInitialStore(store, globalVar))
+            if (!store || store->getPtr() != globalVar || !isEntryBlockStore(store))
                 return false;
             auto entryPoint = as<IRFunc>(store->getParent()->getParent());
             // One initial store per entry point.
             if (valueByEntryPoint.containsKey(entryPoint))
                 return false;
             valueByEntryPoint[entryPoint] = store->getVal();
+            stores.add(store);
         }
         // Only variables that hold an entry-point input (a built-in or varying input that
         // `translateGlobalVaryingVar` stores); other module-scope variables keep their storage.
@@ -360,6 +375,13 @@ struct EntryPointGlobalThreadingContext
                 if (!addNeeded(getParentFunc(call)))
                     return false;
             }
+        }
+
+        // The store must come before anything in its entry point that can read the variable.
+        for (auto store : stores)
+        {
+            if (!isInitialStore(store, globalVar, neededSet))
+                return false;
         }
 
         // Add the parameter to every function that needs it.
