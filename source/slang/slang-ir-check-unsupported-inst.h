@@ -16,8 +16,9 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
 /// including HLSL source output, are not checked by this operation.
 void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
 
-/// Diagnose pointers to memory addresses (a pointer cast from an integer address, or `nullptr`)
-/// on targets that have none (WGSL and the D3D family), instead of failing during emit.
+/// Diagnose pointers to memory addresses (a pointer cast from an integer address, a pointer read
+/// from memory, or `nullptr`) on targets that have none (WGSL and the D3D family), and `BFloat16`
+/// values on WGSL, instead of emitting invalid code or failing during emit.
 ///
 /// This validation is required regardless of the selected optimization mode.
 void checkUnsupportedPhysicalPointers(
