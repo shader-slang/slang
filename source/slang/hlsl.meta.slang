@@ -14944,13 +14944,14 @@ T __copyObject<T>(T v)
    }
 }
 
+// Neither Metal nor WGSL has a non-uniform annotation to emit, so the emitter drops the call;
+// see the note at the top of slang-ir-float-non-uniform-resource-index.cpp. WGSL binding
+// arrays are still a proposal, and runtimes that ship them may gate non-uniform indexing
+// behind an optional feature.
 /// `NonUniformResourceIndex` function is used to indicate if the resource index is
 /// divergent, and ensure scalarization happens correctly for each divergent lane.
 ///
-/// Metal and WGSL have no such qualifier, and the call returns `index` unchanged:
-/// Metal handles a non-uniform index into an array of resources itself (MSL spec,
-/// "The Need for a Uniform Type"), and the WebGPU binding-array proposals allow
-/// non-uniform indexing without an annotation.
+/// On Metal and WGSL the call returns `index` unchanged.
 __generic<T:__BuiltinArithmeticType>
 __intrinsic_op($(kIROp_NonUniformResourceIndex))
 [require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]

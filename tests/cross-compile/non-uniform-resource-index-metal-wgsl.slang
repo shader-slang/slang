@@ -3,6 +3,11 @@
 // arrays itself, and the WebGPU binding-array proposals allow non-uniform indexing without an
 // annotation.
 
+// Run 1 (Metal) and run 2 (WGSL) index a sized array.
+// Run 3 indexes an unsized array on WGSL, emitted as a runtime-sized `array<texture_2d<f32>>`.
+// Metal is left out because an unsized resource array is not yet a valid Metal kernel argument
+// (see tests/metal/uniform-unsized-resource-array-unbound.slang).
+
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -DUNBOUNDED
@@ -27,6 +32,8 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // METAL-NOT: NonUniformResourceIndex
 // METAL: textures_{{[0-9]+}}[materialIndices_{{[0-9]+}}[
 // METAL-SAME: .sample(
+// METAL-NOT: NonUniformResourceIndex
 
 // WGSL-NOT: NonUniformResourceIndex
 // WGSL: textureSampleLevel((textures_{{[0-9]+}}[materialIndices_{{[0-9]+}}[
+// WGSL-NOT: NonUniformResourceIndex
