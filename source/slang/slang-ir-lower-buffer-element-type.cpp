@@ -2718,6 +2718,10 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
         return true;
     }
 
+    // The matrix pack and unpack functions convert each element between the storage element type
+    // and the matrix element type with `emitCast`, which is the identity unless the storage holds
+    // another type, as SPIR-V stores a `bool` as an `int`; that is the same conversion
+    // `lowerLeafLogicalType` gives a `bool` field.
     IRFunc* createMatrixUnpackFunc(
         IRMatrixType* matrixType,
         IRStructType* structType,
