@@ -246,6 +246,16 @@ struct SamplerComparisonState
     ISamplerComparisonState* state;
 };
 
+// The CPU targets do not implement ray tracing, so nothing reads this handle. We still define the
+// type because a shader that only declares or passes an acceleration structure keeps it in its
+// parameters (the layout reserves one pointer for it), and the emitted C++ names this type.
+struct IRaytracingAccelerationStructure;
+
+struct RaytracingAccelerationStructure
+{
+    IRaytracingAccelerationStructure* handle;
+};
+
 #ifndef SLANG_RESOURCE_SHAPE
 #define SLANG_RESOURCE_SHAPE
 typedef unsigned int SlangResourceShape;
