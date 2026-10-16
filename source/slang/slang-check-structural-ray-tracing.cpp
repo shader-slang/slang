@@ -658,9 +658,11 @@ static RestrictedRayTracingTypeKind _getRestrictedRayTracingTypeKind(Type* type)
     return RestrictedRayTracingTypeKind::None;
 }
 
-// Reports an invalid value use of a known input or the dedicated stage interface itself.
-// Concrete structs implementing the interface do not reach either diagnostic.
-static bool _diagnoseRestrictedRayTracingValueType(
+// Reports an invalid use of an RT builtin type: a stage input or the stage interface itself.
+// "RT builtin" means a compiler-recognized library type, not necessarily a C++ BuiltinType.
+// Concrete structs implementing the interface remain ordinary types. Returns true when an error
+// is reported, or false when the supplied type needs no diagnostic.
+static bool _diagnoseInvalidRTBuiltinTypeUse(
     SemanticsVisitor* visitor,
     Type* type,
     SourceLoc location)
@@ -714,7 +716,7 @@ static bool _diagnoseRestrictedRayTracingGenericArgument(
             .location = location});
         return true;
     case RestrictedRayTracingTypeKind::StageInterface:
-        return _diagnoseRestrictedRayTracingValueType(visitor, type, location);
+        return _diagnoseInvalidRTBuiltinTypeUse(visitor, type, location);
     default:
         return false;
     }
@@ -1502,7 +1504,7 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBa
     // checks restricted types inside built-in containers and the stage interface itself.
     // Reaching this call does not imply an error: ordinary types, including concrete stage
     // structs, pass without a diagnostic.
-    _diagnoseRestrictedRayTracingValueType(this, type, varDecl->loc);
+    _diagnoseInvalidRTBuiltinTypeUse(this, type, varDecl->loc);
 }
 
 // Rejects results such as `rt::MissInput<C> makeInput();`. Inputs may be received as in parameters
@@ -1512,7 +1514,7 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingReturnType(CallableDec
 {
     if (as<ConstructorDecl>(decl))
         return;
-    _diagnoseRestrictedRayTracingValueType(
+    _diagnoseInvalidRTBuiltinTypeUse(
         this,
         decl->returnType.type,
         decl->returnType.exp ? decl->returnType.exp->loc : decl->loc);
@@ -1522,7 +1524,7 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingReturnType(CallableDec
 // properties have ordinary application-defined result types and remain legal.
 void SemanticsVisitor::diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl)
 {
-    _diagnoseRestrictedRayTracingValueType(
+    _diagnoseInvalidRTBuiltinTypeUse(
         this,
         propertyDecl->type.type,
         propertyDecl->type.exp ? propertyDecl->type.exp->loc : propertyDecl->loc);
@@ -1571,7 +1573,7 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingExpression(Expr* expr)
             Diagnostics::StructuralRayTracingTypeConstruction{.type = type, .location = location});
         return true;
     }
-    return _diagnoseRestrictedRayTracingValueType(this, type, location);
+    return _diagnoseInvalidRTBuiltinTypeUse(this, type, location);
 }
 
 // Checks the type arguments of a resolved function, method, or constructor call. Consider:
