@@ -14,6 +14,7 @@ RWStructuredBuffer<float4> floatBuffer;
 // MATCH-NOT: var<private>
 // MATCH: subgroupShuffle(
 // MATCH: subgroupBallot(
+// MATCH: (u32(1) << (
 // MATCH-NOT: subgroupShuffle({{[^,]*}}bool
 // MATCH: fn matchMain({{.*}}@builtin(subgroup_size)
 // MATCH-NOT: var<private>

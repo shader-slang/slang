@@ -19655,6 +19655,8 @@ uint4 WaveGetActiveMulti()
 // - When `lane` is inactive or past the end of the subgroup, `subgroupShuffle` returns an
 //   indeterminate value and the ballot is meaningless, but it is always discarded: `lane == self`
 //   only holds for the lane of an active invocation.
+// - The current lane's bit is ORed in, because WaveMatch always includes the current lane and a
+//   NaN component compares unequal to itself.
 //
 // The loop runs to `WaveGetLaneCount()` and is in uniform control flow, as WGSL requires for
 // subgroup operations, only because the subgroup size reaches the function as a value (WGSL
@@ -19675,7 +19677,7 @@ uint4 __wgslWaveMatch(T value)
     {
         const uint4 matching = WaveActiveBallot(value == WaveReadLaneAt(value, int(lane)));
         if (lane == self)
-            result = matching;
+            result = matching | WaveGetLaneEqMask();
     }
     return result;
 }
@@ -19691,7 +19693,7 @@ uint4 __wgslWaveMatch(vector<T, N> value)
         const uint4 matching =
             WaveActiveBallot(all(value == WaveReadLaneAt(value, int(lane))));
         if (lane == self)
-            result = matching;
+            result = matching | WaveGetLaneEqMask();
     }
     return result;
 }
