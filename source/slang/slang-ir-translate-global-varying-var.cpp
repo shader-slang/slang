@@ -34,6 +34,12 @@ struct GlobalVarTranslationContext
             materializeGetWorkGroupSize(module, referencingEntryPoints, inst);
         IRBuilder builder(module);
 
+        // A global varying may be reached from several entry points that are emitted into one
+        // module. Each of those entry points receives the varying through its own parameter or
+        // result field, so we copy the global's decorations onto every entry point's struct key
+        // and only remove them from the global once all entry points have been processed.
+        OrderedHashSet<IRInst*> translatedGlobalVars;
+
         for (auto entryPoint : entryPoints)
         {
             List<IRInst*> outputVars;
@@ -218,7 +224,9 @@ struct GlobalVarTranslationContext
                 }
                 auto varLayout = varLayoutBuilder.build();
                 inputStructTypeLayoutBuilder.addField(key, varLayout);
-                input->transferDecorationsTo(key);
+                for (auto decoration : input->getDecorations())
+                    cloneDecoration(decoration, key);
+                translatedGlobalVars.add(input);
 
                 // Emit a new param here to represent the global input var.
                 auto inputParam =
@@ -262,11 +270,17 @@ struct GlobalVarTranslationContext
 
                 // Relate the old "global variable" to a "global parameter" for use later in
                 // compilation to resolve a "global variable" shadowing a "global parameter"
-                // relationship.
-                builder.addGlobalVariableShadowingGlobalParameterDecoration(
-                    newParams[i],
-                    input,
-                    inputKeys[i]);
+                // relationship. GLSL/SPIR-V legalization then rewrites every use of `input` in
+                // the module to this entry point's parameter, which is only valid when no other
+                // entry point reaches `input`. A global shared by several entry points stays a
+                // private variable that each entry point initializes with the store above.
+                auto referencingEntryPointSet = referencingEntryPoints.tryGetValue(input);
+                SLANG_ASSERT(referencingEntryPointSet);
+                if (referencingEntryPointSet->getCount() == 1)
+                    builder.addGlobalVariableShadowingGlobalParameterDecoration(
+                        newParams[i],
+                        input,
+                        inputKeys[i]);
             }
 
             // For each entry point, introduce a new parameter to represent each output parameter,
@@ -288,6 +302,10 @@ struct GlobalVarTranslationContext
                 UInt outputVarIndex = 0;
                 for (auto output : outputVars)
                 {
+                    // The declared semantic and layout of an `in out` global describe its input,
+                    // so its output field takes the stage's default semantic instead.
+                    IRInst* outputDecorSource =
+                        output->findDecoration<IRGlobalInputDecoration>() ? nullptr : output;
                     auto key = builder.createStructKey();
                     auto ptrType = as<IRPtrTypeBase>(output->getDataType());
                     builder.createStructField(resultType, key, ptrType->getValueType());
@@ -296,7 +314,9 @@ struct GlobalVarTranslationContext
                     IRTypeLayout* fieldTypeLayout = nullptr;
                     bool hasExistingLayout = false;
                     if (auto existingLayoutDecoration =
-                            output->findDecoration<IRLayoutDecoration>())
+                            outputDecorSource
+                                ? outputDecorSource->findDecoration<IRLayoutDecoration>()
+                                : nullptr)
                     {
                         if (auto existingVarLayout =
                                 as<IRVarLayout>(existingLayoutDecoration->getLayout()))
@@ -313,7 +333,10 @@ struct GlobalVarTranslationContext
 
                     IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout);
                     varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
-                    if (auto semanticDecor = output->findDecoration<IRSemanticDecoration>())
+                    if (auto semanticDecor =
+                            outputDecorSource
+                                ? outputDecorSource->findDecoration<IRSemanticDecoration>()
+                                : nullptr)
                     {
                         varLayoutBuilder.setSystemValueSemantic(
                             semanticDecor->getSemanticName(),
@@ -321,7 +344,8 @@ struct GlobalVarTranslationContext
                     }
                     else
                     {
-                        if (auto layoutDecor = findVarLayout(output))
+                        if (auto layoutDecor =
+                                outputDecorSource ? findVarLayout(outputDecorSource) : nullptr)
                         {
                             if (auto offsetAttr =
                                     layoutDecor->findOffsetAttr(LayoutResourceKind::VaryingOutput))
@@ -352,7 +376,12 @@ struct GlobalVarTranslationContext
                         outputVarIndex++;
                     }
                     typeLayoutBuilder.addField(key, varLayoutBuilder.build());
-                    output->transferDecorationsTo(key);
+                    if (outputDecorSource)
+                    {
+                        for (auto decoration : outputDecorSource->getDecorations())
+                            cloneDecoration(decoration, key);
+                    }
+                    translatedGlobalVars.add(output);
                 }
                 auto resultTypeLayout = typeLayoutBuilder.build();
                 IRVarLayout::Builder resultVarLayoutBuilder(&builder, resultTypeLayout);
@@ -435,6 +464,12 @@ struct GlobalVarTranslationContext
             }
             IRType* newFuncType = builder.getFuncType(paramTypes, resultType);
             entryPointFunc->setFullType(newFuncType);
+        }
+
+        for (auto globalVar : translatedGlobalVars)
+        {
+            while (auto decoration = globalVar->getFirstDecoration())
+                decoration->removeAndDeallocate();
         }
     }
 
