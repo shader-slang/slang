@@ -112,11 +112,11 @@ void computeMain()
 }
 
 // CHECK: type: int32_t
-// CHECK-NEXT: 1
-// CHECK-NEXT: 2
-// CHECK-NEXT: 10
-// CHECK-NEXT: 20
-// CHECK-NEXT: 200
-// CHECK-NEXT: 11
-// CHECK-NEXT: 21
-// CHECK-NEXT: 30
+// CHECK-NEXT: {{^}}1{{$}}
+// CHECK-NEXT: {{^}}2{{$}}
+// CHECK-NEXT: {{^}}10{{$}}
+// CHECK-NEXT: {{^}}20{{$}}
+// CHECK-NEXT: {{^}}200{{$}}
+// CHECK-NEXT: {{^}}11{{$}}
+// CHECK-NEXT: {{^}}21{{$}}
+// CHECK-NEXT: {{^}}30{{$}}

@@ -50,5 +50,5 @@ void computeMain()
 }
 
 // CHECK: type: int32_t
-// CHECK-NEXT: 3
-// CHECK-NEXT: 5
+// CHECK-NEXT: {{^}}3{{$}}
+// CHECK-NEXT: {{^}}5{{$}}
