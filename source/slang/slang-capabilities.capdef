@@ -621,6 +621,11 @@ def SPV_KHR_shader_clock : _spirv_1_0;
 /// [EXT]
 def SPV_NV_shader_subgroup_partitioned : _spirv_1_0;
 
+/// Represents the cross-vendor SPIR-V extension for shader subgroup partitioned.
+/// Same opcodes and capability as SPV_NV_shader_subgroup_partitioned.
+/// [EXT]
+def SPV_EXT_shader_subgroup_partitioned : _spirv_1_0;
+
 /// Represents the SPIR-V extension enables rotating values across invocations within a subgroup.
 /// [EXT]
 def SPV_KHR_subgroup_rotate : _spirv_1_3;
@@ -832,6 +837,11 @@ def spvGroupNonUniformVote : _spirv_1_3;
 /// Represents the SPIR-V capability for group non-uniform partitioned operations.
 /// [EXT]
 def spvGroupNonUniformPartitionedNV : _spirv_1_3 + SPV_NV_shader_subgroup_partitioned;
+
+/// Represents the SPIR-V capability for group non-uniform partitioned operations,
+/// declared through SPV_EXT_shader_subgroup_partitioned.
+/// [EXT]
+def spvGroupNonUniformPartitionedEXT : _spirv_1_3 + SPV_EXT_shader_subgroup_partitioned;
 
 /// Represents the SPIR-V capability for group non-uniform rotate operations.
 /// [EXT]
