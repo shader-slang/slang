@@ -50,12 +50,6 @@ enum class IsSubTypeOptions
 /// Should the given `decl` be treated as a static rather than instance declaration?
 bool isEffectivelyStatic(Decl* decl);
 
-/// Apply one declaration's source-level policy for its effective `this` parameter mode.
-///
-/// This operation only interprets declaration kind and modifiers. It does not apply the declared
-/// receiver type's copyability adjustment or any specialization.
-ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode defaultMode);
-
 bool isGlobalDecl(Decl* decl);
 
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
@@ -1477,6 +1471,16 @@ public:
     CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
+    /// Return the language of the translation unit being checked.
+    ///
+    /// Returns `SourceLanguage::Unknown` for reflection and specialization contexts that have no
+    /// translation unit.
+    SourceLanguage getSourceLanguage()
+    {
+        auto translationUnit = getShared()->getTranslationUnitRequest();
+        return translationUnit ? translationUnit->sourceLanguage : SourceLanguage::Unknown;
+    }
+
     DiagnosticSink* getSink() { return m_sink; }
 
     Session* getSession() { return m_shared->getSession(); }
@@ -2213,6 +2217,14 @@ public:
 
     Expr* _CheckTerm(Expr* term);
 
+    /// Checks an object-oriented `this` expression without registering a lambda capture.
+    ///
+    /// `ConstructLookupResultExpr` uses this operation when it reconstructs an implicit `this`
+    /// expression, because capture registration belongs to the surrounding expression-checking
+    /// path. The ordinary `this` expression visitor registers its own capture after calling this
+    /// operation.
+    Expr* checkThisExprWithoutCapturing(ThisExpr* expr);
+
     /// If inside a lambda body, check whether `exprIn` (or its base sub-expression chain)
     /// references an outer-scope variable that needs to be captured into the lambda struct.
     /// This handles the case where an expression was already checked by the parser's
@@ -2500,6 +2512,12 @@ public:
         bool ignoreUnallowedModifier);
 
     void checkModifiers(ModifiableSyntaxNode* syntaxNode);
+
+    /// Diagnoses repeated or conflicting receiver parameter mode specifiers attached to `decl`.
+    ///
+    /// Requires checked modifiers, so attributes have their concrete attribute classes.
+    void checkReceiverParamModeSpecifiers(Decl* decl);
+
     void checkVisibility(Decl* decl);
 
     bool doesAccessorMatchRequirement(
@@ -3222,6 +3240,13 @@ public:
     std::optional<ParamInfo> checkEffectiveThisParamInfo(
         Decl* decl,
         bool shouldDiagnoseModeAttributes);
+
+    /// Return the receiver parameter mode used for `decl` when no specifier is present.
+    ///
+    /// Setters and non-synthesized HLSL methods default to `ParamPassingMode::BorrowInOut`;
+    /// other declarations use `ParamPassingMode::In`.
+    /// For a non-synthesized `FuncDecl`, requires the context for its owning translation unit.
+    ParamPassingMode getDefaultReceiverParamMode(Decl* decl);
 
     /// Compute and attach the effective `this` parameter information owned by `decl`.
     void checkAndAttachEffectiveThisParamInfo(Decl* decl);
