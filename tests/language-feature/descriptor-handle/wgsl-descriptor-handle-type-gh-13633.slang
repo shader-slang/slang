@@ -51,9 +51,11 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // CHECK-DAG: fn unpackAnyValue8_0({{.*}}) -> vec2<u32>
 // CHECK-DAG: fn unpackAnyValue8_1({{.*}}) -> vec2<u32>
 
-// No function returns, and no parameter or field has, a texture or sampler type anywhere in the
-// output; the resource types appear only as the element types of the heap bindings.
+// No function, parameter, or field has a texture or sampler type; those types appear only as the
+// element types of the heap bindings.
 // NO-RESOURCE-NOT: -> texture_2d
 // NO-RESOURCE-NOT: -> sampler
 // NO-RESOURCE-NOT: : texture_2d<f32>,
 // NO-RESOURCE-NOT: : texture_2d<f32>)
+// NO-RESOURCE-NOT: : sampler,
+// NO-RESOURCE-NOT: : sampler)
