@@ -624,7 +624,7 @@ def SPV_NV_shader_subgroup_partitioned : _spirv_1_0;
 /// Represents the cross-vendor SPIR-V extension for shader subgroup partitioned.
 /// Same opcodes and capability as SPV_NV_shader_subgroup_partitioned.
 /// [EXT]
-def SPV_EXT_shader_subgroup_partitioned : _spirv_1_0;
+def SPV_EXT_shader_subgroup_partitioned : _spirv_1_3;
 
 /// Represents the SPIR-V extension enables rotating values across invocations within a subgroup.
 /// [EXT]
