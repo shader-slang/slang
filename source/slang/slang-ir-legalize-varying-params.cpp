@@ -2962,6 +2962,11 @@ protected:
         SLANG_UNUSED(entryPoint);
     }
 
+    // Whether vertex-stage input locations come from the varying-input layout (declaration
+    // order or explicit `[[vk::location]]`, which is what reflection reports) rather than from
+    // the user semantic index.
+    virtual bool vertexInputLocationsFollowLayout() const { return false; }
+
     virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint)
     {
         SLANG_UNUSED(entryPoint);
@@ -3337,6 +3342,11 @@ private:
                 ensureStructHasUserSemantic<LayoutResourceKind::VaryingInput>(
                     flattenedStruct,
                     layout);
+                if (vertexInputLocationsFollowLayout() && flattenedStruct == structType &&
+                    entryPoint.entryPointDecor->getProfile().getStage() == Stage::Vertex)
+                {
+                    assignUserSemanticIndicesFromLayout(flattenedStruct, layout);
+                }
                 if (flattenedStruct != structType)
                 {
                     // Replace the 'old IRParam type' with a 'new IRParam type'
@@ -3490,6 +3500,37 @@ private:
         m_sink->diagnose(Diagnostics::SystemValueAttributeNotSupported{
             .semanticName = semanticName,
             .location = param->sourceLoc});
+    }
+
+    // Re-index every user-semantic field with its varying-input layout location, so the
+    // emitted location matches the one reported by reflection and used by the API.
+    void assignUserSemanticIndicesFromLayout(IRStructType* structType, IRVarLayout* varLayout)
+    {
+        auto typeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
+        if (!typeLayout)
+            return;
+        UInt varOffset = 0;
+        if (auto varOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+            varOffset = varOffsetAttr->getOffset();
+        IRBuilder builder(structType);
+        Index index = 0;
+        for (auto field : structType->getFields())
+        {
+            auto key = field->getKey();
+            auto fieldLayout = typeLayout->getFieldLayout(index++);
+            auto semanticDecor = key->findDecoration<IRSemanticDecoration>();
+            if (!semanticDecor || !fieldLayout)
+                continue;
+            auto offsetAttr = fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingInput);
+            if (!offsetAttr)
+                continue;
+            auto newDecor = builder.addSemanticDecoration(
+                key,
+                semanticDecor->getSemanticName(),
+                (int)(varOffset + offsetAttr->getOffset()));
+            semanticDecor->replaceUsesWith(newDecor);
+            semanticDecor->removeAndDeallocate();
+        }
     }
 
     template<LayoutResourceKind K>
@@ -5115,6 +5156,10 @@ public:
     }
 
 protected:
+    // WebGPU binds vertex attributes by `shaderLocation`, which applications take from
+    // reflection; the emitted `@location` must agree with it.
+    bool vertexInputLocationsFollowLayout() const SLANG_OVERRIDE { return true; }
+
     SystemValueInfo getSystemValueInfo(
         String inSemanticName,
         String* optionalSemanticIndex,
