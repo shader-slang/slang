@@ -10,6 +10,44 @@
 
 namespace Slang
 {
+// The block-param rule (`trySimplifyBlockParam` and the helpers it calls) uses these terms:
+//
+// - An *undefined* value is an `IRUndefined`: a `LoadFromUninitializedMemory` or a `Poison`. Any
+//   other value is *defined*.
+// - A *frozen* value is a `LoadFromUninitializedMemory`. Like LLVM's `freeze(undef)`, it yields one
+//   arbitrary but fixed value that is not poison, and distinct frozen values may differ.
+// - A frozen input of a param is *observed elsewhere* when it has a non-debug use other than the
+//   argument that a branch passes to that param. Only frozen inputs are checked, because a `Poison`
+//   is infectious and no use of it has to agree with the param.
+// - To *refine* a frozen value is to replace all of its uses with one chosen value, which
+//   `slang-ir-insts.lua` permits ("an optimization pass may freely decide on a particular value to
+//   use and replace all uses of the instruction with that value").
+// - *Correlation* holds when `p == a` is true on the `a` edge of `p = phi(a, ...)`. *Loop
+//   stability* holds when `p = phi(entry: a, backedge: p)` sees the same `a` on every iteration.
+
+/// Return whether every use of `value` other than a debug-info use is as the argument that a branch
+/// into `block` passes to the param at `paramIndex`.
+///
+/// For a frozen value, such uses do not observe which arbitrary value it yields except through that
+/// one param, so the param may be replaced by an independent fresh value without breaking
+/// correlation. Passing the same value to another param slot, on the same branch or another one,
+/// is another observing use.
+static bool isUsedOnlyAsArgForParam(IRInst* value, IRBlock* block, UInt paramIndex)
+{
+    for (auto use = value->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (isDebugInfoInst(user))
+            continue;
+        auto branch = as<IRUnconditionalBranch>(user);
+        if (!branch || branch->getTargetBlock() != block)
+            return false;
+        if (paramIndex >= branch->getArgCount() || use != branch->getArgs() + paramIndex)
+            return false;
+    }
+    return true;
+}
+
 struct PeepholeContext : InstPassBase
 {
     PeepholeContext(IRModule* inModule)
@@ -25,6 +63,215 @@ struct PeepholeContext : InstPassBase
     bool useFastAnalysis = false;
 
     TargetProgram* targetProgram;
+
+    /// Replace the uses of `param` with `value` if `value` is visible at `param`, and return
+    /// whether we did.
+    ///
+    /// A value outside every block (a constant, a global, a `Poison`) is visible whenever `param`
+    /// is nested in its parent. A value defined in a block is visible only if it dominates `param`,
+    /// which we check only when `useFastAnalysis` is off.
+    bool tryForwardParam(IRParam* param, IRInst* value)
+    {
+        if (!param->hasUses())
+            return false;
+        if (!as<IRBlock>(value->getParent()) && isChildInstOf(param, value->getParent()))
+        {
+            param->replaceUsesWith(value);
+            return true;
+        }
+        if (useFastAnalysis)
+            return false;
+        auto parentFunc = getParentFunc(param);
+        if (!parentFunc)
+            return false;
+        auto domTree = parentFunc->getModule()->findOrCreateDominatorTree(parentFunc);
+        if (!domTree->dominates(value, param))
+            return false;
+        param->replaceUsesWith(value);
+        return true;
+    }
+
+    /// Return whether every use of `input`, a `LoadFromUninitializedMemory`, may instead use
+    /// `value`.
+    ///
+    /// `input` yields one arbitrary value that is not poison, so `value` must never be poison, must
+    /// be fixed for as long as `input` is, and must be visible at each use of `input`. A value that
+    /// merely dominates `input` can still be poison on some path, as `select(c, 1, poison)` is when
+    /// `c` is false. Refining to it would turn a path that only observed `input` into poison. We
+    /// therefore accept only two kinds of value, both defined outside any function body and thus
+    /// fixed for the whole invocation:
+    ///
+    /// - A literal constant. `Poison` is its own opcode, not an `IRConstant`. A constant whose type
+    ///   is local to a function is hoisted into that function's body, so it is excluded.
+    /// - A global shader parameter, which is set outside the shader and has one value per
+    ///   invocation. A specialization constant with a default value is excluded: the default is a
+    ///   lowered expression that may itself be poison, and it is the value used when the
+    ///   application does not override it.
+    bool canRefineUninitializedValueTo(IRInst* input, IRInst* value)
+    {
+        if (auto globalParam = as<IRGlobalParam>(value))
+        {
+            if (globalParam->findDecoration<IRDefaultValueDecoration>())
+                return false;
+        }
+        else if (!as<IRConstant>(value) || getParentFunc(value))
+        {
+            return false;
+        }
+        for (auto use = input->firstUse; use; use = use->nextUse)
+        {
+            if (!isChildInstOf(use->getUser(), value->getParent()))
+                return false;
+        }
+        return true;
+    }
+
+    /// Forward `param`, whose incoming `values` are `definedValue` and undefined values, to
+    /// `definedValue`. A frozen input that is observed elsewhere is also refined to
+    /// `definedValue`, so that those uses still agree with `param` on the edge that passes the
+    /// input.
+    ///
+    /// Prelinking runs forward without refining, so that the front end's uninitialized-use check
+    /// still sees each uninitialized value. That loses correlation for an observed input: for
+    /// `t = phi(5, a)` with `a` also read elsewhere, `t` becomes `5` while `a` stays independent.
+    /// This is a known limitation, tracked in https://github.com/shader-slang/slang/issues/13727,
+    /// so the correlation that `trySimplifyBlockParam` keeps holds only outside prelinking.
+    bool tryForwardDefinedValue(
+        IRParam* param,
+        IRBlock* block,
+        UInt paramIndex,
+        ShortList<IRInst*> const& values,
+        IRInst* definedValue)
+    {
+        if (!param->hasUses())
+            return false;
+        ShortList<IRInst*> observedInputs;
+        for (auto value : values)
+        {
+            if (as<IRLoadFromUninitializedMemory>(value) &&
+                !isUsedOnlyAsArgForParam(value, block, paramIndex))
+                observedInputs.add(value);
+        }
+        if (!isPrelinking)
+        {
+            for (auto input : observedInputs)
+            {
+                if (!canRefineUninitializedValueTo(input, definedValue))
+                    return false;
+            }
+        }
+        if (!tryForwardParam(param, definedValue))
+            return false;
+        if (!isPrelinking)
+        {
+            for (auto input : observedInputs)
+                input->replaceUsesWith(definedValue);
+        }
+        return true;
+    }
+
+    /// Simplify `param`, a block param, using the values that the predecessors of its block pass
+    /// to it, and return whether any uses were replaced. The param itself is never removed.
+    ///
+    /// Consider:
+    ///
+    ///     int p;
+    ///     if (c) { int a; p = a; } else { int b; p = b; }
+    ///
+    /// On the `a` edge `p` equals `a`, so replacing `p` with an independent fresh value is only
+    /// valid when nothing else observes `a` or `b`. We collect the distinct incoming values,
+    /// ignoring `param` itself (a loop back edge), and decide by how many there are and how many
+    /// of them are defined:
+    ///
+    /// - No value (an unreachable block, or a param fed only by itself): the param is kept.
+    /// - One distinct value: it is forwarded, including a frozen value that every edge shares. A
+    ///   loop header that receives `a` from the entry and itself from the back edge thus sees the
+    ///   same `a` on every iteration, and no value is created in the header. Prelinking keeps the
+    ///   param when that value is undefined.
+    /// - Two or more distinct defined values: the param is kept.
+    /// - One defined value `d` among undefined ones: `tryForwardDefinedValue` forwards the param
+    ///   to `d`. Outside prelinking, it also refines each frozen input that is observed elsewhere
+    ///   to `d`, which keeps correlation: `p == a` becomes `d == d`. If
+    ///   `canRefineUninitializedValueTo` rejects that refinement, the param is kept.
+    /// - Only undefined values: outside prelinking, and when no frozen input is observed
+    ///   elsewhere, the param becomes one fresh `LoadFromUninitializedMemory` in the function's
+    ///   entry block. That block runs once per invocation and dominates every use, so the value is
+    ///   stable across loop iterations. Without this, phi elimination would create a local of the
+    ///   param's type, which Khronos targets reject for a texture. The param is kept if its type
+    ///   is defined inside the function, because the entry block cannot refer to it.
+    ///
+    /// Forwarding also requires the value to be visible at `param` (`tryForwardParam`), and a
+    /// param without uses is never changed.
+    ///
+    /// Prelinking keeps undefined values apart because the front end's uninitialized-use check
+    /// runs after the prelinking runs and reports each undefined value separately.
+    ///
+    /// Slang's SSA form has no critical edges, so every predecessor of a block with params ends
+    /// in an unconditional branch that passes one argument per param.
+    bool trySimplifyBlockParam(IRParam* param)
+    {
+        auto block = as<IRBlock>(param->getParent());
+        if (!block)
+            return false;
+        auto code = as<IRGlobalValueWithCode>(block->getParent());
+        if (!code)
+            return false;
+        auto paramIndexInBlock = getParamIndexInBlock(param);
+        SLANG_ASSERT(paramIndexInBlock >= 0);
+        auto paramIndex = UInt(paramIndexInBlock);
+
+        ShortList<IRInst*> values;
+        IRInst* definedValue = nullptr;
+        for (auto pred : block->getPredecessors())
+        {
+            auto branch = cast<IRUnconditionalBranch>(pred->getTerminator());
+            SLANG_ASSERT(branch->getArgCount() > paramIndex);
+            auto arg = branch->getArg(paramIndex);
+            if (arg == param || values.contains(arg))
+                continue;
+            if (!as<IRUndefined>(arg))
+            {
+                if (definedValue)
+                    return false;
+                definedValue = arg;
+            }
+            values.add(arg);
+        }
+        if (values.getCount() == 0)
+            return false;
+
+        if (values.getCount() == 1)
+        {
+            if (isPrelinking && !definedValue)
+                return false;
+            return tryForwardParam(param, values[0]);
+        }
+
+        if (definedValue)
+            return tryForwardDefinedValue(param, block, paramIndex, values, definedValue);
+
+        if (isPrelinking)
+            return false;
+        for (auto value : values)
+        {
+            if (as<IRLoadFromUninitializedMemory>(value) &&
+                !isUsedOnlyAsArgForParam(value, block, paramIndex))
+                return false;
+        }
+
+        // The fresh value is placed in the entry block, so its type must not be defined inside
+        // this function's body.
+        auto type = param->getFullType();
+        if (isChildInstOf(type, code) || !param->hasUses())
+            return false;
+        IRBuilder builder(module);
+        IRBuilderSourceLocRAII srcLocRAII(&builder, param->sourceLoc);
+        builder.setInsertBefore(code->getFirstBlock()->getFirstOrdinaryInst());
+        auto undefinedValue = builder.emitLoadFromUninitializedMemory(type);
+        copyNameHintAndDebugDecorations(undefinedValue, param);
+        param->replaceUsesWith(undefinedValue);
+        return true;
+    }
 
     void maybeRemoveOldInst(IRInst* inst)
     {
@@ -1663,73 +1910,7 @@ struct PeepholeContext : InstPassBase
             changed |= tryOptimizeArithmeticInst(inst);
             break;
         case kIROp_Param:
-            {
-                auto block = as<IRBlock>(inst->parent);
-                if (!block)
-                    break;
-                UInt paramIndex = 0;
-                auto prevParam = inst->getPrevInst();
-                while (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(prevParam))
-                {
-                    prevParam = prevParam->getPrevInst();
-                    paramIndex++;
-                }
-                IRInst* argValue = nullptr;
-                for (auto pred : block->getPredecessors())
-                {
-                    auto terminator = as<IRUnconditionalBranch>(pred->getTerminator());
-                    if (!terminator)
-                        continue;
-                    SLANG_ASSERT(terminator->getArgCount() > paramIndex);
-                    auto arg = terminator->getArg(paramIndex);
-                    if (as<IRUndefined>(arg))
-                        continue;
-                    if (argValue == nullptr)
-                        argValue = arg;
-                    else if (argValue == arg)
-                    {
-                    }
-                    else
-                    {
-                        argValue = nullptr;
-                        break;
-                    }
-                }
-                if (argValue)
-                {
-                    if (inst->hasUses())
-                    {
-                        // Is argValue not a local value, i.e. it's not a child
-                        // of a block, and it's 'visible' from inst because
-                        // inst is a descendent of argValue's parent
-                        if (!as<IRBlock>(argValue->getParent()) &&
-                            isChildInstOf(inst, argValue->getParent()))
-                        {
-                            inst->replaceUsesWith(argValue);
-                            // Never remove param inst.
-                            changed = true;
-                        }
-                        else if (!useFastAnalysis)
-                        {
-                            // If argValue is defined locally,
-                            // we can replace only if argVal dominates inst.
-                            auto parentFunc = getParentFunc(inst);
-                            if (!parentFunc)
-                                break;
-
-                            auto domTree =
-                                parentFunc->getModule()->findOrCreateDominatorTree(parentFunc);
-
-                            if (domTree->dominates(argValue, inst))
-                            {
-                                inst->replaceUsesWith(argValue);
-                                // Never remove param inst.
-                                changed = true;
-                            }
-                        }
-                    }
-                }
-            }
+            changed |= trySimplifyBlockParam(cast<IRParam>(inst));
             break;
         case kIROp_Swizzle:
             {
@@ -2109,8 +2290,14 @@ bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizat
 
 bool peepholeOptimize(TargetProgram* target, IRInst* func)
 {
+    return peepholeOptimize(target, func, PeepholeOptimizationOptions());
+}
+
+bool peepholeOptimize(TargetProgram* target, IRInst* func, PeepholeOptimizationOptions options)
+{
     PeepholeContext context = PeepholeContext(func->getModule());
     context.targetProgram = target;
+    context.isPrelinking = options.isPrelinking;
     context.useFastAnalysis =
         target ? target->getOptionSet().shouldPerformMinimumOptimizations() : true;
     return context.processFunc(func);

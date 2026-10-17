@@ -15682,7 +15682,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                         func,
                         nullptr,
                         compileRequest->getSink());
-                    changed |= peepholeOptimize(nullptr, func);
+                    // This run is before linking and before the uninitialized-use check
+                    // below, so it uses the prelinking options, like the module-wide peephole
+                    // run after SSA construction.
+                    changed |= peepholeOptimize(
+                        nullptr,
+                        func,
+                        PeepholeOptimizationOptions::getPrelinking());
                     changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
                     eliminateDeadCode(func, dceOptions);
                 }
