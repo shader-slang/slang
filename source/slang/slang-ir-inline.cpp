@@ -1261,7 +1261,7 @@ struct ForceInliningPass : InliningPassBase
                         stack.add(cur->getOperand(i));
                 }
             }
-        } walker{m_staticAssertReachableCalls};
+        } walker{m_staticAssertReachableCalls, {}};
 
         // An `IRStaticAssert` can be nested to any depth (e.g. inside an `IRFunc` that is itself
         // under an `IRGeneric`), so scan the whole IR tree, the same traversal `checkStaticAssert`
@@ -1333,7 +1333,7 @@ struct ForceInliningPass : InliningPassBase
         }
     }
 
-    bool shouldInline(CallSiteInfo const& info)
+    bool shouldInline(CallSiteInfo const& info) override
     {
         auto callee = info.callee;
         bool hasUserForceInline = callee->findDecoration<IRUserForceInlineDecoration>() != nullptr;
