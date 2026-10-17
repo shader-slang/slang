@@ -79,6 +79,7 @@ protected:
 
     virtual void emitGlobalInstImpl(IRInst* inst) override;
     void emitBufferPointerTypeDefinition(IRInst* ptrType);
+    virtual void emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType) SLANG_OVERRIDE;
 
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;

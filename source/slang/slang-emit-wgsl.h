@@ -22,6 +22,12 @@ public:
         IRFunc* irFunc,
         IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
+    // WGSL module-scope declarations may refer to each other in any order, and the language has
+    // no forward declarations, so a pointer on a cycle needs nothing emitted ahead of it.
+    virtual void emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(ptrType);
+    }
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
         SLANG_OVERRIDE;
     virtual void emitFuncHeaderImpl(IRFunc* func) SLANG_OVERRIDE;
