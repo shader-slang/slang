@@ -2,7 +2,7 @@
 // the output is valid and the check for more than one push-constant block per
 // entry point (shader-slang/slang#13713) must not fire.
 
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -profile spirv_1_5
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry onlyEntryPointUniforms -stage compute
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry onlyGlobalBlock -stage compute
 //TEST:SIMPLE(filecheck=NOERR): -target glsl -entry onlyGlobalBlock -stage compute -preserve-params
@@ -57,7 +57,8 @@ void deadBranch(uint3 tid: SV_DispatchThreadID)
     outBuf[tid.x] = v;
 }
 
-// Two entry points that each use one different block.
+// `onlyGlobalBlock` and `secondGlobalBlock` are two entry points that each use a different
+// global block.
 [shader("compute")]
 [numthreads(4, 1, 1)]
 void secondGlobalBlock(uint3 tid: SV_DispatchThreadID)
@@ -86,7 +87,8 @@ float4 discardThenRead(float4 pos: SV_Position, uniform float k) : SV_Target
 // With `-preserve-params` the unused blocks stay in the module, but only the
 // block that `onlyGlobalBlock` reads is declared.
 // NOERR-NOT: E39033
-// NOERR-COUNT-1: layout(push_constant)
+// NOERR: layout(push_constant)
+// NOERR-NEXT: uniform block_PC_
 // NOERR-NOT: layout(push_constant)
 
 // SPIRV-NOT: E39033

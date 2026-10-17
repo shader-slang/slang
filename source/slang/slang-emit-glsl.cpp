@@ -92,13 +92,23 @@ void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
 {
     buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
 
-    // We count push-constant blocks with the same reference graph that decides which globals this
-    // emitter declares.
+    // glslang rejects a stage whose code statically uses more than one `layout(push_constant)`
+    // block. The reference graph records which push-constant blocks each entry point's call tree
+    // uses, and `emitParameterGroupImpl` omits blocks with no uses, so the blocks counted here are
+    // the blocks glslang sees for the stage.
     checkForMultiplePushConstantBlocksPerEntryPoint(
         module,
         m_referencingEntryPoints,
         isPushConstantBlockByLayout,
         getSink());
+
+    Index pushConstantBlockCount = 0;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (as<IRGlobalParam>(globalInst) && isPushConstantBlockByLayout(globalInst))
+            pushConstantBlockCount++;
+    }
+    m_hasMultiplePushConstantBlocks = pushConstantBlockCount > 1;
 
     IRBuilder builder(module);
     for (auto globalInst : module->getGlobalInsts())
@@ -1490,10 +1500,11 @@ void GLSLSourceEmitter::emitParameterGroupImpl(
     IRUniformParameterGroupType* type)
 {
     // glslang allows one `layout(push_constant)` block per stage and counts every block we
-    // declare, so we omit a push-constant block that no entry point reads. Such a block is left in
-    // the module only by `-preserve-params`.
-    if (isPushConstantBlockByLayout(varDecl) &&
-        !getReferencingEntryPoints(m_referencingEntryPoints, varDecl))
+    // declare, including one that nothing reads. `-preserve-params` keeps such unused blocks, so
+    // a module with one used block and one unused block would be rejected. We therefore omit a
+    // push-constant block with no uses when the module has more than one push-constant block.
+    if (m_hasMultiplePushConstantBlocks && isPushConstantBlockByLayout(varDecl) &&
+        !varDecl->hasUses())
         return;
     _emitGLSLParameterGroup(varDecl, type);
 }
