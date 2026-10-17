@@ -1,5 +1,6 @@
 // single-shader-record.slang
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -profile sm_6_3 -stage closesthit -entry main -target spirv-assembly
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -stage closesthit -entry main -target cuda
 //CHECK: too many shader record constant buffers
 //CHECK: can have at most one 'shader record' attributed constant buffer; found 2.
 
