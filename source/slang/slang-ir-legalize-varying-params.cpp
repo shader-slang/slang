@@ -2907,7 +2907,65 @@ protected:
 
         bool isUnsupported = false;
         bool isSpecial = false;
+
+        // The WGSL enable-extension that a module must declare before it can use the target
+        // builtin named by `systemValueName`, such as `primitive_index`. An empty value means the
+        // builtin needs no `enable` directive from this legalizer.
+        String requiredWGSLExtension;
+
+        // The only stage the target builtin exists in, or `Stage::Unknown` for any stage, and
+        // whether it exists only as an input. The front end rejects most misuses first, but it
+        // does not check the stage of a global `in` varying, and `-ignore-capabilities` turns its
+        // stage checks off. Only WGSL's `primitive_index` sets these today, so other builtins
+        // still rely on the front end alone.
+        Stage onlyStage = Stage::Unknown;
+        bool isInputOnly = false;
     };
+
+    // Return false and report a diagnostic when the system value described by `info` cannot be
+    // used as `var` in an entry point for `stage`, as an input or, when `isOutput` (which includes
+    // `inout`), as an output. An unsupported semantic reports E55202; a semantic the target
+    // supports elsewhere reports E30702 for the stage or direction it was used in.
+    bool checkSystemValueUse(
+        const SystemValueInfo& info,
+        IRInst* var,
+        UnownedStringSlice semanticName,
+        Stage stage,
+        bool isOutput)
+    {
+        if (info.isUnsupported)
+        {
+            reportUnsupportedSystemAttribute(var, semanticName);
+            return false;
+        }
+        const bool isWrongStage = info.onlyStage != Stage::Unknown && info.onlyStage != stage;
+        const bool isWrongDirection = isOutput && info.isInputOnly;
+        if (!isWrongStage && !isWrongDirection)
+            return true;
+        m_sink->diagnose(Diagnostics::SystemValueSemanticInvalidDirection{
+            .semantic = semanticName,
+            .direction = isOutput ? "output" : "input",
+            .stage = getStageName(stage),
+            .location = var->sourceLoc});
+        return false;
+    }
+
+    // Mark `var` (a parameter, global varying or struct key) as the target builtin described by
+    // `info`. A builtin that needs a WGSL enable-extension also adds a
+    // `RequireWGSLExtensionDecoration` to the entry-point function, which the WGSL emitter turns
+    // into one `enable` directive for the whole module.
+    static void addTargetSystemValueDecorations(
+        IRBuilder& builder,
+        const EntryPointInfo& entryPoint,
+        IRInst* var,
+        const SystemValueInfo& info)
+    {
+        builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
+        if (info.requiredWGSLExtension.getLength())
+            builder.addRequireWGSLExtensionDecoration(
+                entryPoint.entryPointFunc,
+                info.requiredWGSLExtension.getUnownedSlice());
+    }
 
     struct SystemValLegalizationWorkItem
     {
@@ -3011,15 +3069,14 @@ protected:
             handleSpecialSystemValue(entryPoint, workItem, info, builder);
         }
 
-        if (info.isUnsupported)
-        {
-            reportUnsupportedSystemAttribute(var, semanticName);
+        const auto stage = entryPoint.entryPointDecor->getProfile().getStage();
+        const bool isOutput = as<IROutParamTypeBase>(varType) != nullptr;
+        if (!checkSystemValueUse(info, var, semanticName.getUnownedSlice(), stage, isOutput))
             return;
-        }
         if (!info.permittedTypes.getCount())
             return;
 
-        builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
+        addTargetSystemValueDecorations(builder, entryPoint, var, info);
 
         bool varTypeIsPermitted = false;
         for (auto& permittedType : info.permittedTypes)
@@ -3335,6 +3392,7 @@ private:
                 // Validate/rearange all semantics which overlap in our flat struct.
                 fixFieldSemanticsOfFlatStruct(flattenedStruct);
                 ensureStructHasUserSemantic<LayoutResourceKind::VaryingInput>(
+                    entryPoint,
                     flattenedStruct,
                     layout);
                 if (flattenedStruct != structType)
@@ -3493,10 +3551,14 @@ private:
     }
 
     template<LayoutResourceKind K>
-    void ensureStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
+    void ensureStructHasUserSemantic(
+        const EntryPointInfo& entryPoint,
+        IRStructType* structType,
+        IRVarLayout* varLayout)
     {
-        // Ensure each field in an output struct type has either a system semantic or a user
-        // semantic, so that signature matching can happen correctly.
+        // Ensure each field of `structType`, an entry point's flattened input struct or output
+        // struct depending on the direction `K`, has either a system semantic or a user semantic,
+        // so that signature matching can happen correctly.
         auto typeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
         Index index = 0;
         IRBuilder builder(structType);
@@ -3510,15 +3572,14 @@ private:
                     auto indexAsString = String(UInt(semanticDecor->getEffectiveSemanticIndex()));
                     auto sysValInfo =
                         getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, field);
-                    if (sysValInfo.isUnsupported)
+                    if (checkSystemValueUse(
+                            sysValInfo,
+                            field,
+                            semanticDecor->getSemanticName(),
+                            entryPoint.entryPointDecor->getProfile().getStage(),
+                            K == LayoutResourceKind::VaryingOutput))
                     {
-                        reportUnsupportedSystemAttribute(field, semanticDecor->getSemanticName());
-                    }
-                    else
-                    {
-                        builder.addTargetSystemValueDecoration(
-                            key,
-                            sysValInfo.systemValueName.getUnownedSlice());
+                        addTargetSystemValueDecorations(builder, entryPoint, key, sysValInfo);
                         semanticDecor->removeAndDeallocate();
                     }
                 }
@@ -4225,6 +4286,7 @@ private:
             // Ensure non-overlapping semantics
             fixFieldSemanticsOfFlatStruct(flattenedStruct);
             ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(
+                entryPoint,
                 flattenedStruct,
                 resultLayout);
             return;
@@ -4246,7 +4308,10 @@ private:
         auto typeLayout = structTypeLayoutBuilder.build();
         IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
         auto varLayout = varLayoutBuilder.build();
-        ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(structType, varLayout);
+        ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(
+            entryPoint,
+            structType,
+            varLayout);
 
         _replaceAllReturnInst(
             builder,
@@ -5258,6 +5323,15 @@ protected:
             }
 
         case SystemValueSemanticName::PrimitiveID:
+            {
+                result.systemValueName = toSlice("primitive_index");
+                result.permittedTypes.add(builder.getUIntType());
+                result.requiredWGSLExtension = toSlice("primitive_index");
+                result.onlyStage = Stage::Fragment;
+                result.isInputOnly = true;
+                break;
+            }
+
         case SystemValueSemanticName::RenderTargetArrayIndex:
             {
                 result.isUnsupported = true;
