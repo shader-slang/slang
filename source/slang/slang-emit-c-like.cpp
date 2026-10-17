@@ -3369,6 +3369,12 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_Unmodified:
         break;
 
+    // GLSL turns these into entry-point decorations before emitting. The other textual targets
+    // have no equivalent, so there is nothing to emit.
+    case kIROp_RequireMaximallyReconverges:
+    case kIROp_RequireQuadDerivatives:
+        break;
+
         // Insts that needs to be emitted as code blocks.
     case kIROp_CudaKernelLaunch:
     case kIROp_AtomicLoad:
