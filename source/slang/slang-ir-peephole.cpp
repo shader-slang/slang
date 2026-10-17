@@ -76,6 +76,74 @@ struct PeepholeContext : InstPassBase
         return true;
     }
 
+    /// Return whether every use of `input`, a `LoadFromUninitializedMemory`, may instead use
+    /// `value`.
+    ///
+    /// An `input` yields one fixed value each time it executes, so `value` must be fixed over the
+    /// same span. That holds when `value` is outside every block (a constant or global) and in
+    /// scope at each use, or when `value` dominates `input`: each execution of `input` then follows
+    /// the `value` it pairs with, and every use of `input` is dominated by `input`. A `value`
+    /// computed inside a loop that `input` enters from outside would change between iterations, so
+    /// it does not qualify.
+    bool canRefineUninitializedValueTo(IRInst* input, IRInst* value)
+    {
+        if (!as<IRBlock>(value->getParent()))
+        {
+            for (auto use = input->firstUse; use; use = use->nextUse)
+            {
+                if (!isChildInstOf(use->getUser(), value->getParent()))
+                    return false;
+            }
+            return true;
+        }
+        if (useFastAnalysis)
+            return false;
+        auto parentFunc = getParentFunc(input);
+        if (!parentFunc)
+            return false;
+        auto domTree = parentFunc->getModule()->findOrCreateDominatorTree(parentFunc);
+        return domTree->dominates(value, input);
+    }
+
+    /// Forward `param`, whose incoming `values` are `definedValue` and undefined values, to
+    /// `definedValue`. A frozen input with uses beyond this param slot is first refined to
+    /// `definedValue`, so that those uses still agree with `param` on the edge that passes the
+    /// input. Prelinking runs forward without refining, so the front end still sees each
+    /// uninitialized value.
+    bool tryForwardDefinedValue(
+        IRParam* param,
+        IRBlock* block,
+        UInt paramIndex,
+        ShortList<IRInst*> const& values,
+        IRInst* definedValue)
+    {
+        if (!param->hasUses())
+            return false;
+        ShortList<IRInst*> observedInputs;
+        for (auto value : values)
+        {
+            if (as<IRLoadFromUninitializedMemory>(value) &&
+                !isUsedOnlyAsArgForParam(value, block, paramIndex))
+                observedInputs.add(value);
+        }
+        if (!isPrelinking)
+        {
+            for (auto input : observedInputs)
+            {
+                if (!canRefineUninitializedValueTo(input, definedValue))
+                    return false;
+            }
+        }
+        if (!tryForwardParam(param, definedValue))
+            return false;
+        if (!isPrelinking)
+        {
+            for (auto input : observedInputs)
+                input->replaceUsesWith(definedValue);
+        }
+        return true;
+    }
+
     /// Simplify `param`, a block param, using the values that the predecessors of its block pass
     /// to it. The param itself is never removed; at most its uses are replaced.
     ///
@@ -92,8 +160,12 @@ struct PeepholeContext : InstPassBase
     /// - One distinct value is forwarded, including a frozen value that every edge shares. A loop
     ///   header that receives `a` from the entry and itself from the back edge thus sees the same
     ///   `a` on every iteration, and no value is created in the header.
-    /// - Otherwise, one distinct defined value among undefined ones is forwarded, if every
-    ///   frozen input is unobserved elsewhere.
+    /// - Otherwise, one distinct defined value `d` among undefined ones is forwarded, as before
+    ///   this rule handled undefined inputs. When a frozen input is also observed elsewhere, we
+    ///   first refine it to `d`, which `LoadFromUninitializedMemory` permits ("an optimization
+    ///   pass may freely decide on a particular value to use and replace all uses of the
+    ///   instruction with that value"). That keeps correlation: `p == a` becomes `d == d`. If
+    ///   `canRefineUninitializedValueTo` rejects the refinement, the param is kept.
     /// - Otherwise, if every value is undefined and every frozen input is unobserved elsewhere, the
     ///   param becomes one fresh `LoadFromUninitializedMemory` in the function's entry block. That
     ///   block runs once per invocation and dominates every use, so the value is stable across
@@ -144,7 +216,12 @@ struct PeepholeContext : InstPassBase
             return tryForwardParam(param, values[0]);
         }
 
-        if (definedValueCount > 1 || (isPrelinking && definedValueCount == 0))
+        if (definedValueCount > 1)
+            return false;
+        if (definedValue)
+            return tryForwardDefinedValue(param, block, paramIndex, values, definedValue);
+
+        if (isPrelinking)
             return false;
         for (auto value : values)
         {
@@ -152,8 +229,6 @@ struct PeepholeContext : InstPassBase
                 !isUsedOnlyAsArgForParam(value, block, paramIndex))
                 return false;
         }
-        if (definedValue)
-            return tryForwardParam(param, definedValue);
 
         // The fresh value is placed in the entry block, so its type must not be defined inside
         // this function's body.
