@@ -33,6 +33,8 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void compute_main(uint3 tid: SV_DispatchThreadID)
 {
-    // SPV: OpLoad %Bottom_natural
+    // The value must be loaded before the aliasing store to `*gOther`.
+    // SPV: OpLoad %float
+    // SPV: OpStore %{{[0-9]+}} %int_100
     outputBuffer[0] = gRoot.bottom1.bottomGetValue(0);
 }
