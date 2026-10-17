@@ -4101,7 +4101,7 @@ bool CLikeSourceEmitter::tryMatchCountedLoop(
             Region* region = simpleRegion;
             while (region && region->getParent() != loopRegion)
                 region = region->getParent();
-            if (!region || region != loopRegion->body)
+            if (!region || region != loopRegion->body.Ptr())
                 return false;
         }
         return true;
@@ -4171,13 +4171,13 @@ bool CLikeSourceEmitter::tryMatchCountedLoop(
             isMatch = false;
         }
         if (!isMatch || !initStore)
-            return false;
+            continue;
 
         // The initial value is evaluated in the `for` header instead of at the store, so it
         // must be a constant or a value that already has its own name at that point.
         auto initVal = initStore->getVal();
         if (!as<IRConstant>(initVal) && shouldFoldInstIntoUseSites(initVal))
-            return false;
+            continue;
 
         outLoop.counter = counter;
         outLoop.initVal = initVal;
