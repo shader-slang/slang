@@ -11,11 +11,18 @@ namespace Slang
 struct AddressSpaceContext : public AddressSpaceSpecializationContext
 {
     IRModule* module;
+    DiagnosticSink* sink = nullptr;
 
     Dictionary<IRInst*, AddressSpace> mapInstToAddrSpace;
     InitialAddressSpaceAssigner* addrSpaceAssigner;
     HashSet<IRFunc*> functionsToConsiderRemoving;
-    DiagnosticSink* sink = nullptr;
+
+    // Functions that return pointers in more than one storage class, mapped to
+    // the disagreeing return's location. Recorded as found (once each, across the
+    // fixpoint's repeated passes) but reported only after dead-clone removal, so a
+    // diagnostic never fires on an original that a specialized clone replaced and
+    // this pass then deletes.
+    OrderedDictionary<IRFunc*, SourceLoc> conflictingReturns;
 
     // Reconciled contained address space of each local pointer slot (`Var`/`DebugVar`). A
     // load of one slot stored into another resolves to the source slot's *reconciled* space
@@ -23,15 +30,24 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // regardless of the order slots are visited rather than depending on declaration order.
     Dictionary<IRInst*, AddressSpace> reconciledSlotAddrSpace;
 
-    // Local pointer slots (`Var`) already reported for holding two different concrete address
-    // spaces, so the fixpoint diagnoses each exactly once.
+    // Local pointer slots (`Var`) already recorded for holding two different concrete address
+    // spaces, so the fixpoint records each exactly once.
     HashSet<IRInst*> diagnosedAddrSpaceConflicts;
+
+    // Conflicting slots whose load is not returned, pending the general E58003
+    // (`InconsistentPointerAddressSpace`) report. Deferred like `conflictingReturns` (emitted after
+    // dead-clone removal so a slot surviving only in a removed clone reports not at all), but
+    // deduped by *source-slot identity* — `(specialization root, slot ordinal)` — not by function
+    // root: specialized clones of one source slot collapse to one diagnostic, while two genuinely
+    // distinct conflicting slots in the same function each keep their own. Maps each slot to its
+    // parent function for the removed-clone check and the root lookup.
+    OrderedDictionary<IRInst*, IRFunc*> inconsistentAddrSpaceSlots;
 
     AddressSpaceContext(
         IRModule* inModule,
         InitialAddressSpaceAssigner* inAddrSpaceAssigner,
         DiagnosticSink* inSink)
-        : module(inModule), addrSpaceAssigner(inAddrSpaceAssigner), sink(inSink)
+        : module(inModule), sink(inSink), addrSpaceAssigner(inAddrSpaceAssigner)
     {
     }
 
@@ -99,6 +115,23 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     Dictionary<FuncSpecializationKey, IRFunc*> functionSpecializations;
 
+    // Maps each specialized clone to its ultimate original. Detects cyclic
+    // specialization: clone identities differ across recursion levels, the root
+    // does not.
+    Dictionary<IRFunc*, IRFunc*> specializationRootOf;
+
+    // Specialization roots in progress on the processFunction stack. Guards
+    // unbounded recursion when a recursive function reaches this pass (only under
+    // -disable-non-essential-validations, which skips the E55201 check).
+    HashSet<IRFunc*> rootsBeingSpecialized;
+
+    // Specialization roots ever observed recursing (a call re-entered a root still
+    // on the stack). A recursive call's result never settles to a concrete pointer,
+    // so held-pointer reconciliation ignores stores fed by such calls rather than
+    // treat a provisional default as a conflicting storage class; the recursion
+    // itself is invalid SPIR-V and diagnosed elsewhere.
+    HashSet<IRFunc*> recursiveRoots;
+
     IRFunc* specializeFunc(const FuncSpecializationKey& key)
     {
         auto func = key.getFunc();
@@ -134,6 +167,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         fixUpFuncType(specializedFunc);
 
         functionSpecializations[key] = specializedFunc;
+
+        // Record this clone's root (the original's root, else the original
+        // itself) so a later cyclic specialization is detected despite each
+        // clone's distinct identity.
+        specializationRootOf[specializedFunc] = getSpecializationRoot(func);
+
         return specializedFunc;
     }
 
@@ -143,18 +182,212 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return getAddressSpaceFromVarType(funcType->getResultType());
     }
 
+    // Return true if a value loaded from `var` is *directly* returned by its function (the load's
+    // immediate user is a `Return`). Used to scope the held-pointer conflict to the return conflict
+    // E58005 — the merged-pointer-that-reaches-a-return shape #12563 is about and what the E58005
+    // message describes. A pointer routed to the return indirectly (through a cast/copy/another
+    // slot) does not match and falls to the general E58003, which is also correct: it is still a
+    // slot that cannot hold one concrete class.
+    bool anyLoadDirectlyReturned(IRInst* var)
+    {
+        for (auto use = var->firstUse; use; use = use->nextUse)
+        {
+            auto load = as<IRLoad>(use->getUser());
+            if (!load || load->getPtr() != var)
+                continue;
+            for (auto loadUse = load->firstUse; loadUse; loadUse = loadUse->nextUse)
+                if (loadUse->getUser()->getOp() == kIROp_Return)
+                    return true;
+        }
+        return false;
+    }
+
+    // The index of `slot` among the `IRVar`s of `func`, enumerated in structural order. A
+    // specialized clone preserves that order, so `(getSpecializationRoot(func), ordinal)`
+    // identifies the *source* slot across all of a function's clones — which is how the deferred
+    // E58003 report dedups by source slot rather than by function (see the report loop in
+    // `processModule`). Returns -1 only if `slot` is not a var of `func`, which never happens for a
+    // slot enumerated from it.
+    Index getSlotOrdinalInFunc(IRFunc* func, IRInst* slot)
+    {
+        Index ordinal = 0;
+        for (auto block : func->getBlocks())
+            for (auto inst : block->getChildren())
+            {
+                if (inst == slot)
+                    return ordinal;
+                if (as<IRVar>(inst))
+                    ordinal++;
+            }
+        return -1;
+    }
+
+    // Record a local pointer slot that would need two different concrete address spaces at once, so
+    // the conflict is diagnosed exactly once after dead-clone removal. A slot whose load is
+    // directly returned is the return conflict E58005 (`conflictingReturns`); any other conflicting
+    // slot is the general E58003 (`inconsistentAddrSpaceSlots`). Both buckets are reported after
+    // dead-clone removal — E58005 deduped by specialization root (a function has one result type),
+    // E58003 by source-slot identity. `diagnosedAddrSpaceConflicts` gates so each IR slot instance
+    // is recorded once across the fixpoint's repeated visits.
+    void recordSlotConflict(IRFunc* func, IRInst* slot, SourceLoc conflictLoc)
+    {
+        if (!sink || !diagnosedAddrSpaceConflicts.add(slot))
+            return;
+        if (anyLoadDirectlyReturned(slot))
+            conflictingReturns.addIfNotExists(func, conflictLoc);
+        else
+            inconsistentAddrSpaceSlots.addIfNotExists(slot, func);
+    }
+
+    // Reconcile the address space of the pointer *held by* a local variable that
+    // stores a pointer (a `Ptr(Ptr(T))` such as an `int*` local) from the pointers
+    // written into it. The pass otherwise tracks a single address space per inst,
+    // which is the variable's own storage class (Function); the *pointee* pointer's
+    // class comes only from what is stored. Consider:
+    //
+    //     int* result;
+    //     if (c) result = &gShared;   // Workgroup
+    //     else   result = &buf[i];    // StorageBuffer
+    //     return result;
+    //
+    // `result` is a `Ptr(Ptr(int, UserPointer), Function)` whose inner pointer keeps
+    // the pre-specialization default (UserPointer) while the stored pointers are
+    // Workgroup/StorageBuffer, so the OpStore/OpLoad types disagree. When every
+    // stored pointer shares one concrete class, rewrite the variable's inner pointer
+    // (and its loads) to that class so the stores and the loaded/returned pointer
+    // agree. When two stored pointers disagree, the held pointer would need two
+    // classes at once — the same conflict as a function returning two classes — so it
+    // is reported as E58005 (returned) or E58003 (not returned); see the conflict
+    // branch. Returns whether anything changed.
+    //
+    // Gated to the same targets as the slot pre-pass (`shouldReconcileLocalPointerSlots`, SPIR-V
+    // only): only SPIR-V's split of logical and physical pointers makes a slot that would hold two
+    // concrete classes ill-typed. Metal and WGSL do assign pointer address spaces in this pass, but
+    // a merged slot is not a type error for them here — on those targets a function returning
+    // pointers in two address spaces is already a type mismatch (E30019) caught in semantic
+    // checking before this pass runs (see the conflicting-returnable-addrspace-{metal,wgsl,glsl}
+    // tests); GLSL's assigner infers nothing. Running this off SPIR-V would retype slots and raise
+    // SPIR-V-shaped diagnostics on targets that never needed either.
+    bool reconcileHeldPointerAddressSpace(IRFunc* func, IRInst* storePtr)
+    {
+        if (!addrSpaceAssigner->shouldReconcileLocalPointerSlots())
+            return false;
+        auto var = as<IRVar>(storePtr);
+        if (!var)
+            return false;
+        auto outerPtr = as<IRPtrTypeBase>(var->getDataType());
+        if (!outerPtr)
+            return false;
+        auto innerPtr = as<IRPtrTypeBase>(outerPtr->getValueType());
+        if (!innerPtr)
+            return false;
+
+        AddressSpace held = AddressSpace::Generic;
+        bool conflict = false;
+        SourceLoc conflictLoc;
+        for (auto use = var->firstUse; use; use = use->nextUse)
+        {
+            auto store = as<IRStore>(use->getUser());
+            if (!store || store->getPtr() != var)
+                continue;
+            // Skip a value still settling on the recursion stack: an in-progress
+            // recursive call's result is provisional (a pre-settlement default) and
+            // would otherwise look like a second, conflicting storage class. Once the
+            // callee settles, a later drain rescans this store with its concrete
+            // result.
+            if (auto call = as<IRCall>(store->getVal()))
+                if (auto calleeFunc = as<IRFunc>(call->getCallee()))
+                {
+                    auto calleeRoot = getSpecializationRoot(calleeFunc);
+                    if (rootsBeingSpecialized.contains(calleeRoot) ||
+                        recursiveRoots.contains(calleeRoot))
+                        continue;
+                }
+            auto valAddrSpace = getAddrSpace(store->getVal());
+            if (valAddrSpace == AddressSpace::Generic)
+                continue;
+            if (held == AddressSpace::Generic)
+            {
+                held = valAddrSpace;
+            }
+            else if (held != valAddrSpace)
+            {
+                conflict = true;
+                conflictLoc = store->sourceLoc;
+                break;
+            }
+        }
+        if (conflict)
+        {
+            // The held pointer would need two concrete address spaces at once — the same defect the
+            // slot pre-pass `reconcilePointerSlotWithStoredValue` detects; both run only on SPIR-V
+            // (this one is gated above, the pre-pass by the same predicate) and route the conflict
+            // through the shared `recordSlotConflict`. This branch catches a non-returned conflict
+            // the pre-pass misses — e.g. a slot fed by two pointer-returning calls, whose classes
+            // only become concrete after the calls resolve (the pre-pass's
+            // `getStoredValueAddrSpace` has no call case and sees `Generic`) — that would otherwise
+            // emit invalid SPIR-V with disagreeing OpStore/OpLoad types.
+            recordSlotConflict(func, var, conflictLoc);
+            return false;
+        }
+        if (held == AddressSpace::Generic)
+            return false;
+
+        bool changed = false;
+        if (innerPtr->getAddressSpace() != held)
+        {
+            IRBuilder builder(var);
+            auto newInner = builder.getPtrType(
+                innerPtr->getOp(),
+                innerPtr->getValueType(),
+                innerPtr->getAccessQualifier(),
+                held,
+                innerPtr->getDataLayout());
+            auto newOuter = builder.getPtrType(
+                outerPtr->getOp(),
+                newInner,
+                outerPtr->getAccessQualifier(),
+                outerPtr->getAddressSpace(),
+                outerPtr->getDataLayout());
+            setDataType(var, newOuter);
+            changed = true;
+        }
+        for (auto use = var->firstUse; use; use = use->nextUse)
+        {
+            auto load = as<IRLoad>(use->getUser());
+            if (!load || load->getPtr() != var)
+                continue;
+            if (getAddrSpace(load) != held)
+            {
+                mapInstToAddrSpace[load] = held;
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    // Return the ultimate original `func` was (transitively) specialized from, or
+    // `func` itself when it is not a clone. Every specialized copy of one source
+    // function shares this root, so it is a stable per-source-function key.
+    IRFunc* getSpecializationRoot(IRFunc* func)
+    {
+        if (IRFunc** root = specializationRootOf.tryGetValue(func))
+            return *root;
+        return func;
+    }
+
     // Join the address spaces flowing into a phi (a non-entry block parameter) and return the
     // joined concrete address space, or `Generic` if no predecessor has been resolved yet.
     // Called both when the phi is first resolved and when it is revisited, so a predecessor
     // resolved on a later fixpoint iteration can still refine the mapping.
     //
-    // This does not diagnose a phi that merges two *different* concrete address spaces:
-    // `SPIRVLegalizationContext::processParam` (slang-ir-spirv-legalize.cpp) already reports
-    // that, and it runs while phis still exist — by the time this pass runs on the only
-    // sink-carrying path (SPIR-V) phis have been eliminated, so a phi conflict never reaches
-    // here with a sink. Diagnosing it here would be dead on every path (no other caller passes a
-    // sink) and would double-report with `processParam`. A conflicting phi therefore just joins
-    // to its last concrete arg here; compilation has already failed via `processParam`.
+    // This does not diagnose a phi that merges two *different* concrete address spaces. On
+    // SPIR-V, phis are eliminated before this pass runs and
+    // `SPIRVLegalizationContext::processParam` (slang-ir-spirv-legalize.cpp) already reports such a
+    // conflict while phis still exist. The GLSL/Metal/WGSL callers now also pass a sink (for the
+    // return-conflict diagnostic), but only SPIR-V's split of logical and physical pointers makes a
+    // merged pointer ill-typed, so a merged phi is not a target error on those targets and never
+    // needs diagnosing here. A conflicting phi therefore just joins to its last concrete arg here.
     AddressSpace resolvePhiAddrSpace(IRInst* param)
     {
         AddressSpace joined = AddressSpace::Generic;
@@ -175,6 +408,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         while (changed)
         {
             changed = false;
+            // Tracks whether this traversal has already derived the function's result
+            // address space from a return, so only the first concrete return (in
+            // iteration order) is used — see the Return case.
+            bool resultAddrSpaceSetThisPass = false;
             for (auto block : func->getBlocks())
             {
                 bool isFirstBlock = block == func->getFirstBlock();
@@ -253,6 +490,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         }
                         break;
                     case kIROp_Store:
+                        changed |=
+                            reconcileHeldPointerAddressSpace(func, as<IRStore>(inst)->getPtr());
                         break;
                     case kIROp_Param:
                         if (!isFirstBlock)
@@ -269,64 +508,141 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         {
                             auto callInst = as<IRCall>(inst);
                             auto callee = as<IRFunc>(inst->getOperand(0));
-                            if (callee)
+                            if (!callee)
+                                break;
+
+                            List<AddressSpace> argAddrSpaces;
+                            bool hasSpecializableArg = false;
+                            for (UInt i = 0; i < callInst->getArgCount(); i++)
                             {
-                                List<AddressSpace> argAddrSpaces;
-                                bool hasSpecializableArg = false;
-                                for (UInt i = 0; i < callInst->getArgCount(); i++)
-                                {
-                                    auto arg = callInst->getArg(i);
-                                    auto addrSpace = getAddrSpace(arg);
-                                    argAddrSpaces.add(addrSpace);
-                                    if (addrSpace != AddressSpace::Generic)
-                                    {
-                                        hasSpecializableArg = true;
-                                    }
-                                }
-                                if (!hasSpecializableArg)
-                                {
-                                    workList.add(callee);
-                                    break;
-                                }
-                                // If callee doesn't have a body, don't specialize.
-                                if (!callee->getFirstBlock())
-                                    break;
+                                auto arg = callInst->getArg(i);
+                                auto argAddrSpace = getAddrSpace(arg);
+                                argAddrSpaces.add(argAddrSpace);
+                                if (argAddrSpace != AddressSpace::Generic)
+                                    hasSpecializableArg = true;
+                            }
+
+                            // A callee with no pointer arguments (or no body) is not
+                            // cloned, but it can still RETURN a pointer, so its result
+                            // address space must be reconciled onto the call below either
+                            // way. Argument specialization and result reconciliation are
+                            // independent concerns; only the former is gated on
+                            // hasSpecializableArg.
+                            IRFunc* specializedCallee = callee;
+                            if (hasSpecializableArg && callee->getFirstBlock())
+                            {
                                 FuncSpecializationKey key(callee, argAddrSpaces);
-                                IRFunc* specializedCallee = nullptr;
-                                if (IRFunc** specializedFunc =
-                                        functionSpecializations.tryGetValue(key))
+                                if (IRFunc** cached = functionSpecializations.tryGetValue(key))
                                 {
-                                    specializedCallee = *specializedFunc;
+                                    specializedCallee = *cached;
                                 }
                                 else
                                 {
-                                    specializedCallee = specializeFunc(key);
-                                    workList.add(specializedCallee);
+                                    // Cyclic specialization: if specializing `callee` re-enters a
+                                    // root already on this stack, the call graph is recursive
+                                    // (normally rejected by E55201, skipped under
+                                    // -disable-non-essential-validations). Cloning would not
+                                    // terminate (each clone is a fresh identity), so reuse `callee`
+                                    // to break the cycle.
+                                    IRFunc* root = getSpecializationRoot(callee);
+                                    if (rootsBeingSpecialized.contains(root))
+                                    {
+                                        // Cache the reuse under this key so the worklist's later
+                                        // revisit resolves the same call from the cache instead of
+                                        // re-cloning (the root has left the stack by then).
+                                        specializedCallee = callee;
+                                        functionSpecializations[key] = callee;
+                                        recursiveRoots.add(root);
+                                    }
+                                    else
+                                    {
+                                        specializedCallee = specializeFunc(key);
+                                        workList.add(specializedCallee);
+
+                                        // Settle the callee's result address space before reading
+                                        // it below: specializeFunc concretizes only parameters, the
+                                        // result lazily in Return handling. The workList.add stays
+                                        // idempotent (processFunction skips already-mapped insts).
+                                        // Bracketing with rootsBeingSpecialized lets the check
+                                        // above catch a cyclic callee.
+                                        rootsBeingSpecialized.add(root);
+                                        processFunction(specializedCallee);
+                                        rootsBeingSpecialized.remove(root);
+                                    }
                                 }
-                                IRBuilder builder(callInst);
-                                builder.setInsertBefore(callInst);
-                                if (specializedCallee != callInst->getCallee())
+                            }
+                            else if (callee->getFirstBlock())
+                            {
+                                // No argument to specialize on, but the callee may still
+                                // return a pointer. Add it to the worklist, and if it
+                                // returns a pointer settle its result now (guarded against
+                                // recursion via the specialization root) — exactly as the
+                                // specialized branch settles a fresh clone. The tail below
+                                // records this call's result once and it is then skipped on
+                                // later drains (a mapped inst is not revisited), so reading a
+                                // pre-settlement default here would never be corrected.
+                                workList.add(callee);
+                                IRFunc* root = getSpecializationRoot(callee);
+                                if (rootsBeingSpecialized.contains(root))
                                 {
-                                    callInst = as<IRCall>(builder.replaceOperand(
-                                        callInst->getOperands(),
-                                        specializedCallee));
-                                    // At this point, the original callee may be left without uses.
-                                    functionsToConsiderRemoving.add(callee);
+                                    recursiveRoots.add(root);
                                 }
-                                auto callResultAddrSpace =
-                                    getFuncResultAddrSpace(specializedCallee);
-                                if (callResultAddrSpace != AddressSpace::Generic)
+                                else if (getFuncResultAddrSpace(callee) != AddressSpace::Generic)
                                 {
-                                    mapInstToAddrSpace[callInst] = callResultAddrSpace;
-                                    changed = true;
+                                    rootsBeingSpecialized.add(root);
+                                    processFunction(callee);
+                                    rootsBeingSpecialized.remove(root);
                                 }
+                            }
+
+                            IRBuilder builder(callInst);
+                            builder.setInsertBefore(callInst);
+                            if (specializedCallee != callInst->getCallee())
+                            {
+                                callInst = as<IRCall>(builder.replaceOperand(
+                                    callInst->getOperands(),
+                                    specializedCallee));
+                                // At this point, the original callee may be left without uses.
+                                functionsToConsiderRemoving.add(callee);
+                            }
+                            // Reconcile the call's result address space to the callee's.
+                            // The callee has been settled above (eagerly for a fresh
+                            // specialization or a pointer-returning unspecialized callee;
+                            // a recursive back-edge reuses an already-cached callee whose
+                            // result the base case settles before the recursive return is
+                            // read), so this reads a concrete result rather than a default.
+                            auto callResultAddrSpace = getFuncResultAddrSpace(specializedCallee);
+                            if (callResultAddrSpace != AddressSpace::Generic)
+                            {
+                                mapInstToAddrSpace[callInst] = callResultAddrSpace;
+                                changed = true;
                             }
                         }
                         break;
                     case kIROp_Return:
                         {
+                            // Use the first concrete return (in iteration order) as the result
+                            // address space and skip the rest. A well-typed function's returns
+                            // agree, so the choice is unambiguous; committing to one also keeps
+                            // conflicting returns from flipping the result type every drain and
+                            // requeuing the function forever.
                             auto retVal = inst->getOperand(0);
                             auto addrSpace = getAddrSpace(retVal);
+                            if (resultAddrSpaceSetThisPass)
+                            {
+                                // A later return in a different concrete storage class means the
+                                // function returns pointers in more than one class, which is
+                                // invalid (a function has one result type). Record it (once per
+                                // function); it is reported from this shared pass after dead-clone
+                                // removal, so every target is covered and no diagnostic fires on an
+                                // original that a clone replaced and this pass deletes.
+                                if (sink && addrSpace != AddressSpace::Generic &&
+                                    addrSpace != getFuncResultAddrSpace(func))
+                                {
+                                    conflictingReturns.addIfNotExists(func, inst->sourceLoc);
+                                }
+                                break;
+                            }
                             if (addrSpace != AddressSpace::Generic)
                             {
                                 auto funcType = as<IRFuncType>(func->getDataType());
@@ -346,6 +662,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                     fixUpFuncType(func, newResultType);
                                     retValAddrSpaceChanged = true;
                                 }
+                                resultAddrSpaceSetThisPass = true;
                             }
                         }
                         break;
@@ -502,7 +819,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         AddressSpace storedAddrSpace = AddressSpace::Generic;
         bool conflict = false;
-        auto consider = [&](IRInst* value)
+        SourceLoc conflictLoc;
+        auto consider = [&](IRInst* value, SourceLoc loc)
         {
             auto valueAddrSpace = getStoredValueAddrSpace(value);
             if (valueAddrSpace == AddressSpace::Generic)
@@ -510,7 +828,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             if (storedAddrSpace == AddressSpace::Generic)
                 storedAddrSpace = valueAddrSpace;
             else if (storedAddrSpace != valueAddrSpace)
+            {
                 conflict = true;
+                conflictLoc = loc;
+            }
         };
         for (auto use = slot->firstUse; use; use = use->nextUse)
         {
@@ -518,26 +839,28 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             if (auto store = as<IRStore>(user))
             {
                 if (store->getPtr() == slot)
-                    consider(store->getVal());
+                    consider(store->getVal(), store->sourceLoc);
             }
             else if (auto debugValue = as<IRDebugValue>(user))
             {
                 if (debugValue->getDebugVar() == slot)
-                    consider(debugValue->getValue());
+                    consider(debugValue->getValue(), debugValue->sourceLoc);
             }
         }
         if (conflict)
         {
-            // Two writes give the slot pointer values in different concrete address spaces;
-            // a single slot cannot hold both, so diagnose rather than silently picking one.
-            // Only the real variable is diagnosed: a `DebugVar` mirrors that same variable, so
-            // diagnosing it too would double-report, and a debug slot must never be the thing
-            // that rejects an otherwise valid program. The fixpoint may revisit the slot, so
-            // report each conflicting slot exactly once.
-            if (sink && slot->getOp() == kIROp_Var && diagnosedAddrSpaceConflicts.add(slot))
-                sink->diagnose(Diagnostics::InconsistentPointerAddressSpace{
-                    .inst = slot,
-                    .location = slot->sourceLoc});
+            // A single slot cannot hold pointers in two concrete address spaces. Only the real
+            // variable is diagnosed: a `DebugVar` mirrors it, and a debug slot must never be the
+            // thing that rejects an otherwise valid program. The shared `recordSlotConflict` owns
+            // the E58005-vs-E58003 ownership rule and the deferred, deduped reporting.
+            if (slot->getOp() == kIROp_Var)
+            {
+                // A slot is enumerated from a function's blocks, so it always has a parent
+                // function; assert that invariant rather than silently dropping the diagnostic.
+                auto func = getParentFunc(slot);
+                SLANG_RELEASE_ASSERT(func);
+                recordSlotConflict(func, slot, conflictLoc);
+            }
             return false;
         }
         if (storedAddrSpace == AddressSpace::Generic)
@@ -652,23 +975,36 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // through derived pointer ops, phi/block parameters, calls, and returns via the
         // existing machinery, rather than leaving stale `Device` types on the users.
         //
-        // Gated to the SPIR-V path (the only caller that passes a `sink`). This pre-pass — and
-        // its `InconsistentPointerAddressSpace` conflict diagnostic — targets the logical-
-        // `StorageBuffer`-vs-physical-`Device` slot mismatch that only SPIR-V's split of logical
-        // and physical pointers makes ill-typed. The other callers (Metal/WGSL/GLSL legalization)
-        // pass no sink; their targets do not model that split, so retyping slots there would be a
-        // silent, undiagnosed change to their address-space handling with no correctness benefit.
-        // A caller that wants slot reconciliation (and the conflict diagnostic) must opt in with a
-        // sink.
-        if (sink)
+        // This pre-pass — and its `InconsistentPointerAddressSpace` conflict diagnostic —
+        // targets the logical-`StorageBuffer`-vs-physical-`Device` slot mismatch that only
+        // SPIR-V's split of logical and physical pointers makes ill-typed, so it is gated on the
+        // assigner opting in via `shouldReconcileLocalPointerSlots`, not on the presence of a
+        // sink: Metal and WGSL do assign pointer address spaces in this pass, but a merged slot is
+        // not a type error for them, and GLSL's assigner infers nothing — so retyping slots there
+        // would be a silent, SPIR-V-shaped change to their address-space handling with no
+        // correctness benefit, even though they now supply a sink for the separate return-conflict
+        // diagnostic.
+        if (addrSpaceAssigner->shouldReconcileLocalPointerSlots())
             reconcilePointerSlots();
 
-        HashSet<IRFunc*> newWorkList;
         while (workList.getCount())
         {
+            // Requeue only the callers discovered this round; the set must reset
+            // each iteration or the worklist refills from the whole accumulated
+            // set forever and the fixpoint never terminates (#12498).
+            HashSet<IRFunc*> newWorkList;
+            // Process each function at most once per drain. processFunction is
+            // idempotent, and a caller needing a callee's settled result is
+            // requeued via newWorkList, so this is a no-op for an acyclic graph.
+            // It bounds the drain for a cyclic one: a recursive call re-adds its
+            // callee every visit (see the Call case), which would otherwise grow
+            // workList without bound under -disable-non-essential-validations.
+            HashSet<IRFunc*> processedThisDrain;
             for (Index i = 0; i < workList.getCount(); i++)
             {
                 auto func = workList[i];
+                if (!processedThisDrain.add(func))
+                    continue;
                 bool resultTypeChanged = processFunction(func);
                 if (resultTypeChanged)
                 {
@@ -688,11 +1024,71 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         applyAddressSpaceToInstType();
 
-        for (IRFunc* func : functionsToConsiderRemoving)
+        // Remove originals replaced by specialized clones. Removal must be
+        // order-independent: an original callee may still be used by an original
+        // caller that is itself pending removal, so a single pass could skip the
+        // callee, remove the caller, and orphan it (a dead unspecialized function
+        // whose Generic address space a later Metal/WGSL emit cannot lower).
+        // Iterate to a fixpoint.
+        List<IRFunc*> deadCandidates;
+        for (auto func : functionsToConsiderRemoving)
+            deadCandidates.add(func);
+        HashSet<IRFunc*> removedFuncs;
+        bool removedAny = true;
+        while (removedAny)
         {
-            SLANG_ASSERT(!func->findDecoration<IREntryPointDecoration>());
-            if (!func->hasUses())
-                func->removeAndDeallocate();
+            removedAny = false;
+            for (Index i = 0; i < deadCandidates.getCount(); i++)
+            {
+                auto func = deadCandidates[i];
+                if (!func)
+                    continue;
+                SLANG_ASSERT(!func->findDecoration<IREntryPointDecoration>());
+                if (!func->hasUses())
+                {
+                    removedFuncs.add(func);
+                    func->removeAndDeallocate();
+                    deadCandidates[i] = nullptr;
+                    removedAny = true;
+                }
+            }
+        }
+
+        // Report conflicting-return-storage-class functions now that dead clones
+        // are gone. Skip any removed function (removedFuncs holds freed pointers,
+        // compared by identity only, never read). One source function can survive
+        // as several specialized copies, so key on the specialization root to
+        // report each source function at most once.
+        if (sink)
+        {
+            HashSet<IRFunc*> reportedRoots;
+            for (auto& [func, loc] : conflictingReturns)
+            {
+                if (removedFuncs.contains(func))
+                    continue;
+                if (reportedRoots.add(getSpecializationRoot(func)))
+                    sink->diagnose(
+                        Diagnostics::ConflictingReturnPointerStorageClasses{.location = loc});
+            }
+
+            // The non-returned held/slot conflicts (E58003) share the deferral, but — unlike the
+            // return conflicts above, where a function has one result type — a single function may
+            // have several genuinely distinct conflicting slots, each of which must be reported.
+            // So we dedup by *source slot*, keyed on `(specialization root, slot ordinal)`: clones
+            // of one source slot share both and collapse to one diagnostic, while distinct slots in
+            // the same function differ in ordinal and each report. `reportedSlots` maps a root to
+            // the set of source-slot ordinals already reported for it.
+            Dictionary<IRFunc*, HashSet<Index>> reportedSlots;
+            for (auto& [slot, func] : inconsistentAddrSpaceSlots)
+            {
+                if (removedFuncs.contains(func))
+                    continue;
+                auto root = getSpecializationRoot(func);
+                if (reportedSlots[root].add(getSlotOrdinalInFunc(func, slot)))
+                    sink->diagnose(Diagnostics::InconsistentPointerAddressSpace{
+                        .inst = slot,
+                        .location = slot->sourceLoc});
+            }
         }
     }
 };
