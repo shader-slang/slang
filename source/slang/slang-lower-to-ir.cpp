@@ -14563,6 +14563,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IRNoSideEffectDecoration>(irFunc);
             }
+            else if (
+                auto requireShaderInputAttr =
+                    as<GLSLRequireShaderInputParameterAttribute>(modifier))
+            {
+                getBuilder()->addDecoration(
+                    irFunc,
+                    kIROp_RequireShaderInputParameterDecoration,
+                    getBuilder()->getIntValue(
+                        getBuilder()->getIntType(),
+                        requireShaderInputAttr->parameterNumber));
+            }
             else if (as<EarlyDepthStencilAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
