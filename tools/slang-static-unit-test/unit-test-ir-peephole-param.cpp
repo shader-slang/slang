@@ -671,9 +671,10 @@ SLANG_UNIT_TEST(irPeepholeParamForwardsBlockLocalDefinedValueOnlyWhenItDominates
     }
 }
 
-// A frozen input is refined only to a value that cannot be poison. Here `x` is computed in the entry
-// block after `a` and dominates every use of `a`, but an arbitrary instruction result may be poison
-// (or may depend on a poison argument), so the param is kept rather than refining `a` to `x`.
+// A frozen input is refined only to a value that cannot be poison. Here `x` is computed in the
+// entry block after `a` and dominates every use of `a`, but an arbitrary instruction result may be
+// poison (or may depend on a poison argument), so the param is kept rather than refining `a` to
+// `x`.
 SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueIsBlockLocal)
 {
     StaticUnitTestEnv env(unitTestContext);
