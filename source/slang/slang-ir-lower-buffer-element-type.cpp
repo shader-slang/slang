@@ -2612,6 +2612,13 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
 
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config)
     {
+        // On CPU and CUDA, `&x` of a local gives a `Ptr<T>` in the same `UserPointer` address
+        // space as a pointer into device memory, so both must share one pointee type. We keep
+        // the pointee a plain matrix, which is how these targets store every matrix that is not
+        // in a buffer.
+        if (config.addressSpace == AddressSpace::UserPointer &&
+            (isCPUTarget(target->getTargetReq()) || isCUDATarget(target->getTargetReq())))
+            return false;
         if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout &&
             config.getLayoutRule()->ruleName == IRTypeLayoutRuleName::Natural)
         {
