@@ -108,10 +108,9 @@ int lambdaParameter()
     return f(1);
 }
 
-// A function-local `cbuffer` is a local whose fields lookup finds through it. A local type
-// written directly in the function already could not see the field before this change, but one
-// written inside a lambda reached it through the `cbuffer`'s local and emitted an undeclared
-// value, so we test the lambda shape.
+// A function-local `cbuffer` is a local whose fields lookup finds through it. Nesting the local
+// type in a lambda makes lookup reach the field through the `cbuffer`'s transparent local; a
+// type written directly in the function takes a different lookup path.
 int localCBufferFieldInLambda()
 {
     cbuffer CB { int c; };
@@ -158,7 +157,7 @@ int laterLocalHidesGlobal()
 // No "did you mean" note suggests a local that the local type cannot use, or a global that such
 // a local hides.
 static const int total = 1;
-int noSuggestionOfHiddenLocal()
+int noSuggestionOfShadowedGlobal()
 {
     int total = buf[0];
     struct L { int get() { return totl; } };
