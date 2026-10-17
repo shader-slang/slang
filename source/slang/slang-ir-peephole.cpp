@@ -197,7 +197,6 @@ struct PeepholeContext : InstPassBase
 
         ShortList<IRInst*> values;
         IRInst* definedValue = nullptr;
-        Index definedValueCount = 0;
         for (auto pred : block->getPredecessors())
         {
             auto branch = cast<IRUnconditionalBranch>(pred->getTerminator());
@@ -205,12 +204,13 @@ struct PeepholeContext : InstPassBase
             auto arg = branch->getArg(paramIndex);
             if (arg == param || values.contains(arg))
                 continue;
-            values.add(arg);
             if (!as<IRUndefined>(arg))
             {
+                if (definedValue)
+                    return false;
                 definedValue = arg;
-                definedValueCount++;
             }
+            values.add(arg);
         }
         if (values.getCount() == 0)
             return false;
@@ -222,8 +222,6 @@ struct PeepholeContext : InstPassBase
             return tryForwardParam(param, values[0]);
         }
 
-        if (definedValueCount > 1)
-            return false;
         if (definedValue)
             return tryForwardDefinedValue(param, block, paramIndex, values, definedValue);
 
