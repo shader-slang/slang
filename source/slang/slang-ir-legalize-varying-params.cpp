@@ -3342,10 +3342,10 @@ private:
                 ensureStructHasUserSemantic<LayoutResourceKind::VaryingInput>(
                     flattenedStruct,
                     layout);
-                if (vertexInputLocationsFollowLayout() && flattenedStruct == structType &&
+                if (vertexInputLocationsFollowLayout() &&
                     entryPoint.entryPointDecor->getProfile().getStage() == Stage::Vertex)
                 {
-                    assignUserSemanticIndicesFromLayout(flattenedStruct, layout);
+                    assignUserSemanticIndicesFromLayout(flattenedStruct, structType, layout);
                 }
                 if (flattenedStruct != structType)
                 {
@@ -3502,32 +3502,74 @@ private:
             .location = param->sourceLoc});
     }
 
-    // Re-index every user-semantic field with its varying-input layout location, so the
-    // emitted location matches the one reported by reflection and used by the API.
-    void assignUserSemanticIndicesFromLayout(IRStructType* structType, IRVarLayout* varLayout)
+    // Appends, in depth-first field order (the order nested structs are flattened in), the
+    // absolute varying-input location of every leaf field of `type`, or -1 when unknown.
+    void collectLeafVaryingInputLocations(
+        IRStructType* type,
+        IRTypeLayout* typeLayout,
+        UInt baseOffset,
+        List<Index>& outLocations)
     {
-        auto typeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
-        if (!typeLayout)
-            return;
-        UInt varOffset = 0;
-        if (auto varOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
-            varOffset = varOffsetAttr->getOffset();
-        IRBuilder builder(structType);
+        auto structLayout = as<IRStructTypeLayout>(typeLayout);
         Index index = 0;
-        for (auto field : structType->getFields())
+        for (auto field : type->getFields())
         {
+            auto fieldLayout = structLayout ? structLayout->getFieldLayout(index) : nullptr;
+            index++;
+            UInt offset = baseOffset;
+            bool known = false;
+            if (fieldLayout)
+            {
+                if (auto offsetAttr = fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                {
+                    offset += offsetAttr->getOffset();
+                    known = true;
+                }
+            }
+            if (auto nestedType = as<IRStructType>(field->getFieldType()))
+            {
+                collectLeafVaryingInputLocations(
+                    nestedType,
+                    fieldLayout ? fieldLayout->getTypeLayout() : nullptr,
+                    offset,
+                    outLocations);
+                continue;
+            }
+            outLocations.add(known ? Index(offset) : -1);
+        }
+    }
+
+    // Re-index every user-semantic field of the (possibly flattened) `flatStruct` with its
+    // varying-input layout location taken from the original `sourceStruct`, so the emitted
+    // location matches the one reported by reflection and used by the API.
+    void assignUserSemanticIndicesFromLayout(
+        IRStructType* flatStruct,
+        IRStructType* sourceStruct,
+        IRVarLayout* varLayout)
+    {
+        UInt baseOffset = 0;
+        if (auto varOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+            baseOffset = varOffsetAttr->getOffset();
+        List<Index> locations;
+        collectLeafVaryingInputLocations(
+            sourceStruct,
+            varLayout->getTypeLayout(),
+            baseOffset,
+            locations);
+
+        IRBuilder builder(flatStruct);
+        Index index = 0;
+        for (auto field : flatStruct->getFields())
+        {
+            if (index >= locations.getCount())
+                break;
+            auto location = locations[index++];
             auto key = field->getKey();
-            auto fieldLayout = typeLayout->getFieldLayout(index++);
             auto semanticDecor = key->findDecoration<IRSemanticDecoration>();
-            if (!semanticDecor || !fieldLayout)
+            if (!semanticDecor || location < 0)
                 continue;
-            auto offsetAttr = fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingInput);
-            if (!offsetAttr)
-                continue;
-            auto newDecor = builder.addSemanticDecoration(
-                key,
-                semanticDecor->getSemanticName(),
-                (int)(varOffset + offsetAttr->getOffset()));
+            auto newDecor =
+                builder.addSemanticDecoration(key, semanticDecor->getSemanticName(), (int)location);
             semanticDecor->replaceUsesWith(newDecor);
             semanticDecor->removeAndDeallocate();
         }

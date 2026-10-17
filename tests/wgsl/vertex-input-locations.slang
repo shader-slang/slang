@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=IMPLICIT): -target wgsl -stage vertex -entry implicitMain
 //TEST:SIMPLE(filecheck=EXPLICIT): -target wgsl -stage vertex -entry explicitMain
+//TEST:SIMPLE(filecheck=NESTED): -target wgsl -stage vertex -entry nestedMain
 
 // Vertex input locations follow the varying-input layout (declaration order, or explicit
 // `[[vk::location]]`), which is what reflection reports and what WebGPU pipelines bind as
@@ -34,4 +35,27 @@ struct ExplicitInput
 float4 explicitMain(ExplicitInput input) : SV_Position
 {
     return float4(input.position * input.weight, 1.0);
+}
+
+// Nested structs are flattened; locations still follow the (accumulated) layout offsets.
+struct NestedWidth
+{
+    float lineWidth : TEXCOORD0;
+    float3 end : TEXCOORD1;
+};
+
+struct NestedInput
+{
+    // NESTED-DAG: @location(0) start{{.*}} : vec3<f32>
+    float3 start : POSITION0;
+    // NESTED-DAG: @location(1) lineWidth{{.*}} : f32
+    // NESTED-DAG: @location(2) end{{.*}} : vec3<f32>
+    NestedWidth more;
+    // NESTED-DAG: @location(3) color{{.*}} : vec4<f32>
+    float4 color : COLOR0;
+};
+
+float4 nestedMain(NestedInput input) : SV_Position
+{
+    return float4(input.start + input.more.end * input.more.lineWidth, 1.0) + input.color;
 }
