@@ -2398,6 +2398,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.loc = param->loc;
             // Note: `InOutModifier` inherits from `OutModifier`, so it must be
             // checked first to avoid mislabeling `inout` parameters as "output".
+            // A reference parameter never reaches here; we reject it earlier
+            // in this function.
             ctx.direction = param->hasModifier<InOutModifier>() ? "input/output"
                             : param->hasModifier<OutModifier>() ? "output"
                                                                 : "input";
