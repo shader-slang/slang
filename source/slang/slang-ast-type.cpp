@@ -658,30 +658,8 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
                 auto ptrPairType =
                     astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
 
-                switch (paramInfo.mode)
-                {
-                case ParamPassingMode::Out:
-                    newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::In:
-                    newParamTypes.add(ptrPairType);
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::BorrowIn:
-                    newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::RefReadWrite:
-                case ParamPassingMode::RefReadOnly:
-                case ParamPassingMode::RefWriteOnly:
-                    newParamTypes.add(
-                        getParamTypeWithModeWrapper(astBuilder, ptrPairType, paramInfo.mode));
-                    break;
-                default:
-                    SLANG_ASSERT(!"Unknown parameter direction");
-                    break;
-                }
+                newParamTypes.add(
+                    getParamTypeWithModeWrapper(astBuilder, ptrPairType, paramInfo.mode));
             }
             else
             {
@@ -760,30 +738,8 @@ Val* RematFuncType::_resolveImplOverride()
                 auto ptrPairType =
                     astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
 
-                switch (paramInfo.mode)
-                {
-                case ParamPassingMode::Out:
-                    newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::In:
-                    newParamTypes.add(ptrPairType);
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::BorrowIn:
-                    newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::RefReadWrite:
-                case ParamPassingMode::RefReadOnly:
-                case ParamPassingMode::RefWriteOnly:
-                    newParamTypes.add(
-                        getParamTypeWithModeWrapper(astBuilder, ptrPairType, paramInfo.mode));
-                    break;
-                default:
-                    SLANG_ASSERT(!"Unknown parameter direction");
-                    break;
-                }
+                newParamTypes.add(
+                    getParamTypeWithModeWrapper(astBuilder, ptrPairType, paramInfo.mode));
             }
             else
             {
