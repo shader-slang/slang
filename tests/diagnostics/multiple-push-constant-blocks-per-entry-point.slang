@@ -7,8 +7,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute -O0
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target glsl -entry main -stage compute
-// CHECK: error[E39033]
-// CHECK: note:
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -emit-spirv-via-glsl -entry main -stage compute
 
 struct PC
 {
@@ -25,10 +24,10 @@ RWStructuredBuffer<float> outBuf;
 [numthreads(4, 1, 1)]
 void main(uint3 tid: SV_DispatchThreadID, uniform float k, uniform float2 scale)
 /*CHECK:
-     ^^^^ entry point uses more than one push-constant block
+     ^^^^ error E39033
      ^^^^ entry point `main` uses more than one push-constant block, but Vulkan allows at most one per entry point
      ^^^^ the push-constant block that holds the `uniform` parameters `k`, `scale` of `main` is used by this entry point
-     ^^^^ each push-constant block starts at offset 0
+     ^^^^ combine the data into one
 */
 {
     outBuf[tid.x] = push.a.x + k * scale.y + tid.x;

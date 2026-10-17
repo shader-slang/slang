@@ -3084,7 +3084,15 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         // passes have been performed, we can emit target code from
         // the IR module.
         //
+        const Index errorCountBeforeEmit = sink->getErrorCount();
         sourceEmitter->emitModule(irModule, sink);
+
+        // The GLSL emitter reports more than one push-constant block in an entry point, which
+        // glslang would reject, so we do not return that GLSL. Other emitters can report errors
+        // that callers such as `getTargetMetadata` have so far tolerated, so this applies to GLSL
+        // only.
+        if (target == CodeGenTarget::GLSL && sink->getErrorCount() > errorCountBeforeEmit)
+            return SLANG_FAIL;
     }
 
     String code = sourceWriter.getContent();
