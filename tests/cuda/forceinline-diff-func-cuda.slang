@@ -16,10 +16,11 @@ float square(float x)
 }
 
 // Both the primal `square` and its forward-derivative survive as deferred `__forceinline__
-// __device__` functions carrying the hint.
+// __device__` functions carrying the hint, and the kernel still calls the derivative.
 // CHECK-DAG: __forceinline__ __device__ {{.*}}square
 // CHECK-DAG: __forceinline__ __device__ {{.*}}s_fwd_square
 // CHECK: computeMain
+// CHECK: s_fwd_square{{.*}}(
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
