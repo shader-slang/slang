@@ -8,6 +8,29 @@
 
 namespace Slang
 {
+/// Return the first `VaryingInput` offset after the varying inputs that an entry point declares as
+/// its own parameters, or 0 when it declares none. A module-scope input that is appended to the
+/// entry point's parameters is placed relative to this offset: for `vsB(float4 extra : EXTRA)`,
+/// `extra` takes location 0, so an appended `in float3 gPos;` starts at location 1.
+static UInt getVaryingInputOffsetAfterParams(IRStructTypeLayout* paramsStructLayout)
+{
+    IRVarLayout* lastFieldVarLayout = nullptr;
+    for (auto attr : paramsStructLayout->getFieldLayoutAttrs())
+    {
+        if (attr->getLayout()->usesResourceKind(LayoutResourceKind::VaryingInput))
+            lastFieldVarLayout = attr->getLayout();
+    }
+    if (!lastFieldVarLayout)
+        return 0;
+
+    auto sizeAttr =
+        lastFieldVarLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::VaryingInput);
+    auto offsetAttr = lastFieldVarLayout->findOffsetAttr(LayoutResourceKind::VaryingInput);
+    if (!sizeAttr || !offsetAttr)
+        return 0;
+    return sizeAttr->getFiniteSize() + (UInt)offsetAttr->getOffset();
+}
+
 struct GlobalVarTranslationContext
 {
     CodeGenContext* context;
@@ -87,10 +110,8 @@ struct GlobalVarTranslationContext
             // replacement struct type first.
             //
             // We'll also need to fix up the offsets of the global varing inputs
-            // being added if we have any varing input entry point params. Set
-            // these to some defaults for now.
+            // being added if we have any varing input entry point params.
             UInt nextOffset = 0;
-            IRVarLayout* lastFieldVarLayout = nullptr;
 
             // If we have an existing entry point struct layout, we need to go through it and
             // add any of the struct field layout attributes as fields in the new struct type
@@ -116,32 +137,8 @@ struct GlobalVarTranslationContext
                             IRVarLayout* fieldLayout = attr->getLayout();
                             IRInst* key = attr->getFieldKey();
                             inputStructTypeLayoutBuilder.addField(key, fieldLayout);
-
-                            // Save the last VaryingInput type. This will be used to help
-                            // recalculate offsets for the global varying inputs.
-                            if (fieldLayout->usesResourceKind(LayoutResourceKind::VaryingInput))
-                                lastFieldVarLayout = fieldLayout;
                         }
-
-                        // Calculate the nextOffset if necessary. If entry params had no varying
-                        // inputs nextOffset will just be 0.
-                        if (lastFieldVarLayout)
-                        {
-                            // Find the size and offset of the last varying "in" kind
-                            // param in the entry point param struct. Adding these will give us
-                            // the starting offset that should be used for the first global.
-                            if (auto sizeAttr = lastFieldVarLayout->getTypeLayout()->findSizeAttr(
-                                    LayoutResourceKind::VaryingInput))
-                            {
-                                const auto finiteSize = sizeAttr->getFiniteSize();
-                                if (auto offsetAttr = lastFieldVarLayout->findOffsetAttr(
-                                        LayoutResourceKind::VaryingInput))
-                                {
-                                    UInt lastFieldOffset = offsetAttr->getOffset();
-                                    nextOffset = finiteSize + lastFieldOffset;
-                                }
-                            }
-                        }
+                        nextOffset = getVaryingInputOffsetAfterParams(entryPointParamsStructLayout);
                     }
                 }
             }
