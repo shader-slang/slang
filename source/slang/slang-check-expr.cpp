@@ -5449,7 +5449,10 @@ static Name* findClosestInScopeName(
 
     // Lookup from a member of a function-local type does not find the enclosing function's
     // parameters and non-static locals, so we don't suggest them once the walk has left a type.
+    // Such a declaration still hides declarations of the same name in farther-out scopes, so we
+    // don't suggest those either.
     bool hasLeftTypeDecl = false;
+    HashSet<Name*> hiddenNames;
 
     for (Scope* s = scope; s; s = s->parent)
     {
@@ -5483,6 +5486,11 @@ static Name* findClosestInScopeName(
                     continue;
 
                 if (hasLeftTypeDecl && isAutomaticStorageDecl(candidateDecl))
+                {
+                    hiddenNames.add(candidateName);
+                    continue;
+                }
+                if (hiddenNames.contains(candidateName))
                     continue;
 
                 const UnownedStringSlice candidateText = getUnownedStringSliceText(candidateName);

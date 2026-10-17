@@ -1119,13 +1119,14 @@ static void _lookUpInScopes(
         // An excluded parameter or local still hides declarations of the same name in farther-out
         // scopes, so a reference from the local type to that name is an undefined identifier
         // rather than a silent reference to, say, a global. We stop only when nothing has been
-        // found yet; otherwise the rules below decide whether to keep walking, and a completion
-        // request keeps walking to list every visible name.
+        // found yet; otherwise the rules below decide whether to keep walking. A completion
+        // request has already found the local type's own members by this point, so it keeps
+        // walking and lists the names that stay visible.
         //
         // `visitBlockStmt` checks local types before it hides the block's later locals from
         // lookup, so a local declared after the type also hides a global of the same name here,
         // although C++ would bind the global in that order.
-        if (excludedAutomaticStorageDecl && !result.isValid() && !request.isCompletionRequest())
+        if (excludedAutomaticStorageDecl && !result.isValid())
             break;
 
         if (result.isValid())
