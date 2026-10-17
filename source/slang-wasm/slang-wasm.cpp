@@ -71,8 +71,100 @@ GlobalSession* createGlobalSession()
     return new GlobalSession(globalSession);
 }
 
-Session* GlobalSession::createSession(int compileTarget)
+// True if `object` has its own property `name` (not one from its prototype) and the property
+// is neither `undefined` nor `null`. A descriptor is a plain object literal, so an explicit
+// `undefined` or `null` counts as leaving the field out.
+static bool hasProperty(const emscripten::val& object, const char* name)
 {
+    return object.hasOwnProperty(name) && !object[name].isUndefined() && !object[name].isNull();
+}
+
+Session* GlobalSession::createSession(emscripten::val desc)
+{
+    // A plain number is the compile target (the original signature).
+    const bool isTargetOnly = desc.isNumber();
+    const bool isObject =
+        !desc.isNull() && !desc.isUndefined() && desc.typeOf().as<std::string>() == "object";
+    if (!isTargetOnly && (!isObject || !hasProperty(desc, "target")))
+    {
+        g_error.type = std::string("USER");
+        g_error.result = SLANG_E_INVALID_ARG;
+        g_error.message = std::string("createSession: expected a compile target or an object "
+                                      "with a 'target' property");
+        return nullptr;
+    }
+    const int compileTarget = isTargetOnly ? desc.as<int>() : desc["target"].as<int>();
+
+    std::string profile;
+    std::vector<std::string> macroNames, macroValues, searchPaths;
+    std::vector<std::string> optionStrings0, optionStrings1;
+    std::vector<CompilerOptionEntry> options;
+    // The default of slang::SessionDesc, which every session used before descriptors.
+    SlangMatrixLayoutMode matrixLayoutMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+
+    if (!isTargetOnly)
+    {
+        if (hasProperty(desc, "profile"))
+            profile = desc["profile"].as<std::string>();
+        if (hasProperty(desc, "preprocessorMacros"))
+        {
+            for (auto& macro :
+                 emscripten::vecFromJSArray<emscripten::val>(desc["preprocessorMacros"]))
+            {
+                macroNames.push_back(macro["name"].as<std::string>());
+                macroValues.push_back(
+                    hasProperty(macro, "value") ? macro["value"].as<std::string>() : "");
+            }
+        }
+        if (hasProperty(desc, "searchPaths"))
+            searchPaths = emscripten::vecFromJSArray<std::string>(desc["searchPaths"]);
+        if (hasProperty(desc, "defaultMatrixLayoutMode"))
+            matrixLayoutMode = (SlangMatrixLayoutMode)desc["defaultMatrixLayoutMode"].as<int>();
+        if (hasProperty(desc, "compilerOptions"))
+        {
+            for (auto& option :
+                 emscripten::vecFromJSArray<emscripten::val>(desc["compilerOptions"]))
+            {
+                CompilerOptionEntry entry = {};
+                entry.name = (CompilerOptionName)option["name"].as<int>();
+                // The kind follows from the fields that are set: each option reads either
+                // strings or ints (see slang::CompilerOptionName), so an option given its
+                // documented fields gets the kind it reads.
+                const bool isString =
+                    hasProperty(option, "stringValue0") || hasProperty(option, "stringValue1");
+                entry.value.kind =
+                    isString ? CompilerOptionValueKind::String : CompilerOptionValueKind::Int;
+                if (hasProperty(option, "intValue0"))
+                    entry.value.intValue0 = option["intValue0"].as<int>();
+                if (hasProperty(option, "intValue1"))
+                    entry.value.intValue1 = option["intValue1"].as<int>();
+                optionStrings0.push_back(
+                    hasProperty(option, "stringValue0") ? option["stringValue0"].as<std::string>()
+                                                        : "");
+                optionStrings1.push_back(
+                    hasProperty(option, "stringValue1") ? option["stringValue1"].as<std::string>()
+                                                        : "");
+                options.push_back(entry);
+            }
+        }
+    }
+
+    // Point the descriptors at the strings only now that the vectors no longer grow.
+    std::vector<PreprocessorMacroDesc> macros;
+    for (size_t i = 0; i < macroNames.size(); i++)
+        macros.push_back({macroNames[i].c_str(), macroValues[i].c_str()});
+    std::vector<const char*> searchPathPointers;
+    for (auto& path : searchPaths)
+        searchPathPointers.push_back(path.c_str());
+    for (size_t i = 0; i < options.size(); i++)
+    {
+        if (options[i].value.kind == CompilerOptionValueKind::String)
+        {
+            options[i].value.stringValue0 = optionStrings0[i].c_str();
+            options[i].value.stringValue1 = optionStrings1[i].c_str();
+        }
+    }
+
     Slang::ComPtr<ISession> session;
     {
         SessionDesc sessionDesc = {};
@@ -80,12 +172,30 @@ Session* GlobalSession::createSession(int compileTarget)
         constexpr SlangInt targetCount = 1;
         TargetDesc target = {};
         target.format = (SlangCompileTarget)compileTarget;
-        if (compileTarget == SLANG_HLSL)
+        if (!profile.empty())
+        {
+            target.profile = spFindProfile(m_interface, profile.c_str());
+            if (target.profile == SLANG_PROFILE_UNKNOWN)
+            {
+                g_error.type = std::string("USER");
+                g_error.result = SLANG_E_INVALID_ARG;
+                g_error.message = "createSession: unknown profile '" + profile + "'";
+                return nullptr;
+            }
+        }
+        else if (compileTarget == SLANG_HLSL)
         {
             target.profile = spFindProfile(m_interface, "sm_6_6");
         }
         sessionDesc.targets = &target;
         sessionDesc.targetCount = targetCount;
+        sessionDesc.preprocessorMacros = macros.data();
+        sessionDesc.preprocessorMacroCount = (SlangInt)macros.size();
+        sessionDesc.searchPaths = searchPathPointers.data();
+        sessionDesc.searchPathCount = (SlangInt)searchPathPointers.size();
+        sessionDesc.compilerOptionEntries = options.data();
+        sessionDesc.compilerOptionEntryCount = (uint32_t)options.size();
+        sessionDesc.defaultMatrixLayoutMode = matrixLayoutMode;
         SlangResult result = m_interface->createSession(sessionDesc, session.writeRef());
         if (result != SLANG_OK)
         {
