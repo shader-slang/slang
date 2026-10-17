@@ -14878,11 +14878,20 @@ T __copyObject<T>(T v)
    }
 }
 
+// We drop the call on Metal and WGSL because neither target has a non-uniform annotation; the note
+// at the top of slang-ir-float-non-uniform-resource-index.cpp explains when that is correct.
 /// `NonUniformResourceIndex` function is used to indicate if the resource index is
 /// divergent, and ensure scalarization happens correctly for each divergent lane.
+///
+/// On Metal, WGSL, CUDA and CPU targets no non-uniform annotation is emitted, and none is needed:
+/// Metal handles a divergent index into an array of textures or buffers itself. On WebGPU, a runtime
+/// may require an optional feature for divergent indexing into binding arrays; enabling it is up to
+/// the application, and Slang does not diagnose a missing feature.
 __generic<T:__BuiltinArithmeticType>
 __intrinsic_op($(kIROp_NonUniformResourceIndex))
 [require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
+[require(metal)]
+[require(wgsl)]
 T NonUniformResourceIndex(T index);
 
 /// HLSL allows NonUniformResourceIndex around non int/uint types.
