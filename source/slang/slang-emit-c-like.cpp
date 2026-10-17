@@ -3758,6 +3758,10 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion, Region* breakRegionToOmit)
                 for (auto inst = block->getFirstInst(); inst != terminator;
                      inst = inst->getNextInst())
                 {
+                    // A counted loop's header emits its counter's declaration and
+                    // stores, so skip them here.
+                    if (m_instsEmittedInLoopHeader.contains(inst))
+                        continue;
                     emitInst(inst);
                 }
 
@@ -3867,7 +3871,10 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion, Region* breakRegionToOmit)
                     emitLoopControlDecorationImpl(loopControlDecoration);
                 }
 
-                m_writer->emit(getUnconditionalLoopHeader());
+                if (auto countedLoop = m_countedLoops.tryGetValue(loopInst))
+                    emitCountedLoopHeader(*countedLoop);
+                else
+                    m_writer->emit(getUnconditionalLoopHeader());
                 m_writer->emit("\n{\n");
                 m_writer->indent();
                 emitRegion(loopRegion->body);
@@ -3985,7 +3992,231 @@ void CLikeSourceEmitter::emitFunctionBody(IRGlobalValueWithCode* code)
     Dictionary<IRInst*, bool> foldSafetyCache;
     m_foldSafetyCache = &foldSafetyCache;
     SLANG_DEFER(m_foldSafetyCache = nullptr);
+
+    m_countedLoops.clear();
+    m_instsEmittedInLoopHeader.clear();
+    SLANG_DEFER(m_countedLoops.clear());
+    SLANG_DEFER(m_instsEmittedInLoopHeader.clear());
+    if (shouldEmitCountedLoopsAsFor())
+        findCountedLoops(regionTree, regionTree->rootRegion);
+
     emitRegionTree(regionTree);
+}
+
+void CLikeSourceEmitter::findCountedLoops(RegionTree* regionTree, Region* region)
+{
+    while (region)
+    {
+        switch (region->getFlavor())
+        {
+        case Region::Flavor::Simple:
+            region = ((SimpleRegion*)region)->nextRegion;
+            break;
+        case Region::Flavor::If:
+            {
+                auto ifRegion = (IfRegion*)region;
+                findCountedLoops(regionTree, ifRegion->thenRegion);
+                findCountedLoops(regionTree, ifRegion->elseRegion);
+                region = ifRegion->nextRegion;
+            }
+            break;
+        case Region::Flavor::Switch:
+            {
+                auto switchRegion = (SwitchRegion*)region;
+                for (auto& switchCase : switchRegion->cases)
+                    findCountedLoops(regionTree, switchCase->body);
+                region = switchRegion->nextRegion;
+            }
+            break;
+        case Region::Flavor::Loop:
+            {
+                auto loopRegion = (LoopRegion*)region;
+                CountedLoop countedLoop;
+                if (tryMatchCountedLoop(regionTree, loopRegion, countedLoop))
+                    m_countedLoops[loopRegion->loopInst] = countedLoop;
+                findCountedLoops(regionTree, loopRegion->body);
+                region = loopRegion->nextRegion;
+            }
+            break;
+        default:
+            // `break` and `continue` regions end a sequence.
+            region = nullptr;
+            break;
+        }
+    }
+}
+
+// Match a loop whose only back edge runs `counter = counter + step` (or `- step`) on an
+// integer `var` that is initialized right before the loop and used only inside it:
+//
+//      var i = init;           // the only other store to `i`
+//      loop {                  // the header's only predecessors: here and the continue block
+//          ...                 // loads of `i`, no stores to it
+//      continue_block:
+//          ...
+//          i = i + step;       // the only store in the loop
+//          ...                 // no loads of `i` after it
+//          goto loop;
+//      }
+//
+// Such a loop can be emitted as `for (var i = init; ; i = i + step) { ... }`. Every path to
+// the back edge passes through the continue block, so moving the update into the `for`
+// update clause (which runs on `continue` and at the end of the body) keeps its semantics,
+// and the copies of the continue block at each `continue` site simply drop the update.
+//
+bool CLikeSourceEmitter::tryMatchCountedLoop(
+    RegionTree* regionTree,
+    LoopRegion* loopRegion,
+    CountedLoop& outLoop)
+{
+    auto loopInst = loopRegion->loopInst;
+    auto loopBlock = as<IRBlock>(loopInst->getParent());
+    auto headerBlock = loopInst->getTargetBlock();
+    auto continueBlock = loopInst->getContinueBlock();
+    if (!loopBlock || !headerBlock || !continueBlock || continueBlock == headerBlock)
+        return false;
+    if (headerBlock->getFirstParam() || loopInst->getArgCount() != 0)
+        return false;
+
+    auto backEdge = as<IRUnconditionalBranch>(continueBlock->getTerminator());
+    if (!backEdge || backEdge->getOp() != kIROp_UnconditionalBranch ||
+        backEdge->getTargetBlock() != headerBlock || backEdge->getArgCount() != 0)
+        return false;
+    for (auto pred : headerBlock->getPredecessors())
+    {
+        if (pred != loopBlock && pred != continueBlock)
+            return false;
+    }
+
+    // Is every copy of `block` in the output emitted inside the loop body? A region's parent
+    // is the region before it in sequence, so the regions after the loop lead up to the loop
+    // region too (through its `nextRegion`); only the chain that starts at `body` is inside.
+    auto isEmittedInsideLoop = [&](IRBlock* block)
+    {
+        SimpleRegion* simpleRegion = nullptr;
+        if (!regionTree->mapBlockToRegion.tryGetValue(block, simpleRegion))
+            return false;
+        for (; simpleRegion; simpleRegion = simpleRegion->nextSimpleRegionForSameBlock)
+        {
+            Region* region = simpleRegion;
+            while (region && region->getParent() != loopRegion)
+                region = region->getParent();
+            if (!region || region != loopRegion->body)
+                return false;
+        }
+        return true;
+    };
+
+    for (auto inst : continueBlock->getChildren())
+    {
+        // Look for `store(counter, add(load(counter), step))`.
+        auto updateStore = as<IRStore>(inst);
+        if (!updateStore)
+            continue;
+        auto counter = as<IRVar>(updateStore->getPtr());
+        if (!counter)
+            continue;
+        auto counterType = counter->getDataType()->getValueType();
+        if (!counterType ||
+            (counterType->getOp() != kIROp_IntType && counterType->getOp() != kIROp_UIntType))
+            continue;
+
+        auto newVal = updateStore->getVal();
+        if (newVal->getOp() != kIROp_Add && newVal->getOp() != kIROp_Sub)
+            continue;
+        bool isDecrement = newVal->getOp() == kIROp_Sub;
+        IRInst* counterLoad = newVal->getOperand(0);
+        IRInst* step = newVal->getOperand(1);
+        if (!isDecrement && as<IRIntLit>(counterLoad))
+            Swap(counterLoad, step);
+        auto stepLit = as<IRIntLit>(step);
+        if (!stepLit || !as<IRLoad>(counterLoad) || counterLoad->getOperand(0) != counter)
+            continue;
+        if (stepLit->getDataType() != counterType)
+            continue;
+
+        // The counter's other uses must be one initial store in the block that enters the
+        // loop, and loads that are emitted inside the loop and read the current iteration's
+        // value (so none after the update in the continue block).
+        IRStore* initStore = nullptr;
+        bool isMatch = true;
+        for (auto use = counter->firstUse; use && isMatch; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (user == updateStore)
+            {
+                isMatch = use == &updateStore->ptr;
+                continue;
+            }
+            if (auto store = as<IRStore>(user))
+            {
+                isMatch = !initStore && use == &store->ptr && store->getParent() == loopBlock;
+                initStore = store;
+                continue;
+            }
+            if (auto load = as<IRLoad>(user))
+            {
+                auto loadBlock = as<IRBlock>(load->getParent());
+                isMatch = loadBlock && isEmittedInsideLoop(loadBlock);
+                if (isMatch && loadBlock == continueBlock)
+                {
+                    for (auto ii = updateStore->getNextInst(); ii; ii = ii->getNextInst())
+                    {
+                        if (ii == load)
+                            isMatch = false;
+                    }
+                }
+                continue;
+            }
+            isMatch = false;
+        }
+        if (!isMatch || !initStore)
+            return false;
+
+        // The initial value is evaluated in the `for` header instead of at the store, so it
+        // must be a constant or a value that already has its own name at that point.
+        auto initVal = initStore->getVal();
+        if (!as<IRConstant>(initVal) && shouldFoldInstIntoUseSites(initVal))
+            return false;
+
+        outLoop.counter = counter;
+        outLoop.initVal = initVal;
+        outLoop.step = stepLit;
+        outLoop.isDecrement = isDecrement;
+        m_instsEmittedInLoopHeader.add(counter);
+        m_instsEmittedInLoopHeader.add(initStore);
+        m_instsEmittedInLoopHeader.add(updateStore);
+        // The header re-computes the new value, so drop it from the body if nothing else
+        // uses it (it may sit in an earlier block, where it would not be folded).
+        if (!newVal->hasMoreThanOneUse())
+        {
+            m_instsEmittedInLoopHeader.add(newVal);
+            if (!counterLoad->hasMoreThanOneUse())
+                m_instsEmittedInLoopHeader.add(counterLoad);
+        }
+        return true;
+    }
+    return false;
+}
+
+void CLikeSourceEmitter::emitCountedLoopHeader(const CountedLoop& countedLoop)
+{
+    auto counter = countedLoop.counter;
+    auto counterType = counter->getDataType()->getValueType();
+    auto counterName = getName(counter);
+
+    m_writer->emit("for (");
+    emitVarKeyword(counterType, counter);
+    emitType(counterType, counterName);
+    m_writer->emit(" = ");
+    emitOperand(countedLoop.initVal, getInfo(EmitOp::General));
+    m_writer->emit("; ; ");
+    m_writer->emit(counterName);
+    m_writer->emit(" = ");
+    m_writer->emit(counterName);
+    m_writer->emit(countedLoop.isDecrement ? " - " : " + ");
+    emitOperand(countedLoop.step, getInfo(EmitOp::General));
+    m_writer->emit(")");
 }
 
 void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
