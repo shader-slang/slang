@@ -1,6 +1,6 @@
 // Guard for shader-slang/slang#13687: the declared semantic of a module-scope `in out` varying
 // describes its input. The output field of the entry point's result takes the stage's default
-// fragment output semantic, as it did before global varyings were translated per entry point.
+// fragment output semantic.
 
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry fsA -stage fragment
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry fsA -stage fragment
