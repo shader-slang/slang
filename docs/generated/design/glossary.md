@@ -32,7 +32,7 @@ lookup aid; the peer document is the source of truth.
 
 This page does **not** redefine terms that already live in the
 user-facing language/runtime glossary at
-[../../language-reference/glossary.md](../../language-reference/glossary.md)
+[specification/glossary.md](https://github.com/shader-slang/spec/blob/main/specification/glossary.md)
 (threads, dispatch, observable behavior, tangled function, ...).
 A handful of terms (notably `entry point`) have both a runtime sense and
 a compile-pipeline sense; in those cases the language-reference glossary

@@ -22,7 +22,7 @@ both sets coexist and may be cross-referenced.
 | [ir-reference/](ir-reference) | Per-opcode reference for the Slang IR instruction set, grouped by family (types, values, control-flow, structure, generics/existentials, resources/atomics, differentiation, decorations, metadata, misc) |
 | [name-resolution/](name-resolution) | Algorithmic rules for identifier scopes, lookup, shadowing, visibility, and overload resolution |
 | [target-pipelines/](target-pipelines) | Ordered, control-flow-graph view of the IR passes that run for one target end-to-end; complements the unordered catalog in `pipeline/05-ir-passes.md`. Pages: SPIR-V, HLSL, Metal, WGSL, CUDA, plus an index. |
-| [glossary.md](glossary.md) | Compiler-internals vocabulary used across this tree and the source; complements the user-facing [language-reference glossary](../../language-reference/glossary.md) |
+| [glossary.md](glossary.md) | Compiler-internals vocabulary used across this tree and the source; complements the user-facing [language-reference glossary](https://github.com/shader-slang/spec/blob/main/specification/glossary.md) |
 | [_meta/](_meta) | Pipeline infrastructure: manifest, prompts, freshness state, regeneration driver |
 
 ## Trust model and freshness

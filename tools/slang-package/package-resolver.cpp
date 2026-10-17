@@ -1,0 +1,1490 @@
+// package-resolver.cpp
+
+#include "package-resolver.h"
+
+#include "core/slang-io.h"
+#include "package-git.h"
+#include "package-json.h"
+#include "package-local.h"
+#include "package-path.h"
+#include "package-report.h"
+
+namespace Slang
+{
+namespace PackageTool
+{
+
+struct GitRequirement
+{
+    String owner;
+    String git;
+    /// Git URL written on the dependency edge before the remap index replaces it.
+    String declaredGit;
+    VersionConstraint constraint;
+};
+
+struct ResolutionPackage
+{
+    String name;
+    String git;
+    String canonicalPath;
+    String pathOwner;
+    List<GitRequirement> gitRequirements;
+    bool selected = false;
+    ResolveSelectionKind selectionKind = ResolveSelectionKind::HighestRelease;
+    List<ResolveConstraintNote> constraintNotes;
+    List<ResolveSkipNote> skips;
+    LockedPackage locked;
+    ResolvedManifest resolvedManifest;
+};
+
+static String _rootOwnerKey()
+{
+    return "<root>";
+}
+
+static String _gitOwnerKey(const String& packageName, const String& commit)
+{
+    return String("git:") + packageName + "@" + commit;
+}
+
+static String _pathOwnerKey(const String& canonicalPath)
+{
+    return String("path:") + canonicalPath;
+}
+
+static String _localOwnerKey(const String& packageName, const String& path)
+{
+    return String("local:") + packageName + ":" + path;
+}
+
+static String _candidateOwnerKey(const String& packageName, const String& ref)
+{
+    return String("candidate:") + packageName + "@" + ref;
+}
+
+class GitPackageResolverSource : public IPackageResolverSource
+{
+public:
+    String projectRoot;
+    String cacheRoot;
+    String depsDirectory;
+    bool allowRemote = true;
+    List<String>* warnings = nullptr;
+    List<String> preparedPackages;
+    List<DeferredCacheReplacement> deferredCacheReplacements;
+
+    SlangResult initialize(String& outError)
+    {
+        cacheRoot = Path::combine(Path::combine(projectRoot, ".slang"), "repositories");
+        if (allowRemote && !Path::createDirectoryRecursive(cacheRoot))
+        {
+            outError = String("Cannot create package cache directory: ") + cacheRoot;
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
+
+    SlangResult ensureCachedRepository(
+        const String& packageName,
+        const String& git,
+        String& outRepositoryPath,
+        String& outError)
+    {
+        outRepositoryPath = packageRepositoryPath(projectRoot, git);
+        String cacheKey = packageName + "\n" + git;
+        if (preparedPackages.indexOf(cacheKey) >= 0)
+        {
+            String located;
+            SLANG_RETURN_ON_FAIL(
+                locatePreparedPackageCache(outRepositoryPath, git, located, outError));
+            outRepositoryPath = located;
+            return SLANG_OK;
+        }
+        if (allowRemote)
+        {
+            String activePath;
+            String unpushedReport;
+            SLANG_RETURN_ON_FAIL(refreshPackageCache(
+                projectRoot,
+                git,
+                outRepositoryPath,
+                outError,
+                false,
+                &activePath,
+                &unpushedReport));
+            if (activePath.getLength())
+                outRepositoryPath = activePath;
+            if (unpushedReport.getLength())
+            {
+                DeferredCacheReplacement replacement;
+                replacement.packageName = packageName;
+                replacement.gitURL = git;
+                replacement.canonicalPath = packageRepositoryPath(projectRoot, git);
+                replacement.replacementPath = activePath;
+                replacement.report = unpushedReport;
+                deferredCacheReplacements.add(replacement);
+            }
+        }
+        else
+        {
+            SLANG_RETURN_ON_FAIL(requirePackageCache(git, outRepositoryPath, outError));
+        }
+        preparedPackages.add(cacheKey);
+        return SLANG_OK;
+    }
+
+    virtual SlangResult listReleaseTags(
+        const String& packageName,
+        const String& git,
+        List<TagCandidate>& outCandidates,
+        String& outError) override
+    {
+        String repositoryPath;
+        SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
+        return listReleaseTagsFromRepository(repositoryPath, outCandidates, outError, warnings);
+    }
+
+    virtual SlangResult loadManifest(
+        const String& packageName,
+        const String& git,
+        const TagCandidate& candidate,
+        ResolvedManifest& outManifest,
+        String& outError) override
+    {
+        String repositoryPath;
+        SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
+        SlangResult result = allowRemote
+                                 ? fetchCachedCommit(repositoryPath, candidate.commit, outError)
+                                 : requireCachedCommit(repositoryPath, candidate.commit, outError);
+        SLANG_RETURN_ON_FAIL(result);
+        String manifestText;
+        SLANG_RETURN_ON_FAIL(readFileAtRevision(
+            repositoryPath,
+            candidate.commit,
+            kPackageFileName,
+            manifestText,
+            outError));
+        String sourceName = git + "@" + candidate.ref + ":" + kPackageFileName;
+        SLANG_RETURN_ON_FAIL(
+            readManifestText(sourceName, manifestText, outManifest.manifest, outError));
+        outManifest.ownerKey = _gitOwnerKey(packageName, candidate.commit);
+        outManifest.lockRoot = Path::combine(depsDirectory, packageName);
+        outManifest.gitRepositoryPath = repositoryPath;
+        outManifest.gitRevision = candidate.commit;
+        return SLANG_OK;
+    }
+
+    virtual SlangResult loadCheckoutManifest(
+        const String& packageName,
+        const LockedPackage& held,
+        ResolvedManifest& outManifest,
+        String& outError) override
+    {
+        String checkout = Path::combine(Path::combine(projectRoot, depsDirectory), packageName);
+        String origin;
+        SLANG_RETURN_ON_FAIL(getRepositoryOrigin(checkout, origin, outError));
+        if (origin != held.git)
+        {
+            outError = String("Edited package '") + packageName +
+                       "' checkout origin does not match the lock.";
+            return SLANG_FAIL;
+        }
+        String branch;
+        bool detached = false;
+        SLANG_RETURN_ON_FAIL(getCheckedOutBranch(checkout, branch, detached, outError));
+        if (detached || branch != held.branch)
+        {
+            String actual =
+                detached ? String("a detached HEAD") : String("branch '") + branch + "'";
+            outError = String("Edited package '") + packageName + "' is checked out on " + actual +
+                       ", but the lock records branch '" + held.branch +
+                       "'. update leaves this checkout unchanged.";
+            return SLANG_FAIL;
+        }
+        String manifestPath = Path::combine(checkout, kPackageFileName);
+        String manifestText;
+        if (SLANG_FAILED(File::readAllText(manifestPath, manifestText)))
+        {
+            outError = String("Cannot read edited package manifest: ") + manifestPath;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(
+            readManifestText(manifestPath, manifestText, outManifest.manifest, outError));
+        String headCommit;
+        SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(checkout, headCommit, outError));
+        outManifest.ownerKey = String("edit:") + packageName + "@" + held.branch;
+        outManifest.lockRoot = Path::combine(depsDirectory, packageName);
+        outManifest.gitRepositoryPath = checkout;
+        outManifest.gitRevision = headCommit;
+        return SLANG_OK;
+    }
+};
+
+class LocalPackageResolverSource : public IPackageResolverSource
+{
+public:
+    String projectRoot;
+    const List<LocalPackage>* localPackages = nullptr;
+    GitPackageResolverSource gitSource;
+    bool allowRemote = true;
+    List<String>* warnings = nullptr;
+
+    SlangResult initialize(String& outError)
+    {
+        gitSource.projectRoot = projectRoot;
+        gitSource.depsDirectory = depsDirectory;
+        gitSource.allowRemote = allowRemote;
+        gitSource.warnings = warnings;
+        return gitSource.initialize(outError);
+    }
+
+    virtual SlangResult loadCheckoutManifest(
+        const String& packageName,
+        const LockedPackage& held,
+        ResolvedManifest& outManifest,
+        String& outError) override
+    {
+        return gitSource.loadCheckoutManifest(packageName, held, outManifest, outError);
+    }
+
+    String depsDirectory;
+
+    virtual SlangResult listReleaseTags(
+        const String& packageName,
+        const String& git,
+        List<TagCandidate>& outCandidates,
+        String& outError) override
+    {
+        Index localIndex = findActiveLocalPackageIndex(*localPackages, packageName);
+        if (localIndex < 0)
+            return gitSource.listReleaseTags(packageName, git, outCandidates, outError);
+
+        const LocalPackage& localPackage = (*localPackages)[localIndex];
+        TagCandidate candidate;
+        candidate.path = localPackage.path;
+        SLANG_RETURN_ON_FAIL(parseExactVersion(localPackage.as, candidate.version, outError));
+        outCandidates.clear();
+        outCandidates.add(candidate);
+        return SLANG_OK;
+    }
+
+    virtual SlangResult loadManifest(
+        const String& packageName,
+        const String& git,
+        const TagCandidate& candidate,
+        ResolvedManifest& outManifest,
+        String& outError) override
+    {
+        if (!candidate.path.getLength())
+            return gitSource.loadManifest(packageName, git, candidate, outManifest, outError);
+
+        Index localIndex = findActiveLocalPackageIndex(*localPackages, packageName);
+        if (localIndex < 0 || (*localPackages)[localIndex].path != candidate.path)
+        {
+            outError =
+                String("Local package registration changed during resolution: ") + packageName;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(readLocalPackageManifest(
+            projectRoot,
+            (*localPackages)[localIndex],
+            outManifest.manifest,
+            outError));
+        SLANG_RETURN_ON_FAIL(getLocalPackageRoot(
+            projectRoot,
+            (*localPackages)[localIndex],
+            outManifest.sourceRoot,
+            outError));
+        outManifest.ownerKey = _localOwnerKey(packageName, candidate.path);
+        outManifest.lockRoot = (*localPackages)[localIndex].path;
+        return SLANG_OK;
+    }
+};
+
+/// Resolve the workspace package's dependency graph to one lock entry per package name.
+///
+/// Consider this example: the workspace package depends on `b` from Git (`>=1.0.0`) and on `a` by
+/// relative path, and `a` also depends on `b` by path. Name identity is unique, so there is one
+/// `b`. The path edge wins, Git constraints that only the Git pin contributed must disappear, and
+/// transitives that existed only because of that pin must be pruned. Path packages are selected
+/// immediately; Git packages are searched by release tag.
+/// `ownerKey` records which selected representation added each Git requirement so a later path
+/// selection can retract it. Every candidate has one effective release version, including paths
+/// and local overrides, so all incoming version constraints use the same matching path.
+class Resolver
+{
+public:
+    static const Index kMaxPackageCount = 256;
+    static const Index kMaxCandidateAttempts = 4096;
+
+    IPackageResolverSource* source = nullptr;
+    String projectRoot;
+    const LockFile* heldLock = nullptr;
+    /// Name-to-Git-URL map from the lock's remap index. Null when this resolve uses manifest URLs.
+    const List<RepositoryLocation>* remapUrls = nullptr;
+    List<String>* warnings = nullptr;
+    ResolveReport* report = nullptr;
+    const Manifest* rootManifest = nullptr;
+    List<ResolutionPackage> packages;
+    Index candidateAttemptCount = 0;
+
+    SlangResult resolve(const Manifest& rootManifest, LockFile& outLock, String& outError)
+    {
+        this->rootManifest = &rootManifest;
+        if (report)
+        {
+            *report = ResolveReport();
+            report->rootPackageName = rootManifest.name;
+        }
+        ResolvedManifest root;
+        root.manifest = rootManifest;
+        root.ownerKey = _rootOwnerKey();
+        root.sourceRoot = projectRoot;
+        root.lockRoot = ".";
+        for (const auto& dependency : rootManifest.dependencies)
+            SLANG_RETURN_ON_FAIL(addDependency(dependency, root, outError));
+
+        ResolveFailure failure;
+        if (SLANG_FAILED(search(outError, failure)))
+        {
+            if (failure.packageName.getLength())
+            {
+                if (report)
+                    report->failure = failure;
+                outError = formatResolveFailure(failure);
+            }
+            return SLANG_FAIL;
+        }
+        outLock = LockFile();
+        List<bool> reachable;
+        getReachablePackages(reachable);
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (!reachable[i])
+                continue;
+            if (!packages[i].selected)
+            {
+                outError = String("Internal resolver error: reachable package '") +
+                           packages[i].name + "' is unexpectedly unselected.";
+                return SLANG_FAIL;
+            }
+            outLock.packages.add(packages[i].locked);
+        }
+        outLock.packages.sort([](const LockedPackage& left, const LockedPackage& right)
+                              { return left.name < right.name; });
+        List<ToolchainConstraint> toolchainConstraints;
+        addSlangToolchainConstraint(rootManifest, toolchainConstraints);
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (!reachable[i])
+                continue;
+            addSlangToolchainConstraint(
+                packages[i].resolvedManifest.manifest,
+                toolchainConstraints);
+        }
+        SLANG_RETURN_ON_FAIL(selectSlangToolchain(toolchainConstraints, outError));
+        if (report)
+        {
+            publishReport();
+            report->toolchainConstraints = toolchainConstraints;
+            if (toolchainConstraints.getCount())
+            {
+                PackageVersion installed;
+                String installedText;
+                String toolchainError;
+                if (SLANG_SUCCEEDED(getInstalledSlangToolchainVersion(
+                        installed,
+                        installedText,
+                        toolchainError)))
+                    report->installedToolchain = installedText;
+            }
+        }
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (!reachable[i])
+                continue;
+            addUnadoptedWorkspaceExclusionWarnings(
+                rootManifest,
+                packages[i].name,
+                packages[i].resolvedManifest.manifest,
+                warnings);
+        }
+        return SLANG_OK;
+    }
+
+private:
+    Index findPackage(const String& name) const
+    {
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (packages[i].name == name)
+                return i;
+        }
+        return -1;
+    }
+
+    /// Drop every constraint note on `package` that `owner` contributed.
+    ///
+    /// A note and the requirement it describes are two views of the same incoming edge: the
+    /// requirement is what `matchesAll` enforces, and the note is how the report explains it. If
+    /// the solver retracted one without the other, a report could tell the user that
+    /// `video-preview` requires `color-encoding >=2.0.0` after the path selection that removed
+    /// `video-preview` from the graph, and the printed requirements would no longer add up to the
+    /// failure being described. Every site that retracts requirements retracts the notes with them.
+    static void removeConstraintNotesFromOwner(ResolutionPackage& package, const String& owner)
+    {
+        for (Index i = package.constraintNotes.getCount() - 1; i >= 0; --i)
+        {
+            if (package.constraintNotes[i].ownerKey == owner)
+                package.constraintNotes.removeAt(i);
+        }
+    }
+
+    bool matchesAll(const ResolutionPackage& package, const PackageVersion& version) const
+    {
+        for (const auto& requirement : package.gitRequirements)
+        {
+            if (requirement.constraint.clauses.getCount() &&
+                !requirement.constraint.matches(version))
+                return false;
+        }
+        return true;
+    }
+
+    const Exclusion* findExclusion(const String& packageName, const PackageVersion& version) const
+    {
+        for (const auto& exclusion : rootManifest->workspace.exclusions)
+        {
+            if (exclusion.packageName == packageName &&
+                matchesVersionPolicy(exclusion.version, version))
+            {
+                return &exclusion;
+            }
+        }
+        return nullptr;
+    }
+
+    static const Retraction* findRetraction(
+        const List<Retraction>& retractions,
+        const PackageVersion& version)
+    {
+        for (const auto& retraction : retractions)
+        {
+            if (matchesVersionPolicy(retraction.version, version))
+                return &retraction;
+        }
+        return nullptr;
+    }
+
+    /// Read publisher retractions from the highest release, independently of the workspace's
+    /// version constraint. Local override candidates are explicit developer choices and do not
+    /// participate in remote retraction discovery.
+    SlangResult loadPublisherRetractions(
+        const ResolutionPackage& package,
+        const List<TagCandidate>& candidates,
+        List<Retraction>& outRetractions,
+        String& outError)
+    {
+        outRetractions.clear();
+        const TagCandidate* highestRelease = nullptr;
+        for (const auto& candidate : candidates)
+        {
+            if (!candidate.path.getLength())
+            {
+                highestRelease = &candidate;
+                break;
+            }
+        }
+        if (!highestRelease)
+            return SLANG_OK;
+
+        ResolvedManifest latestManifest;
+        SLANG_RETURN_ON_FAIL(
+            loadCandidateManifest(package, *highestRelease, latestManifest, outError));
+        outRetractions = latestManifest.manifest.retractions;
+        return SLANG_OK;
+    }
+
+    void removeRequirementsFromOwner(const String& owner)
+    {
+        // Path selection of `owner`'s package retracts every Git constraint that representation
+        // added, including constraints on other package names.
+        for (auto& package : packages)
+        {
+            String oldGit = package.git;
+            for (Index i = package.gitRequirements.getCount() - 1; i >= 0; --i)
+            {
+                if (package.gitRequirements[i].owner == owner)
+                    package.gitRequirements.removeAt(i);
+            }
+            removeConstraintNotesFromOwner(package, owner);
+            package.git =
+                package.gitRequirements.getCount() ? package.gitRequirements[0].git : String();
+            if (!package.canonicalPath.getLength() && package.selected && oldGit != package.git)
+            {
+                package.selected = false;
+                package.locked = LockedPackage();
+                package.resolvedManifest = ResolvedManifest();
+            }
+        }
+    }
+
+    bool isOwnerActive(const String& owner, const List<bool>& reachable) const
+    {
+        if (owner == _rootOwnerKey())
+            return true;
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (reachable[i] && packages[i].selected &&
+                packages[i].resolvedManifest.ownerKey == owner)
+                return true;
+        }
+        return false;
+    }
+
+    /// Drop Git constraints whose contributing representation is no longer reachable, and unselect
+    /// path packages whose declaring owner disappeared. Repeat until the reachable set is stable;
+    /// each iteration only removes requirements or selections, so it cannot cycle.
+    void pruneUnreachableGitRequirements()
+    {
+        for (;;)
+        {
+            List<bool> reachable;
+            getReachablePackages(reachable);
+            bool changed = false;
+            for (auto& package : packages)
+            {
+                if (package.canonicalPath.getLength() &&
+                    !isOwnerActive(package.pathOwner, reachable))
+                {
+                    String removedOwner = package.resolvedManifest.ownerKey;
+                    removeRequirementsFromOwner(removedOwner);
+                    package.canonicalPath = String();
+                    package.pathOwner = String();
+                    package.selected = false;
+                    package.locked = LockedPackage();
+                    package.resolvedManifest = ResolvedManifest();
+                    changed = true;
+                }
+                String oldGit = package.git;
+                for (Index i = package.gitRequirements.getCount() - 1; i >= 0; --i)
+                {
+                    const String& owner = package.gitRequirements[i].owner;
+                    if (!isOwnerActive(owner, reachable))
+                    {
+                        package.gitRequirements.removeAt(i);
+                        changed = true;
+                    }
+                }
+                package.git =
+                    package.gitRequirements.getCount() ? package.gitRequirements[0].git : String();
+                if (!package.canonicalPath.getLength() && package.selected && oldGit != package.git)
+                {
+                    package.selected = false;
+                    package.locked = LockedPackage();
+                    package.resolvedManifest = ResolvedManifest();
+                    changed = true;
+                }
+                // Retract the explanations for edges that just went away. This also covers the
+                // `as` note from a path edge, which has no Git requirement of its own but is just
+                // as stale once its declaring owner leaves the graph. Note removal never feeds
+                // back into the solve, so it does not set `changed` and cannot extend this loop.
+                for (Index i = package.constraintNotes.getCount() - 1; i >= 0; --i)
+                {
+                    if (!isOwnerActive(package.constraintNotes[i].ownerKey, reachable))
+                        package.constraintNotes.removeAt(i);
+                }
+            }
+            if (!changed)
+                return;
+        }
+    }
+
+    void getReachablePackages(List<bool>& outReachable) const
+    {
+        outReachable.setCount(packages.getCount());
+        for (auto& value : outReachable)
+            value = false;
+        List<Index> pending;
+        for (const auto& dependency : rootManifest->dependencies)
+        {
+            Index index = findPackage(dependency.name);
+            if (index >= 0 && !outReachable[index])
+            {
+                outReachable[index] = true;
+                pending.add(index);
+            }
+        }
+        for (Index pendingIndex = 0; pendingIndex < pending.getCount(); ++pendingIndex)
+        {
+            const auto& package = packages[pending[pendingIndex]];
+            if (!package.selected)
+                continue;
+            for (const auto& dependency : package.locked.dependencies)
+            {
+                Index index = findPackage(dependency.name);
+                if (index >= 0 && !outReachable[index])
+                {
+                    outReachable[index] = true;
+                    pending.add(index);
+                }
+            }
+        }
+    }
+
+    void addWarning(const String& warning)
+    {
+        if (!warnings || warnings->contains(warning))
+            return;
+        warnings->add(warning);
+    }
+
+    String ownerVersionFor(const ResolvedManifest& declaringManifest) const
+    {
+        if (declaringManifest.ownerKey == _rootOwnerKey())
+            return String();
+        Index index = findPackage(declaringManifest.manifest.name);
+        if (index < 0 || !packages[index].selected)
+            return String();
+        return packages[index].locked.version;
+    }
+
+    void addConstraintNote(
+        ResolutionPackage& package,
+        const ResolvedManifest& declaringManifest,
+        const String& text,
+        const VersionConstraint& constraint)
+    {
+        ResolveConstraintNote note;
+        note.ownerKey = declaringManifest.ownerKey;
+        note.ownerName = declaringManifest.manifest.name;
+        note.ownerVersion = ownerVersionFor(declaringManifest);
+        note.text = text;
+        note.constraint = constraint;
+        package.constraintNotes.add(note);
+    }
+
+    void publishReport()
+    {
+        if (!report)
+            return;
+        *report = ResolveReport();
+        report->rootPackageName = rootManifest->name;
+        List<bool> reachable;
+        getReachablePackages(reachable);
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (!reachable[i])
+                continue;
+            const ResolutionPackage& package = packages[i];
+            ResolvePackageExplanation explanation;
+            explanation.name = package.name;
+            explanation.version = package.locked.version;
+            explanation.git = package.locked.git;
+            explanation.ref =
+                package.locked.branch.getLength() ? package.locked.branch : package.locked.ref;
+            explanation.path = package.locked.path;
+            explanation.selectionKind = package.selectionKind;
+            explanation.constraints = package.constraintNotes;
+            explanation.skips = package.skips;
+            report->packages.add(explanation);
+        }
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (!reachable[i] || !packages[i].selected)
+                continue;
+            const ResolutionPackage& package = packages[i];
+            if (!remapUrls)
+                continue;
+            Index repositoryIndex = findRepositoryLocationIndex(*remapUrls, package.name);
+            if (repositoryIndex < 0)
+                continue;
+            String adoptedGit = (*remapUrls)[repositoryIndex].git;
+            if (!adoptedGit.getLength() || adoptedGit != package.git)
+                continue;
+            String declaredGit;
+            if (package.gitRequirements.getCount())
+                declaredGit = package.gitRequirements[0].declaredGit;
+            String previousGit;
+            if (heldLock)
+            {
+                Index lockedIndex = findLockedPackageIndex(*heldLock, package.name);
+                if (lockedIndex >= 0)
+                    previousGit = heldLock->packages[lockedIndex].git;
+            }
+            String fromGit = previousGit.getLength() ? previousGit : declaredGit;
+            if (!fromGit.getLength() || fromGit == adoptedGit)
+                continue;
+            RepositoryAdoption adoption;
+            adoption.packageName = package.name;
+            adoption.fromGit = fromGit;
+            adoption.toGit = adoptedGit;
+            report->repositoryAdoptions.add(adoption);
+        }
+    }
+
+    SlangResult loadPathManifest(
+        const Dependency& dependency,
+        const ResolvedManifest& declaringManifest,
+        String& outCanonicalPath,
+        ResolvedManifest& outManifest,
+        String& outError)
+    {
+        if (declaringManifest.gitRevision.getLength())
+        {
+            String gitRelativeRoot =
+                Path::simplify(Path::combine(declaringManifest.gitRelativeRoot, dependency.path));
+            if (Path::isAbsolute(gitRelativeRoot) || pathStartsWithParentComponent(gitRelativeRoot))
+            {
+                outError = String("Path dependency '") + dependency.name +
+                           "' escapes its Git package checkout: " + dependency.path;
+                return SLANG_FAIL;
+            }
+            String manifestPath = gitRelativeRoot.getLength()
+                                      ? Path::combine(gitRelativeRoot, kPackageFileName)
+                                      : kPackageFileName;
+            String manifestText;
+            SLANG_RETURN_ON_FAIL(readFileAtRevision(
+                declaringManifest.gitRepositoryPath,
+                declaringManifest.gitRevision,
+                manifestPath,
+                manifestText,
+                outError));
+            String sourceName = declaringManifest.gitRepositoryPath + "@" +
+                                declaringManifest.gitRevision + ":" + manifestPath;
+            SLANG_RETURN_ON_FAIL(
+                readManifestText(sourceName, manifestText, outManifest.manifest, outError));
+            outCanonicalPath = declaringManifest.gitRepositoryPath + "@" +
+                               declaringManifest.gitRevision + ":" + gitRelativeRoot;
+            outManifest.lockRoot =
+                Path::simplify(Path::combine(declaringManifest.lockRoot, dependency.path));
+            outManifest.gitRepositoryPath = declaringManifest.gitRepositoryPath;
+            outManifest.gitRevision = declaringManifest.gitRevision;
+            outManifest.gitRelativeRoot = gitRelativeRoot;
+        }
+        else
+        {
+            String sourcePath = Path::combine(declaringManifest.sourceRoot, dependency.path);
+            SlangPathType type;
+            if (SLANG_FAILED(Path::getPathType(sourcePath, &type)) ||
+                type != SLANG_PATH_TYPE_DIRECTORY ||
+                SLANG_FAILED(Path::getCanonical(sourcePath, outCanonicalPath)))
+            {
+                outError = String("Path dependency directory does not exist: ") + dependency.name +
+                           " (" + dependency.path + ")";
+                return SLANG_FAIL;
+            }
+            String canonicalDeclaringRoot;
+            if (SLANG_FAILED(
+                    Path::getCanonical(declaringManifest.sourceRoot, canonicalDeclaringRoot)))
+            {
+                outError =
+                    String("Cannot canonicalize package root: ") + declaringManifest.sourceRoot;
+                return SLANG_FAIL;
+            }
+            SLANG_RETURN_ON_FAIL(validatePathDoesNotEscapeIntoToolState(
+                projectRoot,
+                canonicalDeclaringRoot,
+                outCanonicalPath,
+                dependency.name,
+                outError));
+            SLANG_RETURN_ON_FAIL(readManifest(
+                Path::combine(outCanonicalPath, kPackageFileName),
+                outManifest.manifest,
+                outError));
+            outManifest.sourceRoot = outCanonicalPath;
+            if (isCanonicalPathWithin(canonicalDeclaringRoot, outCanonicalPath))
+            {
+                String relative =
+                    Path::getRelativePath(declaringManifest.sourceRoot, outCanonicalPath);
+                outManifest.lockRoot =
+                    Path::simplify(Path::combine(declaringManifest.lockRoot, relative));
+            }
+            else
+            {
+                outManifest.lockRoot = Path::getRelativePath(projectRoot, outCanonicalPath);
+                addWarning(
+                    String("Path dependency '") + dependency.name + "' escapes package '" +
+                    declaringManifest.manifest.name + "': " + dependency.path);
+            }
+            if (Path::isAbsolute(outManifest.lockRoot))
+            {
+                outError =
+                    String("Path dependency must be on the same filesystem as the workspace: ") +
+                    dependency.name;
+                return SLANG_FAIL;
+            }
+        }
+        if (outManifest.manifest.name != dependency.name)
+        {
+            outError = String("Package name '") + outManifest.manifest.name +
+                       "' does not match dependency name '" + dependency.name + "'.";
+            return SLANG_FAIL;
+        }
+        outManifest.ownerKey = _pathOwnerKey(outCanonicalPath);
+        return SLANG_OK;
+    }
+
+    SlangResult selectPathDependency(
+        ResolutionPackage& package,
+        const Dependency& dependency,
+        const ResolvedManifest& declaringManifest,
+        String& outError)
+    {
+        String canonicalPath;
+        ResolvedManifest pathManifest;
+        SLANG_RETURN_ON_FAIL(
+            loadPathManifest(dependency, declaringManifest, canonicalPath, pathManifest, outError));
+        if (package.canonicalPath.getLength() && package.canonicalPath != canonicalPath)
+        {
+            outError =
+                String("Package '") + dependency.name + "' is required from more than one path.";
+            return SLANG_FAIL;
+        }
+        PackageVersion pathVersion;
+        SLANG_RETURN_ON_FAIL(parseExactVersion(dependency.as, pathVersion, outError));
+        if (package.canonicalPath == canonicalPath && package.locked.path.getLength())
+        {
+            if (!sameExactRelease(package.locked.version, dependency.as))
+            {
+                outError = String("Package '") + dependency.name +
+                           "' is required from one path with different 'as' versions.";
+                return SLANG_FAIL;
+            }
+            VersionConstraint asConstraint;
+            String asError;
+            SLANG_RETURN_ON_FAIL(parseVersionConstraint(dependency.as, asConstraint, asError));
+            addConstraintNote(
+                package,
+                declaringManifest,
+                String("as ") + dependency.as,
+                asConstraint);
+            return SLANG_OK;
+        }
+        if (!matchesAll(package, pathVersion))
+        {
+            outError = String("Path dependency '") + dependency.name + "' provides version " +
+                       dependency.as + ", which conflicts with a Git version constraint.";
+            return SLANG_FAIL;
+        }
+        if (package.git.getLength())
+        {
+            addWarning(
+                String("Path dependency '") + dependency.name + "' shadows a Git dependency from " +
+                package.git + ".");
+        }
+        if (package.selected)
+        {
+            String removedOwner = package.resolvedManifest.ownerKey;
+            removeRequirementsFromOwner(removedOwner);
+        }
+        package.canonicalPath = canonicalPath;
+        package.pathOwner = declaringManifest.ownerKey;
+        package.selected = true;
+        package.selectionKind = ResolveSelectionKind::Path;
+        package.resolvedManifest = pathManifest;
+        package.locked = LockedPackage();
+        package.locked.name = package.name;
+        package.locked.path = pathManifest.lockRoot;
+        package.locked.version = dependency.as;
+        package.locked.dependencies = pathManifest.manifest.dependencies;
+        VersionConstraint asConstraint;
+        String asError;
+        SLANG_RETURN_ON_FAIL(parseVersionConstraint(dependency.as, asConstraint, asError));
+        addConstraintNote(package, declaringManifest, String("as ") + dependency.as, asConstraint);
+        pruneUnreachableGitRequirements();
+        for (const auto& child : pathManifest.manifest.dependencies)
+            SLANG_RETURN_ON_FAIL(addDependency(child, pathManifest, outError));
+        return SLANG_OK;
+    }
+
+    /// Return the Git URL to resolve for `packageName`.
+    ///
+    /// The remap index supplies the URL this lock uses for a package name. Edges that still name
+    /// the manifest URL resolve from the remapped one, so those edges agree on a single repository.
+    /// The substitution itself is reported from the selected graph, after search finishes.
+    String effectiveGitUrl(const String& packageName, const String& declaredGit)
+    {
+        if (!remapUrls)
+            return declaredGit;
+        Index repositoryIndex = findRepositoryLocationIndex(*remapUrls, packageName);
+        if (repositoryIndex < 0)
+            return declaredGit;
+        String remappedGit = (*remapUrls)[repositoryIndex].git;
+        return remappedGit.getLength() ? remappedGit : declaredGit;
+    }
+
+    /// Record one Git edge after checking that its source agrees with every other Git edge for the
+    /// package.
+    SlangResult addGitRequirement(
+        ResolutionPackage& package,
+        const Dependency& dependency,
+        const ResolvedManifest& declaringManifest,
+        const VersionConstraint& constraint,
+        String& outError)
+    {
+        String git = effectiveGitUrl(dependency.name, dependency.git);
+        if (package.git.getLength() && package.git != git)
+        {
+            outError =
+                String("Package '") + dependency.name + "' is required from more than one Git URL.";
+            return SLANG_FAIL;
+        }
+
+        package.git = git;
+        GitRequirement requirement;
+        requirement.owner = declaringManifest.ownerKey;
+        requirement.git = git;
+        requirement.declaredGit = dependency.git;
+        requirement.constraint = constraint;
+        package.gitRequirements.add(requirement);
+        addConstraintNote(package, declaringManifest, dependency.version, constraint);
+        return SLANG_OK;
+    }
+
+    SlangResult addDependency(
+        const Dependency& dependency,
+        const ResolvedManifest& declaringManifest,
+        String& outError)
+    {
+        if (dependency.path.getLength())
+        {
+            outError = String("Path dependencies are no longer supported: ") + dependency.name;
+            return SLANG_FAIL;
+        }
+
+        Index index = findPackage(dependency.name);
+        VersionConstraint constraint;
+        if (dependency.version.getLength())
+            SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, constraint, outError));
+
+        if (index < 0)
+        {
+            if (packages.getCount() >= kMaxPackageCount)
+            {
+                outError = "Dependency graph exceeds the package limit.";
+                return SLANG_FAIL;
+            }
+            ResolutionPackage package;
+            package.name = dependency.name;
+            packages.add(package);
+            index = packages.getCount() - 1;
+        }
+
+        ResolutionPackage& package = packages[index];
+        if (package.canonicalPath.getLength())
+        {
+            addWarning(
+                String("Path dependency '") + dependency.name + "' shadows a Git dependency from " +
+                dependency.git + ".");
+            PackageVersion selectedVersion;
+            SLANG_RETURN_ON_FAIL(
+                parseExactVersion(package.locked.version, selectedVersion, outError));
+            if (constraint.clauses.getCount() && !constraint.matches(selectedVersion))
+            {
+                outError = String("Path dependency '") + dependency.name + "' provides version " +
+                           package.locked.version + ", which conflicts with a Git constraint.";
+                return SLANG_FAIL;
+            }
+            SLANG_RETURN_ON_FAIL(
+                addGitRequirement(package, dependency, declaringManifest, constraint, outError));
+            return SLANG_OK;
+        }
+        SLANG_RETURN_ON_FAIL(
+            addGitRequirement(package, dependency, declaringManifest, constraint, outError));
+        if (package.selected)
+        {
+            PackageVersion selectedVersion;
+            SLANG_RETURN_ON_FAIL(
+                parseExactVersion(package.locked.version, selectedVersion, outError));
+            if (constraint.clauses.getCount() && !constraint.matches(selectedVersion))
+            {
+                outError = String("Selected version of package '") + dependency.name +
+                           "' conflicts with a transitive constraint.";
+                return SLANG_FAIL;
+            }
+        }
+        return SLANG_OK;
+    }
+
+    SlangResult loadCandidateManifest(
+        const ResolutionPackage& package,
+        const TagCandidate& candidate,
+        ResolvedManifest& outManifest,
+        String& outError)
+    {
+        SLANG_RETURN_ON_FAIL(
+            source->loadManifest(package.name, package.git, candidate, outManifest, outError));
+        if (outManifest.manifest.name != package.name)
+        {
+            outError = String("Package name '") + outManifest.manifest.name +
+                       "' does not match dependency name '" + package.name + "'.";
+            return SLANG_FAIL;
+        }
+        if (!outManifest.ownerKey.getLength())
+            outManifest.ownerKey = _candidateOwnerKey(package.name, candidate.ref);
+        return SLANG_OK;
+    }
+
+    /// Describe the first incoming requirement that rejects `version`.
+    ///
+    /// `matchesAll` remains the source of truth for candidate eligibility. This helper only
+    /// identifies one failed member of that same constraint set for the diagnostic.
+    String describeConstraintRejection(
+        const ResolutionPackage& package,
+        const PackageVersion& version)
+    {
+        for (const auto& note : package.constraintNotes)
+        {
+            if (note.constraint.clauses.getCount() == 0 || note.constraint.matches(version))
+                continue;
+            String owner = note.ownerName;
+            if (note.ownerVersion.getLength())
+                owner = owner + "@" + note.ownerVersion;
+            return String("does not satisfy ") + note.text + " required by " + owner;
+        }
+        return "does not satisfy all incoming requirements";
+    }
+
+    const LockedPackage* findHeld(const String& name) const
+    {
+        if (!heldLock)
+            return nullptr;
+        Index index = findLockedPackageIndex(*heldLock, name);
+        if (index < 0)
+            return nullptr;
+        const LockedPackage& held = heldLock->packages[index];
+        if (!held.branch.getLength() && !held.pinned)
+            return nullptr;
+        return &held;
+    }
+
+    /// Keep a pinned or edited row instead of searching for a newer tag.
+    ///
+    /// Consider `noise` pinned at 1.2 while `v1.3` also satisfies the manifest range. `update`
+    /// passes the existing lock in, and this selection is the only candidate: the recorded
+    /// version stays, and an edited checkout is read where it sits.
+    SlangResult selectHeld(
+        Index unresolvedIndex,
+        const ResolutionPackage& unresolved,
+        const LockedPackage& held,
+        String& outError,
+        ResolveFailure& outFailure)
+    {
+        LockedPackage recorded = held;
+        if (recorded.git != unresolved.git)
+        {
+            // An edited checkout is tied to the remote it was created from. A pin keeps its
+            // version and takes the canonical tag of that version on the repository the manifest
+            // now names.
+            if (recorded.branch.getLength())
+            {
+                outError = String("Package '") + unresolved.name + "' is edited on branch '" +
+                           recorded.branch + "'. Unedit it before changing its Git URL.";
+                return SLANG_FAIL;
+            }
+            if (!recorded.pinned)
+            {
+                outError = String("Locked package '") + unresolved.name + "' records Git URL '" +
+                           recorded.git + "', which does not match the manifest.";
+                return SLANG_FAIL;
+            }
+            PackageVersion pinnedVersion;
+            SLANG_RETURN_ON_FAIL(parseExactVersion(recorded.version, pinnedVersion, outError));
+            List<TagCandidate> candidates;
+            SLANG_RETURN_ON_FAIL(
+                source->listReleaseTags(unresolved.name, unresolved.git, candidates, outError));
+            const TagCandidate* matched = nullptr;
+            for (const auto& candidate : candidates)
+            {
+                if (candidate.version == pinnedVersion)
+                {
+                    matched = &candidate;
+                    break;
+                }
+            }
+            if (!matched)
+            {
+                outError = String("Version ") + formatExactVersion(pinnedVersion) +
+                           " of package '" + unresolved.name + "' has no canonical tag at " +
+                           unresolved.git + ".";
+                return SLANG_FAIL;
+            }
+            recorded.ref = matched->ref;
+            recorded.commit = matched->commit;
+            recorded.git = unresolved.git;
+        }
+        PackageVersion version;
+        SLANG_RETURN_ON_FAIL(parseExactVersion(recorded.version, version, outError));
+        if (!matchesAll(unresolved, version))
+        {
+            outError = String("Locked version ") + formatExactVersion(version) + " of package '" +
+                       unresolved.name + "' " + describeConstraintRejection(unresolved, version) +
+                       ".";
+            return SLANG_FAIL;
+        }
+
+        ResolvedManifest manifest;
+        if (recorded.branch.getLength())
+        {
+            SLANG_RETURN_ON_FAIL(
+                source->loadCheckoutManifest(unresolved.name, recorded, manifest, outError));
+        }
+        else
+        {
+            TagCandidate candidate;
+            candidate.ref = recorded.ref;
+            candidate.commit = recorded.commit;
+            candidate.version = version;
+            SLANG_RETURN_ON_FAIL(loadCandidateManifest(unresolved, candidate, manifest, outError));
+        }
+        if (manifest.manifest.name != unresolved.name)
+        {
+            outError = String("Package name '") + manifest.manifest.name +
+                       "' does not match dependency name '" + unresolved.name + "'.";
+            return SLANG_FAIL;
+        }
+
+        ResolutionPackage& selected = packages[unresolvedIndex];
+        selected.selected = true;
+        selected.selectionKind = recorded.branch.getLength() ? ResolveSelectionKind::Edited
+                                                             : ResolveSelectionKind::PinnedRef;
+        selected.locked = recorded;
+        selected.locked.name = selected.name;
+        selected.locked.git = selected.git;
+        selected.locked.version = formatExactVersion(version);
+        selected.locked.path = String();
+        selected.locked.dependencies = manifest.manifest.dependencies;
+        if (recorded.branch.getLength())
+        {
+            selected.locked.ref = recorded.ref;
+            selected.locked.commit = recorded.commit;
+        }
+        else
+        {
+            selected.locked.branch = String();
+            selected.locked.ref = recorded.ref;
+            selected.locked.commit = recorded.commit;
+            selected.locked.pinned = true;
+        }
+        selected.resolvedManifest = manifest;
+
+        String dependencyError;
+        for (const auto& dependency : manifest.manifest.dependencies)
+        {
+            if (SLANG_FAILED(addDependency(dependency, manifest, dependencyError)))
+            {
+                outError = dependencyError;
+                return SLANG_FAIL;
+            }
+        }
+        return search(outError, outFailure);
+    }
+
+    /// Search the reachable unresolved packages depth-first, trying each package's newest eligible
+    /// candidate first and restoring a full snapshot after a rejected branch.
+    ///
+    /// `unresolved` must be copied by value: selecting a candidate can append to `packages`, which
+    /// can invalidate a reference, and restoring `snapshot` replaces the entire package list.
+    SlangResult search(String& outError, ResolveFailure& outFailure)
+    {
+        List<bool> reachable;
+        getReachablePackages(reachable);
+        Index unresolvedIndex = -1;
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (reachable[i] && !packages[i].selected)
+            {
+                unresolvedIndex = i;
+                break;
+            }
+        }
+        if (unresolvedIndex < 0)
+            return SLANG_OK;
+
+        ResolutionPackage unresolved = packages[unresolvedIndex];
+        if (const LockedPackage* held = findHeld(unresolved.name))
+            return selectHeld(unresolvedIndex, unresolved, *held, outError, outFailure);
+
+        List<TagCandidate> candidates;
+        List<Retraction> retractions;
+        SLANG_RETURN_ON_FAIL(
+            source->listReleaseTags(unresolved.name, unresolved.git, candidates, outError));
+        SLANG_RETURN_ON_FAIL(
+            loadPublisherRetractions(unresolved, candidates, retractions, outError));
+        ResolveFailure lastNestedFailure;
+        List<ResolveCandidateRejection> candidateRejections;
+        for (const auto& candidate : candidates)
+        {
+            if (!matchesAll(unresolved, candidate.version))
+            {
+                ResolveCandidateRejection rejection;
+                rejection.version = formatExactVersion(candidate.version);
+                rejection.reason = describeConstraintRejection(unresolved, candidate.version);
+                candidateRejections.add(rejection);
+                continue;
+            }
+            if (!candidate.path.getLength())
+            {
+                if (const Exclusion* exclusion = findExclusion(unresolved.name, candidate.version))
+                {
+                    ResolveSkipNote skip;
+                    skip.version = formatExactVersion(candidate.version);
+                    skip.reason = String("workspace excludes this release — ") + exclusion->reason;
+                    packages[unresolvedIndex].skips.add(skip);
+                    ResolveCandidateRejection rejection;
+                    rejection.version = skip.version;
+                    rejection.reason = skip.reason;
+                    candidateRejections.add(rejection);
+                    addWarning(
+                        String("Workspace excludes package '") + unresolved.name + "' release " +
+                        candidate.ref + ": " + exclusion->reason);
+                    continue;
+                }
+                if (const Retraction* retraction = findRetraction(retractions, candidate.version))
+                {
+                    ResolveSkipNote skip;
+                    skip.version = formatExactVersion(candidate.version);
+                    skip.reason = String("retracted — ") + retraction->reason;
+                    packages[unresolvedIndex].skips.add(skip);
+                    ResolveCandidateRejection rejection;
+                    rejection.version = skip.version;
+                    rejection.reason = skip.reason;
+                    candidateRejections.add(rejection);
+                    addWarning(
+                        String("Package '") + unresolved.name + "' retracts release " +
+                        candidate.ref + ": " + retraction->reason);
+                    continue;
+                }
+            }
+            if (++candidateAttemptCount > kMaxCandidateAttempts)
+            {
+                outError = "Dependency resolution exceeds the candidate-attempt limit.";
+                return SLANG_FAIL;
+            }
+
+            List<ResolutionPackage> snapshot = packages;
+            ResolvedManifest manifest;
+            String candidateError;
+            if (SLANG_FAILED(
+                    loadCandidateManifest(unresolved, candidate, manifest, candidateError)))
+            {
+                ResolveCandidateRejection rejection;
+                rejection.version = formatExactVersion(candidate.version);
+                rejection.reason = candidateError;
+                candidateRejections.add(rejection);
+                packages = snapshot;
+                continue;
+            }
+
+            ResolutionPackage& selected = packages[unresolvedIndex];
+            selected.selected = true;
+            if (candidate.path.getLength())
+                selected.selectionKind = ResolveSelectionKind::Override;
+            else
+                selected.selectionKind = ResolveSelectionKind::HighestRelease;
+            selected.locked.name = selected.name;
+            selected.locked.git = selected.git;
+            selected.locked.version = formatExactVersion(candidate.version);
+            if (candidate.path.getLength())
+            {
+                addWarning(
+                    String("Local path for package '") + selected.name +
+                    "' shadows a Git dependency from " + selected.git + ".");
+                selected.locked.path = candidate.path;
+            }
+            else
+            {
+                selected.locked.ref = candidate.ref;
+                selected.locked.commit = candidate.commit;
+            }
+            selected.resolvedManifest = manifest;
+            selected.locked.dependencies = manifest.manifest.dependencies;
+
+            bool dependencyConflict = false;
+            for (const auto& dependency : manifest.manifest.dependencies)
+            {
+                if (SLANG_FAILED(addDependency(dependency, manifest, candidateError)))
+                {
+                    dependencyConflict = true;
+                    break;
+                }
+            }
+            ResolveFailure candidateFailure;
+            if (!dependencyConflict)
+            {
+                if (SLANG_SUCCEEDED(search(candidateError, candidateFailure)))
+                    return SLANG_OK;
+                if (candidateFailure.packageName.getLength())
+                    lastNestedFailure = candidateFailure;
+            }
+
+            if (!candidateFailure.packageName.getLength())
+            {
+                ResolveCandidateRejection rejection;
+                rejection.version = formatExactVersion(candidate.version);
+                rejection.reason =
+                    candidateError.getLength() ? candidateError : "candidate could not be selected";
+                candidateRejections.add(rejection);
+            }
+            packages = snapshot;
+        }
+
+        if (lastNestedFailure.packageName.getLength())
+        {
+            outFailure = lastNestedFailure;
+            return SLANG_FAIL;
+        }
+
+        outFailure.packageName = unresolved.name;
+        outFailure.constraints = unresolved.constraintNotes;
+        outFailure.candidates = candidateRejections;
+        outError = formatResolveFailure(outFailure);
+        return SLANG_FAIL;
+    }
+};
+
+SlangResult resolveDependenciesWithSource(
+    const Manifest& manifest,
+    IPackageResolverSource& source,
+    LockFile& outLock,
+    String& outError)
+{
+    Resolver resolver;
+    resolver.source = &source;
+    resolver.projectRoot = ".";
+    return resolver.resolve(manifest, outLock, outError);
+}
+
+SlangResult resolveDependenciesWithSource(
+    const String& projectRoot,
+    const Manifest& manifest,
+    IPackageResolverSource& source,
+    LockFile& outLock,
+    String& outError,
+    List<String>* outWarnings,
+    ResolveReport* outReport,
+    const LockFile* heldLock,
+    const List<RepositoryLocation>* remapUrls)
+{
+    Resolver resolver;
+    resolver.source = &source;
+    resolver.projectRoot = projectRoot;
+    resolver.warnings = outWarnings;
+    resolver.report = outReport;
+    resolver.heldLock = heldLock;
+    resolver.remapUrls = remapUrls;
+    return resolver.resolve(manifest, outLock, outError);
+}
+
+SlangResult resolveDependencies(
+    const String& projectRoot,
+    const Manifest& manifest,
+    LockFile& outLock,
+    String& outError,
+    List<String>* outWarnings,
+    ResolveReport* outReport,
+    bool offline,
+    const LockFile* heldLock,
+    const List<RepositoryLocation>* remapUrls)
+{
+    GitPackageResolverSource source;
+    source.projectRoot = projectRoot;
+    source.depsDirectory = getWorkspaceDepsDirectory(manifest);
+    source.allowRemote = !offline;
+    source.warnings = outWarnings;
+    SLANG_RETURN_ON_FAIL(source.initialize(outError));
+    Resolver resolver;
+    resolver.source = &source;
+    resolver.projectRoot = projectRoot;
+    resolver.heldLock = heldLock;
+    resolver.remapUrls = remapUrls;
+    resolver.warnings = outWarnings;
+    resolver.report = outReport;
+    SlangResult result = resolver.resolve(manifest, outLock, outError);
+    if (SLANG_FAILED(result))
+    {
+        for (const auto& replacement : source.deferredCacheReplacements)
+        {
+            String ignored;
+            discardReplacementPackageCache(replacement.replacementPath, ignored);
+        }
+        return result;
+    }
+    if (outReport)
+        outReport->deferredCacheReplacements = source.deferredCacheReplacements;
+    else if (source.deferredCacheReplacements.getCount())
+    {
+        StringBuilder message;
+        message << "Refusing to replace a package cache that has commits or tags that are not on "
+                   "a remote:\n";
+        for (const auto& replacement : source.deferredCacheReplacements)
+        {
+            message << replacement.canonicalPath << "\n" << replacement.report;
+            String ignored;
+            discardReplacementPackageCache(replacement.replacementPath, ignored);
+        }
+        outError = message.produceString();
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+SlangResult resolveDependenciesFromLocalPackages(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const List<LocalPackage>& localPackages,
+    LockFile& outLock,
+    String& outError,
+    List<String>* outWarnings,
+    ResolveReport* outReport,
+    bool offline,
+    const LockFile* heldLock,
+    const List<RepositoryLocation>* remapUrls)
+{
+    LocalPackageResolverSource source;
+    source.projectRoot = projectRoot;
+    source.depsDirectory = getWorkspaceDepsDirectory(manifest);
+    source.localPackages = &localPackages;
+    source.allowRemote = !offline;
+    source.warnings = outWarnings;
+    SLANG_RETURN_ON_FAIL(source.initialize(outError));
+    Resolver resolver;
+    resolver.source = &source;
+    resolver.projectRoot = projectRoot;
+    resolver.heldLock = heldLock;
+    resolver.remapUrls = remapUrls;
+    resolver.warnings = outWarnings;
+    resolver.report = outReport;
+    SlangResult result = resolver.resolve(manifest, outLock, outError);
+    if (SLANG_FAILED(result))
+    {
+        for (const auto& replacement : source.gitSource.deferredCacheReplacements)
+        {
+            String ignored;
+            discardReplacementPackageCache(replacement.replacementPath, ignored);
+        }
+        return result;
+    }
+    if (outReport)
+        outReport->deferredCacheReplacements = source.gitSource.deferredCacheReplacements;
+    else if (source.gitSource.deferredCacheReplacements.getCount())
+    {
+        StringBuilder message;
+        message << "Refusing to replace a package cache that has commits or tags that are not on "
+                   "a remote:\n";
+        for (const auto& replacement : source.gitSource.deferredCacheReplacements)
+        {
+            message << replacement.canonicalPath << "\n" << replacement.report;
+            String ignored;
+            discardReplacementPackageCache(replacement.replacementPath, ignored);
+        }
+        outError = message.produceString();
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+} // namespace PackageTool
+} // namespace Slang

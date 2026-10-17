@@ -12,7 +12,7 @@ Audience: a new contributor reading the other generated documents or the
 source itself who needs a one-paragraph anchor for an unfamiliar term.
 
 This document is **not** the same as
-[docs/language-reference/glossary.md](../../language-reference/glossary.md),
+[specification/glossary.md](https://github.com/shader-slang/spec/blob/main/specification/glossary.md),
 which is the user-facing language/execution-model glossary (threads,
 dispatch, observable behavior). Do not redefine terms that already live
 in that glossary; cross-link to it from the preamble and otherwise stay
@@ -44,7 +44,7 @@ project-specific shading inside the definition.
 1. `# Compiler-Internals Glossary` (title).
 2. `## Conventions` — short preamble (3-5 sentences) explaining the two
    classes, the `See:` / `External:` link style, and pointing readers at
-   [../language-reference/glossary.md](../language-reference/glossary.md)
+   [specification/glossary.md](https://github.com/shader-slang/spec/blob/main/specification/glossary.md)
    for language-runtime terms.
 3. `## Terms` — flat A-Z list. Use a sub-heading per letter only if the
    final list has more than ~30 entries; otherwise just stream the
@@ -116,7 +116,7 @@ representation`, `lexer`, `monomorphization`, `name resolution`,
 ## Forbidden content (in addition to _common.md)
 
 - Do not redefine terms that already appear in
-  [../language-reference/glossary.md](../language-reference/glossary.md).
+  [specification/glossary.md](https://github.com/shader-slang/spec/blob/main/specification/glossary.md).
   If a term in that doc also has a compiler-internals meaning, omit it
   here and rely on the preamble cross-link.
 - Do not include per-function or per-class reference documentation.
@@ -131,7 +131,7 @@ representation`, `lexer`, `monomorphization`, `name resolution`,
       `docs/generated/design/`.
 - [ ] Every `External:` link, when present, is an `https://` URL.
 - [ ] No entry duplicates a term already defined in
-      [../language-reference/glossary.md](../language-reference/glossary.md).
+      [specification/glossary.md](https://github.com/shader-slang/spec/blob/main/specification/glossary.md).
 - [ ] The `## Cross-reference index` table covers every peer doc listed
       in the manifest entry for `glossary.md`.
 - [ ] Document under the 100 KB size cap.

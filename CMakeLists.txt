@@ -227,6 +227,11 @@ option(
     ON
 )
 option(
+    SLANG_ENABLE_PACKAGE_GIT_TESTS
+    "Register opt-in slang-package tests that invoke the Git executable"
+    OFF
+)
+option(
     SLANG_ENABLE_EXAMPLES
     "Enable example targets (most require SLANG_ENABLE_SLANG_RHI)"
     ON
