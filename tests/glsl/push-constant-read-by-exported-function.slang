@@ -5,7 +5,7 @@
 // glslang reject the output (shader-slang/slang#13713).
 
 //TEST:SIMPLE(filecheck=EXPORT): -target glsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=EXPORT): -target spirv -emit-spirv-via-glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=VIAGLSL): -target spirv-asm -emit-spirv-via-glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=LONE): -target glsl -entry main -stage compute -preserve-params -DNO_EXPORT
 
 struct PC
@@ -33,7 +33,13 @@ void main()
 }
 
 // EXPORT-NOT: error[
-// EXPORT: {{layout\(push_constant\)|OpEntryPoint}}
+// EXPORT: layout(push_constant)
+// EXPORT-NEXT: uniform block_PC_
+// EXPORT: float helper_0()
+
+// glslang accepts the module with the exported reader's block declared.
+// VIAGLSL-NOT: error[
+// VIAGLSL: PushConstant
 
 // LONE-NOT: error[
 // LONE: layout(push_constant)

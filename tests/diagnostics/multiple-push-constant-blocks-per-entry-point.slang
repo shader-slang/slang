@@ -1,8 +1,7 @@
-// Vulkan allows at most one push-constant block per entry point. A global
-// `[[vk::push_constant]]` block and the push-constant block that holds an
-// entry point's `uniform` parameters both start at offset 0, so an entry point
-// that reads both must be rejected instead of producing invalid SPIR-V/GLSL
-// (shader-slang/slang#13713).
+// An entry point that reads both a global `[[vk::push_constant]]` block and the
+// push-constant block that holds its own `uniform` parameters exceeds Vulkan's
+// limit of one push-constant block per entry point, so it must be rejected
+// instead of producing invalid SPIR-V/GLSL (shader-slang/slang#13713).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute -O0

@@ -92,10 +92,10 @@ void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
 {
     buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
 
-    // glslang rejects a stage whose code statically uses more than one `layout(push_constant)`
-    // block. The reference graph records which push-constant blocks each entry point's call tree
-    // uses, and `emitParameterGroupImpl` omits blocks with no uses, so the blocks counted here are
-    // the blocks glslang sees for the stage.
+    // glslang rejects a stage that declares more than one `layout(push_constant)` block. We report
+    // the case where an entry point's own call tree uses more than one block. A block read only by
+    // an exported function that the entry point does not call is still declared, and this check
+    // does not count it.
     checkForMultiplePushConstantBlocksPerEntryPoint(
         module,
         m_referencingEntryPoints,
