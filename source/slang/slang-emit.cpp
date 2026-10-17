@@ -2919,6 +2919,13 @@ Result linkAndOptimizeIR(
     // We check D3D and Metal resource locals after all passes that can create mutable storage.
     // Minimum-optimization mode must still reject storage that its target cannot represent.
     SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
+    // Physical pointers on targets without them, and BFloat16 on WGSL, abort the emitter or produce
+    // invalid code, so these also run in minimum-optimization mode. They report each value where it
+    // enters a function, which relies on the IR's final shape: specialization, inlining, phi
+    // elimination and address-space specialization have run, and uniform parameters have been
+    // moved into constant buffers where the target needs that.
+    SLANG_PASS(checkUnsupportedPhysicalPointers, codeGenContext->getTargetReq(), sink);
+    SLANG_PASS(checkUnsupportedBFloat16, codeGenContext->getTargetReq(), sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 

@@ -426,6 +426,233 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     }
 }
 
+// A physical pointer is a `T*`: a `Ptr` in the `UserPointer` address space, which holds a raw
+// memory address. The diagnostics call it a "pointer to a memory address". Parameter-passing types
+// such as `RefParam` also use the `UserPointer` address space, but they are not physical pointers.
+static bool isPhysicalPointerType(IRType* type)
+{
+    auto ptrType = as<IRPtrType>(type);
+    return ptrType && ptrType->hasAddressSpace() &&
+           ptrType->getAddressSpace() == AddressSpace::UserPointer;
+}
+
+static bool isBFloat16ScalarVectorOrMatrixType(IRType* type)
+{
+    if (auto vectorType = as<IRVectorType>(type))
+        type = vectorType->getElementType();
+    else if (auto matrixType = as<IRMatrixType>(type))
+        type = matrixType->getElementType();
+    return type && type->getOp() == kIROp_BFloat16Type;
+}
+
+// Whether `type` matches `isLeaf`, or contains a type that does as a struct field, an array
+// element or a tuple element. The type a pointer points to is not searched.
+static bool containsType(IRType* type, bool (*isLeaf)(IRType*), HashSet<IRType*>& visited)
+{
+    if (!type)
+        return false;
+    if (isLeaf(type))
+        return true;
+    if (!visited.add(type))
+        return false;
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        return containsType(arrayType->getElementType(), isLeaf, visited);
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (containsType(field->getFieldType(), isLeaf, visited))
+                return true;
+        }
+    }
+    if (auto tupleType = as<IRTupleTypeBase>(type))
+    {
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        {
+            if (containsType(as<IRType>(tupleType->getOperand(i)), isLeaf, visited))
+                return true;
+        }
+    }
+    return false;
+}
+
+static bool containsType(IRType* type, bool (*isLeaf)(IRType*))
+{
+    HashSet<IRType*> visited;
+    return containsType(type, isLeaf, visited);
+}
+
+static bool isAnyPointerType(IRType* type)
+{
+    return as<IRPtrTypeBase>(type) != nullptr;
+}
+
+// Whether `inst` introduces into its function a value whose type contains one that `isLeaf`
+// matches, rather than passing along a value introduced elsewhere. `isCarrier` matches the
+// operand types that pass such a value along: `isLeaf` itself, or for physical pointers any
+// pointer type, because address-space specialization can give the same pointer value another
+// address space (a `T*` parameter can become a `Function` pointer, for example).
+//
+// Every value of such a type is computed from values that were introduced, so reporting only the
+// introductions reports each unsupported value once, where it enters the program:
+// - A value computed from operands that carry the type passes them along. This covers field and
+//   element extraction, construction from such values, and addresses derived from a pointer.
+// - A parameter passes along the arguments of its call sites, and a call result passes along what
+//   the callee returns; both are reported in the function that introduced them. The parameters of
+//   an entry point have no caller, so they are introductions.
+// - An uninitialized value holds nothing yet.
+// - A module-scope constant is an introduction; its uses pass it along.
+// - A load introduces the value it reads, except from a local or module-scope variable (which reads
+//   back a value stored there earlier) and through a physical pointer (already reported). The root
+//   address is checked rather than the address space of the pointer type, because some locals have
+//   none: every local on HLSL, and the temporaries that phi elimination creates.
+// Addresses derived from logical storage (`&buffer[i]`, `groupshared` variables) are not
+// reported, even when they have a `T*` type.
+static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*isCarrier)(IRType*))
+{
+    if (!containsType(inst->getDataType(), isLeaf))
+        return false;
+    switch (inst->getOp())
+    {
+    case kIROp_Param:
+        {
+            auto block = as<IRBlock>(inst->getParent());
+            auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
+            return func && func->getFirstBlock() == block &&
+                   func->findDecoration<IREntryPointDecoration>();
+        }
+    case kIROp_GlobalConstant:
+        return true;
+    case kIROp_Call:
+    // An uninitialized value holds no pointer or `BFloat16` value yet, such as a local struct with
+    // a pointer field that is never set.
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
+        return false;
+    case kIROp_Load:
+        {
+            auto address = inst->getOperand(0);
+            auto root = getRootAddr(address);
+            return !as<IRVar>(root) && !as<IRGlobalVar>(root) &&
+                   !isPhysicalPointerType(address->getDataType());
+        }
+    default:
+        break;
+    }
+    for (UInt i = 0; i < inst->getOperandCount(); i++)
+    {
+        if (containsType(inst->getOperand(i)->getDataType(), isCarrier))
+            return false;
+    }
+    return true;
+}
+
+// Calls `diagnose(loc)` for each instruction that `introduces` matches, among the global
+// parameters, the module-scope constants, the instructions of global variable initializers and
+// those of each function (including the function a module-level generic returns, as
+// `checkUnsupportedInst` does). Specialization and inlining copy an instruction's location to
+// every copy, so each location is diagnosed once. Instructions without a location (some are
+// created by legalization) are diagnosed once, without a location, and only if nothing else was:
+// emitting them would produce invalid code or abort the emitter.
+template<typename Introduces, typename Diagnose>
+static void reportOncePerLocation(
+    IRModule* module,
+    const Introduces& introduces,
+    const Diagnose& diagnose)
+{
+    HashSet<SourceLoc::RawValue> diagnosedLocations;
+    bool foundWithoutLocation = false;
+    auto visit = [&](IRInst* inst)
+    {
+        if (!introduces(inst))
+            return;
+        auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+        if (!loc.isValid())
+            foundWithoutLocation = true;
+        else if (diagnosedLocations.add(loc.getRaw()))
+            diagnose(loc);
+    };
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (as<IRGlobalParam>(globalInst) || as<IRGlobalConstant>(globalInst))
+        {
+            visit(globalInst);
+            continue;
+        }
+        if (auto globalVar = as<IRGlobalVar>(globalInst))
+        {
+            // The instructions of an initializer that is still attached to its variable.
+            for (auto block : globalVar->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                    visit(inst);
+            }
+            continue;
+        }
+        auto func = as<IRFunc>(globalInst);
+        if (auto generic = as<IRGeneric>(globalInst))
+            func = as<IRFunc>(findGenericReturnVal(generic));
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+                visit(inst);
+        }
+    }
+    if (foundWithoutLocation && diagnosedLocations.getCount() == 0)
+        diagnose(SourceLoc());
+}
+
+void checkUnsupportedPhysicalPointers(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+{
+    // HLSL, DXIL and WGSL have no physical pointers. The other targets do: SPIR-V has physical
+    // storage buffer pointers, GLSL buffer references, Metal device pointers, and CUDA and C++
+    // native pointers.
+    if (!isWGPUTarget(target) && !isD3DTarget(target))
+        return;
+
+    reportOncePerLocation(
+        module,
+        [](IRInst* inst)
+        {
+            // A physical pointer is introduced by a cast from an integer address, by `nullptr` (a
+            // hoisted `PtrLit` constant, so it is found among the operands), or as any other value
+            // that `introducesValueOfType` finds, such as a pointer loaded from memory.
+            if (inst->getOp() == kIROp_CastIntToPtr)
+                return true;
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                auto operand = inst->getOperand(i);
+                if (operand->getOp() == kIROp_PtrLit &&
+                    isPhysicalPointerType(operand->getDataType()))
+                    return true;
+            }
+            return introducesValueOfType(inst, isPhysicalPointerType, isAnyPointerType);
+        },
+        [&](SourceLoc loc)
+        { sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = loc}); });
+}
+
+void checkUnsupportedBFloat16(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+{
+    // WGSL has no bfloat16 type.
+    if (!isWGPUTarget(target))
+        return;
+
+    reportOncePerLocation(
+        module,
+        [](IRInst* inst)
+        {
+            return introducesValueOfType(
+                inst,
+                isBFloat16ScalarVectorOrMatrixType,
+                isBFloat16ScalarVectorOrMatrixType);
+        },
+        [&](SourceLoc loc)
+        { sink->diagnose(Diagnostics::Bfloat16NotSupportedOnTarget{.location = loc}); });
+}
+
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
