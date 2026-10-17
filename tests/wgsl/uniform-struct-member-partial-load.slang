@@ -31,7 +31,9 @@ uniform Push push;
 // WGSL-LABEL: fn computeMain
 // WGSL-NOT: : Push_std140{{.*}} = {{.*}}push
 // WGSL: Span_std140{{.*}} = {{.*}}push{{.*}}.b
+// WGSL-NOT: : Push_std140{{.*}} = {{.*}}push
 // WGSL: Span_operatorx5Bx5D_get
+// WGSL-NOT: : Push_std140{{.*}} = {{.*}}push
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 t : SV_DispatchThreadID)
