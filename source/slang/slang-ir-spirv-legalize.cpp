@@ -735,6 +735,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         processGlobalVar(inst);
     }
 
+    // Returns the storage class implied by a global parameter's resource kind, or `Generic` when
+    // the kind implies none (e.g. `InputAttachmentIndex`, `RegisterSpace`,
+    // `SubElementRegisterSpace`); `getGlobalParamAddressSpace` ignores such kinds when inferring
+    // the parameter's address space.
     AddressSpace getAddressSpaceFromGlobalParamResourceKind(LayoutResourceKind kind)
     {
         AddressSpace addressSpace = AddressSpace::Generic;
@@ -807,6 +811,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto rr : varLayout->getOffsetAttrs())
         {
             auto addressSpace = getAddressSpaceFromGlobalParamResourceKind(rr->getResourceKind());
+            // A kind with no storage class, such as a `SubpassInput`'s `InputAttachmentIndex` slot,
+            // neither seeds nor conflicts with the inferred address space.
+            if (addressSpace == AddressSpace::Generic)
+                continue;
             // If we haven't inferred a storage class yet, use the one we just found.
             if (result == AddressSpace::Generic)
                 result = addressSpace;
