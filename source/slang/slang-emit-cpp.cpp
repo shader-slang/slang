@@ -236,6 +236,21 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 {
     switch (type->getOp())
     {
+    case kIROp_TensorViewType:
+        {
+            auto offsetType = cast<IRTensorViewType>(type)->getOffsetType();
+            if (offsetType->getOp() == kIROp_UIntType)
+            {
+                out << "TensorView";
+            }
+            else
+            {
+                // CUDA's uint64 vectors use unsigned long long. Match that specialization
+                // on the host even on platforms where uint64_t aliases unsigned long.
+                out << "TensorViewT<unsigned long long>";
+            }
+            return SLANG_OK;
+        }
     case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
