@@ -440,20 +440,46 @@ public:
     /// Emit high-level statements for the body of a function.
     void emitFunctionBody(IRGlobalValueWithCode* code);
 
-    /// A loop whose counter is emitted in a `for` header: `for (var counter = initVal; ;
-    /// counter = counter + step)` (or `- step`). The counter's declaration, its initial
-    /// store and its update store are skipped where they appear in the body.
+    /// A loop that is emitted with its counter in a `for` header (see `tryMatchCountedLoop`).
+    /// A match guarantees that `counter` is a local `int` or `uint` var whose only stores are
+    /// `initStore`, in the block that enters the loop, and `updateStore`, in the continue
+    /// block, which writes `counter + step` (or `counter - step`, if `isDecrement`); and that
+    /// every load of it is emitted inside the loop body and reads the current iteration's
+    /// value.
     struct CountedLoop
     {
         IRVar* counter = nullptr;
-        IRInst* initVal = nullptr;
-        IRInst* step = nullptr;
+        IRStore* initStore = nullptr;
+        IRStore* updateStore = nullptr;
+        IRIntLit* step = nullptr;
         bool isDecrement = false;
+        /// The update's `add`/`sub`, and the load of the counter it reads, when nothing else
+        /// uses them (otherwise null). The header recomputes them.
+        IRInst* updateValue = nullptr;
+        IRInst* updateLoad = nullptr;
     };
 
-    /// Find the loops in `regionTree` that can be emitted as counted `for` loops.
+    /// Find the loops in `region`, the regions after it and the regions nested in them that
+    /// can be emitted as counted `for` loops, and record them in `m_countedLoops` and
+    /// `m_instsSubsumedByLoopHeader`.
     void findCountedLoops(RegionTree* regionTree, Region* region);
+    /// Returns true, and fills in `outLoop`, if `loopRegion` can be emitted as a counted `for`
+    /// loop. Has no other effect.
     bool tryMatchCountedLoop(RegionTree* regionTree, LoopRegion* loopRegion, CountedLoop& outLoop);
+    /// Returns the initial store of `counter` if its uses other than `updateStore` are exactly
+    /// one store in the block that enters the loop and loads that are emitted only inside the
+    /// loop body, none of them after `updateStore`; otherwise null.
+    IRStore* findCountedLoopInitStore(
+        RegionTree* regionTree,
+        LoopRegion* loopRegion,
+        IRVar* counter,
+        IRStore* updateStore);
+    /// Returns true if every emitted copy of `block` is nested in the body of `loopRegion`.
+    static bool isBlockEmittedOnlyInLoopBody(
+        RegionTree* regionTree,
+        IRBlock* block,
+        LoopRegion* loopRegion);
+    /// Emit `for (<declaration of counter> = <initial value>; ; counter = counter + step)`.
     void emitCountedLoopHeader(const CountedLoop& countedLoop);
 
     void emitFuncHeader(IRFunc* func) { emitFuncHeaderImpl(func); }
@@ -698,9 +724,12 @@ protected:
     /// unconditional loop, without trailing whitespace.
     virtual char const* getUnconditionalLoopHeader() { return "for(;;)"; }
 
-    /// Returns true if loops with a simple counter should be emitted as
-    /// `for (var i = init; ; i = i + step)` instead of an unconditional loop that
-    /// updates the counter in its body (see `findCountedLoops`).
+    /// Returns true if loops with a simple counter (see `tryMatchCountedLoop`) should be
+    /// emitted as `for (<declaration of i> = init; ; i = i + step)` instead of an
+    /// unconditional loop that updates the counter in its body. The rewrite relies only on
+    /// what a C-like `for` does (the update clause runs at the end of every iteration and
+    /// on `continue`), so it is valid on any C-like target; a target turns it on when its
+    /// downstream compiler handles the `for` form better.
     virtual bool shouldEmitCountedLoopsAsFor() { return false; }
 
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }
@@ -851,10 +880,12 @@ protected:
 
     Dictionary<IRInst*, bool>* m_foldSafetyCache = nullptr;
 
-    // Loops of the function being emitted that get a counted `for` header, and the
-    // instructions that header emits in place of their original location.
+    // For the function being emitted (filled by `findCountedLoops` in `emitFunctionBody`):
+    // the loops that get a counted `for` header, and the instructions that are not emitted
+    // where they are because such a header takes their place (the counter's declaration,
+    // its two stores, and the update's value and load when nothing else uses them).
     Dictionary<IRLoop*, CountedLoop> m_countedLoops;
-    HashSet<IRInst*> m_instsEmittedInLoopHeader;
+    HashSet<IRInst*> m_instsSubsumedByLoopHeader;
 
     bool isSafeToFoldIntoUseSitesUncached(IRInst* inst);
 
