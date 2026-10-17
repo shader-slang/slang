@@ -108,8 +108,10 @@ int lambdaParameter()
     return f(1);
 }
 
-// A function-local `cbuffer` is a local whose fields lookup finds through it. Lookup from a
-// local type inside a lambda reaches the `cbuffer` field through that local.
+// A function-local `cbuffer` is a local whose fields lookup finds through it. A local type
+// written directly in the function already could not see the field before this change, but one
+// written inside a lambda reached it through the `cbuffer`'s local and emitted an undeclared
+// value, so we test the lambda shape.
 int localCBufferFieldInLambda()
 {
     cbuffer CB { int c; };
@@ -183,3 +185,15 @@ struct S
 //CHECK:                                    ^ undefined identifier 'i'.
     }
 };
+
+// A global that no local hides is still suggested from inside a local type.
+static const int counter = 3;
+int suggestsUnshadowedGlobal()
+{
+    struct L { int get() { return countr; } };
+//CHECK:                          ^^^^^^ undefined identifier
+//CHECK:                          ^^^^^^ undefined identifier 'countr'.
+//CHECK:                          ^^^^^^ did you mean 'counter'?
+    L l;
+    return l.get();
+}
