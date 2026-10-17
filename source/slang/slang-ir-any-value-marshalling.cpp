@@ -28,6 +28,35 @@ static bool isVerbatimWordScalar(IROp op)
     }
 }
 
+// Return true if empty-type legalization preserves `type` as-is (keeps it with its emitted
+// footprint) instead of removing/decomposing it. This mirrors, in order, the three preservation
+// decisions `legalizeTypeImpl` (slang-legalize-types.cpp) makes before its struct-decompose case
+// that would otherwise drop an empty struct:
+//   1. a target-intrinsic type (`findDecoration<IRTargetIntrinsicDecoration>`), and
+//   2. a work-graph record type (`isWorkGraphRecordType`)
+// are returned unchanged on *every* target — both early-outs run before `isSimpleType`, so Metal
+// keeps them too; then
+//   3. `IREmptyTypeLegalizationContext::isSimpleType` (slang-ir-legalize-types.cpp) handles the
+// decoration-based case: its first action removes empty types unconditionally on Metal, and only
+// off Metal does an ABI/layout-significant decoration keep them. Hence the Metal short-circuit
+// applies to case 3 only, and the shared `typeHasAbiSignificantDecoration` supplies its decoration
+// set (so the set cannot drift). Ordering the intrinsic/work-graph checks before the Metal branch
+// is what keeps this a faithful mirror; today the Metal branch is a no-op because
+// `canBulkCopyMarshal` excludes Metal before this is reached, but getting it right keeps the helper
+// correct for any future caller. Update this mirror if a new struct-wholesale preservation
+// early-out is ever added to `legalizeTypeImpl`. This is the per-type check only; whether the
+// empties *inside* a preserved struct survive is decided by `countWordScalarLeaves` threading the
+// enclosing-preservation flag, since a preserved struct is not decomposed and so keeps every field
+// it contains.
+static bool isTypePreservedByEmptyLegalization(TargetRequest* targetReq, IRType* type)
+{
+    if (type->findDecoration<IRTargetIntrinsicDecoration>() || isWorkGraphRecordType(type))
+        return true;
+    if (isMetalTarget(targetReq))
+        return false;
+    return typeHasAbiSignificantDecoration(type);
+}
+
 // This is a subpass of generics lowering IR transformation.
 // This pass generates packing/unpacking functions for `AnyValue`s,
 // and replaces all `IRPackAnyValue` and `IRUnpackAnyValue` with calls to these
@@ -111,6 +140,11 @@ struct AnyValueMarshallingContext
         StringBuilder nameSb;
         nameSb << "AnyValue" << size;
         builder.addExportDecoration(structType, nameSb.getUnownedSlice());
+        // Mark the concrete storage struct with its AnyValue byte size. This is the provenance
+        // `legalizeBitCast` keys on to authorize zero-filling an empty source into this fixed-size
+        // payload (see the Form-2 gate there): only a struct this pass produced carries the marker,
+        // so a user-authored `bit_cast<UserStruct>(Empty{})` still fails loudly.
+        builder.addAnyValueSizeDecoration(structType, size);
         auto fieldCount = (size + sizeof(uint32_t) - 1) / sizeof(uint32_t);
         for (decltype(fieldCount) i = 0; i < fieldCount; i++)
         {
@@ -727,8 +761,12 @@ struct AnyValueMarshallingContext
     };
 
     // Count the leaves of `type`, requiring every one to be a 4-byte scalar whose
-    // bit pattern is marshalled verbatim into a `uint` payload slot; return -1 if any
-    // leaf is not such a scalar. A word scalar is packed by
+    // bit pattern is marshalled verbatim into a `uint` payload slot. Returns that leaf
+    // count, or -1 if any leaf is not such a scalar. The count may be 0 for a type with
+    // no word-scalar leaves (e.g. a transitively-empty aggregate) — 0 is not a rejection
+    // here; the caller `canBulkCopyMarshal` rejects a zero-size object via its
+    // `layout.size` gate, so the zero-leaf case is filtered there rather than in this
+    // function. A word scalar is packed by
     // `TypePackingContext::marshalBasicType` as a plain `bit_cast<uint>` store with no
     // normalization, sub-word masking, 64-bit splitting, or target-specific handling,
     // so a whole-object copy of it reproduces the field-wise store exactly.
@@ -747,25 +785,31 @@ struct AnyValueMarshallingContext
     // rejecting it is a conservative choice rather than a byte-equivalence requirement (and
     // on CUDA a matrix row is often a `float4`, which the alignment condition rejects
     // anyway). Rejecting both keeps the predicate uniform and independent of matrix layout.
-    IRIntegerValue countWordScalarLeaves(IRType* type)
+    // `enclosingPreserved` is true when some enclosing aggregate is preserved as-is by empty-type
+    // legalization (so it is not decomposed and keeps every field it contains). It threads down the
+    // recursion so the struct case can tell whether a zero-leaf member will actually be dropped.
+    IRIntegerValue countWordScalarLeaves(IRType* type, bool enclosingPreserved = false)
     {
         if (isVerbatimWordScalar(type->getOp()))
             return 1;
         switch (type->getOp())
         {
         case kIROp_EnumType:
-            return countWordScalarLeaves(cast<IREnumType>(type)->getTagType());
+            return countWordScalarLeaves(cast<IREnumType>(type)->getTagType(), enclosingPreserved);
         case kIROp_VectorType:
             {
                 auto vecType = cast<IRVectorType>(type);
-                auto elementLeaves = countWordScalarLeaves(vecType->getElementType());
+                auto elementLeaves =
+                    countWordScalarLeaves(vecType->getElementType(), enclosingPreserved);
                 if (elementLeaves < 0)
                     return -1;
                 auto total = elementLeaves * getIntVal(vecType->getElementCount());
-                // Reject a zero-width vector (e.g. `vector<float,0>`) for the same reason
-                // as an empty struct/array below: it contributes no payload words, but a
-                // value containing it is split by legalization into a non-simple tuple that
-                // the whole-object bit-cast cannot handle.
+                // A zero-width vector contributes no word-scalar leaves. Unlike an empty struct —
+                // which legalization removes, leaving the enclosing object a contiguous run of word
+                // scalars — a `vector<float,0>` legalizes to `simple` unchanged and survives as a
+                // member of the emitted struct, so leaf-counting can no longer certify the object
+                // is the clean word-scalar run the whole-object `bit_cast` relies on. Reject it;
+                // the `IZeroVec` test pins this reject as load-bearing.
                 return total > 0 ? total : -1;
             }
         case kIROp_MatrixType:
@@ -773,29 +817,49 @@ struct AnyValueMarshallingContext
         case kIROp_ArrayType:
             {
                 auto arrType = cast<IRArrayType>(type);
-                auto elementLeaves = countWordScalarLeaves(arrType->getElementType());
+                auto elementLeaves =
+                    countWordScalarLeaves(arrType->getElementType(), enclosingPreserved);
                 if (elementLeaves < 0)
                     return -1;
                 auto total = elementLeaves * getIntVal(arrType->getElementCount());
-                // Reject an empty (zero-leaf) aggregate: it carries no payload words,
-                // but `legalizeEmptyTypes` still splits a value containing it into a
-                // non-simple tuple, and a whole-object bit-cast has no type-legalization
-                // handler for such an operand (it would abort with "non-simple operand").
+                // A zero-leaf array (empty element type or zero length) has no word-scalar leaves,
+                // so — as with the zero-width vector above — leaf-counting cannot certify the
+                // object is the clean word-scalar run the whole-object `bit_cast` relies on. Reject
+                // it.
                 return total > 0 ? total : -1;
             }
         case kIROp_StructType:
             {
+                // A struct that empty-type legalization preserves as-is — this struct itself, or an
+                // enclosing one — is not decomposed, so every field it holds keeps its emitted
+                // footprint (empties included).
+                auto targetReq = targetProgram->getTargetReq();
+                bool preserved =
+                    enclosingPreserved || isTypePreservedByEmptyLegalization(targetReq, type);
                 IRIntegerValue total = 0;
                 for (auto field : cast<IRStructType>(type)->getFields())
                 {
-                    auto fieldLeaves = countWordScalarLeaves(field->getFieldType());
+                    auto fieldType = field->getFieldType();
+                    auto fieldLeaves = countWordScalarLeaves(fieldType, preserved);
                     if (fieldLeaves < 0)
+                        return -1;
+                    // A zero-leaf member is bulk-copy-safe only when empty-type legalization
+                    // actually drops it, leaving the surviving leaves contiguous. It is *not*
+                    // dropped when it is itself preserved, or when it sits inside a preserved
+                    // (non-decomposed) struct: it then keeps a nonzero footprint in the emitted
+                    // C++/CUDA layout and shifts the following fields, so a whole-object copy would
+                    // move the wrong bytes. Reject such a member.
+                    if (fieldLeaves == 0 &&
+                        (preserved || isTypePreservedByEmptyLegalization(targetReq, fieldType)))
                         return -1;
                     total += fieldLeaves;
                 }
-                // See the array case: reject empty aggregates so a value that
-                // legalization would split never reaches the whole-object bit-cast.
-                return total > 0 ? total : -1;
+                // An interior empty struct field that legalization *drops* contributes no payload
+                // words and does not disqualify the fast path: dropping it leaves a byte-compatible
+                // object that boxes with a single whole-object bit-cast. A wholly-empty struct
+                // returns 0 (no word-scalar leaves); that zero-leaf object is rejected by
+                // `canBulkCopyMarshal`'s size gate, per this function's contract above.
+                return total;
             }
         default:
             return -1;
