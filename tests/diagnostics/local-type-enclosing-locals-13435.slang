@@ -119,16 +119,25 @@ int localCBufferFieldInLambda()
     return f();
 }
 
-// A `const` local is still a non-static local, so a local type cannot use it in a type
-// position or a `static const` initializer either. `static const` is the spelling that stays
-// visible.
-int constLocalInTypePosition()
+// A `const` local is still a non-static local, so a local type cannot use it in a `static const`
+// initializer or a type either. `static const` is the spelling that stays visible.
+int constLocalInStaticConstInitializer()
 {
     const int N = 4;
     struct L { static const int M = N; };
 //CHECK:                            ^ undefined identifier
 //CHECK:                            ^ undefined identifier 'N'.
     return L::M;
+}
+
+int constLocalInType()
+{
+    const int N = 2;
+    struct L { vector<int, N> v; };
+//CHECK:                   ^ undefined identifier
+//CHECK:                   ^ undefined identifier 'N'.
+    L l;
+    return l.v.x;
 }
 
 // `visitBlockStmt` checks local types before the rest of the block, so a local declared after
@@ -144,7 +153,9 @@ int laterLocalHidesGlobal()
     return h;
 }
 
-// No "did you mean" note suggests a local that the local type cannot use.
+// No "did you mean" note suggests a local that the local type cannot use, or a global that such
+// a local hides.
+static const int total = 1;
 int noSuggestionOfHiddenLocal()
 {
     int total = buf[0];
