@@ -2962,6 +2962,11 @@ protected:
         SLANG_UNUSED(entryPoint);
     }
 
+    // Whether vertex-stage input locations come from the varying-input layout (declaration
+    // order or explicit `[[vk::location]]`, which is what reflection reports) rather than from
+    // the user semantic index.
+    virtual bool vertexInputLocationsFollowLayout() const { return false; }
+
     virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint)
     {
         SLANG_UNUSED(entryPoint);
@@ -3337,6 +3342,11 @@ private:
                 ensureStructHasUserSemantic<LayoutResourceKind::VaryingInput>(
                     flattenedStruct,
                     layout);
+                if (vertexInputLocationsFollowLayout() &&
+                    entryPoint.entryPointDecor->getProfile().getStage() == Stage::Vertex)
+                {
+                    assignUserSemanticIndicesFromLayout(flattenedStruct, structType, layout);
+                }
                 if (flattenedStruct != structType)
                 {
                     // Replace the 'old IRParam type' with a 'new IRParam type'
@@ -3490,6 +3500,79 @@ private:
         m_sink->diagnose(Diagnostics::SystemValueAttributeNotSupported{
             .semanticName = semanticName,
             .location = param->sourceLoc});
+    }
+
+    // Appends, in depth-first field order (the order nested structs are flattened in), the
+    // absolute varying-input location of every leaf field of `type`, or -1 when unknown.
+    void collectLeafVaryingInputLocations(
+        IRStructType* type,
+        IRTypeLayout* typeLayout,
+        UInt baseOffset,
+        List<Index>& outLocations)
+    {
+        auto structLayout = as<IRStructTypeLayout>(typeLayout);
+        Index index = 0;
+        for (auto field : type->getFields())
+        {
+            auto fieldLayout = structLayout ? structLayout->getFieldLayout(index) : nullptr;
+            index++;
+            UInt offset = baseOffset;
+            bool known = false;
+            if (fieldLayout)
+            {
+                if (auto offsetAttr = fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                {
+                    offset += offsetAttr->getOffset();
+                    known = true;
+                }
+            }
+            if (auto nestedType = as<IRStructType>(field->getFieldType()))
+            {
+                collectLeafVaryingInputLocations(
+                    nestedType,
+                    fieldLayout ? fieldLayout->getTypeLayout() : nullptr,
+                    offset,
+                    outLocations);
+                continue;
+            }
+            outLocations.add(known ? Index(offset) : -1);
+        }
+    }
+
+    // Re-index every user-semantic field of the (possibly flattened) `flatStruct` with its
+    // varying-input layout location taken from the original `sourceStruct`, so the emitted
+    // location matches the one reported by reflection and used by the API.
+    void assignUserSemanticIndicesFromLayout(
+        IRStructType* flatStruct,
+        IRStructType* sourceStruct,
+        IRVarLayout* varLayout)
+    {
+        UInt baseOffset = 0;
+        if (auto varOffsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+            baseOffset = varOffsetAttr->getOffset();
+        List<Index> locations;
+        collectLeafVaryingInputLocations(
+            sourceStruct,
+            varLayout->getTypeLayout(),
+            baseOffset,
+            locations);
+
+        IRBuilder builder(flatStruct);
+        Index index = 0;
+        for (auto field : flatStruct->getFields())
+        {
+            if (index >= locations.getCount())
+                break;
+            auto location = locations[index++];
+            auto key = field->getKey();
+            auto semanticDecor = key->findDecoration<IRSemanticDecoration>();
+            if (!semanticDecor || location < 0)
+                continue;
+            auto newDecor =
+                builder.addSemanticDecoration(key, semanticDecor->getSemanticName(), (int)location);
+            semanticDecor->replaceUsesWith(newDecor);
+            semanticDecor->removeAndDeallocate();
+        }
     }
 
     template<LayoutResourceKind K>
@@ -5115,6 +5198,10 @@ public:
     }
 
 protected:
+    // WebGPU binds vertex attributes by `shaderLocation`, which applications take from
+    // reflection; the emitted `@location` must agree with it.
+    bool vertexInputLocationsFollowLayout() const SLANG_OVERRIDE { return true; }
+
     SystemValueInfo getSystemValueInfo(
         String inSemanticName,
         String* optionalSemanticIndex,
