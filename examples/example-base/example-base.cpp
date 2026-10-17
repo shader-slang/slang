@@ -117,9 +117,11 @@ Slang::Result WindowedAppBase::initializeBase(
         titleSb << title << " (" << deviceInfo.apiName << ": " << deviceInfo.adapterName << ")";
         gWindow->setText(titleSb.getBuffer());
 
+        gColorFormat = gSurface->getInfo().preferredFormat;
+
         rhi::SurfaceConfig surfaceConfig = {};
 
-        surfaceConfig.format = gSurface->getInfo().preferredFormat;
+        surfaceConfig.format = gColorFormat;
         surfaceConfig.width = width;
         surfaceConfig.height = height;
         surfaceConfig.desiredImageCount = kSwapchainImageCount;
@@ -230,7 +232,7 @@ void WindowedAppBase::createOfflineTextures()
         TextureDesc textureDesc = {};
         textureDesc.size.width = this->windowWidth;
         textureDesc.size.height = this->windowHeight;
-        textureDesc.format = Format::RGBA8Unorm;
+        textureDesc.format = gColorFormat;
         textureDesc.mipCount = 1;
         textureDesc.usage = TextureUsage::UnorderedAccess | TextureUsage::CopySource;
         auto texture = gDevice->createTexture(textureDesc);
@@ -253,7 +255,9 @@ void WindowedAppBase::windowSizeChanged()
     if (clientRect.width > 0 && clientRect.height > 0)
     {
         SurfaceConfig config = {};
-        config.format = gSurface->getInfo().preferredFormat;
+        // Reuse the format the present pipeline was created with so the resized surface can't drift
+        // from it.
+        config.format = gColorFormat;
         config.width = clientRect.width;
         config.height = clientRect.height;
         config.vsync = false;

@@ -40,6 +40,11 @@ protected:
 
     Slang::List<Slang::ComPtr<rhi::ITexture>> gOfflineTextures;
 
+    // Single source of truth for the color format the present pipeline renders into: dynamic-
+    // rendering backends require its colorTarget.format to equal the format of every texture
+    // passed to renderFrame() (swapchain image when windowed, offline texture in test mode).
+    rhi::Format gColorFormat = rhi::Format::RGBA8Unorm;
+
     Slang::Result initializeBase(
         const char* title,
         int width,
@@ -62,6 +67,7 @@ protected:
 
 public:
     platform::Window* getWindow() { return gWindow.Ptr(); }
+    rhi::Format getColorFormat() const { return gColorFormat; }
     virtual void finalize() { gQueue->waitOnHost(); }
     void offlineRender();
 };
