@@ -721,7 +721,6 @@ fetch_or_build_slang_llvm()
 #
 # Our targets
 #
-
 add_subdirectory(source/core)
 add_subdirectory(source/slang-rt)
 add_subdirectory(source/compiler-core)
@@ -733,6 +732,7 @@ add_subdirectory(source/slang-core-module)
 add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
+
 if(TARGET slangc)
     # Keep DXC runtime artifacts and headers staged for targeted slangc builds.
     foreach(_dxc_stage_target copy-dxcompiler copy-dxil stage-dxc-headers)
@@ -924,10 +924,18 @@ configure_package_config_file(
 # unconditional include() of slangTargets.cmake (cmake/SlangConfig.cmake.in)
 # satisfied, so find_package(slang) works for static installs too.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    if (TARGET slang)
+        add_library(slang::slang ALIAS slang)
+    endif()
+
+    if (TARGET slangc)
+        add_executable(slang::slang-compiler ALIAS slangc)
+    endif()
+
     install(
         EXPORT SlangTargets
         FILE ${PROJECT_NAME}Targets.cmake
-        NAMESPACE ${PROJECT_NAME}::
+        NAMESPACE slang::
         DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
     )
 
