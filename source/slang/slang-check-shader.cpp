@@ -1809,7 +1809,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             if (mode == ParamPassingMode::Ref)
             {
                 sink->diagnose(
-                    Diagnostics::EntryPointParamHasReferenceMode{.param = param, .mode = mode});
+                    Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
                 hasReferenceParam = true;
             }
         }
