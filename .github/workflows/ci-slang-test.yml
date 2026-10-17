@@ -60,11 +60,22 @@ on:
         type: string
         default: ""
         description: "Override the -api expression passed to slang-test (e.g. 'dx11+dx12' or 'vk+cuda+cpu+llvm'). Overrides cpu-only and gpu-api-only when set."
+      test-category:
+        required: false
+        type: string
+        default: ""
+        description: "Optional slang-test category filter"
+      shadow:
+        required: false
+        type: boolean
+        default: false
+        description: "Observe a test selection without failing CI; retain its actual result"
 
 jobs:
   test-slang:
+    continue-on-error: ${{ inputs.shadow }}
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 80
+    timeout-minutes: ${{ inputs.shadow && 20 || 80 }}
     defaults:
       run:
         shell: bash
@@ -80,6 +91,7 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        id: checkout
         with:
           submodules: "false"
           fetch-depth: "1"
@@ -108,6 +120,7 @@ jobs:
         run: python3 extras/tests/test_verify_user_skills_package.py
 
       - name: Common Test Setup
+        id: setup
         uses: ./.github/actions/common-test-setup
         with:
           os: ${{ inputs.os }}
@@ -138,8 +151,12 @@ jobs:
           -I prelude -o "${{ runner.temp }}/cuda-prelude-vec1-make.obj"
 
       - name: Test Slang
+        id: test
         env:
           API_INPUT: ${{ inputs.api }}
+          TEST_CATEGORY: ${{ inputs.test-category }}
+          IS_SHADOW: ${{ inputs.shadow }}
+          SERVER_COUNT: ${{ inputs.server-count }}
         run: |
           # Fail fast on mutually exclusive inputs — both would accumulate
           # -api filters and produce an empty test partition.
@@ -200,11 +217,14 @@ jobs:
           fi
 
           slang_test_args+=("-api" "$api_expr")
+          if [[ -n "$TEST_CATEGORY" ]]; then
+            slang_test_args+=("-category" "$TEST_CATEGORY")
+          fi
 
           # Add test server arguments only if server count > 1
-          if [ "${{ inputs.server-count }}" -gt 1 ]; then
+          if [ "$SERVER_COUNT" -gt 1 ]; then
             slang_test_args+=("-use-test-server")
-            slang_test_args+=("-server-count" "${{ inputs.server-count }}")
+            slang_test_args+=("-server-count" "$SERVER_COUNT")
           fi
 
           # Add no-GPU failure list for non-GPU tests
@@ -236,9 +256,16 @@ jobs:
           printf ' %q' "${slang_test_args[@]}"
           printf '\n'
 
-          "$bin_dir/slang-test" "${slang_test_args[@]}"
+          if [[ "$IS_SHADOW" == "true" ]]; then
+            python3 extras/ci/l0-shadow.py run \
+              --output-dir "$RUNNER_TEMP/l0-shadow" \
+              -- "$bin_dir/slang-test" "${slang_test_args[@]}"
+          else
+            "$bin_dir/slang-test" "${slang_test_args[@]}"
+          fi
 
       - name: Check slang-test worktree cleanliness
+        id: cleanliness
         if: always()
         run: |
           status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
@@ -247,6 +274,25 @@ jobs:
             printf '%s\n' "$status"
             exit 1
           fi
+
+      - name: Report shadow observation
+        if: always() && inputs.shadow && steps.checkout.outcome == 'success'
+        env:
+          SETUP_OUTCOME: ${{ steps.setup.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          CLEANLINESS_OUTCOME: ${{ steps.cleanliness.outcome }}
+        run: >-
+          python3 extras/ci/l0-shadow.py report
+          --output-dir "$RUNNER_TEMP/l0-shadow"
+
+      - name: Upload shadow observation
+        if: always() && inputs.shadow
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: l0-shadow-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/l0-shadow/
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Run Slang examples
         # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
@@ -259,6 +305,7 @@ jobs:
            --config "${{ inputs.config }}" \
            --skip-file tests/expected-example-failure-github.txt
       - name: Run slangc tests
+        if: "!inputs.shadow"
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
