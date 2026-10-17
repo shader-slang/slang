@@ -1,6 +1,7 @@
-// The entry point below reads the global push-constant block only through a
-// call whose result the downstream optimizer can prove unused. Slang's own
-// SPIR-V, before spirv-opt runs, lists both push-constant blocks in the
+// The entry point below reads the global push-constant block only inside
+// `extra`, on a path that `extra(false)` never takes. The downstream optimizer
+// can prove that read unreachable, but Slang's dead-code elimination keeps it,
+// so Slang's own SPIR-V, before spirv-opt runs, lists both push-constant blocks in the
 // entry point's interface, so it fails
 // VUID-StandaloneSpirv-OpEntryPoint-06674 at every optimization level (and
 // spirv-opt does not remove the read at -O0). The GLSL output declares both

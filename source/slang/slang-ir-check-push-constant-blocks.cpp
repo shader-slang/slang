@@ -26,7 +26,7 @@ static IRStructType* getEntryPointUniformsStruct(IRInst* block)
     if (auto groupType = as<IRParameterGroupType>(type))
         type = groupType->getElementType();
     auto structType = as<IRStructType>(type);
-    SLANG_ASSERT(structType);
+    SLANG_RELEASE_ASSERT(structType);
     return structType;
 }
 
@@ -48,19 +48,16 @@ static String describePushConstantBlock(IRInst* block, IRFunc* entryPoint)
     if (block->sourceLoc.isValid() && block->sourceLoc == entryPoint->sourceLoc)
     {
         sb << "the push-constant block that holds the `uniform` parameters ";
-        if (auto structType = getEntryPointUniformsStruct(block))
+        auto structType = getEntryPointUniformsStruct(block);
+        const char* separator = "";
+        for (auto field : structType->getFields())
         {
-            const char* separator = "";
-            for (auto field : structType->getFields())
-            {
-                sb << separator << "`";
-                printDiagnosticArg(sb, field->getKey());
-                sb << "`";
-                separator = ", ";
-            }
-            sb << " ";
+            sb << separator << "`";
+            printDiagnosticArg(sb, field->getKey());
+            sb << "`";
+            separator = ", ";
         }
-        sb << "of `";
+        sb << " of `";
         printDiagnosticArg(sb, entryPoint);
         sb << "`";
     }

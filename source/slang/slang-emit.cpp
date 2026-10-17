@@ -3087,10 +3087,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         const Index errorCountBeforeEmit = sink->getErrorCount();
         sourceEmitter->emitModule(irModule, sink);
 
-        // The GLSL emitter reports more than one push-constant block in an entry point, which
-        // glslang would reject, so we do not return that GLSL. Other emitters can report errors
-        // that callers such as `getTargetMetadata` have so far tolerated, so this applies to GLSL
-        // only.
+        // When the GLSL emitter reports an error, such as E39033 for an entry point that uses more
+        // than one push-constant block, we do not return the GLSL it wrote, so that
+        // `-emit-spirv-via-glsl` does not pass rejected code on to glslang. Other emitters can
+        // report errors that callers such as `getTargetMetadata` have so far tolerated, so this
+        // applies to GLSL only.
         if (target == CodeGenTarget::GLSL && sink->getErrorCount() > errorCountBeforeEmit)
             return SLANG_FAIL;
     }

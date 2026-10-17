@@ -19,8 +19,9 @@ class DiagnosticSink;
 /// `VUID-StandaloneSpirv-OpEntryPoint-06674` and GLSL that glslang rejects.
 ///
 /// `referencingEntryPoints` maps each global instruction to the entry points whose call trees use
-/// it, which is the static use that the Vulkan rule counts. Each target calls this at the point
-/// where that graph describes the code it emits, after the last pass that can remove a use.
+/// it, which is the static use that the Vulkan rule counts. Each target calls this where that
+/// graph describes the code it emits: SPIR-V after the last dead-code elimination in
+/// `legalizeIRForSPIRV`, and GLSL when the emitter starts.
 /// `isPushConstantBlock` is a parameter because the targets recognize push-constant blocks
 /// differently at that point: the GLSL emitter still has each parameter's var layout, while SPIR-V
 /// legalization has replaced the layout of a push-constant block with a `PushConstant` pointer
