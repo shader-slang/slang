@@ -590,10 +590,10 @@ SLANG_UNIT_TEST(irPeepholeParamForwardsSingleDefinedValueAndRefinesObservedInput
     }
 }
 
-// The defined value may follow the frozen input in the same block, as long as it dominates every
-// use of the input. Here `a` comes first in the entry block and `x` after it, and every use of `a`
-// is in later blocks, so `a` is refined to `x`.
-SLANG_UNIT_TEST(irPeepholeParamRefinesInputToLaterValueInSameBlock)
+// A frozen input is refined only to a value that cannot be poison. Here `x` is computed in the entry
+// block after `a` and dominates every use of `a`, but an arbitrary instruction result may be poison
+// (or may depend on a poison argument), so the param is kept rather than refining `a` to `x`.
+SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueIsBlockLocal)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder fixture(env.getSessionImpl());
@@ -619,8 +619,99 @@ SLANG_UNIT_TEST(irPeepholeParamRefinesInputToLaterValueInSameBlock)
     peepholeOptimize(getDefaultTargetProgram(env, "peepholeParamTargetY"), d.func);
 
     SLANG_CHECK(isValidModule(fixture.getModule()));
-    SLANG_CHECK(eq->getOperand(0) == x);
-    SLANG_CHECK(eq->getOperand(1) == x);
+    SLANG_CHECK(eq->getOperand(0) == p);
+    SLANG_CHECK(eq->getOperand(1) == a);
+}
+
+// Consider:
+//
+//     entry(c): d = select(c, 1, poison); a = LoadFromUninitializedMemory<int>(); if (c) ...
+//     left:     br merge(d)
+//     right:    br merge(a)
+//     merge(p): return select(c, p, a)
+//
+// `d` dominates `a` and every use of it, but `d` is poison when `c` is false. On that path the
+// function returns `a`, an arbitrary but defined value. Refining every use of `a` to `d` would
+// return poison there, so the param is kept.
+SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueMayBePoison)
+{
+    for (bool withTarget : {true, false})
+    {
+        StaticUnitTestEnv env(unitTestContext);
+        IRFixtureBuilder fixture(env.getSessionImpl());
+        IRBuilder builder(fixture.getModule());
+        auto intType = builder.getIntType();
+
+        Diamond d;
+        d.begin(builder, fixture.getModule(), intType);
+        IRInst* selectArgs[] = {
+            d.condition,
+            builder.getIntValue(intType, 1),
+            builder.getPoison(intType)};
+        auto dValue = builder.emitIntrinsicInst(intType, kIROp_Select, 3, selectArgs);
+        auto a = builder.emitLoadFromUninitializedMemory(intType);
+        d.finishEntry(builder);
+        d.finishArm(builder, d.left, {dValue});
+        d.finishArm(builder, d.right, {a});
+        builder.setInsertInto(d.merge);
+        auto p = builder.emitParam(intType);
+        IRInst* resultArgs[] = {d.condition, p, a};
+        auto result = builder.emitIntrinsicInst(intType, kIROp_Select, 3, resultArgs);
+        builder.emitReturn(result);
+        SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
+
+        auto target = withTarget ? getDefaultTargetProgram(env, "peepholeParamTargetP") : nullptr;
+        peepholeOptimize(target, d.func);
+
+        SLANG_CHECK(isValidModule(fixture.getModule()));
+        SLANG_CHECK(result->getOperand(1) == p);
+        SLANG_CHECK(result->getOperand(2) == a);
+    }
+}
+
+// A global shader parameter is bound by the application, has no operands that could carry poison,
+// and is fixed for the whole invocation, so an observed frozen input is refined to it. A
+// specialization constant with a default value is excluded, because the default is an arbitrary
+// lowered expression; that param is kept.
+SLANG_UNIT_TEST(irPeepholeParamRefinesObservedInputToGlobalParam)
+{
+    for (bool hasDefaultValue : {false, true})
+    {
+        for (bool withTarget : {true, false})
+        {
+            StaticUnitTestEnv env(unitTestContext);
+            IRFixtureBuilder fixture(env.getSessionImpl());
+            IRBuilder builder(fixture.getModule());
+            auto intType = builder.getIntType();
+
+            builder.setInsertInto(fixture.getModule());
+            auto global = builder.createGlobalParam(intType);
+            if (hasDefaultValue)
+                builder.addDefaultValueDecoration(global, builder.getIntValue(intType, 3));
+
+            Diamond d;
+            d.begin(builder, fixture.getModule(), builder.getBoolType());
+            auto a = builder.emitLoadFromUninitializedMemory(intType);
+            d.finishEntry(builder);
+            d.finishArm(builder, d.left, {a});
+            d.finishArm(builder, d.right, {global});
+            builder.setInsertInto(d.merge);
+            auto p = builder.emitParam(intType);
+            auto eq = builder.emitEql(p, a);
+            builder.emitReturn(eq);
+            SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
+
+            auto target =
+                withTarget ? getDefaultTargetProgram(env, "peepholeParamTargetG") : nullptr;
+            peepholeOptimize(target, d.func);
+
+            SLANG_CHECK(isValidModule(fixture.getModule()));
+            IRInst* expectedLeft = hasDefaultValue ? (IRInst*)p : global;
+            IRInst* expectedRight = hasDefaultValue ? (IRInst*)a : global;
+            SLANG_CHECK(eq->getOperand(0) == expectedLeft);
+            SLANG_CHECK(eq->getOperand(1) == expectedRight);
+        }
+    }
 }
 
 // The refinement is refused when the defined value can change while the frozen input stays fixed.
