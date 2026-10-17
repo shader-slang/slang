@@ -100,6 +100,7 @@
 #include "slang-ir-metal-legalize.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
+#include "slang-ir-promote-param-fields.h"
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-ray-tracing-legalize.h"
 #include "slang-ir-redundancy-removal.h"
@@ -2492,6 +2493,11 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
+
+    // Pass only the fields a callee reads from large aggregate parameters, so
+    // call sites do not copy the whole aggregate into thread-local storage.
+    if (targetProgram->getOptionSet().getOptimizationLevel() != OptimizationLevel::None)
+        SLANG_PASS(promoteParamFields, targetRequest);
 
     switch (target)
     {
