@@ -1,16 +1,18 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
 
-// WGSL has a native unary '-' only for signed float/int vectors; matrices and unsigned-integer
-// vectors have none, so the WGSL emitter lowers vector/matrix negation uniformly to the
-// subtraction "(type(0) - operand)". "operand" is the right-hand side of that subtraction, so an
-// additive operand such as "a + b" -- equal precedence to '-', and the RHS of the left-associative
-// '-' -- must be wrapped in its own parentheses: "-(a + b)" must emit "(vec3<f32>(0) - (a + b))".
+// WGSL has a native unary '-' only for signed float/int vectors; unsigned-integer vectors have
+// none, so the WGSL emitter lowers vector negation uniformly to the subtraction
+// "(type(0) - operand)". "operand" is the right-hand side of that subtraction, so an additive
+// operand such as "a + b" -- equal precedence to '-', and the RHS of the left-associative '-' --
+// must be wrapped in its own parentheses: "-(a + b)" must emit "(vec3<f32>(0) - (a + b))".
 // Without the inner parentheses the expression reassociates to "-a + b", silently changing the
-// result. This covers all three lowered element shapes: signed vectors, unsigned vectors, matrices.
+// result. Matrices have no unary '-' either and are lowered to "(T(-1) * operand)"; there an
+// additive operand needs its own parentheses because '+' binds looser than '*'. This covers
+// signed vectors, unsigned vectors and matrices.
 //
 // The inputs are derived from SV_DispatchThreadID so the negation is applied to runtime values;
-// negation of a compile-time constant is folded away before emission and would not exercise this
-// path.
+// negation of a scalar compile-time constant is folded away before emission and would not
+// exercise this path.
 
 RWStructuredBuffer<float3> outVec;
 RWStructuredBuffer<uint3> outUVec;
@@ -35,9 +37,9 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     //WGSL: vec3<u32>(0) - (
     outUVec[0] = -(ua + ub);
 
-    // Matrices: no native WGSL unary '-', so the same subtraction lowering runs.
+    // Matrices: no native WGSL unary '-', so they are multiplied by -1.
     float2x2 m1 = float2x2(float(tid.x), 1, 2, 3);
     float2x2 m2 = float2x2(float(tid.y), 4, 5, 6);
-    //WGSL: mat2x2<f32>(0) - (
+    //WGSL: f32(-1) * (mat2x2<f32>({{.*}}) + mat2x2<f32>(
     outMat[0] = -(m1 + m2);
 }
