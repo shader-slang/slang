@@ -307,6 +307,44 @@ SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenInputFeedsAnotherSlot)
     SLANG_CHECK(countUninitializedLoads(d.entry) == 0);
 }
 
+// An input passed to a branch into a different block is observed through that block's param.
+// Here `a` reaches `merge` as `p` and also `tail` as `q`, both at slot 0, so `p` may not become an
+// independent fresh value: `q == p` must hold on the `a` edge.
+SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenInputFeedsAnotherBlock)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder fixture(env.getSessionImpl());
+    IRBuilder builder(fixture.getModule());
+    auto intType = builder.getIntType();
+
+    Diamond d;
+    d.begin(builder, fixture.getModule(), builder.getBoolType());
+    auto a = builder.emitLoadFromUninitializedMemory(intType);
+    d.finishEntry(builder);
+    d.finishArm(builder, d.left, {a});
+    builder.setInsertInto(d.right);
+    d.finishArm(builder, d.right, {builder.emitLoadFromUninitializedMemory(intType)});
+    builder.setInsertInto(d.func);
+    auto tail = builder.emitBlock();
+    builder.setInsertInto(d.merge);
+    auto p = builder.emitParam(intType);
+    IRInst* tailArgs[] = {a, p};
+    builder.emitBranch(tail, 2, tailArgs);
+    builder.setInsertInto(tail);
+    auto q = builder.emitParam(intType);
+    auto r = builder.emitParam(intType);
+    auto eq = builder.emitEql(q, r);
+    builder.emitReturn(eq);
+    SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
+
+    peepholeOptimize(getDefaultTargetProgram(env, "peepholeParamTargetB"), d.func);
+
+    SLANG_CHECK(isValidModule(fixture.getModule()));
+    SLANG_CHECK(eq->getOperand(0) == a);
+    SLANG_CHECK(eq->getOperand(1) == p);
+    SLANG_CHECK(countUninitializedLoads(d.entry) == 1);
+}
+
 // `Poison` is deduplicated per type, so all-poison inputs are one instruction and the param is
 // forwarded to it. A mix of poison and frozen inputs keeps frozen-value semantics: the result is a
 // fresh `LoadFromUninitializedMemory`, unless the frozen input is observed elsewhere.
@@ -730,6 +768,63 @@ SLANG_UNIT_TEST(irPeepholeParamRefinesObservedInputToGlobalParam)
             SLANG_CHECK(eq->getOperand(1) == expectedRight);
         }
     }
+}
+
+// A constant is hoisted into the scope of its type, so a constant of a function-local type sits in
+// a block of that function rather than outside every function body. Here the null pointer `n` has a
+// pointer type to `extractExistentialType(e)`, so it lands in `body`, where `a` and every use of
+// `a` also live. Such a constant is not accepted as a refinement target, and the loop-header param
+// `p = phi(a, n)` is kept.
+SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementConstantIsFunctionLocal)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder fixture(env.getSessionImpl());
+    IRBuilder builder(fixture.getModule());
+
+    builder.setInsertInto(fixture.getModule());
+    auto interfaceType = builder.createInterfaceType(0, nullptr);
+    auto func = builder.createFunc();
+    IRType* paramTypes[] = {builder.getBoolType()};
+    func->setFullType(builder.getFuncType(1, paramTypes, builder.getVoidType()));
+    builder.addKeepAliveDecoration(func);
+    builder.setInsertInto(func);
+    auto entry = builder.emitBlock();
+    auto c = builder.emitParam(builder.getBoolType());
+    auto body = builder.emitBlock();
+    auto header = builder.emitBlock();
+    auto continueBlock = builder.emitBlock();
+    auto exit = builder.emitBlock();
+
+    builder.setInsertInto(entry);
+    builder.emitBranch(body);
+    builder.setInsertInto(body);
+    auto e = builder.emitLoadFromUninitializedMemory(interfaceType);
+    auto localType = builder.emitExtractExistentialType(e);
+    auto ptrType = builder.getPtrType(localType);
+    auto n = builder.getNullPtrValue(ptrType);
+    SLANG_CHECK_ABORT(n->getParent() == body);
+    auto a = builder.emitLoadFromUninitializedMemory(ptrType);
+    auto observed = builder.emitVar(ptrType);
+    auto observe = builder.emitStore(observed, a);
+    IRInst* entryArgs[] = {a};
+    builder.emitLoop(header, exit, header, 1, entryArgs);
+    builder.setInsertInto(header);
+    auto p = builder.emitParam(ptrType);
+    auto result = builder.emitVar(ptrType);
+    auto store = builder.emitStore(result, p);
+    builder.emitIfElse(c, exit, continueBlock, exit);
+    builder.setInsertInto(continueBlock);
+    IRInst* backArgs[] = {n};
+    builder.emitBranch(header, 1, backArgs);
+    builder.setInsertInto(exit);
+    builder.emitReturn();
+    SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
+
+    peepholeOptimize(getDefaultTargetProgram(env, "peepholeParamTargetL"), func);
+
+    SLANG_CHECK(isValidModule(fixture.getModule()));
+    SLANG_CHECK(store->getOperand(1) == p);
+    SLANG_CHECK(observe->getOperand(1) == a);
 }
 
 // A value computed in a loop is not a refinement target: it is neither a literal nor a global
