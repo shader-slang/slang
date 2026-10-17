@@ -2,9 +2,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -target spirv -entry computeMain -stage compute -g
 
 // Code generation forwards a block param whose incoming values are all the same undefined value,
-// as happens for the loop below once its inner merge is folded. The front end's uninitialized-use
-// check runs before that, so it still sees each never-written variable on its own, and the warnings
-// are the same with and without debug info.
+// as happens for the loop below once its inner merge is folded, and the loop-header param, whose
+// other incoming value is itself, is left alone so peephole terminates. The front end's warnings
+// come from its uninitialized-use check, which runs before those folds, and are the same with and
+// without debug info. The prelinking gate on the undefined-value folds is pinned by
+// uninitialized-merge-early-inline.slang.
 
 cbuffer C
 {
