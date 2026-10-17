@@ -1376,6 +1376,33 @@ struct ByteAddressBufferLegalizationContext
     // of byte-address buffer stores, which mostly parallels code we've
     // already discussed.
 
+    // Returns true if `type` is or contains a non-`bool` scalar smaller than 4 bytes.
+    bool containsSubWordScalar(IRType* type)
+    {
+        if (auto vectorType = as<IRVectorType>(type))
+            return containsSubWordScalar(vectorType->getElementType());
+        if (auto matrixType = as<IRMatrixType>(type))
+            return containsSubWordScalar(matrixType->getElementType());
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+            return containsSubWordScalar(arrayType->getElementType());
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                if (containsSubWordScalar(field->getFieldType()))
+                    return true;
+            }
+            return false;
+        }
+        if (as<IRBasicType>(type) && !as<IRBoolType>(type))
+        {
+            IRSizeAndAlignment sizeAlignment;
+            if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment)))
+                return sizeAlignment.size < 4;
+        }
+        return false;
+    }
+
     void processStore(IRInst* store)
     {
         // Just as for loads, the logic for stores is base on the type
@@ -1389,6 +1416,20 @@ struct ByteAddressBufferLegalizationContext
         // Validate the store's `location`/`alignment` contract up front so the diagnostic
         // fires regardless of whether the stored type happens to need legalization.
         validateExplicitAlignment(store->getOperand(1), store->getOperand(2), type);
+
+        // On targets that can only write whole 32-bit words, a store of a 1- or 2-byte
+        // value would have to read-modify-write the containing word, which can lose a
+        // concurrent write to the other bytes. Report it here, where the store still has
+        // its source location, instead of failing later on the 8/16-bit integer types.
+        if (m_options.rejectSubWordStores && containsSubWordScalar(type))
+        {
+            m_sink->diagnose(Diagnostics::ByteAddressBufferSubWordStoreNotSupportedInWgsl{
+                .type = type,
+                .location = store->sourceLoc,
+            });
+            store->removeAndDeallocate();
+            return;
+        }
 
         // Types that are already legal to use don't require any processing.
         //

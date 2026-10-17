@@ -2273,6 +2273,7 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             byteAddressBufferOptions.useBitCastFromUInt = true;
+            byteAddressBufferOptions.rejectSubWordStores = true;
             break;
         }
 

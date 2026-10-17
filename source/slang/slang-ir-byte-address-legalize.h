@@ -20,6 +20,11 @@ struct ByteAddressBufferLegalizationOptions
     /// define `ByteAddressBuffer`/`StructuredBuffer` and introduce operations which prevent DCE
     /// from destroying old definitions of `ByteAddressBuffer` after variable replacement.
     bool treatGetEquivalentStructuredBufferAsGetThis = false;
+
+    /// Report an error for stores of values with a scalar smaller than 4 bytes. Used for
+    /// targets that can only write whole 32-bit words of a byte-address buffer, where such a
+    /// store would have to read-modify-write the word and race with neighbouring writes.
+    bool rejectSubWordStores = false;
 };
 
 /// Legalize byte-address buffer `Load()` and `Store()` operations.
