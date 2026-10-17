@@ -207,8 +207,9 @@ By default, a `uniform` parameter defined in the parameter list of an entrypoint
 All `uniform` parameters defined in global scope are grouped together and placed in a default constant buffer. You can make a global uniform parameter laid out as a push constant by using the `[vk::push_constant]` attribute
 on the uniform parameter. All push constants follow the std430 layout by default.
 
-Vulkan allows an entry point to statically use at most one push-constant block, and Slang lays out each block from offset 0.
-The compiler reports error 39033 when the SPIR-V or GLSL it generates for an entry point would use more than one, for example a global `[vk::push_constant]` parameter together with the entry point's own `uniform` parameters.
+Vulkan allows an entry point to statically use at most one push-constant block.
+The compiler reports error 39033 when an entry point uses more than one, for example when a compute or rasterization entry point reads both a global `[vk::push_constant]` parameter and its own `uniform` parameters.
+A block counts as used when the entry point, or a function it calls, refers to it in code that Slang's own dead-code elimination keeps. A read inside a branch that a constant condition removes does not count, but a read in a function called with an argument that makes the read unreachable still counts. With `-g`, an entry point's `uniform` parameters count even when the code never reads them, because Slang loads their values so that a debugger can show them.
 
 ## Specialization Constants
 

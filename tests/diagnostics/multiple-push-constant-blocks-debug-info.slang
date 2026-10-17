@@ -8,8 +8,6 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute -g
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute -g -O0
-// CHECK: error[E39033]
-// CHECK: note:
 
 struct PC
 {
@@ -26,10 +24,10 @@ RWStructuredBuffer<float> outBuf;
 [numthreads(1, 1, 1)]
 void main(uniform float unused)
 /*CHECK:
-     ^^^^ entry point uses more than one push-constant block
+     ^^^^ error E39033
      ^^^^ entry point `main` uses more than one push-constant block
      ^^^^ the push-constant block that holds the `uniform` parameters `unused` of `main` is used by this entry point
-     ^^^^ each push-constant block starts at offset 0
+     ^^^^ combine the data into one
 */
 {
     outBuf[0] = push.a.y;

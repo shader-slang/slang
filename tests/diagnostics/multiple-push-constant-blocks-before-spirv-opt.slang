@@ -13,8 +13,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute -O0
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target glsl -entry main -stage compute
-// CHECK: error[E39033]
-// CHECK: note:
 
 struct PC
 {
@@ -36,10 +34,10 @@ float extra(bool useGlobal)
 [numthreads(1, 1, 1)]
 void main([[vk::binding(3, 2)]] RWStructuredBuffer<float> outBuf, uniform float k)
 /*CHECK:
-     ^^^^ entry point uses more than one push-constant block
+     ^^^^ error E39033
      ^^^^ entry point `main` uses more than one push-constant block
      ^^^^ the push-constant block that holds the `uniform` parameters `k` of `main` is used by this entry point
-     ^^^^ each push-constant block starts at offset 0
+     ^^^^ combine the data into one
 */
 {
     outBuf[0] = k + extra(false);

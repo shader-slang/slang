@@ -15,17 +15,19 @@ bool isPushConstantBlockByLayout(IRInst* globalParam)
                             LayoutResourceKind::PushConstantBuffer);
 }
 
-/// Return the struct type that holds the fields of push-constant block `block`, or null if it has
-/// none. On SPIR-V the block is a pointer to the struct after legalization; on GLSL it is still a
-/// `ConstantBuffer` of the struct.
-static IRStructType* findPushConstantBlockStruct(IRInst* block)
+/// Return the struct type that holds the `uniform` parameters in the push-constant block that
+/// `collectEntryPointUniformParams` creates for an entry point. On SPIR-V the block is a pointer
+/// to the struct after legalization; on GLSL it is still a `ConstantBuffer` of the struct.
+static IRStructType* getEntryPointUniformsStruct(IRInst* block)
 {
     IRInst* type = block->getDataType();
     if (auto ptrType = as<IRPtrTypeBase>(type))
         type = ptrType->getValueType();
     if (auto groupType = as<IRParameterGroupType>(type))
-        type = groupType->getOperand(0);
-    return as<IRStructType>(type);
+        type = groupType->getElementType();
+    auto structType = as<IRStructType>(type);
+    SLANG_ASSERT(structType);
+    return structType;
 }
 
 /// Describe `block` the way the user wrote it, for example "push-constant block `push`" for a
@@ -33,15 +35,20 @@ static IRStructType* findPushConstantBlockStruct(IRInst* block)
 /// parameters `k`, `scale` of `main`" for the block that `collectEntryPointUniformParams` creates
 /// for `main`.
 ///
-/// The compiler-created block takes the source location of the entry point that declares its
-/// parameters, so a block located at `entryPoint` is that entry point's own block.
+/// The compiler-created block has no declaration of its own, so `collectEntryPointUniformParams`
+/// gives it the source location of the entry point, and the passes that later rebuild a global
+/// parameter (`moveEntryPointUniformParamsToGlobalScope`, and `legalizeGlobalParam` through
+/// `declareSimpleVar`) copy that location to the replacement. A block located at `entryPoint` is
+/// therefore that entry point's own block. We use the location because
+/// `IREntryPointParamDecoration`, which records the same fact, is removed by
+/// `stripLegalizationOnlyInstructions` before either target runs this check.
 static String describePushConstantBlock(IRInst* block, IRFunc* entryPoint)
 {
     StringBuilder sb;
     if (block->sourceLoc.isValid() && block->sourceLoc == entryPoint->sourceLoc)
     {
         sb << "the push-constant block that holds the `uniform` parameters ";
-        if (auto structType = findPushConstantBlockStruct(block))
+        if (auto structType = getEntryPointUniformsStruct(block))
         {
             const char* separator = "";
             for (auto field : structType->getFields())

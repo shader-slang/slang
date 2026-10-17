@@ -5,8 +5,6 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry vmain -stage vertex
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target glsl -entry vmain -stage vertex
-// CHECK: error[E39033]
-// CHECK: note:
 
 struct PC
 {
@@ -34,9 +32,9 @@ float4 readSecond()
 [shader("vertex")]
 float4 vmain(float3 p: POSITION) : SV_Position
 /*CHECK:
-       ^^^^^ entry point uses more than one push-constant block
+       ^^^^^ error E39033
        ^^^^^ entry point `vmain` uses more than one push-constant block
-       ^^^^^ each push-constant block starts at offset 0
+       ^^^^^ combine the data into one
 */
 {
     return float4(p, 1) + push.a + readSecond();

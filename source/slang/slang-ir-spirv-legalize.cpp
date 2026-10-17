@@ -3459,9 +3459,9 @@ void legalizeIRForSPIRV(
 
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
 
-    // The emitter lists every global that `m_referencingEntryPoints` maps to an entry point in that
-    // entry point's interface, so we count push-constant blocks with the same graph, after the last
-    // dead-code elimination that can remove a block's only use.
+    // `m_referencingEntryPoints` records which globals each entry point's call tree uses, which is
+    // the static use that Vulkan limits to one push-constant block per entry point. We count blocks
+    // here, after the last dead-code elimination that can remove a block's only use.
     checkForMultiplePushConstantBlocksPerEntryPoint(
         module,
         context->m_referencingEntryPoints,
