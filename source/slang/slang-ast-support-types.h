@@ -645,13 +645,14 @@ FIDDLE() namespace Slang
         /// flags play the role of C++'s modifiable and non-modifiable l-values, so an argument
         /// for a `__ref_readonly` parameter may be either.
         ///
-        /// TODO: A more general design is an `isAddressable` flag set on every expression that
-        /// denotes a memory location, writable or not, with `__ref` arguments requiring it
-        /// rather than `isLeftValue`. Semantic checking would then reject an l-value that is not
-        /// a memory location (a multi-element swizzle, or a property with `get`/`set`), which
-        /// lowering's `getAddress` currently reports as E40008. We chose the narrower flag
-        /// because the general one must be set at every site that produces an l-value, which
-        /// is a larger change than adding `__ref_readonly` needs.
+        /// TODO: This flag combines two properties of an expression that we want to record
+        /// independently: its value category (a pure value, an abstract storage location such
+        /// as a `property` reference, or a memory location) and the access it permits
+        /// (read-only, write-only, or read-write). `isLeftValue` and `isWriteOnly` each encode
+        /// part of the same two properties. We expect `QualType` to become an `ExprInfo` that
+        /// stores the value category and the access as separate fields. We added only this flag
+        /// because restructuring `QualType` is a larger change than adding `__ref_readonly`
+        /// needs.
         FIDDLE() bool isReadOnlyMemoryLocation = false;
 
         QualType() = default;
