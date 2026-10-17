@@ -479,7 +479,7 @@ SLANG_UNIT_TEST(irBlob)
 
 // Check current module loading and rejection of version-35 modules.
 //
-// Adding `ReadOnlyModifier` and `WriteOnlyModifier` changes the numeric AST node IDs in version 36.
+// Adding `RefReadOnlyModifier` and `RefWriteOnlyModifier` changes the numeric AST node IDs in version 36.
 // This test verifies that a current module loads, then changes only its module version to 35
 // and requires rejection with the specific unsupported-version diagnostic.
 SLANG_UNIT_TEST(irBlobRejectsVersion35)

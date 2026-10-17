@@ -207,8 +207,9 @@ enum class AccessQualifier : uint64_t
     Immutable = 2,
 
     // The data being referred to can only be written through the reference.
-    // This is only valid as the access of a `RefParam` (a `__ref_writeonly`
-    // parameter), not of a `Ptr` or `Ref`.
+    // `IRRefParamType` records this access for a `__ref_writeonly` parameter;
+    // the core module's `Access` enum does not expose it, so a `Ptr` or `Ref`
+    // cannot name it.
     WriteOnly = 3,
 };
 
