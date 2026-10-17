@@ -1,0 +1,294 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+// MLP-only image fitting test.
+//
+// InlineVector mode exposes regular slangpy-callable functions.
+// WaveTangledVector mode exposes explicit compute entry points selected with
+// -DUSE_WAVE_TANGLED=1 from Python.
+//
+// Half-precision variant (USE_HALF=1) uses mixed-precision training:
+//   - Forward/backward: WaveTangledVector<half> with PointerAddress<half>
+//   - Gradients: accumulated in half via PointerAddress<half> atomicAdd
+//   - Optimizer: reads half grads, does Adam in fp32 on a master copy,
+//               copies fp32 master back to half params
+//   - Kernel parameters are declared as 'float*' for all variants because
+//     slangpy passes raw device addresses; PointerAddress<ElemType>(float*)
+//     reinterprets the pointer at the correct element stride.
+
+import slangpy;
+import slang.neural;
+import neural_test_common;
+
+static const int INPUT_DIM = 2;
+static const int HIDDEN_DIM = 128;
+static const int OUTPUT_DIM = 3;
+static const float ALPHA = 0.01f;
+
+#ifdef USE_WAVE_TANGLED
+static const int SUBGROUP_SIZE = 32;
+#ifndef WORKGROUP_SIZE
+#define WORKGROUP_SIZE 64
+#endif
+static const int WORKGROUP_SZ = WORKGROUP_SIZE;
+static const int SUBGROUP_COUNT = WORKGROUP_SZ / SUBGROUP_SIZE;
+#ifdef USE_HALF
+typealias ElemType = half;
+#else
+typealias ElemType = float;
+#endif
+typealias ShMemSize = SharedMemorySize<ElemType, TargetEnum.CUDA, ExecutionMode.Training,
+                                       SUBGROUP_SIZE, SUBGROUP_COUNT>;
+typealias ShMemSizeLayer4 = ShMemSize.OfLayer4<INPUT_DIM, HIDDEN_DIM, HIDDEN_DIM,
+                                                HIDDEN_DIM, OUTPUT_DIM>;
+typealias Address = PointerAddress<ElemType>;
+typealias InputVec = WaveTangledVector<ElemType, ShMemSizeLayer4, INPUT_DIM, SUBGROUP_SIZE>;
+typealias HiddenVec = WaveTangledVector<ElemType, ShMemSizeLayer4, HIDDEN_DIM, SUBGROUP_SIZE>;
+typealias OutputVec = WaveTangledVector<ElemType, ShMemSizeLayer4, OUTPUT_DIM, SUBGROUP_SIZE>;
+#else
+typealias Address = PointerAddress<float>;
+typealias InputVec = InlineVector<float, INPUT_DIM>;
+typealias HiddenVec = InlineVector<float, HIDDEN_DIM>;
+typealias OutputVec = InlineVector<float, OUTPUT_DIM>;
+#endif
+
+#ifdef USE_WAVE_TANGLED
+typealias Layer0 = FFLayer<ElemType, InputVec, HiddenVec, LinearLayout, LeakyReLU<ElemType>>;
+typealias Layer1 = FFLayer<ElemType, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<ElemType>>;
+typealias Layer2 = FFLayer<ElemType, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<ElemType>>;
+typealias Layer3 = FFLayer<ElemType, HiddenVec, OutputVec, LinearLayout, Sigmoid<ElemType>>;
+#else
+typealias Layer0 = FFLayer<float, InputVec, HiddenVec, LinearLayout, LeakyReLU<float>>;
+typealias Layer1 = FFLayer<float, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<float>>;
+typealias Layer2 = FFLayer<float, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<float>>;
+typealias Layer3 = FFLayer<float, HiddenVec, OutputVec, LinearLayout, Sigmoid<float>>;
+#endif
+
+static const uint TOTAL_PARAMS = Layer0.ParameterCount + Layer1.ParameterCount
+                                + Layer2.ParameterCount + Layer3.ParameterCount;
+
+int get_total_params() { return int(TOTAL_PARAMS); }
+
+
+#ifdef USE_WAVE_TANGLED
+[Differentiable]
+OutputVec mlp_forward_coords(
+    Address paramAddr,
+    no_diff float2 uv)
+{
+    InputVec input;
+    input[0] = uv.x;
+    input[1] = uv.y;
+
+    let act = LeakyReLU<ElemType>(ElemType(ALPHA));
+    let h0 = Layer0(act).eval<Address>(input, paramAddr);
+    let a1 = paramAddr.getOffset(Layer0.ParameterCount);
+    let h1 = Layer1(act).eval<Address>(h0, a1);
+    let a2 = a1.getOffset(Layer1.ParameterCount);
+    let h2 = Layer2(act).eval<Address>(h1, a2);
+    let a3 = a2.getOffset(Layer2.ParameterCount);
+    return Layer3(Sigmoid<ElemType>()).eval<Address>(h2, a3);
+}
+
+OutputVec forward_inference(float* params, float2 uv)
+{
+    return mlp_forward_coords(Address(params), uv);
+}
+
+[shader("compute")]
+[numthreads(WORKGROUP_SIZE, 1, 1)]
+void compute_calculate_grads(
+    uint3 gid : SV_GroupID,
+    uint gtid : SV_GroupIndex,
+    uniform uint seed,
+    uniform int2 batch_size,
+    uniform int2 img_resolution,
+    uniform float loss_scale,
+    uniform float* ref_image,
+    uniform float* params,
+    uniform float* params_grad)
+{
+    int sample_idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
+    int batch_count = batch_size.x * batch_size.y;
+    if (sample_idx >= batch_count) return;
+
+    LCG lcg = LCG(seed + uint(sample_idx));
+    int2 batch_index = int2(sample_idx % batch_size.x, sample_idx / batch_size.x);
+    float2 uv = (float2(batch_index) + float2(lcg.next_float(), lcg.next_float()))
+                / float2(batch_size);
+    int2 pixel = clamp(int2(uv * float2(img_resolution)), int2(0), img_resolution - 1);
+    float2 pixel_uv = (float2(pixel) + 0.5f) / float2(img_resolution);
+
+    int ref_idx = (pixel.y * img_resolution.x + pixel.x) * 3;
+    float3 ref_color = float3(ref_image[ref_idx], ref_image[ref_idx + 1], ref_image[ref_idx + 2]);
+
+    OutputVec out = forward_inference(params, pixel_uv);
+    ElemType doutArr[OUTPUT_DIM];
+    doutArr[0] = ElemType(2.0f * (float(out[0]) - ref_color.x) * loss_scale / float(OUTPUT_DIM));
+    doutArr[1] = ElemType(2.0f * (float(out[1]) - ref_color.y) * loss_scale / float(OUTPUT_DIM));
+    doutArr[2] = ElemType(2.0f * (float(out[2]) - ref_color.z) * loss_scale / float(OUTPUT_DIM));
+    OutputVec dOutput = OutputVec(doutArr);
+
+    bwd_diff(mlp_forward_coords)(
+        DifferentialPtrPair<Address>(Address(params), Address(params_grad)),
+        pixel_uv, dOutput);
+}
+
+[shader("compute")]
+[numthreads(WORKGROUP_SIZE, 1, 1)]
+void compute_render(
+    uint3 gid : SV_GroupID,
+    uint gtid : SV_GroupIndex,
+    uniform int2 img_resolution,
+    uniform float* params,
+    uniform float* output_image)
+{
+    int pixel_idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
+    int total_pixels = img_resolution.x * img_resolution.y;
+    if (pixel_idx >= total_pixels) return;
+
+    int2 pixel = int2(pixel_idx % img_resolution.x, pixel_idx / img_resolution.x);
+    float2 uv = (float2(pixel) + 0.5f) / float2(img_resolution);
+    OutputVec out = forward_inference(params, uv);
+
+    int out_idx = pixel_idx * 3;
+    output_image[out_idx + 0] = float(out[0]);
+    output_image[out_idx + 1] = float(out[1]);
+    output_image[out_idx + 2] = float(out[2]);
+}
+
+[shader("compute")]
+[numthreads(WORKGROUP_SIZE, 1, 1)]
+void compute_show_loss(
+    uint3 gid : SV_GroupID,
+    uint gtid : SV_GroupIndex,
+    uniform int2 img_resolution,
+    uniform float* params,
+    uniform float* ref_image,
+    uniform float* output_loss)
+{
+    int pixel_idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
+    int total_pixels = img_resolution.x * img_resolution.y;
+    if (pixel_idx >= total_pixels) return;
+
+    int2 pixel = int2(pixel_idx % img_resolution.x, pixel_idx / img_resolution.x);
+    float2 uv = (float2(pixel) + 0.5f) / float2(img_resolution);
+    OutputVec out = forward_inference(params, uv);
+
+    int ref_idx = pixel_idx * 3;
+    float3 ref_color = float3(ref_image[ref_idx], ref_image[ref_idx + 1], ref_image[ref_idx + 2]);
+    output_loss[ref_idx + 0] = pow(float(out[0]) - ref_color.x, 2);
+    output_loss[ref_idx + 1] = pow(float(out[1]) - ref_color.y, 2);
+    output_loss[ref_idx + 2] = pow(float(out[2]) - ref_color.z, 2);
+}
+
+[shader("compute")]
+[numthreads(WORKGROUP_SIZE, 1, 1)]
+void compute_optimizer_step(
+    uint3 gid : SV_GroupID,
+    uint gtid : SV_GroupIndex,
+    uniform float* primal,
+    uniform float* grad,
+    uniform float* mean_buf,
+    uniform float* variance_buf,
+    uniform float lr,
+    uniform int iter,
+    uniform float loss_scale,
+    uniform int param_count)
+{
+    int idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
+    if (idx >= param_count) return;
+    adam_step(primal[idx], grad[idx], mean_buf[idx], variance_buf[idx], lr, iter, loss_scale);
+}
+
+#ifdef USE_HALF
+[shader("compute")]
+[numthreads(WORKGROUP_SIZE, 1, 1)]
+void compute_optimizer_step_half(
+    uint3 gid : SV_GroupID,
+    uint gtid : SV_GroupIndex,
+    uniform half* primal,
+    uniform half* grad,
+    uniform float* primal_master,
+    uniform float* mean_buf,
+    uniform float* variance_buf,
+    uniform float lr,
+    uniform int iter,
+    uniform float loss_scale,
+    uniform int param_count)
+{
+    int idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
+    if (idx >= param_count) return;
+    adam_step_mixed(primal[idx], grad[idx], primal_master[idx],
+                    mean_buf[idx], variance_buf[idx], lr, iter, loss_scale);
+}
+#endif
+#else
+[Differentiable]
+OutputVec mlp_forward(Address paramAddr, InputVec input)
+{
+    let act = LeakyReLU<float>(ALPHA);
+    let h0 = Layer0(act).eval<Address>(input, paramAddr);
+    let a1 = paramAddr.getOffset(Layer0.ParameterCount);
+    let h1 = Layer1(act).eval<Address>(h0, a1);
+    let a2 = a1.getOffset(Layer1.ParameterCount);
+    let h2 = Layer2(act).eval<Address>(h1, a2);
+    let a3 = a2.getOffset(Layer2.ParameterCount);
+    return Layer3(Sigmoid<float>()).eval<Address>(h2, a3);
+}
+
+struct Network
+{
+    float* params;
+    float* params_grad;
+};
+
+[Differentiable]
+float3 loss(
+    Address paramAddr,
+    no_diff int2 pixel, no_diff int2 resolution, no_diff float3 reference)
+{
+    float2 uv = (float2(pixel) + 0.5f) / float2(resolution);
+    InputVec input;
+    input[0] = uv.x;
+    input[1] = uv.y;
+    let out = mlp_forward(paramAddr, input);
+    float3 error = float3(out[0], out[1], out[2]) - reference;
+    return error * error;
+}
+
+void calculate_grads(uint seed, int2 batch_index, int2 batch_size,
+                     Tensor<float3, 2> reference, Network network)
+{
+    LCG lcg = LCG(seed);
+    float2 uv = (batch_index + float2(lcg.next_float(), lcg.next_float())) / float2(batch_size);
+    int2 resolution = int2(reference.shape[1], reference.shape[0]);
+    int2 pixel = int2(uv * float2(resolution));
+    float3 ref_color = reference[pixel];
+
+    bwd_diff(loss)(
+        DifferentialPtrPair<Address>(Address(network.params), Address(network.params_grad)),
+        pixel, resolution, ref_color, float3(1.0f));
+}
+
+float3 render(int2 pixel, int2 resolution, Network network)
+{
+    float2 uv = (float2(pixel) + 0.5f) / float2(resolution);
+    InputVec input;
+    input[0] = uv.x;
+    input[1] = uv.y;
+    let out = mlp_forward(Address(network.params), input);
+    return float3(out[0], out[1], out[2]);
+}
+
+float3 show_loss(int2 pixel, int2 resolution, float3 reference, Network network)
+{
+    return loss(Address(network.params), pixel, resolution, reference);
+}
+
+void optimizer_step(inout float primal, inout float grad,
+                    inout float mean, inout float variance,
+                    float lr, int iter)
+{
+    adam_step(primal, grad, mean, variance, lr, iter, 1.0f /* no loss scaling */);
+}
+#endif
