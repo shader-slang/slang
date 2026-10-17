@@ -14,13 +14,19 @@
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
-uniform float tail[];
+// The unsized array is the trailing field of a storage buffer: a global uniform
+// `float tail[]` would be packed into the implicit constant buffer, which rejects it (E31215).
+struct Tail
+{
+    float tail[];
+}
+GLSLShaderStorageBuffer<Tail> tailBuffer;
 uniform RWStructuredBuffer<float> buf;
 
 [numthreads(1, 1, 1)]
 void main()
 {
-    buf[0] = tail[0];
+    buf[0] = tailBuffer.tail[0];
 }
 
-// IR: let {{.*}}%tail{{.*}}: UnsizedArray(Float){{.*}}= global_param
+// IR: field(%tail, UnsizedArray(Float))
