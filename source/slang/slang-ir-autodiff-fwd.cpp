@@ -131,14 +131,8 @@ struct ForwardDiffTranslationContext
     // Pending values to write back to inout params at the end of the current function.
     OrderedDictionary<IRInst*, InstPair> mapInOutParamToWriteBackValue;
 
-    // Signals the translater to use an IRTrivialForwardDifferentiate(func)
-    // instruction for functions that are non-forward-differentiable, but
-    // have a reverse-mode derivative defined.
-    //
-    // Normally, we just treat the call as non-differentiable, but this will
-    // cause the reverse-mode differentiation step to skip the function as well
-    //
-    bool useTrivialFwdsForBwdDifferentiableFuncs = true;
+    // Reverse transcription needs backward associations even though it first builds forward IR.
+    bool isForBackwardDiff = false;
 
     ForwardDiffTranslationContext(AutoDiffSharedContext* shared, DiagnosticSink* inSink)
         : autoDiffSharedContext(shared), diffTypeContext(shared), sink(inSink)
@@ -146,13 +140,7 @@ struct ForwardDiffTranslationContext
         cloneEnv.squashChildrenMapping = true;
     }
 
-    void enableReverseModeCompatibility()
-    {
-        useTrivialFwdsForBwdDifferentiableFuncs = true;
-
-        // TODO: Any other flags that we need to generate a reverse-mode compatible
-        // forward-mode derivative.
-    }
+    void enableReverseModeCompatibility() { isForBackwardDiff = true; }
 
     DiagnosticSink* getSink() { return sink; }
 
@@ -1019,6 +1007,11 @@ struct ForwardDiffTranslationContext
             primalCallee,
             AnnotationKind::FwdDiffBackwardDerivativeWitnessTable);
 
+        if (isAbsentOptionalDerivative(fwdDiffFwdTable))
+            fwdDiffFwdTable = nullptr;
+        if (isAbsentOptionalDerivative(fwdDiffBwdTable))
+            fwdDiffBwdTable = nullptr;
+
         if (fwdDiffFwdTable)
         {
             IRInterfaceType* fwdDiffInterfaceType = cast<IRInterfaceType>(
@@ -1300,6 +1293,19 @@ struct ForwardDiffTranslationContext
         return hasDiffPtrOutput;
     }
 
+    /// Identifies a call produced by differentiating an actual forward-differentiable callee.
+    /// For example, differentiating c.eval(x) records eval as the source of the call to evalFwd.
+    bool isHigherOrderDerivativeCall(IRCall* call)
+    {
+        auto originalValue = call->findDecoration<IRAutoDiffOriginalValueDecoration>();
+        if (!originalValue)
+            return false;
+        auto forwardDerivative = diffTypeContext.tryGetAssociationOfKind(
+            originalValue->getOriginalValue(),
+            AnnotationKind::ForwardDerivative);
+        return forwardDerivative && !isAbsentOptionalDerivative(forwardDerivative);
+    }
+
     // Differentiating a call instruction here is primarily about generating
     // an appropriate call list based on whichever parameters have differentials
     // in the current transcription context.
@@ -1326,36 +1332,55 @@ struct ForwardDiffTranslationContext
             primalCallee,
             AnnotationKind::ForwardDerivative));
 
-        if (!diffCallee || as<IRVoidLit>(diffCallee))
+        bool treatAsDifferentiable =
+            origCall->findDecoration<IRTreatCallAsDifferentiableDecoration>() != nullptr;
+        auto backwardDerivative = diffTypeContext.tryGetAssociationOfKind(
+            primalCallee,
+            AnnotationKind::BackwardDerivativeApply);
+        bool isHigherOrderCall = isHigherOrderDerivativeCall(origCall);
+        // Ordinary unannotated callees retain their primal-only transcription.
+        bool needsTrivialDerivative =
+            treatAsDifferentiable && (diffCallee || backwardDerivative || isHigherOrderCall) &&
+            (isForBackwardDiff
+                 ? !backwardDerivative || isAbsentOptionalDerivative(backwardDerivative)
+                 : !diffCallee || isAbsentOptionalDerivative(diffCallee));
+        if (!treatAsDifferentiable && isHigherOrderCall)
         {
-            // TODO: It may be better to lower this as a SynthesizedFuncDecl from the front-end
-            // if a function is backward-differentiable, but not forward-differentiable.
-            //
-            if (this->useTrivialFwdsForBwdDifferentiableFuncs)
+            auto requiredDerivative = isForBackwardDiff
+                                          ? diffTypeContext.tryGetAssociationOfKind(
+                                                primalCallee,
+                                                AnnotationKind::BackwardDerivativeApply)
+                                          : diffCallee;
+            if (!requiredDerivative || isAbsentOptionalDerivative(requiredDerivative))
             {
-                // See if the callee is backward differentiable.
-                if (this->diffTypeContext.tryGetAssociationOfKind(
-                        primalCallee,
-                        AnnotationKind::BackwardDerivativeApply))
-                {
-                    // If yes, then we want to generate a trivial forward function.
-                    IRInst* args[] = {primalCallee->getDataType()};
-                    auto fwdDiffFuncTypeInst = builder->emitIntrinsicInst(
-                        builder->getTypeKind(),
-                        kIROp_ForwardDiffFuncType,
-                        1,
-                        args);
-                    auto resolvedFuncType =
-                        diffTypeContext.resolveType(builder, fwdDiffFuncTypeInst);
-                    // Generate a trivial forward differentiation function
-                    auto trivialFwdCallee = builder->emitIntrinsicInst(
-                        resolvedFuncType,
-                        kIROp_TrivialForwardDifferentiate,
-                        1,
-                        &primalCallee);
+                getSink()->diagnose(
+                    Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
+                        .diffLevel = isForBackwardDiff ? "backward" : "forward",
+                        .funcName = getResolvedInstForDecorations(primalCallee),
+                        .location = origCall->sourceLoc,
+                    });
+                return InstPair(maybeCloneForPrimalInst(builder, origCall), nullptr);
+            }
+        }
 
-                    diffCallee = trivialFwdCallee;
-                }
+        if (needsTrivialDerivative || !diffCallee || isAbsentOptionalDerivative(diffCallee))
+        {
+            // A backward-only callee uses a trivial forward pass so reverse unzipping can
+            // recover its actual backward derivative. An unavailable no_diff call uses zero.
+            if (needsTrivialDerivative || backwardDerivative)
+            {
+                IRInst* args[] = {primalCallee->getDataType()};
+                auto fwdDiffFuncTypeInst = builder->emitIntrinsicInst(
+                    builder->getTypeKind(),
+                    kIROp_ForwardDiffFuncType,
+                    1,
+                    args);
+                auto resolvedFuncType = diffTypeContext.resolveType(builder, fwdDiffFuncTypeInst);
+                diffCallee = builder->emitIntrinsicInst(
+                    resolvedFuncType,
+                    kIROp_TrivialForwardDifferentiate,
+                    1,
+                    &primalCallee);
             }
         }
 
@@ -1541,6 +1566,8 @@ struct ForwardDiffTranslationContext
         }
 
         auto callInst = argBuilder.emitCallInst(diffReturnType, diffCallee, args);
+        if (treatAsDifferentiable)
+            argBuilder.addDecoration(callInst, kIROp_TreatCallAsDifferentiableDecoration);
         placeholderCall->removeAndDeallocate();
         placeholderCallee->removeAndDeallocate();
 
@@ -2482,7 +2509,10 @@ struct ForwardDiffTranslationContext
         InstPair pair = this->translateFuncHeader(inBuilder, origFunc);
         fwdDiffFunc = pair.differential;
 
+        auto errorCount = sink->getErrorCount();
         this->translateFunc(inBuilder, origFunc, cast<IRFunc>(fwdDiffFunc));
+        if (sink->getErrorCount() != errorCount)
+            return;
 
         fwdDiffFunc = maybeHoist(*inBuilder, fwdDiffFunc);
         stripTempDecorations(fwdDiffFunc);
@@ -3576,7 +3606,10 @@ IRInst* maybeTranslateForwardDerivative(
     IRBuilder builder(sharedContext->moduleInst);
 
     builder.setInsertAfter(targetFunc);
+    auto errorCount = sink->getErrorCount();
     translater._translateFuncImpl(&builder, targetFunc, fwdDiffFunc);
+    if (sink->getErrorCount() != errorCount)
+        return builder.getPoison(fwdDiffFunc->getFullType());
 
     // TODO: Should hoist outside..
     return fwdDiffFunc;
@@ -3588,6 +3621,7 @@ IRInst* maybeTranslateRawForwardDerivativeWithAnnotations(
     IRFunc* primalFunc)
 {
     ForwardDiffTranslationContext translater(sharedContext, sink);
+    translater.enableReverseModeCompatibility();
 
     IRInst* fwdDiffFunc;
     IRBuilder builder(sharedContext->moduleInst);

@@ -87,6 +87,9 @@ bool isTypePack(Type* type);
 bool isAbstractTypePack(Type* type);
 bool isPackType(Type* type);
 
+/// The type of a differential pair of `primalType`; a type pack pairs element-wise.
+Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitness);
+
 // Base class for types that can be used in arithmetic expressions
 FIDDLE(abstract)
 class ArithmeticExpressionType : public DeclRefType

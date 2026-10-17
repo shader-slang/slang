@@ -598,6 +598,10 @@ void stripTempDecorations(IRInst* inst);
 bool isNoDiffType(IRType* paramType);
 bool isNeverDiffFuncType(IRFuncType* funcType);
 
+/// Recognizes an absent optional conformance: NoneWitness lowers to a void-conformance table,
+/// and looking up a requirement in that table produces IRVoidLit.
+bool isAbsentOptionalDerivative(IRInst* inst);
+
 // True if `inst` is the value produced by a `bwd_diff(...)` operation, i.e. a callable
 // backward-derivative function. Unwraps `Specialize`/generic layers on the way in.
 bool isBackwardDerivativeValue(IRInst* inst);

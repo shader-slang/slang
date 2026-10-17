@@ -315,7 +315,7 @@ Type* MatrixExpressionType::getRowType()
     return rowType;
 }
 
-static Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitness)
+Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitness)
 {
     auto astBuilder = getCurrentASTBuilder();
 
@@ -499,6 +499,8 @@ Val* BwdCallableFuncType::_resolveImplOverride()
 
         auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
         auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
+        SLANG_RELEASE_ASSERT(
+            funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
 
         // First translate the this-type.
         // Get the differential value type and add it with flipped direction.
@@ -616,6 +618,8 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
 
         auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
         auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
+        SLANG_RELEASE_ASSERT(
+            funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
 
         // The result type is Tuple<FuncResultType, MinimalContextType> when non-void,
         // or just MinimalContextType when the function returns void.
@@ -714,6 +718,8 @@ Val* RematFuncType::_resolveImplOverride()
 
         auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
         auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
+        SLANG_RELEASE_ASSERT(
+            funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
 
         // First parameter is always the MinimalCtxType.
         newParamTypes.add(resolvedMinimalCtxType);
@@ -822,6 +828,8 @@ Val* BwdDiffFuncType::_resolveImplOverride()
 
         auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
         auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
+        SLANG_RELEASE_ASSERT(
+            funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
 
         // The backward diff return type is void.
         auto resultType = astBuilder->getVoidType();
@@ -974,6 +982,8 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         auto astBuilder = getCurrentASTBuilder();
         auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
         auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
+        SLANG_RELEASE_ASSERT(
+            funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
 
         auto thisParamType = diffTypeWitness->getThisParamType();
         if (thisParamType)

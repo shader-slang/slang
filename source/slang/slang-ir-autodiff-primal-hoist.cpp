@@ -462,6 +462,11 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
         for (auto child : block->getChildren())
         {
+            // Zero-derivative call splitting can leave an unused pair. Such temporary IR is valid,
+            // and checkpointing has no primal operands to preserve for it.
+            if (as<IRMakeDifferentialPair>(child) && !child->hasUses())
+                continue;
+
             // Special case: Ignore the primals used to construct the return pair.
             if (as<IRMakeDifferentialPair>(child) && as<IRReturn>(child->firstUse->getUser()))
             {
