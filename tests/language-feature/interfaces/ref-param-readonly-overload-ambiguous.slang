@@ -5,7 +5,7 @@
 
 int read(__ref_readonly int x);
 /*CHECK:
-    ^^^^ candidate: func read(ref readonly int) -> int
+    ^^^^ candidate: func read(ref_readonly int) -> int
 */
 int read(__ref int x) { return x + 1; }
 /*CHECK:

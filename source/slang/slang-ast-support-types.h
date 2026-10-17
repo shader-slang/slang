@@ -1873,9 +1873,8 @@ FIDDLE() namespace Slang
 
         /// Pass a reference to a borrowed immutable value.
         ///
-        /// Indicated by using the `borrow` modifier on a parameter,
-        /// or the combination of `borrow` and `in` (while not also
-        /// using `out`).
+        /// Indicated by the `__borrow` modifier on a parameter, or by
+        /// its legacy alias `__constref`.
         ///
         /// May semantically be implemented by directly passing a
         /// reference to the argument, or a reference to a temporary
@@ -2035,6 +2034,44 @@ FIDDLE() namespace Slang
             SLANG_UNEXPECTED("unhandled parameter-passing mode");
             UNREACHABLE_RETURN(true);
         }
+    }
+
+    /// Get the keyword that the compiler prints to name `mode`, such as `"inout"`.
+    ///
+    /// Each keyword is the modifier that declares the mode, with any leading `__` removed, so a
+    /// `__ref_readonly` parameter prints as `ref_readonly`. A `__constref` parameter prints as
+    /// `borrow`, because `__constref` is the legacy alias of `__borrow`.
+    inline const char* getParamPassingModeKeyword(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::In:
+            return "in";
+        case ParamPassingMode::Out:
+            return "out";
+        case ParamPassingMode::BorrowInOut:
+            return "inout";
+        case ParamPassingMode::BorrowIn:
+            return "borrow";
+        case ParamPassingMode::RefReadWrite:
+            return "ref";
+        case ParamPassingMode::RefReadOnly:
+            return "ref_readonly";
+        case ParamPassingMode::RefWriteOnly:
+            return "ref_writeonly";
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN("");
+        }
+    }
+
+    /// Print the keyword for `mode` followed by a space, as it appears before a parameter in a
+    /// function signature or an inlay hint. An `in` parameter prints nothing, because `in` is
+    /// the default and labeling it would add noise to most signatures.
+    inline void printParamPassingModePrefix(StringBuilder & sb, ParamPassingMode mode)
+    {
+        if (mode != ParamPassingMode::In)
+            sb << getParamPassingModeKeyword(mode) << " ";
     }
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);

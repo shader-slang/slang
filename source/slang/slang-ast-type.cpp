@@ -1396,32 +1396,38 @@ void ExplicitRefType::_toTextOverride(StringBuilder& out)
 
 void OutParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("out ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::Out);
+    out << getValueType();
 }
 
 void BorrowInOutParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("inout ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::BorrowInOut);
+    out << getValueType();
 }
 
 void RefParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("ref ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::RefReadWrite);
+    out << getValueType();
 }
 
 void RefReadOnlyParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("ref readonly ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::RefReadOnly);
+    out << getValueType();
 }
 
 void RefWriteOnlyParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("ref writeonly ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::RefWriteOnly);
+    out << getValueType();
 }
 
 void BorrowInParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("borrow ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::BorrowIn);
+    out << getValueType();
 }
 
 

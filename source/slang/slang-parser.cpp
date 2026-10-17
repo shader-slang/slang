@@ -11091,6 +11091,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
     _makeParseModifier("__ref_readonly", getSyntaxClass<RefReadOnlyModifier>()),
     _makeParseModifier("__ref_writeonly", getSyntaxClass<RefWriteOnlyModifier>()),
+    _makeParseModifier("__borrow", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),

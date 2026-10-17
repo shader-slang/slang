@@ -70,29 +70,7 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
                         hint.paddingLeft = false;
                         hint.kind = LanguageServerProtocol::kInlayHintKindParameter;
                         StringBuilder lblSb;
-                        switch (getParamPassingMode(param))
-                        {
-                        case ParamPassingMode::Out:
-                            lblSb << "out ";
-                            break;
-                        case ParamPassingMode::BorrowInOut:
-                            lblSb << "inout ";
-                            break;
-                        case ParamPassingMode::RefReadWrite:
-                            lblSb << "ref ";
-                            break;
-                        case ParamPassingMode::RefReadOnly:
-                            lblSb << "ref readonly ";
-                            break;
-                        case ParamPassingMode::RefWriteOnly:
-                            lblSb << "ref writeonly ";
-                            break;
-                        case ParamPassingMode::BorrowIn:
-                            lblSb << "constref ";
-                            break;
-                        default:
-                            break;
-                        }
+                        printParamPassingModePrefix(lblSb, getParamPassingMode(param));
                         lblSb << name->text;
                         lblSb << ":";
                         hint.label = lblSb.produceString();

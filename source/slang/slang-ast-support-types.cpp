@@ -109,33 +109,7 @@ AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode)
 
 void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
 {
-    switch (direction)
-    {
-    case ParamPassingMode::In:
-        sb << "in";
-        break;
-    case ParamPassingMode::Out:
-        sb << "out";
-        break;
-    case ParamPassingMode::RefReadWrite:
-        sb << "ref";
-        break;
-    case ParamPassingMode::RefReadOnly:
-        sb << "ref readonly";
-        break;
-    case ParamPassingMode::RefWriteOnly:
-        sb << "ref writeonly";
-        break;
-    case ParamPassingMode::BorrowInOut:
-        sb << "inout";
-        break;
-    case ParamPassingMode::BorrowIn:
-        sb << "constref";
-        break;
-    default:
-        sb << "(" << int(direction) << ")";
-        break;
-    }
+    sb << getParamPassingModeKeyword(direction);
 }
 
 String SpecializationArg::toString()
