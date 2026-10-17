@@ -2432,6 +2432,15 @@ local insts = {
 					struct_name = "GlobalInputDecoration",
 				},
 			},
+			{
+				requireShaderInputParameter = {
+					-- The parameter at `parameterIndex` of the decorated function must be bound to a
+					-- shader input variable, as `[__GLSLRequireShaderInputParameter(n)]` declares for
+					-- the GLSL `interpolateAt*` functions.
+					struct_name = "RequireShaderInputParameterDecoration",
+					operands = { { "parameterIndex", "IRIntLit" } },
+				},
+			},
 			{ glslLocation = { struct_name = "GLSLLocationDecoration", operands = { { "location", "IRIntLit" } } } },
 			{ glslOffset = { struct_name = "GLSLOffsetDecoration", operands = { { "offset", "IRIntLit" } } } },
 			{ vkStructOffset = { struct_name = "VkStructOffsetDecoration", operands = { { "offset", "IRIntLit" } } } },
