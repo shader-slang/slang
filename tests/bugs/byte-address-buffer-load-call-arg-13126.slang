@@ -1,11 +1,9 @@
 // Regression test for shader-slang/slang#13126: a `ByteAddressBuffer` load passed as a call argument.
 //
-// Any call that takes the loaded struct as an argument routes the load through buffer-load-arg
-// specialization once the struct is deferred-loaded (larger than 16 bytes and containing an array),
-// so the specialized callee must receive the load with its alignment operand intact. The call need
-// not be a method: a free function, a generic, an interface-typed parameter and a `[noinline]`
-// callee all take this path, from both `ByteAddressBuffer` and `RWByteAddressBuffer`, and for any
-// position of the array within the struct.
+// A struct larger than 16 bytes that contains an array is deferred-loaded, so a call that takes it
+// as an argument has the load rebuilt inside a specialized callee by buffer-load-arg
+// specialization. The rebuilt load must keep its alignment operand whatever the callee's form and
+// wherever the array sits in the struct.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
@@ -18,7 +16,7 @@ ByteAddressBuffer pool;
 //TEST_INPUT:set rwpool = ubuffer(data=[10 20 30 40 50], stride=4)
 RWByteAddressBuffer rwpool;
 
-//TEST_INPUT:set outb = out ubuffer(data=[0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT:set outb = out ubuffer(data=[0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outb;
 
 interface ISum
@@ -48,12 +46,21 @@ struct Q
     uint y[2][2];
 }
 
+// 20 bytes, array between scalars.
+struct R
+{
+    uint a;
+    uint y[1];
+    uint b, c, d;
+}
+
 uint useFree(M m) { return m.a + m.y[3]; }
 uint useGeneric<T : ISum>(T v) { return v.sum(); }
 uint useInterface(ISum v) { return v.sum(); }
 [noinline] uint useNoInline(M m) { return m.a + m.y[3]; }
 uint useInterleaved(N n) { return n.a * 10 + n.y[0]; }
 uint useNested(Q q) { return q.a * 100 + q.y[1][1]; }
+uint useBetween(R r) { return r.a * 1000 + r.y[0] * 100 + r.d; }
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -66,6 +73,7 @@ void computeMain()
     outb[4] = useFree(rwpool.Load<M>(0));
     outb[5] = useInterleaved(pool.Load<N>(0));
     outb[6] = useNested(pool.Load<Q>(0));
+    outb[7] = useBetween(pool.Load<R>(4));
     // CHECK: 6
     // CHECK-NEXT: 8
     // CHECK-NEXT: 10
@@ -73,4 +81,5 @@ void computeMain()
     // CHECK-NEXT: 60
     // CHECK-NEXT: 51
     // CHECK-NEXT: 105
+    // CHECK-NEXT: 2306
 }

@@ -136,10 +136,7 @@ struct ByteAddressBufferLegalizationContext
         // `emitLegalLoad` emits below are inserted before the current inst and excluded from this
         // walk's snapshotted child list, so they are never re-processed here. Enforce the contract
         // before reading the alignment operand so a dropped operand fails loudly rather than
-        // reading out of bounds and dereferencing a garbage pointer. `processStore` reads its
-        // operands the same way but needs no equivalent guard: buffer-load-arg specialization only
-        // rebuilds element-access *load* arguments, so a store's operands are never truncated the
-        // way this load's were.
+        // reading out of bounds and dereferencing a garbage pointer.
         SLANG_RELEASE_ASSERT(load->getOperandCount() == 3);
 
         // Validate the load's `location`/`alignment` contract up front so the diagnostic

@@ -20,7 +20,6 @@ RWStructuredBuffer<float> output;
 struct S
 {
     float values[5];
-    // The accesses span offsets across the 20-byte struct (first and last element).
     float get() { return values[0] + values[4]; }
 }
 
