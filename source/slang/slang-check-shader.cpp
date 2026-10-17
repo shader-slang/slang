@@ -1995,8 +1995,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // reject only the `Ref` mode: a borrow such as `__constref` has value semantics and may be
     // implemented by copying, so it remains valid here. The checks from here on, starting with
     // system-value semantic validation, classify each parameter as a stage input, output, or
-    // both, which a reference mode does not determine, so we stop after reporting every such
-    // parameter.
+    // both, so we stop after reporting every such parameter rather than have them add
+    // diagnostics for a parameter that is already invalid.
     {
         bool hasReferenceParam = false;
         for (const auto& param : entryPointFuncDecl->getParameters())

@@ -3,6 +3,7 @@
 // parameter is reported. A borrow such as `__constref` has value semantics and remains valid.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=REF):-target spirv -entry refParam -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=REF):-target hlsl -entry refParam -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=CONSTREF):-target spirv -entry constRefParam -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNIFORM):-target spirv -entry uniformRefParam -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=MULTI):-target spirv -entry multiRefParam -stage fragment
