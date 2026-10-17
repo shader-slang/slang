@@ -1,6 +1,8 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
+//TEST:SIMPLE: -target spirv -entry computeMain -stage compute
 
 // Regression test for issue #7748: Dictionary key collision in multi-level break processing
+// Also covers #10198: SPIRV structured control flow violation with switch-continue
 // This test specifically exercises the case of "continue inside a switch that is inside a for loop"
 // which was identified as the root cause of the dictionary collision issue.
 
