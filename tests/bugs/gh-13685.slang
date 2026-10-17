@@ -72,6 +72,21 @@ float4 readLocal(float2 uv)
     return float4(0, 0, 0, 1);
 }
 
+// A merge of a never-written texture with a real one, where the never-written texture is also
+// sampled on the other path. The merge folds to the real texture, and the never-written one is
+// refined to it.
+Texture2D<float4> realTexture;
+float4 readMixed(float2 uv)
+{
+    Texture2D<float4> t;
+    float4 r = 0;
+    if (replaceValue)
+        t = realTexture;
+    else
+        r = t.SampleLevel(samplerState, uv, 0);
+    return r + t.SampleLevel(samplerState, uv, 0);
+}
+
 #ifndef NO_LOOP
 // The same merge inside a loop. Once the inner merge is forwarded, the loop-header
 // param's incoming values are an undefined value and the param itself.
@@ -103,7 +118,7 @@ float4 main(float2 uv: TEXCOORD) : SV_Target
         replacement.enabled = false;
         value = replacement;
     }
-    float4 result = readTexture(value, uv) + readLocal(uv);
+    float4 result = readTexture(value, uv) + readLocal(uv) + readMixed(uv);
 #ifndef NO_LOOP
     result += readInLoop(uv);
 #endif
