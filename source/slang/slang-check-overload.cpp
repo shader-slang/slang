@@ -3956,11 +3956,13 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         }
     }
 
-    // Nothing at all was found that we could even consider invoking.
-    // In all other cases, this is an error.
+    // Nothing that lookup found can be invoked. If it found several declarations, the
+    // reference is ambiguous. A single declaration that cannot be invoked, such as a field
+    // that witness synthesis tries to call as a method, is reported like any other callee
+    // that is not a function.
     if (auto overloadExpr = as<OverloadedExpr>(funcExpr))
     {
-        if (overloadExpr->lookupResult2.isValid())
+        if (overloadExpr->lookupResult2.isOverloaded())
         {
             diagnoseAmbiguousReference(funcExpr);
             return CreateErrorExpr(expr);
