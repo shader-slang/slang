@@ -1,17 +1,10 @@
 // Regression for shader-slang/slang#13126: the natural-alignment `LoadAligned<T>(location)` overload,
 // routed through a method call, must specialize and legalize without aborting.
 //
-// The natural-alignment overload `T LoadAligned<T>(uint location)` (hlsl.meta.slang:490) forwards
-// `__naturalAlignmentOf<T>()` as the load's alignment operand, rather than an explicit literal.
-// That operand is folded to a module-scope integer literal before `specializeFuncsForBufferLoadArgs`
-// runs (a `-dump-ir-after` of that pass shows a literal alignment, not a `getNaturalAlignment`
-// inst), so the buffer-load-arg rebuild's `SLANG_RELEASE_ASSERT(!getParentFunc(trailingOperand))`
-// never sees a function-local operand -- even at `-O0` (where the optional peephole pass does not
-// run before this pass) and even when the call is wrapped in a user generic. This test guards that
-// invariant: the natural-alignment path, direct and generic-wrapped, must produce the correct value
-// (the COMPARE_COMPUTE arm) and must compile without aborting at minimal optimization (the `-O0`
-// SIMPLE arm). The COMPARE_COMPUTE harness does not accept `-O0`, so the `-O0` arm is a compile-only
-// SIMPLE run.
+// The overload's alignment operand is `__naturalAlignmentOf<T>()` rather than a literal. It must
+// already be folded to a literal when buffer-load-arg specialization copies it into a clone, also
+// at `-O0` and when the load is made inside a user generic. The COMPARE_COMPUTE arms check the
+// values; the COMPARE_COMPUTE harness does not accept `-O0`, so a compile-only SIMPLE arm covers it.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
@@ -51,7 +44,7 @@ float loadViaGeneric<T : IStructSum>(uint off)
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // -O0 SIMPLE arm reaches this far without aborting; the struct load legalizes to scalar loads.
+    // The -O0 arm only checks that compilation completes and emits a byte-address load.
     //CHECKO0: .Load
     output[0] = input.LoadAligned<S>(0).get();
     output[1] = loadViaGeneric<S>(0);

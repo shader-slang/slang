@@ -2,20 +2,10 @@
 // preserved alignment operand.
 //
 // Two `LoadAligned` calls that differ only in their alignment promise must be specialized into
-// separate clones; otherwise they collapse into one clone and a call inherits whichever alignment
-// was specialized first (a source-order-dependent miscompile of the later wide-vs-scalarized
-// decision). `struct S { float4 values[2]; }` is deferred-loaded, and a runtime offset routes the
-// alignment promise into that decision, so the collapse is observable. With correct keying each
-// call keeps its own alignment operand: after this pass there are four `byteAddressBufferLoad`
-// insts -- the two original call-site loads plus one in each of the two specialized clones -- two
-// carrying alignment 16 and two carrying alignment 4. A collapse merges the clones, leaving three.
-//
-// Why the two original call-site loads are still present in this dump: `specializeFuncsForBufferLoadArgs`
-// replaces each specialized *call* but runs no argument DCE, so the now-dead original loads remain
-// until a later dead-code pass. The four checks below are order-independent CHECK-DAG lines (a lower
-// bound of two per alignment) rather than exact CHECK-COUNTs because the loads interleave in the dump
-// (16, 4, 4, 16); a clone collapse drops one alignment to a single load, so the second DAG line for
-// that alignment fails and the test catches the regression.
+// separate clones. If they shared one clone, the second call would get the first call's alignment.
+// `struct S { float4 values[2]; }` is deferred-loaded, so each call gets a clone of `S.get` that
+// takes the runtime offset as a parameter. The checks require a clone loading with alignment 16 and
+// a clone loading with alignment 4.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute -dump-ir-after specializeFuncsForBufferLoadArgs -o -
 
@@ -35,10 +25,11 @@ void computeMain()
 {
     output[0] = input.LoadAligned<S>(dynOffset, 16).get();
     output[1] = input.LoadAligned<S>(dynOffset, 4).get();
-    // Both alignments must survive on distinct loads (two carrying 16, two carrying 4); a collapse
-    // loses one of the alignment values.
-    // CHECK-DAG: byteAddressBufferLoad(%input, {{.*}}, 16 : UInt)
-    // CHECK-DAG: byteAddressBufferLoad(%input, {{.*}}, 16 : UInt)
-    // CHECK-DAG: byteAddressBufferLoad(%input, {{.*}}, 4 : UInt)
-    // CHECK-DAG: byteAddressBufferLoad(%input, {{.*}}, 4 : UInt)
+    // The clones of `S.get` follow the entry point in the dump, so matching after the first clone
+    // excludes the original call-site loads. Each clone holds exactly one load, so finding both a
+    // 16-aligned and a 4-aligned load there requires two clones with different alignments.
+    // CHECK: func %computeMain
+    // CHECK: func %{{.*}}get{{.*}}Func(Float, UInt)
+    // CHECK-DAG: byteAddressBufferLoad(%input, {{[^,]*}}, 16 : UInt)
+    // CHECK-DAG: byteAddressBufferLoad(%input, {{[^,]*}}, 4 : UInt)
 }

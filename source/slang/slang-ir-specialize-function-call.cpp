@@ -603,8 +603,10 @@ struct FunctionParameterSpecializationContext
             // Then we process `oldIndex` just like we
             // would have an ordinary argument that doesn't
             // involve specialization: add its value to
-            // the arguments at the new call site, and
-            // don't add anything to the specialization key.
+            // the arguments at the new call site. Its value
+            // is not part of the specialization key, but its
+            // type and non-uniformity are (below), as are any
+            // operands past the base/index pair.
             //
             // We should also add 2 more things such that our specialization
             // can handle the corner cases that if the oldBase is a nonuniform
@@ -621,13 +623,10 @@ struct FunctionParameterSpecializationContext
             auto irType = getBuilder()->getAttributedType(oldIndex->getDataType(), irAttrs);
             ioInfo.key.vals.add(irType);
 
-            // getSpecializedValueForArg bakes any operands beyond the base/index pair into the
-            // specialized callee, so they must also distinguish specializations here; otherwise two
-            // accesses that differ only in a trailing operand share one clone and inherit whichever
-            // operand was specialized first. A `ByteAddressBufferLoad`'s alignment is such an
-            // operand: `LoadAligned<T>(o, 16)` and `LoadAligned<T>(o, 4)` on the same buffer must
-            // stay distinct so each keeps its own wide-vs-scalarized decision. See
-            // shader-slang/slang#13126.
+            // getSpecializedValueForArg bakes the operands past the base/index pair into the clone
+            // (see isElementAccessInst), so they must also distinguish specializations; otherwise
+            // `LoadAligned<T>(o, 16)` and `LoadAligned<T>(o, 4)` would share one clone and the
+            // second would get the first one's alignment.
             for (UInt i = 2; i < oldArg->getOperandCount(); i++)
                 ioInfo.key.vals.add(oldArg->getOperand(i));
 
@@ -829,6 +828,9 @@ struct FunctionParameterSpecializationContext
     }
 
     // Returns true if `inst` is an instruction that accesses an element from an array or a buffer.
+    // Operand 0 is the base and operand 1 the index; any later operand (today only
+    // `ByteAddressBufferLoad`'s alignment) must be a compile-time literal, because specialization
+    // keys on it and copies it into the clone rather than passing it as an argument.
     //
     static bool isElementAccessInst(IRInst* inst)
     {
@@ -941,24 +943,21 @@ struct FunctionParameterSpecializationContext
             //
             builder->setInsertInto(ioInfo.newBodyInsts);
 
-            // Rebuild the access from the specialized base and index, copying any operands past the
-            // base/index pair (e.g. a `ByteAddressBufferLoad`'s trailing `alignment`) so they
-            // survive into the specialized body, which references them -- so each must be
-            // module-scope, not function-local, or the reference would cross function boundaries.
-            // Every alignment form reaching this pass is a module-scope integer literal: plain
-            // `Load` and explicit `LoadAligned<T>(loc, N)` pass a literal, and the
-            // natural-alignment `LoadAligned<T>(loc)` overload's `__naturalAlignmentOf<T>()` is
-            // folded to one before this pass runs (including at -O0; see
-            // byte-address-buffer-loadaligned-natural-13126). The release-assert enforces that
-            // loudly rather than silently forming a cross-function reference if a future producer
-            // ever violates it.
+            // The operands past base/index (see isElementAccessInst) are copied into the clone,
+            // a different function, so each must be a module-scope literal. The only such operand
+            // today is a `ByteAddressBufferLoad`'s alignment, which is always an `IRIntLit` by now:
+            // `Load` and `LoadAligned<T>(loc, N)` pass a literal, and the natural-alignment
+            // overload's `__naturalAlignmentOf<T>()` is folded when specializeModule specializes
+            // `LoadAligned<T>` (specializeGenericImpl runs simplifyFunc on the result, whose
+            // peephole folds kIROp_GetNaturalAlignment) before this pass, at every optimization
+            // level.
             List<IRInst*> newOperands;
             newOperands.add(newBase);
             newOperands.add(newIndex);
             for (UInt i = 2; i < oldArg->getOperandCount(); i++)
             {
                 auto trailingOperand = oldArg->getOperand(i);
-                SLANG_RELEASE_ASSERT(!getParentFunc(trailingOperand));
+                SLANG_RELEASE_ASSERT(as<IRIntLit>(trailingOperand));
                 newOperands.add(trailingOperand);
             }
             auto newVal = builder->emitIntrinsicInst(
