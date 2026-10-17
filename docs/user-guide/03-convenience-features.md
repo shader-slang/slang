@@ -1007,7 +1007,7 @@ for (int i = 0; i < 5; i++)
 Force inlining
 -----------------
 
-Most downstream shader compilers will inline all function calls. However, you can instruct the Slang compiler to do the inlining
+Most downstream shader compilers will inline all function calls. However, you can request that the Slang compiler do the inlining
 by using the `[ForceInline]` decoration:
 
 ```slang
