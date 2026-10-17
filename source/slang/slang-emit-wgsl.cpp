@@ -52,6 +52,78 @@ fn _slang_getNan() -> f32
 }
 )";
 
+// In WGSL, `bitcast<f32>(u32(4294967295))` is a const-expression, and a const-expression that
+// evaluates to NaN or infinity is a shader-creation error. A call to a user-declared function is
+// never a const-expression, so passing the bits through this helper moves the bitcast to run time
+// and keeps the exact bit pattern.
+static const char* kWGSLBuiltinPreludeNonConstU32 = R"(
+fn _slang_nonConstU32(x : u32) -> u32
+{
+    return x;
+}
+)";
+
+// Collect the 32-bit words of a constant integer scalar or vector operand.
+// Returns false if `inst` is not made only of integer literals.
+static bool getConstantBitCastWords(IRInst* inst, List<uint32_t>& outWords)
+{
+    if (auto intLit = as<IRIntLit>(inst))
+    {
+        // WGSL's only integer types are the 32-bit `i32` and `u32`.
+        auto typeOp = inst->getDataType()->getOp();
+        if (typeOp != kIROp_IntType && typeOp != kIROp_UIntType)
+            return false;
+        outWords.add(uint32_t(intLit->getValue()));
+        return true;
+    }
+    switch (inst->getOp())
+    {
+    case kIROp_MakeVector:
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            if (!getConstantBitCastWords(inst->getOperand(i), outWords))
+                return false;
+        }
+        return true;
+    case kIROp_MakeVectorFromScalar:
+        {
+            auto vectorType = as<IRVectorType>(inst->getDataType());
+            auto count = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
+            if (!count)
+                return false;
+            for (IRIntegerValue i = 0; i < count->getValue(); i++)
+            {
+                if (!getConstantBitCastWords(inst->getOperand(0), outWords))
+                    return false;
+            }
+            return true;
+        }
+    default:
+        return false;
+    }
+}
+
+// Returns true if a bitcast of `operand` to `toType` reinterprets constant integer bits as `f32`
+// values and at least one of the resulting values is NaN or infinity. WGSL would evaluate such a
+// bitcast as a const-expression and reject the shader, so the emitter must keep it out of const
+// evaluation. On success `outWords` holds the constant 32-bit words of `operand`.
+static bool isNonFiniteConstantBitCast(IRType* toType, IRInst* operand, List<uint32_t>& outWords)
+{
+    outWords.clear();
+    auto elementType = getVectorElementType(toType);
+    if (!elementType || elementType->getOp() != kIROp_FloatType)
+        return false;
+    if (!getConstantBitCastWords(operand, outWords))
+        return false;
+    for (auto word : outWords)
+    {
+        // An all-ones exponent encodes infinity or NaN.
+        if (((word >> 23) & 0xFFu) == 0xFFu)
+            return true;
+    }
+    return false;
+}
+
 WGSLSourceEmitter::WGSLSourceEmitter(const Desc& desc)
     : CLikeSourceEmitter(desc)
 {
@@ -1839,6 +1911,41 @@ void WGSLSourceEmitter::emitIntrinsicCallExprImpl(
     if (intrinsicDefinition.startsWith("f16"))
     {
         m_f16ExtensionEnabled = true;
+    }
+
+    // `asfloat` and friends are defined as `bitcast<$TR>($0)` for WGSL. When the argument is a
+    // constant whose bits are NaN or infinity, emit the bitcast here so the operand can be kept
+    // out of const-expression evaluation.
+    if (intrinsicDefinition == toSlice("bitcast<$TR>($0)") && inst->getArgCount() == 1)
+    {
+        List<uint32_t> words;
+        if (isNonFiniteConstantBitCast(inst->getDataType(), inst->getArg(0), words))
+        {
+            // Pass each constant word through a run-time helper, so the bitcast is not a
+            // const-expression that evaluates to NaN or infinity and the bits are kept exactly.
+            ensurePrelude(kWGSLBuiltinPreludeNonConstU32);
+            m_writer->emit("bitcast<");
+            emitType(inst->getDataType());
+            m_writer->emit(">(");
+            if (words.getCount() > 1)
+            {
+                m_writer->emit("vec");
+                m_writer->emit(words.getCount());
+                m_writer->emit("<u32>(");
+            }
+            for (Index i = 0; i < words.getCount(); i++)
+            {
+                if (i != 0)
+                    m_writer->emit(", ");
+                m_writer->emit("_slang_nonConstU32(u32(");
+                m_writer->emit(UInt(words[i]));
+                m_writer->emit("))");
+            }
+            if (words.getCount() > 1)
+                m_writer->emit(")");
+            m_writer->emit(")");
+            return;
+        }
     }
 
     CLikeSourceEmitter::emitIntrinsicCallExprImpl(
