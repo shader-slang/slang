@@ -17487,11 +17487,37 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 // Information for GLSL wave/subgroup support
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
 
+// WGSL's `quadBroadcast` takes its quad lane as a const-expression, and no bool: `QuadReadLaneAt`
+// converts a bool to 0/1 once before its four broadcasts, so `T` is never bool here.
+__generic<T : __BuiltinType>
+__wgsl_extension(subgroups)
+[require(wgsl, subgroup_quad)]
+T __wgslQuadBroadcast(T value, constexpr uint quadLaneID)
+{
+    static_assert(!(T is bool), "quadBroadcast takes no bool");
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "quadBroadcast($0, $1)";
+    }
+}
+__generic<T : __BuiltinType, let N : int>
+__wgsl_extension(subgroups)
+[require(wgsl, subgroup_quad)]
+vector<T, N> __wgslQuadBroadcast(vector<T, N> value, constexpr uint quadLaneID)
+{
+    static_assert(!(T is bool), "quadBroadcast takes no bool");
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "quadBroadcast($0, $1)";
+    }
+}
+
 /// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_metal_spirv, subgroup_quad)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 {
     __target_switch
@@ -17508,6 +17534,23 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
             OpCapability GroupNonUniformQuad;
             result:$$T = OpGroupNonUniformQuadBroadcast Subgroup $sourceValue $quadLaneID;
         };
+    case wgsl:
+        {
+            // `quadBroadcast` takes no bool: broadcast it as 0/1.
+            if (__isBool<T>())
+                return __wgslUIntToBool<T>(QuadReadLaneAt(__wgslBoolToUInt(sourceValue), quadLaneID));
+            // `quadBroadcast` needs a const-expression lane, and `quadLaneID` may differ between
+            // invocations. None of the four broadcasts depends on `quadLaneID`, so every
+            // invocation of the quad that reaches this call runs all four, and then selects. This
+            // costs four broadcasts even for a constant lane. `& 3u` wraps an out-of-range lane
+            // as the CUDA case does (HLSL leaves it undefined).
+            const uint lane = quadLaneID & 3u;
+            const T q0 = __wgslQuadBroadcast(sourceValue, 0);
+            const T q1 = __wgslQuadBroadcast(sourceValue, 1);
+            const T q2 = __wgslQuadBroadcast(sourceValue, 2);
+            const T q3 = __wgslQuadBroadcast(sourceValue, 3);
+            return lane == 0 ? q0 : (lane == 1 ? q1 : (lane == 2 ? q2 : q3));
+        }
     case cuda:
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, (_getLaneId() & 0xFFFFFFFC) | ($1 & 3))";
     }
@@ -17515,7 +17558,8 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_metal_spirv, subgroup_quad)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
 {
     __target_switch
@@ -17531,11 +17575,50 @@ vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
             OpCapability GroupNonUniformQuad;
             result:$$vector<T,N> = OpGroupNonUniformQuadBroadcast Subgroup $sourceValue $quadLaneID;
         };
+    case wgsl:
+        {
+            // `quadBroadcast` takes no bool: broadcast it as 0/1.
+            if (__isBool<T>())
+                return __wgslUIntToBool<T, N>(
+                    QuadReadLaneAt(__wgslBoolToUInt(sourceValue), quadLaneID));
+            // `quadBroadcast` needs a const-expression lane, and `quadLaneID` may differ between
+            // invocations. None of the four broadcasts depends on `quadLaneID`, so every
+            // invocation of the quad that reaches this call runs all four, and then selects. This
+            // costs four broadcasts even for a constant lane. `& 3u` wraps an out-of-range lane
+            // as the CUDA case does (HLSL leaves it undefined).
+            const uint lane = quadLaneID & 3u;
+            const vector<T, N> q0 = __wgslQuadBroadcast(sourceValue, 0);
+            const vector<T, N> q1 = __wgslQuadBroadcast(sourceValue, 1);
+            const vector<T, N> q2 = __wgslQuadBroadcast(sourceValue, 2);
+            const vector<T, N> q3 = __wgslQuadBroadcast(sourceValue, 3);
+            return lane == 0 ? q0 : (lane == 1 ? q1 : (lane == 2 ? q2 : q3));
+        }
     case cuda:
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, (_getLaneId() & 0xFFFFFFFC) | ($1 & 3))";
     }
 }
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID);
+__generic<T : __BuiltinType, let N : int, let M : int>
+__glsl_extension(GL_KHR_shader_subgroup_quad)
+__spirv_version(1.3)
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
+matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "QuadReadLaneAt";
+    default:
+        {
+            // Row by row through the vector overload, as `WaveReadLaneFirst` does for matrices.
+            matrix<T, N, M> result;
+            [ForceUnroll]
+            for (int i = 0; i < N; i++)
+                result[i] = QuadReadLaneAt(sourceValue[i], quadLaneID);
+            return result;
+        }
+    }
+}
 
 /// @category wave
 __generic<T : __BuiltinType>
@@ -17963,11 +18046,56 @@ ${
 } // WaveActiveProduct/WaveActiveProductSum.
 $}
 
+// A WGSL bool (or vector of bool) as 0/1 in u32, and back. They are generic because their callers
+// are generic over `T` and know only that `__isBool<T>()` holds; `T` must be bool. They emit
+// `select` and `bool(...)` directly because a generic `T` cannot be cast with `uint(value)`.
+__generic<T : __BuiltinType>
+[require(wgsl)]
+uint __wgslBoolToUInt(T value)
+{
+    static_assert(T is bool, "T must be bool");
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "select($TR(0u), $TR(1u), $0)";
+    }
+}
+__generic<T : __BuiltinType, let N : int>
+[require(wgsl)]
+vector<uint, N> __wgslBoolToUInt(vector<T, N> value)
+{
+    static_assert(T is bool, "T must be bool");
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "select($TR(0u), $TR(1u), $0)";
+    }
+}
+__generic<T : __BuiltinType>
+[require(wgsl)]
+T __wgslUIntToBool(uint value)
+{
+    static_assert(T is bool, "T must be bool");
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "$TR($0)";
+    }
+}
+__generic<T : __BuiltinType, let N : int>
+[require(wgsl)]
+vector<T, N> __wgslUIntToBool(vector<uint, N> value)
+{
+    static_assert(T is bool, "T must be bool");
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "$TR($0)";
+    }
+}
+
 /// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_vote)]
 bool WaveActiveAllEqual(T value)
 {
     __target_switch
@@ -17976,6 +18104,14 @@ bool WaveActiveAllEqual(T value)
         __intrinsic_asm "subgroupAllEqual($0)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual";
+    case wgsl:
+        if (__isBool<T>())
+        {
+            // `subgroupBroadcastFirst` takes no bool: compare as 0/1.
+            const uint asUint = __wgslBoolToUInt(value);
+            return WaveActiveAllTrue(asUint == WaveReadLaneFirst(asUint));
+        }
+        return WaveActiveAllTrue(value == WaveReadLaneFirst(value));
     case spirv:
         return spirv_asm
         {
@@ -17990,7 +18126,8 @@ bool WaveActiveAllEqual(T value)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_vote)]
 bool WaveActiveAllEqual(vector<T,N> value)
 {
     __target_switch
@@ -17999,6 +18136,14 @@ bool WaveActiveAllEqual(vector<T,N> value)
         __intrinsic_asm "subgroupAllEqual($0)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual";
+    case wgsl:
+        if (__isBool<T>())
+        {
+            // `subgroupBroadcastFirst` takes no bool: compare as 0/1.
+            const vector<uint, N> asUint = __wgslBoolToUInt(value);
+            return WaveActiveAllTrue(all(asUint == WaveReadLaneFirst(asUint)));
+        }
+        return WaveActiveAllTrue(all(value == WaveReadLaneFirst(value)));
     case spirv:
         return spirv_asm
         {
@@ -18120,7 +18265,8 @@ uint4 WaveActiveBallot(bool condition)
 }
 
 /// @category wave
-[require(cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic_ballot)]
 uint WaveActiveCountBits(bool value)
 {
     __target_switch
@@ -18130,6 +18276,15 @@ uint WaveActiveCountBits(bool value)
     case spirv:
     case metal:
         return _WaveCountBits(WaveActiveBallot(value));
+    case wgsl:
+        {
+            // A WGSL ballot has 0 for inactive invocations and for lanes past the subgroup size, so
+            // all four words can be summed. `_WaveCountBits` would instead read the subgroup size
+            // (a `subgroup_size` input) to skip words, which this does not need.
+            const uint4 ballot = WaveActiveBallot(value);
+            return countbits(ballot.x) + countbits(ballot.y) + countbits(ballot.z) +
+                   countbits(ballot.w);
+        }
     default:
         return WaveMaskCountBits(WaveGetActiveMask(), value);
     }
@@ -19296,10 +19451,19 @@ matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
     }
 }
 
+// The number of bits of `ballot` set for the lanes below the current one.
+[ForceInline]
+uint __ballotCountBitsBelowLane(uint4 ballot)
+{
+    const uint4 below = ballot & WaveGetLaneLtMask();
+    return countbits(below.x) + countbits(below.y) + countbits(below.z) + countbits(below.w);
+}
+
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+__wgsl_extension(subgroups)
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 uint WavePrefixCountBits(bool value)
 {
     __target_switch
@@ -19307,6 +19471,8 @@ uint WavePrefixCountBits(bool value)
     case glsl:
         __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
+    case wgsl:
+        return __ballotCountBitsBelowLane(WaveActiveBallot(value));
     case spirv:
         return spirv_asm
         {
@@ -19354,14 +19520,74 @@ uint4 WaveGetActiveMulti()
 // Shader model 6.5 stuff
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md
 
+// WGSL emulation of WaveMatch (WGSL has no partitioned subgroup operations).
+//
+// Why the loop gives each invocation its WaveMatch result:
+// - On iteration `lane`, every active invocation ballots whether its value equals the value of
+//   `lane`, so the ballot is the set of invocations whose value matches that lane's value. An
+//   invocation keeps the ballot of the iteration where `lane` is its own lane; that ballot is the
+//   set of invocations with the same value as itself, i.e. its WaveMatch result.
+// - When `lane` is inactive or past the end of the subgroup, `subgroupShuffle` returns an
+//   indeterminate value and the ballot is meaningless, but it is always discarded: `lane == self`
+//   only holds for the lane of an active invocation.
+// - The current lane's bit is ORed in, because WaveMatch always includes the current lane and a
+//   NaN component compares unequal to itself.
+//
+// The loop runs to `WaveGetLaneCount()` and is in uniform control flow, as WGSL requires for
+// subgroup operations, only because the subgroup size reaches the function as a value (WGSL
+// legalization passes entry-point inputs to callees as parameters instead of through a
+// module-scope `var<private>`). The cost is one `subgroupShuffle` and one `subgroupBallot` per lane
+// of the subgroup.
+//
+// Precondition (both overloads): `T` is not `bool`; `subgroupShuffle` takes only numeric values.
+// WaveMatch converts bools to 0/1 `uint` first.
+__generic<T : __BuiltinType>
+[ForceInline]
+[require(wgsl, subgroup_ballot)]
+uint4 __wgslWaveMatch(T value)
+{
+    const uint self = WaveGetLaneIndex();
+    uint4 result = uint4(0);
+    for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
+    {
+        const uint4 matching = WaveActiveBallot(value == WaveReadLaneAt(value, int(lane)));
+        if (lane == self)
+            result = matching | WaveGetLaneEqMask();
+    }
+    return result;
+}
+__generic<T : __BuiltinType, let N : int>
+[ForceInline]
+[require(wgsl, subgroup_ballot)]
+uint4 __wgslWaveMatch(vector<T, N> value)
+{
+    const uint self = WaveGetLaneIndex();
+    uint4 result = uint4(0);
+    for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
+    {
+        const uint4 matching =
+            WaveActiveBallot(all(value == WaveReadLaneAt(value, int(lane))));
+        if (lane == self)
+            result = matching | WaveGetLaneEqMask();
+    }
+    return result;
+}
+
 /// @category wave
 __generic<T : __BuiltinType>
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(wgsl, subgroup_ballot)]
 uint4 WaveMatch(T value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
+    case wgsl:
+        // `subgroupShuffle` takes no bool: compare as 0/1.
+        if (__isBool<T>())
+            return __wgslWaveMatch(__wgslBoolToUInt(value));
+        return __wgslWaveMatch(value);
     case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
     case spirv:
         return spirv_asm
@@ -19376,12 +19602,19 @@ uint4 WaveMatch(T value)
 }
 
 __generic<T : __BuiltinType, let N : int>
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(wgsl, subgroup_ballot)]
 uint4 WaveMatch(vector<T,N> value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
+    case wgsl:
+        // `subgroupShuffle` takes no bool: compare as 0/1.
+        if (__isBool<T>())
+            return __wgslWaveMatch(__wgslBoolToUInt(value));
+        return __wgslWaveMatch(value);
     case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
     case spirv:
         return spirv_asm
@@ -19397,6 +19630,7 @@ uint4 WaveMatch(vector<T,N> value)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(wgsl, subgroup_ballot)]
 uint4 WaveMatch(matrix<T,N,M> value)
 {
     __target_switch
@@ -19405,6 +19639,7 @@ uint4 WaveMatch(matrix<T,N,M> value)
     case glsl:
     case cuda:
     case spirv:
+    case wgsl:
         uint4 result = uint4(0xFFFFFFFF);
         [ForceUnroll]
         for (int i = 0; i < N; i++)
@@ -19416,11 +19651,15 @@ uint4 WaveMatch(matrix<T,N,M> value)
 }
 
 /// @category wave
+__wgsl_extension(subgroups)
 [require(cuda_hlsl, subgroup_partitioned)]
+[require(wgsl, subgroup_ballot)]
 uint WaveMultiPrefixCountBits(bool value, uint4 mask)
 {
     __target_switch
     {
+    case wgsl:
+        return __ballotCountBitsBelowLane(WaveActiveBallot(value) & mask);
     case cuda: __intrinsic_asm "_popc(__ballot_sync(($1).x, $0) & _getLaneLtMask())";
     case hlsl: __intrinsic_asm "WaveMultiPrefixCountBits";
     }
@@ -19708,6 +19947,143 @@ ${
 $}
 
 
+// WGSL emulation of the WaveMultiPrefix scans (WGSL has no partitioned subgroup operations).
+//
+// An invocation's scan combines the values of the lanes in its partition: the lanes set in
+// `mask` that are also active. `mask` may name inactive lanes (e.g. a constant mask), and
+// `subgroupShuffle` from an inactive lane is indeterminate, so the partition is `mask` intersected
+// with `WaveActiveBallot(true)`. An exclusive scan combines the partition lanes below the
+// invocation's lane; an inclusive scan also combines the invocation's own lane.
+//
+// Each helper reads every lane in turn with `subgroupShuffle` (through `WaveReadLaneAt`), in a
+// loop bounded by `WaveGetLaneCount()`. The loop is in uniform control flow, as WGSL requires for
+// subgroup operations, only because the subgroup size reaches the function as a value: WGSL
+// legalization passes entry-point inputs to callees as parameters instead of through a
+// module-scope `var<private>`, which WGSL's uniformity analysis would treat as non-uniform. The
+// cost is one `subgroupBallot` plus one `subgroupShuffle` per lane of the subgroup.
+//
+// Precondition: `T` is not `bool`; `subgroupShuffle` takes only numeric values. Callers convert
+// bools to 0/1 `uint` first.
+
+// The operation and kind of a scan, named as in the scan tables' `spirvName` and
+// `spirvGroupOperation` columns, so each table row selects them by its existing entries.
+enum __WGSLArithmeticScanOp
+{
+    Add,
+    Mul,
+};
+enum __WGSLBitwiseScanOp
+{
+    And,
+    Or,
+    Xor,
+};
+enum __WGSLScanKind
+{
+    PartitionedInclusiveScanNV,
+    PartitionedExclusiveScanNV,
+};
+
+// True if `lane` takes part in the scan of the invocation at `currentLane`: it is in
+// `partitionLanes` and below `currentLane`, or is `currentLane` itself for an inclusive scan.
+[ForceInline]
+bool __wgslScanIncludesLane(uint4 partitionLanes, uint lane, uint currentLane, __WGSLScanKind kind)
+{
+    const bool inPartition = ((partitionLanes[lane / 32] >> (lane % 32)) & 1u) != 0;
+    const bool isInclusive = kind == __WGSLScanKind.PartitionedInclusiveScanNV;
+    return inPartition && (lane < currentLane || (isInclusive && lane == currentLane));
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(wgsl, subgroup_shuffle)]
+T __wgslWaveMultiPrefixArithmetic(T value, uint4 mask, __WGSLArithmeticScanOp op, __WGSLScanKind kind)
+{
+    const uint currentLane = WaveGetLaneIndex();
+    const uint4 partitionLanes = mask & WaveActiveBallot(true);
+    // The identity of the operation: 0 for Add, 1 for Mul.
+    T result = op == __WGSLArithmeticScanOp.Mul ? T(1) : T(0);
+    for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
+    {
+        const T other = WaveReadLaneAt(value, int(lane));
+        if (__wgslScanIncludesLane(partitionLanes, lane, currentLane, kind))
+            result = op == __WGSLArithmeticScanOp.Mul ? result * other : result + other;
+    }
+    return result;
+}
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(wgsl, subgroup_shuffle)]
+vector<T, N> __wgslWaveMultiPrefixArithmetic(
+    vector<T, N> value,
+    uint4 mask,
+    __WGSLArithmeticScanOp op,
+    __WGSLScanKind kind)
+{
+    const uint currentLane = WaveGetLaneIndex();
+    const uint4 partitionLanes = mask & WaveActiveBallot(true);
+    vector<T, N> result = vector<T, N>(op == __WGSLArithmeticScanOp.Mul ? T(1) : T(0));
+    for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
+    {
+        const vector<T, N> other = WaveReadLaneAt(value, int(lane));
+        if (__wgslScanIncludesLane(partitionLanes, lane, currentLane, kind))
+            result = op == __WGSLArithmeticScanOp.Mul ? result * other : result + other;
+    }
+    return result;
+}
+
+// The bitwise scans run on `uint`: WGSL's only integer scalars are 32-bit; `int` is bit-cast and
+// `bool` is passed as 0/1 by the callers.
+[ForceInline]
+uint __wgslBitwiseScanIdentity(__WGSLBitwiseScanOp op)
+{
+    return op == __WGSLBitwiseScanOp.And ? 0xFFFFFFFFu : 0u;
+}
+__generic<let N : int>
+[ForceInline]
+vector<uint, N> __wgslBitwiseScanCombine(
+    __WGSLBitwiseScanOp op,
+    vector<uint, N> a,
+    vector<uint, N> b)
+{
+    switch (op)
+    {
+    case __WGSLBitwiseScanOp.And:
+        return a & b;
+    case __WGSLBitwiseScanOp.Or:
+        return a | b;
+    default:
+        return a ^ b;
+    }
+}
+
+[ForceInline]
+[require(wgsl, subgroup_shuffle)]
+uint __wgslWaveMultiPrefixBitwise(uint value, uint4 mask, __WGSLBitwiseScanOp op, __WGSLScanKind kind)
+{
+    return __wgslWaveMultiPrefixBitwise(vector<uint, 1>(value), mask, op, kind)[0];
+}
+__generic<let N : int>
+[ForceInline]
+[require(wgsl, subgroup_shuffle)]
+vector<uint, N> __wgslWaveMultiPrefixBitwise(
+    vector<uint, N> value,
+    uint4 mask,
+    __WGSLBitwiseScanOp op,
+    __WGSLScanKind kind)
+{
+    const uint currentLane = WaveGetLaneIndex();
+    const uint4 partitionLanes = mask & WaveActiveBallot(true);
+    vector<uint, N> result = vector<uint, N>(__wgslBitwiseScanIdentity(op));
+    for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
+    {
+        const vector<uint, N> other = WaveReadLaneAt(value, int(lane));
+        if (__wgslScanIncludesLane(partitionLanes, lane, currentLane, kind))
+            result = __wgslBitwiseScanCombine(op, result, other);
+    }
+    return result;
+}
+
 //
 // WaveMultiPrefixInclusiveSum/WaveMultiPrefixInclusiveProduct.
 // WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
@@ -19748,13 +20124,21 @@ $}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(wgsl, subgroup_shuffle)]
 T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case wgsl:
+        return __wgslWaveMultiPrefixArithmetic(
+            value,
+            mask,
+            __WGSLArithmeticScanOp.$(opName.spirvName),
+            __WGSLScanKind.$(opName.spirvGroupOperation));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -19773,13 +20157,21 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(wgsl, subgroup_shuffle)]
 vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case wgsl:
+        return __wgslWaveMultiPrefixArithmetic(
+            value,
+            mask,
+            __WGSLArithmeticScanOp.$(opName.spirvName),
+            __WGSLScanKind.$(opName.spirvGroupOperation));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -19798,6 +20190,7 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(wgsl, subgroup_shuffle)]
 matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
@@ -20108,13 +20501,28 @@ $}
 
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(wgsl, subgroup_shuffle)]
 T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case wgsl:
+        // Computed on u32: WGSL's only integer scalars are 32-bit, and bools are passed as 0/1.
+        if (__isBool<T>())
+            return __wgslUIntToBool<T>(__wgslWaveMultiPrefixBitwise(
+                __wgslBoolToUInt(value),
+                mask,
+                __WGSLBitwiseScanOp.$(opName.spirvName),
+                __WGSLScanKind.$(opName.spirvGroupOperation)));
+        return bit_cast<T>(__wgslWaveMultiPrefixBitwise(
+            bit_cast<uint>(value),
+            mask,
+            __WGSLBitwiseScanOp.$(opName.spirvName),
+            __WGSLScanKind.$(opName.spirvGroupOperation)));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -20131,13 +20539,27 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
 
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(wgsl, subgroup_shuffle)]
 vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case wgsl:
+        if (__isBool<T>())
+            return __wgslUIntToBool<T, N>(__wgslWaveMultiPrefixBitwise(
+                __wgslBoolToUInt(value),
+                mask,
+                __WGSLBitwiseScanOp.$(opName.spirvName),
+                __WGSLScanKind.$(opName.spirvGroupOperation)));
+        return bit_cast<vector<T, N>>(__wgslWaveMultiPrefixBitwise(
+            bit_cast<vector<uint, N>>(value),
+            mask,
+            __WGSLBitwiseScanOp.$(opName.spirvName),
+            __WGSLScanKind.$(opName.spirvGroupOperation)));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -20154,6 +20576,7 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(wgsl, subgroup_shuffle)]
 matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
 {
     __target_switch
