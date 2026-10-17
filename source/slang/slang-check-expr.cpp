@@ -9809,7 +9809,7 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
                 }
                 expr->type = m_astBuilder->getTypeType(baseType);
             }
-            else
+            else if (!as<ErrorType>(baseType))
             {
                 getSink()->diagnose(Diagnostics::MatrixLayoutModifierOnNonMatrixType{
                     .type = baseType,
