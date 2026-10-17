@@ -45,6 +45,19 @@ let a = 5;
 a = 6; // Error, `a` is immutable.
 ```
 
+## Compile-Time Constants (`constexpr`)
+
+The Slang language allows `constexpr` to be used as a modifier, but at present it is not fully implemented and will not behave as users familiar with `constexpr` in C++ might expect. Use of `constexpr` in Slang code is currently discouraged.
+
+Slang does not evaluate user-defined function bodies at compile time, so `constexpr` will parse but does not cause an expression to be evaluated at compile time. Depending on where the modifier appears, Slang currently reacts as follows:
+
+- On a **variable or global**, `constexpr` is treated as `const`, and Slang emits `warning 31227`. Use `static const` for a global constant instead.
+- On a **function or other callable declaration** (a method, initializer, subscript, accessor, or operator), `constexpr` is ignored, and Slang emits `warning 31228`.
+
+These warnings may be turned into errors in a future version of the Slang language.
+
+When you need a value that is guaranteed to be known at compile time, use a literal, a `static const` initialized from a compile-time constant, a preprocessor `#define`, or a generic value parameter (`struct Foo<int N> { ... }`).
+
 ## Namespaces
 
 You can use the `namespace` syntax to define symbols in a namespace:
@@ -711,11 +724,29 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 `ResourceDescriptorHeap` only converts to resource (CBV/SRV/UAV) types and `SamplerDescriptorHeap` only
 to sampler types; a heap-family mismatch (for example `SamplerState s = ResourceDescriptorHeap[i];`, or
-`Texture2D.Handle th = SamplerDescriptorHeap[j];`) is a compile error. The recovered value rides the
+`Texture2D.Handle th = SamplerDescriptorHeap[j];`) is a compile error. Separately, a combined
+texture-sampler (e.g. `Sampler2D`) needs two distinct heap indices -- one for the texture and one for
+the sampler -- on HLSL and on SPIR-V with the `spvDescriptorHeapEXT` extension, whose lowering keeps
+the two as separate descriptors. A single-index `ResourceDescriptorHeap[i]` handle supplies only one,
+so building a combined sampler from it is a compile-time error on those targets; use the explicit
+`Sampler2D.Handle(uint2(resourceIndex, samplerIndex))` form, which supplies both, instead. The
+single-index form is accepted on the default SPIR-V and GLSL model, where a combined sampler is a
+single native descriptor read by one heap index. (On WGSL, recovering a combined texture-sampler from
+the descriptor heap is not currently supported in either form -- an unrelated limitation of WGSL's
+combined-sampler lowering.) The recovered value rides the
 existing `DescriptorHandle<T>` lowering, so this syntax is available on the same targets as the
 `DescriptorHandle<T>` representation it builds — HLSL, SPIR-V, GLSL, and WGSL — and lowers through the
 bindless path described below. On targets where that representation is unavailable (Metal, CUDA, CPU),
 using the syntax is diagnosed at compile time, exactly as explicit `DescriptorHandle<T>` construction is.
+
+Under `spvBindlessTextureNV`, a texture/sampler `.Handle` is a native `uint64` bindless handle that
+cannot hold a `uint2` heap index, so recovering a `T.Handle` from a heap index is **rejected at compile
+time**. The supported way to index the heap for such a type is to enable `spvDescriptorHeapEXT` and
+recover the resource type `T` directly (`Texture2D t = ResourceDescriptorHeap[i];`), which loads the
+descriptor from the EXT heap. Under `spvBindlessTextureNV` **without** `spvDescriptorHeapEXT` there is no
+heap to load from: recovering the `T.Handle` is likewise rejected, and recovering the resource type `T`
+directly is **not** diagnosed but currently produces incorrect code (the index is reinterpreted as a
+native handle) — avoid it until this direct-resource path is diagnosed too (tracked as follow-up work).
 
 By default, when targeting HLSL, `DescriptorHandle<T>` translates to uses of `ResourceDescriptorHeap[index]` and `SamplerDescriptorHeap[index]`.
 In particular, when combined with combined texture sampler types (e.g. `Sampler2D`), Slang will fetch the texture using the first
@@ -780,11 +811,21 @@ Default behavior calls `defaultGetDescriptorFromHandle` with its default
 
 When the `spvDescriptorHeapEXT` capability is requested (either via the `-capability` command-line option
 or via the compilation API), Slang maps descriptor handles to the `SPV_EXT_descriptor_heap` extension
-without declaring any explicit descriptor sets. Descriptor handles are still lowered to `uint2`.
+without declaring any explicit descriptor sets. Descriptor handles are lowered to `uint2` (unless
+`spvBindlessTextureNV` is also enabled, in which case native texture/sampler handles keep their `uint64`
+representation — see below).
 For resources other than `CombinedTextureSampler`, Slang uses `uint2.x` as the index to access the global
 sampler or resource heap. For `CombinedTextureSampler` handles, Slang uses `uint2.x` to index into the
 resource heap to obtain the texture, and `uint2.y` to index into the sampler heap to obtain the sampler
 state, and combines the objects with an `OpSampledImage` instruction.
+
+If `spvBindlessTextureNV` is enabled alongside `spvDescriptorHeapEXT`, the two representations coexist:
+a native bindless texture or sampler handle keeps its `uint64` representation and is converted with the
+`SPV_NV_bindless_texture` opcodes, while all other descriptor handles use the `uint2` EXT-heap path
+described above. Because a native `uint64` handle cannot hold a `uint2` heap index, converting an
+explicit `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` index into a texture/sampler `.Handle`
+is not supported in this configuration and is diagnosed at compile time; assign the heap entry directly
+to the resource type (which loads it from the EXT heap) instead.
 
 By default, when using the `spvDescriptorHeapEXT` capability, Slang reinterprets the resource or sampler
 heap as an array of the requested resource type, whose stride is defined by the resource type and obtained
@@ -840,6 +881,15 @@ export T getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqu
 Note that the `getDescriptorFromHandle` is not supposed to be called from the user code directly,
 it will be automatically called by the compiler to dereference a `DescriptorHandle<T>` to get `T`.
 Think about providing `getDescriptorFromHandle` as a way to override `operator->` for `DescriptorHandle<T>`.
+
+> #### Note
+>
+> A custom `getDescriptorFromHandle` override is honored for every conversion except one: when both
+> `spvBindlessTextureNV` and `spvDescriptorHeapEXT` are enabled, a native texture/sampler recovered from
+> an explicit `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` index is loaded from the EXT heap
+> directly, bypassing the override. This is required because the explicit index cannot be routed through
+> the override's `(type, capability)`-keyed path without being reinterpreted as a native `uint64` handle.
+> The override still applies to such a type's genuine `DescriptorHandle` values, and to all other types.
 
 The `IOpaqueDescriptor` interface is defined as:
 

@@ -1,6 +1,6 @@
 // Test that unbounded arrays are NonAddressable and cannot be used in arrays
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -allow-glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -stage compute -entry computeMain
 // Using non-exhaustive due to multiple duplicate cascading errors
 
 // Unbounded array itself is fine

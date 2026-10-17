@@ -34,6 +34,13 @@ public:
     // unsupported parameter is diagnosed once rather than once per reference.
     HashSet<IRGlobalParam*> diagnosedGlobalParams;
 
+    // Types with no HostVM layout (e.g. `String`), already reported via
+    // getRepresentableSizeAndAlignment. Keyed on the type so a given unrepresentable
+    // type is diagnosed once rather than at every storage-defining site that hits it
+    // (a value's own slot, a variable's backing storage, a store's width, and a
+    // function's result-ABI slot, among others).
+    HashSet<IRType*> diagnosedUnrepresentableTypes;
+
     VMByteCodeBuilder& byteCodeBuilder;
     CodeGenContext* codeGenContext;
 
@@ -98,6 +105,9 @@ public:
         return operand;
     }
 
+    // Allocate (or return the cached) working-set slot for `inst`'s value, sized through the
+    // guarded getRepresentableSizeAndAlignment so a value whose type has no HostVM layout is
+    // diagnosed rather than given a silent 0-byte slot.
     VMOperand ensureWorkingsetMemory(VMByteCodeFunctionBuilder& funcBuilder, IRInst* inst)
     {
         VMOperand operand;
@@ -105,11 +115,8 @@ public:
         if (mapInstToOperand.tryGetValue(inst, operand))
             return operand;
 
-        IRSizeAndAlignment sizeAlignment = {};
-        getNaturalSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            inst->getDataType(),
-            &sizeAlignment);
+        IRSizeAndAlignment sizeAlignment =
+            getRepresentableSizeAndAlignment(inst, inst->getDataType());
         operand = allocReg(funcBuilder, sizeAlignment.size, sizeAlignment.alignment);
         mapInstToOperand[inst] = operand;
         return operand;
@@ -366,6 +373,55 @@ public:
             return;
         codeGenContext->getSink()->diagnose(
             Diagnostics::GlobalParamNotSupportedByInterpreter{.name = getName(globalParam)});
+    }
+
+    // Report that `type` has no HostVM representation (getNaturalSizeAndAlignment fails
+    // for it, e.g. `String`), located at `diagnosticSource`. De-duplicated per type
+    // because several layout-query sites can encounter the same unrepresentable type.
+    void diagnoseUnrepresentableType(IRInst* diagnosticSource, IRType* type)
+    {
+        if (!diagnosedUnrepresentableTypes.add(type))
+            return;
+        // The site is often a synthesized temporary -- e.g. the block parameter a
+        // ternary lowers its result into -- with no source location of its own, so
+        // fall back to the location of a use.
+        auto loc = diagnosticSource->sourceLoc.isValid() ? diagnosticSource->sourceLoc
+                                                         : findFirstUseLoc(diagnosticSource);
+        codeGenContext->getSink()->diagnose(
+            Diagnostics::TypeNotRepresentableByInterpreter{.type = type, .location = loc});
+    }
+
+    // Return the HostVM size and alignment of `type`, diagnosing types that have none.
+    // `String` and other host-only types have no interpreter layout, so allocating storage
+    // for one would let the interpreter read past a 0-byte slot and crash. On layout failure
+    // this reports E52014 against `diagnosticSource` and returns a defined (0,1) placeholder
+    // rather than the query's output (which a failing path may have left partially written);
+    // alignment 1 keeps the later getStride()/align() well defined. Emission still fails
+    // overall, because the recorded diagnostic makes emitVMByteCodeForEntryPoints return
+    // SLANG_FAIL -- the same sink-error path GlobalParamNotSupportedByInterpreter relies on
+    // -- so the placeholder slot is never run.
+    //
+    // This is the one *guarded* layout query, routed deliberately only at the storage-defining
+    // sites: value slots (ensureWorkingsetMemory), a local var's backing storage (kIROp_Var), a
+    // store's destination width (kIROp_Store), and a function's result-ABI slot (emitFunction).
+    // The file's other, raw getNaturalSizeAndAlignment/getNaturalOffset queries (parameter stride,
+    // load width, and the element/field strides and offsets of an aggregate under construction)
+    // are left un-guarded on purpose. Each computes a stride/offset into storage whose value slot
+    // is itself allocated through a guarded site -- so an unrepresentable *enclosing* value (e.g.
+    // the array/struct being built) is diagnosed there -- or it lies on the representable
+    // constant/strings path (an IRStringLit in addConstantValue never takes a working-set slot).
+    // Either way the recorded diagnostic aborts emission before a raw query's harmless
+    // (0,1)/zero-stride result is executed. A new storage-defining site must route through here.
+    IRSizeAndAlignment getRepresentableSizeAndAlignment(IRInst* diagnosticSource, IRType* type)
+    {
+        IRSizeAndAlignment sizeAlignment = {};
+        if (SLANG_FAILED(
+                getNaturalSizeAndAlignment(codeGenContext->getTargetReq(), type, &sizeAlignment)))
+        {
+            diagnoseUnrepresentableType(diagnosticSource, type);
+            return IRSizeAndAlignment(0, 1);
+        }
+        return sizeAlignment;
     }
 
     // Report a clean diagnostic if any instruction of a function body has a global
@@ -664,8 +720,11 @@ public:
             {
                 IRBuilder builder(inst);
                 auto type = tryGetPointedToType(&builder, inst->getDataType());
-                IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(codeGenContext->getTargetReq(), type, &sizeAlignment);
+                // Size the local's backing storage by its pointee type (guarded). This guard
+                // is defensive/co-caught: a reachable `String` local is already diagnosed at
+                // its value slot or a use, so it enforces the fail-loud invariant uniformly at
+                // this storage-writing boundary rather than being an independent sole catcher.
+                IRSizeAndAlignment sizeAlignment = getRepresentableSizeAndAlignment(inst, type);
                 auto varStorage = allocReg(
                     funcBuilder,
                     (size_t)sizeAlignment.size,
@@ -703,14 +762,13 @@ public:
                     tryGetPointedToType(&builder, storeInst->getPtr()->getDataType());
                 SLANG_RELEASE_ASSERT(pointeeType);
 
-                // Use the destination type to determine how many bytes the store writes. For
-                // example, StringType has no configured HostVM size, but a NativeString field is
-                // pointer-sized.
-                IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    pointeeType,
-                    &sizeAlignment);
+                // Size the store by its destination (pointee) type (guarded): StringType has no
+                // configured HostVM size, while a NativeString field is pointer-sized. Like the
+                // var guard this is defensive/co-caught -- a reachable unrepresentable
+                // destination is already diagnosed at its allocation or a use -- and enforces the
+                // fail-loud invariant uniformly at this storage-writing boundary.
+                IRSizeAndAlignment sizeAlignment =
+                    getRepresentableSizeAndAlignment(inst, pointeeType);
                 writeInst(
                     funcBuilder,
                     VMOp::Store,
@@ -1242,11 +1300,12 @@ public:
         VMByteCodeFunctionBuilder funcBuilder;
         funcBuilder.name = addStringLiteral(getName(func).getUnownedSlice());
 
-        IRSizeAndAlignment sizeAlignment = {};
-        getNaturalSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            func->getResultType(),
-            &sizeAlignment);
+        // Size the function's result-ABI slot by its result type (guarded). Unlike the var and
+        // store guards this one is load-bearing: a function that returns a `String` literal takes
+        // the constant path and never gets a value slot, so this is the *only* site that catches
+        // it -- pinned by tests/byte-code/interpreter-string-result-type.slang.
+        IRSizeAndAlignment sizeAlignment =
+            getRepresentableSizeAndAlignment(func, func->getResultType());
         funcBuilder.resultSize = (uint32_t)sizeAlignment.getStride();
 
         Dictionary<IRBlock*, Index> mapBlockToByteOffset;

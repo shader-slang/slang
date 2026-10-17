@@ -33,6 +33,17 @@ class ConstModifier : public Modifier
     FIDDLE(...)
 };
 
+/// A `const` modifier written after a function parameter list.
+///
+/// Specifies `ParamPassingMode::In` for the receiver parameter.
+/// Prefix `const` uses `ConstModifier`.
+/// Attribute spellings of receiver modes use `ReceiverParamModeSpecifierAttribute`.
+FIDDLE()
+class CppStyleTrailingReceiverParamConstModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class BuiltinModifier : public Modifier
 {
@@ -162,6 +173,11 @@ class GLSLPrecisionModifier : public Modifier
     FIDDLE(...)
 };
 
+/// Legacy marker retained so module ASTs serialized by older Slang versions can be deserialized.
+///
+/// `FIDDLE` must continue registering this node type for those artifacts, but the current
+/// front-end intentionally neither creates nor interprets it. New code reads the effective
+/// language exclusively from `TranslationUnitRequest::sourceLanguage`.
 FIDDLE()
 class GLSLModuleModifier : public Modifier
 {
@@ -182,6 +198,21 @@ class SynthesizedModifier : public Modifier
     FIDDLE(...)
     FIDDLE() uint32_t op = kIROp_Nop;
     FIDDLE() List<Val*> operands;
+};
+
+/// Records the effective parameter-passing mode that a synthesized declaration must preserve.
+///
+/// Requirement-witness synthesis creates new declarations after applying substitutions to their
+/// value types. Recomputing a mode from those substituted types can change the ABI promised by the
+/// original declaration. This internal modifier makes the required mode declaration-owned on the
+/// synthesized `ParamDecl`, or on a synthesized callable for its effective `this` parameter.
+/// Signature checking consumes it before attaching any checked semantic attributes. It has no
+/// source-language spelling.
+FIDDLE()
+class SynthesizedParamPassingModeModifier : public Modifier
+{
+    FIDDLE(...)
+    FIDDLE() ParamPassingMode mode = ParamPassingMode::In;
 };
 
 // Marks that the definition of a func decl is synthesized static invoke func for
@@ -622,61 +653,6 @@ class IntrinsicTypeModifier : public Modifier
     // (e.g., for a texture type this passes in shape/mutability info)
     FIDDLE() List<uint32_t> irOperands;
 };
-
-// Modifiers that affect the storage layout for matrices
-FIDDLE(abstract)
-class MatrixLayoutModifier : public Modifier
-{
-    FIDDLE(...)
-};
-
-
-// Modifiers that specify row- and column-major layout, respectively
-FIDDLE(abstract)
-class RowMajorLayoutModifier : public MatrixLayoutModifier
-{
-    FIDDLE(...)
-};
-
-FIDDLE(abstract)
-class ColumnMajorLayoutModifier : public MatrixLayoutModifier
-{
-    FIDDLE(...)
-};
-
-// The HLSL flavor of those modifiers
-FIDDLE()
-class HLSLRowMajorLayoutModifier : public RowMajorLayoutModifier
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
-class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier
-{
-    FIDDLE(...)
-};
-
-
-// The GLSL flavor of those modifiers
-//
-// Note(tfoley): The GLSL versions of these modifiers are "backwards"
-// in the sense that when a GLSL programmer requests row-major layout,
-// we actually interpret that as requesting column-major. This makes
-// sense because we interpret matrix conventions backwards from how
-// GLSL specifies them.
-FIDDLE()
-class GLSLRowMajorLayoutModifier : public ColumnMajorLayoutModifier
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
-class GLSLColumnMajorLayoutModifier : public RowMajorLayoutModifier
-{
-    FIDDLE(...)
-};
-
 
 // More HLSL Keyword
 
@@ -1201,6 +1177,14 @@ class GLSLLayoutDerivativeGroupLinearAttribute : public Attribute
     FIDDLE(...)
 };
 
+// GLSL `layout(early_fragment_tests) in;` marker; the checker lifts it to an
+// `EarlyDepthStencilAttribute` on the fragment entry point.
+FIDDLE()
+class GLSLLayoutEarlyFragmentTestsAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 // TODO: for attributes that take arguments, the syntax node
 // classes should provide accessors for the values of those arguments.
 
@@ -1248,6 +1232,13 @@ class EarlyDepthStencilAttribute : public Attribute
     FIDDLE(...)
 };
 // `[earlydepthstencil]`
+
+FIDDLE()
+class PostDepthCoverageAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+// `[postdepthcoverage]`
 
 FIDDLE()
 class Shader64BitIndexingAttribute : public Attribute
@@ -1433,12 +1424,21 @@ class VulkanHitObjectAttributesAttribute : public Attribute
     FIDDLE() int location;
 };
 
+/// An attribute that specifies the passing mode of a declaration's receiver parameter.
+///
+/// Trailing `const` is represented separately by `CppStyleTrailingReceiverParamConstModifier`.
+FIDDLE(abstract)
+class ReceiverParamModeSpecifierAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 // A `[mutating]` attribute, which indicates that a member
 // function is allowed to modify things through its `this`
 // argument.
 //
 FIDDLE()
-class MutatingAttribute : public Attribute
+class MutatingAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1448,7 +1448,7 @@ class MutatingAttribute : public Attribute
 // its `this` parameter.
 //
 FIDDLE()
-class NonmutatingAttribute : public Attribute
+class NonmutatingAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1470,7 +1470,7 @@ class NoDiscardAttribute : public Attribute
 // a member function should be passed by const reference.
 //
 FIDDLE()
-class ConstRefAttribute : public Attribute
+class ConstRefAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1479,9 +1479,21 @@ class ConstRefAttribute : public Attribute
 // a member function should be passed by reference.
 //
 FIDDLE()
-class RefAttribute : public Attribute
+class RefAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
+};
+
+/// Records the type and parameter-passing mode of a declaration's effective `this` parameter.
+///
+/// Signature checking attaches this attribute if and only if the declaration has an effective
+/// `this` parameter. Later compiler stages consume this checked semantic information instead of
+/// deriving it again from syntax or compilation options.
+FIDDLE()
+class ThisParamInfoAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() ParamInfo info;
 };
 
 // A `[__readNone]` attribute, which indicates that a function
@@ -2189,6 +2201,72 @@ class SNormModifier : public ResourceElementFormatModifier
 
 FIDDLE()
 class NoDiffModifier : public TypeModifier
+{
+    FIDDLE(...)
+};
+
+// Modifiers that affect the storage layout for matrices.
+//
+// These are `TypeModifier`s so the parser grafts them onto the type specifier
+// (`row_major float2x3`), like `unorm`/`snorm`, keeping the layout on the
+// matrix element itself — including when a declarator wraps it in an array or
+// it precedes a function return type.
+//
+// The parser only moves these off a *declarator*, though; a traditional-style
+// function parameter (leading-modifier syntax, `void f(row_major float2x3 m)`)
+// keeps its modifiers on the `ParamDecl` — its type is parsed after the
+// modifiers — so that path applies the layout via `maybeApplyLayoutModifier`
+// (slang-check-decl.cpp) instead. (Modern `m: row_major float2x3` syntax puts
+// the modifier on the type expression, so it flows through the graft.)
+FIDDLE(abstract)
+class MatrixLayoutModifier : public TypeModifier
+{
+    FIDDLE(...)
+};
+
+
+// Modifiers that specify row- and column-major layout, respectively
+FIDDLE(abstract)
+class RowMajorLayoutModifier : public MatrixLayoutModifier
+{
+    FIDDLE(...)
+};
+
+FIDDLE(abstract)
+class ColumnMajorLayoutModifier : public MatrixLayoutModifier
+{
+    FIDDLE(...)
+};
+
+// The HLSL flavor of those modifiers
+FIDDLE()
+class HLSLRowMajorLayoutModifier : public RowMajorLayoutModifier
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier
+{
+    FIDDLE(...)
+};
+
+
+// The GLSL flavor of those modifiers
+//
+// Note(tfoley): The GLSL versions of these modifiers are "backwards"
+// in the sense that when a GLSL programmer requests row-major layout,
+// we actually interpret that as requesting column-major. This makes
+// sense because we interpret matrix conventions backwards from how
+// GLSL specifies them.
+FIDDLE()
+class GLSLRowMajorLayoutModifier : public ColumnMajorLayoutModifier
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class GLSLColumnMajorLayoutModifier : public RowMajorLayoutModifier
 {
     FIDDLE(...)
 };

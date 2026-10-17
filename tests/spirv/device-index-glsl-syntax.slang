@@ -1,8 +1,10 @@
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry main -stage fragment -allow-glsl
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage fragment -allow-glsl
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry main -stage fragment
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage fragment
 
 // SPIRV: OpDecorate %{{.*}} BuiltIn DeviceIndex
 // GLSL: gl_DeviceIndex
+
+import glsl;
 
 struct PSIn
 {

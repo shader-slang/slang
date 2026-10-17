@@ -7,7 +7,9 @@ permalink: /user-guide/language-version
 
 Like many programming languages, Slang experiences a tension between the desire for rapid innovation/evolution and stability. One of the benefits that users of Slang have so far enjoyed has been the rapid pace of innovation in the language and its standard library. However, as developers start to have larger bodies of Slang code, they may become concerned that changes to the language could break existing code. There is no magical way to keep innovating while also keeping the language static.
 
-Slang supports using the `#language` preprocessor directive, as well as the `-std` compiler option (`CompilerOptionName::LanguageVersion`) to specify the language version that a source file is written against. The source file will then be parsed and checked by the compiler using the rules from the specified language version.
+Slang supports using the `#language` preprocessor directive, as well as the `-std` compiler option (`CompilerOptionName::LanguageVersion`) to specify the language version that a translation unit is written against.
+The translation unit will then be parsed and checked by the compiler using the rules from the specified language version.
+If a translation unit has multiple primary source files, a `#language` directive in any of them selects the version for the complete module, and all such directives must agree.
 
 Users are advised to provide a `#language` directive as the first non-whitespace line in their source file, such as:
 
@@ -91,3 +93,8 @@ Slang language version 202c brings these changes on top of Slang 2026:
   [#12045](https://github.com/shader-slang/slang/issues/12045) for details.
 - Compile-time for (`$for`) has been removed from the language. Use `[ForceUnroll] for` instead. See GitHub issue
   [#13065](https://github.com/shader-slang/slang/issues/13065) for details.
+- A non-void function must `return` a value or `throw` on every path that reaches the end of its body. Failure
+  to do so is diagnosed as an error in Slang 202c. Earlier versions report a warning, and an error only for
+  targets that require a return value (SPIR-V, GLSL and WGSL). To migrate, add an explicit `return` at the end
+  of the function where required. See GitHub issue
+  [#12264](https://github.com/shader-slang/slang/issues/12264) for details.

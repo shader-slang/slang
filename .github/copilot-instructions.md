@@ -84,6 +84,17 @@ change.)
 - **Comment functions as complete sentences: what, then why.** Say what the function does first;
   then, if non-obvious, why it exists. Include a concrete example for non-trivial behavior; avoid
   terse fragment/bullet-only function comments.
+- **Write comments as declarative statements, not imperatives.** State how the code is structured
+  and why, in the present tense ("We split X into Y because Z"), not as an instruction ("Keep X in
+  Y") — imperative phrasing tends to state what without why. Don't open a paragraph with an
+  unattached "This."
+- **Keep comments proportionate; land on a conclusion.** A comment records durable state — an
+  invariant, a constraint, an unusual shape — not the edits or review rounds that produced it (a
+  renumbering note belongs in the commit message). Prefer one "if X, then Y, because Z" sentence
+  over a paragraph of premises with no stated point. If justifying one line takes several
+  paragraphs, restructure the code instead — extract a named helper, assert the invariant, simplify
+  the condition. This is about ordinary comments; a genuinely subtle cross-pass invariant can still
+  warrant a fuller worked example — that is the exception, not the default.
 - **Reuse before you write; then extract.** Before adding a helper, check shared headers
   (`slang-ast-type.h`, `slang-ir-util.h`, the `*-util.h` files) for an existing one (e.g.
   `isDeclRefTypeOf<T>`). When the logic is genuinely new, extract it into a named, documented helper
