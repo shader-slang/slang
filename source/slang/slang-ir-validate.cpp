@@ -4,6 +4,7 @@
 #include "slang-compiler.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
@@ -725,8 +726,11 @@ void validateVectorsAndMatrices(
     {
         if (auto matrixType = as<IRMatrixType>(globalInst))
         {
-            // Matrices with row/col dimension 1 are only well-supported on D3D targets
-            if (!isD3DTarget(targetRequest))
+            // Matrices with row/col dimension 1 are only well-supported on D3D targets. A matrix
+            // that `legalizeMatrixTypes` turns into an array of vectors is never emitted as a
+            // matrix, so its dimensions are not restricted.
+            if (!isD3DTarget(targetRequest) &&
+                !isMatrixTypeLoweredToArray(targetRequest, matrixType))
             {
                 // Verify that neither row nor col count is 1
                 auto colCount = as<IRIntLit>(matrixType->getColumnCount());
