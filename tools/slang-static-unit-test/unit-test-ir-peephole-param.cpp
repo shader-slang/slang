@@ -628,6 +628,49 @@ SLANG_UNIT_TEST(irPeepholeParamForwardsSingleDefinedValueAndRefinesObservedInput
     }
 }
 
+// Consider `int p; if (c) p = x; else { int a; p = a; } return p;`, where nothing but `p` observes
+// `a`. The param is forwarded to the one defined value `x` only when `x` is visible at `p`. A value
+// computed in the entry block dominates `merge`, so `p` becomes `x` in the dominance-based mode.
+// A value computed in `left` does not dominate `merge`, so the param is kept. The fast analysis
+// used without a target does not check dominance, so it keeps the param in both placements.
+SLANG_UNIT_TEST(irPeepholeParamForwardsBlockLocalDefinedValueOnlyWhenItDominates)
+{
+    for (bool isInEntry : {true, false})
+    {
+        for (bool withTarget : {true, false})
+        {
+            StaticUnitTestEnv env(unitTestContext);
+            IRFixtureBuilder fixture(env.getSessionImpl());
+            IRBuilder builder(fixture.getModule());
+            auto intType = builder.getIntType();
+
+            Diamond d;
+            d.begin(builder, fixture.getModule(), intType);
+            auto a = builder.emitLoadFromUninitializedMemory(intType);
+            builder.setInsertInto(isInEntry ? d.entry : d.left);
+            auto x = builder.emitAdd(
+                intType,
+                builder.emitCast(intType, d.condition),
+                builder.getIntValue(intType, 2));
+            d.finishEntry(builder);
+            d.finishArm(builder, d.left, {x});
+            d.finishArm(builder, d.right, {a});
+            builder.setInsertInto(d.merge);
+            auto p = builder.emitParam(intType);
+            auto ret = builder.emitReturn(p);
+            SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
+
+            auto target =
+                withTarget ? getDefaultTargetProgram(env, "peepholeParamTargetV") : nullptr;
+            peepholeOptimize(target, d.func);
+
+            SLANG_CHECK(isValidModule(fixture.getModule()));
+            IRInst* expected = isInEntry && withTarget ? x : (IRInst*)p;
+            SLANG_CHECK(ret->getOperand(0) == expected);
+        }
+    }
+}
+
 // A frozen input is refined only to a value that cannot be poison. Here `x` is computed in the entry
 // block after `a` and dominates every use of `a`, but an arbitrary instruction result may be poison
 // (or may depend on a poison argument), so the param is kept rather than refining `a` to `x`.
