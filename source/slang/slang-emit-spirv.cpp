@@ -12483,7 +12483,7 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
-    legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
+    SLANG_RETURN_ON_FAIL(legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext));
 
 #if 0
     {

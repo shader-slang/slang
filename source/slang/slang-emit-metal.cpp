@@ -313,6 +313,8 @@ void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
     }
 }
 
+// Metal texture atomics take no memory order, so `doesAtomicEncodeMemoryOrder` in
+// slang-ir-validate.cpp uses the same test to exempt them from the constant-order check.
 static IRImageSubscript* isTextureAccess(IRInst* inst)
 {
     return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));

@@ -65,7 +65,10 @@ struct SPIRVEmitSharedContext
     SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic);
 };
 
-void legalizeIRForSPIRV(
+// Legalize `module` for SPIR-V emission. Returns SLANG_FAIL if the memory orders of its atomic
+// operations fail `validateAtomicMemoryOrders`, in which case the module must not be emitted. Other
+// errors are reported to the sink of `codeGenContext` without changing the result.
+SlangResult legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
     const List<IRFunc*>& entryPoints,
