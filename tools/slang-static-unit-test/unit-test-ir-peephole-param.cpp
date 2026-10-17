@@ -632,40 +632,56 @@ SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueIsBlockLocal)
 //
 // `d` dominates `a` and every use of it, but `d` is poison when `c` is false. On that path the
 // function returns `a`, an arbitrary but defined value. Refining every use of `a` to `d` would
-// return poison there, so the param is kept.
+// return poison there, so the param is kept. The same holds when `d` is a module-scope global
+// constant whose value is poison: it is visible everywhere and fixed, but not a constant literal.
 SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueMayBePoison)
 {
-    for (bool withTarget : {true, false})
+    for (bool isGlobalConstant : {false, true})
     {
-        StaticUnitTestEnv env(unitTestContext);
-        IRFixtureBuilder fixture(env.getSessionImpl());
-        IRBuilder builder(fixture.getModule());
-        auto intType = builder.getIntType();
+        for (bool withTarget : {true, false})
+        {
+            StaticUnitTestEnv env(unitTestContext);
+            IRFixtureBuilder fixture(env.getSessionImpl());
+            IRBuilder builder(fixture.getModule());
+            auto intType = builder.getIntType();
 
-        Diamond d;
-        d.begin(builder, fixture.getModule(), intType);
-        IRInst* selectArgs[] = {
-            d.condition,
-            builder.getIntValue(intType, 1),
-            builder.getPoison(intType)};
-        auto dValue = builder.emitIntrinsicInst(intType, kIROp_Select, 3, selectArgs);
-        auto a = builder.emitLoadFromUninitializedMemory(intType);
-        d.finishEntry(builder);
-        d.finishArm(builder, d.left, {dValue});
-        d.finishArm(builder, d.right, {a});
-        builder.setInsertInto(d.merge);
-        auto p = builder.emitParam(intType);
-        IRInst* resultArgs[] = {d.condition, p, a};
-        auto result = builder.emitIntrinsicInst(intType, kIROp_Select, 3, resultArgs);
-        builder.emitReturn(result);
-        SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
+            IRInst* globalConstant = nullptr;
+            if (isGlobalConstant)
+            {
+                builder.setInsertInto(fixture.getModule());
+                globalConstant = builder.emitGlobalConstant(intType, builder.getPoison(intType));
+            }
 
-        auto target = withTarget ? getDefaultTargetProgram(env, "peepholeParamTargetP") : nullptr;
-        peepholeOptimize(target, d.func);
+            Diamond d;
+            d.begin(builder, fixture.getModule(), intType);
+            IRInst* dValue = globalConstant;
+            if (!dValue)
+            {
+                IRInst* selectArgs[] = {
+                    d.condition,
+                    builder.getIntValue(intType, 1),
+                    builder.getPoison(intType)};
+                dValue = builder.emitIntrinsicInst(intType, kIROp_Select, 3, selectArgs);
+            }
+            auto a = builder.emitLoadFromUninitializedMemory(intType);
+            d.finishEntry(builder);
+            d.finishArm(builder, d.left, {dValue});
+            d.finishArm(builder, d.right, {a});
+            builder.setInsertInto(d.merge);
+            auto p = builder.emitParam(intType);
+            IRInst* resultArgs[] = {d.condition, p, a};
+            auto result = builder.emitIntrinsicInst(intType, kIROp_Select, 3, resultArgs);
+            builder.emitReturn(result);
+            SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
 
-        SLANG_CHECK(isValidModule(fixture.getModule()));
-        SLANG_CHECK(result->getOperand(1) == p);
-        SLANG_CHECK(result->getOperand(2) == a);
+            auto target =
+                withTarget ? getDefaultTargetProgram(env, "peepholeParamTargetP") : nullptr;
+            peepholeOptimize(target, d.func);
+
+            SLANG_CHECK(isValidModule(fixture.getModule()));
+            SLANG_CHECK(result->getOperand(1) == p);
+            SLANG_CHECK(result->getOperand(2) == a);
+        }
     }
 }
 
