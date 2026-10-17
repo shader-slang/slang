@@ -2754,10 +2754,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         // otherwise they will include all of the above cases...
         else if (auto declRefType = as<DeclRefType>(type))
         {
-            // If we are trying to get the layout of some extern type, do our best
-            // to look it up in other loaded modules and generate the type layout
-            // based on that.
-            auto lookedUpType = context->layoutContext.lookupExternDeclRefType(declRefType);
+            // If we are trying to get the layout of some link-time type, do our best to resolve
+            // it to something concrete before laying it out (see
+            // `tryResolveAllLinkTimeTypesInDeclRef`).
+            auto lookedUpType =
+                context->layoutContext.tryResolveAllLinkTimeTypesInDeclRef(declRefType);
 
             // If the link-time type resolved to something concrete, process the param as if it is
             // of the concrete type by recursively calling this lambda.
