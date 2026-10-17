@@ -288,6 +288,10 @@ public:
 
     int getDefinedEntryPointCount();
 
+    // Returns the module serialized as IR (what `slangc -o <name>.slang-module` writes), as a
+    // Uint8Array that owns its bytes, or null. Load it with Session.loadModuleFromIRBlob.
+    emscripten::val serialize();
+
     slang::IModule* moduleInterface() const { return static_cast<slang::IModule*>(interface()); }
 };
 
@@ -305,6 +309,14 @@ public:
         const std::string& slangCode,
         const std::string& name,
         const std::string& path);
+
+    // Loads a precompiled module: the bytes of a serialized module (a `.slang-module` file, or
+    // Module.serialize()) as a Uint8Array. A module can only be loaded by the same Slang version
+    // that produced it. Returns Module or null.
+    emscripten::val loadModuleFromIRBlob(
+        const std::string& name,
+        const std::string& path,
+        emscripten::val bytes);
 
     // `components` is a javascript array of ComponentType/Module/EntryPoint objects.
     // Returns ComponentType or null.

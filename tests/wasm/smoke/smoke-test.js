@@ -161,6 +161,69 @@ async function runSmokeTest() {
         }
         console.log('Builtin module source smoke test passed');
 
+        // Precompiled modules: serialize a module to IR, load it into a new session from the
+        // bytes, and import it from source there.
+        const wgslTargetValue = targets.find(target => target.name === 'WGSL').value;
+        const libSession = globalSession.createSession(wgslTargetValue);
+        const libModule = libSession.loadModuleFromSource(
+            'module irlib;\npublic float scaled(float x) { return x * 3.0; }\n',
+            'irlib', '/irlib.slang');
+        if (!libModule) {
+            throw new Error('IR blob: failed to compile the library module');
+        }
+        const irBytes = libModule.serialize();
+        if (!(irBytes instanceof Uint8Array) || irBytes.length === 0) {
+            throw new Error('IR blob: Module.serialize() did not return bytes');
+        }
+        // The bytes must stay valid after the module and its session are gone.
+        libModule.delete();
+        libSession.delete();
+        const irSession = globalSession.createSession(wgslTargetValue);
+        const loadedLib = irSession.loadModuleFromIRBlob('irlib', '/irlib.slang-module', irBytes);
+        if (!loadedLib) {
+            const error = module.getLastError();
+            throw new Error(`IR blob: loadModuleFromIRBlob failed: ${error ? error.message : ''}`);
+        }
+        const irMain = irSession.loadModuleFromSource(
+            'import irlib;\n' +
+            'RWStructuredBuffer<float> outputBuffer;\n' +
+            '[shader("compute")] [numthreads(1, 1, 1)]\n' +
+            'void computeMain() { outputBuffer[0] = scaled(outputBuffer[1]); }\n',
+            'irmain', '/irmain.slang');
+        if (!irMain) {
+            const error = module.getLastError();
+            throw new Error(`IR blob: importing the loaded module failed: ${error ? error.message : ''}`);
+        }
+        const irProgram = irSession.createCompositeComponentType([irMain, loadedLib]).link();
+        const irWgsl = irProgram ? irProgram.getTargetCode(0) : '';
+        if (!irWgsl.includes('@compute') || !irWgsl.includes('scaled')) {
+            throw new Error(`IR blob: unexpected WGSL:\n${irWgsl}`);
+        }
+        const badModule = irSession.loadModuleFromIRBlob('bad', '/bad.slang-module',
+            new Uint8Array([1, 2, 3, 4]));
+        if (badModule) {
+            throw new Error('IR blob: garbage bytes should not load');
+        }
+        const badBlobError = module.getLastError();
+        if (!badBlobError || badBlobError.type !== 'USER') {
+            throw new Error('IR blob: garbage bytes should set a USER error');
+        }
+        for (const notBytes of [null, undefined, [1, 2, 3]]) {
+            if (irSession.loadModuleFromIRBlob('bad', '/bad.slang-module', notBytes)) {
+                throw new Error(`IR blob: ${notBytes} should not load`);
+            }
+            const notBytesError = module.getLastError();
+            if (!notBytesError || notBytesError.type !== 'USER' ||
+                notBytesError.result === module.SLANG_OK) {
+                throw new Error(`IR blob: ${notBytes} should set a USER error`);
+            }
+        }
+        irProgram.delete();
+        irMain.delete();
+        loadedLib.delete();
+        irSession.delete();
+        console.log('IR blob smoke test passed');
+
         // Clean up
         linkedProgram.delete();
         program.delete();
