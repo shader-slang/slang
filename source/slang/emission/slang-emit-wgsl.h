@@ -42,6 +42,10 @@ public:
     // redundant; omit it (older naga rejects `break` outside a loop). Early breaks are kept.
     virtual bool shouldEmitSwitchCaseTerminatingBreak() SLANG_OVERRIDE { return false; }
 
+    // Emit loops with a simple counter as `for (var i = init; ; i = i + step)`. Tint can
+    // then prove them finite, and does not add its robustness iteration counter to them.
+    virtual bool shouldEmitCountedLoopsAsFor() SLANG_OVERRIDE { return true; }
+
     virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator)
         SLANG_OVERRIDE;
     virtual void emitVarKeywordImpl(IRType* type, IRInst* varDecl) SLANG_OVERRIDE;
