@@ -21,6 +21,14 @@ The [CPU target guide](cpu-target.md) gives information on compiling Slang or C+
 
 The [CUDA target guide](cuda-target.md) provides information on compiling Slang/HLSL or CUDA source. Slang can compile to equivalent CUDA source, as well as to PTX via the nvrtc CUDA compiler.
 
+Writing documentation
+---------------------
+
+Reader-facing pages (the user guide under `user-guide/`, the target guides above) are written for a graphics programmer who is new to Slang: one idea per sentence, an example before its explanation, no preview of what the page is about to say, no marketing adjectives.
+Use simple technical English; the `slang-ste-writing` skill in [shader-slang/slang-skills](https://github.com/shader-slang/slang-skills) describes the subset we follow (short sentences, the same word for the same thing, active voice in procedures).
+Text drafted with a tool is rewritten by a person before review, and the pull request's Evidence section says which pages were generated and which were rewritten by hand.
+A page that reads like generated text is sent back to its author.
+
 Contributors
 ------------
 
