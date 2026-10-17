@@ -65,6 +65,7 @@ enum class PassThroughMode : SlangPassThroughIntegral
     MetalC = SLANG_PASS_THROUGH_METAL,
     Tint = SLANG_PASS_THROUGH_TINT,            ///< pass through spirv to Tint API
     SpirvLink = SLANG_PASS_THROUGH_SPIRV_LINK, ///< pass through spirv to spirv-link
+    Vkd3d = SLANG_PASS_THROUGH_VKD3D,
     CountOf = SLANG_PASS_THROUGH_COUNT_OF,
 };
 void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);
