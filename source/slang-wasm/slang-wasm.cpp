@@ -71,6 +71,9 @@ GlobalSession* createGlobalSession()
     return new GlobalSession(globalSession);
 }
 
+// True if `object` has its own property `name` (not one from its prototype) and the property
+// is neither `undefined` nor `null`. A descriptor is a plain object literal, so an explicit
+// `undefined` or `null` counts as leaving the field out.
 static bool hasProperty(const emscripten::val& object, const char* name)
 {
     return object.hasOwnProperty(name) && !object[name].isUndefined() && !object[name].isNull();
@@ -92,25 +95,25 @@ Session* GlobalSession::createSession(emscripten::val desc)
     }
     const int compileTarget = isTargetOnly ? desc.as<int>() : desc["target"].as<int>();
 
-    auto keep = [](const emscripten::val& value) { return value.as<std::string>(); };
-
     std::string profile;
     std::vector<std::string> macroNames, macroValues, searchPaths;
     std::vector<std::string> optionStrings0, optionStrings1;
     std::vector<CompilerOptionEntry> options;
-    SlangMatrixLayoutMode matrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
+    // The default of slang::SessionDesc, which every session used before descriptors.
+    SlangMatrixLayoutMode matrixLayoutMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
     if (!isTargetOnly)
     {
         if (hasProperty(desc, "profile"))
-            profile = keep(desc["profile"]);
+            profile = desc["profile"].as<std::string>();
         if (hasProperty(desc, "preprocessorMacros"))
         {
             for (auto& macro :
                  emscripten::vecFromJSArray<emscripten::val>(desc["preprocessorMacros"]))
             {
-                macroNames.push_back(keep(macro["name"]));
-                macroValues.push_back(hasProperty(macro, "value") ? keep(macro["value"]) : "");
+                macroNames.push_back(macro["name"].as<std::string>());
+                macroValues.push_back(
+                    hasProperty(macro, "value") ? macro["value"].as<std::string>() : "");
             }
         }
         if (hasProperty(desc, "searchPaths"))
@@ -124,6 +127,9 @@ Session* GlobalSession::createSession(emscripten::val desc)
             {
                 CompilerOptionEntry entry = {};
                 entry.name = (CompilerOptionName)option["name"].as<int>();
+                // The kind follows from the fields that are set: each option reads either
+                // strings or ints (see slang::CompilerOptionName), so an option given its
+                // documented fields gets the kind it reads.
                 const bool isString =
                     hasProperty(option, "stringValue0") || hasProperty(option, "stringValue1");
                 entry.value.kind =
@@ -133,9 +139,11 @@ Session* GlobalSession::createSession(emscripten::val desc)
                 if (hasProperty(option, "intValue1"))
                     entry.value.intValue1 = option["intValue1"].as<int>();
                 optionStrings0.push_back(
-                    hasProperty(option, "stringValue0") ? keep(option["stringValue0"]) : "");
+                    hasProperty(option, "stringValue0") ? option["stringValue0"].as<std::string>()
+                                                        : "");
                 optionStrings1.push_back(
-                    hasProperty(option, "stringValue1") ? keep(option["stringValue1"]) : "");
+                    hasProperty(option, "stringValue1") ? option["stringValue1"].as<std::string>()
+                                                        : "");
                 options.push_back(entry);
             }
         }

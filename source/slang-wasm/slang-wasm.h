@@ -335,14 +335,19 @@ public:
     //   {
     //     target: number,                       // required
     //     profile?: string,                     // e.g. "sm_6_6"; HLSL defaults to sm_6_6
-    //     preprocessorMacros?: [{name: string, value: string}],
+    //     preprocessorMacros?: [{name: string, value?: string}],  // value defaults to ""
     //     searchPaths?: [string],               // paths in the Emscripten file system
-    //     defaultMatrixLayoutMode?: number,     // SlangMatrixLayoutMode
+    //     defaultMatrixLayoutMode?: number,     // SlangMatrixLayoutMode; row-major by default
     //     compilerOptions?: [{name: number,     // slang::CompilerOptionName
     //                         intValue0?: number, intValue1?: number,
     //                         stringValue0?: string, stringValue1?: string}],
     //   }
-    // An option is passed as a string option when it has a stringValue0 or stringValue1.
+    // The enums are not exported to JavaScript; their integer values are those in
+    // include/slang.h. An option is passed as a string option when it has a stringValue0 or
+    // stringValue1, and as an int option otherwise.
+    // Returns null and sets getLastError() (type "USER", SLANG_E_INVALID_ARG) when `desc` is
+    // neither a number nor an object with a `target`, or names an unknown profile. A field of
+    // the wrong type (for example a macro without a name) throws a JavaScript exception.
     Session* createSession(emscripten::val desc);
 
     // Returns the source of the builtin module "core" or "glsl". The name is matched by prefix,

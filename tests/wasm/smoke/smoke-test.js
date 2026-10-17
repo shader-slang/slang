@@ -165,7 +165,9 @@ async function runSmokeTest() {
         // the session, including one imported from a search path.
         module.FS.mkdirTree('/session-options/lib');
         module.FS.writeFile('/session-options/lib/helper.slang',
-            'module helper;\npublic uint helperValue() { return HELPER_VALUE; }\n');
+            'module helper;\n' +
+            '#if HELPER_VALUE != 7\n#error "HELPER_VALUE did not reach the imported module"\n#endif\n' +
+            'public uint helperValue() { return HELPER_VALUE; }\n');
         const wgslTarget = targets.find(target => target.name === 'WGSL').value;
         const optionsSession = globalSession.createSession({
             target: wgslTarget,
@@ -183,6 +185,9 @@ async function runSmokeTest() {
         }
         const optionsModule = optionsSession.loadModuleFromSource(
             'import helper;\n' +
+            '#if HELPER_VALUE != 7 || MAIN_VALUE != 5 || OPTION_VALUE != 3\n' +
+            '#error "a session macro value was lost"\n' +
+            '#endif\n' +
             '[require(spirv)] uint spirvOnly() { return 1; }\n' +
             'RWStructuredBuffer<uint> outputBuffer;\n' +
             '[shader("compute")] [numthreads(1, 1, 1)]\n' +
@@ -192,13 +197,47 @@ async function runSmokeTest() {
             const error = module.getLastError();
             throw new Error(`Session options: failed to load module: ${error ? error.message : 'Unknown error'}`);
         }
-        // The module only compiles if all three macros reached it, `helper` was found, and
-        // IgnoreCapabilities applied (`spirvOnly` is not available on WGSL without it).
+        // The module only compiles if all three macros reached it with their values, `helper`
+        // was found, and IgnoreCapabilities applied (`spirvOnly` is not available on WGSL
+        // without it).
         const optionsProgram = optionsSession.createCompositeComponentType([optionsModule]).link();
         const wgsl = optionsProgram ? optionsProgram.getTargetCode(0) : '';
         if (!wgsl || !wgsl.includes('@compute')) {
             const error = module.getLastError();
             throw new Error(`Session options: no WGSL generated: ${error ? error.message : ''}`);
+        }
+        // A valid profile and the matrix layout reach the target code. GLSL shows both: the
+        // profile as `#version`, and the layout as a default qualifier (Slang's column-major
+        // layout, 2, is GLSL's `row_major`; the default, row-major, is `column_major`).
+        const glslTarget = targets.find(target => target.name === 'GLSL').value;
+        const glslSource = 'RWStructuredBuffer<uint> outputBuffer;\n' +
+            '[shader("compute")] [numthreads(1, 1, 1)]\n' +
+            'void computeMain() { outputBuffer[0] = 1; }\n';
+        const glslCode = (desc) => {
+            const glslSession = globalSession.createSession(desc);
+            if (!glslSession) {
+                throw new Error(`Failed to create a GLSL session from ${JSON.stringify(desc)}`);
+            }
+            const glslModule = glslSession.loadModuleFromSource(
+                glslSource, 'glsl-options', '/glsl-options.slang');
+            const glslProgram = glslModule ?
+                glslSession.createCompositeComponentType([glslModule]).link() : null;
+            const code = glslProgram ? glslProgram.getTargetCode(0) : '';
+            if (glslProgram) glslProgram.delete();
+            if (glslModule) glslModule.delete();
+            glslSession.delete();
+            return code;
+        };
+        const defaultGlsl = glslCode(glslTarget);
+        if (!defaultGlsl.includes('#version 450') ||
+            !defaultGlsl.includes('layout(column_major) uniform;')) {
+            throw new Error(`Unexpected default GLSL header:\n${defaultGlsl.slice(0, 200)}`);
+        }
+        const configuredGlsl =
+            glslCode({ target: glslTarget, profile: 'glsl_460', defaultMatrixLayoutMode: 2 });
+        if (!configuredGlsl.includes('#version 460') ||
+            !configuredGlsl.includes('layout(row_major) uniform;')) {
+            throw new Error(`profile or defaultMatrixLayoutMode did not apply:\n${configuredGlsl.slice(0, 200)}`);
         }
         const badSession = globalSession.createSession({ profile: 'sm_6_6' });
         if (badSession) {
