@@ -1797,6 +1797,26 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // An entry point receives values from the previous pipeline stage and passes values to the
+    // next one, so a reference to a caller's memory location has no meaning for its parameters.
+    // The remaining checks classify each parameter as a stage input, output, or both, which a
+    // reference mode does not determine, so we stop after reporting any such parameter.
+    {
+        bool hasReferenceParam = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            const auto mode = getParamPassingMode(param);
+            if (mode == ParamPassingMode::Ref)
+            {
+                sink->diagnose(
+                    Diagnostics::EntryPointParamHasReferenceMode{.param = param, .mode = mode});
+                hasReferenceParam = true;
+            }
+        }
+        if (hasReferenceParam)
+            return;
+    }
+
     // Check if the return type is valid for a shader entry point
     auto returnType = entryPointFuncDecl->returnType.type;
     if (returnType)
@@ -2377,7 +2397,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // checked first to avoid mislabeling `inout` parameters as "output".
             ctx.direction = param->hasModifier<InOutModifier>() ? "input/output"
                             : param->hasModifier<OutModifier>() ? "output"
-                            : param->hasModifier<RefModifier>() ? "input/output"
                                                                 : "input";
 
             StringBuilder contextSb;

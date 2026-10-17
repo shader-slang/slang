@@ -810,7 +810,7 @@ struct RayTracingPayloadLegalizationContext
         {
             // D3D receives hit attributes only through an `in` parameter, which
             // translateEntryPointInParamToBorrow has made `borrow in`. Each nonempty non-struct one
-            // is wrapped. Other spellings, such as `__ref`, and a signature with more than one
+            // is wrapped. Other spellings, such as `inout`, and a signature with more than one
             // hit-attribute parameter are invalid on D3D; we leave them for DXC to diagnose.
             if (isD3D && isHitAttributesParam(param))
             {
