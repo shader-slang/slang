@@ -86,9 +86,12 @@ struct PeepholeContext : InstPassBase
     /// therefore accept only two kinds of value, both defined outside any function body and thus
     /// fixed for the whole invocation:
     ///
-    /// - A literal constant. `Poison` is its own opcode, not an `IRConstant`.
-    /// - A global shader parameter, which the application binds. A specialization constant with a
-    ///   default value is excluded, because that default is an arbitrary lowered expression.
+    /// - A literal constant. `Poison` is its own opcode, not an `IRConstant`. A constant whose type
+    ///   is local to a function is hoisted into that function's body, so it is excluded.
+    /// - A global shader parameter, which is set outside the shader and has one value per
+    ///   invocation. A specialization constant with a default value is excluded: the default is a
+    ///   lowered expression that may itself be poison, and it is the value used when the
+    ///   application does not override it.
     bool canRefineUninitializedValueTo(IRInst* input, IRInst* value)
     {
         if (auto globalParam = as<IRGlobalParam>(value))
@@ -96,7 +99,7 @@ struct PeepholeContext : InstPassBase
             if (globalParam->findDecoration<IRDefaultValueDecoration>())
                 return false;
         }
-        else if (!as<IRConstant>(value))
+        else if (!as<IRConstant>(value) || getParentFunc(value))
         {
             return false;
         }
