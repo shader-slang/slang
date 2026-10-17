@@ -6,7 +6,9 @@
 // never-written `t`, so `t == before` must hold whenever `c` is false.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -Wno-41035
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -Wno-41035 -xslang -g
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -Wno-41035
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -Wno-41035 -xslang -g
 
 //TEST_INPUT: set inputBuffer = ubuffer(data=[0 1 7], stride=4)
 RWStructuredBuffer<int> inputBuffer;

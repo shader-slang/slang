@@ -160,12 +160,12 @@ struct PeepholeContext : InstPassBase
     /// - One distinct value is forwarded, including a frozen value that every edge shares. A loop
     ///   header that receives `a` from the entry and itself from the back edge thus sees the same
     ///   `a` on every iteration, and no value is created in the header.
-    /// - Otherwise, one distinct defined value `d` among undefined ones is forwarded, as before
-    ///   this rule handled undefined inputs. When a frozen input is also observed elsewhere, we
-    ///   first refine it to `d`, which `LoadFromUninitializedMemory` permits ("an optimization
-    ///   pass may freely decide on a particular value to use and replace all uses of the
-    ///   instruction with that value"). That keeps correlation: `p == a` becomes `d == d`. If
-    ///   `canRefineUninitializedValueTo` rejects the refinement, the param is kept.
+    /// - Otherwise, one distinct defined value `d` among undefined ones is forwarded. When a frozen
+    ///   input is also observed elsewhere, we first refine it to `d`, which
+    ///   `LoadFromUninitializedMemory` permits ("an optimization pass may freely decide on a
+    ///   particular value to use and replace all uses of the instruction with that value"). That
+    ///   keeps correlation: `p == a` becomes `d == d`. If `canRefineUninitializedValueTo` rejects
+    ///   the refinement, the param is kept.
     /// - Otherwise, if every value is undefined and every frozen input is unobserved elsewhere, the
     ///   param becomes one fresh `LoadFromUninitializedMemory` in the function's entry block. That
     ///   block runs once per invocation and dominates every use, so the value is stable across

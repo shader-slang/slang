@@ -591,8 +591,9 @@ SLANG_UNIT_TEST(irPeepholeParamForwardsSingleDefinedValueAndRefinesObservedInput
 }
 
 // The refinement requires the defined value to dominate the frozen input, so that each execution
-// of the input pairs with one value. Here the defined value `x` is computed in the left arm, after
-// the frozen input `a` in the entry block, so `a` is kept and so is the param.
+// of the input pairs with one value. Here the frozen input `a` comes first in the entry block and
+// the defined value `x` after it. `x` still dominates the merge param, so only the refinement
+// check keeps the param.
 SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueIsLaterThanInput)
 {
     StaticUnitTestEnv env(unitTestContext);
@@ -603,12 +604,13 @@ SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueIsLaterThanInput)
     Diamond d;
     d.begin(builder, fixture.getModule(), builder.getBoolType());
     auto a = builder.emitLoadFromUninitializedMemory(intType);
+    auto x = builder.emitAdd(
+        intType,
+        builder.emitCast(intType, d.condition),
+        builder.getIntValue(intType, 2));
     d.finishEntry(builder);
-    d.finishArm(builder, d.right, {a});
-    builder.setInsertInto(d.left);
-    auto x =
-        builder.emitAdd(intType, builder.getIntValue(intType, 1), builder.getIntValue(intType, 2));
     d.finishArm(builder, d.left, {x});
+    d.finishArm(builder, d.right, {a});
     builder.setInsertInto(d.merge);
     auto p = builder.emitParam(intType);
     auto eq = builder.emitEql(p, a);
