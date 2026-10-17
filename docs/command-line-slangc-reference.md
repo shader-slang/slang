@@ -679,6 +679,14 @@ Specify the byte stride for the resource descriptor heap when generating SPIRV w
 Specify the byte stride for the sampler descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler). 
 
 
+<a id="wgsl-diagnostic"></a>
+### -wgsl-diagnostic
+
+**-wgsl-diagnostic &lt;severity&gt;:&lt;rule&gt;**
+
+Emit a WGSL `diagnostic(&lt;severity&gt;, &lt;rule&gt;);` directive, e.g. `-wgsl-diagnostic off:subgroup_uniformity`. &lt;severity&gt; is one of error, warning, info, off; &lt;rule&gt; is a WGSL identifier or two identifiers separated by a period. Can be repeated; for a repeated rule the last severity is used. Ignored for other targets. 
+
+
 <a id="spirv-unified-descriptor-heap-stride"></a>
 ### -spirv-unified-descriptor-heap-stride
 When generating SPIRV with spvDescriptorHeapEXT, emit each resource descriptor-heap runtime array's ArrayStride as the maximum of image and buffer descriptor sizes, so a single heap shared by buffers and images is indexed at the device's unified stride. Only affects the default OpConstantSizeOfEXT path (used when [-spirv-resource-heap-stride](#spirv-resource-heap-stride) is 0); mutually exclusive with a non-zero [-spirv-resource-heap-stride](#spirv-resource-heap-stride) (combining the two is an error). Does not affect the sampler heap or acceleration-structure entries. 

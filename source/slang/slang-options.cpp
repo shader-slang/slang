@@ -987,6 +987,13 @@ void initCommandOptions(CommandOptions& options)
          "-spirv-sampler-heap-stride <stride>",
          "Specify the byte stride for the sampler descriptor heap when generating SPIRV with "
          "spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler)."},
+        {OptionKind::WGSLDiagnostic,
+         "-wgsl-diagnostic",
+         "-wgsl-diagnostic <severity>:<rule>",
+         "Emit a WGSL `diagnostic(<severity>, <rule>);` directive, e.g. "
+         "`-wgsl-diagnostic off:subgroup_uniformity`. <severity> is one of error, warning, info, "
+         "off; <rule> is a WGSL identifier or two identifiers separated by a period. Can be "
+         "repeated; for a repeated rule the last severity is used. Ignored for other targets."},
         {OptionKind::SPIRVUnifiedDescriptorHeapStride,
          "-spirv-unified-descriptor-heap-stride",
          nullptr,
@@ -3718,6 +3725,30 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
 
                 m_compileRequest->addSearchPath(String(slice).getBuffer());
+                break;
+            }
+        case OptionKind::WGSLDiagnostic:
+            {
+                CommandLineArg operand;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
+                const UnownedStringSlice value = operand.value.getUnownedSlice();
+                const Index colon = value.indexOf(':');
+                const UnownedStringSlice severity =
+                    colon >= 0 ? value.head(colon) : UnownedStringSlice();
+                const UnownedStringSlice rule =
+                    colon >= 0 ? value.tail(colon + 1) : UnownedStringSlice();
+                if (colon < 0 || !isValidWGSLDiagnosticFilter(severity, rule))
+                {
+                    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{
+                        .option = m_currentOptionName,
+                        .validValues = kWGSLDiagnosticFilterSyntax});
+                    return SLANG_FAIL;
+                }
+                CompilerOptionValue optionValue;
+                optionValue.kind = CompilerOptionValueKind::String;
+                optionValue.stringValue = severity;
+                optionValue.stringValue2 = rule;
+                linkage->m_optionSet.add(OptionKind::WGSLDiagnostic, optionValue);
                 break;
             }
         case OptionKind::TypeConformance:
