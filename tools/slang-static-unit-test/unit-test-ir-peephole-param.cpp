@@ -557,10 +557,10 @@ SLANG_UNIT_TEST(irPeepholeParamLeavesSelfOnlyParamAlone)
     }
 }
 
-// A param with one defined value and unobserved undefined inputs is forwarded to the defined value.
-// An observed undefined input keeps the param: on that edge `p` equals the frozen input, which the
-// defined value need not.
-SLANG_UNIT_TEST(irPeepholeParamForwardsSingleDefinedValueOnlyWhenUncorrelated)
+// A param with one defined value and undefined inputs is forwarded to the defined value. A frozen
+// input that is also observed elsewhere is refined to that value first, so `p == a` becomes
+// `7 == 7` rather than comparing the forwarded value with an independent arbitrary one.
+SLANG_UNIT_TEST(irPeepholeParamForwardsSingleDefinedValueAndRefinesObservedInput)
 {
     for (bool observed : {false, true})
     {
@@ -585,7 +585,68 @@ SLANG_UNIT_TEST(irPeepholeParamForwardsSingleDefinedValueOnlyWhenUncorrelated)
         peepholeOptimize(getDefaultTargetProgram(env, "peepholeParamTargetX"), d.func);
 
         SLANG_CHECK(isValidModule(fixture.getModule()));
-        IRInst* expected = observed ? (IRInst*)p : (IRInst*)seven;
-        SLANG_CHECK(eq->getOperand(0) == expected);
+        SLANG_CHECK(eq->getOperand(0) == seven);
+        SLANG_CHECK(eq->getOperand(1) == seven);
     }
+}
+
+// The refinement requires the defined value to dominate the frozen input, so that each execution
+// of the input pairs with one value. Here the defined value `x` is computed in the left arm, after
+// the frozen input `a` in the entry block, so `a` is kept and so is the param.
+SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueIsLaterThanInput)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder fixture(env.getSessionImpl());
+    IRBuilder builder(fixture.getModule());
+    auto intType = builder.getIntType();
+
+    Diamond d;
+    d.begin(builder, fixture.getModule(), builder.getBoolType());
+    auto a = builder.emitLoadFromUninitializedMemory(intType);
+    d.finishEntry(builder);
+    d.finishArm(builder, d.right, {a});
+    builder.setInsertInto(d.left);
+    auto x =
+        builder.emitAdd(intType, builder.getIntValue(intType, 1), builder.getIntValue(intType, 2));
+    d.finishArm(builder, d.left, {x});
+    builder.setInsertInto(d.merge);
+    auto p = builder.emitParam(intType);
+    auto eq = builder.emitEql(p, a);
+    builder.emitReturn(eq);
+    SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
+
+    peepholeOptimize(getDefaultTargetProgram(env, "peepholeParamTargetY"), d.func);
+
+    SLANG_CHECK(isValidModule(fixture.getModule()));
+    SLANG_CHECK(eq->getOperand(0) == p);
+    SLANG_CHECK(eq->getOperand(1) == a);
+}
+
+// Prelinking runs forward the single defined value without refining the frozen input, so the
+// front end's uninitialized-use check still sees `a`.
+SLANG_UNIT_TEST(irPeepholeParamForwardsWithoutRefiningWhenPrelinking)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder fixture(env.getSessionImpl());
+    IRBuilder builder(fixture.getModule());
+    auto intType = builder.getIntType();
+
+    Diamond d;
+    d.begin(builder, fixture.getModule(), builder.getBoolType());
+    auto a = builder.emitLoadFromUninitializedMemory(intType);
+    d.finishEntry(builder);
+    d.finishArm(builder, d.left, {a});
+    auto seven = builder.getIntValue(intType, 7);
+    d.finishArm(builder, d.right, {seven});
+    builder.setInsertInto(d.merge);
+    builder.emitParam(intType);
+    auto eq = builder.emitEql(d.merge->getFirstParam(), a);
+    builder.emitReturn(eq);
+    SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
+
+    peepholeOptimize(nullptr, d.func, PeepholeOptimizationOptions::getPrelinking());
+
+    SLANG_CHECK(isValidModule(fixture.getModule()));
+    SLANG_CHECK(eq->getOperand(0) == seven);
+    SLANG_CHECK(eq->getOperand(1) == a);
 }
