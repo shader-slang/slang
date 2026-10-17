@@ -52,6 +52,77 @@ fn _slang_getNan() -> f32
 }
 )";
 
+// A call to a user-declared function is never a WGSL const-expression or override-expression, so
+// passing a literal through this identity function makes a `@const` builtin applied to it a
+// runtime expression. WGSL allows such a call only inside a function body.
+static const char* kWGSLBuiltinPreludeNonConstU32 = R"(
+fn _slang_nonConstU32(x : u32) -> u32
+{
+    return x;
+}
+)";
+
+// Return true if either 16-bit half of `packedHalves` is an IEEE binary16 Inf or NaN, i.e. has an
+// all-ones exponent. For example, 0x7C00 (+Inf) and 0x7E003C00 (NaN in the high half) return
+// true, and 0x7BFF7BFF (the largest finite pair) returns false. The high half matters even for
+// `f16tof32`, which reads only `.x`, because WGSL evaluates the whole `vec2<f32>` result of
+// `unpack2x16float`.
+static bool hasNonFiniteHalf(uint32_t packedHalves)
+{
+    const uint32_t kHalfExponentMask = 0x7C00u;
+    return (packedHalves & kHalfExponentMask) == kHalfExponentMask ||
+           ((packedHalves >> 16) & kHalfExponentMask) == kHalfExponentMask;
+}
+
+// Return the argument of `inst` if `inst` is a one-argument intrinsic call whose WGSL text starts
+// with `unpack2x16float`, it is inside a function body, and its argument is a `uint` `IRIntLit`
+// with an Inf or NaN half; otherwise return null. The emitter then writes that argument as
+// `_slang_nonConstU32(<literal>)`.
+//
+// `unpack2x16float` is a `@const` builtin, so applied to a literal it is a const-expression, and
+// WGSL makes a const-expression whose value is Inf or NaN a shader-creation error. Consider
+// `f16tof32(0x7C00u)`: it emits `(unpack2x16float((u32(31744))).x)`, which Tint rejects with
+// "value inf cannot be represented as 'f32'". With the literal passed through
+// `_slang_nonConstU32` the call is a runtime expression, so Tint accepts the shader; as for any
+// runtime Inf or NaN in WGSL, the value the implementation then produces is not guaranteed.
+//
+// The rule is keyed on the WGSL spelling, which in the core module is used by `f16tof32(uint)`
+// (`"unpack2x16float($0).x"`) and `unpackHalf2x16ToFloat(uint)` (`"unpack2x16float"`). It sees
+// only operands folded to an `IRIntLit` by emit time: an operand that WGSL still treats as a
+// const-expression without being a literal, such as `max(0x7C00u, 0u)` or
+// `asuint(<float literal>)`, is emitted as written and is still rejected.
+static IRIntLit* findLiteralToEmitAsRuntimeValue(
+    IRCall* inst,
+    UnownedStringSlice intrinsicDefinition)
+{
+    if (!intrinsicDefinition.startsWith("unpack2x16float"))
+        return nullptr;
+
+    // User-written `__intrinsic_asm` text can share the spelling with any number of arguments.
+    // The one-argument shape is also what makes the literal the only operand the expansion emits.
+    if (inst->getArgCount() != 1)
+        return nullptr;
+
+    // WGSL legalization copies module-scope calls into the functions that use them, so a call
+    // still outside a function body is a module-scope initializer, such as the `override` default
+    // of a specialization constant. WGSL allows no user-declared function call there, and a
+    // non-finite value is invalid there either way, so the call is left as written and Tint's
+    // "value inf" error names the actual problem.
+    if (!getParentFunc(inst))
+        return nullptr;
+
+    // `_slang_nonConstU32` takes a `u32`, and a user intrinsic with this spelling can take
+    // another type, so only a `uint` literal is wrapped.
+    auto literal = as<IRIntLit>(inst->getArg(0));
+    if (!literal || literal->getDataType()->getOp() != kIROp_UIntType)
+        return nullptr;
+
+    // Finite literals stay bare so Tint can fold them.
+    if (!hasNonFiniteHalf(uint32_t(literal->getValue())))
+        return nullptr;
+    return literal;
+}
+
 WGSLSourceEmitter::WGSLSourceEmitter(const Desc& desc)
     : CLikeSourceEmitter(desc)
 {
@@ -1040,6 +1111,14 @@ void WGSLSourceEmitter::emitOperandImpl(IRInst* operand, EmitOpInfo const& outer
         m_writer->emit(getName(operand));
         m_writer->emit(")");
     }
+    else if (operand == m_literalToEmitAsRuntimeValue)
+    {
+        // See `m_literalToEmitAsRuntimeValue` for why matching a shared `IRIntLit` is safe.
+        ensurePrelude(kWGSLBuiltinPreludeNonConstU32);
+        m_writer->emit("_slang_nonConstU32(");
+        CLikeSourceEmitter::emitOperandImpl(operand, getInfo(EmitOp::General));
+        m_writer->emit(")");
+    }
     else
     {
         CLikeSourceEmitter::emitOperandImpl(operand, outerPrec);
@@ -1841,11 +1920,17 @@ void WGSLSourceEmitter::emitIntrinsicCallExprImpl(
         m_f16ExtensionEnabled = true;
     }
 
+    // `m_literalToEmitAsRuntimeValue` is null on entry: it is reset after every expansion, and
+    // the expansion that sets it emits only an `IRIntLit`, which cannot reach another intrinsic
+    // call.
+    SLANG_ASSERT(!m_literalToEmitAsRuntimeValue);
+    m_literalToEmitAsRuntimeValue = findLiteralToEmitAsRuntimeValue(inst, intrinsicDefinition);
     CLikeSourceEmitter::emitIntrinsicCallExprImpl(
         inst,
         intrinsicDefinition,
         intrinsicInst,
         inOuterPrec);
+    m_literalToEmitAsRuntimeValue = nullptr;
 }
 
 void WGSLSourceEmitter::emitInterpolationModifiersImpl(
