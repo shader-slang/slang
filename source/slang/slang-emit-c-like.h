@@ -440,6 +440,22 @@ public:
     /// Emit high-level statements for the body of a function.
     void emitFunctionBody(IRGlobalValueWithCode* code);
 
+    /// A loop whose counter is emitted in a `for` header: `for (var counter = initVal; ;
+    /// counter = counter + step)` (or `- step`). The counter's declaration, its initial
+    /// store and its update store are skipped where they appear in the body.
+    struct CountedLoop
+    {
+        IRVar* counter = nullptr;
+        IRInst* initVal = nullptr;
+        IRInst* step = nullptr;
+        bool isDecrement = false;
+    };
+
+    /// Find the loops in `regionTree` that can be emitted as counted `for` loops.
+    void findCountedLoops(RegionTree* regionTree, Region* region);
+    bool tryMatchCountedLoop(RegionTree* regionTree, LoopRegion* loopRegion, CountedLoop& outLoop);
+    void emitCountedLoopHeader(const CountedLoop& countedLoop);
+
     void emitFuncHeader(IRFunc* func) { emitFuncHeaderImpl(func); }
     void emitSimpleFunc(IRFunc* func) { emitSimpleFuncImpl(func); }
 
@@ -682,6 +698,11 @@ protected:
     /// unconditional loop, without trailing whitespace.
     virtual char const* getUnconditionalLoopHeader() { return "for(;;)"; }
 
+    /// Returns true if loops with a simple counter should be emitted as
+    /// `for (var i = init; ; i = i + step)` instead of an unconditional loop that
+    /// updates the counter in its body (see `findCountedLoops`).
+    virtual bool shouldEmitCountedLoopsAsFor() { return false; }
+
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }
     virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) { SLANG_UNUSED(switchInst); }
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault);
@@ -829,6 +850,11 @@ protected:
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
 
     Dictionary<IRInst*, bool>* m_foldSafetyCache = nullptr;
+
+    // Loops of the function being emitted that get a counted `for` header, and the
+    // instructions that header emits in place of their original location.
+    Dictionary<IRLoop*, CountedLoop> m_countedLoops;
+    HashSet<IRInst*> m_instsEmittedInLoopHeader;
 
     bool isSafeToFoldIntoUseSitesUncached(IRInst* inst);
 
