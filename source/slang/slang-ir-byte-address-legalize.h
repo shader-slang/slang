@@ -15,6 +15,11 @@ struct ByteAddressBufferLegalizationOptions
     bool translateToStructuredBufferOps = false;
     bool lowerBasicTypeOps = false;
 
+    /// Load `half` values by loading the containing 32-bit word and bit-casting it to
+    /// `vector<half, 2>`, instead of going through a 16-bit integer. This is for targets
+    /// that support `half` but have no 16-bit integer types (e.g. WGSL).
+    bool loadHalfFrom32BitWords = false;
+
     /// Causes all calls to `getEquivlentStructuredBuffer` to return a `ByteAddressBuffer` (this)
     /// instead of a `StructuredBuffer`. This option is used for targets that do not distinctly
     /// define `ByteAddressBuffer`/`StructuredBuffer` and introduce operations which prevent DCE
