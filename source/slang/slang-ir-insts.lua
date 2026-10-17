@@ -1902,6 +1902,18 @@ local insts = {
 				},
 			},
 			{
+				noTargetCase = {
+					-- Marks the `missingReturn` that `specializeTargetSwitch` emits for a
+					-- `__target_switch` with no case for the target, which is reported as E41037
+					-- (see that function). We reuse `missingReturn` because every CFG pass and
+					-- emitter already treats it as an unreachable terminator; only the two
+					-- missing-return consumers need to tell the two meanings apart. The operand
+					-- is the display name of the function that held the switch.
+					struct_name = "NoTargetCaseDecoration",
+					operands = { { "funcNameOperand", "IRStringLit" } },
+				},
+			},
+			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",
 					operands = { { "SPIRVVersionOperand", "IRConstant" } },

@@ -881,5 +881,6 @@ return {
 	["Decoration.AutodiffParameterContextTypeDecoration"] = 905,
 	["DebugLexicalBlock"] = 906,
 	["Decoration.fileOrNamespaceScopeMutableVar"] = 907,
-	["Decoration.uninitializedGlobalCheckFoundPossibleWrite"] = 908
+	["Decoration.uninitializedGlobalCheckFoundPossibleWrite"] = 908,
+	["Decoration.noTargetCase"] = 909
 }

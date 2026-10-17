@@ -2251,8 +2251,10 @@ public:
     // Version 34 is the earliest module version with the updated AST node numbering.
     // Version 35 adds `IRUninitializedGlobalCheckFoundPossibleWriteDecoration`. Its stable opcode
     // is appended, so the reader can continue to load version-34 modules.
+    // Version 36 adds `IRNoTargetCaseDecoration`, also appended. It only appears in linked IR,
+    // which the host VM target serializes.
     const static UInt k_minSupportedModuleVersion = 34;
-    const static UInt k_maxSupportedModuleVersion = 35;
+    const static UInt k_maxSupportedModuleVersion = 36;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

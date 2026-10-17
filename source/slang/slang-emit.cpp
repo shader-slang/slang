@@ -115,6 +115,7 @@
 #include "slang-ir-specialize-matrix-layout.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-specialize-stage-switch.h"
+#include "slang-ir-specialize-target-switch.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-ssa.h"
@@ -2588,6 +2589,17 @@ Result linkAndOptimizeIR(
     // pure no-op and gating drops no diagnostic.
     if (requiredLoweringPassSet.lateRequireCapability)
         SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
+
+    // E41037 is reported here, after target legalization; see `specializeTargetSwitch` for why.
+    // `NoTargetCaseDecoration` is only added at link time, before the last
+    // `calcRequiredLoweringPassSet` scan, so the `missingReturn` flag covers it. We stop on an
+    // error because the remaining passes would lower code that cannot be generated.
+    if (requiredLoweringPassSet.missingReturn)
+    {
+        SLANG_PASS(diagnoseRemainingNoTargetCases, target, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
 
     SLANG_PASS(cleanUpVoidType);
 
