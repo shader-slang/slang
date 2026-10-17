@@ -10,13 +10,28 @@
 
 namespace Slang
 {
+// The block-param rule (`trySimplifyBlockParam` and the helpers it calls) uses these terms:
+//
+// - An *undefined* value is an `IRUndefined`: a `LoadFromUninitializedMemory` or a `Poison`. Any
+//   other value is *defined*.
+// - A *frozen* value is a `LoadFromUninitializedMemory`. Like LLVM's `freeze(undef)`, it yields one
+//   arbitrary but fixed value that is not poison, and distinct frozen values may differ.
+// - A frozen input of a param is *observed elsewhere* when it has a non-debug use other than the
+//   argument that a branch passes to that param. Only frozen inputs are checked, because a `Poison`
+//   is infectious and no use of it has to agree with the param.
+// - To *refine* a frozen value is to replace all of its uses with one chosen value, which
+//   `slang-ir-insts.lua` permits ("an optimization pass may freely decide on a particular value to
+//   use and replace all uses of the instruction with that value").
+// - *Correlation* holds when `p == a` is true on the `a` edge of `p = phi(a, ...)`. *Loop
+//   stability* holds when `p = phi(entry: a, backedge: p)` sees the same `a` on every iteration.
+
 /// Return whether every use of `value` other than a debug-info use is as the argument that a branch
 /// into `block` passes to the param at `paramIndex`.
 ///
-/// For a `LoadFromUninitializedMemory`, such uses do not observe which arbitrary value it yields
-/// except through that one param, so the param may be replaced by an independent fresh value
-/// without breaking correlation. Passing the same value to another param slot, on the same branch
-/// or another one, is another observing use.
+/// For a frozen value, such uses do not observe which arbitrary value it yields except through that
+/// one param, so the param may be replaced by an independent fresh value without breaking
+/// correlation. Passing the same value to another param slot, on the same branch or another one,
+/// is another observing use.
 static bool isUsedOnlyAsArgForParam(IRInst* value, IRBlock* block, UInt paramIndex)
 {
     for (auto use = value->firstUse; use; use = use->nextUse)
@@ -79,8 +94,8 @@ struct PeepholeContext : InstPassBase
     /// Return whether every use of `input`, a `LoadFromUninitializedMemory`, may instead use
     /// `value`.
     ///
-    /// `input` yields one arbitrary but defined value, so `value` must never be poison, must be
-    /// fixed for as long as `input` is, and must be visible at each use of `input`. A value that
+    /// `input` yields one arbitrary value that is not poison, so `value` must never be poison, must
+    /// be fixed for as long as `input` is, and must be visible at each use of `input`. A value that
     /// merely dominates `input` can still be poison on some path, as `select(c, 1, poison)` is when
     /// `c` is false. Refining to it would turn a path that only observed `input` into poison. We
     /// therefore accept only two kinds of value, both defined outside any function body and thus
@@ -112,10 +127,15 @@ struct PeepholeContext : InstPassBase
     }
 
     /// Forward `param`, whose incoming `values` are `definedValue` and undefined values, to
-    /// `definedValue`. A frozen input with uses beyond this param slot is also refined to
+    /// `definedValue`. A frozen input that is observed elsewhere is also refined to
     /// `definedValue`, so that those uses still agree with `param` on the edge that passes the
-    /// input. Prelinking runs forward without refining, so the front end still sees each
-    /// uninitialized value.
+    /// input.
+    ///
+    /// Prelinking runs forward without refining, so that the front end's uninitialized-use check
+    /// still sees each uninitialized value. That loses correlation for an observed input: for
+    /// `t = phi(5, a)` with `a` also read elsewhere, `t` becomes `5` while `a` stays independent.
+    /// This is a known limitation, tracked in https://github.com/shader-slang/slang/issues/13727,
+    /// so the correlation that `trySimplifyBlockParam` keeps holds only outside prelinking.
     bool tryForwardDefinedValue(
         IRParam* param,
         IRBlock* block,
@@ -151,35 +171,40 @@ struct PeepholeContext : InstPassBase
     }
 
     /// Simplify `param`, a block param, using the values that the predecessors of its block pass
-    /// to it. The param itself is never removed; at most its uses are replaced.
+    /// to it, and return whether any uses were replaced. The param itself is never removed.
     ///
-    /// A `LoadFromUninitializedMemory` is like LLVM's `freeze(undef)`: one arbitrary but fixed
-    /// value, which may differ from another instance. Consider:
+    /// Consider:
     ///
     ///     int p;
     ///     if (c) { int a; p = a; } else { int b; p = b; }
     ///
-    /// On the `a` edge `p` equals `a`. Replacing `p` with an independent fresh value is only valid
-    /// when nothing else observes `a` or `b`, which `isUsedOnlyAsArgForParam` checks. We consider
-    /// the distinct incoming values, ignoring `param` itself (a loop back edge):
+    /// On the `a` edge `p` equals `a`, so replacing `p` with an independent fresh value is only
+    /// valid when nothing else observes `a` or `b`. We collect the distinct incoming values,
+    /// ignoring `param` itself (a loop back edge), and decide by how many there are and how many
+    /// of them are defined:
     ///
-    /// - One distinct value is forwarded, including a frozen value that every edge shares. A loop
-    ///   header that receives `a` from the entry and itself from the back edge thus sees the same
-    ///   `a` on every iteration, and no value is created in the header.
-    /// - Otherwise, one distinct defined value `d` among undefined ones is forwarded. When a frozen
-    ///   input is also observed elsewhere, we also refine it to `d`, which
-    ///   `LoadFromUninitializedMemory` permits ("an optimization pass may freely decide on a
-    ///   particular value to use and replace all uses of the instruction with that value"). That
-    ///   keeps correlation: `p == a` becomes `d == d`. If `canRefineUninitializedValueTo` rejects
-    ///   the refinement, the param is kept.
-    /// - Otherwise, if every value is undefined and every frozen input is unobserved elsewhere, the
-    ///   param becomes one fresh `LoadFromUninitializedMemory` in the function's entry block. That
-    ///   block runs once per invocation and dominates every use, so the value is stable across
-    ///   loop iterations. Without this, phi elimination would create a local of the param's type,
-    ///   which Khronos targets reject for a texture.
+    /// - No value (an unreachable block, or a param fed only by itself): the param is kept.
+    /// - One distinct value: it is forwarded, including a frozen value that every edge shares. A
+    ///   loop header that receives `a` from the entry and itself from the back edge thus sees the
+    ///   same `a` on every iteration, and no value is created in the header. Prelinking keeps the
+    ///   param when that value is undefined.
+    /// - Two or more distinct defined values: the param is kept.
+    /// - One defined value `d` among undefined ones: `tryForwardDefinedValue` forwards the param
+    ///   to `d`. Outside prelinking, it also refines each frozen input that is observed elsewhere
+    ///   to `d`, which keeps correlation: `p == a` becomes `d == d`. If
+    ///   `canRefineUninitializedValueTo` rejects that refinement, the param is kept.
+    /// - Only undefined values: outside prelinking, and when no frozen input is observed
+    ///   elsewhere, the param becomes one fresh `LoadFromUninitializedMemory` in the function's
+    ///   entry block. That block runs once per invocation and dominates every use, so the value is
+    ///   stable across loop iterations. Without this, phi elimination would create a local of the
+    ///   param's type, which Khronos targets reject for a texture. The param is kept if its type
+    ///   is defined inside the function, because the entry block cannot refer to it.
     ///
-    /// Prelinking runs forward only defined values. The front end's uninitialized-use check runs
-    /// after them and reports each undefined value separately.
+    /// Forwarding also requires the value to be visible at `param` (`tryForwardParam`), and a
+    /// param without uses is never changed.
+    ///
+    /// Prelinking keeps undefined values apart because the front end's uninitialized-use check
+    /// runs after the prelinking runs and reports each undefined value separately.
     ///
     /// Slang's SSA form has no critical edges, so every predecessor of a block with params ends
     /// in an unconditional branch that passes one argument per param.
