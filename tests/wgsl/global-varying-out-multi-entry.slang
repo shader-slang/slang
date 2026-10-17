@@ -15,17 +15,23 @@ void writeColor(float v)
     gColor = float4(v, 0, 0, 1);
 }
 
-// WGSL: @location(0) gColor{{[A-Za-z0-9_]*}} : vec4<f32>
-// WGSL: fn fsA() -> [[RESULT_A:[A-Za-z0-9_]+]]
-// WGSL: return
-// WGSL: @location(0) gColor{{[A-Za-z0-9_]*}} : vec4<f32>
-// WGSL: fn fsB() -> [[RESULT_B:[A-Za-z0-9_]+]]
-// WGSL: return
+// WGSL: struct [[RESULT_A:[A-Za-z0-9_]+]]
+// WGSL-NEXT: {
+// WGSL-NEXT: @location(0) gColor{{[A-Za-z0-9_]*}} : vec4<f32>,
+// WGSL: fn fsA() -> [[RESULT_A]]
+// WGSL: struct [[RESULT_B:[A-Za-z0-9_]+]]
+// WGSL-NEXT: {
+// WGSL-NEXT: @location(0) gColor{{[A-Za-z0-9_]*}} : vec4<f32>,
+// WGSL: fn fsB() -> [[RESULT_B]]
 
-// METAL: {{\[\[}}color(0){{\]\]}}
-// METAL: {{\[\[}}fragment{{\]\]}} {{[A-Za-z0-9_]+}} fsA()
-// METAL: {{\[\[}}color(0){{\]\]}}
-// METAL: {{\[\[}}fragment{{\]\]}} {{[A-Za-z0-9_]+}} fsB()
+// METAL: struct [[RESULT_A:_S[0-9]+]]
+// METAL-NEXT: {
+// METAL-NEXT: {{\[\[}}color(0){{\]\]}}
+// METAL: {{\[\[}}fragment{{\]\]}} [[RESULT_A]] fsA()
+// METAL: struct [[RESULT_B:_S[0-9]+]]
+// METAL-NEXT: {
+// METAL-NEXT: {{\[\[}}color(0){{\]\]}}
+// METAL: {{\[\[}}fragment{{\]\]}} [[RESULT_B]] fsB()
 
 // SPIRV-DAG: OpEntryPoint Fragment %fsA "fsA" {{.*}}%entryPointParam_fsA_gColor
 // SPIRV-DAG: OpEntryPoint Fragment %fsB "fsB" {{.*}}%entryPointParam_fsB_gColor

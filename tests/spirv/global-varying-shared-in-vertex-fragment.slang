@@ -6,6 +6,8 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -whole-program
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -whole-program -entry fsB -stage fragment -entry vsA -stage vertex
+//TEST:SIMPLE(filecheck=VTX): -target spirv-asm -whole-program
+//TEST:SIMPLE(filecheck=VTX): -target spirv-asm -whole-program -entry fsB -stage fragment -entry vsA -stage vertex
 
 in uint gId;
 
@@ -14,7 +16,10 @@ uint readId() { return gId; }
 // CHECK-DAG: OpEntryPoint Vertex %vsA "vsA" {{.*}}%[[V_ID:gId[A-Za-z0-9_]*]]{{$}}
 // CHECK-DAG: OpEntryPoint Fragment %fsB "fsB" {{.*}}%[[F_ID:gId[A-Za-z0-9_]*]]{{$}}
 // CHECK-DAG: OpDecorate %[[F_ID]] Flat
-// CHECK-NOT: OpDecorate %[[V_ID]] Flat
+
+// Every `OpDecorate` follows the `OpEntryPoint` lines, so this negative check covers them all.
+// VTX: OpEntryPoint Vertex %vsA "vsA" {{.*}}%[[V_ID:gId[A-Za-z0-9_]*]]{{$}}
+// VTX-NOT: OpDecorate %[[V_ID]] Flat
 
 [shader("vertex")]
 float4 vsA() : SV_Position
