@@ -5029,19 +5029,7 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
     }
 
     if (decl->initExpr)
-    {
         decl->initExpr = CheckTerm(decl->initExpr);
-
-        // A default argument does not pass through generic-argument binding, so we check it here.
-        if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
-        {
-            diagnoseWriteOnlyAccessOutsideRefParam(
-                genericDecl,
-                decl->type.type,
-                tryConstantFoldExpr(decl->initExpr, ConstantFoldingKind::LinkTime, nullptr),
-                decl->initExpr);
-        }
-    }
 
     if (decl->initExpr && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
         checkForwardReferencesInGenericDecl(decl, decl->initExpr, nullptr);

@@ -1443,13 +1443,6 @@ err(
 )
 
 err(
-    "write-only-access-not-allowed",
-    30035,
-    "'Access.WriteOnly' is only valid for a reference parameter type",
-    span { loc = "arg:Expr", message = "'~generic:Decl' cannot use 'Access.WriteOnly'; it is only valid as the access of 'RefParam'." }
-)
-
-err(
     "non-addressable-type-in-structured-buffer",
     30031,
     "non-addressable type cannot be used in StructuredBuffer",

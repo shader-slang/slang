@@ -1352,9 +1352,6 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
     case AccessQualifier::Immutable:
         out << toSlice(", Access.Immutable");
         break;
-    case AccessQualifier::WriteOnly:
-        out << toSlice(", Access.WriteOnly");
-        break;
     default:
         break;
     }

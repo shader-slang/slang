@@ -594,14 +594,6 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     getType(m_astBuilder, valParamRef),
                     argFoldingKind,
                     context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
-                if (context.mode == OverloadResolveContext::Mode::ForReal)
-                {
-                    diagnoseWriteOnlyAccessOutsideRefParam(
-                        genericDeclRef.getDecl(),
-                        getType(m_astBuilder, valParamRef),
-                        val,
-                        arg);
-                }
             }
 
             // If any of the above checking steps fail and we don't

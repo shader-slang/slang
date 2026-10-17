@@ -1877,19 +1877,6 @@ public:
     DeclRefType* getExprDeclRefType(Expr* expr);
     LookupResult lookupConstructorsInType(Type* type, Scope* sourceScope);
 
-    /// Report E30035 at `argExpr` if `val`, the value bound to a generic value parameter of
-    /// type `paramType` of `genericDecl`, is `Access.WriteOnly` and `genericDecl` is not
-    /// `RefParam`.
-    ///
-    /// `Access.WriteOnly` describes only a `__ref_writeonly` parameter, which is represented as
-    /// `RefParam<T, Access.WriteOnly>`. Any other generic could use it to form a value, such as a
-    /// `Ptr`, that promises it is never read through, so we reject it where the argument binds.
-    void diagnoseWriteOnlyAccessOutsideRefParam(
-        GenericDecl* genericDecl,
-        Type* paramType,
-        Val* val,
-        Expr* argExpr);
-
     /// Is `decl` usable as a static member?
     bool isDeclUsableAsStaticMember(Decl* decl);
 
