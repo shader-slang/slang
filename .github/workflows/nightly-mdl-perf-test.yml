@@ -1,4 +1,4 @@
-name: Nightly MDL Perf Test
+name: Nightly Compile and Runtime Perf Test
 
 # Daily tip-of-tree compile-time sweep. Builds master HEAD on the dedicated
 # benchmark runner, runs the perf suite, stores the day's results in the
@@ -44,7 +44,7 @@ on:
         default: "false"
 
 concurrency:
-  group: nightly-mdl-perf-test
+  group: slang-performance-measurements
   cancel-in-progress: false # never cancel a running benchmark — timing must be clean
 
 env:
@@ -91,7 +91,10 @@ jobs:
           # suite root, so dropping it breaks --api backfills at bench time.
           sparse-checkout: |
             tools/compile-perf
+            tools/runtime-perf
+            external/slang-rhi
             include
+          submodules: recursive
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
@@ -244,6 +247,51 @@ jobs:
           python3 confirm.py measure --results "$GITHUB_WORKSPACE/perf-results" \
             --label "${PERF_LABEL:?}" --slangc "$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
 
+      # Both suites use this compiler build. Keep GPU measurements after all
+      # compile measurements/confirmation so CPU load cannot contaminate them.
+      - name: Build runtime benchmark runner
+        id: runtime-build
+        if: ${{ !cancelled() && steps.sweep.outputs.perf_label != '' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S "$SUITE/../runtime-perf" -B build/runtime-perf-nightly -A x64 \
+            -DSLANG_ROOT="$GITHUB_WORKSPACE/build/Release" \
+            -DSLANG_INCLUDE_DIR="$GITHUB_WORKSPACE/include" \
+            -DSLANG_RHI_ENABLE_VULKAN=ON -DSLANG_RHI_ENABLE_D3D12=ON \
+            -DSLANG_RHI_ENABLE_CUDA=ON -DSLANG_RHI_ENABLE_OPTIX=OFF
+          cmake --build build/runtime-perf-nightly --config Release --parallel 4
+
+      - name: Collect runtime results for the same nightly
+        id: runtime
+        if: ${{ !cancelled() && steps.sweep.outputs.perf_label != '' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          RUNTIME_BUILD_OUTCOME: ${{ steps.runtime-build.outcome }}
+        run: |
+          set -euo pipefail
+          RESULTS="$GITHUB_WORKSPACE/perf-results"
+          [ "$PUBLISH" = "true" ] || RESULTS="$GITHUB_WORKSPACE/bench-results"
+          failure=()
+          driver=""
+          gpu=""
+          if [ "$RUNTIME_BUILD_OUTCOME" != "success" ]; then
+            failure=(--failure "Runtime runner build failed; see workflow build log")
+          elif gpu=$(nvidia-smi --query-gpu=name,uuid,driver_version --format=csv,noheader) && [ "$(printf '%s\n' "$gpu" | wc -l)" -eq 1 ]; then
+            driver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader)
+          else
+            failure=(--failure "GPU identity unavailable or multiple GPUs present; explicit adapter configuration required")
+          fi
+          python "$SUITE/../runtime-perf/nightly.py" \
+            --results "$RESULTS" --label "$PERF_LABEL" \
+            --attempt "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --commit "$(git rev-parse HEAD)" --suite-commit "$(git -C "$SUITE" rev-parse HEAD)" \
+            --runner "$GITHUB_WORKSPACE/build/runtime-perf-nightly/Release/slang-runtime-perf.exe" \
+            --slangc "$GITHUB_WORKSPACE/build/Release/bin/slangc.exe" \
+            --driver-id "$driver" --environment-id "nightly-perf:$gpu" --references "${failure[@]}"
+
       - name: Archive original and confirmation measurements
         if: always() && env.PUBLISH == 'true' && steps.sweep.outputs.perf_label != ''
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -279,7 +327,7 @@ jobs:
             --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES"
 
       - name: Push results
-        if: env.PUBLISH == 'true'
+        if: ${{ !cancelled() && env.PUBLISH == 'true' && steps.sweep.outputs.perf_label != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -306,7 +354,7 @@ jobs:
       # shader-slang.org/slang-compile-perf. continue-on-error so a report
       # failure never blocks the trend check below.
       - name: Generate HTML reports
-        if: env.PUBLISH == 'true'
+        if: ${{ !cancelled() && env.PUBLISH == 'true' && steps.sweep.outputs.perf_label != '' }}
         continue-on-error: true
         shell: bash
         run: |
@@ -325,7 +373,7 @@ jobs:
           python3 sweep_report.py --results "$RESULTS" --publish "$RESULTS/analysis/sweep"
 
       - name: Checkout gh-pages branch
-        if: env.PUBLISH == 'true'
+        if: ${{ !cancelled() && env.PUBLISH == 'true' && steps.sweep.outputs.perf_label != '' }}
         continue-on-error: true
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -335,7 +383,7 @@ jobs:
           token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
 
       - name: Deploy HTML reports to GitHub Pages
-        if: env.PUBLISH == 'true'
+        if: ${{ !cancelled() && env.PUBLISH == 'true' && steps.sweep.outputs.perf_label != '' }}
         continue-on-error: true
         shell: bash
         env:
@@ -390,6 +438,17 @@ jobs:
             http."https://github.com/".extraheader 2>/dev/null || true
           git -C "$GITHUB_WORKSPACE/perf-pages" remote set-url origin \
             "https://github.com/${{ env.PERF_RESULTS_REPO }}.git" 2>/dev/null || true
+
+      - name: Enforce required runtime coverage
+        if: ${{ !cancelled() && steps.sweep.outputs.perf_label != '' }}
+        shell: bash
+        env:
+          RUNTIME_OUTCOME: ${{ steps.runtime.outcome }}
+        run: |
+          if [ "$RUNTIME_OUTCOME" != "success" ]; then
+            echo "::error::Runtime measurements failed or required coverage is missing. See the archived runtime run manifest."
+            exit 1
+          fi
 
   # Analysis and notification, deliberately NOT on the perf runner.
   #

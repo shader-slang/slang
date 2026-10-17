@@ -35,6 +35,109 @@ on Windows). See `README.md` Quickstart for copy-paste commands.
 
 ## CI workflows
 
+### Shared runtime reporting and schedule
+
+`nightly-mdl-perf-test.yml` collects the existing runtime suite after compile
+measurements and confirmation, using the same ToT build, commit, and daily label.
+It retains the daily 05:00 UTC schedule, results repository, manual dispatch, and
+Pages deployment. Nightly and release-sweep workflows share a concurrency group
+so their measurements cannot overlap. No separate scheduled publisher is added.
+
+`tools/runtime-perf/nightly.py` archives immutable attempts under
+`daily/<label>/runtime/<run-id>-<attempt>/`. `run.json` records compiler and suite
+commits, expected backend coverage, selected calibration, commands, and failures.
+Vulkan and D3D12 require all 23 cases; CUDA requires the 20 compute cases (OptiX is
+outside this suite). The first run calibrates on its actual GPU. Later runs reuse
+compatible dimensions; runtime comparisons reject incompatible environments,
+workloads, harnesses, RHI versions, scene contracts, or measurement policies.
+A setup failure produces a failed manifest rather than successful empty coverage.
+
+The existing `report.py` renders the **GPU runtime** section through
+`runtime_report.py`. The landing page is titled **Slang performance**; existing
+compile report URLs are preserved and **API & RT compilation** is labeled
+explicitly. The runtime landing page lists each subtest and its backends, linking to a page
+with daily and main-release graphs for that subtest. Each backend/cadence has two graphs: GPU execution time combines suite Slang,
+matched-run Slang and equivalent reference; compilation time combines paired CLI
+wall time and internal compiler time. Runtime curves label their element counts,
+and only matching dimensions support direct reference comparisons. Changed
+measurement contracts produce separate curves on the same axes, and failed/missing points break lines. Tooltips show exact values. Raw run
+pages retain dispersion, phase/setup observations and downloadable bundles.
+The nightly also runs the six existing equivalent reference cases after primary
+measurements. Those paired comparisons are separately calibrated within each run;
+primary daily comparisons use the frozen normal-suite calibration. No tuned
+candidate is silently promoted to a nightly target.
+
+Both publishing workflows regenerate the runtime section from archived data.
+Compile-only history needs no migration. Failed/unsupported/missing measurements
+remain visible; valid compile results survive runtime failures. `publish=false`
+archives both suites without changing the results repository or Pages. Runtime
+coverage is enforced after publication. Performance deltas are advisory until
+repeat measurements on the CI GPU establish suitable confirmation thresholds.
+The compile suite's existing alert policy is unchanged.
+
+The Windows measurement host needs GPU access, Vulkan and D3D12, a CUDA toolkit
+with `CUDA_PATH` pointing to NVRTC, and `dxc` and `glslangValidator` on PATH for
+references. The workflow verifies a single NVIDIA GPU and records its name, UUID,
+and driver. Runner labels do not prove the VM exposes these capabilities: setup
+or coverage failures remain failures, with diagnostics archived. RTX 4090 local
+results cannot serve as the RTX 5090 machine's calibration.
+
+### BenchView integration
+
+[PR #13625](https://github.com/shader-slang/slang/pull/13625) introduces submissions
+to the shared `slang` project with suite `compile-perf`. Extend that integration
+with suite `runtime-perf` after reconciling the two nightly workflow changes.
+This is a planned export contract; the runtime collector does not yet submit to
+BenchView. Reuse the adapter's transport, batching, artifact export and replay
+handling rather than maintaining another HTTP client.
+
+| Runtime data               | Planned BenchView representation                                                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Subtest                    | Stable test ID `runtime-perf/<workload>`                                                                                                                            |
+| Backend and implementation | Case dimensions for Vulkan/D3D12/CUDA and Slang/equivalent reference; reserve an explicit optimized-reference value for future frozen targets                       |
+| Measurement configuration  | Dimensions for element count, batch, source/harness/scene contract and suite versus matched-reference measurement; incompatible contracts must not become one trend |
+| GPU execution              | `runtime.gpu_iteration_ms`, milliseconds, lower is better, with the original per-execution samples                                                                  |
+| Paired compilation         | CLI wall and internal compiler samples on the same subtest, retaining individual stage identity for multi-stage workloads                                           |
+| Machine                    | Recorded host, GPU identity and driver; RTX 4090 and RTX 5090 must remain separate environments                                                                     |
+| Compiler and cadence       | Full tested compiler SHA in VCS provenance; daily runs omit release metadata, main releases use `run.metadata.release.label` as in #13625                           |
+| Execution                  | Original measurement timestamp and immutable attempt identity, with deterministic replay keys                                                                       |
+| Diagnostics                | Correctness/stability status, raw records, phase/setup observations and reference toolchain provenance in metadata/artifacts                                        |
+
+The intended BenchView view follows the HTML report: a runtime graph with Slang
+and reference curves, and a compilation graph with wall/internal curves, for each
+subtest/backend and daily/release cadence. Direct reference comparisons require
+matching dimensions; preserve the matched Slang samples even when the suite used
+a larger workload. Do not duplicate paired compilation for each reference
+implementation or treat one-time reference compilation as repeated compile data.
+
+Export actual sample distributions, never reconstructed samples from medians.
+GPU stage and host timings overlap and must not be exported as an additive phase
+breakdown. Failed, unstable or unsupported runtime observations retain their
+status/reason without publishing a successful timing curve; independently valid
+paired compile results remain exportable. Verify the service's supported status
+and environment fields before implementing the adapter. Honor its metric/request
+limits and retain overflow diagnostics in artifacts.
+
+Follow #13625's publication policy: export reviewable payloads, submit only on the
+publishing path with the configured write key, and surface submission failures
+without blocking the existing report. Release backfill uses the same adapter
+with explicit release metadata and original measurement provenance. Do not infer
+a release date from the measurement date or a compiler SHA from a display label.
+
+Acceptance requires an archived runtime/reference/compile fixture, deterministic
+replay and failed-case tests, API ingestion, and a check that the deployed
+BenchView UI can overlay the requested metrics and implementation dimensions in
+both daily and release views. #13625's compile ingestion validation alone does
+not establish those runtime visualization capabilities.
+
+Remaining reporting extensions are cached runtime measurements of the last five
+main releases (excluding patches), and
+independently confirmed, frozen optimized reference targets. These do not alter
+the current workload set. The previous local release study remains a separate
+artifact until compatible runtime release bundles are archived by CI. Runtime
+confirmation/gating must use measured CI noise and interleaved reruns, not reuse
+the 5% within-run stability allowance as a regression threshold.
+
 Both run on the dedicated, quiesced NVIDIA RGFX perf pool, reached through the
 VM-based GitHub bridge (labels `[Windows, X64, nvrgfx-perf-kernelvm-bridge]`;
 the pre-VM `nvrgfx` runner group + `nvrgfx-perf` label pair was retired
@@ -408,3 +511,18 @@ perf runner; only pursue if Phases 1–2 prove insufficient.
 ladder as the internal benchmark's data (2026.5.2, 2026.12, 2026.12.2,
 `f4975a7`) and confirm they reproduce both signals (the release-boundary jump
 and the 2026-07-03 step). If they do, the dimension is captured.
+
+### Runtime release archives
+
+The shared report reads both `daily/<label>/runtime/<attempt>/run.json` and
+`releases/<tag>/runtime/<attempt>/run.json`, with the same bundle layout. A runner
+built against a release package can archive a main-release point with
+`tools/runtime-perf/nightly.py --kind release --label vYYYY.N` and the normal
+collector arguments. Patch tags are rejected by the collector and excluded from
+release charts. Automated release-package backfill remains separate from rendering.
+
+Each subtest page shows the last 30 daily labels and the last five main-release
+tags available for its backend. Release tags are sorted numerically. The latest
+attempt for a label is shown, including a failed attempt; earlier attempts remain
+in the raw archive. Compilation charts keep individual image stages separate.
+One-time reference compilation is not plotted as a repeated compile benchmark.

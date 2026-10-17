@@ -1,7 +1,8 @@
 # Slang compile-time performance suite
 
 A harness that measures **compiler time** (how long `slangc` takes to compile),
-not GPU/runtime performance — built to **detect and localize compile-time
+with GPU/runtime measurements collected separately by `tools/runtime-perf` and
+published on the same report site. The compilation suite is built to **detect and localize compile-time
 regressions** and replay the measurement across historical Slang releases.
 
 Motivation: a compile-time slowdown was observed building Slang for Falcor.

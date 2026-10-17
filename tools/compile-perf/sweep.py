@@ -98,7 +98,8 @@ def main():
     all_wls = {w.name for w in manifest.WORKLOADS
                if (not w.platforms or sys.platform in w.platforms)
                and (args.api or w.mode != "api")
-               and not w.downstream_required}
+               and not w.downstream_required
+               and (args.only or not w.opt_in)}
     failures = []
     for i, rec in enumerate(ready, 1):
         tag = rec["tag"]

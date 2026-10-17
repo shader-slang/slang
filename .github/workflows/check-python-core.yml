@@ -1,17 +1,31 @@
 name: Check Python Scripts (Core Python Only)
 
 on:
+  workflow_dispatch:
+    inputs:
+      runtime-perf:
+        description: "Also build runtime-perf on Windows and run it on the Linux GPU pool"
+        type: boolean
+        default: false
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "extras/**/*.py"
       - "tools/compile-perf/**/*.py"
+      - "tools/runtime-perf/**/*.py"
       - ".github/workflows/check-python-core.yml"
   merge_group:
     types: [checks_requested]
 
 jobs:
+  runtime-perf:
+    if: github.event_name == 'workflow_dispatch' && inputs.runtime-perf
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/runtime-perf-test.yml
+
   check-python-core:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     strategy:
@@ -114,6 +128,9 @@ jobs:
       - name: Test compile-perf sampling, provenance and confirmation
         run: python3 -m unittest discover -s tools/compile-perf -p 'test_*.py'
 
+      - name: Check runtime-perf comparison and corpus contracts
+        run: python3 -m unittest discover -s tools/runtime-perf -p 'test_*.py'
+
   # The compile-perf suite's only Windows consumer is the scheduled nightly,
   # so a Windows-only defect in an import-time self-check merges green and
   # surfaces a day later as a lost data point rather than as a PR failure.
@@ -157,3 +174,6 @@ jobs:
 
       - name: Test compile-perf sampling, provenance and confirmation
         run: python -m unittest discover -s tools/compile-perf -p 'test_*.py'
+
+      - name: Check runtime-perf comparison and corpus contracts
+        run: python -m unittest discover -s tools/runtime-perf -p 'test_*.py'

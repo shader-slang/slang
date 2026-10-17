@@ -17,7 +17,8 @@ def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def line_panel(labels, series, title, unit="", width=620, height=300):
+def line_panel(labels, series, title, unit="", width=620, height=300, point_titles=None,
+               tick_format=".0f", show_legend=True):
     """One SVG panel: multiple line series over a shared categorical x axis.
 
     labels — x-axis category names (release tags / daily dates), evenly
@@ -25,10 +26,16 @@ def line_panel(labels, series, title, unit="", width=620, height=300):
     series — [(name, css_color, [value_or_None per label])]; None gaps split
     the polyline rather than interpolating through missing points.
     unit   — y-axis legend suffix (e.g. "MiB").
+    point_titles — optional full point labels for hover tooltips and markers.
+    show_legend — draw the inline legend; disable when the caller supplies one.
+    tick_format — numeric format for y-axis ticks (default integer labels).
 
     Y always starts at 0 so panel-to-panel comparisons stay honest.
     """
     pad_l, pad_r, pad_t, pad_b = 56, 10, 26, 34
+    if point_titles is not None:
+        # Full date/release labels and unit-bearing ticks need room at both ends.
+        pad_l, pad_r = 76, 76
     pw, ph = width - pad_l - pad_r, height - pad_t - pad_b
     vals = [v for _n, _c, vs in series for v in vs if v is not None]
     # The y domain always includes 0 (honest panel-to-panel comparison) and
@@ -45,7 +52,7 @@ def line_panel(labels, series, title, unit="", width=620, height=300):
     def y(v):
         return pad_t + ph * (1 - (v - bot) / (top - bot))
 
-    s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+    s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
          f'font-family="system-ui,sans-serif" font-size="10">']
     s.append(f'<text x="{pad_l}" y="15" font-size="12" font-weight="600" '
              f'fill="#333">{esc(title)}</text>')
@@ -55,21 +62,21 @@ def line_panel(labels, series, title, unit="", width=620, height=300):
         s.append(f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{width - pad_r}" y2="{gy:.1f}" '
                  f'stroke="#eee"/>')
         s.append(f'<text x="{pad_l - 4}" y="{gy + 3:.1f}" text-anchor="end" '
-                 f'fill="#666">{gv:.0f}{esc(unit)}</text>')
+             f'fill="#666">{format(gv, tick_format)}{esc(unit)}</text>')
     step = max(1, n // 6)
     for i, lab in enumerate(labels):
         if i % step == 0 or i == n - 1:
             s.append(f'<text x="{x(i):.1f}" y="{height - 8}" text-anchor="middle" '
                      f'fill="#666">{esc(str(lab))}</text>')
     lx = pad_l
-    for name, color, vs in series:
+    for series_index, (name, color, vs) in enumerate(series):
         run = []
 
         def flush(run):
             # A lone point (a gap on both sides, or a single-measurement
             # series — the first release with memory data) gets a visible
             # marker; a polyline needs two points and would draw nothing.
-            if len(run) == 1:
+            if len(run) == 1 and point_titles is None:
                 cx, cy = run[0].split(",")
                 s.append(f'<circle cx="{cx}" cy="{cy}" r="3" fill="{color}"/>')
             elif len(run) > 1:
@@ -82,10 +89,17 @@ def line_panel(labels, series, title, unit="", width=620, height=300):
                 run = []
                 continue
             run.append(f"{x(i):.1f},{y(v):.1f}")
+            if point_titles is not None:
+                # Hollow markers leave another series visible when values coincide.
+                fill = color if series_index == 0 else "none"
+                radius = 4 if series_index == 0 else 5 + series_index % 4
+                s.append(f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="{radius}" fill="{fill}" stroke="{color}" stroke-width="2">'
+                         f'<title>{esc(point_titles[i])} — {esc(name)}: {v:.4g} {esc(unit)}</title></circle>')
         flush(run)
-        s.append(f'<rect x="{lx}" y="{pad_t - 8}" width="9" height="9" fill="{color}"/>')
-        s.append(f'<text x="{lx + 12}" y="{pad_t}" fill="#444">{esc(name)}</text>')
-        lx += 14 + 7 * len(name)
+        if show_legend:
+            s.append(f'<rect x="{lx}" y="{pad_t - 8}" width="9" height="9" fill="{color}"/>')
+            s.append(f'<text x="{lx + 12}" y="{pad_t}" fill="#444">{esc(name)}</text>')
+            lx += 14 + 7 * len(name)
     s.append("</svg>")
     return "".join(s)
 
