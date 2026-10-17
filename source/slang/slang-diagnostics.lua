@@ -6196,6 +6196,27 @@ err(
     span { loc = "location", message = "mutable local storage contains an opaque value of type '~type:IRInst', which target '~target:CodeGenTarget' cannot represent; use or pass the resource value directly instead of assigning it to a mutable local or `static` variable" }
 )
 
+warning(
+    "texture-partial-write-is-read-modify-write",
+    56020,
+    "write to part of a texel reads the texel first, which is undefined after an earlier write in the same CUDA kernel launch",
+    span { loc = "location", message = "this write to part of a texel is lowered to a read of the whole texel followed by a write of the whole texel. On CUDA that read returns undefined data if the texel was already written earlier in the same kernel launch, so an earlier write to another component can be lost even within one thread. A concurrent write by another thread to another component of the texel can also be lost." }
+)
+
+err(
+    "cuda-surface-format-conversion-unavailable",
+    56021,
+    "CUDA surface access cannot convert this texture's format",
+    span { loc = "location", message = "this write to a texel is lowered to a CUDA surface ~access:String that converts between the texture's [format(...)] and its element type, which the CUDA prelude does not do correctly. It converts on read only from 'r16f', 'rg16f' and 'rgba16f', and has no converting read for array textures." }
+)
+
+err(
+    "cuda-surface-shape-unsupported",
+    56022,
+    "writes through a subscript of this texture shape are not supported on CUDA",
+    span { loc = "location", message = "this write to a texel is lowered to CUDA surface calls, which Slang spells only for 1D, 2D and 3D textures and 1D and 2D array textures." }
+)
+
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
