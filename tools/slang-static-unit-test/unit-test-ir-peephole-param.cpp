@@ -634,6 +634,8 @@ SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueIsBlockLocal)
 // function returns `a`, an arbitrary but defined value. Refining every use of `a` to `d` would
 // return poison there, so the param is kept. The same holds when `d` is a module-scope global
 // constant whose value is poison: it is visible everywhere and fixed, but not a constant literal.
+// The test relies on peephole not folding `select(c, 1, poison)` to `1`; if it ever did, `d` would
+// become a literal and the refinement would be valid.
 SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueMayBePoison)
 {
     for (bool isGlobalConstant : {false, true})
@@ -685,10 +687,10 @@ SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueMayBePoison)
     }
 }
 
-// A global shader parameter is bound by the application, has no operands that could carry poison,
+// A global shader parameter is set outside the shader, has no operands that could carry poison,
 // and is fixed for the whole invocation, so an observed frozen input is refined to it. A
-// specialization constant with a default value is excluded, because the default is an arbitrary
-// lowered expression; that param is kept.
+// specialization constant with a default value is excluded, because the default is a lowered
+// expression that may itself be poison; that param is kept.
 SLANG_UNIT_TEST(irPeepholeParamRefinesObservedInputToGlobalParam)
 {
     for (bool hasDefaultValue : {false, true})
@@ -730,11 +732,11 @@ SLANG_UNIT_TEST(irPeepholeParamRefinesObservedInputToGlobalParam)
     }
 }
 
-// The refinement is refused when the defined value can change while the frozen input stays fixed.
-// Here `a` is defined before a loop and `x` is computed in the loop header, which dominates the
-// merge param `p = phi(x, a)`. Forwarding `p` to `x` would need `a` to become `x`, but `x` changes
-// on each iteration while `a` must not, and `x` is not a value that is guaranteed to be non-poison
-// either, so the param is kept.
+// A value computed in a loop is not a refinement target: it is neither a literal nor a global
+// shader parameter. Here `a` is defined before a loop and `x` is computed in the loop header, which
+// dominates the merge param `p = phi(x, a)`. Refining `a` to `x` would also break loop stability,
+// because `x` changes on each iteration while `a` must not. The test guards against reintroducing
+// a dominance-based refinement route, and the param is kept.
 SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueVariesInLoop)
 {
     StaticUnitTestEnv env(unitTestContext);

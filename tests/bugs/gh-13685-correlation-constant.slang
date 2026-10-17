@@ -3,9 +3,9 @@
 // The constant variant of gh-13685-correlation.slang. Here `t` is `5` or the never-written `t`, and
 // `before` reads the never-written `t`, so `t == before` must hold whenever `c` is false. The
 // front end's prelinking peephole forwards the merge to `5` without refining the never-written
-// value, so the `!c` path compares `5` with an independent arbitrary value. Master behaves the same
-// way. Refining during prelinking would change the front end's uninitialized-use warnings, so the
-// test stays disabled until https://github.com/shader-slang/slang/issues/13727 is resolved.
+// value, so the `!c` path compares `5` with an independent arbitrary value. Refining during
+// prelinking would change the front end's uninitialized-use warnings, so the test stays disabled
+// until https://github.com/shader-slang/slang/issues/13727 is resolved.
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -Wno-41035 -xslang -Wno-41016
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -Wno-41035 -xslang -Wno-41016

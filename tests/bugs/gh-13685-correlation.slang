@@ -5,7 +5,9 @@
 // two reads still agree. Refinement only targets a value that cannot be poison, such as a constant.
 // Here `x` becomes the constant 7 only when the back end inlines `mergeAndCompare`, so the front end
 // keeps the merge and the back end refines the never-written `t` to 7. Since `before` reads that
-// same `t`, `t == before` must hold whenever `c` is false.
+// same `t`, `t == before` must hold whenever `c` is false. A literal `7` inside `mergeAndCompare`
+// would instead be forwarded by the front end without refinement; that case is
+// gh-13685-correlation-constant.slang (#13727).
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -Wno-41035
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -Wno-41035 -xslang -g
