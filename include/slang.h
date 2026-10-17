@@ -1359,6 +1359,10 @@ typedef uint32_t SlangSizeT;
 
         DiagnosticFormat = 162, // intValue0: SlangDiagnosticFormat (default, vs)
 
+        // `bool`: Enables additional backwards-compatibility features for legacy HLSL inputs,
+        // such as using uniform parameters as mutable temporaries. Has no effect on other dialects.
+        EnableExtendedHLSLBackwardsCompatibility = 163,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
@@ -6072,6 +6076,11 @@ SLANG_EXTERN_C SLANG_API void slang_shutdown();
    - SLANG_RECORD_LAYER=1: Enable recording on startup
    - SLANG_RECORD_PATH=<path>: Use the exact path specified for recording output
      instead of generating a timestamped folder under .slang-replays/
+
+   Thread safety: enable or disable the layer only when no other thread is inside a
+   Slang API call. Enable it once during startup (or via SLANG_RECORD_LAYER) before
+   issuing concurrent calls; changing the mode while other threads are mid-call is
+   not supported.
  */
 SLANG_EXTERN_C SLANG_API void slang_enableRecordLayer(bool enable);
 
