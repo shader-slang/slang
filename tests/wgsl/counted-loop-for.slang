@@ -107,6 +107,25 @@ uint usedAfterLoop(uint x)
     return i;
 }
 
+// A second variable is updated on the back edge and read after the loop: it keeps its
+// update in the body, and the loop counter still moves to the `for` header.
+// WGSL-LABEL: fn twoCounters
+// WGSL: for (var [[I:i_[0-9]+]] : i32 = i32(0); ; [[I]] = [[I]] + i32(1))
+// WGSL-NOT: [[I]] = [[I]] + i32(1);
+// WGSL: var [[T:k_[0-9]+]] : u32 = [[K:k_[0-9]+]] + u32(2);
+// WGSL-NEXT: [[K]] = [[T]];
+// WGSL: return
+uint twoCounters(uint x)
+{
+    uint k = 0;
+    for (int i = 0; i < 4; k += 2, i++)
+    {
+        if (buffer[i] == x)
+            break;
+    }
+    return k;
+}
+
 // No counter updated by a constant: the loop keeps its current shape.
 // WGSL-LABEL: fn halving
 // WGSL-NOT: for (
@@ -129,5 +148,5 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     uint x = buffer[tid.x];
     buffer[tid.x] = countUp(x) + countWithContinue(x) + countDown(x) + sharedIncrement(x) +
-                    nestedLoops(x) + usedAfterLoop(x) + halving(x);
+                    nestedLoops(x) + usedAfterLoop(x) + twoCounters(x) + halving(x);
 }
