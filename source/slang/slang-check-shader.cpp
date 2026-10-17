@@ -33,15 +33,30 @@ struct EntryPointParamDirections
     bool isOutput = false;
 };
 
+/// Get whether entry-point parameter `param` is a stage input, a stage output, or both.
+///
+/// `validateEntryPoint` rejects reference passing modes on entry-point parameters before it
+/// computes any directions, so only the value modes reach this function.
 static EntryPointParamDirections getEntryPointParamDirections(ParamDecl* param)
 {
-    const auto mode = getParamPassingMode(param);
     EntryPointParamDirections directions;
-    directions.isInput = doesParamPassingModeReadArgument(mode);
-    // `__ref_writeonly` is a reference, not a stage output. Both flags stay false for that
-    // mode, so its semantics are validated as an input and its diagnostics call it
-    // "input/output", the same as a `__ref` entry-point parameter.
-    directions.isOutput = mode == ParamPassingMode::Out || mode == ParamPassingMode::BorrowInOut;
+    switch (getParamPassingMode(param))
+    {
+    case ParamPassingMode::In:
+    case ParamPassingMode::BorrowIn:
+        directions.isInput = true;
+        break;
+    case ParamPassingMode::Out:
+        directions.isOutput = true;
+        break;
+    case ParamPassingMode::BorrowInOut:
+        directions.isInput = true;
+        directions.isOutput = true;
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled entry-point parameter passing mode");
+        break;
+    }
 
     // Mesh output types encode stage-output direction even when passed with mode In.
     Type* type = param->getType();
@@ -2018,6 +2033,29 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // An entry point receives values from the previous pipeline stage and passes values to the
+    // next one, so there is no caller's memory location for a reference parameter to bind to. We
+    // reject only the reference modes: a borrow such as `__constref` has value semantics and may
+    // be implemented by copying, so it remains valid here. The checks from here on, starting with
+    // system-value semantic validation, classify each parameter as a stage input, output, or
+    // both, so we stop after reporting every such parameter rather than have them add
+    // diagnostics for a parameter that is already invalid.
+    {
+        bool hasReferenceParam = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            const auto mode = getParamPassingMode(param);
+            if (isByReferenceParamPassingMode(mode))
+            {
+                sink->diagnose(
+                    Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
+                hasReferenceParam = true;
+            }
+        }
+        if (hasReferenceParam)
+            return;
+    }
+
     // The entry point's effective requirements, seeded from the decl's inferred set and augmented
     // at this boundary with two contributions the per-decl capability walk does not record: the
     // SV_ semantic-accessor requirements (walk just below) and the signature's generic-struct
@@ -2402,10 +2440,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.entryPointName = entryPointName;
             ctx.loc = param->loc;
             const auto directions = getEntryPointParamDirections(param);
-            const bool isByReference = isByReferenceParamPassingMode(getParamPassingMode(param));
-            ctx.direction = directions.isOutput ? (directions.isInput ? "input/output" : "output")
-                            : isByReference     ? "input/output"
-                                                : "input";
+            ctx.direction =
+                directions.isOutput ? (directions.isInput ? "input/output" : "output") : "input";
 
             StringBuilder contextSb;
             auto paramName = param->getName();

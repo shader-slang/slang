@@ -4811,6 +4811,13 @@ warning(
 )
 
 err(
+    "entry-point-param-has-reference-mode",
+    38054,
+    "entry-point parameter cannot use a reference passing mode",
+    span { loc = "param:Decl", message = "entry-point parameter '~param' cannot use the reference passing mode '~mode:ParamPassingMode', because an entry point exchanges values with the pipeline rather than with a caller's memory location" }
+)
+
+err(
     "int-val-from-non-int-spec-const-encountered",
     38041,
     "cannot cast non-integer specialization constant to integer",
