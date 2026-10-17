@@ -94,6 +94,8 @@ private:
 
     void _requireExtension(const UnownedStringSlice& name);
 
+    void emitFloatLitValue(IRFloatLit* litInst, BaseType baseType);
+
     bool m_f16ExtensionEnabled = false;
 
     RefPtr<ShaderExtensionTracker> m_extensionTracker;

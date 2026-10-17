@@ -31,24 +31,42 @@
 namespace Slang
 {
 
-// In WGSL, expression of "1.0/0.0" is not allowed, it will report compile error,
-// so to construct infinity or nan, we have to assign the float literal to a variable
-// and then use it to bypass the compile error.
+// WGSL has no NaN or infinity literal, and a const-expression such as `1.0 / 0.0` that evaluates to
+// one is a shader-creation error. These f32 and f16 helpers reinterpret the IEEE bit pattern held
+// in a `let`, which is a runtime expression rather than a const-expression; without the `let`,
+// `bitcast` of a literal is a const-expression and is rejected. We use bit patterns rather than a
+// runtime `0.0 / 0.0` because the NVIDIA Vulkan driver crashes creating a pipeline whose
+// function-local array holds such a division and is indexed at run time (issue #13658). See
+// `emitFloatLitValue` for where they are used.
 static const char* kWGSLBuiltinPreludeGetInfinity = R"(
 fn _slang_getInfinity(positive: bool) -> f32
 {
-    let a = select(f32(-1.0), f32(1.0), positive);
-    let b = f32(0.0);
-    return a / b;
+    let bits = select(0xff800000u, 0x7f800000u, positive);
+    return bitcast<f32>(bits);
 }
 )";
 
 static const char* kWGSLBuiltinPreludeGetNan = R"(
 fn _slang_getNan() -> f32
 {
-    let a = f32(0.0);
-    let b = f32(0.0);
-    return a / b;
+    let bits = 0x7fc00000u;
+    return bitcast<f32>(bits);
+}
+)";
+
+static const char* kWGSLBuiltinPreludeGetInfinityHalf = R"(
+fn _slang_getInfinityHalf(positive: bool) -> f16
+{
+    let bits = select(0xfc00u, 0x7c00u, positive);
+    return bitcast<vec2<f16>>(bits).x;
+}
+)";
+
+static const char* kWGSLBuiltinPreludeGetNanHalf = R"(
+fn _slang_getNanHalf() -> f16
+{
+    let bits = 0x7e00u;
+    return bitcast<vec2<f16>>(bits).x;
 }
 )";
 
@@ -1056,6 +1074,40 @@ void WGSLSourceEmitter::emitSimpleTypeAndDeclaratorImpl(IRType* type, Declarator
     emitSimpleType(type);
 }
 
+// Emit the value of float literal `litInst`, whose type is `half` or `float` (`baseType`). A
+// finite value is written with an `h` or `f` suffix. A NaN or infinity is written as a call to the
+// matching prelude helper (`_slang_getNan()`, `_slang_getInfinity(positive)` or their `Half`
+// counterparts), because WGSL cannot spell it as a literal. That call is a runtime expression, so
+// it is valid only where WGSL accepts one: not in a `const` declaration, a module-scope
+// `var<private>` initializer or an `override` default (issues #13658 and #13671).
+void WGSLSourceEmitter::emitFloatLitValue(IRFloatLit* litInst, BaseType baseType)
+{
+    SLANG_ASSERT(baseType == BaseType::Half || baseType == BaseType::Float);
+    const bool isHalf = baseType == BaseType::Half;
+    if (isHalf)
+        m_f16ExtensionEnabled = true;
+
+    switch (litInst->getFloatKind())
+    {
+    case IRConstant::FloatKind::Nan:
+        ensurePrelude(isHalf ? kWGSLBuiltinPreludeGetNanHalf : kWGSLBuiltinPreludeGetNan);
+        m_writer->emit(isHalf ? "_slang_getNanHalf()" : "_slang_getNan()");
+        break;
+    case IRConstant::FloatKind::PositiveInfinity:
+    case IRConstant::FloatKind::NegativeInfinity:
+        ensurePrelude(isHalf ? kWGSLBuiltinPreludeGetInfinityHalf : kWGSLBuiltinPreludeGetInfinity);
+        m_writer->emit(isHalf ? "_slang_getInfinityHalf(" : "_slang_getInfinity(");
+        m_writer->emit(
+            litInst->getFloatKind() == IRConstant::FloatKind::PositiveInfinity ? "true)"
+                                                                               : "false)");
+        break;
+    case IRConstant::FloatKind::Finite:
+        m_writer->emit(litInst->getValue());
+        m_writer->emit(isHalf ? "h" : "f");
+        break;
+    }
+}
+
 void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->getOp())
@@ -1171,42 +1223,11 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 default:
 
                 case BaseType::Half:
-                    {
-                        m_writer->emit(litInst->value.floatVal);
-                        m_writer->emit("h");
-                        m_f16ExtensionEnabled = true;
-                    }
+                    emitFloatLitValue(static_cast<IRFloatLit*>(inst), BaseType::Half);
                     break;
 
                 case BaseType::Float:
-                    {
-                        IRConstant::FloatKind kind = litInst->getFloatKind();
-                        switch (kind)
-                        {
-                        case IRConstant::FloatKind::Nan:
-                            {
-                                ensurePrelude(kWGSLBuiltinPreludeGetNan);
-                                m_writer->emit("_slang_getNan()");
-                                break;
-                            }
-                        case IRConstant::FloatKind::PositiveInfinity:
-                            {
-                                ensurePrelude(kWGSLBuiltinPreludeGetInfinity);
-                                m_writer->emit("_slang_getInfinity(true)");
-                                break;
-                            }
-                        case IRConstant::FloatKind::NegativeInfinity:
-                            {
-                                ensurePrelude(kWGSLBuiltinPreludeGetInfinity);
-                                m_writer->emit("_slang_getInfinity(false)");
-                                break;
-                            }
-                        default:
-                            m_writer->emit(litInst->value.floatVal);
-                            m_writer->emit("f");
-                            break;
-                        }
-                    }
+                    emitFloatLitValue(static_cast<IRFloatLit*>(inst), BaseType::Float);
                     break;
 
                 case BaseType::Double:
