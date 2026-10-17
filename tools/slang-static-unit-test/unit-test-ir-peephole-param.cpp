@@ -590,11 +590,10 @@ SLANG_UNIT_TEST(irPeepholeParamForwardsSingleDefinedValueAndRefinesObservedInput
     }
 }
 
-// The refinement requires the defined value to dominate the frozen input, so that each execution
-// of the input pairs with one value. Here the frozen input `a` comes first in the entry block and
-// the defined value `x` after it. `x` still dominates the merge param, so only the refinement
-// check keeps the param.
-SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueIsLaterThanInput)
+// The defined value may follow the frozen input in the same block, as long as it dominates every
+// use of the input. Here `a` comes first in the entry block and `x` after it, and every use of `a`
+// is in later blocks, so `a` is refined to `x`.
+SLANG_UNIT_TEST(irPeepholeParamRefinesInputToLaterValueInSameBlock)
 {
     StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder fixture(env.getSessionImpl());
@@ -618,6 +617,65 @@ SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueIsLaterThanInput)
     SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
 
     peepholeOptimize(getDefaultTargetProgram(env, "peepholeParamTargetY"), d.func);
+
+    SLANG_CHECK(isValidModule(fixture.getModule()));
+    SLANG_CHECK(eq->getOperand(0) == x);
+    SLANG_CHECK(eq->getOperand(1) == x);
+}
+
+// The refinement is refused when the defined value can change while the frozen input stays fixed.
+// Here `a` is defined before a loop and `x` is computed in the loop header, which dominates the
+// merge param `p = phi(x, a)`. Forwarding `p` to `x` would need `a` to become `x`, but `x` changes
+// on each iteration while `a` must not, so the param is kept.
+SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueVariesInLoop)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder fixture(env.getSessionImpl());
+    IRBuilder builder(fixture.getModule());
+    auto intType = builder.getIntType();
+
+    builder.setInsertInto(fixture.getModule());
+    auto func = builder.createFunc();
+    IRType* paramTypes[] = {builder.getBoolType()};
+    func->setFullType(builder.getFuncType(1, paramTypes, builder.getBoolType()));
+    builder.addKeepAliveDecoration(func);
+    builder.setInsertInto(func);
+    auto entry = builder.emitBlock();
+    auto c = builder.emitParam(builder.getBoolType());
+    auto header = builder.emitBlock();
+    auto left = builder.emitBlock();
+    auto right = builder.emitBlock();
+    auto merge = builder.emitBlock();
+    auto exit = builder.emitBlock();
+
+    builder.setInsertInto(entry);
+    auto a = builder.emitLoadFromUninitializedMemory(intType);
+    IRInst* entryArgs[] = {builder.getIntValue(intType, 0)};
+    builder.emitLoop(header, exit, header, 1, entryArgs);
+    builder.setInsertInto(header);
+    auto i = builder.emitParam(intType);
+    auto x = builder.emitAdd(intType, i, builder.getIntValue(intType, 1));
+    builder.emitIfElse(c, left, right, merge);
+    builder.setInsertInto(left);
+    IRInst* leftArgs[] = {x};
+    builder.emitBranch(merge, 1, leftArgs);
+    builder.setInsertInto(right);
+    IRInst* rightArgs[] = {a};
+    builder.emitBranch(merge, 1, rightArgs);
+    builder.setInsertInto(merge);
+    auto p = builder.emitParam(intType);
+    auto eq = builder.emitEql(p, a);
+    auto continueBlock = builder.emitBlock();
+    builder.setInsertInto(merge);
+    builder.emitIfElse(eq, exit, continueBlock, exit);
+    builder.setInsertInto(continueBlock);
+    IRInst* backArgs[] = {x};
+    builder.emitBranch(header, 1, backArgs);
+    builder.setInsertInto(exit);
+    builder.emitReturn(builder.getBoolValue(true));
+    SLANG_CHECK_ABORT(isValidModule(fixture.getModule()));
+
+    peepholeOptimize(getDefaultTargetProgram(env, "peepholeParamTargetZ"), func);
 
     SLANG_CHECK(isValidModule(fixture.getModule()));
     SLANG_CHECK(eq->getOperand(0) == p);

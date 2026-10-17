@@ -102,11 +102,25 @@ struct PeepholeContext : InstPassBase
         if (!parentFunc)
             return false;
         auto domTree = parentFunc->getModule()->findOrCreateDominatorTree(parentFunc);
-        return domTree->dominates(value, input);
+        if (domTree->dominates(value, input))
+            return true;
+        // `value` may also follow `input` in the same block, provided it dominates every use of
+        // `input`: each run of the block then produces one `input` and one `value`, and each use
+        // sees the pair from the latest run.
+        if (value->getParent() != input->getParent())
+            return false;
+        for (auto use = input->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (user == value || !as<IRBlock>(user->getParent()) ||
+                !domTree->dominates(value, user))
+                return false;
+        }
+        return true;
     }
 
     /// Forward `param`, whose incoming `values` are `definedValue` and undefined values, to
-    /// `definedValue`. A frozen input with uses beyond this param slot is first refined to
+    /// `definedValue`. A frozen input with uses beyond this param slot is also refined to
     /// `definedValue`, so that those uses still agree with `param` on the edge that passes the
     /// input. Prelinking runs forward without refining, so the front end still sees each
     /// uninitialized value.
@@ -161,7 +175,7 @@ struct PeepholeContext : InstPassBase
     ///   header that receives `a` from the entry and itself from the back edge thus sees the same
     ///   `a` on every iteration, and no value is created in the header.
     /// - Otherwise, one distinct defined value `d` among undefined ones is forwarded. When a frozen
-    ///   input is also observed elsewhere, we first refine it to `d`, which
+    ///   input is also observed elsewhere, we also refine it to `d`, which
     ///   `LoadFromUninitializedMemory` permits ("an optimization pass may freely decide on a
     ///   particular value to use and replace all uses of the instruction with that value"). That
     ///   keeps correlation: `p == a` becomes `d == d`. If `canRefineUninitializedValueTo` rejects
