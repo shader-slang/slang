@@ -717,7 +717,8 @@ SLANG_UNIT_TEST(irPeepholeParamRefinesObservedInputToGlobalParam)
 // The refinement is refused when the defined value can change while the frozen input stays fixed.
 // Here `a` is defined before a loop and `x` is computed in the loop header, which dominates the
 // merge param `p = phi(x, a)`. Forwarding `p` to `x` would need `a` to become `x`, but `x` changes
-// on each iteration while `a` must not, so the param is kept.
+// on each iteration while `a` must not, and `x` is not a value that is guaranteed to be non-poison
+// either, so the param is kept.
 SLANG_UNIT_TEST(irPeepholeParamKeepsParamWhenRefinementValueVariesInLoop)
 {
     StaticUnitTestEnv env(unitTestContext);

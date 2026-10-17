@@ -79,41 +79,30 @@ struct PeepholeContext : InstPassBase
     /// Return whether every use of `input`, a `LoadFromUninitializedMemory`, may instead use
     /// `value`.
     ///
-    /// An `input` yields one fixed value each time it executes, so `value` must be fixed over the
-    /// same span. That holds when `value` is outside every block (a constant or global) and in
-    /// scope at each use, or when `value` dominates `input`: each execution of `input` then follows
-    /// the `value` it pairs with, and every use of `input` is dominated by `input`. A `value`
-    /// computed inside a loop that `input` enters from outside would change between iterations, so
-    /// it does not qualify.
+    /// `input` yields one arbitrary but defined value, so `value` must never be poison, must be
+    /// fixed for as long as `input` is, and must be visible at each use of `input`. A value that
+    /// merely dominates `input` can still be poison on some path, as `select(c, 1, poison)` is when
+    /// `c` is false. Refining to it would turn a path that only observed `input` into poison. We
+    /// therefore accept only two kinds of value, both defined outside any function body and thus
+    /// fixed for the whole invocation:
+    ///
+    /// - A literal constant. `Poison` is its own opcode, not an `IRConstant`.
+    /// - A global shader parameter, which the application binds. A specialization constant with a
+    ///   default value is excluded, because that default is an arbitrary lowered expression.
     bool canRefineUninitializedValueTo(IRInst* input, IRInst* value)
     {
-        if (!as<IRBlock>(value->getParent()))
+        if (auto globalParam = as<IRGlobalParam>(value))
         {
-            for (auto use = input->firstUse; use; use = use->nextUse)
-            {
-                if (!isChildInstOf(use->getUser(), value->getParent()))
-                    return false;
-            }
-            return true;
+            if (globalParam->findDecoration<IRDefaultValueDecoration>())
+                return false;
         }
-        if (useFastAnalysis)
+        else if (!as<IRConstant>(value))
+        {
             return false;
-        auto parentFunc = getParentFunc(input);
-        if (!parentFunc)
-            return false;
-        auto domTree = parentFunc->getModule()->findOrCreateDominatorTree(parentFunc);
-        if (domTree->dominates(value, input))
-            return true;
-        // `value` may also follow `input` in the same block, provided it dominates every use of
-        // `input`: each run of the block then produces one `input` and one `value`, and each use
-        // sees the pair from the latest run.
-        if (value->getParent() != input->getParent())
-            return false;
+        }
         for (auto use = input->firstUse; use; use = use->nextUse)
         {
-            auto user = use->getUser();
-            if (user == value || !as<IRBlock>(user->getParent()) ||
-                !domTree->dominates(value, user))
+            if (!isChildInstOf(use->getUser(), value->getParent()))
                 return false;
         }
         return true;
