@@ -7,9 +7,13 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage fragment
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage fragment -g
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage fragment
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage fragment -g
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage fragment
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage fragment -g
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage fragment
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage fragment -g
 //TEST:SIMPLE(filecheck=MINOPT):-target spirv -entry main -stage fragment -minimum-slang-optimization -DNO_LOOP
+//TEST:SIMPLE(filecheck=MINOPT):-target spirv -entry main -stage fragment -minimum-slang-optimization -DNO_LOOP -g
 
 // SPIRV-NOT: {{E56004|E56019}}
 // SPIRV: OpEntryPoint
