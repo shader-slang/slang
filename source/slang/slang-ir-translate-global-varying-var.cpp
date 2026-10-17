@@ -23,55 +23,83 @@ static UInt getVaryingInputOffsetAfterParams(IRStructTypeLayout* paramsStructLay
     if (!lastFieldVarLayout)
         return 0;
 
+    // `usesResourceKind` means the field has a `VaryingInput` offset, and a field that occupies
+    // varying input locations also has a `VaryingInput` size.
     auto sizeAttr =
         lastFieldVarLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::VaryingInput);
     auto offsetAttr = lastFieldVarLayout->findOffsetAttr(LayoutResourceKind::VaryingInput);
-    if (!sizeAttr || !offsetAttr)
-        return 0;
+    SLANG_RELEASE_ASSERT(sizeAttr && offsetAttr);
     return sizeAttr->getFiniteSize() + (UInt)offsetAttr->getOffset();
 }
 
-/// Return true if the address `addr`, or an address derived from it by field or element access,
-/// is passed to a function parameter that must be bound to a shader input variable. Consider:
+/// Return true if the module-scope input `input` is passed to a function parameter that must be
+/// bound to a shader input variable. Consider:
 ///
 ///     in float4 vColor;
-///     float4 rd() { return interpolateAtCentroid(vColor); }
+///     float4 readColor() { return interpolateAtCentroid(vColor); }
 ///
 /// `interpolateAtCentroid` carries `RequireShaderInputParameterDecoration(0)`, and its argument is
-/// the address of `vColor`, so this returns true for `vColor`.
-static bool isAddressPassedToShaderInputParameter(IRInst* addr)
+/// `vColor` itself, so this returns true for `vColor`. Lowering reports E31208 for any argument of
+/// such a parameter that is not a module-scope input, so only direct uses need to be checked.
+static bool isPassedToShaderInputParameter(IRInst* input)
 {
-    for (auto use = addr->firstUse; use; use = use->nextUse)
+    for (auto use = input->firstUse; use; use = use->nextUse)
     {
-        auto user = use->getUser();
-        if (auto call = as<IRCall>(user))
-        {
-            auto callee = getResolvedInstForDecorations(call->getCallee());
-            auto requirement = callee->findDecoration<IRRequireShaderInputParameterDecoration>();
-            if (requirement &&
-                use == call->getArgs() + requirement->getParameterIndex()->getValue())
-                return true;
-        }
-        else if (as<IRFieldAddress>(user) || as<IRGetElementPtr>(user))
-        {
-            if (isAddressPassedToShaderInputParameter(user))
-                return true;
-        }
+        auto call = as<IRCall>(use->getUser());
+        if (!call)
+            continue;
+        auto callee = getResolvedInstForDecorations(call->getCallee());
+        auto requirement = callee->findDecoration<IRRequireShaderInputParameterDecoration>();
+        if (requirement && use == call->getArgs() + requirement->getParameterIndex()->getValue())
+            return true;
     }
     return false;
+}
+
+/// How the translation of a module-scope input is shared between the entry points that reach it.
+///
+/// - `SingleEntryPoint`: one entry point reaches the input. It receives the input as a parameter,
+///   and on GLSL/SPIR-V `legalizeEntryPointParameterForGLSL` replaces the global with that
+///   entry point's input variable.
+/// - `SharedPrivate`: several entry points reach the input. Each of them receives its own
+///   parameter and stores it into the global, which stays a private variable.
+/// - `SharedInterpolant`: the input is passed to an interpolation function such as
+///   `interpolateAtCentroid`, which reads its argument through the address of a real input
+///   variable. The first entry point in module order that reaches it owns it as in the
+///   `SingleEntryPoint` case, and every other entry point that reaches it gets no parameter and
+///   reads the owner's input variable once the global is replaced by it. The choice of owner does
+///   not change the output, because we require every entry point to place the input at the same
+///   location (E58004 otherwise).
+enum class GlobalInputSharing
+{
+    SingleEntryPoint,
+    SharedPrivate,
+    SharedInterpolant,
+};
+
+/// Return how the translation of the module-scope input `input` is shared between the entry
+/// points that reach it, as recorded in `referencingEntryPoints` before any entry point is
+/// rewritten.
+static GlobalInputSharing classifyGlobalInput(
+    IRInst* input,
+    Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints)
+{
+    if (isPassedToShaderInputParameter(input))
+        return GlobalInputSharing::SharedInterpolant;
+    if (referencingEntryPoints.getValue(input).getCount() == 1)
+        return GlobalInputSharing::SingleEntryPoint;
+    return GlobalInputSharing::SharedPrivate;
 }
 
 struct GlobalVarTranslationContext
 {
     CodeGenContext* context;
 
-    /// The stage and `VaryingInput` location at which an entry point would read a module-scope
-    /// input. `location` is unused for an input with a system-value semantic, which has no
-    /// location.
+    /// The `VaryingInput` location at which an entry point would read a module-scope input.
+    /// `location` is unused for an input with a semantic, which is not placed by location.
     struct InterpolantInputPlacement
     {
-        Stage stage;
-        bool hasSystemValueSemantic;
+        bool hasSemantic;
         UInt location;
     };
 
@@ -88,11 +116,9 @@ struct GlobalVarTranslationContext
     InterpolantInputPlacement getInterpolantInputPlacement(IRInst* input, IRFunc* entryPoint)
     {
         InterpolantInputPlacement placement;
-        placement.stage =
-            entryPoint->findDecoration<IREntryPointDecoration>()->getProfile().getStage();
-        placement.hasSystemValueSemantic = input->findDecoration<IRSemanticDecoration>() != nullptr;
+        placement.hasSemantic = input->findDecoration<IRSemanticDecoration>() != nullptr;
         placement.location = 0;
-        if (placement.hasSystemValueSemantic)
+        if (placement.hasSemantic)
             return placement;
 
         if (auto layoutDecor = entryPoint->findDecoration<IRLayoutDecoration>())
@@ -118,15 +144,12 @@ struct GlobalVarTranslationContext
         IRFunc* entryPoint)
     {
         auto placement = getInterpolantInputPlacement(input, entryPoint);
-        bool samePlacement =
-            placement.stage == owner.placement.stage &&
-            (placement.hasSystemValueSemantic || placement.location == owner.placement.location);
-        if (samePlacement)
+        if (placement.hasSemantic || placement.location == owner.placement.location)
             return;
         context->getSink()->diagnose(Diagnostics::SharedGlobalInterpolantInputMismatch{
             .inst = input,
             .entryPoint = entryPoint,
-            .firstEntryPoint = owner.entryPoint,
+            .ownerEntryPoint = owner.entryPoint,
             .location = input->sourceLoc});
     }
 
@@ -135,7 +158,7 @@ struct GlobalVarTranslationContext
         Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
         buildEntryPointReferenceGraph(referencingEntryPoints, module);
 
-        List<IRInst*> entryPoints;
+        List<IRFunc*> entryPoints;
         List<IRInst*> getWorkGroupSizeInsts;
 
         // Traverse the module to find all entry points.
@@ -144,7 +167,7 @@ struct GlobalVarTranslationContext
         for (auto inst : module->getGlobalInsts())
         {
             if (inst->getOp() == kIROp_Func && inst->findDecoration<IREntryPointDecoration>())
-                entryPoints.add(inst);
+                entryPoints.add(cast<IRFunc>(inst));
             else if (inst->getOp() == kIROp_GetWorkGroupSize)
                 getWorkGroupSizeInsts.add(inst);
         }
@@ -156,22 +179,17 @@ struct GlobalVarTranslationContext
         // module, and each of them classifies and lays out the varying by reading the
         // `GlobalInput`/`GlobalOutput`, semantic and layout decorations on the global. We
         // therefore copy those decorations onto every entry point's struct key and remove them
-        // from the global only once all entry points have been processed, which leaves the
-        // global as an undecorated variable, as later passes expect.
+        // from the global only once all entry points have been processed. That leaves a global
+        // that is not replaced by an input variable as an ordinary global variable without a
+        // layout, which the C-like emitters assert (`emitGlobalVar` in slang-emit-c-like.cpp).
         HashSet<IRInst*> translatedGlobalVars;
 
-        // An interpolation function such as `interpolateAtCentroid` reads its argument through
-        // the address of a real shader input variable, so a module-scope input whose address is
-        // passed to one cannot become a private copy that each entry point initializes. Such an
-        // input belongs to the first entry point that reaches it: that entry point receives it
-        // as a parameter, and every other entry point reads the same input variable through the
-        // shadowing relationship established below. Sharing one input variable is only valid if
-        // every entry point would assign it the same stage and location, which we check here.
+        // The owners of `GlobalInputSharing::SharedInterpolant` inputs, keyed by input. An entry
+        // point that reaches an input already in this map gets no parameter for it.
         Dictionary<IRInst*, InterpolantInputOwner> interpolantInputOwners;
 
-        for (auto entryPoint : entryPoints)
+        for (auto entryPointFunc : entryPoints)
         {
-            auto entryPointFunc = as<IRFunc>(entryPoint);
             List<IRInst*> outputVars;
             List<IRInst*> inputVars;
             for (auto inst : module->getGlobalInsts())
@@ -199,9 +217,6 @@ struct GlobalVarTranslationContext
             bool hasOutput = outputVars.getCount() != 0;
 
             if (!hasInput && !hasOutput)
-                continue;
-
-            if (!entryPointFunc)
                 continue;
 
             auto entryPointDecor = entryPointFunc->findDecoration<IREntryPointDecoration>();
@@ -371,16 +386,11 @@ struct GlobalVarTranslationContext
 #endif
                 builder.emitStore(input, builder.emitLoad(newParams[i]));
 
-                // The shadowing decoration tells `legalizeEntryPointParameterForGLSL` that
-                // `input` is another name for this parameter, and that pass then replaces every
-                // use of `input` in the module with this entry point's input variable. That is
-                // only valid when this is the only entry point that reaches `input` (the entry
-                // point reference graph is built once, before any entry point is rewritten), or
-                // when `input` must be a real input variable that all of its entry points share.
-                // A global shared by several entry points otherwise stays a private variable that
-                // each entry point initializes with the store above.
-                bool isInterpolantInput = isAddressPassedToShaderInputParameter(input);
-                if (isInterpolantInput)
+                // The shadowing decoration makes `legalizeEntryPointParameterForGLSL` replace
+                // every use of `input` in the module with this entry point's input variable, so
+                // it is only added when no other entry point needs its own copy of `input`.
+                auto sharing = classifyGlobalInput(input, referencingEntryPoints);
+                if (sharing == GlobalInputSharing::SharedInterpolant)
                 {
                     interpolantInputOwners.add(
                         input,
@@ -388,7 +398,7 @@ struct GlobalVarTranslationContext
                             entryPointFunc,
                             getInterpolantInputPlacement(input, entryPointFunc)});
                 }
-                if (isInterpolantInput || referencingEntryPoints.getValue(input).getCount() == 1)
+                if (sharing != GlobalInputSharing::SharedPrivate)
                     builder.addGlobalVariableShadowingGlobalParameterDecoration(
                         newParams[i],
                         input,
@@ -400,7 +410,7 @@ struct GlobalVarTranslationContext
             if (hasOutput)
             {
                 // If we have global outputs, the entry-point must not return anything itself.
-                if (as<IRFuncType>(entryPoint->getDataType())->getResultType()->getOp() !=
+                if (as<IRFuncType>(entryPointFunc->getDataType())->getResultType()->getOp() !=
                     kIROp_VoidType)
                 {
                     context->getSink()->diagnose(

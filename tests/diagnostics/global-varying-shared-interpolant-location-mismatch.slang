@@ -9,7 +9,7 @@ import glsl;
 
 in float4 vColor;
 //CHECK:  ^^^^^^ error E58004
-//CHECK:  ^^^^^^ 'fsB' would place it at a different location or stage than 'fsA'
+//CHECK:  ^^^^^^ 'fsB' would place it at a different location than 'fsA'
 
 float4 readColor() { return interpolateAtCentroid(vColor); }
 

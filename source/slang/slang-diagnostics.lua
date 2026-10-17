@@ -6338,8 +6338,8 @@ err(
 err(
     "shared-global-interpolant-input-mismatch",
     58004,
-    "global input passed to an interpolation function has a different location in another entry point",
-    span { loc = "location", message = "module-scope input '~inst:IRInst' is passed to an interpolation function, so the entry points that reach it must share one input variable, but '~entryPoint:IRInst' would place it at a different location or stage than '~firstEntryPoint:IRInst'; declare it as an entry-point parameter or compile these entry points separately." }
+    "global input passed to an interpolation function has different locations in its entry points",
+    span { loc = "location", message = "module-scope input '~inst:IRInst' is passed to an interpolation function, so the entry points that reach it must share one input variable, but '~entryPoint:IRInst' would place it at a different location than '~ownerEntryPoint:IRInst'; compile these entry points separately." }
 )
 
 -- Autodiff checkpoint reporting notes (-1)
