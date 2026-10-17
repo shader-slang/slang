@@ -29388,6 +29388,29 @@ T getDescriptorFromExplicitHeapIndex<T:IOpaqueDescriptor>(uint2 handle)
     return getDescriptorFromHandle(DescriptorHandle<T>(handle));
 }
 
+/// Look up a descriptor in the WGSL resource table of Chromium's
+/// `chromium_experimental_resource_table` extension: `getResource<T>(index)`.
+/// The resource table holds sampled textures (including depth and multisampled textures) and
+/// samplers. Storage textures, buffers and combined texture-samplers cannot be looked up in it,
+/// so they are rejected at compile time instead of producing WGSL that Tint refuses.
+/// `[__readNone]` keeps the call at its use site: WGSL cannot store a texture or a sampler in a
+/// function-scope `var`.
+__wgsl_extension(chromium_experimental_resource_table)
+[ForceInline]
+[__readNone]
+[require(wgsl, wgsl_chromium_experimental_resource_table)]
+T __wgslGetResourceFromTable<T:IOpaqueDescriptor>(uint index)
+{
+    static_assert(T.kind == DescriptorKind.Sampler
+                  || (T.kind == DescriptorKind.Texture && T.descriptorAccess == DescriptorAccess.Read),
+                  "the WGSL resource table (chromium_experimental_resource_table) only holds sampled textures and samplers; "
+                  "storage textures, buffers and combined texture-samplers cannot be accessed through a DescriptorHandle on WGSL");
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "getResource<$TR>($0)";
+    }
+}
+
 /// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
 /// to a descriptor object.
 [ForceInline]
@@ -29409,6 +29432,9 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
         return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    case wgsl_chromium_experimental_resource_table:
+        // The handle is the resource-table index; `.y` is unused.
+        return __wgslGetResourceFromTable<T>(((uint2)handleValue).x);
     case spvBindlessTextureNV:
         if (__isBindlessTextureNVEncodable<T>())
             return __castDescriptorHandleToResource<T>(handleValue);
