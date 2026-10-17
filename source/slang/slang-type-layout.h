@@ -1563,6 +1563,11 @@ struct TypeLayoutContext
     // their linked in definitions during layout generation
     std::optional<Dictionary<String, Type*>> externTypeMap;
 
+    /// Resolve all link-time dependencies before computing layout or varying bindings.
+    Type* resolveLinkTimeType(DeclRefType* type);
+
+    // Return the selected export wrapper, or the input if no export is selected. This does
+    // not unwrap aliases; resolveLinkTimeType uses the wrapper's checked proof before unwrapping.
     Type* lookupExternDeclRefType(DeclRefType* declRefType);
     void buildExternTypeMap();
 
