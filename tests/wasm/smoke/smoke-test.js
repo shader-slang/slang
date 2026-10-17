@@ -183,15 +183,17 @@ async function runSmokeTest() {
         }
         const optionsModule = optionsSession.loadModuleFromSource(
             'import helper;\n' +
+            '[require(spirv)] uint spirvOnly() { return 1; }\n' +
             'RWStructuredBuffer<uint> outputBuffer;\n' +
             '[shader("compute")] [numthreads(1, 1, 1)]\n' +
-            'void computeMain() { outputBuffer[0] = helperValue() * 1000 + MAIN_VALUE * 10 + OPTION_VALUE; }\n',
+            'void computeMain() { outputBuffer[0] = helperValue() * 1000 + MAIN_VALUE * 10 + OPTION_VALUE + spirvOnly(); }\n',
             'session-options', '/session-options/main.slang');
         if (!optionsModule) {
             const error = module.getLastError();
             throw new Error(`Session options: failed to load module: ${error ? error.message : 'Unknown error'}`);
         }
-        // The module only compiles if all three macros reached it and `helper` was found.
+        // The module only compiles if all three macros reached it, `helper` was found, and
+        // IgnoreCapabilities applied (`spirvOnly` is not available on WGSL without it).
         const optionsProgram = optionsSession.createCompositeComponentType([optionsModule]).link();
         const wgsl = optionsProgram ? optionsProgram.getTargetCode(0) : '';
         if (!wgsl || !wgsl.includes('@compute')) {
