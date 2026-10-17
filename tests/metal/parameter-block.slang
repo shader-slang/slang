@@ -96,14 +96,14 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     // CHECK: {{.*}}->buffer{{.*}}
     outputBuffer[0] = simpleBlock.buffer[0];
     
-    // CHECK: arrayBlock{{.*}}->data{{.*}}[int(1)]{{.*}}buffer
+    // CHECK: arrayBlock{{.*}}->data{{.*}}[int(1)])->buffer
     ResourceStruct fromArray = arrayBlock[1];
     outputBuffer[1] = fromArray.buffer[1];
         
     // CHECK: complexBlock{{.*}}->nested{{.*}}->data{{.*}}[int(1)])->resources{{.*}})->data{{.*}}[int(1)])->buffer{{.*}}
     outputBuffer[3] = complexBlock.nested[1].resources[1].buffer[3];
     
-    // CHECK: {{.*}}arrayComplexBlock{{.*}}->data{{.*}}[int(0)])->nested{{.*}})->data{{.*}}[int(2)])->resources{{.*}})->data{{.*}}[int(0)]{{.*}}buffer
+    // CHECK: {{.*}}arrayComplexBlock{{.*}}->data{{.*}}[int(0)])->nested{{.*}})->data{{.*}}[int(2)])->resources{{.*}})->data{{.*}}[int(0)])->buffer
     ComplexStruct complexFromArray = arrayComplexBlock[0];
     outputBuffer[4] = complexFromArray.nested[2].resources[0].buffer[4];
     
@@ -111,7 +111,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     outputBuffer[5] = complexBlock.directBuffer[5];
     
     // Test parameter block accessed via a local variable
-    // CHECK: nestedBlock{{.*}}->resource{{.*}}buffer_0
+    // CHECK: nestedBlock{{.*}}->resource{{.*}})->buffer_0
     ResourceStruct resStruct = nestedBlock.resource;
     outputBuffer[6] = resStruct.buffer[2];
 

@@ -1192,15 +1192,18 @@ struct LoweredElementTypeContext
         return config;
     }
 
-    // Returns true if `value` is available at `pos`: it is not a local instruction,
-    // or it comes earlier in the same block.
-    static bool isAvailableBefore(IRInst* value, IRInst* pos)
+    // Returns true if `value` is defined before `pos` in the same block, or is not defined in
+    // a block at all (a global, constant or key). This is a conservative dominance check: a
+    // value from a dominating block, or a parameter of the entry block when `pos` is in a
+    // later block, is reported as unavailable. Callers then fall back to a path that does not
+    // need `value` at `pos`.
+    static bool isDefinedBeforeInSameBlock(IRInst* value, IRInst* pos)
     {
         if (!as<IRBlock>(value->getParent()))
             return true;
         if (value->getParent() != pos->getParent())
             return false;
-        for (auto inst = value; inst; inst = inst->getNextInst())
+        for (auto inst = value->getNextInst(); inst; inst = inst->getNextInst())
         {
             if (inst == pos)
                 return true;
@@ -1208,54 +1211,99 @@ struct LoweredElementTypeContext
         return false;
     }
 
-    // `load(castStorageToLogical(addr))` whose only uses are `fieldExtract`/`getElement`
-    // on the loaded value: replace each extract with
-    // `load(gep(castStorageToLogical(addr), key))`, emitted where the original load was so
-    // the memory access happens at the same point. This avoids copying the whole composite
-    // into a temp var when only some of its members are needed (e.g. `push.b[i]` on a large
-    // uniform struct).
+    // Replace `extract`, a `fieldExtract` or `getElement` of a value that `ptrVal` holds in
+    // storage layout, with `load(gep(castStorageToLogical(ptrVal), key))`, emitted at the
+    // builder's insertion point. `logicalPtrType` is the type of the logical address.
+    void replaceExtractWithMemberLoad(
+        IRBuilder& builder,
+        IRType* logicalPtrType,
+        IRInst* ptrVal,
+        IRMakeStorageTypeLoweringConfig* layoutConfig,
+        IRInst* extract,
+        List<IRCastStorageToLogicalBase*>& castInstWorkList)
+    {
+        auto castAddr = builder.emitCastStorageToLogical(logicalPtrType, ptrVal, layoutConfig);
+        IRInst* gep = nullptr;
+        if (extract->getOp() == kIROp_GetElement)
+            gep = builder.emitElementAddress(castAddr, extract->getOperand(1));
+        else
+            gep = builder.emitFieldAddress(castAddr, extract->getOperand(1));
+        auto memberLoad = builder.emitLoad(gep);
+        extract->replaceUsesWith(memberLoad);
+        extract->removeAndDeallocate();
+        if (auto castStorage = as<IRCastStorageToLogical>(castAddr))
+            castInstWorkList.add(castStorage);
+    }
+
+    // Try to replace `load`, a plain load of the composite at `castInst`
+    // (`castStorageToLogical(ptrVal)`), with loads of only the members its users read.
+    //
+    // This applies when every use of the loaded value is a `fieldExtract` or `getElement` of
+    // it. Each extract is then replaced with `load(gep(castStorageToLogical(ptrVal), key))`,
+    // and `load` is removed. Returns true if it did that, and pushes the new casts onto
+    // `castInstWorkList`; otherwise changes nothing.
+    //
+    // The member loads are all emitted where `load` was, so memory is read at the same point
+    // of the program as before; they read a subset of the bytes `load` read, so no other
+    // write can come in between. This avoids copying the whole composite into a temporary
+    // when only some of its members are needed (e.g. `push.b[i]` on a large uniform struct).
+    //
+    // It does not apply, and the caller keeps the whole load, when:
+    // - `load` has an alignment or memory-scope attribute, which describes the whole access
+    //   and cannot be carried over to a member at another offset (as in `deferBufferLoadInst`);
+    // - a `getElement` index is not defined before `load`, since the new address is built at
+    //   `load` (`fieldExtract` keys are global and always available);
+    // - a `getElement` with a non-constant index is in another block than `load`: emitting its
+    //   load at `load` would read the element even on paths where the program does not (for
+    //   example when the index is checked first), which can be out of bounds.
     bool tryReplaceLoadWithPartialLoads(
         IRBuilder& builder,
         IRLoad* load,
-        IRCastStorageToLogicalBase* castInst,
+        IRCastStorageToLogical* castInst,
         IRInst* ptrVal,
         List<IRCastStorageToLogicalBase*>& castInstWorkList)
     {
-        if (!load || !load->hasUses())
+        SLANG_ASSERT(castInst->getOperand(0) == ptrVal && load->getPtr() == castInst);
+        if (!load->hasUses())
             return false;
+        for (auto attr : load->getAllAttrs())
+        {
+            if (as<IRAlignedAttr>(attr) || as<IRMemoryScopeAttr>(attr))
+                return false;
+        }
         for (auto use = load->firstUse; use; use = use->nextUse)
         {
             auto extract = use->getUser();
             if (extract->getOp() != kIROp_FieldExtract && extract->getOp() != kIROp_GetElement)
                 return false;
-            if (use != extract->getOperands())
+            if (!isUseBaseAddrOperand(use, extract))
                 return false;
-            if (extract->getOp() == kIROp_GetElement &&
-                !isAvailableBefore(extract->getOperand(1), load))
-                return false;
+            if (extract->getOp() == kIROp_GetElement)
+            {
+                auto index = extract->getOperand(1);
+                if (!isDefinedBeforeInSameBlock(index, load))
+                    return false;
+                if (!as<IRIntLit>(index) && extract->getParent() != load->getParent())
+                    return false;
+            }
         }
 
         List<IRInst*> extracts;
         for (auto use = load->firstUse; use; use = use->nextUse)
             extracts.add(use->getUser());
 
+        // `castInst` is a pointer, so its type is the logical address type, including its
+        // address space.
         builder.setInsertBefore(load);
         for (auto extract : extracts)
         {
-            auto castAddr = builder.emitCastStorageToLogical(
+            replaceExtractWithMemberLoad(
+                builder,
                 castInst->getFullType(),
                 ptrVal,
-                castInst->getLayoutConfig());
-            IRInst* gep = nullptr;
-            if (extract->getOp() == kIROp_GetElement)
-                gep = builder.emitElementAddress(castAddr, extract->getOperand(1));
-            else
-                gep = builder.emitFieldAddress(castAddr, extract->getOperand(1));
-            auto partialLoad = builder.emitLoad(gep);
-            extract->replaceUsesWith(partialLoad);
-            extract->removeAndDeallocate();
-            if (auto castStorage = as<IRCastStorageToLogical>(castAddr))
-                castInstWorkList.add(castStorage);
+                castInst->getLayoutConfig(),
+                extract,
+                castInstWorkList);
         }
         load->removeAndDeallocate();
         return true;
@@ -1438,6 +1486,10 @@ struct LoweredElementTypeContext
                                 // Note that it is important to introduce a temp var and preserve
                                 // the buffer load operation, so we are not changing the memory
                                 // semantics of the original program.
+                                // - A plain load whose value is only taken apart is replaced by
+                                //   loads of the members that are used, all at the point of the
+                                //   original load (see `tryReplaceLoadWithPartialLoads`), so the
+                                //   memory is still read once, at the same place.
                                 if (!isUseBaseAddrOperand(use, user))
                                     break;
                                 // If loaded value is itself a pointer or buffer,
@@ -1451,16 +1503,6 @@ struct LoweredElementTypeContext
                                 // a simple type.
                                 if (!isCompositeType(user->getDataType()))
                                     break;
-                                // If the loaded value is only taken apart with field/element
-                                // extracts, load just those parts instead of copying the
-                                // whole composite into a temp var.
-                                if (tryReplaceLoadWithPartialLoads(
-                                        builder,
-                                        as<IRLoad>(user),
-                                        castInst,
-                                        ptrVal,
-                                        castInstWorkList))
-                                    break;
                                 IRInst* tempVar = nullptr;
                                 if (as<IRLoad>(user))
                                 {
@@ -1468,6 +1510,24 @@ struct LoweredElementTypeContext
                                     if (rootAddr->findDecorationImpl(
                                             kIROp_TempCallArgImmutableVarDecoration))
                                         tempVar = ptrVal;
+                                }
+                                // A plain load from memory (an immutable temp var needs no copy
+                                // and is handled below) whose value is only taken apart: load
+                                // just the members that are used instead of copying the whole
+                                // composite into a temp var. Structured-buffer loads and
+                                // `Consume` keep the copy.
+                                if (!tempVar)
+                                {
+                                    auto load = as<IRLoad>(user);
+                                    auto ptrCast = as<IRCastStorageToLogical>(castInst);
+                                    if (load && ptrCast &&
+                                        tryReplaceLoadWithPartialLoads(
+                                            builder,
+                                            load,
+                                            ptrCast,
+                                            ptrVal,
+                                            castInstWorkList))
+                                        break;
                                 }
                                 TypeLoweringConfig newLoweringConfig = config;
                                 builder.setInsertBefore(user);
@@ -1564,21 +1624,16 @@ struct LoweredElementTypeContext
                                     break;
                                 // elementExtract(castStorageToLogicalDeref(addr), key)
                                 // ==> load(gep(castStorageToLogical(addr), key)
+                                // `castInst` is a value here, so the logical address gets a
+                                // pointer to its type.
                                 builder.setInsertBefore(user);
-                                auto castAddr = builder.emitCastStorageToLogical(
+                                replaceExtractWithMemberLoad(
+                                    builder,
                                     builder.getPtrType(castInst->getDataType()),
                                     ptrVal,
-                                    castInst->getLayoutConfig());
-                                IRInst* gep = nullptr;
-                                if (user->getOp() == kIROp_GetElement)
-                                    gep = builder.emitElementAddress(castAddr, user->getOperand(1));
-                                else
-                                    gep = builder.emitFieldAddress(castAddr, user->getOperand(1));
-                                auto load = builder.emitLoad(gep);
-                                user->replaceUsesWith(load);
-                                user->removeAndDeallocate();
-                                if (auto castStorage = as<IRCastStorageToLogical>(castAddr))
-                                    castInstWorkList.add(castStorage);
+                                    castInst->getLayoutConfig(),
+                                    user,
+                                    castInstWorkList);
                                 break;
                             }
                         case kIROp_Store:
