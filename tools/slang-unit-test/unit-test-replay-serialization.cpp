@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-serialization.cpp
 // Unit tests for basic type serialization round-trips
 
@@ -844,3 +845,4 @@ SLANG_UNIT_TEST(replayContextTypeMismatch)
     }
     SLANG_CHECK(caughtException);
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

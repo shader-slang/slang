@@ -237,6 +237,12 @@ void ASTCloner::cloneField(QualType& dst, QualType const& src)
     dst = rewriteQualType(src);
 }
 
+void ASTCloner::cloneField(ParamInfo& dst, ParamInfo const& src)
+{
+    dst = src;
+    dst.type = rewriteType(src.type);
+}
+
 void ASTCloner::cloneField(TypeExp& dst, TypeExp const& src)
 {
     dst = cloneTypeExp(src);

@@ -2110,6 +2110,31 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // GLSL puts `layout(early_fragment_tests) in;` on a standalone EmptyDecl beside the entry
+    // point, not on the function; lift it onto the fragment entry point as the canonical
+    // EarlyDepthStencilAttribute (as the local_size_* -> NumThreadsAttribute lift below does).
+    // Resolve the scope with getParentDecl, not the raw parentDecl: a *specialized* generic
+    // fragment entry point's immediate parent is the GenericDecl, not the module scope holding the
+    // EmptyDecl, so the raw parentDecl would miss the marker and silently drop the mode. Require
+    // the `in` direction: the qualifier is input-only, so `out;`/bare forms stay inert.
+    if (stage == Stage::Fragment && !entryPointFuncDecl->findModifier<EarlyDepthStencilAttribute>())
+    {
+        if (auto parentDecl = getParentDecl(entryPointFuncDecl))
+        {
+            for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+            {
+                if (emptyDecl->findModifier<GLSLLayoutEarlyFragmentTestsAttribute>() &&
+                    emptyDecl->findModifier<InModifier>())
+                {
+                    addModifier(
+                        entryPointFuncDecl,
+                        getCurrentASTBuilder()->create<EarlyDepthStencilAttribute>());
+                    break;
+                }
+            }
+        }
+    }
+
     // For compute, mesh, and amplification (task) entry points using GLSL
     // syntax, the thread group size is specified via layout(local_size_x = N)
     // on a sibling EmptyDecl rather than via [numthreads] on the entry point
@@ -2799,11 +2824,41 @@ Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
     return paramType;
 }
 
+ParamInfo getParamInfo(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
+{
+    ParamInfo result;
+    result.type = getParamValueType(astBuilder, paramDeclRef);
+    result.mode = getParamPassingMode(paramDeclRef.getDecl());
+    return result;
+}
+
 Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
-    auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
-    auto paramMode = getParamPassingMode(paramDeclRef.getDecl());
-    return getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
+    return getParamTypeWithModeWrapper(astBuilder, getParamInfo(astBuilder, paramDeclRef));
+}
+
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, ParamInfo const& paramInfo)
+{
+    SLANG_RELEASE_ASSERT(paramInfo.type);
+    // The mode is encoded by the wrapper this function adds; accepting a wrapped value type would
+    // give one parameter two independently encoded modes.
+    SLANG_RELEASE_ASSERT(!as<ParamPassingModeType>(paramInfo.type));
+    switch (paramInfo.mode)
+    {
+    case ParamPassingMode::In:
+        return paramInfo.type;
+    case ParamPassingMode::BorrowIn:
+        return astBuilder->getConstRefParamType(paramInfo.type);
+    case ParamPassingMode::Out:
+        return astBuilder->getOutParamType(paramInfo.type);
+    case ParamPassingMode::BorrowInOut:
+        return astBuilder->getBorrowInOutParamType(paramInfo.type);
+    case ParamPassingMode::Ref:
+        return astBuilder->getRefParamType(paramInfo.type);
+    default:
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        UNREACHABLE_RETURN(paramInfo.type);
+    }
 }
 
 Type* getParamTypeWithModeWrapper(
@@ -2811,22 +2866,7 @@ Type* getParamTypeWithModeWrapper(
     Type* paramValueType,
     ParamPassingMode paramMode)
 {
-    switch (paramMode)
-    {
-    case ParamPassingMode::In:
-        return paramValueType;
-    case ParamPassingMode::BorrowIn:
-        return astBuilder->getConstRefParamType(paramValueType);
-    case ParamPassingMode::Out:
-        return astBuilder->getOutParamType(paramValueType);
-    case ParamPassingMode::BorrowInOut:
-        return astBuilder->getBorrowInOutParamType(paramValueType);
-    case ParamPassingMode::Ref:
-        return astBuilder->getRefParamType(paramValueType);
-    default:
-        SLANG_UNEXPECTED("unhandled parameter-passing mode");
-        UNREACHABLE_RETURN(paramValueType);
-    }
+    return getParamTypeWithModeWrapper(astBuilder, ParamInfo{paramValueType, paramMode});
 }
 
 void Module::_collectShaderParams(DiagnosticSink* sink)

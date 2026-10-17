@@ -32,6 +32,9 @@ public:
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault)
         SLANG_OVERRIDE;
 
+    // Prefer WGSL's native `loop` spelling for structured unconditional loops.
+    virtual char const* getUnconditionalLoopHeader() SLANG_OVERRIDE { return "loop"; }
+
     // WGSL doesn't support fall-through in switch statements
     virtual bool supportsSwitchFallThrough() SLANG_OVERRIDE { return false; }
 

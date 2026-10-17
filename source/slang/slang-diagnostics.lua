@@ -351,6 +351,49 @@ warning(
 )
 
 err(
+    "unsupported-serialized-module-version",
+    130,
+    "cannot load IR module version ~actualVersion; this compiler supports IR module versions ~minimumVersion through ~maximumVersion",
+    span { loc = "location" }
+)
+
+warning(
+    "ignoring-unsupported-serialized-module-version",
+    131,
+    "ignoring IR module version ~actualVersion because this compiler supports IR module versions ~minimumVersion through ~maximumVersion; regenerate or remove the serialized module",
+    span { loc = "location" }
+)
+
+err(
+    "unsupported-serialized-module-format-version",
+    132,
+    "cannot load serialized module format version ~actualVersion; regenerate the serialized module with this compiler",
+    span { loc = "location" }
+)
+
+warning(
+    "ignoring-unsupported-serialized-module-format-version",
+    133,
+    "ignoring unsupported serialized module format version ~actualVersion; regenerate or remove the serialized module",
+    span { loc = "location" }
+)
+
+warning(
+    "deprecated-msvc-style-bitfield-packing",
+    134,
+    "`-msvc-style-bitfield-packing` is deprecated: it packs bitfields MSB-first, unlike MSVC "
+        .. "on little-endian platforms. Use `-bitfield-packing-rules legacy-msb-first-msvc` "
+        .. "for the same packing behavior, or `-bitfield-packing-rules msvc` for MSVC bitfield "
+        .. "packing"
+)
+
+err(
+    "conflicting-bitfield-packing-rules-options",
+    135,
+    "`-msvc-style-bitfield-packing` cannot be combined with `-bitfield-packing-rules`"
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",
@@ -506,6 +549,12 @@ err(
     "unable-to-set-default-downstream-compiler",
     87,
     "unable to set default downstream compiler for source language '~language' to '~compiler'"
+)
+
+standalone_note(
+    "module-format-not-finalized",
+    88,
+    "the Slang module file format is not yet finalized and is not versioned across compiler releases; a compiled Slang module can only be loaded by the exact same Slang compiler version that produced it"
 )
 
 err("expecting-slang-riff-container", 89, "expecting a slang riff container")
@@ -1421,6 +1470,20 @@ err(
     span { loc = "expr:Expr", message = "'~name:Name' is not a member of '~type:Type'." }
 )
 
+standalone_note(
+    "suggest-constraint-for-missing-member",
+    30032,
+    "consider adding a constraint such as 'where ~genericParam:Name : ~interfaceName:Name', since '~member:Name' is declared by that interface",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "suggest-generic-interface-constraint-for-missing-member",
+    30033,
+    "consider constraining '~genericParam:Name' to interface '~interfaceName:Name', since '~member:Name' is declared by that interface",
+    span { loc = "location" }
+)
+
 err(
     "argument-expected-lvalue",
     30047,
@@ -1527,6 +1590,27 @@ err(
 )
 
 err(
+    "receiver-param-mode-specifier-without-receiver-param",
+    30428,
+    "receiver-mode specifier requires an instance receiver",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is only allowed on an instance member that has a `this` parameter." }
+)
+
+err(
+    "receiver-param-mode-specifier-on-class-member",
+    30429,
+    "receiver-mode specifier is not allowed on a class member",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is not allowed on a class member; a class receiver always uses the `in` parameter-passing mode." }
+)
+
+err(
+    "cpp-style-trailing-receiver-param-const-requires-hlsl",
+    30443,
+    "trailing `const` is only allowed in the HLSL dialect",
+    span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`)." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
@@ -1618,10 +1702,31 @@ err(
 )
 
 err(
-    "global-var-cannot-have-opaque-type",
+    "opaque-type-not-supported-for-mutable-static",
     30076,
-    "global variable cannot have opaque type",
-    span { loc = "decl:Decl", message = "global variable cannot have opaque type." }
+    "opaque type is not supported for mutable static storage",
+    span { loc = "decl:Decl", message = "mutable file- or namespace-scope `static` variable '~decl' has the opaque type '~type:Type', which cannot be represented by mutable storage" }
+)
+
+err(
+    "mutable-global-requires-addressable-type",
+    30088,
+    "mutable global variable requires an addressable type",
+    span { loc = "decl:Decl", message = "a mutable static global variable requires an addressable type." }
+)
+
+err(
+    "opaque-type-not-supported-for-mutable-global-storage",
+    30089,
+    "opaque type is not supported for mutable global storage",
+    span { loc = "location", message = "mutable global storage cannot contain an opaque value of type '~type:IRInst'" }
+)
+
+err(
+    "unsized-type-in-mutable-global-storage",
+    30074,
+    "mutable global variable has an unsized type",
+    span { loc = "location", message = "a mutable global variable cannot have the unsized type '~type:IRInst'" }
 )
 
 err(
@@ -2155,7 +2260,7 @@ err(
 )
 
 err(
-    "generic-argument-does-not-satisfy-constraint",
+    "generic-argument-does-not-satisfy-constraint", -- span message kept in sync with note E40023
     30440,
     "generic constraint not satisfied",
     span { loc = "location", message = "could not satisfy the generic constraint '~constraint:String'" }
@@ -3092,7 +3197,7 @@ warning(
     "deprecated-usage",
     31200,
     "use of deprecated declaration",
-    span { loc = "location", message = "~declName:Name has been deprecated: ~message" }
+    span { loc = "location", message = "~decl:Decl has been deprecated: ~message" }
 )
 
 err(
@@ -3141,7 +3246,7 @@ err(
     "removed-usage",
     31207,
     "use of removed declaration",
-    span { loc = "location", message = "~declName:Name has been removed since language version '~sinceVersion:Int': ~message" }
+    span { loc = "location", message = "~decl:Decl has been removed since language version '~sinceVersion:Int': ~message" }
 )
 
 err(
@@ -4055,6 +4160,27 @@ err(
 )
 
 err(
+    "set-accessor-param-cannot-have-default-value",
+    31163,
+    "a 'set' parameter cannot have a default value",
+    span { loc = "initExpr:Expr", message = "the value passed to a 'set' accessor is always supplied by an assignment" }
+)
+
+err(
+    "set-accessor-param-must-be-input-only",
+    31164,
+    "a 'set' parameter must be input-only",
+    span { loc = "param:Decl", message = "'set' parameter '~param' has parameter-passing mode '~mode:ParamPassingMode'; only 'in' and immutable-borrow modes are allowed" }
+)
+
+err(
+    "subscript-param-must-be-input-only",
+    31165,
+    "a subscript parameter must be input-only",
+    span { loc = "param:Decl", message = "subscript parameter '~param' has parameter-passing mode '~mode:ParamPassingMode'; only 'in' and immutable-borrow modes are allowed" }
+)
+
+err(
     "accessor-does-not-satisfy-type-constraint-requirements",
     31110,
     "accessor does not satisfy type constraint requirements",
@@ -4076,6 +4202,13 @@ err(
     31301,
     "bit-field type must be integral",
     span { loc = "location", message = "bit-field type (~type:Type) must be an integral type" }
+)
+
+err(
+    "zero-width-bit-field-unsupported-in-msvc-packing",
+    31302,
+    "zero-width bit fields are not supported by `-bitfield-packing-rules msvc`",
+    span { loc = "location", message = "this zero-width bit field has no defined MSVC packing behavior in Slang" }
 )
 
 --
@@ -4173,6 +4306,26 @@ standalone_note(
     "overload-candidate-argument-type-mismatch",
     40018,
     "argument ~argIndex:Int does not match: expected '~expectedType:Type', got '~actualType:Type'",
+    span { loc = "location" }
+)
+
+-- Note-severity companions to the E38029 / E30440 constraint-failure errors, attached to the
+-- "no overload applicable" error for a rejected generic candidate. The DSL binds severity at
+-- definition time, so a note cannot reuse an error's text; each message string below is
+-- intentionally identical to the *span* message of E38029 / E30440 respectively (not that error's
+-- top-level header) and MUST be kept in sync — rewording either error's span message should update
+-- its companion note here (and vice versa).
+standalone_note(
+    "overload-candidate-type-argument-does-not-conform", -- keep in sync with E38029's span message
+    40022,
+    "type argument '~typeArg:Type' does not conform to the required interface '~interface:Type'",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "overload-candidate-generic-constraint-not-satisfied", -- keep in sync with E30440's span message
+    40023,
+    "could not satisfy the generic constraint '~constraint:String'",
     span { loc = "location" }
 )
 
@@ -4438,6 +4591,12 @@ err(
     span { loc = "location", message = "generic entry point '~entryPoint:Name' must be specialized with concrete generic arguments (e.g. via '-specialize' or 'addEntryPointEx'); an unspecialized generic entry point cannot be compiled" }
 )
 
+err(
+    "entry-point-index-out-of-range",
+    38015,
+    "entry point index ~entryPointIndex:int is out of range; the program's entry-point count is ~entryPointCount:int"
+)
+
 
 -- Load semantic checking diagnostics (part 10) - Interface Requirements, Global Generics, Differentiation, Modules
 -- (inlined from slang-diagnostics-semantic-checking-10.lua)
@@ -4574,7 +4733,7 @@ err(
 )
 
 err(
-    "type-argument-does-not-conform-to-interface",
+    "type-argument-does-not-conform-to-interface", -- span message kept in sync with note E40022
     38029,
     "type argument doesn't conform to interface",
     span { loc = "location", message = "type argument '~typeArg:Type' does not conform to the required interface '~interface:Type'" }
@@ -5050,6 +5209,13 @@ err(
     span { loc = "location", message = "loop does not terminate within the limited number of iterations, unrolling is aborted." }
 )
 
+err(
+    "conditional-has-value-not-constant",
+    40024,
+    "Conditional hasValue is not a compile-time constant",
+    span { loc = "location", message = "the 'hasValue' argument of 'Conditional<T, hasValue>' must be a compile-time constant by code generation" }
+)
+
 fatal(
     "function-never-returns-fatal",
     40030,
@@ -5092,6 +5258,13 @@ err(
     41009,
     "non-void function must return",
     span { loc = "location", message = "non-void function must return in all cases for target '~targetName'" }
+)
+
+err(
+    "missing-return-not-allowed-in-slang-202c",
+    40025,
+    "non-void function must return in Slang 202c and later",
+    span { loc = "location", message = "non-void function must return in all cases in Slang 202c and later" }
 )
 
 warning(
@@ -5687,6 +5860,13 @@ err(
     "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
 )
 
+err(
+    "type-not-representable-by-interpreter",
+    52014,
+    "type has no HostVM layout; use 'NativeString' for a null-terminated string, or compile for a host target",
+    span { loc = "location", message = "'~type:IRInst' has no HostVM layout and cannot be used at runtime" }
+)
+
 warning(
     "mesh-output-must-be-out",
     54001,
@@ -5916,6 +6096,104 @@ warning(
     56005,
     "'precise' qualifier is not supported on target '~target' and will be ignored; Slang does not currently preserve it in generated code, so the value may be optimized with fused/contracted arithmetic",
     span { loc = "location" }
+)
+
+err(
+    "mutable-resource-used-by-function-without-rewritable-call",
+    56006,
+    "mutable resource state is unavailable to a function whose invocations cannot all be rewritten",
+    span { loc = "location", message = "function '~function:IRInst' may be invoked without a direct call that Slang can rewrite, so Slang cannot automatically pass the resource that it accesses; pass the resource explicitly instead" }
+)
+
+err(
+    "mutable-resource-has-conflicting-call-aliases",
+    56007,
+    "mutable resource state cannot be passed by reference and accessed by name when either path may modify it",
+    span { loc = "location", message = "mutable resource variable '~variable:IRInst' is passed by reference to function '~function:IRInst', which also accesses the resource by name, and at least one of those paths may modify it; pass the resource through only one path" }
+)
+
+err(
+    "mutable-resource-requires-module-scope-storage",
+    56008,
+    "mutable resource variable must remain in module-scope storage",
+    span { loc = "location", message = "mutable resource variable '~variable:IRInst' must remain in module-scope storage because it is externally accessible or explicitly retained; Slang cannot replace it with function-local storage" }
+)
+
+err(
+    "mutable-resource-address-has-unsupported-use",
+    56009,
+    "address use may observe the identity of mutable resource storage",
+    span { loc = "location", message = "the program may retain the address of mutable resource variable '~variable:IRInst' or observe its storage identity; replacing the variable with function-local storage might change that behavior" }
+)
+
+err(
+    "mutable-resource-used-by-entry-point-with-unrewritable-invocation",
+    56010,
+    "entry point may be invoked through a path that cannot receive mutable resource state",
+    span { loc = "location", message = "entry point '~function:IRInst' accesses mutable resource state and may be invoked through another path for which Slang cannot add generated resource arguments; move the shared implementation to an ordinary function and pass the resource explicitly" }
+)
+
+err(
+    "mutable-resource-used-outside-function",
+    56011,
+    "mutable resource variable is used by executable code outside a function",
+    span { loc = "location", message = "mutable resource variable '~variable:IRInst' is referenced by an operation outside a function body; perform that operation inside an entry point or another function" }
+)
+
+err(
+    "mutable-resource-array-complete-initialization-not-proven",
+    56012,
+    "cannot prove complete initialization of a mutable resource array",
+    span { loc = "location", message = "mutable resource array '~variable:IRInst' may be written one element at a time and may be read before a whole-array assignment; assign the whole array before reading it" }
+)
+
+err(
+    "cannot-prove-mutable-resource-initializer-safe-to-move",
+    56013,
+    "cannot prove that a mutable resource initializer can be moved safely",
+    span { loc = "location", message = "Slang cannot prove that moving the initializer for the mutable resource variable '~variable:IRInst' to each entry point preserves observable behavior. The initializer may fail to return normally, may have externally observable side effects, or may read preexisting mutable storage, resource contents, or non-resource data from an explicit parameter group; initialize the resource explicitly in an entry point instead" }
+)
+
+err(
+    "mutable-resource-used-by-generic-assembly-function",
+    56014,
+    "mutable resource state is unavailable to a generic-assembly function",
+    span { loc = "location", message = "function '~function:IRInst' uses generic assembly as its emitted implementation, so Slang cannot preserve the function body's access to mutable resource state; pass the resource explicitly as an assembly operand instead" }
+)
+
+err(
+    "mutable-resource-used-by-target-intrinsic-function",
+    56015,
+    "mutable resource state is unavailable to a target-intrinsic function",
+    span { loc = "location", message = "function '~function:IRInst' has a target-intrinsic implementation for this compilation target, so Slang emits that implementation instead of the function body and cannot preserve the body's access to mutable resource state; pass the resource as an explicit function argument and reference it from the target intrinsic instead" }
+)
+
+err(
+    "mutable-resource-has-reference-outside-function-body",
+    56016,
+    "mutable resource variable has an unsupported reference outside a function body",
+    span { loc = "location", message = "mutable resource variable '~variable:IRInst' is referenced by an instruction that is not inside a function body; Slang cannot preserve that reference after replacing the variable with function-local storage" }
+)
+
+err(
+    "mutable-static-resource-cannot-use-shared-or-qualified-storage",
+    56017,
+    "mutable static resource cannot use shared or memory-qualified storage",
+    span { loc = "decl:Decl", message = "a resource-valued `static` variable declared at file or namespace scope cannot use `groupshared` or a memory-access qualifier; per-invocation resource replacement uses function-local storage and cannot preserve group sharing or the qualified memory-access behavior" }
+)
+
+err(
+    "mutable-resource-attached-metadata-has-external-reference",
+    56018,
+    "metadata attached to a mutable resource variable has an external reference",
+    span { loc = "location", message = "metadata attached to mutable resource variable '~variable:IRInst' is referenced from outside the variable's metadata subtree; Slang cannot remove the variable without leaving that reference dangling" }
+)
+
+err(
+    "opaque-local-storage-not-supported-for-target",
+    56019,
+    "target cannot represent an opaque value in mutable local storage",
+    span { loc = "location", message = "mutable local storage contains an opaque value of type '~type:IRInst', which target '~target:CodeGenTarget' cannot represent; use or pass the resource value directly instead of assigning it to a mutable local or `static` variable" }
 )
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics

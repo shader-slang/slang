@@ -39,10 +39,13 @@ source/standard-modules/
 ├── experimental/                           # Experimental module subdirectory
 │   ├── CMakeLists.txt                      # Experimental module build logic
 │   └── workgraph.slang                     # Workgraph module entry point
-└── numerics/                               # Experimental numeric interface modules
-    ├── CMakeLists.txt                      # Numeric module build logic
-    ├── numerics.slang                      # `slang.numerics` entry point
-    └── differentiable.slang                # Differentiable annex entry point
+├── numerics/                               # Experimental numeric interface modules
+│   ├── CMakeLists.txt                      # Numeric module build logic
+│   ├── numerics.slang                      # `slang.numerics` entry point
+│   └── differentiable.slang                # Differentiable annex entry point
+└── functional/                             # Experimental higher-order operations
+    ├── CMakeLists.txt                      # Functional module build logic
+    └── functional.slang                    # `slang.functional` entry point
 ```
 
 ## Files Involved
@@ -59,6 +62,7 @@ source/standard-modules/
 - `source/standard-modules/neural/CMakeLists.txt` - Neural module specific build logic
 - `source/standard-modules/experimental/CMakeLists.txt` - Experimental module specific build logic
 - `source/standard-modules/numerics/CMakeLists.txt` - Experimental numeric module build logic
+- `source/standard-modules/functional/CMakeLists.txt` - Experimental functional module build logic
 - `source/slang/CMakeLists.txt` - Uses the standard module config header internally for the slang library
 
 ### C++ Code
@@ -100,6 +104,7 @@ For example, `import slang.neural;` resolves to `slang/neural.slang-module`, and
 `import experimental.workgraph;` resolves to `experimental/workgraph.slang-module`.
 The experimental numeric imports resolve to `slang/numerics.slang-module` and
 `slang/numerics/differentiable.slang-module`.
+The experimental functional import resolves to `slang/functional.slang-module`.
 
 This ensures that both the C++ runtime search logic and the CMake build logic use exactly the same
 path configuration, while keeping the implementation details internal to the slang library.

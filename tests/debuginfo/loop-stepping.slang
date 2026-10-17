@@ -17,6 +17,9 @@ void main(uniform RWStructuredBuffer<uint> input,
     output[0] = sum;
 }
 
+// Loop inversion must preserve the same breakpoint hits and local values.
+//TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute -loop-inversion
+
 // SPVDB-CMD: descriptor 0 0 [4]
 // SPVDB-CMD: descriptor 0 1 [0]
 // SPVDB-CMD: break loop-stepping.slang 15

@@ -3,7 +3,8 @@ name: CMake Options
 # Verifies that each CMake option compiles successfully when set to its
 # non-default value (one option changed at a time, all others at their
 # defaults). This is "depth-1" coverage: no multi-option combinations are
-# tested.
+# tested. The option/value cases are defined in .github/cmake-options-matrix.json;
+# list-valued options use a representative non-empty value there.
 
 on:
   workflow_dispatch:
@@ -182,18 +183,14 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_CMAKE_OPTIONS }}
-      # TODO: Re-enable the failure notification once this weekly workflow has
-      # proven stable enough that a failure means a real regression. Until
-      # then we only post the success message, so an infrastructure hiccup
-      # does not advertise a false failure to the channel.
-      # - name: failure notification
-      #   id: slack-notify-failure
-      #   if: ${{ github.event_name == 'schedule' && !success() }}
-      #   uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
-      #   with:
-      #     payload: |
-      #       {
-      #         "CMake-Options-Weekly": ":alert: :alert: :alert: :alert: :alert: :alert:\nCMake options weekly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-      #       }
-      #   env:
-      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_CMAKE_OPTIONS }}
+      - name: failure notification
+        id: slack-notify-failure
+        if: ${{ github.event_name == 'schedule' && !success() }}
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "CMake-Options-Weekly": ":alert: :alert: :alert: :alert: :alert: :alert:\nCMake options weekly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_CMAKE_OPTIONS }}
