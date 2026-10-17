@@ -1192,6 +1192,75 @@ struct LoweredElementTypeContext
         return config;
     }
 
+    // Returns true if `value` is available at `pos`: it is not a local instruction,
+    // or it comes earlier in the same block.
+    static bool isAvailableBefore(IRInst* value, IRInst* pos)
+    {
+        if (!as<IRBlock>(value->getParent()))
+            return true;
+        if (value->getParent() != pos->getParent())
+            return false;
+        for (auto inst = value; inst; inst = inst->getNextInst())
+        {
+            if (inst == pos)
+                return true;
+        }
+        return false;
+    }
+
+    // `load(castStorageToLogical(addr))` whose only uses are `fieldExtract`/`getElement`
+    // on the loaded value: replace each extract with
+    // `load(gep(castStorageToLogical(addr), key))`, emitted where the original load was so
+    // the memory access happens at the same point. This avoids copying the whole composite
+    // into a temp var when only some of its members are needed (e.g. `push.b[i]` on a large
+    // uniform struct).
+    bool tryReplaceLoadWithPartialLoads(
+        IRBuilder& builder,
+        IRLoad* load,
+        IRCastStorageToLogicalBase* castInst,
+        IRInst* ptrVal,
+        List<IRCastStorageToLogicalBase*>& castInstWorkList)
+    {
+        if (!load || !load->hasUses())
+            return false;
+        for (auto use = load->firstUse; use; use = use->nextUse)
+        {
+            auto extract = use->getUser();
+            if (extract->getOp() != kIROp_FieldExtract && extract->getOp() != kIROp_GetElement)
+                return false;
+            if (use != extract->getOperands())
+                return false;
+            if (extract->getOp() == kIROp_GetElement &&
+                !isAvailableBefore(extract->getOperand(1), load))
+                return false;
+        }
+
+        List<IRInst*> extracts;
+        for (auto use = load->firstUse; use; use = use->nextUse)
+            extracts.add(use->getUser());
+
+        builder.setInsertBefore(load);
+        for (auto extract : extracts)
+        {
+            auto castAddr = builder.emitCastStorageToLogical(
+                castInst->getFullType(),
+                ptrVal,
+                castInst->getLayoutConfig());
+            IRInst* gep = nullptr;
+            if (extract->getOp() == kIROp_GetElement)
+                gep = builder.emitElementAddress(castAddr, extract->getOperand(1));
+            else
+                gep = builder.emitFieldAddress(castAddr, extract->getOperand(1));
+            auto partialLoad = builder.emitLoad(gep);
+            extract->replaceUsesWith(partialLoad);
+            extract->removeAndDeallocate();
+            if (auto castStorage = as<IRCastStorageToLogical>(castAddr))
+                castInstWorkList.add(castStorage);
+        }
+        load->removeAndDeallocate();
+        return true;
+    }
+
     void deferStorageToLogicalCasts(
         IRModule* module,
         List<IRCastStorageToLogicalBase*> castInstWorkList)
@@ -1381,6 +1450,16 @@ struct LoweredElementTypeContext
                                 // Don't push the cast beyond the load if we are already
                                 // a simple type.
                                 if (!isCompositeType(user->getDataType()))
+                                    break;
+                                // If the loaded value is only taken apart with field/element
+                                // extracts, load just those parts instead of copying the
+                                // whole composite into a temp var.
+                                if (tryReplaceLoadWithPartialLoads(
+                                        builder,
+                                        as<IRLoad>(user),
+                                        castInst,
+                                        ptrVal,
+                                        castInstWorkList))
                                     break;
                                 IRInst* tempVar = nullptr;
                                 if (as<IRLoad>(user))
