@@ -16018,7 +16018,6 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
         };
         if (!isInterfaceRequirement(decl))
         {
-            // A user `[ForwardDerivative]` provides the forward conformance instead.
             if ((decl->findModifier<ForwardDifferentiableAttribute>() ||
                  decl->findModifier<BackwardDifferentiableAttribute>()) &&
                 !decl->findModifier<ForwardDerivativeAttribute>())
@@ -16097,7 +16096,6 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
                 }
             }
 
-            // A user `[BackwardDerivative]` provides the backward conformance instead.
             if (decl->findModifier<BackwardDifferentiableAttribute>() &&
                 !decl->findModifier<BackwardDerivativeAttribute>())
             {
