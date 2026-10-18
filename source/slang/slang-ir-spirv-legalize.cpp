@@ -3437,20 +3437,34 @@ void legalizeIRForSPIRV(
     SLANG_UNUSED(entryPoints);
 
     // An `export`ed generic is still pinned here, so `legalizeSPIRV` would walk its unspecialized
-    // body, where an op's result type can be a generic parameter that its handler cannot lower
-    // (#13744). We drop the pins so DCE removes every generic nothing uses. Other targets check
-    // atomic destinations in `linkAndOptimizeIR`, while those generics are still present, so we
-    // run the same check on them first and an unused exported generic is diagnosed on every target.
-    for (auto inst : module->getGlobalInsts())
-    {
-        if (as<IRGeneric>(inst) && inst->findDecoration<IRKeepAliveDecoration>())
-        {
-            bool skipFuncParamValidation = true;
-            validateAtomicOperations(skipFuncParamValidation, codeGenContext->getSink(), inst);
-        }
-    }
+    // body. There `MakeCombinedTextureSamplerFromHandle` can have the generic parameter `T` as its
+    // result type, which `processMakeCombinedTextureSamplerFromHandle` cannot lower (#13744). We
+    // drop the pins so DCE removes every generic nothing uses, along with everything only those
+    // generics reach.
+    //
+    // Other targets check atomic destinations in `linkAndOptimizeIR`, while that code is still
+    // present, but `legalizeSPIRV` checks them only after the DCE below. We therefore check each
+    // instruction the DCE removes. Like the other targets, and unlike `legalizeSPIRV`, we skip
+    // parameter destinations, because a function that is never called has no call site to validate
+    // them against. An invalid atomic in an unused exported generic, or in a function only it calls,
+    // is then reported on every target.
     if (unpinGenerics(module))
-        eliminateDeadCode(module);
+    {
+        struct ValidateAtomicsInRemovedInsts : IRDeadCodeEliminationOptions::RemovedGlobalInstObserver
+        {
+            DiagnosticSink* sink;
+            void onRemove(IRInst* inst) override
+            {
+                bool skipFuncParamValidation = true;
+                validateAtomicOperations(skipFuncParamValidation, sink, inst);
+            }
+        };
+        ValidateAtomicsInRemovedInsts validateRemovedInsts;
+        validateRemovedInsts.sink = codeGenContext->getSink();
+        IRDeadCodeEliminationOptions options;
+        options.removedGlobalInstObserver = &validateRemovedInsts;
+        eliminateDeadCode(module, options);
+    }
 #ifdef _DEBUG
     if (!codeGenContext->isSpecializationDisabled())
     {
