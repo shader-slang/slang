@@ -48,23 +48,17 @@ public struct RWRenderBuffer2D<T : ITexelElement> {
 }
 
 __generic<T : __BuiltinFloatingPointType>
-public extension RWRenderBuffer2D<T>
-    where T : ITexelElement
-    where T.DataType == T
-{
+public extension RWRenderBuffer2D<T> where T : ITexelElement {
     [ForceInline]
-    public void accumulate(uint32_t2 pDestIdx, uint64_t pSampleIdx, T.DataType pSampleValue) {
+    public void accumulate(uint32_t2 pDestIdx, uint64_t pSampleIdx, T pSampleValue) {
         uint32_t2 lIndex = offset + pDestIdx;
         handle[lIndex] = accumulateSample(pSampleIdx, handle[lIndex], pSampleValue);
     }
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
-public extension RWRenderBuffer2D<vector<T, N>>
-    where vector<T,N> : ITexelElement
-    where vector<T,N>.DataType == vector<T,N>
-{
+public extension RWRenderBuffer2D<vector<T, N>> where vector<T,N>:ITexelElement {
     [ForceInline]
-    public void accumulate(uint32_t2 pDestIdx, uint64_t pSampleIdx, vector<T, N>.DataType pSampleValue) {
+    public void accumulate(uint32_t2 pDestIdx, uint64_t pSampleIdx, vector<T, N> pSampleValue) {
         uint32_t2 lIndex = offset + pDestIdx;
         handle[lIndex] = accumulateSample(pSampleIdx, handle[lIndex], pSampleValue);
     }
