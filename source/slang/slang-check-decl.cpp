@@ -15970,6 +15970,14 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
     // extension __func_as_type(decl) : IBackwardDifferentiable<__func_as_type(decl)>
     // { /* ..empty.. */ }
     //
+    // We skip either extension when the decl carries the matching `[ForwardDerivative]` or
+    // `[BackwardDerivative]` attribute, because `translateFwdDerivativeAttributeToAD2` or
+    // `translateBwdDerivativeAttributeToAD2` then conforms the decl to that interface with the
+    // user's derivative. Both conformances would lower to one witness table whose synthesized
+    // entries win, so calls through an interface requirement would ignore the user's derivative.
+    // A derivative attached with `[ForwardDerivativeOf]`/`[BackwardDerivativeOf]` is not a
+    // modifier of this decl, so its primal still gets the synthesized extension (#13301).
+    //
 
     if (decl->findModifier<DifferentiableAttribute>())
     {
@@ -16002,8 +16010,9 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
         };
         if (!isInterfaceRequirement(decl))
         {
-            if (decl->findModifier<ForwardDifferentiableAttribute>() ||
-                decl->findModifier<BackwardDifferentiableAttribute>())
+            if ((decl->findModifier<ForwardDifferentiableAttribute>() ||
+                 decl->findModifier<BackwardDifferentiableAttribute>()) &&
+                !decl->findModifier<ForwardDerivativeAttribute>())
             {
                 auto declsToExtend = ShortList<FunctionDeclBase*, 4>{as<FunctionDeclBase>(decl)};
                 for (auto _decl : getCurrentASTBuilder()->m_substituteMap[decl])
@@ -16079,7 +16088,8 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
                 }
             }
 
-            if (decl->findModifier<BackwardDifferentiableAttribute>())
+            if (decl->findModifier<BackwardDifferentiableAttribute>() &&
+                !decl->findModifier<BackwardDerivativeAttribute>())
             {
                 auto declsToExtend = ShortList<FunctionDeclBase*, 4>{as<FunctionDeclBase>(decl)};
                 for (auto _decl : getCurrentASTBuilder()->m_substituteMap[decl])
