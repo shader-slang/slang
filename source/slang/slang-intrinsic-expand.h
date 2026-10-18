@@ -57,13 +57,14 @@ protected:
 
     // True when the string starts with `$q` and the call has a split-out sampler argument; see
     // `intrinsicSkipsSplitSamplerArg`.
-    bool m_skipCombinedSamplerOperand = false;
+    bool m_skipsSplitSamplerArg = false;
 };
 
-/// Return true if `intrinsicText` is a `$q` string and the call's argument 1 is the sampler that
-/// type legalization split out of a combined texture-sampler. In that case each bare `$N` with
-/// N >= 1 reads argument N + 1. The expander and the emitter's fold check both use this, so
-/// they agree on which argument a `$N` reads.
+/// Return true if `intrinsicText` is a `$q` string and the call's argument 1 has a sampler type,
+/// which for a `$q` operation means it is the sampler split out of a combined texture-sampler
+/// (see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`). In that case each bare `$N` with
+/// N >= 1 reads argument N + 1. The expander and the emitter's fold check both use this, so they
+/// apply the `$q` shift the same way.
 bool intrinsicSkipsSplitSamplerArg(
     const UnownedStringSlice& intrinsicText,
     IRUse* args,

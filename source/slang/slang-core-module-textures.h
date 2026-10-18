@@ -67,9 +67,10 @@ public:
         Always
     };
 
-    // `cppHlslPreamble` holds statements emitted at the start of the shared cpp/hlsl case, before
-    // the member-form intrinsic. Each of its paths must end in `return`. An empty string emits
-    // only the member form.
+    // `cppHlslPreamble` holds statements emitted verbatim (already indented) at the start of the
+    // shared cpp/hlsl case, before the member-form intrinsic. A path that handles the call must
+    // `return`; every other path falls through to the member form. The only use is forwarding a
+    // combined receiver; an empty string emits only the member form.
     void writeFuncBody(
         const char* funcName,
         const String& cppHlslPreamble,

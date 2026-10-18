@@ -2720,9 +2720,12 @@ _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format> __extractIma
     _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> combinedSampler);
 
 // Texture-only operations on a combined texture-sampler forward to the extracted texture through
-// these free functions. A member call on the extracted texture from inside the combined-generic
-// extension (`__extractImage(this).Load(location)`) fails lookup with E30027, while a call through
-// a free function resolves normally.
+// these free functions. Inside the extension that is generic over `isCombined`, a member call on
+// the extracted texture (`__extractImage(this).Load(location)`) fails lookup with E30027: the
+// extracted type reuses the extension's own generic parameters, and generic inference does not
+// record a parameter that unifies with itself, so the extension does not apply to it. A free
+// function avoids applying the extension to its own target. If that lookup is fixed, these
+// forwarders can become member calls.
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [__readNone]
 [ForceInline]
@@ -5156,10 +5159,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         {
         case cpp:
         case hlsl:
-            // On these targets a combined texture-sampler becomes a `{texture, sampler}` pair:
-            // HLSL passes both as call arguments, and CPU passes the struct. The member form
-            // would hand either one to `.Load`, so a texture-only operation forwards to the
-            // extracted texture instead.
+            // A combined receiver forwards to the extracted texture here. Otherwise the member
+            // form emits `tex.Load(sampler, location)` on HLSL, where the combined value is split
+            // into two arguments, and `combined.Load(location)` on CPU, where it stays a struct
+            // with no `Load` member (see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`).
             if (isCombined != 0)
                 return __loadTexture(__extractImage(this), location);
             __intrinsic_asm ".Load";
@@ -5197,6 +5200,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         case metal:
             // The Metal and WGSL strings start with `$q`, which skips the sampler argument that a
             // combined receiver gains; see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`.
+            // These targets keep `$q` instead of forwarding like HLSL: forwarding WGSL `Load`
+            // crashes type legalization for a bindless `Sampler2D.Handle`, and Metal uses the same
+            // mechanism as WGSL and as its `GetDimensions` strings.
             switch (Shape.flavor)
             {
             case $(SLANG_TEXTURE_1D):

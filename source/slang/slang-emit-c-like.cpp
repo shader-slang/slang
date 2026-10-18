@@ -1797,8 +1797,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
             SLANG_ASSERT(paramIndex >= 0 && paramIndex < Index(callInst->getArgCount()));
 
             // Look through the slice to see how many times this parameter is used (signified via
-            // `$0`...`$9`). Each placeholder is mapped to its argument the same way the expander
-            // does, because a `$q` string reads a different argument than its digit names.
+            // `$0`...`$9`). The `$q` shift is applied the same way the expander applies it,
+            // because a `$q` string reads a different argument than its digit names.
             {
                 UnownedStringSlice slice = intrinsicDef;
                 const bool skipsSplitSamplerArg =
