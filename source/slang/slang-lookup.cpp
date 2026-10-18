@@ -29,10 +29,9 @@ DeclRef<ExtensionDecl> applyExtensionToType(
 struct BreadcrumbInfo
 {
     LookupResultItem::Breadcrumb::Kind kind;
-    LookupResultItem::Breadcrumb::ThisParameterMode thisParameterMode =
-        LookupResultItem::Breadcrumb::ThisParameterMode::Default;
     DeclRef<Decl> declRef;
     Val* val = nullptr;
+    Scope* thisExprScope = nullptr;
     BreadcrumbInfo* prev = nullptr;
 };
 
@@ -158,7 +157,7 @@ LookupResultItem CreateLookupResultItem(DeclRef<Decl> declRef, BreadcrumbInfo* b
             bb->declRef,
             bb->val,
             breadcrumbs,
-            bb->thisParameterMode);
+            bb->thisExprScope);
     }
     item.breadcrumbs = breadcrumbs;
     return item;
@@ -783,13 +782,44 @@ static bool _isDeclOverloadable(Decl* decl)
     return false;
 }
 
+/// Returns whether leaving `decl`'s scope blocks implicit use of an enclosing `this` value.
+///
+/// A true result requires a type base for members found in farther-out type scopes.
+/// A false result leaves the existing lookup state unchanged; it does not establish that a
+/// `this` value is available.
+static bool _doesScopeBlockUseOfEnclosingThisExpr(Decl* decl)
+{
+    // We classify a generic declaration by the declaration it wraps. During parsing, `inner` can
+    // still be null; none of the declaration-kind tests below match that incomplete wrapper.
+    while (auto genericDecl = as<GenericDecl>(decl))
+        decl = genericDecl->inner;
+
+    // `isEffectivelyStatic` treats constructors as static for calls, but their bodies have a
+    // local `this` value that can refer to instance members.
+    if (as<ConstructorDecl>(decl))
+        return false;
+
+    // Members of a nested type or extension belong to that type or extension target, so lookup
+    // outside that declaration cannot use an instance of the enclosing type.
+    if (as<AggTypeDeclBase>(decl))
+        return true;
+
+    // A static callable, property, or subscript has no receiver. Ordinary block scopes do not
+    // impose this restriction, even when nested in a function that makes their declarations
+    // effectively static for member lookup.
+    if (as<CallableDecl>(decl) || as<PropertyDecl>(decl))
+        return isEffectivelyStatic(decl);
+    return false;
+}
+
 static void _lookUpInScopes(
     ASTBuilder* astBuilder,
     Name* name,
     LookupRequest const& request,
     LookupResult& result)
 {
-    auto thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Default;
+    auto thisBreadcrumbKind = LookupResultItem::Breadcrumb::Kind::ThisExpr;
+    auto thisBreadcrumbScope = request.scope;
 
     auto scope = request.scope;
 
@@ -857,9 +887,9 @@ static void _lookUpInScopes(
                 // a "breadcrumb" here to track that fact.
                 //
                 BreadcrumbInfo breadcrumb;
-                breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
-                breadcrumb.thisParameterMode = thisParameterMode;
+                breadcrumb.kind = thisBreadcrumbKind;
                 breadcrumb.declRef = aggTypeDeclBaseRef;
+                breadcrumb.thisExprScope = thisBreadcrumbScope;
                 breadcrumb.prev = nullptr;
                 BreadcrumbInfo* breadcrumbPtr = &breadcrumb;
                 Type* type = nullptr;
@@ -955,9 +985,9 @@ static void _lookUpInScopes(
                 if (getText(name) != "This")
                 {
                     BreadcrumbInfo breadcrumb;
-                    breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
-                    breadcrumb.thisParameterMode = thisParameterMode;
+                    breadcrumb.kind = thisBreadcrumbKind;
                     breadcrumb.declRef = DeclRef<Decl>(defaultImplDecl->thisTypeDecl);
+                    breadcrumb.thisExprScope = thisBreadcrumbScope;
                     breadcrumb.prev = nullptr;
                     Type* type = DeclRefType::create(astBuilder, breadcrumb.declRef);
                     _lookUpMembersInType(astBuilder, name, type, request, result, &breadcrumb);
@@ -973,93 +1003,12 @@ static void _lookUpInScopes(
                 break;
             }
 
-            // Before we proceed up to the next outer scope to perform lookup
-            // again, we need to consider what the current scope tells us
-            // about how to interpret uses of `this` or `This`. For example, the
-            // effective `this` parameter of a writable method makes the `this`
-            // value used for lookup an l-value.
-            //
-            // Similarly, if we look up a member in a type from the scope
-            // of some nested type, then there shouldn't be a `this` expression
-            // for the outer type; only its `This` type is available.
-            //
-            if (containerDeclRef.is<ConstructorDecl>())
+            // We use a type base for members found in farther-out type scopes once a scope blocks
+            // implicit use of the enclosing `this` value.
+            if (_doesScopeBlockUseOfEnclosingThisExpr(containerDecl))
             {
-                // In the context of an `__init` declaration, the members of
-                // the surrounding type are accessible through a mutable `this`.
-                //
-                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-            }
-            else if (auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>())
-            {
-                // Header checking can perform lookup through the callable that is currently being
-                // checked. Its effective `this` parameter information is attached only after that
-                // header pass completes, so querying it here would recursively try to finish the
-                // same declaration. Use the declaration spelling only as a bootstrap below;
-                // lookup performed from the body and later phases takes the checked-data path.
-                if (funcDeclRef.getDecl()->isChecked(DeclCheckState::SignatureChecked))
-                {
-                    std::optional<ParamInfo> thisParamInfo;
-                    if (request.semantics)
-                    {
-                        thisParamInfo = request.semantics->findEffectiveThisParamInfo(funcDeclRef);
-                    }
-                    else
-                    {
-                        thisParamInfo = findEffectiveThisParamInfo(astBuilder, funcDeclRef);
-                    }
-
-                    if (thisParamInfo)
-                    {
-                        thisParameterMode =
-                            isThisExprWritable(funcDeclRef.as<CallableDecl>(), *thisParamInfo)
-                                ? LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue
-                                : LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
-                    }
-                    else
-                    {
-                        // A function without an effective `this` parameter only has access to
-                        // `This`.
-                        thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
-                    }
-                }
-                else if (isEffectivelyStatic(funcDeclRef.getDecl()))
-                {
-                    // Signature checking can need lookup before the checked parameter information
-                    // is attached. Staticness is already known at that point and must still prevent
-                    // lookup from constructing a `this` value.
-                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
-                }
-                else
-                {
-                    // This branch is deliberately limited to the declaration's unchecked header.
-                    // Default-value expressions can perform nested lookup here, so preserve enough
-                    // of the source/internal mode policy to construct a writable `this` when the
-                    // declaration requires one. Once signature checking completes,
-                    // `isThisExprWritable` combines the attached `ParamInfo` with the class-setter
-                    // body rule documented there.
-                    auto bootstrapMode =
-                        applyThisParamModePolicy(funcDeclRef.getDecl(), ParamPassingMode::In);
-                    bool isWritable = doesParamPassingModeIndicateWritableStorage(bootstrapMode);
-                    if (auto synthesizedMode =
-                            funcDeclRef.getDecl()
-                                ->findModifier<SynthesizedParamPassingModeModifier>())
-                    {
-                        isWritable =
-                            doesParamPassingModeIndicateWritableStorage(synthesizedMode->mode);
-                    }
-                    thisParameterMode =
-                        isWritable
-                            ? LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue
-                            : LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
-                }
-            }
-            else if (containerDeclRef.as<AggTypeDeclBase>())
-            {
-                // When lookup moves from a nested typed declaration to an outer scope, there is no
-                // `this` expression for the outer type, and only the `This` type is available.
-                //
-                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
+                thisBreadcrumbKind = LookupResultItem::Breadcrumb::Kind::ThisType;
+                thisBreadcrumbScope = nullptr;
             }
         }
 
