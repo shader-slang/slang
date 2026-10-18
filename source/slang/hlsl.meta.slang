@@ -5101,7 +5101,13 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         __target_switch
         {
         case cpp:
+            __intrinsic_asm ".Load";
         case hlsl:
+            // HLSL, Metal and WGSL split a combined texture-sampler into a texture and a sampler,
+            // and pass both to every call. `Load` and the subscript use only the texture, so their
+            // combined-case strings start with `$q`, which skips the sampler operand.
+            if (isCombined != 0)
+                __intrinsic_asm "$q$0.Load($1)";
             __intrinsic_asm ".Load";
 		case cuda:
             // The 'tex*fetch_int<T>' prelude templates below have no half implementation
@@ -5141,35 +5147,35 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 // lod is not supported for 1D texture
                 if (isArray == 1)
                     // Tv read(uint coord, uint array, uint lod = 0) const
-                    __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y))$z";
+                    __intrinsic_asm "$q$c$0.read(uint(($1).x), uint(($1).y))$z";
                 else
                     // Tv read(uint coord, uint lod = 0) const
-                    __intrinsic_asm "$c$0.read(uint(($1).x))$z";
+                    __intrinsic_asm "$q$c$0.read(uint(($1).x))$z";
                 break;
             case $(SLANG_TEXTURE_2D):
                 if (isShadow == 1)
                 {
                     if (isArray == 1)
                         // T read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // T read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 else
                 {
                     if (isArray == 1)
                         // Tv read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // Tv read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 break;
             case $(SLANG_TEXTURE_3D):
                 if (isShadow == 0 && isArray == 0)
                     // Tv read(uint3 coord, uint lod = 0) const
-                    __intrinsic_asm "$c$0.read(vec<uint,3>(($1).xyz), uint(($1).w))$z";
+                    __intrinsic_asm "$q$c$0.read(vec<uint,3>(($1).xyz), uint(($1).w))$z";
                 break;
             case $(SLANG_TEXTURE_CUBE):
                 static_assert(isArray == 0, "Unsupported 'Load' of 'texture cube array' for 'metal' target");
@@ -5180,7 +5186,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __intrinsic_asm "<invalid intrinsics>";
                     else
                         // T read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 else
                 {
@@ -5189,7 +5195,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __intrinsic_asm "<invalid intrinsics>";
                     else
                         // Tv read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 break;
             }
@@ -5234,17 +5240,17 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 switch (Shape.flavor)
                 {
                 case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z), ($1).w)$z";
+                    __intrinsic_asm "$qtextureLoad($0, ($1).xy, i32(($1).z), ($1).w)$z";
                 }
             }
             switch (Shape.flavor)
             {
             case $(SLANG_TEXTURE_1D):
-                __intrinsic_asm "textureLoad($0, ($1).x, ($1).y)$z";
+                __intrinsic_asm "$qtextureLoad($0, ($1).x, ($1).y)$z";
             case $(SLANG_TEXTURE_2D):
-                __intrinsic_asm "textureLoad($0, ($1).xy, ($1).z)$z";
+                __intrinsic_asm "$qtextureLoad($0, ($1).xy, ($1).z)$z";
             case $(SLANG_TEXTURE_3D):
-                __intrinsic_asm "textureLoad($0, ($1).xyz, ($1).w)$z";
+                __intrinsic_asm "$qtextureLoad($0, ($1).xyz, ($1).w)$z";
             default:
                 __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
@@ -5260,7 +5266,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".Load";
             case hlsl:
+                if (isCombined != 0)
+                    __intrinsic_asm "$q$0.Load($1, $2)";
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
@@ -5298,7 +5307,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load";
+        case hlsl:
+            if (isCombined != 0)
+                __intrinsic_asm "$q$0.Load($1, $2, $3)";
+            __intrinsic_asm ".Load";
         case spirv:
              const int lodLoc = Shape.dimensions+isArray;
              let coord = __vectorReshape<Shape.dimensions+isArray>(location);
@@ -5351,7 +5363,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             __target_switch
             {
                 case cpp:
+                    __intrinsic_asm ".operator[]";
                 case hlsl:
+                    if (isCombined != 0)
+                        __intrinsic_asm "$q$0[$1]";
                     __intrinsic_asm ".operator[]";
                 case metal:
                 case cuda:
@@ -5404,7 +5419,10 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".Load";
             case hlsl:
+                if (isCombined != 0)
+                    __intrinsic_asm "$q$0.Load($1, $2)";
                 __intrinsic_asm ".Load";
             case metal:
                 switch (Shape.flavor)
@@ -5415,20 +5433,20 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$q$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$q$c$0.read($1, uint($2))$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$q$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$q$c$0.read($1, uint($2))$z";
                     }
                     break;
                 }
@@ -5460,7 +5478,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
-                __intrinsic_asm "textureLoad($0, $1, $2)$z";
+                __intrinsic_asm "$qtextureLoad($0, $1, $2)$z";
         }
     }
 
@@ -5480,7 +5498,10 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".Load";
             case hlsl:
+                if (isCombined != 0)
+                    __intrinsic_asm "$q$0.Load($1, $2, $3)";
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
@@ -5515,7 +5536,10 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load";
+        case hlsl:
+            if (isCombined != 0)
+                __intrinsic_asm "$q$0.Load($1, $2, $3, $4)";
+            __intrinsic_asm ".Load";
         case spirv:
              if (isCombined != 0)
              {
@@ -5565,7 +5589,10 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             __target_switch
             {
                 case cpp:
+                    __intrinsic_asm "($0).sample[$1]";
                 case hlsl:
+                    if (isCombined != 0)
+                        __intrinsic_asm "$q$0[$1]";
                     __intrinsic_asm "($0).sample[$1]";
                 case metal:
                 case spirv:
@@ -5588,7 +5615,10 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             __target_switch
             {
                 case cpp:
+                    __intrinsic_asm "($0).sample[$2][$1]";
                 case hlsl:
+                    if (isCombined != 0)
+                        __intrinsic_asm "$q($0).sample[$2][$1]";
                     __intrinsic_asm "($0).sample[$2][$1]";
                 case metal:
                 case spirv:

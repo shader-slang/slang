@@ -66,6 +66,7 @@ TextureTypeInfo::TextureTypeInfo(
 
 void TextureTypeInfo::writeFuncBody(
     const char* funcName,
+    int paramCount,
     const String& glsl,
     const String& cuda,
     const String& spirvDefault,
@@ -79,7 +80,16 @@ void TextureTypeInfo::writeFuncBody(
         sb << i << "__target_switch\n";
         BraceScope switchScope{i, sb};
         sb << i << "case cpp:\n";
+        sb << i << "__intrinsic_asm \"." << funcName << "\";\n";
         sb << i << "case hlsl:\n";
+        // A combined texture-sampler reaches HLSL split into `{texture, sampler}`, and the member
+        // form would pass the injected sampler as the first argument. The `$q` string names the
+        // arguments explicitly so that the expander can skip the sampler.
+        sb << i << "if (isCombined != 0)\n";
+        sb << i << "    __intrinsic_asm \"$q$0." << funcName << "(";
+        for (int p = 1; p <= paramCount; ++p)
+            sb << (p > 1 ? ", " : "") << "$" << p;
+        sb << ")\";\n";
         sb << i << "__intrinsic_asm \"." << funcName << "\";\n";
         if (glsl.getLength())
         {
@@ -137,6 +147,7 @@ void TextureTypeInfo::writeFuncBody(
 
 void TextureTypeInfo::writeFuncWithSig(
     const char* funcName,
+    int paramCount,
     const String& sig,
     const String& glsl,
     const String& spirvDefault,
@@ -151,13 +162,23 @@ void TextureTypeInfo::writeFuncWithSig(
         sb << i << "[__readNone]\n";
     sb << i << "[ForceInline]\n";
     sb << i << sig << "\n";
-    writeFuncBody(funcName, glsl, cuda, spirvDefault, spirvRWDefault, spirvCombined, metal, wgsl);
+    writeFuncBody(
+        funcName,
+        paramCount,
+        glsl,
+        cuda,
+        spirvDefault,
+        spirvRWDefault,
+        spirvCombined,
+        metal,
+        wgsl);
     sb << "\n";
 }
 
 void TextureTypeInfo::writeFunc(
     const char* returnType,
     const char* funcName,
+    int paramCount,
     const String& params,
     const String& glsl,
     const String& spirvDefault,
@@ -170,6 +191,7 @@ void TextureTypeInfo::writeFunc(
 {
     writeFuncWithSig(
         funcName,
+        paramCount,
         cat(returnType, " ", funcName, "(", params, ")"),
         glsl,
         spirvDefault,
@@ -256,15 +278,14 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             StringBuilder params;
             int paramCount = 0;
 
-            // Metal and WGSL lower a combined `Sampler2D` into a `{texture, sampler}` pair (see
-            // `lowerCombinedTextureSamplers`, which runs for HLSL/Metal/WGSL/CPU only), injecting a
-            // sampler operand at index 1. `GetDimensions` is a texture-only query, so its
-            // positional
-            // `$N` string is numbered without that sampler; prefix it with the `$q` marker so the
-            // expander skips the injected sampler. On a plain texture `$q` is a no-op. CUDA is not
-            // in the lowering set — its combined `Sampler2D` stays a single `CUtexObject`, so no
-            // marker is needed. See `IntrinsicExpandContext::_emitSpecial` and
-            // shader-slang/slang#11669.
+            // HLSL, Metal and WGSL lower a combined `Sampler2D` into a `{texture, sampler}` pair
+            // (see `lowerCombinedTextureSamplers`), injecting a sampler operand at index 1.
+            // `GetDimensions` is a texture-only query, so its positional `$N` string is numbered
+            // without that sampler; the `$q` marker makes the expander skip the injected sampler.
+            // On a plain texture `$q` is a no-op. The HLSL string is built by `writeFuncBody`.
+            // CUDA is not in the lowering set — its combined `Sampler2D` stays a single
+            // `CUtexObject`, so no marker is needed. See `IntrinsicExpandContext::_emitSpecial`
+            // and shader-slang/slang#11669.
             StringBuilder metal;
             metal << "$q";
             const char* metalMipLevel = "0";
@@ -645,6 +666,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             writeFunc(
                 "void",
                 "GetDimensions",
+                paramCount,
                 params,
                 glsl,
                 spirvDefault,

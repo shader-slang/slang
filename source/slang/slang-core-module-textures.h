@@ -66,6 +66,7 @@ public:
 
     void writeFuncBody(
         const char* funcName,
+        int paramCount,
         const String& glsl,
         const String& cuda,
         const String& spirvDefault,
@@ -75,6 +76,7 @@ public:
         const String& wgsl);
     void writeFuncWithSig(
         const char* funcName,
+        int paramCount,
         const String& sig,
         const String& glsl = String{},
         const String& spirvDefault = String{},
@@ -87,6 +89,7 @@ public:
     void writeFunc(
         const char* returnType,
         const char* funcName,
+        int paramCount,
         const String& params,
         const String& glsl = String{},
         const String& spirvDefault = String{},

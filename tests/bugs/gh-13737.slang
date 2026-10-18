@@ -29,8 +29,10 @@ float4 portableOps(int2 p)
 {
     uint w, h, e, l, s;
     float fw, fh;
+    u_tex.GetDimensions(w, h);
+    float4 r = float4(w, h, 0, 0);
     u_texArray.GetDimensions(w, h, e);
-    float4 r = float4(w, h, e, 0);
+    r += float4(w, h, e, 0);
     u_texArray.GetDimensions(0, w, h, e, l);
     r += float4(w, h, e, l);
     u_texMS.GetDimensions(w, h, s);
@@ -40,23 +42,32 @@ float4 portableOps(int2 p)
     r += u_tex.Load(int3(p, 0));
     r += u_tex[uint2(p)];
     r += u_texArray.Load(int4(p, 1, 0));
+    r += u_texArray[uint3(p, 1)];
+    r += u_shadow.Load(int3(p, 0));
+    r += u_shadow[uint2(p)];
     r += u_texMS.Load(p, 1);
     r += u_texMS[uint2(p)];
     r += u_texMS[uint2(p), 3];
     return r;
 }
 
-// HLSL: GetDimensions(w_{{[0-9]+}}, h_{{[0-9]+}}, e_{{[0-9]+}})
-// HLSL: GetDimensions(0U, w_{{[0-9]+}}, h_{{[0-9]+}}, e_{{[0-9]+}}, l_{{[0-9]+}})
-// HLSL: u_texMS_texture_{{[0-9]+}}.GetDimensions(w_{{[0-9]+}}, h_{{[0-9]+}}, s_{{[0-9]+}})
-// HLSL: u_shadow_texture_{{[0-9]+}}.GetDimensions(fw_{{[0-9]+}}, fh_{{[0-9]+}})
-// HLSL: u_tex_texture_{{[0-9]+}}.Load(int3(
-// HLSL: u_tex_texture_{{[0-9]+}}[
-// HLSL: u_texArray_texture_{{[0-9]+}}.Load(int4(
-// HLSL: u_texMS_texture_{{[0-9]+}}.Load(
-// HLSL: u_texMS_texture_{{[0-9]+}}.Load(
-// HLSL: u_tex_texture_{{[0-9]+}}.Load(int3({{.*}}, int2(int(1), int(1)))
-// HLSL: u_tex_texture_{{[0-9]+}}.Load(int3({{.*}}, int2(int(1), int(1)), status_{{[0-9]+}})
+// HLSL: (u_tex_texture_{{[0-9]+}}).GetDimensions((w_{{[0-9]+}}), (h_{{[0-9]+}}))
+// HLSL: (u_texArray_texture_{{[0-9]+}}).GetDimensions((w_{{[0-9]+}}), (h_{{[0-9]+}}), (e_{{[0-9]+}}))
+// HLSL: (u_texArray_texture_{{[0-9]+}}).GetDimensions((0U), (w_{{[0-9]+}}), (h_{{[0-9]+}}), (e_{{[0-9]+}}), (l_{{[0-9]+}}))
+// HLSL: (u_texMS_texture_{{[0-9]+}}).GetDimensions((w_{{[0-9]+}}), (h_{{[0-9]+}}), (s_{{[0-9]+}}))
+// HLSL: (u_shadow_texture_{{[0-9]+}}).GetDimensions((fw_{{[0-9]+}}), (fh_{{[0-9]+}}))
+// HLSL: (u_tex_texture_{{[0-9]+}}).Load(({{[^,]*}}))
+// HLSL: (u_tex_texture_{{[0-9]+}})[(
+// HLSL: (u_texArray_texture_{{[0-9]+}}).Load((int4(p_{{[0-9]+}}, int(1), int(0))))
+// HLSL: (u_texArray_texture_{{[0-9]+}})[(
+// HLSL: (u_shadow_texture_{{[0-9]+}}).Load(({{[^,]*}}))
+// HLSL: (u_shadow_texture_{{[0-9]+}})[(
+// HLSL: (u_texMS_texture_{{[0-9]+}}).Load((p_{{[0-9]+}}), (int(1)))
+// HLSL: (u_texMS_texture_{{[0-9]+}})[(
+// HLSL: ((u_texMS_texture_{{[0-9]+}})).sample[(int(3))][(
+// HLSL: (u_texMS_texture_{{[0-9]+}}).Load(({{.*}}), (int(2)))
+// HLSL: (u_tex_texture_{{[0-9]+}}).Load((int3(int2(id_{{[0-9]+}}.xy), int(0))), ({{[_A-Za-z0-9]+}}))
+// HLSL: (u_tex_texture_{{[0-9]+}}).Load((int3(int2(id_{{[0-9]+}}.xy), int(0))), ({{[_A-Za-z0-9]+}}), (status_{{[0-9]+}}))
 
 // DXIL: call %dx.types.Dimensions @dx.op.getDimensions
 // DXIL: call %dx.types.ResRet.f32 @dx.op.textureLoad
