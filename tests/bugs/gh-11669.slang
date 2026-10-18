@@ -11,9 +11,8 @@
 //
 // WGSL and Metal are the affected targets (both lower the combined value and emit GetDimensions
 // via a positional `$N` string), so both are asserted below. CUDA is not in the combined-sampler
-// lowering set (its `Sampler2D` stays a single `CUtexObject`), so it needs no marker. HLSL/CPU
-// emit GetDimensions via the leading-`.` member form, which does not route through `$N` expansion;
-// fixing those needs a separate rewrite to an explicit string and is tracked as the #10522 family.
+// lowering set (its `Sampler2D` stays a single `CUtexObject`), so it needs no marker. HLSL uses
+// an explicit `$q` string for the combined case too; `tests/bugs/gh-13737.slang` covers it.
 
 Sampler2D<float4> input_texture;
 

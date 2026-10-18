@@ -385,9 +385,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         {
             --cursor;
             Index argIndex = parseNat();
-            // For a texture-only query on a combined texture-sampler that was lowered into a
+            // For a texture-only operation on a combined texture-sampler that was lowered into a
             // `{texture, sampler}` pair, skip over the injected sampler operand at index 1 so the
-            // positional output args line up. `$0` (the texture) is intentionally left unshifted.
+            // positional args line up. `$0` (the texture) is intentionally left unshifted.
             if (m_skipCombinedSamplerOperand && argIndex >= 1)
                 argIndex += 1;
             argIndex += m_argIndexOffset;
@@ -487,19 +487,19 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
     case 'q':
         {
-            // Marker that emits nothing; used by a texture-only query (`GetDimensions`) on a
-            // combined texture-sampler. It is the mirror of `$p` below: `$p` compensates for a
-            // string numbered *with* a sampler slot that is absent, while `$q` compensates for a
-            // string numbered *without* the sampler that lowering injected.
+            // Marker that emits nothing; used by a texture-only operation (`Load`, the subscript,
+            // `GetDimensions`) on a combined texture-sampler. It is the mirror of `$p` below: `$p`
+            // compensates for a string numbered *with* a sampler slot that is absent, while `$q`
+            // compensates for a string numbered *without* the sampler that lowering injected.
             //
             // When a combined `Sampler2D`-style value is lowered into a `{texture, sampler}` pair
             // (HLSL/Metal/WGSL/CPU; see `lowerCombinedTextureSamplers`), the lowered call gains an
-            // injected sampler operand at
-            // index 1 that a texture-only query never consumes. Without compensation the positional
-            // `$N` accessors in the query's intrinsic string would address the sampler and shift
-            // every output argument by one (see shader-slang/slang#11669). Setting this flag makes
-            // `$N` for N >= 1 skip the injected sampler so the operands line up again; `$0` (the
-            // texture) is left unshifted.
+            // injected sampler operand at index 1 that a texture-only operation never consumes.
+            // Without compensation the positional `$N` accessors in the operation's intrinsic
+            // string would address the sampler and shift every argument by one (see
+            // shader-slang/slang#11669 and #13737). Setting this flag makes `$N` for N >= 1 skip
+            // the injected sampler so the operands line up again; `$0` (the texture) is left
+            // unshifted.
             //
             // The sampler operand is only present when the receiver was a combined texture-sampler,
             // so we detect it by type rather than assume it: on a plain texture the operand at
