@@ -210,7 +210,7 @@ async function runSmokeTest() {
         // profile as `#version`, and the layout as a default qualifier (Slang's column-major
         // layout, 2, is GLSL's `row_major`; the default, row-major, is `column_major`).
         const glslTarget = targets.find(target => target.name === 'GLSL').value;
-        const glslSource = 'RWStructuredBuffer<uint> outputBuffer;\n' +
+        const glslShaderSource = 'RWStructuredBuffer<uint> outputBuffer;\n' +
             '[shader("compute")] [numthreads(1, 1, 1)]\n' +
             'void computeMain() { outputBuffer[0] = 1; }\n';
         const glslCode = (desc) => {
@@ -219,7 +219,7 @@ async function runSmokeTest() {
                 throw new Error(`Failed to create a GLSL session from ${JSON.stringify(desc)}`);
             }
             const glslModule = glslSession.loadModuleFromSource(
-                glslSource, 'glsl-options', '/glsl-options.slang');
+                glslShaderSource, 'glsl-options', '/glsl-options.slang');
             const glslProgram = glslModule ?
                 glslSession.createCompositeComponentType([glslModule]).link() : null;
             const code = glslProgram ? glslProgram.getTargetCode(0) : '';
