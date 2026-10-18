@@ -66,6 +66,8 @@ float4 portableOps(int2 p)
 // HLSL: (u_texMS_texture_{{[0-9]+}}).Load(({{.*}}), (int(2)))
 // HLSL: (u_tex_texture_{{[0-9]+}}).Load((int3(int2(id_{{[0-9]+}}.xy), int(0))), ({{[_A-Za-z0-9]+}}))
 // HLSL: (u_tex_texture_{{[0-9]+}}).Load((int3(int2(id_{{[0-9]+}}.xy), int(0))), ({{[_A-Za-z0-9]+}}), (status_{{[0-9]+}}))
+// HLSL: (u_texMS_texture_{{[0-9]+}}).Load(({{[^,]+}}), (int(1)), ({{[_A-Za-z0-9]+}}))
+// HLSL: (u_texMS_texture_{{[0-9]+}}).Load(({{[^,]+}}), (int(1)), ({{[_A-Za-z0-9]+}}), (msStatus_{{[0-9]+}}))
 
 // DXIL: call %dx.types.Dimensions @dx.op.getDimensions
 // DXIL: call %dx.types.ResRet.f32 @dx.op.textureLoad
@@ -96,5 +98,8 @@ void hlslMain(uint3 id: SV_DispatchThreadID)
     r += u_texMS.Load(int3(int2(id.xy), 2));
     r += u_tex.Load(int3(int2(id.xy), 0), int2(1, 1));
     r += u_tex.Load(int3(int2(id.xy), 0), int2(1, 1), status);
-    outBuf[0] = r + float4(status);
+    uint msStatus;
+    r += u_texMS.Load(int2(id.xy), 1, int2(1, 1));
+    r += u_texMS.Load(int2(id.xy), 1, int2(1, 1), msStatus);
+    outBuf[0] = r + float4(status) + float4(msStatus);
 }
