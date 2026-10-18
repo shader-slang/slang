@@ -66,7 +66,7 @@ TextureTypeInfo::TextureTypeInfo(
 
 void TextureTypeInfo::writeFuncBody(
     const char* funcName,
-    int paramCount,
+    const String& cppHlslPreamble,
     const String& glsl,
     const String& cuda,
     const String& spirvDefault,
@@ -80,16 +80,8 @@ void TextureTypeInfo::writeFuncBody(
         sb << i << "__target_switch\n";
         BraceScope switchScope{i, sb};
         sb << i << "case cpp:\n";
-        sb << i << "__intrinsic_asm \"." << funcName << "\";\n";
         sb << i << "case hlsl:\n";
-        // A combined texture-sampler reaches HLSL split into `{texture, sampler}`, and the member
-        // form would pass the injected sampler as the first argument. The `$q` string names the
-        // arguments explicitly so that the expander can skip the sampler.
-        sb << i << "if (isCombined != 0)\n";
-        sb << i << "    __intrinsic_asm \"$q$0." << funcName << "(";
-        for (int p = 1; p <= paramCount; ++p)
-            sb << (p > 1 ? ", " : "") << "$" << p;
-        sb << ")\";\n";
+        sb << cppHlslPreamble;
         sb << i << "__intrinsic_asm \"." << funcName << "\";\n";
         if (glsl.getLength())
         {
@@ -147,7 +139,7 @@ void TextureTypeInfo::writeFuncBody(
 
 void TextureTypeInfo::writeFuncWithSig(
     const char* funcName,
-    int paramCount,
+    const String& cppHlslPreamble,
     const String& sig,
     const String& glsl,
     const String& spirvDefault,
@@ -164,7 +156,7 @@ void TextureTypeInfo::writeFuncWithSig(
     sb << i << sig << "\n";
     writeFuncBody(
         funcName,
-        paramCount,
+        cppHlslPreamble,
         glsl,
         cuda,
         spirvDefault,
@@ -178,7 +170,7 @@ void TextureTypeInfo::writeFuncWithSig(
 void TextureTypeInfo::writeFunc(
     const char* returnType,
     const char* funcName,
-    int paramCount,
+    const String& cppHlslPreamble,
     const String& params,
     const String& glsl,
     const String& spirvDefault,
@@ -191,7 +183,7 @@ void TextureTypeInfo::writeFunc(
 {
     writeFuncWithSig(
         funcName,
-        paramCount,
+        cppHlslPreamble,
         cat(returnType, " ", funcName, "(", params, ")"),
         glsl,
         spirvDefault,
@@ -252,7 +244,7 @@ static String wgslTextureAttributeConversion(DimType type, S expr)
     };
 }
 
-void TextureTypeInfo::writeGetDimensionFunctions()
+void TextureTypeInfo::writeGetDimensionFunctions(StringBuilder& outCombinedForwarders)
 {
     static const char* kComponentNames[]{"x", "y", "z", "w"};
 
@@ -276,6 +268,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
             int sizeDimCount = 0;
             StringBuilder params;
+            StringBuilder args;
             int paramCount = 0;
 
             // HLSL, Metal and WGSL lower a combined `Sampler2D` into a `{texture, sampler}` pair
@@ -303,6 +296,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             {
                 ++paramCount;
                 params << "uint mipLevel,";
+                args << "mipLevel, ";
 
                 if (baseShape != SLANG_TEXTURE_1D)
                     metalMipLevel = "$1";
@@ -313,6 +307,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             case SLANG_TEXTURE_1D:
                 ++paramCount;
                 params << t << "width";
+                args << "width";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
                 cuda << "uint32_t width; asm(\\\"" << cudaTxqPrefix << "width.b32 %0, [%1]"
@@ -333,6 +328,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             case SLANG_TEXTURE_CUBE:
                 ++paramCount;
                 params << t << "width,";
+                args << "width, ";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
                 cuda << "uint32_t w, h; asm(\\\"" << cudaTxqPrefix << "width.b32 %0, [%2]"
@@ -347,6 +343,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
                 ++paramCount;
                 params << t << "height";
+                args << "height";
                 metal << "(*($" << String(paramCount) << ") = $0.get_height("
                       << String(metalMipLevel) << ")),";
                 if (cuda.getLength() > 1 && cuda[cuda.getLength() - 1] != ';')
@@ -361,6 +358,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             case SLANG_TEXTURE_3D:
                 ++paramCount;
                 params << t << "width,";
+                args << "width, ";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
                 cuda << "uint32_t w, h, d; asm(\\\"" << cudaTxqPrefix << "width.b32 %0, [%3]"
@@ -376,6 +374,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
                 ++paramCount;
                 params << t << "height,";
+                args << "height, ";
                 metal << "(*($" << String(paramCount) << ") = $0.get_height("
                       << String(metalMipLevel) << ")),";
                 if (cuda.getLength() > 1 && cuda[cuda.getLength() - 1] != ';')
@@ -386,6 +385,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
                 ++paramCount;
                 params << t << "depth";
+                args << "depth";
                 metal << "(*($" << String(paramCount) << ") = $0.get_depth("
                       << String(metalMipLevel) << ")),";
                 if (cuda.getLength() > 1 && cuda[cuda.getLength() - 1] != ';')
@@ -407,6 +407,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 ++sizeDimCount;
                 ++paramCount;
                 params << ", " << t << "elements";
+                args << ", elements";
                 metal << "(*($" << String(paramCount) << ") = $0.get_array_size()),";
 
                 // For cube map arrays, CUDA should include all 6 faces in the array size count
@@ -425,6 +426,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             {
                 ++paramCount;
                 params << ", " << t << "sampleCount";
+                args << ", sampleCount";
                 metal << "(*($" << String(paramCount) << ") = $0.get_num_samples()),";
                 if (cuda.getLength() > 1 && cuda[cuda.getLength() - 1] != ';')
                     cuda << "; ";
@@ -439,6 +441,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             {
                 ++paramCount;
                 params << ", " << t << "numberOfLevels";
+                args << ", numberOfLevels";
                 metal << "(*($" << String(paramCount) << ") = $0.get_num_mip_levels()),";
                 if (cuda.getLength() > 1 && cuda[cuda.getLength() - 1] != ';')
                     cuda << "; ";
@@ -663,10 +666,29 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             if (cuda.getLength() && includeMipInfo)
                 sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
+            // On HLSL and CPU a combined receiver forwards to the extracted texture through a
+            // file-scope function (see `__loadTexture` in hlsl.meta.slang for why it is not a
+            // member call). One forwarder name per shape keeps each overload set to the six
+            // `GetDimensions` overloads of that shape.
+            StringBuilder forwarderName;
+            forwarderName << "__getDimensions" << base.shapeName << (isArray ? "Array" : "")
+                          << (isMultisample ? "MS" : "");
+            outCombinedForwarders
+                << "__generic<T:ITexelElement, let texSampleCount:int, let access:int, let "
+                   "isShadow:int, let format:int>\n"
+                << "[__readNone]\n[ForceInline]\n"
+                << "void " << forwarderName << "(_Texture<T,__Shape" << base.shapeName << ","
+                << int(isArray) << "," << int(isMultisample)
+                << ",texSampleCount,access,isShadow,0,format> t, " << params << ")\n"
+                << "{\n    t.GetDimensions(" << args << ");\n}\n\n";
+            StringBuilder combinedForward;
+            combinedForward << i << "if (isCombined != 0) { " << forwarderName
+                            << "(__extractImage(this), " << args << "); return; }\n";
+
             writeFunc(
                 "void",
                 "GetDimensions",
-                paramCount,
+                combinedForward.produceString(),
                 params,
                 glsl,
                 spirvDefault,

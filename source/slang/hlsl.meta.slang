@@ -2719,6 +2719,58 @@ __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int
 _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format> __extractImage(
     _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> combinedSampler);
 
+// Texture-only operations on a combined texture-sampler forward to the extracted texture through
+// these free functions. A member call on the extracted texture from inside the combined-generic
+// extension (`__extractImage(this).Load(location)`) fails lookup with E30027, while a call through
+// a free function resolves normally.
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTexture(_Texture<T,Shape,isArray,0,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray+1> location)
+{
+    return t.Load(location);
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTexture(_Texture<T,Shape,isArray,0,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
+{
+    return t.Load(location, offset);
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTexture(_Texture<T,Shape,isArray,0,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+{
+    return t.Load(location, offset, status);
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTextureMS(_Texture<T,Shape,isArray,1,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray> location, int sampleIndex)
+{
+    return t.Load(location, sampleIndex);
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTextureMS(_Texture<T,Shape,isArray,1,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
+{
+    return t.Load(location, sampleIndex, offset);
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTextureMS(_Texture<T,Shape,isArray,1,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+{
+    return t.Load(location, sampleIndex, offset, status);
+}
+
 // Gather with a texel offset. The SPIR-V backend selects `ConstOffset` (no capability) or `Offset`
 // (`ImageGatherExtended`) based on whether the offset is a compile-time constant.
 __intrinsic_op($(kIROp_ImageGatherOffset))
@@ -4430,17 +4482,19 @@ for (int isMS = 0; isMS <= 1; isMS++) {
     }
     auto shapeTypeName = kTextureShapeTypeNames[shapeIndex];
     TextureTypeInfo textureTypeInfo(kBaseTextureShapes[shapeIndex], isArray, isMS, 0, sb, path);
+    StringBuilder combinedForwarders;
 $}
 
 __generic<T:ITexelElement, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,$(shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
 {
     ${
-    textureTypeInfo.writeGetDimensionFunctions();
+    textureTypeInfo.writeGetDimensionFunctions(combinedForwarders);
     $}
 }
 
 ${
+    sb << combinedForwarders;
 }
 $}
 
@@ -5101,13 +5155,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         __target_switch
         {
         case cpp:
-            __intrinsic_asm ".Load";
         case hlsl:
-            // HLSL, Metal and WGSL split a combined texture-sampler into a texture and a sampler,
-            // and pass both to every call. `Load` and the subscript use only the texture, so their
-            // combined-case strings start with `$q`, which skips the sampler operand.
+            // A combined texture-sampler is lowered to a `{texture, sampler}` pair on these
+            // targets, so the member form would also receive the sampler. Texture-only
+            // operations therefore forward to the extracted texture.
             if (isCombined != 0)
-                __intrinsic_asm "$q$0.Load($1)";
+                return __loadTexture(__extractImage(this), location);
             __intrinsic_asm ".Load";
 		case cuda:
             // The 'tex*fetch_int<T>' prelude templates below have no half implementation
@@ -5266,10 +5319,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         __target_switch
         {
             case cpp:
-                __intrinsic_asm ".Load";
             case hlsl:
                 if (isCombined != 0)
-                    __intrinsic_asm "$q$0.Load($1, $2)";
+                    return __loadTexture(__extractImage(this), location, offset);
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
@@ -5309,7 +5361,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         {
         case hlsl:
             if (isCombined != 0)
-                __intrinsic_asm "$q$0.Load($1, $2, $3)";
+                return __loadTexture(__extractImage(this), location, offset, status);
             __intrinsic_asm ".Load";
         case spirv:
              const int lodLoc = Shape.dimensions+isArray;
@@ -5363,10 +5415,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             __target_switch
             {
                 case cpp:
-                    __intrinsic_asm ".operator[]";
                 case hlsl:
                     if (isCombined != 0)
-                        __intrinsic_asm "$q$0[$1]";
+                        return Load(__makeVector(location, 0));
                     __intrinsic_asm ".operator[]";
                 case metal:
                 case cuda:
@@ -5419,10 +5470,9 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         __target_switch
         {
             case cpp:
-                __intrinsic_asm ".Load";
             case hlsl:
                 if (isCombined != 0)
-                    __intrinsic_asm "$q$0.Load($1, $2)";
+                    return __loadTextureMS(__extractImage(this), location, sampleIndex);
                 __intrinsic_asm ".Load";
             case metal:
                 switch (Shape.flavor)
@@ -5498,10 +5548,9 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         __target_switch
         {
             case cpp:
-                __intrinsic_asm ".Load";
             case hlsl:
                 if (isCombined != 0)
-                    __intrinsic_asm "$q$0.Load($1, $2, $3)";
+                    return __loadTextureMS(__extractImage(this), location, sampleIndex, offset);
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
@@ -5538,7 +5587,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         {
         case hlsl:
             if (isCombined != 0)
-                __intrinsic_asm "$q$0.Load($1, $2, $3, $4)";
+                return __loadTextureMS(__extractImage(this), location, sampleIndex, offset, status);
             __intrinsic_asm ".Load";
         case spirv:
              if (isCombined != 0)
@@ -5589,10 +5638,9 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             __target_switch
             {
                 case cpp:
-                    __intrinsic_asm "($0).sample[$1]";
                 case hlsl:
                     if (isCombined != 0)
-                        __intrinsic_asm "$q$0[$1]";
+                        return Load(location, 0);
                     __intrinsic_asm "($0).sample[$1]";
                 case metal:
                 case spirv:
@@ -5615,10 +5663,9 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             __target_switch
             {
                 case cpp:
-                    __intrinsic_asm "($0).sample[$2][$1]";
                 case hlsl:
                     if (isCombined != 0)
-                        __intrinsic_asm "$q($0).sample[$2][$1]";
+                        return Load(location, sampleIndex);
                     __intrinsic_asm "($0).sample[$2][$1]";
                 case metal:
                 case spirv:
