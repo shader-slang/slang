@@ -5,13 +5,8 @@
 //
 // `p` is a `Ptr(Ptr(int))` local written a Workgroup pointer (from `pickShared`) on one path and a
 // StorageBuffer pointer (from `pickBuf`) on the other, then only dereferenced. The two stores come
-// from calls, so the storage classes only become concrete after the callees settle during the
-// dataflow — the slot pre-pass `reconcilePointerSlotWithStoredValue` resolves stored values with
-// `getStoredValueAddrSpace`, which has no call case and sees `Generic`, so it cannot flag this.
-// `reconcileHeldPointerAddressSpace` runs during the drain (after the calls resolve) and detects
-// the conflict; because `p` is not returned it is the general inconsistent-slot conflict, reported
-// as E58003. Before the fix this branch dropped a non-returned conflict silently and emitted
-// invalid SPIR-V (disagreeing OpStore/OpLoad pointer types) with no diagnostic on any path.
+// from calls, so the storage classes become concrete only after the callees settle; the conflict
+// is detected then, and because `p` is not returned it is reported as E58003.
 
 RWStructuredBuffer<int> buf;
 

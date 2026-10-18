@@ -125,12 +125,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // -disable-non-essential-validations, which skips the E55201 check).
     HashSet<IRFunc*> rootsBeingSpecialized;
 
-    // Specialization roots ever observed recursing (a call re-entered a root still
-    // on the stack). A recursive call's result never settles to a concrete pointer,
-    // so held-pointer reconciliation ignores stores fed by such calls rather than
-    // treat a provisional default as a conflicting storage class; the recursion
-    // itself is invalid SPIR-V and diagnosed elsewhere.
-    HashSet<IRFunc*> recursiveRoots;
+    // Calls that re-entered a specialization root still on the stack (recursive
+    // back-edges). Such a call's result is recorded before its callee settles, so it is
+    // provisional, and held-pointer reconciliation ignores the stores it feeds rather
+    // than treat that provisional value as a conflicting storage class. Other calls to
+    // the same function settle normally and still feed conflict detection. The recursion
+    // itself is invalid SPIR-V and rejected elsewhere.
+    HashSet<IRInst*> recursiveBackEdgeCalls;
 
     IRFunc* specializeFunc(const FuncSpecializationKey& key)
     {
@@ -300,7 +301,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 {
                     auto calleeRoot = getSpecializationRoot(calleeFunc);
                     if (rootsBeingSpecialized.contains(calleeRoot) ||
-                        recursiveRoots.contains(calleeRoot))
+                        recursiveBackEdgeCalls.contains(call))
                         continue;
                 }
             auto valAddrSpace = getAddrSpace(store->getVal());
@@ -325,8 +326,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             // through the shared `recordSlotConflict`. This branch catches a non-returned conflict
             // the pre-pass misses — e.g. a slot fed by two pointer-returning calls, whose classes
             // only become concrete after the calls resolve (the pre-pass's
-            // `getStoredValueAddrSpace` has no call case and sees `Generic`) — that would otherwise
-            // emit invalid SPIR-V with disagreeing OpStore/OpLoad types.
+            // `getStoredValueAddrSpace` treats an unsettled call as `Generic`) — that would
+            // otherwise emit invalid SPIR-V with disagreeing OpStore/OpLoad types.
             recordSlotConflict(func, var, conflictLoc);
             return false;
         }
@@ -439,6 +440,24 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 changed = true;
                             }
                         }
+                        // Likewise a recursive back-edge call was mapped from its callee's
+                        // provisional result; once the callee leaves the specialization stack,
+                        // adopt its settled result so the call and the callee's return agree.
+                        else if (recursiveBackEdgeCalls.contains(inst))
+                        {
+                            auto callee = as<IRFunc>(as<IRCall>(inst)->getCallee());
+                            if (callee &&
+                                !rootsBeingSpecialized.contains(getSpecializationRoot(callee)))
+                            {
+                                auto settled = getFuncResultAddrSpace(callee);
+                                if (settled != AddressSpace::Generic &&
+                                    mapInstToAddrSpace[inst] != settled)
+                                {
+                                    mapInstToAddrSpace[inst] = settled;
+                                    changed = true;
+                                }
+                            }
+                        }
                         continue;
                     }
 
@@ -535,6 +554,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 if (IRFunc** cached = functionSpecializations.tryGetValue(key))
                                 {
                                     specializedCallee = *cached;
+                                    // A cached clone whose root is still on the stack is a
+                                    // recursive back-edge (e.g. `a -> b -> a` reusing `a`'s
+                                    // clone), exactly as in the uncached branch below.
+                                    if (rootsBeingSpecialized.contains(
+                                            getSpecializationRoot(specializedCallee)))
+                                        recursiveBackEdgeCalls.add(callInst);
                                 }
                                 else
                                 {
@@ -552,7 +577,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                         // re-cloning (the root has left the stack by then).
                                         specializedCallee = callee;
                                         functionSpecializations[key] = callee;
-                                        recursiveRoots.add(root);
+                                        recursiveBackEdgeCalls.add(callInst);
                                     }
                                     else
                                     {
@@ -578,14 +603,14 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 // returns a pointer settle its result now (guarded against
                                 // recursion via the specialization root) — exactly as the
                                 // specialized branch settles a fresh clone. The tail below
-                                // records this call's result once and it is then skipped on
-                                // later drains (a mapped inst is not revisited), so reading a
+                                // records this call's result once and only a recursive
+                                // back-edge call is revisited after it is mapped, so reading a
                                 // pre-settlement default here would never be corrected.
                                 workList.add(callee);
                                 IRFunc* root = getSpecializationRoot(callee);
                                 if (rootsBeingSpecialized.contains(root))
                                 {
-                                    recursiveRoots.add(root);
+                                    recursiveBackEdgeCalls.add(callInst);
                                 }
                                 else if (getFuncResultAddrSpace(callee) != AddressSpace::Generic)
                                 {
@@ -607,10 +632,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             }
                             // Reconcile the call's result address space to the callee's.
                             // The callee has been settled above (eagerly for a fresh
-                            // specialization or a pointer-returning unspecialized callee;
-                            // a recursive back-edge reuses an already-cached callee whose
-                            // result the base case settles before the recursive return is
-                            // read), so this reads a concrete result rather than a default.
+                            // specialization or a pointer-returning unspecialized callee), so
+                            // this reads a concrete result. A recursive back-edge call reads
+                            // its callee's provisional result here and adopts the settled one
+                            // once the callee leaves the specialization stack (see the
+                            // already-mapped case at the top of this loop).
                             auto callResultAddrSpace = getFuncResultAddrSpace(specializedCallee);
                             if (callResultAddrSpace != AddressSpace::Generic)
                             {
@@ -776,6 +802,16 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             // debug backing variable — are out of scope here and require reconciliation after call
             // specialization (tracked in #13039); until then they can emit ill-typed SPIR-V that
             // is only caught when validation is enabled.
+            if (!mapInstToAddrSpace.containsKey(value))
+                return AddressSpace::Generic;
+            break;
+        case kIROp_Call:
+            // A call's result address space is likewise unknown at this pre-pass: the callee's
+            // result is settled, and recorded onto the call, only by the worklist fixpoint that
+            // runs afterwards. Until then the call's declared type carries the `Ptr<T>` surface
+            // default (`Device`), so reading it would report a false conflict for a slot fed by
+            // `&gShared` on one path and a call returning `&gShared` on the other. A call-fed slot
+            // is reconciled once its calls settle, by `reconcileHeldPointerAddressSpace`.
             if (!mapInstToAddrSpace.containsKey(value))
                 return AddressSpace::Generic;
             break;
