@@ -270,6 +270,7 @@ issue, comment, and review events rather than to a PR's code.
 | `issue-onboard.yml` / `issue-board-onboard.yml`         | Adds a new issue to Slang-All; sets Source; Internal authors are assigned and moved to In Triage / current Sprint. |
 | `claude.yml`                                            | The `@claude` assistant on issues and PRs.                                                                         |
 | `claude-ci-analysis.yml`                                | On demand: analyzes a CI failure and pushes a fix to the PR.                                                       |
+| `claude-perf-bisect.yml`                                | After a red nightly perf run, or on demand: shadow bisect and classification of a confirmed regression.            |
 
 ## 5. Slash-command regenerators
 
