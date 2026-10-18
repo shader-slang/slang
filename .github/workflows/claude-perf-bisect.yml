@@ -9,9 +9,9 @@ name: Claude Perf Bisect
 #   classify (ubuntu)    Claude reads the culprit PR's intent, only after
 #                        attribution, and classifies the cost.
 #
-# Output goes only to job summaries and run artifacts. Every job token is
-# read-only and no job requests id-token, so the runner's Claude App token
-# exchange cannot happen and nothing can be posted, pushed or filed.
+# Output goes only to job summaries and run artifacts. Nothing can be posted,
+# pushed or filed because the permissions blocks grant only read scopes: with
+# no id-token the runner falls back to github.token, which those blocks bound.
 # The procedure follows slang-coworkers/nanoclaw#1980 (slang-perf-regression).
 
 on:
