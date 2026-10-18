@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=MIP): -target metal -entry mipMain -stage compute
 
 // shader-slang/slang#13737: the `$q` strings for `Load` on a combined texture-sampler read the
 // coordinate from call operand 2, because operand 1 is the split-out sampler. The emitter decides
@@ -12,8 +12,8 @@
 Sampler2DArray<int4> u_tex;
 RWStructuredBuffer<int4> outBuf;
 
-// CHECK-COUNT-5: {{textureLoad|\.read|\.Load}}(
-// CHECK-NOT: {{textureLoad|\.read|\.Load}}(
+// CHECK-COUNT-5: {{textureLoad|\.read}}(
+// CHECK-NOT: {{textureLoad|\.read}}(
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -26,4 +26,18 @@ void main(uint3 id: SV_DispatchThreadID)
     c = u_tex.Load(c);
     c = u_tex.Load(c);
     outBuf[0] = c;
+}
+
+// The Metal `GetDimensions` strings use the mip level `$1` in every getter, so it must be computed
+// once into a temporary, not copied into each `get_width`/`get_height` call.
+// MIP: uint [[MIPLEVEL:_S[0-9]+]] = id_{{[0-9]+}}.x * 3U + id_{{[0-9]+}}.y;
+// MIP: get_width(([[MIPLEVEL]]))
+// MIP: get_height(([[MIPLEVEL]]))
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mipMain(uint3 id: SV_DispatchThreadID)
+{
+    uint w, h, e, l;
+    u_tex.GetDimensions(id.x * 3u + id.y, w, h, e, l);
+    outBuf[0] = int4(w, h, e, l);
 }

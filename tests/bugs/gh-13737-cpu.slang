@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPPNOT): -target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SO): -target shader-sharedlib -entry computeMain -stage compute
 
 // shader-slang/slang#13737: on CPU a combined texture-sampler that is also sampled is lowered to a
@@ -11,7 +12,12 @@ RWStructuredBuffer<float4> outBuf;
 
 // CPP: u_texArray_{{[0-9]+}}.texture_{{[0-9]+}}.GetDimensions(
 // CPP: u_tex_{{[0-9]+}}.texture_{{[0-9]+}}.Load(
+// CPPNOT-NOT: u_tex{{(Array)?}}_{{[0-9]+}}.{{Load|GetDimensions}}(
 // SO: result code = 0
+
+// The `uint` overload of `GetDimensions` is used because the CPU prelude declares the array
+// textures' `GetDimensions` with a `uint32_t*` width only, so the `float` overload fails to compile
+// for plain `Texture2DArray` too; that is a separate prelude limitation.
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

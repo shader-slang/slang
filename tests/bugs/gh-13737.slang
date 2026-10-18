@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry hlslMain -stage compute
 //TEST:SIMPLE(filecheck=NOSAMPLER): -target hlsl -entry hlslMain -stage compute
+//TEST:SIMPLE(filecheck=HLSLDIMS): -target hlsl -entry hlslMain -stage compute
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry hlslMain -stage compute -profile cs_6_0
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry portableMain -stage compute
 //TEST:SIMPLE(filecheck=NOSAMPLER): -target wgsl -entry portableMain -stage compute
@@ -29,6 +30,7 @@ SamplerCube<float4> u_texCube;
 SamplerCubeShadow u_cubeShadow;
 Sampler2DMSArray<float4> u_texMSArray;
 Sampler2DArrayShadow u_arrayShadow;
+SamplerCubeArray<float4> u_texCubeArray;
 RWStructuredBuffer<float4> outBuf;
 
 // NOSAMPLER-NOT: _sampler_{{[0-9]+}}{{[]),]}}
@@ -154,12 +156,34 @@ void shapesMain(uint3 id: SV_DispatchThreadID)
     outBuf[0] = shapeOps(int(id.x));
 }
 
+// HLSLDIMS: u_tex1D_texture_{{[0-9]+}}.GetDimensions(0U, w_{{[0-9]+}}, l_{{[0-9]+}});
+// HLSLDIMS: u_tex3D_texture_{{[0-9]+}}.GetDimensions(w_{{[0-9]+}}, h_{{[0-9]+}}, e_{{[0-9]+}});
+// HLSLDIMS: u_texCube_texture_{{[0-9]+}}.GetDimensions(0U, fw_{{[0-9]+}}, fh_{{[0-9]+}}, fl_{{[0-9]+}});
+// HLSLDIMS: u_tex1DArray_texture_{{[0-9]+}}.GetDimensions(w_{{[0-9]+}}, e_{{[0-9]+}});
+// HLSLDIMS: u_texMSArray_texture_{{[0-9]+}}.GetDimensions(w_{{[0-9]+}}, h_{{[0-9]+}}, e_{{[0-9]+}}, s_{{[0-9]+}});
+// HLSLDIMS: u_texCubeArray_texture_{{[0-9]+}}.GetDimensions(w_{{[0-9]+}}, h_{{[0-9]+}}, e_{{[0-9]+}});
+// HLSLDIMS: u_tex_texture_{{[0-9]+}}.GetDimensions(0U, iw_{{[0-9]+}}, ih_{{[0-9]+}}, il_{{[0-9]+}});
+float4 moreDimensions()
+{
+    uint w, h, e, l, s;
+    int iw, ih, il;
+    float fw, fh, fl;
+    u_tex1D.GetDimensions(0, w, l);
+    u_tex3D.GetDimensions(w, h, e);
+    u_texCube.GetDimensions(0, fw, fh, fl);
+    u_tex1DArray.GetDimensions(w, e);
+    u_texMSArray.GetDimensions(w, h, e, s);
+    u_texCubeArray.GetDimensions(w, h, e);
+    u_tex.GetDimensions(0, iw, ih, il);
+    return float4(w + h + e + l + s, iw + ih + il, fw + fh + fl, 0);
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void hlslMain(uint3 id: SV_DispatchThreadID)
 {
     uint status;
-    float4 r = portableOps(int2(id.xy));
+    float4 r = portableOps(int2(id.xy)) + moreDimensions();
     r += u_texMS.Load(int3(int2(id.xy), 2));
     r += u_tex.Load(int3(int2(id.xy), 0), int2(1, 1));
     r += u_tex.Load(int3(int2(id.xy), 0), int2(1, 1), status);
