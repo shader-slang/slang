@@ -9,10 +9,8 @@
 // shader-slang/slang#13737 and #10522: texture-only operations (`Load`, the subscript and
 // `GetDimensions`) on a combined texture-sampler must use only the texture. HLSL, Metal and WGSL
 // have no combined texture-sampler type, so the compiler splits `Sampler2D` and friends into a
-// texture and a sampler, and every call on the combined value receives both. The texture-only
-// operations used to pass the sampler on to the target, as an extra first argument on HLSL
-// (`tex.Load(sampler, coord)`, `tex[sampler]`) and as the coordinate on Metal and WGSL
-// (`textureLoad(tex, (sampler).xy, ...)`).
+// texture and a sampler, and every call on the combined value receives both. Texture-only
+// operations must ignore the injected sampler operand.
 //
 // The shader below never samples, so no sampler may be referenced as a call argument or index.
 

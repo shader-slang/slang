@@ -11,7 +11,6 @@
 Sampler2DArray<int4> u_tex;
 RWStructuredBuffer<int4> outBuf;
 
-// Five chained loads must stay five texture reads.
 // CHECK-COUNT-5: {{textureLoad|\.read}}(
 // CHECK-NOT: {{textureLoad|\.read}}(
 
