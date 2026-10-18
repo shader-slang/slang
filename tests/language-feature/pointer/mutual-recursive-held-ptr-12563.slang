@@ -1,12 +1,13 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -stage compute -entry computeMain -disable-non-essential-validations -skip-spirv-validation
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -stage compute -entry computeMainPtrArg -disable-non-essential-validations -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -stage compute -entry computeMainDirect -disable-non-essential-validations -skip-spirv-validation
 //TEST:SIMPLE(filecheck=CONFLICT):-target spirv -stage compute -entry computeMainConflict -disable-non-essential-validations -skip-spirv-validation
 
 // Regression test for shader-slang/slang#12563. With the recursion check (E55201) disabled, a
 // recursive call's result is provisional until the cycle settles, and it must not read as a second
-// storage class. Mutual recursion `a -> b -> a` (no pointer argument) and `c -> d -> c` (pointer
-// argument, so the back-edge reuses a cached clone) store only Workgroup pointers into `r`, so
-// neither may report E58005. A settled call to the same recursive function outside the cycle still
+// storage class. Mutual recursion `a -> b -> a` (no pointer argument), `c -> d -> c` (pointer
+// argument, so the back-edge reuses a cached clone) and `e -> f -> e` (direct returns, no local)
+// yield only Workgroup pointers, so none may report E58005. A settled call to the same recursive function outside the cycle still
 // feeds conflict detection: `computeMainConflict` merges it with a StorageBuffer pointer (E58003).
 // Once the cycle settles, every call's result type matches its callee's Workgroup return type,
 // including the back-edge call. A recursive call graph is invalid SPIR-V regardless, so SPIR-V
@@ -63,6 +64,24 @@ int* d(int* p, int n)
     return r;
 }
 
+int* f(int n);
+
+[noinline]
+int* e(int n)
+{
+    if (n <= 0)
+        return &gShared;
+    return f(n - 1);
+}
+
+[noinline]
+int* f(int n)
+{
+    if (n <= 0)
+        return &gShared;
+    return e(n - 1);
+}
+
 // CHECK-NOT: E58005
 // CHECK: OpEntryPoint
 // CHECK-NOT: OpFunctionCall %_ptr_PhysicalStorageBuffer_int
@@ -81,6 +100,13 @@ void computeMainPtrArg(uint3 tid: SV_DispatchThreadID)
 }
 
 // CONFLICT: E58003
+[numthreads(1, 1, 1)]
+void computeMainDirect(uint3 tid: SV_DispatchThreadID)
+{
+    *e(int(tid.x)) = 1;
+    outBuf[0] = gShared;
+}
+
 [numthreads(1, 1, 1)]
 void computeMainConflict(uint3 tid: SV_DispatchThreadID)
 {
