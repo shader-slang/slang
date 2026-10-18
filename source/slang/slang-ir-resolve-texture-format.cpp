@@ -41,14 +41,9 @@ static void resolveTextureFormatForParameter(IRInst* textureInst, IRTextureTypeB
 {
     ImageFormat format = (ImageFormat)(textureType->getFormat());
     auto decor = textureInst->findDecoration<IRFormatDecoration>();
-
-    // A concrete format on the texture type is the source of truth. Format decorations are only
-    // used to preserve the older `[format(...)]` path for texture types whose format operand is
-    // still unknown.
-    if (format != ImageFormat::unknown)
-        return;
-
     if (!decor)
+        return;
+    if (decor->getFormat() == (ImageFormat)textureType->getFormat())
         return;
 
     format = decor->getFormat();
