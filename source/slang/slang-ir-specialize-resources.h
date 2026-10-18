@@ -19,7 +19,7 @@ struct IRType;
 ///
 bool specializeResourceParameters(CodeGenContext* codeGenContext, IRModule* module);
 
-/// Specialize resource input and output uses until no transformation can make further progress.
+/// Specialize resource selections, inputs, and outputs until no transformation makes progress.
 ///
 /// The operation simplifies the module after each successful specialization or inlining round. If
 /// a resource output cannot be reconstructed at its call sites, it tries to inline direct calls to
