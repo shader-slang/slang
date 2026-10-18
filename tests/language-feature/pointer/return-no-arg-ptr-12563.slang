@@ -7,8 +7,8 @@
 // A pointer-returning function does not need a pointer *argument*: it can pick up
 // a concrete address space entirely from what it returns. Argument specialization
 // and result reconciliation are independent concerns, so a callee with no pointer
-// argument (`pickShared`) or only a scalar argument (`pickBuf`) still has its
-// result address space reconciled onto the call. Before the fix,
+// argument (`pickShared`, `pickBufZero`) or only a scalar argument (`pickSharedScalar`,
+// `pickBuf`) still has its result address space reconciled onto the call. Before the fix,
 // specializeAddressSpace bailed out of the call on `!hasSpecializableArg` before
 // recording the call result, so the OpFunctionCall result type kept its default
 // while the callee's return type became Workgroup/StorageBuffer — an
@@ -32,6 +32,14 @@ int* pickShared()
     return &gShared;
 }
 
+// Only a scalar argument; returns a Workgroup pointer.
+[noinline]
+int* pickSharedScalar(uint i)
+{
+    gShared += int(i);
+    return &gShared;
+}
+
 // WORKGROUP-DAG: OpEntryPoint
 // WORKGROUP-DAG: OpFunctionCall
 // WORKGROUP-NOT: error
@@ -40,7 +48,8 @@ void computeMainWorkgroup(uint3 tid: SV_DispatchThreadID)
 {
     gShared = int(tid.x);
     int* got = pickShared();
-    outputBuffer[0] = *got;
+    int* gotScalar = pickSharedScalar(tid.x);
+    outputBuffer[0] = *got + *gotScalar;
 }
 
 // Only a scalar argument; returns a StorageBuffer pointer.
@@ -48,6 +57,13 @@ void computeMainWorkgroup(uint3 tid: SV_DispatchThreadID)
 int* pickBuf(uint i)
 {
     return &outputBuffer[i];
+}
+
+// Zero pointer arguments; returns a StorageBuffer pointer.
+[noinline]
+int* pickBufZero()
+{
+    return &outputBuffer[0];
 }
 
 // STORAGE-DAG: OpEntryPoint
@@ -58,4 +74,6 @@ void computeMainStorage(uint3 tid: SV_DispatchThreadID)
 {
     int* got = pickBuf(tid.x);
     *got = int(tid.x);
+    int* gotZero = pickBufZero();
+    *gotZero += 1;
 }
