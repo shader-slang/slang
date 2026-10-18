@@ -76,8 +76,8 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 // COMBINED: OpImageSampleImplicitLod {{.*}} %[[SAMPLED]]
 
 // NAME: OpEntryPoint Fragment %main
-// NAME: OpImageSampleImplicitLod
 // NAME-NOT: makeDescriptor
+// NAME: OpImageSampleImplicitLod
 
 // HEAP: OpEntryPoint Fragment %main
 // HEAP: OpDecorate %slang_resourceHeap BuiltIn ResourceHeapEXT
