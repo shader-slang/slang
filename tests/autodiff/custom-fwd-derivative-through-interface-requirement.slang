@@ -1,11 +1,12 @@
 // A conformer's `[ForwardDerivative]` must be used when its method is called through the
 // interface requirement it implements: through an existential parameter, a generic parameter,
-// or runtime dynamic dispatch. A generic caller must also not change the derivative used by a
-// direct call on the concrete type. The custom derivatives below deliberately differ from the
+// or runtime dynamic dispatch. A direct call on the concrete type must also keep the user's
+// derivative when a generic caller in the same module resolves the requirement to the same method
+// (the MIXED mode). The custom derivatives below deliberately differ from the
 // true derivative of the primal body (`3 * s`), and each counts its invocations, so the output
 // shows which derivative ran. Backward-mode calls have no user derivative to honor and keep the
 // synthesized one, a conformer with both custom derivatives uses each in its own mode, and a
-// differentiable custom derivative still provides second-order derivatives.
+// differentiable custom derivative still provides second-order derivatives through a direct call.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CONCRETE):-cpu -shaderobj -output-using-type -Xslang... -DCONCRETE -X.
 //TEST:COMPARE_COMPUTE(filecheck-buffer=EXISTENTIAL):-cpu -shaderobj -output-using-type -Xslang... -DEXISTENTIAL -X.

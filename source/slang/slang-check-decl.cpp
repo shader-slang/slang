@@ -15970,13 +15970,21 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
     // extension __func_as_type(decl) : IBackwardDifferentiable<__func_as_type(decl)>
     // { /* ..empty.. */ }
     //
-    // We skip either extension when the decl carries the matching `[ForwardDerivative]` or
-    // `[BackwardDerivative]` attribute, because `translateFwdDerivativeAttributeToAD2` or
-    // `translateBwdDerivativeAttributeToAD2` then conforms the decl to that interface with the
-    // user's derivative. Both conformances would lower to one witness table whose synthesized
-    // entries win, so calls through an interface requirement would ignore the user's derivative.
-    // A derivative attached with `[ForwardDerivativeOf]`/`[BackwardDerivativeOf]` is not a
-    // modifier of this decl, so its primal still gets the synthesized extension (#13301).
+    // For each mode, `__func_as_type(decl)` must have exactly one conformance to the derivative
+    // interface: either the synthesized extension here, or the one that
+    // `translateFwdDerivativeAttributeToAD2` / `translateBwdDerivativeAttributeToAD2` creates later
+    // (at `ReadyForLookup`) from a `[ForwardDerivative]` / `[BackwardDerivative]` on the decl.
+    // Two conformances of the same function type to the same interface get the same witness-table
+    // linkage name in `visitInheritanceDecl`, and the linker keeps only one of them, so calls
+    // through an interface requirement could silently use the synthesized derivative instead of the
+    // user's. We therefore skip the synthesized extension for a mode whose attribute is present.
+    // For the forward mode, that also skips the synthesized higher-order conformances of
+    // `fwd_diff`; a differentiable user derivative provides them instead.
+    //
+    // The guard only sees attributes on the decl itself. A derivative attached from the other side
+    // with `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]`, or one a `[Differentiable]` decl
+    // gets through `[PrimalSubstitute]`, is not visible here, so those spellings can still produce
+    // both conformances.
     //
 
     if (decl->findModifier<DifferentiableAttribute>())
@@ -16010,6 +16018,7 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
         };
         if (!isInterfaceRequirement(decl))
         {
+            // A user `[ForwardDerivative]` provides the forward conformance instead.
             if ((decl->findModifier<ForwardDifferentiableAttribute>() ||
                  decl->findModifier<BackwardDifferentiableAttribute>()) &&
                 !decl->findModifier<ForwardDerivativeAttribute>())
@@ -16088,6 +16097,7 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
                 }
             }
 
+            // A user `[BackwardDerivative]` provides the backward conformance instead.
             if (decl->findModifier<BackwardDifferentiableAttribute>() &&
                 !decl->findModifier<BackwardDerivativeAttribute>())
             {
