@@ -2724,8 +2724,7 @@ _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format> __extractIma
 // the extracted texture (`__extractImage(this).Load(location)`) fails lookup with E30027: the
 // extracted type reuses the extension's own generic parameters, and generic inference does not
 // record a parameter that unifies with itself, so the extension does not apply to it. A free
-// function avoids applying the extension to its own target. If that lookup is fixed, these
-// forwarders can become member calls.
+// function avoids applying the extension to its own target.
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [__readNone]
 [ForceInline]
