@@ -64,4 +64,22 @@ void unpinWitnessTables(IRModule* module)
     }
 }
 
+bool unpinGenerics(IRModule* module)
+{
+    bool changed = false;
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto generic = as<IRGeneric>(inst);
+        if (!generic)
+            continue;
+
+        while (auto decor = generic->findDecoration<IRKeepAliveDecoration>())
+        {
+            decor->removeAndDeallocate();
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 } // namespace Slang

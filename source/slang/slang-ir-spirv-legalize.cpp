@@ -22,6 +22,7 @@
 #include "slang-ir-sccp.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-specialize-address-space.h"
+#include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
@@ -3434,6 +3435,12 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
+
+    // An unspecialized exported generic can still be in the module, and SPIR-V legalization would
+    // otherwise walk its body, where operand types are generic parameters (#13744).
+    if (unpinGenerics(module))
+        eliminateDeadCode(module);
+
     legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
 

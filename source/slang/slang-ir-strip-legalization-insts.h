@@ -20,4 +20,14 @@ void stripLegalizationOnlyInstructions(IRModule* module);
 /// Remove [KeepAlive] decorations from witness tables.
 void unpinWitnessTables(IRModule* module);
 
+/// Remove [KeepAlive] decorations from top-level generics, and return whether any were removed.
+///
+/// An `export`ed generic (for example a user `getDescriptorFromHandle` override) is pinned so that
+/// it survives linking and the checks in `linkAndOptimizeIR`, some of which diagnose its
+/// unspecialized body (for example `legalizeResourceGlobalVars`). We therefore call this only after
+/// `linkAndOptimizeIR`. By then no emitter can emit a generic, so the pin only keeps an
+/// unspecialized body alive for target legalization that cannot handle it. Unpinning lets
+/// dead-code elimination remove the generic unless something still uses it.
+bool unpinGenerics(IRModule* module);
+
 } // namespace Slang
