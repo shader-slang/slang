@@ -249,16 +249,15 @@ jobs:
             ./examples/mdl_sdk/dxr/content/slangified
 
       # Probes build in a separate worktree so the checked-out master, which
-      # holds the trusted composite actions and the suite, never moves. The
-      # suite is copied out so every probe is measured by the same bench.py.
-      - name: Prepare probe worktree and suite
+      # holds the trusted composite actions and the suite, never moves and
+      # every probe is measured by the same bench.py.
+      - name: Prepare probe worktree
         shell: bash
         run: |
           set -euo pipefail
           git worktree add --detach probe "$(python -c "import json; print(json.load(open('tmp/targets.json'))['head'])")"
-          cp -r tools/compile-perf suite
-          mkdir -p suite/corpus/mdl snap
-          cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang suite/corpus/mdl/
+          mkdir -p tools/compile-perf/corpus/mdl snap
+          cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang tools/compile-perf/corpus/mdl/
 
       - name: Install Claude Code (Windows)
         id: install-claude
@@ -296,9 +295,9 @@ jobs:
               cmake -S probe -B probe/build --preset default -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DCMAKE_COMPILE_WARNING_AS_ERROR=false -DSLANG_ENABLE_RELEASE_LTO=ON -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF
               cmake --build probe/build --config Release --target slangc
               cp -r probe/build/Release snap/<short sha>
-            - Measure only with the copied suite, never probe/tools:
-              python suite/bench.py --prepare corpus --only <workloads> --api   (once)
-              python suite/bench.py --slangc snap/<sha>/bin/slangc.exe --label <name> --out tmp/runs/<round> --corpus corpus --only <workloads> --samples 5 --warmup 1 --api
+            - Measure only with the checked-out suite, never probe/tools:
+              python tools/compile-perf/bench.py --prepare corpus --only <workloads> --api   (once)
+              python tools/compile-perf/bench.py --slangc snap/<sha>/bin/slangc.exe --label <name> --out tmp/runs/<round> --corpus corpus --only <workloads> --samples 5 --warmup 1 --api
               Each results.json lists per-counter samples and median under timers.
             - To pool rounds, write a short stdlib script under tmp/ and run it with
               python tmp/<name>.py; it may only read tmp/ and write tmp/.
@@ -339,7 +338,7 @@ jobs:
             Bash(git -C probe rev-parse *),Bash(git -C probe show --stat *),
             Bash(cmake -S probe *),Bash(cmake --build probe/build *),
             Bash(cp -r probe/build/Release snap/*),
-            Bash(python suite/bench.py *),Bash(python3 suite/bench.py *),
+            Bash(python tools/compile-perf/bench.py *),Bash(python3 tools/compile-perf/bench.py *),
             Bash(python tmp/*.py*),
             Bash(ls *),Bash(cat tmp/*),Bash(mkdir -p tmp/*)
 
@@ -374,7 +373,7 @@ jobs:
         run: |
           git -C probe bisect reset 2>/dev/null || true
           git worktree remove --force probe 2>/dev/null || true
-          rm -rf snap suite corpus
+          rm -rf snap corpus
 
   classify:
     needs: bisect
