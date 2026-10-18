@@ -9,6 +9,16 @@ namespace Slang
 
 /* Handles all the special case handling of expansions of intrinsics. In particular handles the
 expansion of the 'special cases' prefixed with '$' */
+/// Return the call operand index that `$<stringIndex>` reads in `intrinsicText`, given the call's
+/// operands. The two differ only for a `$q` string on a combined texture-sampler that lowering
+/// split into `{texture, sampler}`: there `$N` (N >= 1) skips the injected sampler at operand 1.
+/// For example, `"$q$0.Load($1)"` on a split `Sampler2D` reads operands 0 and 2.
+Index getIntrinsicArgOperandIndex(
+    const UnownedStringSlice& intrinsicText,
+    IRUse* args,
+    Int argCount,
+    Index stringIndex);
+
 struct IntrinsicExpandContext
 {
     IntrinsicExpandContext(CLikeSourceEmitter* emitter)

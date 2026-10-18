@@ -49,6 +49,25 @@ static String _getIntrinsicOperationName(IRCall* callInst)
     return "<unknown>";
 }
 
+// Return true if `args` are the operands of a combined texture-sampler that lowering split into
+// `{texture, sampler}`, so that operand 1 is the injected sampler.
+static bool _hasInjectedCombinedSampler(IRUse* args, Int argCount)
+{
+    return argCount >= 2 && as<IRSamplerStateTypeBase>(args[1].get()->getDataType());
+}
+
+Index getIntrinsicArgOperandIndex(
+    const UnownedStringSlice& intrinsicText,
+    IRUse* args,
+    Int argCount,
+    Index stringIndex)
+{
+    if (stringIndex >= 1 && intrinsicText.indexOf(toSlice("$q")) >= 0 &&
+        _hasInjectedCombinedSampler(args, argCount))
+        return stringIndex + 1;
+    return stringIndex;
+}
+
 void IntrinsicExpandContext::emit(
     IRCall* inst,
     IRUse* args,
@@ -485,7 +504,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // The sampler operand is only present when the receiver was a combined texture-sampler,
             // so we detect it by type rather than assume it: on a plain texture the operand at
             // index 1 is the first output and the flag stays false.
-            if (m_argCount >= 2 && as<IRSamplerStateTypeBase>(m_args[1].get()->getDataType()))
+            if (_hasInjectedCombinedSampler(m_args, m_argCount))
             {
                 m_skipCombinedSamplerOperand = true;
             }

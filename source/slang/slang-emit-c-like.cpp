@@ -1811,7 +1811,11 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
                     const char c = *cur;
                     if (c == '$' && cur + 1 < end && cur[1] >= '0' && cur[1] <= '9')
                     {
-                        const Index index = Index(cur[1] - '0');
+                        const Index index = getIntrinsicArgOperandIndex(
+                            intrinsicDef,
+                            args,
+                            callInst->getArgCount(),
+                            Index(cur[1] - '0'));
                         useCount += Index(index == paramIndex);
                         cur += 2;
                     }
