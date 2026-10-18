@@ -5156,9 +5156,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         {
         case cpp:
         case hlsl:
-            // A combined texture-sampler is lowered to a `{texture, sampler}` pair on these
-            // targets, so the member form would also receive the sampler. Texture-only
-            // operations therefore forward to the extracted texture.
+            // On these targets a combined texture-sampler becomes a `{texture, sampler}` pair:
+            // HLSL passes both as call arguments, and CPU passes the struct. The member form
+            // would hand either one to `.Load`, so a texture-only operation forwards to the
+            // extracted texture instead.
             if (isCombined != 0)
                 return __loadTexture(__extractImage(this), location);
             __intrinsic_asm ".Load";
@@ -5194,6 +5195,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             static_assert(false, "Unsupported 'Load' of 'texture' for 'cuda' target");
             __intrinsic_asm "<invalid intrinsic>";
         case metal:
+            // The Metal and WGSL strings start with `$q`, which skips the sampler argument that a
+            // combined receiver gains; see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`.
             switch (Shape.flavor)
             {
             case $(SLANG_TEXTURE_1D):

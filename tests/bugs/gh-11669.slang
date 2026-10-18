@@ -6,13 +6,13 @@
 // lowered call gains an injected sampler operand at index 1. The positional `$N` accessors in the
 // GetDimensions intrinsic string previously addressed that sampler, so the texture width was
 // written through the sampler global and every output argument was shifted by one (the second
-// output was never written). The `$q` skip-sampler marker makes the texture-only query skip the
-// injected sampler so the outputs line up again.
+// output was never written). The Metal and WGSL strings now start with the `$q` marker, which
+// skips the injected sampler so the outputs line up again.
 //
 // WGSL and Metal are the affected targets (both lower the combined value and emit GetDimensions
 // via a positional `$N` string), so both are asserted below. CUDA is not in the combined-sampler
-// lowering set (its `Sampler2D` stays a single `CUtexObject`), so it needs no marker. HLSL uses
-// an explicit `$q` string for the combined case too; `tests/bugs/gh-13737.slang` covers it.
+// lowering set (its `Sampler2D` stays a single `CUtexObject`), so it needs no marker. HLSL and
+// CPU forward the combined case to the extracted texture; `tests/bugs/gh-13737.slang` covers them.
 
 Sampler2D<float4> input_texture;
 

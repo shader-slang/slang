@@ -271,14 +271,11 @@ void TextureTypeInfo::writeGetDimensionFunctions(StringBuilder& outCombinedForwa
             StringBuilder args;
             int paramCount = 0;
 
-            // HLSL, Metal and WGSL lower a combined `Sampler2D` into a `{texture, sampler}` pair
-            // (see `lowerCombinedTextureSamplers`), injecting a sampler operand at index 1.
-            // `GetDimensions` is a texture-only query, so its positional `$N` string is numbered
-            // without that sampler; the `$q` marker makes the expander skip the injected sampler.
-            // On a plain texture `$q` is a no-op. The HLSL string is built by `writeFuncBody`.
-            // CUDA is not in the lowering set — its combined `Sampler2D` stays a single
-            // `CUtexObject`, so no marker is needed. See `IntrinsicExpandContext::_emitSpecial`
-            // and shader-slang/slang#11669.
+            // The Metal and WGSL strings are positional and start with `$q`, so a combined
+            // receiver's split-out sampler argument is skipped (see `case 'q'` in
+            // `IntrinsicExpandContext::_emitSpecial`). HLSL and CPU forward the combined case
+            // instead; see `combinedForward` below. CUDA keeps a combined `Sampler2D` as a single
+            // `CUtexObject`, so its string needs no marker.
             StringBuilder metal;
             metal << "$q";
             const char* metalMipLevel = "0";
