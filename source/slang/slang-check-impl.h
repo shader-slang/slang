@@ -3630,14 +3630,6 @@ public:
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
 
-    /// Roots a declared facet witness at the type whose conformance is being queried.
-    /// Both ordinary subtype queries and provisional extension constraints use this path.
-    /// Other witness forms are returned unchanged.
-    SubtypeWitness* getSubtypeWitnessForType(
-        Type* subType,
-        Type* superType,
-        SubtypeWitness* witness);
-
     Witness* getDiffTypeInfoWitness(Type* type);
     Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
 
