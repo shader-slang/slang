@@ -231,34 +231,6 @@ static IRFormatDecoration* _findImageFormatDecoration(IRInst* resourceInst)
     return resourceInst->findDecoration<IRFormatDecoration>();
 }
 
-static bool _tryGetImageFormatFromTextureType(IRInst* resourceInst, ImageFormat& outFormat)
-{
-    auto textureType = as<IRTextureTypeBase>(resourceInst->getDataType());
-    if (!textureType || !textureType->hasFormat())
-        return false;
-
-    auto format = (ImageFormat)textureType->getFormat();
-    if (format == ImageFormat::unknown)
-        return false;
-
-    outFormat = format;
-    return true;
-}
-
-static bool _tryGetImageFormat(IRInst* resourceInst, ImageFormat& outFormat)
-{
-    if (_tryGetImageFormatFromTextureType(resourceInst, outFormat))
-        return true;
-
-    if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
-    {
-        outFormat = formatDecoration->getFormat();
-        return true;
-    }
-
-    return false;
-}
-
 // Returns true if dataType and imageFormat are compatible - that they have the same representation,
 // and no conversion is required.
 static bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
@@ -297,12 +269,10 @@ static bool _isConvertRequired(ImageFormat imageFormat, IRInst* callee)
 
 static size_t _calcBackingElementSizeInBytes(IRInst* resourceInst)
 {
-    // First see if there is a format associated with the resource. The texture type is the source
-    // of truth when it carries a concrete format; `[format(...)]` is the fallback for older code.
-    ImageFormat imageFormat = ImageFormat::unknown;
-    if (_tryGetImageFormat(resourceInst, imageFormat))
+    // First see if there is a format associated with the resource
+    if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
     {
-        return getImageFormatInfo(imageFormat).sizeInBytes;
+        return getImageFormatInfo(formatDecoration->getFormat()).sizeInBytes;
     }
     else
     {
@@ -592,9 +562,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             {
                 IRInst* resourceInst = m_callInst->getArg(0);
 
-                ImageFormat imageFormat = ImageFormat::unknown;
-                if (_tryGetImageFormat(resourceInst, imageFormat))
+                if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
                 {
+                    const ImageFormat imageFormat = formatDecoration->getFormat();
                     if (_isConvertRequired(imageFormat, resourceInst))
                     {
                         // If the function returns something it's a reader so we may need to convert
@@ -640,9 +610,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             size_t elemSizeInBytes = _calcBackingElementSizeInBytes(resourceInst);
 
             // If we have a format converstion and its a *write* we don't need to scale
-            ImageFormat imageFormat = ImageFormat::unknown;
-            if (_tryGetImageFormat(resourceInst, imageFormat))
+            if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
             {
+                const ImageFormat imageFormat = formatDecoration->getFormat();
                 if (_isConvertRequired(imageFormat, resourceInst) && _isResourceWrite(m_callInst))
                 {
                     // If there is a conversion *and* it's a write we don't need to scale.
