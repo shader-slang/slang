@@ -1796,10 +1796,13 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
             const Index paramIndex = Index(use - args);
             SLANG_ASSERT(paramIndex >= 0 && paramIndex < Index(callInst->getArgCount()));
 
-            // Look through the slice to seeing how many times this parameters is used (signified
-            // via the $0...$9)
+            // Look through the slice to see how many times this parameter is used (signified via
+            // `$0`...`$9`). Each placeholder is mapped to its argument the same way the expander
+            // does, because a `$q` string reads a different argument than its digit names.
             {
                 UnownedStringSlice slice = intrinsicDef;
+                const bool skipsSplitSamplerArg =
+                    intrinsicSkipsSplitSamplerArg(intrinsicDef, args, callInst->getArgCount());
 
                 const char* cur = slice.begin();
                 const char* end = slice.end();
@@ -1811,12 +1814,10 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
                     const char c = *cur;
                     if (c == '$' && cur + 1 < end && cur[1] >= '0' && cur[1] <= '9')
                     {
-                        const Index index = getIntrinsicArgOperandIndex(
-                            intrinsicDef,
-                            args,
-                            callInst->getArgCount(),
-                            Index(cur[1] - '0'));
-                        useCount += Index(index == paramIndex);
+                        const Index argIndex = getIntrinsicPlaceholderArgIndex(
+                            Index(cur[1] - '0'),
+                            skipsSplitSamplerArg);
+                        useCount += Index(argIndex == paramIndex);
                         cur += 2;
                     }
                     else

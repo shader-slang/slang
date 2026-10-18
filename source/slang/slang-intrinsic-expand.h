@@ -9,16 +9,6 @@ namespace Slang
 
 /* Handles all the special case handling of expansions of intrinsics. In particular handles the
 expansion of the 'special cases' prefixed with '$' */
-/// Return the call operand index that `$<stringIndex>` reads in `intrinsicText`, given the call's
-/// operands. The two differ only for a `$q` string on a combined texture-sampler that lowering
-/// split into `{texture, sampler}`: there `$N` (N >= 1) skips the injected sampler at operand 1.
-/// For example, `"$q$0.Load($1)"` on a split `Sampler2D` reads operands 0 and 2.
-Index getIntrinsicArgOperandIndex(
-    const UnownedStringSlice& intrinsicText,
-    IRUse* args,
-    Int argCount,
-    Index stringIndex);
-
 struct IntrinsicExpandContext
 {
     IntrinsicExpandContext(CLikeSourceEmitter* emitter)
@@ -65,15 +55,24 @@ protected:
     //
     Index m_argIndexOffset = 0;
 
-    // Set by the `$q` marker when a combined texture-sampler has been lowered into a
-    // `{texture, sampler}` pair, which inserts a sampler operand at index 1. Texture-only
-    // operations (`Load`, the subscript, `GetDimensions`) take no sampler, so their positional
-    // `$N` (for N >= 1) indices must skip over that injected sampler operand. This is the
-    // counterpart of the `$p` marker (`m_argIndexOffset`): `$p` handles a string numbered with an
-    // absent sampler slot, `$q` a string numbered without the sampler that lowering injected. See
-    // shader-slang/slang#11669.
+    // True when the string starts with `$q` and the call has a split-out sampler argument; see
+    // `intrinsicSkipsSplitSamplerArg`.
     bool m_skipCombinedSamplerOperand = false;
 };
+
+/// Return true if `intrinsicText` is a `$q` string and the call's argument 1 is the sampler that
+/// type legalization split out of a combined texture-sampler. In that case each bare `$N` with
+/// N >= 1 reads argument N + 1. The expander and the emitter's fold check both use this, so
+/// they agree on which argument a `$N` reads.
+bool intrinsicSkipsSplitSamplerArg(
+    const UnownedStringSlice& intrinsicText,
+    IRUse* args,
+    Int argCount);
+
+/// Return the call argument that `$<placeholder>` reads, given the result of
+/// `intrinsicSkipsSplitSamplerArg` for the call. For example, `$1` in `"$qtextureLoad($0, $1)"`
+/// on a split `Sampler2D` reads argument 2.
+Index getIntrinsicPlaceholderArgIndex(Index placeholder, bool skipsSplitSamplerArg);
 
 } // namespace Slang
 #endif
