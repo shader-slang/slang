@@ -3436,10 +3436,28 @@ void legalizeIRForSPIRV(
 {
     SLANG_UNUSED(entryPoints);
 
-    // An unspecialized exported generic can still be in the module, and SPIR-V legalization would
-    // otherwise walk its body, where operand types are generic parameters (#13744).
+    // An `export`ed generic is still pinned here, so `legalizeSPIRV` would walk its unspecialized
+    // body, where an op's result type can be a generic parameter that its handler cannot lower
+    // (#13744). We drop the pins so DCE removes every generic nothing uses. Other targets check
+    // atomic destinations in `linkAndOptimizeIR`, while those generics are still present, so we
+    // run the same check on them first and an unused exported generic is diagnosed on every target.
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (as<IRGeneric>(inst) && inst->findDecoration<IRKeepAliveDecoration>())
+        {
+            bool skipFuncParamValidation = true;
+            validateAtomicOperations(skipFuncParamValidation, codeGenContext->getSink(), inst);
+        }
+    }
     if (unpinGenerics(module))
         eliminateDeadCode(module);
+#ifdef _DEBUG
+    if (!codeGenContext->isSpecializationDisabled())
+    {
+        for (auto inst : module->getGlobalInsts())
+            SLANG_ASSERT(!as<IRGeneric>(inst));
+    }
+#endif
 
     legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
