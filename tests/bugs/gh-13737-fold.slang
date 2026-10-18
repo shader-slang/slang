@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -stage compute
 
 // shader-slang/slang#13737: the `$q` strings for `Load` on a combined texture-sampler read the
 // coordinate from call operand 2, because operand 1 is the split-out sampler. The emitter decides
@@ -11,8 +12,8 @@
 Sampler2DArray<int4> u_tex;
 RWStructuredBuffer<int4> outBuf;
 
-// CHECK-COUNT-5: {{textureLoad|\.read}}(
-// CHECK-NOT: {{textureLoad|\.read}}(
+// CHECK-COUNT-5: {{textureLoad|\.read|\.Load}}(
+// CHECK-NOT: {{textureLoad|\.read|\.Load}}(
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
