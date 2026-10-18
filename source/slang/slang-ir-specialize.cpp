@@ -886,7 +886,6 @@ struct SpecializationContext
             return maybeSpecializeExpand(as<IRExpand>(inst));
 
         case kIROp_GetTupleElement:
-        case kIROp_TypeEquals:
             return maybeSpecializeFoldableInst(inst);
 
         case kIROp_ExtractFirstFromPack:

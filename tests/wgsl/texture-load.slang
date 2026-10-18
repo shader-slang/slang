@@ -88,17 +88,16 @@ DepthTexture2DMS d2DMS;
 DepthTexture2DArray d2DArray;
 
 
-bool TEST_textureLoad<T : ITexelElement>(
+bool TEST_textureLoad<T>(
     Texture1D<T> t1D,
     Texture2D<T> t2D,
     Texture3D<T> t3D,
     Texture2DMS<T> t2DMS,
     Texture2DArray<T> t2DArray)
-    where T.DataType : IArithmetic
+    where T : ITexelElement, IArithmetic
 {
     // WGSL-LABEL: TEST_textureLoad
-    typealias Tvn = T.DataType;
-    Tvn zero = {};
+    typealias Tvn = T;
 
     return true
         // ===================
@@ -107,19 +106,19 @@ bool TEST_textureLoad<T : ITexelElement>(
         // ===================
 
         // WGSL: textureLoad({{\(*}}t1D
-        && all(zero == t1D.Load(int2(0, 0)))
+        && all(Tvn(T.Element(0)) == t1D.Load(int2(0, 0)))
 
         // WGSL: textureLoad({{\(*}}t2D
-        && all(zero == t2D.Load(int3(0, 0, 0)))
+        && all(Tvn(T.Element(0)) == t2D.Load(int3(0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}t3D
-        && all(zero == t3D.Load(int4(0, 0, 0, 0)))
+        && all(Tvn(T.Element(0)) == t3D.Load(int4(0, 0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}t2DMS
-        && all(zero == t2DMS.Load(int3(0, 0, 0)))
+        && all(Tvn(T.Element(0)) == t2DMS.Load(int3(0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}t2DArray
-        && all(zero == t2DArray.Load(int4(0, 0, 0, 0)))
+        && all(Tvn(T.Element(0)) == t2DArray.Load(int4(0, 0, 0, 0)))
         ;
 }
 
