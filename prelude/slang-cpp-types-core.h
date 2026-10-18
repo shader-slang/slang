@@ -282,6 +282,21 @@ typedef uint32_t uint;
             result[i] = thisVal[i] op other[i];  \
         return result;                           \
     }
+// A shift's result has the type of its left operand, and its amount may be a vector of any integer
+// type, as in `int3 >> uint3`. For two operands of the same type, the `Vector<T, n>` overload above
+// is more specialized and is chosen instead. The result keeps the left operand's signedness, so an
+// `int` vector stays an arithmetic shift.
+#define SLANG_VECTOR_SHIFT_OP(T, op)             \
+    template<typename U, int n>                  \
+    SLANG_FORCE_INLINE Vector<T, n> operator op( \
+        const Vector<T, n>& thisVal,             \
+        const Vector<U, n>& other)               \
+    {                                            \
+        Vector<T, n> result;                     \
+        for (int i = 0; i < n; i++)              \
+            result[i] = thisVal[i] op other[i];  \
+        return result;                           \
+    }
 #define SLANG_VECTOR_BINARY_COMPARE_OP(T, op)       \
     template<int n>                                 \
     SLANG_FORCE_INLINE Vector<bool, n> operator op( \
@@ -316,6 +331,8 @@ typedef uint32_t uint;
     SLANG_VECTOR_BINARY_OP(T, %)          \
     SLANG_VECTOR_BINARY_OP(T, >>)         \
     SLANG_VECTOR_BINARY_OP(T, <<)         \
+    SLANG_VECTOR_SHIFT_OP(T, >>)          \
+    SLANG_VECTOR_SHIFT_OP(T, <<)          \
     SLANG_VECTOR_BINARY_COMPARE_OP(T, >)  \
     SLANG_VECTOR_BINARY_COMPARE_OP(T, <)  \
     SLANG_VECTOR_BINARY_COMPARE_OP(T, >=) \
@@ -390,6 +407,7 @@ SLANG_FLOAT_VECTOR_MOD(float)
 SLANG_FLOAT_VECTOR_MOD(double)
 #undef SLANG_FLOAT_VECTOR_MOD
 #undef SLANG_VECTOR_BINARY_OP
+#undef SLANG_VECTOR_SHIFT_OP
 #undef SLANG_VECTOR_UNARY_OP
 #undef SLANG_INT_VECTOR_OPS
 #undef SLANG_FLOAT_VECTOR_OPS

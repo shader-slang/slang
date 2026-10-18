@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -default-image-format-unknown
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly
 
 // When using a read-write texture (RWTexture2D) without an explicit format,
 // both StorageImageReadWithoutFormat and StorageImageWriteWithoutFormat
