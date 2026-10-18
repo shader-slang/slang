@@ -11,9 +11,52 @@
 // these distinguished forwarding names should be removed in favor of direct qualified calls.
 module __builtin;
 
-// These conversion adapters keep constructor bodies in `slang.numerics` from redispatching to
-// the very generic constructor requirement they implement. Because this module does not import
-// `slang.numerics`, each construction below can only resolve to an established core constructor.
+// These intrinsic declarations give the public explicit-conversion wrappers direct access to the
+// compiler's canonical BuiltinCast operation. In particular, conversion to `bool` tests whether
+// the source is nonzero; this differs from constructor overload resolution for some source types.
+// The vector form applies BuiltinCast to every component without changing the shape.
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op(BuiltinCast)
+public TDestination __numericsBuiltinConvertScalar<
+    TDestination : __BuiltinScalarType,
+    TSource : __BuiltinScalarType>(TSource value);
+
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op(BuiltinCast)
+public vector<TDestination, N> __numericsBuiltinConvertVector<
+    TDestination : __BuiltinScalarType,
+    TSource : __BuiltinScalarType,
+    let N : int>(vector<TSource, N> value);
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<TDestination, R, C, L> __numericsBuiltinConvertMatrix<
+    TDestination : __BuiltinScalarType,
+    TSource : __BuiltinScalarType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<TSource, R, C, L> value)
+{
+    // Do not replace this body with a whole-matrix BuiltinCast. A floating-point-to-Boolean cast
+    // would then emit a matrix-to-scalar comparison, which CUDA's emitted C-like matrix types do
+    // not support. Casting each logical row through the canonical vector BuiltinCast preserves `L`
+    // while giving every target a supported shaped conversion.
+    matrix<TDestination, R, C, L> result;
+    [ForceUnroll]
+    for (int row = 0; row < R; ++row)
+        result[row] = __numericsBuiltinConvertVector<TDestination>(value[row]);
+    return result;
+}
+
+// The adapters below serve a different purpose: they implement the integer and floating-point
+// constructor requirements of the numeric interfaces. The BuiltinCast adapters above accept any
+// source/destination pair in `__BuiltinScalarType`; these construction adapters intentionally
+// support only integer-to-integer, integer-to-floating-point, and floating-point-to-floating-point
+// pairs. Their bodies use the corresponding narrower core conversion operations. Because this
+// module does not import `slang.numerics`, each construction can only resolve to an established
+// core constructor and cannot redispatch to the generic requirement it implements.
 [__readNone]
 [__unsafeForceInlineEarly]
 public TDestination __numericsBuiltinConstructFromInteger<
@@ -119,16 +162,7 @@ SLANG_NUMERICS_VECTOR_COMPARISON_ADAPTER(__numericsBuiltinLessEqual, <=)
 
 [__readNone]
 [__unsafeForceInlineEarly]
-public T __numericsBuiltinDot<T : __BuiltinFloatingPointType, let N : int>(
-    vector<T, N> left,
-    vector<T, N> right)
-{
-    return ::dot(left, right);
-}
-
-[__readNone]
-[__unsafeForceInlineEarly]
-public T __numericsBuiltinDot<T : __BuiltinIntegerType, let N : int>(
+public T __numericsBuiltinDot<T : __BuiltinArithmeticType, let N : int>(
     vector<T, N> left,
     vector<T, N> right)
 {
@@ -295,29 +329,60 @@ public vector<T, N> __numericInterfaceBuiltinAbs<
     return ::abs(value);
 }
 
-#define SLANG_NUMERICS_BINARY_ADAPTER(NAME, BUILTIN)                                  \
+#define SLANG_NUMERICS_BINARY_ADAPTER(NAME, BUILTIN, ELEMENT_CONSTRAINT)              \
     [__readNone] [__unsafeForceInlineEarly]                                     \
-    public T NAME<T : __BuiltinFloatingPointType>(T left, T right)              \
+    public T NAME<T : ELEMENT_CONSTRAINT>(T left, T right)                      \
     {                                                                            \
         return ::BUILTIN(left, right);                                           \
     }                                                                            \
                                                                                  \
     [__readNone] [__unsafeForceInlineEarly]                                     \
-    public vector<T, N> NAME<T : __BuiltinFloatingPointType, let N : int>(      \
+    public vector<T, N> NAME<T : ELEMENT_CONSTRAINT, let N : int>(              \
         vector<T, N> left,                                                       \
         vector<T, N> right)                                                      \
     {                                                                            \
         return ::BUILTIN(left, right);                                           \
     }
 
-SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinAtan2, atan2)
-SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinCopySign, copysign)
-SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinPow, pow)
-SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinRemainder, fmod)
-SLANG_NUMERICS_BINARY_ADAPTER(__numericsBuiltinMaximum, max)
-SLANG_NUMERICS_BINARY_ADAPTER(__numericsBuiltinMinimum, min)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinAtan2, atan2,
+    __BuiltinFloatingPointType)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinCopySign, copysign,
+    __BuiltinFloatingPointType)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinPow, pow,
+    __BuiltinFloatingPointType)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinRemainder, fmod,
+    __BuiltinFloatingPointType)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericsBuiltinMaximum, max,
+    __BuiltinArithmeticType)
+SLANG_NUMERICS_BINARY_ADAPTER(__numericsBuiltinMinimum, min,
+    __BuiltinArithmeticType)
 
 #undef SLANG_NUMERICS_BINARY_ADAPTER
+
+// Extrema are the binary operations above that the core module also defines for matrices over the
+// full builtin arithmetic domain. We define these matrix adapters explicitly so we do not imply
+// that operations such as `atan2` and `fmod` have the same matrix domain.
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<T, R, C, L> __numericsBuiltinMaximum<
+    T : __BuiltinArithmeticType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<T, R, C, L> left, matrix<T, R, C, L> right)
+{
+    return ::max(left, right);
+}
+
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<T, R, C, L> __numericsBuiltinMinimum<
+    T : __BuiltinArithmeticType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<T, R, C, L> left, matrix<T, R, C, L> right)
+{
+    return ::min(left, right);
+}
 
 #define SLANG_NUMERICS_CLASSIFICATION_ADAPTER(NAME, BUILTIN)                          \
     [__readNone] [__unsafeForceInlineEarly]                                     \

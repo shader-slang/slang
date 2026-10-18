@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-playback.cpp
 // Unit tests for playback dispatcher and handler infrastructure
 
@@ -1108,3 +1109,4 @@ SLANG_UNIT_TEST(replayContextTwoDistinctCustomFileSystemsPlayback)
     fileSystemBPtr.setNull();
     SLANG_CHECK(TestFileSystem::s_liveCount == 0);
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

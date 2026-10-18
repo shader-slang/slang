@@ -200,6 +200,7 @@ jobs:
       os: linux
       compiler: gcc
       platform: wasm
+      build-llvm: false
       config: release
       runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
 
@@ -570,6 +571,7 @@ jobs:
       runs-on: '["ubuntu-24.04"]'
       full-gpu-tests: false
       cpu-only: true
+      slang-user-skills: true
       server-count: 4
 
   # macOS tests

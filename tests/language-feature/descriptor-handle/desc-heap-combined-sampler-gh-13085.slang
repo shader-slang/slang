@@ -13,7 +13,7 @@ float4 main(float3 coordinate : TEXCOORD0) : SV_Target
 {
     // Site 1: the `_Texture` type's own single-index initializer.
     //CHECK: error[E41400]
-    //CHECK: cannot be initialized directly from a single ResourceDescriptorHeap index{{.*}}.Handle(uint2(resourceIndex, samplerIndex))
+    //CHECK: Cannot initialize a combined texture-sampler from a single ResourceDescriptorHeap index{{.*}}load the texture and sampler separately from ResourceDescriptorHeap and SamplerDescriptorHeap
     Sampler3D volume = ResourceDescriptorHeap[11];
 
     // Site 2: the `.Handle` (DescriptorHandle<T>) single-index initializer.

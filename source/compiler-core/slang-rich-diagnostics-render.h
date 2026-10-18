@@ -40,6 +40,7 @@ struct DiagnosticRenderOptions
 {
     bool enableTerminalColors = false;
     bool enableUnicode = false;
+    SlangDiagnosticFormat format = SLANG_DIAGNOSTIC_FORMAT_DEFAULT;
 };
 
 String renderDiagnostic(

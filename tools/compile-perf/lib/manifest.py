@@ -63,6 +63,13 @@ class WorkloadSpec:
     # emit reflection JSON (bench.py supplies a writable per-run path). Exercises
     # the reflection serializer in addition to the layout engine.
     reflection_json: bool = False
+    # Diagnostic codes this workload is EXPECTED to emit (e.g. ["E30019"]).
+    # Two effects, and both matter: bench.py stops treating those codes as a
+    # compile failure, AND it fails the workload if they stop appearing. The
+    # second half is the point -- `diagnostics_clean`, which this replaces,
+    # silently became a clean compile that measured no diagnostics at all and
+    # nothing noticed for months.
+    expected_diagnostics: list = field(default_factory=list)
     # for multi-file/corpus workloads: the file to compile (imports resolve via
     # -I <gendir>). If None, bench heuristically picks the file whose name
     # contains "main", or the first file if none does. If set, used directly
@@ -264,14 +271,45 @@ WORKLOADS = [
         sweep_sizes=[250, 500, 1000, 2000],
     ),
     WorkloadSpec(
-        name="diagnostics_clean",
+        name="conditional_compilation",
+        bucket="parse",
+        gen=workloads.gen_conditional_compilation,
+        default_size=200,
+        mode="module",
+        primary_timers=["parseTranslationUnit", "frontEndExecute"],
+        sweep_sizes=[50, 100, 200, 400],
+    ),
+    # Emits one diagnostic per function, so it measures diagnostic PRODUCTION
+    # (source-location resolution, line/caret rendering, message formatting,
+    # sink throughput) rather than the trivial check that finds the error.
+    # Compilation stops after the front end, which is why SemanticChecking is
+    # ~86% of compileInner here against ~27% for the same shape compiling
+    # cleanly -- nothing downstream dilutes it.
+    #
+    # Sized at 9600 deliberately. Its predecessor `diagnostics_clean` ran at
+    # N=400 for 23 ms, of which ~9 ms was the per-compile floor, and on
+    # 2026-09-10 a single perturbed sample carried its median 18.7% past the
+    # trend gate and back again the next night -- the suite's only false alarm
+    # in 73 nights. At 9600 this measures ~122 ms with run-to-run spread under
+    # 1%.
+    WorkloadSpec(
+        name="diagnostics",
         bucket="diagnostics",
-        gen=workloads.gen_diagnostics_clean,
-        default_size=400,
-        mode="target",
-        extra_flags=SPIRV,
-        primary_timers=["frontEndExecute", "SemanticChecking", "compileInner"],
-        sweep_sizes=[400, 800, 1600, 3200],
+        gen=workloads.gen_diagnostics,
+        default_size=9600,
+        mode="module",
+        # E30019 ("type mismatch in expression") is an intentional pin, not
+        # an incidental one: `source/slang/diagnostics/type-errors.lua` also
+        # has an experimental "argument_type_mismatch" diagnostic prototyping
+        # the multi-span diagnostic system under the SAME code, commented as
+        # a "guinea pig." If that migration ever renumbers or reassigns
+        # E30019, this workload will report "expected diagnostics absent"
+        # from a diagnostic-numbering change, not a perf regression -- update
+        # this code in lockstep with that migration rather than treating the
+        # failure as a suite bug.
+        expected_diagnostics=["E30019"],
+        primary_timers=["SemanticChecking", "frontEndExecute", "compileInner"],
+        sweep_sizes=[2400, 4800, 9600, 19200],
     ),
     WorkloadSpec(
         name="sema_generics",
@@ -283,38 +321,13 @@ WORKLOADS = [
         sweep_sizes=[125, 250, 500, 1000],
     ),
     WorkloadSpec(
-        name="generic_nesting",
-        bucket="sema",
-        gen=workloads.gen_generic_nesting,
-        # size = nesting DEPTH, not declaration count: the known substitution
-        # blowup is exponential (~3-4x per level, knee ~depth 18), so the
-        # ladder stays at/below the knee to keep sweep runtime sane while the
-        # top rung still exposes the multiple over the linear expectation.
-        default_size=16,
-        mode="module",
-        primary_timers=["SemanticChecking", "frontEndExecute"],
-        sweep_sizes=[8, 12, 16, 20],
-    ),
-    WorkloadSpec(
-        name="generic_nesting_eval",
-        bucket="sema",
-        gen=workloads.gen_generic_nesting_eval,
-        # size = nesting depth, as in generic_nesting; the witness-method
-        # calls multiply the per-level cost, so the ladder tops out at 14
-        # (~0.5 s) where generic_nesting can afford 20.
-        default_size=12,
-        mode="module",
-        primary_timers=["SemanticChecking", "frontEndExecute"],
-        sweep_sizes=[8, 10, 12, 14],
-    ),
-    WorkloadSpec(
         name="interface_depth",
         bucket="sema",
         gen=workloads.gen_interface_depth,
         # size = interface inheritance chain depth (linear chain, not generic
         # nesting); measured ~N^3.4 at 2026-07, so 128 (~0.4 s) caps the
         # ladder.
-        default_size=64,
+        default_size=128,  # was 64: 26.6 ms, 58% on-target, 13.7% spread
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
         sweep_sizes=[16, 32, 64, 128],
@@ -323,9 +336,12 @@ WORKLOADS = [
         name="conformance",
         bucket="sema",
         gen=workloads.gen_conformance,
-        default_size=600,
+        default_size=2400,  # was 600: 39.5 ms, 8.0% spread
         mode="module",
-        primary_timers=["SemanticChecking", "frontEndExecute"],
+        # frontEndExecute (65%) leads: SemanticChecking is only 19% of this
+        # workload at every ladder size, so witness synthesis is showing up
+        # outside the checking timer.
+        primary_timers=["frontEndExecute", "SemanticChecking"],
         sweep_sizes=[600, 1200, 2400, 4800],
     ),
     # ---- type checking: operator overload resolution + implicit conversion -
@@ -355,7 +371,7 @@ WORKLOADS = [
         name="overload_resolution",
         bucket="typecheck",
         gen=workloads.gen_overload_resolution,
-        default_size=600,
+        default_size=2400,  # was 600: 30.1 ms, 11.5% spread
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
         sweep_sizes=[600, 1200, 2400, 4800],
@@ -369,6 +385,15 @@ WORKLOADS = [
         primary_timers=["SemanticChecking", "frontEndExecute"],
         sweep_sizes=[250, 500, 1000, 2000],
     ),
+    WorkloadSpec(
+        name="vector_matrix_overload_set",
+        bucket="typecheck",
+        gen=workloads.gen_vector_matrix_overload_set,
+        default_size=200,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[50, 100, 200, 400],
+    ),
     # ---- shared-infrastructure / scaling stressors -----------------------
     WorkloadSpec(
         name="ir_builder",
@@ -377,7 +402,10 @@ WORKLOADS = [
         default_size=4000,
         mode="target",
         extra_flags=SPIRV,
-        primary_timers=["generateIR", "simplifyIR", "compileInner"],
+        # generateOutput is 64% here: one giant function costs more to emit
+        # than to build. Tracking both halves rather than only the one the
+        # workload is named after.
+        primary_timers=["generateIR", "simplifyIR", "generateOutput"],
         sweep_sizes=[500, 1000, 2000, 4000],
     ),
     WorkloadSpec(
@@ -390,14 +418,41 @@ WORKLOADS = [
         sweep_sizes=[375, 750, 1500, 3000],
     ),
     WorkloadSpec(
+        name="flat_expr_dag",
+        bucket="ir_infra",
+        gen=workloads.gen_flat_expr_dag,
+        default_size=500,
+        mode="target",
+        # CUDA specifically: this is where deferBufferLoad's global-context
+        # packing and simplifyNonSSAIR's redundancy-removal pass (the two
+        # #13012 fixed a cubic blowup in) actually run over locals; SPIR-V
+        # keeps resources/locals closer to SSA and rarely triggers either.
+        extra_flags=["-target", "cuda"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR", "deferBufferLoad"],
+        sweep_sizes=[125, 250, 500, 1000],
+    ),
+    WorkloadSpec(
         name="module_link",
         bucket="module_link",
         gen=workloads.gen_module_link,
         default_size=100,
         mode="link",
         extra_flags=SPIRV,
-        primary_timers=["linkIR", "compileInner"],
+        # linkIR is 13%. Resolving and checking the main module against n
+        # imports (frontEndExecute, 62%) is the larger half of what this
+        # actually exercises.
+        primary_timers=["linkIR", "frontEndExecute", "compileInner"],
         sweep_sizes=[50, 100, 200, 400],
+    ),
+    WorkloadSpec(
+        name="material_module_graph",
+        bucket="module_link",
+        gen=workloads.gen_material_module_graph,
+        default_size=16,
+        mode="link",
+        extra_flags=SPIRV,
+        primary_timers=["linkIR", "specializeModule", "compileInner"],
+        sweep_sizes=[4, 8, 16, 32],
     ),
     WorkloadSpec(
         name="specialization",
@@ -408,6 +463,23 @@ WORKLOADS = [
         extra_flags=SPIRV,
         primary_timers=["specializeModule", "linkAndOptimizeIR", "compileInner"],
         sweep_sizes=[75, 150, 300, 600],
+    ),
+    WorkloadSpec(
+        name="generic_reinterpret_dispatch",
+        bucket="specialization",
+        gen=workloads.gen_generic_reinterpret_dispatch,
+        default_size=16,
+        mode="target",
+        extra_flags=SPIRV,
+        # generateOutput is included despite not being a leaf timer: it is a
+        # large, currently-unattributed cost this workload is the first to
+        # surface, kept as a real open finding rather than smoothed over by
+        # only listing timers that already explain the total. See
+        # gen_generic_reinterpret_dispatch's docstring for the measured
+        # figures -- kept in that one place, not restated here, so the two
+        # cannot drift apart.
+        primary_timers=["compileInner", "generateOutput", "specializeModule", "lowerReinterpret"],
+        sweep_sizes=[4, 8, 16, 32],
     ),
     WorkloadSpec(
         name="dynamic_dispatch",
@@ -432,9 +504,23 @@ WORKLOADS = [
         # existential field in a struct -> legalizeExistentialTypeLayout, plus a
         # witness-table-per-case specialization blowup. Neither is the primary
         # signal of the bare-local dynamic_dispatch workload.
-        primary_timers=["compileInner", "specializeModule",
+        # legalizeExistentialTypeLayout is the pass this workload exists to
+        # stress, and it measures 1% of compileInner. linkAndOptimizeIR (49%)
+        # is what actually moves, so a regression is only visible if both are
+        # tracked.
+        primary_timers=["compileInner", "linkAndOptimizeIR", "specializeModule",
                         "legalizeExistentialTypeLayout", "simplifyIR"],
         sweep_sizes=[50, 100, 200, 400],
+    ),
+    WorkloadSpec(
+        name="generic_method_dispatch",
+        bucket="dynamic_dispatch",
+        gen=workloads.gen_generic_method_dispatch,
+        default_size=32,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["compileInner", "specializeModule", "linkAndOptimizeIR"],
+        sweep_sizes=[8, 16, 32, 64],
     ),
     # ---- suspected-regression features -----------------------------------
     WorkloadSpec(
@@ -482,7 +568,7 @@ WORKLOADS = [
         name="resource_aggregate",
         bucket="resource_legalize",
         gen=workloads.gen_resource_aggregate,
-        default_size=80,
+        default_size=320,  # was 80: 37.9 ms, legalizeResourceTypes only 2%
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
@@ -513,7 +599,7 @@ WORKLOADS = [
         name="resource_aggregate_metal",
         bucket="resource_legalize",
         gen=workloads.gen_resource_aggregate,
-        default_size=80,
+        default_size=320,
         mode="target",
         extra_flags=["-target", "metal"],
         primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
@@ -524,7 +610,7 @@ WORKLOADS = [
         name="resource_aggregate_glsl",
         bucket="resource_legalize",
         gen=workloads.gen_resource_aggregate,
-        default_size=80,
+        default_size=320,
         mode="target",
         extra_flags=["-target", "glsl", "-entry", "computeMain"],
         primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
@@ -535,11 +621,11 @@ WORKLOADS = [
         name="resource_aggregate_cuda",
         bucket="resource_legalize",
         gen=workloads.gen_resource_aggregate,
-        default_size=80,
+        default_size=320,
         mode="target",
         extra_flags=["-target", "cuda"],
-        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
-                        "simplifyNonSSAIR", "deferBufferLoad"],
+        primary_timers=["linkAndOptimizeIR", "compileInner", "simplifyNonSSAIR",
+                        "deferBufferLoad"],
         sweep_sizes=[80, 160, 320, 640],
     ),
     WorkloadSpec(
@@ -694,8 +780,7 @@ WORKLOADS = [
         default_size=256,
         mode="target",
         extra_flags=["-target", "spirv", "-emit-spirv-directly"],
-        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
-                        "lowerCombinedTextureSamplers"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR"],
         sweep_sizes=[64, 128, 256, 512],
     ),
     WorkloadSpec(
@@ -740,11 +825,15 @@ WORKLOADS = [
     # at N=512 `legalizeMatrixTypes` measures 0.0 ms on every target, while
     # GLSL spends 560 ms of 686 and CUDA 1254 ms of 1974 in `simplifyNonSSAIR`.
     # GLSL runs at N^1.60 and CUDA at N^1.98 against SPIR-V's N^0.78.
+    # Use N=512 across the family to reduce relative timing noise. A same-binary
+    # interleaved Windows study found steadier HLSL/GLSL totals and fewer Metal
+    # simplification spikes at this size. Keep N=256 in the sweep for scaling
+    # comparisons; size provenance prevents mixing the old and new baselines.
     WorkloadSpec(
         name="backend_matrix_spirv",
         bucket="backend_legalize",
         gen=workloads.gen_matrix_chain,
-        default_size=256,
+        default_size=512,
         mode="target",
         extra_flags=["-target", "spirv", "-emit-spirv-directly"],
         primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
@@ -759,7 +848,7 @@ WORKLOADS = [
         name="backend_matrix_hlsl",
         bucket="backend_legalize",
         gen=workloads.gen_matrix_chain,
-        default_size=256,
+        default_size=512,
         mode="target",
         extra_flags=["-target", "hlsl", "-entry", "computeMain"],
         primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
@@ -771,7 +860,7 @@ WORKLOADS = [
         name="backend_matrix_glsl",
         bucket="backend_legalize",
         gen=workloads.gen_matrix_chain,
-        default_size=256,
+        default_size=512,
         mode="target",
         extra_flags=["-target", "glsl", "-entry", "computeMain"],
         primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
@@ -782,7 +871,7 @@ WORKLOADS = [
         name="backend_matrix_metal",
         bucket="backend_legalize",
         gen=workloads.gen_matrix_chain,
-        default_size=256,
+        default_size=512,
         mode="target",
         extra_flags=["-target", "metal"],
         primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
@@ -793,7 +882,7 @@ WORKLOADS = [
         name="backend_matrix_cuda",
         bucket="backend_legalize",
         gen=workloads.gen_matrix_chain,
-        default_size=256,
+        default_size=512,
         mode="target",
         extra_flags=["-target", "cuda"],
         primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",

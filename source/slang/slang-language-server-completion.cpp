@@ -1056,21 +1056,28 @@ void CompletionContext::createSwizzleCandidates(
     // Hard code members for vector and matrix types.
     if (auto vectorType = as<VectorExpressionType>(type))
     {
-        const char* memberNames[4] = {"x", "y", "z", "w"};
+        const char* memberNameSets[][4] = {{"x", "y", "z", "w"}, {"r", "g", "b", "a"}};
         Type* elementType = nullptr;
         elementType = vectorType->getElementType();
         String typeStr;
         if (elementType)
             typeStr = elementType->toString();
         auto count = Math::Min((int)elementCount[0], 4);
-        for (int i = 0; i < count; i++)
+        for (auto& memberNames : memberNameSets)
         {
-            LanguageServerProtocol::CompletionItem item;
-            item.data = 0;
-            item.detail = typeStr;
-            item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
-            item.label = memberNames[i];
-            result.add(item);
+            for (int i = 0; i < count; i++)
+            {
+                LanguageServerProtocol::CompletionItem item;
+                item.data = 0;
+                item.detail = typeStr;
+                item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
+                item.label = memberNames[i];
+                // LSP clients use the label when ordinary members do not provide sortText. The
+                // "0:" prefix ranks swizzles before those labels and sorts the swizzles
+                // alphabetically by label.
+                item.sortText = "0:" + item.label;
+                result.add(item);
+            }
         }
     }
     else if (auto scalarType = as<BasicExpressionType>(type))

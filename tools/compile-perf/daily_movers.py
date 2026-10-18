@@ -53,7 +53,7 @@ def headline(wl):
 # return shape (three callers already destructure it as (date, commit, vals)).
 # Absent entirely on data recorded before bench.py started writing
 # "timer_schema"; _SCHEMA_MARKER's own .get() callers treat that as unknown.
-_SCHEMA_MARKER = "__timer_schema__"
+_SCHEMA_MARKER = analyze.SCHEMA_MARKER
 
 
 def daily_points(results_dir, metric):
@@ -65,9 +65,9 @@ def daily_points(results_dir, metric):
             for t, st in (r.get("timers") or {}).items():
                 if st:
                     vals[(r["workload"], t)] = st[metric]
-            schema = r.get("timer_schema")
-            if schema is not None:
-                vals[(r["workload"], _SCHEMA_MARKER)] = 1.0 if schema == "detailed" else 0.0
+            sv = analyze.schema_value(r.get("timer_schema"))
+            if sv is not None:
+                vals[(r["workload"], _SCHEMA_MARKER)] = sv
         if vals:
             out.append((lab["date"], lab["commit"][:9], vals))
     return out

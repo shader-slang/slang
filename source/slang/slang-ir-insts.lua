@@ -1887,6 +1887,20 @@ local insts = {
 			-- to it.
 			{ vulkanHitObjectAttributes = { struct_name = "VulkanHitObjectAttributesDecoration" } },
 			{ GlobalVariableShadowingGlobalParameterDecoration = { min_operands = 2 } },
+			-- Lowering adds this marker when the AST declaration is either a file- or namespace-scope
+			-- mutable `static` variable or a mutable uniform-parameter shadow. The marker records
+			-- membership in that combined category, not which kind the declaration has or what storage
+			-- rate it uses. Static data members also use `IRGlobalVar`, but are outside the category.
+			{ fileOrNamespaceScopeMutableVar = { struct_name = "FileOrNamespaceScopeMutableVarDecoration" } },
+			-- The pre-link module-wide uninitialized-global check found a possible write and
+			-- therefore could not prove that every read is uninitialized. We preserve that result
+			-- because entry-point linking may remove the writer before a later analysis revisits the
+			-- global.
+			{
+				uninitializedGlobalCheckFoundPossibleWrite = {
+					struct_name = "UninitializedGlobalCheckFoundPossibleWriteDecoration",
+				},
+			},
 			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",
@@ -2068,10 +2082,10 @@ local insts = {
 				availableInDownstreamIR = { struct_name = "AvailableInDownstreamIRDecoration", min_operands = 1 },
 			},
 			{
+				-- Added to an entry point's input parameter, and copied onto the entry-point function
 				GeometryInputPrimitiveTypeDecoration = {
 					{
 						pointPrimitiveType = {
-							-- Added to IRParam parameters to an entry point
 							struct_name = "PointInputPrimitiveTypeDecoration",
 						},
 					},
@@ -2372,11 +2386,11 @@ local insts = {
 			},
 			{ noRefInline = { struct_name = "NoRefInlineDecoration" } },
 			{
-				DerivativeGroupQuad = {
-					struct_name = "DerivativeGroupQuadDecoration",
+				DerivativeGroupDecoration = {
+					{ DerivativeGroupQuad = { struct_name = "DerivativeGroupQuadDecoration" } },
+					{ DerivativeGroupLinear = { struct_name = "DerivativeGroupLinearDecoration" } },
 				},
 			},
-			{ DerivativeGroupLinear = { struct_name = "DerivativeGroupLinearDecoration" } },
 			{
 				MaximallyReconverges = {
 					struct_name = "MaximallyReconvergesDecoration",
@@ -2526,6 +2540,11 @@ local insts = {
 			{ loopCounterUpdateDecoration = {} },
 			{ ParamsContextDecoration = { operands = {"value"} } },
 			{
+				AutodiffParameterContextTypeDecoration = {
+					-- Marks a context whose fields are captured primal parameters.
+				},
+			},
+			{
 				AutodiffInstDecoration = {
 					-- Auto-diff inst decorations
 					{
@@ -2660,9 +2679,9 @@ local insts = {
 			},
 			{
 				DebugLocation = {
-					-- Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
+					-- Source, line, column, and an optional declaration scope for variables/parameters.
 					struct_name = "DebugLocationDecoration",
-					operands = { { "source" }, { "line" }, { "col" } },
+					operands = { { "source" }, { "line" }, { "col" }, { "scope", optional = true } },
 				},
 			},
 			{
@@ -2704,7 +2723,11 @@ local insts = {
 			},
 			{
 				experimentalModule = {
-					-- Marks a module as an experimental module
+					-- Marks a module as experimental in serialized IR.
+					--
+					-- Retained as derived metadata because the AST-gate refactor left
+					-- `IRModule::k_maxSupportedModuleVersion` unchanged, so compatible
+					-- pre-refactor readers still inspect this marker to emit E00104.
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},
@@ -2824,6 +2847,7 @@ local insts = {
 	{ IsUnsignedInt = { operands = { { "value" } } } },
 	{ IsSignedInt = { operands = { { "value" } } } },
 	{ IsVector = { operands = { { "value" } } } },
+	{ IsBindlessTextureNVEncodable = { operands = { { "value" } } } },
 	{ GetDynamicResourceHeap = { hoistable = true } },
 	{ TranslateBase = {
 		hoistable = true,
@@ -2989,7 +3013,11 @@ local insts = {
 			min_operands = 5,
 		},
 	},
-	{ DebugVar = { operands = { { "name" }, { "type" }, { "scope" }, { "location" } } } },
+	{
+		DebugVar = {
+			min_operands = 5,
+		},
+	},
 	{
 		DebugValue = {
 			min_operands = 2,
@@ -3001,13 +3029,18 @@ local insts = {
 			min_operands = 5,
 		},
 	},
+	{
+		DebugLexicalBlock = {
+			operands = { { "source" }, { "line" }, { "col" }, { "parentScope" } },
+		},
+	},
 	{ DebugInlinedVariable = { min_operands = 2 } },
 	{
 		DebugScope = {
-			min_operands = 2,
+			min_operands = 1,
 		},
 	},
-	{ DebugNoScope = { min_operands = 1 } },
+	{ DebugNoScope = { min_operands = 0 } },
 	{
 		DebugBuildIdentifier = {
 			min_operands = 2,

@@ -44,23 +44,23 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
 
 - **`nightly-mdl-perf-test.yml`** — builds tip-of-tree, sweeps into
   `daily/<date>-<sha>/`, runs `track.py register` (stamp + rebuild the tracking
-  series), pushes the results repo, then runs `trend.py`. **Manual
-  `workflow_dispatch` only right now — the daily `schedule` is commented out;**
-  enable it once the suite is validated on the runner and the history is seeded.
+  series), confirms alert candidates on the same runner, pushes the results repo,
+  then reports the archived verdict with `confirm.py report`. It runs daily at
+  05:00 UTC and also supports manual `workflow_dispatch` runs.
   Inputs: `ref` (commit SHA or branch to build; blank = master HEAD, useful for
   backfilling historical daily points), `samples`, `sweep` (default `false` — opt-in,
   ~4x runtime: dispatch with `sweep=true` to also collect the multi-size scaling
   ladders), `only`, `publish` (default `true`), and `notify-slack` (default
   `false`; set `true` to send the Slack notification from a manual run too,
   to test the path end-to-end). The trend gate is two-tier: changes
-  ≥ 10% over the trailing median fail the job (Slack: regression), changes
-  ≥ 5% are reported as warnings (annotations + step summary + a yellow
+  ≥ 10% over the trailing median in both batches fail the job (Slack: regression),
+  changes ≥ 5% in both batches are reported as warnings (annotations + step summary + a yellow
   Slack status) without failing — early signal without alert fatigue. With `publish=false` the run measures only: results are
   uploaded as a run artifact and the results repo, tracking series, pages, and
   trend check are untouched — the mode for one-off measurements (bisect points,
   suspect commits) that must not pollute the series. Because daily labels are
   keyed by the swept commit's date, several points can share a date; the
-  workflow therefore passes the label it registered to `trend.py --label` so
+  workflow therefore passes the label it registered to the confirmation commands so
   the trend check judges exactly this run's point rather than a same-date
   sibling. The run label and `meta.json` date are derived from the checked-out
   commit's author date, so backfill points sort correctly in the tracking
@@ -158,6 +158,22 @@ inclusive and `rel` belongs to the error tier (a metric exactly at 1.10× is an
 error); `classify_metric` owns this decision and pins each boundary with an
 import-time self-check. If the judged point's runner differs from the
 history's, it warns and compares only same-runner points.
+
+The nightly uses `trend.py --candidates` to freeze this comparison without
+emitting performance alarms. `confirm.py measure` reruns each affected
+workload once on the measurement host, with the same compiler, input size,
+sample count and warmup count. Both warning and error candidates are checked.
+A counter must cross the same frozen baseline in both batches to alert; the
+confirmed severity is the lower of the two batch severities. A different
+counter becoming slow in the rerun cannot confirm the original candidate.
+
+The original `results.json` remains the graph/history point. The adjacent
+`confirmation.json` stores candidate baselines, thresholds, coverage notes and
+all rerun records, including failed measurements. `confirm.py report` checks
+that this archive belongs to the original results and current workflow attempt,
+then uses the shared trend renderer to publish the confirmed verdict. Missing,
+stale or failed confirmation produces an evaluation failure, not recovery.
+No retry-until-green loop or next-night delay is involved.
 
 On scheduled runs (and manual runs with `notify-slack=true`) the workflow also
 posts a Slack status notification — clean / warning-level changes / regression
@@ -261,7 +277,7 @@ secret already covers pushes to that repo.
 | Downstream workloads      | `downstream_required`: missing-toolchain diagnostics are REAL errors               | slangc emits its internal timers before the downstream handoff, so without this a host missing dxc/nvrtc would record timers and report OK with no DXIL/PTX produced — the opposite of the workload's purpose                                                                                       |
 | Phase decomposition       | mutually-exclusive buckets (top-down)                                              | Named leaves + `(self)` residuals; if a child timer overshoots its parent it is scaled proportionally so the buckets always sum to `compileInner`                                                                                                                                                   |
 | Output                    | `results.json` only                                                                | JSON holds median/min/mean/stdev per timer; generated sources + compiled outputs go to an auto-removed `--gen-dir` tempdir so the results dir stays scratch-free                                                                                                                                    |
-| Robustness                | 1 warmup + N timed runs (default 5)                                                | The warmup absorbs cold-cache/first-run effects; multiple timed samples + median tame scheduling noise                                                                                                                                                                                              |
+| Robustness                | 1 warmup + N timed suite passes (default 5)                                        | Prepare once; each pass visits every workload/size once. Interleaving spreads the median samples across host states; the trend gate requires matching sampling strategies.                                                                                                                          |
 | Determinism               | generators are deterministic (same N → identical bytes)                            | A release sweep compares like with like, and base/head always compile identical inputs                                                                                                                                                                                                              |
 | GPU / SDK dependency      | none                                                                               | Every workload is GPU-free and external-SDK-free, so it runs headless in CI                                                                                                                                                                                                                         |
 | Target                    | `-target spirv -emit-spirv-directly` (text backends use `-target metal`/`wgsl`)    | Measures Slang itself, not a downstream `spirv-opt`                                                                                                                                                                                                                                                 |
