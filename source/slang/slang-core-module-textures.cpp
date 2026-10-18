@@ -665,7 +665,7 @@ void TextureTypeInfo::writeGetDimensionFunctions(StringBuilder& outCombinedForwa
 
             // On HLSL and CPU a combined receiver forwards to the extracted texture through a
             // file-scope function (see `__loadTexture` in hlsl.meta.slang for why it is not a
-            // member call). One forwarder name per shape keeps each overload set to the six
+            // member call). One forwarder name per shape keeps each overload set to the
             // `GetDimensions` overloads of that shape.
             StringBuilder forwarderName;
             forwarderName << "__getDimensions" << base.shapeName << (isArray ? "Array" : "")
