@@ -443,6 +443,10 @@ jobs:
           repository: ${{ env.PERF_RESULTS_REPO }}
           path: "perf-results"
           token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+          # This job only reads the results; nothing here pushes. Without this
+          # the write PAT would sit in perf-results/.git/config for every later
+          # step of the job.
+          persist-credentials: false
 
       # Read the archived confirmation against its frozen baseline. Only a
       # counter that crosses the threshold in both batches can raise an alarm.
@@ -465,6 +469,23 @@ jobs:
             --label "${PERF_LABEL:?}" || code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit "$code"
+
+      # One extra line for the message below: whether the confirmed change
+      # looks real or like host noise, judged from the samples already in the
+      # results repo (perf_bisect.py triage). It measures nothing, and like
+      # slack_status.py it is report-only: if it fails or times out, the
+      # message goes out without the line.
+      - name: Judge real or noise
+        id: triage
+        if: always() && steps.trend.outputs.exit_code == '3'
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -uo pipefail
+          cd "$GITHUB_WORKSPACE/tools/compile-perf"
+          python3 perf_bisect.py triage --results "$GITHUB_WORKSPACE/perf-results" \
+            --label "${PERF_LABEL:?}" || echo "::warning title=Real-or-noise skipped::perf_bisect.py triage failed"
 
       - name: Notify Slack
         if: always() && (github.event_name == 'schedule' || github.event.inputs['notify-slack'] == 'true')
@@ -497,6 +518,11 @@ jobs:
           # sweep itself fail", which now happens in a different job.
           JOB_STATUS: ${{ needs.nightly.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Empty unless the triage step ran and succeeded. The bisect that a
+          # red night starts (claude-perf-bisect.yml) does not exist yet when
+          # this message is sent, so the message links its run list instead.
+          TRIAGE_LINE: ${{ steps.triage.outputs.line }}
+          BISECT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/claude-perf-bisect.yml
         run: |
           if [ -z "$SLACK_WEBHOOK" ]; then
             echo "SLACK_WEBHOOK_COMPILE_PERF not set; skipping Slack notification"
@@ -522,10 +548,14 @@ jobs:
           export STATUS="${CLASSIFIED#*$'\n'}"
           python3 -c "
           import json, os, urllib.request
+          triage = os.environ.get('TRIAGE_LINE', '')
+          extra = (f'• {triage}\n• Bisect: {os.environ[\"BISECT_URL\"]}\n'
+                   if triage else '')
           payload = {
               'text': (
                   f'{os.environ[\"ICON\"]} *Compile-perf nightly — {os.environ[\"DATE\"]}*\n'
                   f'{os.environ[\"STATUS\"]}\n'
+                  + extra +
                   f'• Run: {os.environ[\"RUN_URL\"]}\n'
                   f'• Report: https://shader-slang.org/slang-compile-perf/'
               )
