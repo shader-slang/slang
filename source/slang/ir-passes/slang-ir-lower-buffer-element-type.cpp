@@ -136,7 +136,13 @@
 /// ```
 /// In this case, only l.member is used, so we should avoid translating other unrelated members
 /// from storage type to logical type. To achieve this we must be able to push the
-/// `CastStorageToLogical` operation beyond the `load`. The steps to achieve this are:
+/// `CastStorageToLogical` operation beyond the `load`.
+///
+/// When, as here, every use of a plain `load` is a `fieldExtract` or `getElement`, the `load` is
+/// replaced by loads of just the used members, all at the point of the `load` (see
+/// `tryReplaceLoadWithMemberLoads`, which also lists when that does not apply). The steps below
+/// are the general mechanism, used otherwise (e.g. when `l` has other uses, or `ptr` is an
+/// immutable temp var):
 /// 1. we process `lptr` inst by inspecting its users. We find that a `load` (l) uses it.
 /// 2. replace the `load` with `CastStorageToLogicalDeref(ptr)`, the IR become:
 /// ```
@@ -1192,12 +1198,12 @@ struct LoweredElementTypeContext
         return config;
     }
 
-    // Returns true if `value` is defined before `pos` in the same block, or is not defined in
-    // a block at all (a global, constant or key). This is a conservative dominance check: a
-    // value from a dominating block, or a parameter of the entry block when `pos` is in a
-    // later block, is reported as unavailable. Callers then fall back to a path that does not
-    // need `value` at `pos`.
-    static bool isDefinedBeforeInSameBlock(IRInst* value, IRInst* pos)
+    // Conservatively returns whether `value` can be used at `pos`: true if `value` is not in a
+    // block (a global, constant or key) or is defined before `pos` in `pos`'s block. A value from
+    // another block, even a dominating one, is reported as not available, and the caller then
+    // keeps the whole load. This avoids building a dominator tree for every load; the index of a
+    // member read such as `push.b[i]` is normally computed next to the load.
+    static bool isKnownAvailableAt(IRInst* value, IRInst* pos)
     {
         if (!as<IRBlock>(value->getParent()))
             return true;
@@ -1213,8 +1219,9 @@ struct LoweredElementTypeContext
 
     // Replace `extract`, a `fieldExtract` or `getElement` of a value that `ptrVal` holds in
     // storage layout, with `load(gep(castStorageToLogical(ptrVal), key))`, emitted at the
-    // builder's insertion point. `logicalPtrType` is the type of the logical address.
-    void replaceExtractWithMemberLoad(
+    // builder's insertion point, and return that member load. `logicalPtrType` is the type of
+    // the logical address.
+    IRInst* replaceExtractWithMemberLoad(
         IRBuilder& builder,
         IRType* logicalPtrType,
         IRInst* ptrVal,
@@ -1233,44 +1240,75 @@ struct LoweredElementTypeContext
         extract->removeAndDeallocate();
         if (auto castStorage = as<IRCastStorageToLogical>(castAddr))
             castInstWorkList.add(castStorage);
+        return memberLoad;
     }
 
-    // Try to replace `load`, a plain load of the composite at `castInst`
-    // (`castStorageToLogical(ptrVal)`), with loads of only the members its users read.
+    // Whether two `fieldExtract` keys or `getElement` indices select the same member: the same
+    // key or index, or two integer literals with the same value.
+    static bool isSameMemberOperand(IRInst* a, IRInst* b)
+    {
+        if (a == b)
+            return true;
+        auto aLit = as<IRIntLit>(a);
+        auto bLit = as<IRIntLit>(b);
+        return aLit && bLit && aLit->getValue() == bLit->getValue();
+    }
+
+    // Whether `index`, a constant `getElement` index into a value of type `compositeType`, is
+    // within its bounds.
+    static bool isConstantIndexInBounds(IRType* compositeType, IRIntLit* index)
+    {
+        IRInst* count = nullptr;
+        if (auto arrayType = as<IRArrayType>(compositeType))
+            count = arrayType->getElementCount();
+        else if (auto vectorType = as<IRVectorType>(compositeType))
+            count = vectorType->getElementCount();
+        else if (auto matrixType = as<IRMatrixType>(compositeType))
+            count = matrixType->getRowCount();
+        auto countLit = as<IRIntLit>(count);
+        return countLit && index->getValue() >= 0 && index->getValue() < countLit->getValue();
+    }
+
+    // Try to replace `load`, a plain load of a composite through `castStorageToLogical(ptrVal)`,
+    // with member loads: loads of only the members its users read.
     //
-    // This applies when every use of the loaded value is a `fieldExtract` or `getElement` of
-    // it. Each extract is then replaced with `load(gep(castStorageToLogical(ptrVal), key))`,
-    // and `load` is removed. Returns true if it did that, and pushes the new casts onto
-    // `castInstWorkList`; otherwise changes nothing.
+    // This applies when every use of the loaded value is a `fieldExtract` or `getElement` of it.
+    // Each member that is extracted becomes one `load(gep(castStorageToLogical(ptrVal), key))`,
+    // however many extracts read it, and `load` is removed. Returns true if it did that, and
+    // pushes the new casts onto `castInstWorkList`; otherwise changes nothing.
     //
-    // The member loads are all emitted where `load` was, so memory is read at the same point
-    // of the program as before; they read a subset of the bytes `load` read, so no other
-    // write can come in between. This avoids copying the whole composite into a temporary
-    // when only some of its members are needed (e.g. `push.b[i]` on a large uniform struct).
+    // Memory order: the member loads are emitted together where `load` was, with nothing in
+    // between, so each one observes the same memory state that `load` did. Each reads bytes that
+    // `load` also read, and no member is read twice, so this never reads more than `load` did.
+    // When only some members are used (e.g. `push.b[i]` on a large uniform struct) it avoids
+    // copying the whole composite into a temp var.
+    //
+    // A member load placed where `load` was reads its member even on paths where the program
+    // never reaches the extract (for example when the index is checked first). That is only
+    // allowed when the address is statically in bounds: a `fieldExtract`, or a `getElement`
+    // with a constant index within the array, vector or matrix.
     //
     // It does not apply, and the caller keeps the whole load, when:
-    // - `load` has an alignment or memory-scope attribute, which describes the whole access
-    //   and cannot be carried over to a member at another offset (as in `deferBufferLoadInst`);
-    // - a `getElement` index is not defined before `load`, since the new address is built at
-    //   `load` (`fieldExtract` keys are global and always available);
-    // - a `getElement` with a non-constant index is in another block than `load`: emitting its
-    //   load at `load` would read the element even on paths where the program does not (for
-    //   example when the index is checked first), which can be out of bounds.
-    bool tryReplaceLoadWithPartialLoads(
+    // - `load` has no uses (it is left to the existing path; dead-code elimination removes it);
+    // - `load` has an alignment or memory-scope attribute (`hasWholeAccessAttr`), which cannot
+    //   be carried over to a member at another offset;
+    // - a `getElement` index is not known to be available at `load` (`isKnownAvailableAt`),
+    //   since the new address is built there (`fieldExtract` keys are global);
+    // - a `getElement` in another block than `load` has an index that is not a constant within
+    //   bounds, so the element may be read only under a condition.
+    bool tryReplaceLoadWithMemberLoads(
         IRBuilder& builder,
         IRLoad* load,
-        IRCastStorageToLogical* castInst,
-        IRInst* ptrVal,
         List<IRCastStorageToLogicalBase*>& castInstWorkList)
     {
-        SLANG_ASSERT(castInst->getOperand(0) == ptrVal && load->getPtr() == castInst);
+        // `load` reads through its address, so the cast is a pointer (never a
+        // `CastStorageToLogicalDeref`, which is a value).
+        auto castInst = cast<IRCastStorageToLogical>(load->getPtr());
+        auto ptrVal = castInst->getOperand(0);
         if (!load->hasUses())
             return false;
-        for (auto attr : load->getAllAttrs())
-        {
-            if (as<IRAlignedAttr>(attr) || as<IRMemoryScopeAttr>(attr))
-                return false;
-        }
+        if (hasWholeAccessAttr(load))
+            return false;
         for (auto use = load->firstUse; use; use = use->nextUse)
         {
             auto extract = use->getUser();
@@ -1281,10 +1319,14 @@ struct LoweredElementTypeContext
             if (extract->getOp() == kIROp_GetElement)
             {
                 auto index = extract->getOperand(1);
-                if (!isDefinedBeforeInSameBlock(index, load))
+                if (!isKnownAvailableAt(index, load))
                     return false;
-                if (!as<IRIntLit>(index) && extract->getParent() != load->getParent())
-                    return false;
+                if (extract->getParent() != load->getParent())
+                {
+                    auto constIndex = as<IRIntLit>(index);
+                    if (!constIndex || !isConstantIndexInBounds(load->getDataType(), constIndex))
+                        return false;
+                }
             }
         }
 
@@ -1295,15 +1337,40 @@ struct LoweredElementTypeContext
         // `castInst` is a pointer, so its type is the logical address type, including its
         // address space.
         builder.setInsertBefore(load);
+        // The op and key or index of each member loaded so far (the extracts themselves are
+        // removed), and its member load.
+        List<IROp> loadedOps;
+        List<IRInst*> loadedOperands;
+        List<IRInst*> memberLoads;
         for (auto extract : extracts)
         {
-            replaceExtractWithMemberLoad(
+            // A member that is extracted more than once is loaded once.
+            auto op = extract->getOp();
+            auto operand = extract->getOperand(1);
+            IRInst* memberLoad = nullptr;
+            for (Index i = 0; i < loadedOps.getCount(); i++)
+            {
+                if (loadedOps[i] == op && isSameMemberOperand(loadedOperands[i], operand))
+                {
+                    memberLoad = memberLoads[i];
+                    break;
+                }
+            }
+            if (memberLoad)
+            {
+                extract->replaceUsesWith(memberLoad);
+                extract->removeAndDeallocate();
+                continue;
+            }
+            loadedOps.add(op);
+            loadedOperands.add(operand);
+            memberLoads.add(replaceExtractWithMemberLoad(
                 builder,
                 castInst->getFullType(),
                 ptrVal,
                 castInst->getLayoutConfig(),
                 extract,
-                castInstWorkList);
+                castInstWorkList));
         }
         load->removeAndDeallocate();
         return true;
@@ -1479,17 +1546,17 @@ struct LoweredElementTypeContext
                                 // - If `storageAddr` is already a tempVar that we introduced to
                                 //   hold the value of a buffer resource load, we can simply
                                 //   convert this into `CastStorageToLogicalDeref(storageAddr)`.
+                                // - Otherwise, if `user` is a plain load whose value is only
+                                //   taken apart, it is replaced by loads of the used members at
+                                //   the same point (see `tryReplaceLoadWithMemberLoads`, which
+                                //   explains why that keeps the memory semantics).
                                 // - Otherwise, if `storageAddr` is a buffer location, we will
                                 //   create a temp var to hold the result of the memory load,
                                 //   Then we create a `CastStorageToLogicalDeref(tempVar)`
                                 //   structure and use it to replace `user`.
-                                // Note that it is important to introduce a temp var and preserve
-                                // the buffer load operation, so we are not changing the memory
-                                // semantics of the original program.
-                                // - A plain load whose value is only taken apart is replaced by
-                                //   loads of the members that are used, all at the point of the
-                                //   original load (see `tryReplaceLoadWithPartialLoads`), so the
-                                //   memory is still read once, at the same place.
+                                //   Note that it is important to introduce a temp var and
+                                //   preserve the buffer load operation, so we are not changing
+                                //   the memory semantics of the original program.
                                 if (!isUseBaseAddrOperand(use, user))
                                     break;
                                 // If loaded value is itself a pointer or buffer,
@@ -1511,22 +1578,20 @@ struct LoweredElementTypeContext
                                             kIROp_TempCallArgImmutableVarDecoration))
                                         tempVar = ptrVal;
                                 }
-                                // A plain load from memory (an immutable temp var needs no copy
-                                // and is handled below) whose value is only taken apart: load
-                                // just the members that are used instead of copying the whole
-                                // composite into a temp var. Structured-buffer loads and
-                                // `Consume` keep the copy.
+                                // `tempVar` is set when `ptrVal` is an immutable temp var, which
+                                // needs no copy (handled below). Otherwise, a plain load whose
+                                // value is only taken apart becomes member loads. Only `IRLoad`
+                                // is handled: `Consume` and the `*LoadStatus` variants must stay
+                                // one operation (a counter update, a status out-parameter), and
+                                // structured-buffer loads of an element that is only taken
+                                // apart could use the same rewrite but are left for later.
                                 if (!tempVar)
                                 {
                                     auto load = as<IRLoad>(user);
-                                    auto ptrCast = as<IRCastStorageToLogical>(castInst);
-                                    if (load && ptrCast &&
-                                        tryReplaceLoadWithPartialLoads(
-                                            builder,
-                                            load,
-                                            ptrCast,
-                                            ptrVal,
-                                            castInstWorkList))
+                                    if (load && tryReplaceLoadWithMemberLoads(
+                                                    builder,
+                                                    load,
+                                                    castInstWorkList))
                                         break;
                                 }
                                 TypeLoweringConfig newLoweringConfig = config;

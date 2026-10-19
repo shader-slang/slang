@@ -13,7 +13,8 @@ struct Bottom
         // bottomGetValue. So we should not defer loading bigArray until after this write.
         *gOther = 100; 
 
-        // We should return the value from bigArray from a previously loaded value of `this`.
+        // The element must be read before the write through `gOther` above. Only that element is
+        // loaded, not all of `this`.
         return bigArray[index];
     }
 }

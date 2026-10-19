@@ -1,8 +1,6 @@
-// Calling a method on a member of a uniform struct must copy only that member into the
-// temporary the method's `this` points to, not the whole uniform struct (#13732). That
-// temporary used to receive a copy of the whole `Push_std140` value, made when buffer-element
-// lowering loaded the struct to take the member apart; it now loads only the member. The
-// `WGSL-NOT` lines check that no whole-struct copy is left.
+// Calling a method on a member of a uniform struct copies only that member into the temporary
+// the method's `this` points to, not the whole uniform struct (#13732). The `WGSL-NOT` lines
+// check that no copy of the whole `Push_std140` value is made.
 
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -output-using-type

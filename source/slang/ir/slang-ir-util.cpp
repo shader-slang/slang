@@ -4134,4 +4134,14 @@ bool isImageSamplerOrAccelerationStructureType(IRType* type)
     return false;
 }
 
+bool hasWholeAccessAttr(IRInst* load)
+{
+    for (auto attr : load->getAllAttrs())
+    {
+        if (as<IRAlignedAttr>(attr) || as<IRMemoryScopeAttr>(attr))
+            return true;
+    }
+    return false;
+}
+
 } // namespace Slang
