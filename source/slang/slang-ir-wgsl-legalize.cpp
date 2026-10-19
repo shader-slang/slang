@@ -420,17 +420,41 @@ struct EntryPointGlobalThreadingContext
         // start (a module-scope initializer that reads the input can run before the store).
         // Otherwise the store must come before anything in its entry point that can read the
         // variable.
+        List<IRFunc*> retypedEntryPoints;
         for (auto store : stores)
         {
             auto entryPoint = as<IRFunc>(store->getParent()->getParent());
             if (auto param = inputParamByEntryPoint.tryGetValue(entryPoint))
-                valueByEntryPoint[entryPoint] = *param;
+            {
+                // Varying legalization retypes a system value declared with a type that WGSL does
+                // not allow (`int3 : SV_DispatchThreadID` becomes `vec3<u32>`), so the parameter
+                // can have another type than the variable. It is converted below.
+                if ((*param)->getDataType() == valueType)
+                    valueByEntryPoint[entryPoint] = *param;
+                else
+                    retypedEntryPoints.add(entryPoint);
+            }
             else if (!isInitialStore(store, globalVar, neededSet))
                 return false;
         }
 
-        // Add the parameter to every function that needs it.
         IRBuilder builder(module);
+
+        // A retyped parameter is converted back to the variable's type at the start of the entry
+        // point, as varying legalization does for the stored value.
+        for (auto entryPoint : retypedEntryPoints)
+        {
+            auto param = inputParamByEntryPoint.getValue(entryPoint);
+            builder.setInsertBefore(entryPoint->getFirstBlock()->getFirstOrdinaryInst());
+            auto converted = tryConvertValue(builder, param, valueType);
+            // Varying legalization has already converted this parameter to this type.
+            SLANG_ASSERT(converted && converted->getDataType() == valueType);
+            if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
+                builder.addNameHintDecoration(converted, nameHint->getName());
+            valueByEntryPoint[entryPoint] = converted;
+        }
+
+        // Add the parameter to every function that needs it.
         for (auto func : needed)
         {
             auto firstBlock = func->getFirstBlock();
