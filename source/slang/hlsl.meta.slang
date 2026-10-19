@@ -19610,8 +19610,14 @@ vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint 
 
 // Declares the SPIR-V capability and extension of the partitioned subgroup operations.
 // SPV_NV_shader_subgroup_partitioned and SPV_EXT_shader_subgroup_partitioned define the same
-// opcodes, operands and capability; only the extension name differs. NV is the default, and EXT
-// is used when the target requests spvGroupNonUniformPartitionedEXT.
+// opcodes, operands and capability: the NV and EXT names are aliases for the same enumerants, so
+// the callers keep the NV spellings of the opcodes and group operations on both paths, and the
+// two capability spellings below are the same capability. Only the extension declared differs.
+// NV is the default, and EXT is used when the target requests spvGroupNonUniformPartitionedEXT.
+//
+// WaveMatch and WaveMaskMatch call this helper directly: they need only the SPIR-V declarations.
+// The WaveMulti* functions call `__shaderSubgroupPartitionedPreamble` below, which also adds the
+// GLSL extension and the subgroup preamble for `T`, and calls this helper on SPIR-V.
 [ForceInline]
 [require(spirv)]
 void __spirvSubgroupPartitionedPreamble()
