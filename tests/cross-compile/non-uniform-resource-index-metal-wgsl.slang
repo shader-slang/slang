@@ -6,8 +6,10 @@
 // textures, and Tint rejects the `array<texture_2d<f32>, ...>` declarations checked below (#9528).
 // Those checks pin today's spelling and will change when binding arrays are emitted.
 //
-// Besides the plain index, the kernel covers the shapes floatNonUniformResourceIndex rewrites: a
-// wrapper floated out of casts, nested wrappers, and a wrapped resource passed to a function.
+// Besides the plain index, the kernel covers a wrapper around a cast index, nested wrappers, and
+// a wrapped index whose indexed resource is passed to a function. The emitter drops the wrapper
+// wherever it ends up, so these runs show that the Textual-mode floatNonUniformResourceIndex pass
+// handles those shapes and that no call is left, not where the pass moved the wrapper.
 //
 // Run 1 (Metal) and run 2 (WGSL) index a sized array.
 // Run 3 indexes an unsized array on WGSL, emitted as a runtime-sized `array<texture_2d<f32>>`.
@@ -22,6 +24,9 @@
 //TEST:SIMPLE(filecheck=NOCALL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=NOCALL): -target wgsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=NOCALL): -target wgsl -stage compute -entry computeMain -DUNBOUNDED
+// Runs 7 and 8 index a buffer, which is valid WGSL today, so Tint also compiles it.
+//TEST:SIMPLE(filecheck=BUFFER): -target wgsl -stage compute -entry bufferMain
+//TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -stage compute -entry bufferMain
 
 // NOCALL-NOT: NonUniformResourceIndex
 // NOCALL: computeMain
@@ -78,3 +83,15 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // WGSL_UNBOUNDED: textureSampleLevel((textures_{{[0-9]+}}[{{[A-Za-z0-9_.]+}}]{{.*}}(2.0f)
 // WGSL_UNBOUNDED: sampleTexture_{{[0-9]+}}(textures_{{[0-9]+}}[materialIndices_{{[0-9]+}}[
 // WGSL_UNBOUNDED-NOT: NonUniformResourceIndex
+
+[numthreads(64, 1, 1)]
+void bufferMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
+    outputBuffer[NonUniformResourceIndex(materialIndices[dispatchThreadID.x])] = float4(1.0);
+}
+
+// BUFFER-NOT: NonUniformResourceIndex
+// BUFFER: outputBuffer_{{[0-9]+}}[materialIndices_{{[0-9]+}}[
+// BUFFER-NOT: NonUniformResourceIndex
+
+// TINT: OpEntryPoint

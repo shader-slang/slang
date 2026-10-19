@@ -41,26 +41,27 @@
 //         GL_EXT_nonuniform_qualifier.)
 //       - Metal / WGSL / CUDA / CPU: the wrapper is dropped at emit time (the
 //         CLikeSourceEmitter base just emits operand 0), because none of these
-//         have a non-uniform-resource-indexing annotation to carry:
-//           . Metal allows dynamic/non-uniform indexing of argument-buffer
-//             resource arrays with no shader-side qualifier (Metal Shading
-//             Language Spec 2.13 Argument Buffers; Tier 2 bindless).
-//           . WGSL/WebGPU has no non-uniform annotation: binding arrays are
-//             still proposal-stage and, per that proposal, "do not require
-//             explicit non-uniform annotations" (gpuweb sized-binding-arrays).
+//         have a non-uniform-resource-indexing annotation to carry. Dropping it
+//         is correct where the target accepts a non-uniform index into a
+//         resource array without an annotation:
+//           . Metal, for every binding form Slang emits: MSL indices are
+//             non-uniform unless declared `uniform<T>`. The spec's example
+//             (MSL 2.14.1, "The Need for a Uniform Type") indexes a direct
+//             `array<texture2d<float>, 10>` kernel argument -- the form Slang
+//             emits for an ordinary resource array -- and argument-buffer
+//             arrays are indexed the same way.
+//           . WGSL: core WGSL has no arrays of textures, and the
+//             `array<texture_2d<f32>, N>` Slang emits today is rejected by
+//             Tint (#9528). WGSL accepts the call so that shared HLSL-style
+//             source type-checks; dropping it is correct under the
+//             binding-array proposal, whose arrays "do not require explicit
+//             non-uniform annotations" (gpuweb sized-binding-arrays), once
+//             Slang emits binding arrays. If a WebGPU runtime gates
+//             non-uniform indexing behind an optional feature, enabling it is
+//             up to the application; Slang has no annotation to emit.
 //           . CUDA/CPU have no descriptor-array / bindless concept at all.
 //         There is nothing to propagate, so doing more here would have no
 //         target syntax to emit it into.
-//         So dropping the wrapper is correct whenever the target accepts a
-//         non-uniform index into a resource array without an annotation. Metal
-//         does for every binding form: MSL indices are non-uniform unless declared
-//         `uniform<T>`, and the spec's example (MSL 2.14.1, "The Need for a Uniform
-//         Type") indexes a direct `array<texture2d<float>, 10>` kernel argument --
-//         the form Slang emits for an ordinary resource array -- as well as
-//         argument-buffer arrays. The WebGPU binding-array proposal does too. If
-//         a WebGPU runtime gates non-uniform indexing behind an
-//         optional feature, the application has to enable it: Slang has no
-//         annotation to emit and does not diagnose a missing feature.
 //
 // So the decoration machinery below is intentionally SPIR-V-only: every other
 // target either delegates propagation to its downstream compiler (HLSL, GLSL)
