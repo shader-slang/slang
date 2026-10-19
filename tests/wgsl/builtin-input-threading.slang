@@ -24,7 +24,8 @@
 // A-NOT: var<private> {{.*}} : vec3<u32>;
 // A: fn threadIndex_{{[0-9]+}}( gThreadId_{{[0-9]+}} : vec3<u32>) -> u32
 // A: var<private> g_{{[0-9]+}} : u32;
-// A: fn laneCount_{{[0-9]+}}( {{[A-Za-z0-9_]+}} : u32) -> u32
+// A: fn laneCount_{{[0-9]+}}( [[LANE_SIZE:[A-Za-z0-9_]+]] : u32) -> u32
+// A: return [[LANE_SIZE]];
 // A: fn leaf_{{[0-9]+}}( v_{{[0-9]+}} : u32,  {{[A-Za-z0-9_]+}} : u32) -> u32
 // A: fn middle_{{[0-9]+}}( v_{{[0-9]+}} : u32,  [[MIDDLE_SIZE:[A-Za-z0-9_]+]] : u32) -> u32
 // A: leaf_{{[0-9]+}}({{.*}}, [[MIDDLE_SIZE]])
