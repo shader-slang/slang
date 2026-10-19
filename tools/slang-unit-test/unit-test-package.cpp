@@ -450,14 +450,14 @@ SLANG_UNIT_TEST(PackageManifestJSON)
                               "  }\n"
                               "}\n";
     SLANG_CHECK(SLANG_FAILED(readManifestText("pinned.json", pinnedText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String refOnlyText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
         "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
         "\"git\":\"https://example.com/noise.git\",\"ref\":\"main\",\"as\":\"2.1.0\"}}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText("ref-only.json", refOnlyText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String contradictoryPinText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
@@ -466,13 +466,13 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "\"ref\":\"main\",\"as\":\"2.1.0\"}}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("contradictory-pin.json", contradictoryPinText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String missingAsText = "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
                                  "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
                                  "\"git\":\"https://example.com/noise.git\",\"ref\":\"main\"}}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText("missing-as.json", missingAsText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String asWithoutRefText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
@@ -481,7 +481,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "\"as\":\"2.1.0\"}}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("as-without-ref.json", asWithoutRefText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String unsafeGitText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
@@ -506,7 +506,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "\"license_files\":[\"LICENSE\"],"
         "\"dependencies\":{\"noise\":{\"path\":\"../noise\",\"as\":\"1.0.0\"}}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText("path.json", pathText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String mixedSourceText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
@@ -515,7 +515,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "\"version\":\"1.0.0\"}}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("mixed-source.json", mixedSourceText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String versionedPathText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
@@ -523,7 +523,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "\"dependencies\":{\"noise\":{\"path\":\"../noise\",\"version\":\"1.0.0\"}}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("versioned-path.json", versionedPathText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String absolutePathText = "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
                                     "\"license_files\":[\"LICENSE\"],"
@@ -531,7 +531,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
                                     "\"as\":\"1.0.0\"}}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("absolute-path.json", absolutePathText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String selfVersionText = "{\"name\":\"root\",\"version\":\"1.0.0\",\"exports\":[\"src\"],"
                                    "\"license_files\":[\"LICENSE\"],\"dependencies\":{}}";
@@ -1087,7 +1087,7 @@ SLANG_UNIT_TEST(PackageLockRoundTripsEditAndPin)
         "{\"schema_version\":1,\"packages\":{\"noise\":{\"path\":\"vendor/noise\","
         "\"version\":\"1.0.0\"}}}")));
     SLANG_CHECK(SLANG_FAILED(readLockFile(path, roundTrip, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageLocalRegistryJSON)
@@ -1272,7 +1272,7 @@ SLANG_UNIT_TEST(PackageToolDiscoversRootFromSubdirectory)
         writeManifest(Path::combine(temp.path, "slang-package.json"), root, error)));
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     String nestedPackage = Path::combine(temp.path, "examples/nested");
     SLANG_CHECK_ABORT(Path::createDirectoryRecursive(nestedPackage));
@@ -1450,7 +1450,7 @@ SLANG_UNIT_TEST(PackageToolSlangToolchain)
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("noise")) >= 0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolBundle)
@@ -1604,17 +1604,17 @@ SLANG_UNIT_TEST(PackageToolUneditRejectsConflictingOptions)
         SLANG_COUNT_OF(cleanAdoptArguments),
         cleanAdoptArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has been removed")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown unedit option")) >= 0);
 
     const char* asArguments[] = {"slang-package", "unedit", "noise", "--as", "1.0.0"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(asArguments), asArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has been removed")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown unedit option")) >= 0);
 
     const char* refArguments[] = {"slang-package", "unedit", "noise", "--ref", "main"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(refArguments), refArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has been removed")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown unedit option")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolUpdateRejectsBundleCaseConflict)
@@ -1679,7 +1679,7 @@ SLANG_UNIT_TEST(PackageToolUpdateRejectsBundleCaseConflict)
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "slang-package-lock.json")));
 }
 
@@ -1949,7 +1949,7 @@ SLANG_UNIT_TEST(PackageToolExecutableRequiresWorkspaceSource)
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolTest)
@@ -2072,9 +2072,9 @@ SLANG_UNIT_TEST(PackageToolUpdateRequiresConfirmation)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeProjectLocalPackages(temp.path, localPackages, error)));
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(statusArguments), statusArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("contains entries")) >= 0);
     SLANG_CHECK(SLANG_FAILED(getWorkspaceStatusReport(temp.path, statusReport, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("contains entries")) >= 0);
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, "slang-package-overlay.json"))));
 
@@ -2145,7 +2145,8 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
     };
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(addArguments), addArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown dependency add option")) >= 0);
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
@@ -2164,7 +2165,8 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
     };
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(replaceArguments), replaceArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown dependency add option")) >= 0);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
     SLANG_CHECK(root.dependencies.getCount() == 0);
 
@@ -2232,7 +2234,8 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
         SLANG_COUNT_OF(invalidSelectorArguments),
         invalidSelectorArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown dependency add option")) >= 0);
     const char* missingValueArguments[] = {
         "slang-package",
         "dependency",
@@ -2289,7 +2292,8 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
     };
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(refArguments), refArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown dependency add option")) >= 0);
     const char* asArguments[] = {
         "slang-package",
         "dependency",
@@ -2304,7 +2308,8 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
     };
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(asArguments), asArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown dependency add option")) >= 0);
     String manifestAfterInvalidAdd;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::readAllText(rootManifestPath, manifestAfterInvalidAdd)));
@@ -2317,7 +2322,8 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
     const char* pinArguments[] = {"slang-package", "dependency", "pin", "remote", "--to", "1.0.0"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(pinArguments), pinArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has been removed")) >= 0);
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Invalid dependency command")) >= 0);
 
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -2362,21 +2368,21 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsPathLockForGitDependency)
     const char* fetchArguments[] = {"slang-package", "fetch"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
     const char* skipFetchArguments[] = {"slang-package", "fetch", "--skip-validate"};
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
         temp.path,
         SLANG_COUNT_OF(skipFetchArguments),
         skipFetchArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
     const char* validateArguments[] = {"slang-package", "validate"};
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
         temp.path,
         SLANG_COUNT_OF(validateArguments),
         validateArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolFetchRejectsWorkspaceExclusion)
@@ -2453,7 +2459,7 @@ SLANG_UNIT_TEST(PackageToolRejectsPathIntoSlangState)
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     LockedPackage locked;
     locked.name = "evil";
@@ -2467,14 +2473,14 @@ SLANG_UNIT_TEST(PackageToolRejectsPathIntoSlangState)
     const char* fetchArguments[] = {"slang-package", "fetch"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
     const char* validateArguments[] = {"slang-package", "validate"};
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
         temp.path,
         SLANG_COUNT_OF(validateArguments),
         validateArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolPathDependencies)
@@ -2571,7 +2577,7 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     List<String> resolveWarnings;
     SLANG_CHECK(
         SLANG_FAILED(resolveDependencies(temp.path, root, previewLock, error, &resolveWarnings)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must contain 'git'")) >= 0);
     return;
     SLANG_CHECK(resolveWarnings.getCount() == 2);
     bool foundShadowWarning = false;
@@ -2798,7 +2804,7 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
         SLANG_COUNT_OF(overrideArguments),
         overrideArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has been removed")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Invalid command")) >= 0);
     return;
 
     TemporaryDirectory helperTemp;
@@ -3198,7 +3204,7 @@ SLANG_UNIT_TEST(PackageToolUpdateSkipsConfirmationWhenLockIsUnchanged)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(plainUpdate), plainUpdate, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
     String lockAfterDeclinedUpdate;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(lockPath, lockAfterDeclinedUpdate)));
     SLANG_CHECK(lockAfterDeclinedUpdate == lockAfterFirstUpdate);
@@ -3294,12 +3300,12 @@ SLANG_UNIT_TEST(PackageValidateRejectsEscapingPathDependency)
         SLANG_COUNT_OF(validateArguments),
         validateArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
     return;
     const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -3402,7 +3408,7 @@ SLANG_UNIT_TEST(PackageCommandsValidateDependencyModuleLayout)
     const char* updateArguments[] = {"slang-package", "update", "--minimal", "--yes"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "slang-package-lock.json")));
     return;
 
@@ -3487,7 +3493,7 @@ SLANG_UNIT_TEST(PackageValidateIgnoresTransitiveAliasThatBuildRejects)
         SLANG_COUNT_OF(validateArguments),
         validateArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
     return;
     const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK(SLANG_FAILED(
@@ -4311,7 +4317,7 @@ SLANG_UNIT_TEST(PackageResolverPathPackageGitTransitive)
     List<String> warnings;
     SLANG_CHECK(SLANG_FAILED(
         resolveDependenciesWithSource(temp.path, root, source, lock, error, &warnings)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must contain 'git'")) >= 0);
     return;
     const LockedPackage* lockedP = _findLockedPackage(lock, "p");
     const LockedPackage* lockedB = _findLockedPackage(lock, "b");
@@ -4358,7 +4364,7 @@ SLANG_UNIT_TEST(PackageResolverPathShadowsSelectedGit)
     List<String> warnings;
     SLANG_CHECK(SLANG_FAILED(
         resolveDependenciesWithSource(temp.path, root, source, lock, error, &warnings)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must contain 'git'")) >= 0);
     return;
     const LockedPackage* lockedQ = _findLockedPackage(lock, "q");
     SLANG_CHECK_ABORT(lockedQ);
@@ -4416,7 +4422,7 @@ SLANG_UNIT_TEST(PackageResolverDropsConstraintNotesFromShadowedGitPackage)
     SlangResult resolveResult =
         resolveDependenciesWithSource(temp.path, root, source, lock, error, nullptr, &report);
     SLANG_CHECK(SLANG_FAILED(resolveResult));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must contain 'git'")) >= 0);
     return;
 
     // The path copy of `q` is what ends up in the graph, so nothing in the report may still be
@@ -4493,7 +4499,7 @@ SLANG_UNIT_TEST(PackageResolverRejectsPathVersionOutsideGitRange)
 
     PackageTool::LockFile lock;
     SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(temp.path, root, source, lock, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must contain 'git'")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageResolverRejectsPathVersionOutsideGitPin)
@@ -4531,7 +4537,7 @@ SLANG_UNIT_TEST(PackageResolverRejectsPathVersionOutsideGitPin)
 
     PackageTool::LockFile lock;
     SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(temp.path, root, source, lock, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no longer supported")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("must contain 'git'")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageResolverCompatibleSelfCycle)

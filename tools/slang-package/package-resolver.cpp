@@ -950,7 +950,7 @@ private:
     {
         if (dependency.path.getLength())
         {
-            outError = String("Path dependencies are no longer supported: ") + dependency.name;
+            outError = String("Dependency must contain 'git': ") + dependency.name;
             return SLANG_FAIL;
         }
 

@@ -356,56 +356,27 @@ static SlangResult _readDependencies(
         for (auto field : container->getObject(pair.value))
         {
             String key = container->getStringFromKey(field.key);
-            if (key != "git" && key != "path" && key != "version" && key != "ref" && key != "as")
+            if (key != "git" && key != "version")
             {
                 outError = String("Unknown field in dependency '") + dependency.name + "': " + key;
-                return SLANG_FAIL;
-            }
-            if (key == "path")
-            {
-                outError = String("Path dependencies are no longer supported: ") + dependency.name;
-                return SLANG_FAIL;
-            }
-            if (key == "ref" || key == "as")
-            {
-                outError = String("Dependency '") + dependency.name +
-                           "' selects a version range. The lock records the resolved tag; use "
-                           "edit to check out a branch and pin to hold a release.";
                 return SLANG_FAIL;
             }
         }
         SLANG_RETURN_ON_FAIL(
             _readOptionalString(container, pair.value, "git", dependency.git, outError));
-        SLANG_RETURN_ON_FAIL(
-            _readOptionalString(container, pair.value, "path", dependency.path, outError));
-        if ((dependency.git.getLength() != 0) == (dependency.path.getLength() != 0))
+        if (!dependency.git.getLength())
         {
-            outError = String("Dependency must contain exactly one of 'git' or 'path': ") +
-                       dependency.name;
+            outError = String("Dependency must contain 'git': ") + dependency.name;
             return SLANG_FAIL;
         }
-        if (dependency.git.getLength() && !_isSafeGitLocation(dependency.git))
+        if (!_isSafeGitLocation(dependency.git))
         {
             outError = String("Dependency has an unsafe Git location: ") + dependency.name;
             return SLANG_FAIL;
         }
-        if (dependency.path.getLength() && !_isSafeLocalPath(dependency.path))
-        {
-            outError = String("Dependency path must be relative: ") + dependency.name;
-            return SLANG_FAIL;
-        }
         SLANG_RETURN_ON_FAIL(
             _readOptionalString(container, pair.value, "version", dependency.version, outError));
-        if (dependency.path.getLength())
-        {
-            if (dependency.version.getLength() || !dependency.as.getLength())
-            {
-                outError =
-                    String("Path dependency must contain 'path' and 'as' only: ") + dependency.name;
-                return SLANG_FAIL;
-            }
-        }
-        else if (!dependency.version.getLength())
+        if (!dependency.version.getLength())
         {
             outError = String("Git dependency '") + dependency.name + "' requires 'version'.";
             return SLANG_FAIL;
@@ -1092,22 +1063,15 @@ static SlangResult _readLockedPackage(
     for (auto field : container->getObject(pair.value))
     {
         String key = container->getStringFromKey(field.key);
-        if (key != "git" && key != "path" && key != "ref" && key != "version" && key != "commit" &&
+        if (key != "git" && key != "ref" && key != "version" && key != "commit" &&
             key != "pinned" && key != "branch")
         {
             outError = String("Unknown field in locked package '") + outPackage.name + "': " + key;
             return SLANG_FAIL;
         }
-        if (key == "path")
-        {
-            outError = String("Path dependencies are no longer supported: ") + outPackage.name;
-            return SLANG_FAIL;
-        }
     }
     SLANG_RETURN_ON_FAIL(
         _readOptionalString(container, pair.value, "git", outPackage.git, outError));
-    SLANG_RETURN_ON_FAIL(
-        _readOptionalString(container, pair.value, "path", outPackage.path, outError));
     SLANG_RETURN_ON_FAIL(
         _readOptionalBool(container, pair.value, "pinned", false, outPackage.pinned, outError));
     SLANG_RETURN_ON_FAIL(
@@ -1118,11 +1082,6 @@ static SlangResult _readLockedPackage(
     if (SLANG_FAILED(parseExactVersion(outPackage.version, ignoredVersion, outError)))
     {
         outError = String("Locked package has an invalid effective version: ") + outPackage.name;
-        return SLANG_FAIL;
-    }
-    if (outPackage.path.getLength())
-    {
-        outError = String("Path dependencies are no longer supported: ") + outPackage.name;
         return SLANG_FAIL;
     }
     if (!outPackage.git.getLength())

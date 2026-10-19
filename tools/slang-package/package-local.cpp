@@ -45,8 +45,7 @@ SlangResult readProjectLocalPackages(
     SLANG_RETURN_ON_FAIL(readLocalPackages(path, outPackages, outError));
     if (outPackages.getCount())
     {
-        outError = "slang-package-overlay.json is no longer supported. Remove it and edit a "
-                   "dependency with 'slang package edit <name> --branch <branch>'.";
+        outError = "slang-package-overlay.json contains entries.";
         outPackages.clear();
         return SLANG_FAIL;
     }

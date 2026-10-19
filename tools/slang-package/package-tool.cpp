@@ -1401,10 +1401,10 @@ static bool _hasEnabledOutOfTreeOverride(
     return false;
 }
 
-/// Copy workspace registrations for one `update`, optionally disabling out-of-tree overrides.
+/// Copy workspace registrations for one `update`.
 ///
-/// An in-place override continues to own `deps/NAME` under `--ignore-overrides`; treating it as
-/// inactive could let materialization replace the checkout the user entered through `edit`.
+/// An in-place edit continues to own `deps/NAME`. Treating it as inactive could let
+/// materialization replace that checkout.
 static void _localPackagesForUpdate(
     const Manifest& manifest,
     const List<LocalPackage>& localPackages,
@@ -3151,13 +3151,7 @@ SlangResult executeInDirectory(
         for (int i = 2; i < argc; ++i)
         {
             String flag = argv[i];
-            if (flag == "--ignore-overrides")
-            {
-                outError = "update --ignore-overrides has been removed. Edits are a branch in "
-                           "the lock, and update does not move an edited checkout.";
-                return SLANG_FAIL;
-            }
-            else if (flag == "--clean")
+            if (flag == "--clean")
                 allowClean = true;
             else if (flag == "--dry-run")
                 dryRun = true;
@@ -3337,20 +3331,8 @@ SlangResult executeInDirectory(
                 String value = argv[i + 1];
                 if (option == "--git")
                     dependency.git = value;
-                else if (option == "--path")
-                {
-                    outError = "Path dependencies are no longer supported.";
-                    return SLANG_FAIL;
-                }
                 else if (option == "--version")
                     dependency.version = value;
-                else if (option == "--ref" || option == "--as")
-                {
-                    outError = "dependency add selects a version range. The lock records the "
-                               "resolved tag; use edit to check out a branch and pin to hold a "
-                               "release.";
-                    return SLANG_FAIL;
-                }
                 else
                 {
                     outError = String("Unknown dependency add option: ") + option;
@@ -3411,11 +3393,6 @@ SlangResult executeInDirectory(
                 return SLANG_FAIL;
             }
             return _dependencyAdd(projectRoot, dependency, outError);
-        }
-        if (String(argv[2]) == "pin")
-        {
-            outError = "dependency pin has been removed. Use 'slang package pin <name> <version>'.";
-            return SLANG_FAIL;
         }
         outError = "Invalid dependency command. Use 'dependency add', 'dependency remove', "
                    "or 'dependency list'.";
@@ -3546,11 +3523,6 @@ SlangResult executeInDirectory(
                 mode = UneditMode::Tag;
                 tagVersion = argv[++i];
             }
-            else if (flag == "--yes" || flag == "--adopt" || flag == "--as" || flag == "--ref")
-            {
-                outError = String(flag) + " has been removed from unedit.";
-                return SLANG_FAIL;
-            }
             else
             {
                 outError = String("Unknown unedit option: ") + flag;
@@ -3559,13 +3531,6 @@ SlangResult executeInDirectory(
         }
         return endPackageEdit(projectRoot, name, mode, tagVersion, clean, outError);
     }
-    if (command == "override")
-    {
-        outError = "The override command has been removed. An edit checks out a branch of the "
-                   "dependency at deps/<name>.";
-        return SLANG_FAIL;
-    }
-
     outError = String("Invalid command or arguments. Run '") + argv[0] + " help'.";
     return SLANG_FAIL;
 }

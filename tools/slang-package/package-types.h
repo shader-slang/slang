@@ -29,8 +29,8 @@ struct Dependency
     String version;
     /// Exact dotted version claimed by a path dependency.
     ///
-    /// Path dependencies are rejected. The field remains so an old in-memory edge can still be
-    /// diagnosed.
+    /// Manifest JSON does not accept a path dependency. The field remains because the resolver
+    /// still diagnoses an in-memory edge that carries one.
     String as;
 };
 
