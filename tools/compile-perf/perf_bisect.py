@@ -623,7 +623,8 @@ def triage(results_dir, label):
     The rules use only what the nightly has already stored: the night's two
     batches and its trailing baseline nights on the same runner. Per counter,
     in order:
-      known-flaky       a counter listed in KNOWN_FLAKY: noise.
+      known-flaky       a counter listed in KNOWN_FLAKY: skipped, and left
+                        out of the night's verdict.
       runner-changed    no baseline night ran on tonight's runner: unclear.
       thin-history      fewer than MIN_HISTORY such nights: unclear.
       same-commit-flat  the newest such night built head's commit and was flat
@@ -633,13 +634,17 @@ def triage(results_dir, label):
                         TAIL_RATIO above their median, reaching within 5% of
                         tonight's fastest sample: noise.
       min-shifted       tonight's fastest sample (either batch) is MIN_SHIFT
-                        above the nights' fastest and clears the absolute
-                        floor: real.
+                        above the median of the nights' fastest samples and
+                        clears the absolute floor: real. The median, not the
+                        lowest of those minima, because one unusually fast
+                        night would otherwise make a quiet night look shifted.
       sibling-shifted   only the tail moved, but another counter of the same
                         workload is min-shifted: real.
       tail-only         only the tail moved: noise.
-    The night is real if any counter is real, noise if all are noise, and
-    unclear otherwise.
+    The night's verdict comes from its confirmed regressions, or from its
+    warnings when no regression remains once known-flaky counters are left
+    out: real if any counter is real, noise if all are noise, unclear
+    otherwise, and "none" if nothing is left to judge.
     """
     night = Path(results_dir) / "daily" / label
     archive = analyze.read_json(night / "confirmation.json")
@@ -682,7 +687,7 @@ def triage(results_dir, label):
         elif len(stats) < MIN_HISTORY or not math.isfinite(best):
             row["rule"] = "thin-history"
         else:
-            hist_best = min(x["min"] for x in stats)
+            hist_best = statistics.median(x["min"] for x in stats)
             row["min_ratio"] = round(best / hist_best, 4)
             floor = trend.abs_floor_for(ct, limits["abs"])
             newest = history[-1]
@@ -707,7 +712,8 @@ def triage(results_dir, label):
     # The night's verdict follows the tier that raised the alert: regressions
     # when there are any, so a red night is judged by the counters that made it
     # red; warnings only on a night that confirmed nothing worse.
-    lead = [r for r in rows if r["tier"] == "regression"] or rows
+    judged = [r for r in rows if r["rule"] != "known-flaky"]
+    lead = [r for r in judged if r["tier"] == "regression"] or judged
     verdicts = {r["verdict"] for r in lead}
     verdict = ("none" if not lead else "real" if "real" in verdicts
                else "noise" if verdicts == {"noise"} else "unclear")
@@ -716,7 +722,7 @@ def triage(results_dir, label):
             "history_nights": len(history), "verdict": verdict, "counters": rows}
 
 
-TRIAGE_RULES = {"known-flaky": "noise", "runner-changed": "unclear",
+TRIAGE_RULES = {"known-flaky": "skipped", "runner-changed": "unclear",
                 "thin-history": "unclear", "same-commit-flat": "noise",
                 "bimodal-history": "noise", "min-shifted": "real",
                 "sibling-shifted": "real", "tail-only": "noise"}
@@ -756,14 +762,18 @@ def triage_line(result):
             notes.append(f"{flaky} known-flaky counter{'s' if flaky > 1 else ''} skipped")
         return group, real, len(judged), (f" ({'; '.join(notes)})" if notes else "")
 
-    lead_tier = "regression" if any(r["tier"] == "regression" for r in rows) else "warning"
+    lead_tier = ("regression" if any(r["tier"] == "regression" and r["rule"] != "known-flaky"
+                                     for r in rows) else "warning")
     other_tier = "warning" if lead_tier == "regression" else "regression"
     _, real, judged, notes = part(lead_tier)
     text = (f"Real or noise: {result['verdict']}. {real} of {judged} confirmed "
             f"{lead_tier}s moved their fastest sample{notes}")
     group, o_real, o_judged, o_notes = part(other_tier)
-    if group:
+    if o_judged:
         text += f"; {o_real} of {o_judged} confirmed {other_tier}s did too{o_notes}"
+    elif group:
+        n = len(group)
+        text += f"; {n} known-flaky {other_tier}{'' if n == 1 else 's'} skipped"
     nights = result.get("history_nights")
     if isinstance(nights, int) and not isinstance(nights, bool):
         compared = ("compared with the last night" if nights == 1

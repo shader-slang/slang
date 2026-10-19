@@ -249,11 +249,55 @@ class TriageTests(unittest.TestCase):
         self.assertEqual(rules, {"compileInner": "min-shifted",
                                  "SemanticChecking": "sibling-shifted"})
 
-    def test_a_known_flaky_counter_is_noise(self):
+    def test_a_known_flaky_counter_is_skipped_not_noise(self):
         result = self.alert(self.STEP, self.STEP, self.history(),
                             workload="api_module_graph", counter="apiGetCode")
         self.assertEqual((result["verdict"], result["counters"][0]["rule"]),
-                         ("noise", "known-flaky"))
+                         ("none", "known-flaky"))
+
+    def test_a_night_whose_only_regression_is_flaky_is_judged_by_its_warnings(self):
+        # The 2026-10-07 shape: the one confirmed regression is the known-flaky
+        # counter, and a confirmed warning carries the real step.
+        flaky, real = ("api_module_graph", "apiGetCode"), ("minimal", "compileInner")
+
+        def records(flaky_samples, real_samples):
+            return [self.rec(flaky_samples, *flaky), self.rec(real_samples, *real)]
+
+        for i, c in enumerate(("aaaa", "bbbb", "cccc")):
+            d = self.root / "daily" / f"2026-10-0{i + 1}-{c}"
+            d.mkdir(parents=True)
+            (d / "results.json").write_text(json.dumps(records(self.FLAT, self.FLAT)))
+            (d / "meta.json").write_text(json.dumps({"commit": c, "runner": self.RUNNER}))
+        warn = [106.0, 106.5, 107.0, 107.5, 108.0]
+        night = self.root / "daily" / "2026-10-10-head"
+        night.mkdir()
+        tonight = records(self.STEP, warn)
+        (night / "results.json").write_text(json.dumps(tonight))
+        (night / "meta.json").write_text(json.dumps({"commit": "headsha000",
+                                                     "runner": self.RUNNER}))
+        plan = {"label": "2026-10-10-head", "runner": self.RUNNER, "thresholds": LIMITS,
+                "baseline_labels": ["2026-10-01-aaaa", "2026-10-02-bbbb", "2026-10-03-cccc"],
+                "notes": [], "judged_count": 2,
+                "regressions": [{"workload": flaky[0], "counter": flaky[1],
+                                 "baseline": 100.0, "value": 120.5}],
+                "warnings": [{"workload": real[0], "counter": real[1],
+                              "baseline": 100.0, "value": 107.0}]}
+        (night / "confirmation.json").write_text(json.dumps(
+            {"plan": plan, "repeated": tonight, "status": "complete"}))
+        result = perf_bisect.triage(self.root, "2026-10-10-head")
+        self.assertEqual(result["verdict"], "real")
+        self.assertEqual(perf_bisect.triage_line(result).split("; compared")[0],
+                         "Real or noise: real. 1 of 1 confirmed warnings moved their fastest "
+                         "sample; 1 known-flaky regression skipped")
+
+    def test_one_fast_night_does_not_make_a_quiet_night_shifted(self):
+        # Five quiet nights near 100 ms and one unusually fast 96 ms night. Tonight's
+        # 100.5 ms is 4.7% above the lowest minimum but in line with the median.
+        history = [(f"2026-10-0{i + 1}-c{i}", f"c{i}", [m, m + 1, m + 2, m + 3, m + 4])
+                   for i, m in enumerate((100.0, 99.5, 96.0, 100.2, 99.8, 100.1))]
+        quiet = [100.5, 101.0, 112.0, 113.0, 114.0]
+        result = self.alert(quiet, quiet, history)
+        self.assertEqual(result["counters"][0]["rule"], "tail-only")
 
     def test_a_cleared_night_says_nothing(self):
         result = self.alert(self.STEP, self.FLAT, self.history())
