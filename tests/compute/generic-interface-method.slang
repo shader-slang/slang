@@ -72,8 +72,8 @@ struct MaterialPattern1 : IDisneyBRDFPattern
 __generic<TVertexInterpolant:IVertexInterpolant, TPattern : IDisneyBRDFPattern>
 float test(TVertexInterpolant vertInterps, TPattern pattern)
 {
-    CameraView cam;
-    VertexPosition vW, vO;
+    CameraView cam = {};
+    VertexPosition vW = {}, vO = {};
     DisneyBRDFPattern rs = pattern.evalPattern(cam, vW, vO, vertInterps);    
     return rs.baseColor.x;
 }

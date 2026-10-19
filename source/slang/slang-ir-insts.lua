@@ -1887,10 +1887,20 @@ local insts = {
 			-- to it.
 			{ vulkanHitObjectAttributes = { struct_name = "VulkanHitObjectAttributesDecoration" } },
 			{ GlobalVariableShadowingGlobalParameterDecoration = { min_operands = 2 } },
-			-- AST-to-IR lowering applies this decoration to mutable file- or namespace-scope
-			-- `static` variables and uniform-parameter shadows with the same storage semantics.
-			-- Lowering does not apply it to static data members, which also use `IRGlobalVar`.
-			{ fileOrNamespaceScopeStaticVar = { struct_name = "FileOrNamespaceScopeStaticVarDecoration" } },
+			-- Lowering adds this marker when the AST declaration is either a file- or namespace-scope
+			-- mutable `static` variable or a mutable uniform-parameter shadow. The marker records
+			-- membership in that combined category, not which kind the declaration has or what storage
+			-- rate it uses. Static data members also use `IRGlobalVar`, but are outside the category.
+			{ fileOrNamespaceScopeMutableVar = { struct_name = "FileOrNamespaceScopeMutableVarDecoration" } },
+			-- The pre-link module-wide uninitialized-global check found a possible write and
+			-- therefore could not prove that every read is uninitialized. We preserve that result
+			-- because entry-point linking may remove the writer before a later analysis revisits the
+			-- global.
+			{
+				uninitializedGlobalCheckFoundPossibleWrite = {
+					struct_name = "UninitializedGlobalCheckFoundPossibleWriteDecoration",
+				},
+			},
 			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",
