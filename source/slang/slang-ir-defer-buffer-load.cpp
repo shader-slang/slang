@@ -227,18 +227,8 @@ struct DeferBufferLoadContext
 
     void deferBufferLoadInst(IRBuilder& builder, List<IRInst*>& workList, IRInst* loadInst)
     {
-        bool failDueToAttributeFound = false;
-        for (auto attr : loadInst->getAllAttrs())
-        {
-            if (as<IRAlignedAttr>(attr) || as<IRMemoryScopeAttr>(attr))
-            {
-                failDueToAttributeFound = true;
-                break;
-            }
-        }
-
         // Don't defer the load anymore if the type is simple.
-        if (failDueToAttributeFound ||
+        if (hasWholeAccessAttr(loadInst) ||
             !isTypePreferrableToDeferLoad(codeGenContext, loadInst->getDataType()))
         {
             return;
