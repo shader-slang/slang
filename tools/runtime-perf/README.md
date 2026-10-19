@@ -4,6 +4,9 @@ The existing compile-perf nightly now collects this suite after compilation and
 publishes a GPU runtime section on the same report site. See
 [`../compile-perf/DESIGN.md`](../compile-perf/DESIGN.md#shared-runtime-reporting-and-schedule)
 for scheduling, runner prerequisites, failure handling, and history compatibility.
+The nightly also exports runtime, reference and paired compile samples with the
+compile suite into the BenchView host-collection bundle. The host handles delivery;
+export readiness does not imply successful upload.
 The runtime landing page links each subtest/backend to its own daily and release
 graphs, including paired compilation. Reference comparisons overlay the Slang run
 measured at the reference's exact dimensions; full-suite history remains separately

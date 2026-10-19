@@ -341,9 +341,9 @@ jobs:
           git push
 
       # The benchmark host owns collection, credentials and delivery.
-      - name: Export nightly results for BenchView
+      - name: Export compile and runtime results for BenchView
         id: benchview
-        if: env.PUBLISH == 'true'
+        if: ${{ !cancelled() && env.PUBLISH == 'true' && steps.sweep.outputs.perf_label != '' }}
         continue-on-error: true
         shell: bash
         run: |
@@ -353,6 +353,7 @@ jobs:
             --meta "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/meta.json" \
             --os Windows --observed-at "$PERF_OBSERVED_AT" \
             --execution-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --runtime-manifest "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/runtime/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/run.json" \
             --output "$GITHUB_WORKSPACE/benchview-export"
 
       - name: Archive BenchView submission payloads

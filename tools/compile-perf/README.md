@@ -493,3 +493,8 @@ the createGlobalSession delta, then each tracked workload's OWN memory
 (its peak minus the same point's floor for its mode, the pure workload
 signal) — because memory components do not tile a total and a stacked
 area would lie.
+
+The same BenchView host export includes archived runtime attempts via
+`benchview.py --runtime-manifest <attempt>/run.json`. Runtime, matched reference
+and paired compile observations share the Slang project under `runtime-perf`;
+see [the integration design](DESIGN.md#benchview-integration).

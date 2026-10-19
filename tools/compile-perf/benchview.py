@@ -155,13 +155,20 @@ def submissions(records, meta, os_name, observed, execution, release=None, branc
                 "metadata": {"defaultBranch": "master", "breakdownTooltipMaxItems": 1}},
                 "producer": {"name": "slang-compile-perf", "version": "1"},
                 "run": run, "execution": {"id": execution, "metadata": meta}}
-    batches, batch, identities = [], [], set()
+    observations, identities = [], set()
     for record in records:
         identity = (record["workload"], record["mode"], record["size"])
         if identity in identities:
             raise ValueError(f"Duplicate workload case: {identity}")
         identities.add(identity)
-        item = observation(record, observed, meta["runner"], os_name)
+        observations.append(observation(record, observed, meta["runner"], os_name))
+    return batch_submissions(envelope, observations)
+
+
+def batch_submissions(envelope, observations):
+    """Batch either suite's observations using the same request limits and replay keys."""
+    batches, batch = [], []
+    for item in observations:
         if batch and (len(batch) == 500 or
                       len(encode(dict(envelope, observations=batch + [item]))) > 7 * 1024 * 1024):
             batches.append(batch)
@@ -174,7 +181,7 @@ def submissions(records, meta, os_name, observed, execution, release=None, branc
     payloads = []
     for batch in batches:
         payload = dict(envelope, observations=batch)
-        payload["idempotencyKey"] = "compile-perf:" + hashlib.sha256(encode(payload)).hexdigest()
+        payload["idempotencyKey"] = envelope["run"]["suite"]["id"] + ":" + hashlib.sha256(encode(payload)).hexdigest()
         if len(encode(payload)) > 8 * 1024 * 1024:
             raise ValueError("A single observation exceeds the request size limit")
         payloads.append(payload)
@@ -225,6 +232,7 @@ def main():
     parser.add_argument("--os", required=True, help="Measured OS, not the importing host's OS")
     parser.add_argument("--observed-at", required=True, help="Measurement time in RFC3339")
     parser.add_argument("--execution-id", required=True)
+    parser.add_argument("--runtime-manifest", type=Path, help="Include this runtime attempt in the same host export")
     parser.add_argument("--branch")
     parser.add_argument("--release", help="Slang version tested, e.g. v2026.19")
     parser.add_argument("--released-at", help="Actual release timestamp, if known")
@@ -241,6 +249,14 @@ def main():
     payloads = submissions(json.loads(args.results.read_text(encoding="utf-8")),
                            json.loads(args.meta.read_text(encoding="utf-8")), args.os,
                            args.observed_at, args.execution_id, release, args.branch)
+    if args.runtime_manifest:
+        import runtime_benchview
+        runtime_payloads = runtime_benchview.submissions(args.runtime_manifest, args.os, args.branch)
+        if runtime_payloads[0]["run"]["vcs"]["revision"] != payloads[0]["run"]["vcs"]["revision"]:
+            raise ValueError("Compile and runtime compiler revisions differ")
+        if runtime_payloads[0]["run"].get("metadata", {}).get("release") != payloads[0]["run"].get("metadata", {}).get("release"):
+            raise ValueError("Compile and runtime release metadata differ")
+        payloads.extend(runtime_payloads)
     export(payloads, args.output)
     print(f"Exported {sum(len(p['observations']) for p in payloads)} observations")
 

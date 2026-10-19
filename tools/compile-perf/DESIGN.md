@@ -84,51 +84,57 @@ results cannot serve as the RTX 5090 machine's calibration.
 
 ### BenchView integration
 
-[PR #13625](https://github.com/shader-slang/slang/pull/13625) introduces submissions
-to the shared `slang` project with suite `compile-perf`. Extend that integration
-with suite `runtime-perf` after reconciling the two nightly workflow changes.
-This is a planned export contract; the runtime collector does not yet submit to
-BenchView. Reuse the adapter's transport, batching, artifact export and replay
-handling rather than maintaining another HTTP client.
+The nightly uses the host-collection export introduced by
+[PR #13625](https://github.com/shader-slang/slang/pull/13625). Both suites are
+exported through `benchview.py --runtime-manifest <attempt>/run.json` into the
+same `benchview-export/submissions.json`. The shared exporter writes
+`submissions.ready` atomically only after the bounded bundle is complete. The
+existing versioned wrapper kind remains unchanged for host compatibility.
+The benchmark host owns validation, credentials, delivery and retries; the public
+workflow contains no BenchView URL, write key or HTTP client. A ready marker
+indicates export completion, not successful ingestion.
 
-| Runtime data               | Planned BenchView representation                                                                                                                                    |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Subtest                    | Stable test ID `runtime-perf/<workload>`                                                                                                                            |
-| Backend and implementation | Case dimensions for Vulkan/D3D12/CUDA and Slang/equivalent reference; reserve an explicit optimized-reference value for future frozen targets                       |
-| Measurement configuration  | Dimensions for element count, batch, source/harness/scene contract and suite versus matched-reference measurement; incompatible contracts must not become one trend |
-| GPU execution              | `runtime.gpu_iteration_ms`, milliseconds, lower is better, with the original per-execution samples                                                                  |
-| Paired compilation         | CLI wall and internal compiler samples on the same subtest, retaining individual stage identity for multi-stage workloads                                           |
-| Machine                    | Recorded host, GPU identity and driver; RTX 4090 and RTX 5090 must remain separate environments                                                                     |
-| Compiler and cadence       | Full tested compiler SHA in VCS provenance; daily runs omit release metadata, main releases use `run.metadata.release.label` as in #13625                           |
-| Execution                  | Original measurement timestamp and immutable attempt identity, with deterministic replay keys                                                                       |
-| Diagnostics                | Correctness/stability status, raw records, phase/setup observations and reference toolchain provenance in metadata/artifacts                                        |
+`runtime_benchview.py` converts archived measurements into suite `runtime-perf`
+under the shared `slang` project. Each test uses `runtime-perf/<workload>`.
+Case dimensions identify backend, implementation, suite/matched-reference/
+compilation measurement, workload dimensions and the measurement-contract hash.
+The contract retains GPU, driver, source, harness, timer policy and scene identity,
+so incompatible measurements cannot silently become a connected trend. Compiler
+revision remains the independent variable. Original records are retained as
+artifacts; phase/setup diagnostics are not falsely represented as additive GPU
+or host breakdowns.
 
-The intended BenchView view follows the HTML report: a runtime graph with Slang
-and reference curves, and a compilation graph with wall/internal curves, for each
-subtest/backend and daily/release cadence. Direct reference comparisons require
-matching dimensions; preserve the matched Slang samples even when the suite used
-a larger workload. Do not duplicate paired compilation for each reference
-implementation or treat one-time reference compilation as repeated compile data.
+GPU execution exports the original `gpu_iteration_ms` samples. Matched reference
+observations retain their own Slang samples at the same dimensions, independently
+of the larger suite measurement. Paired compile observations reuse the compile
+adapter's raw wall/internal timings, phase allocation and metric limits, with a
+separate stage dimension for multi-stage workloads. Compilation is exported once
+per source stage, not duplicated for each reference. Failed/unstable runtime
+results retain status and diagnostics without successful timing curves; valid
+paired compilation remains independently exportable. Unsupported measurements
+retain their original reason in the failed observation's source record.
 
-Export actual sample distributions, never reconstructed samples from medians.
-GPU stage and host timings overlap and must not be exported as an additive phase
-breakdown. Failed, unstable or unsupported runtime observations retain their
-status/reason without publishing a successful timing curve; independently valid
-paired compile results remain exportable. Verify the service's supported status
-and environment fields before implementing the adapter. Honor its metric/request
-limits and retain overflow diagnostics in artifacts.
+The export uses the archived measurement timestamp, full tested compiler SHA and
+immutable attempt identity. Replay keys are deterministic. Main-release archives
+use `run.metadata.release.label`; daily runs omit it. The combined CLI rejects
+mismatched compiler revisions or release metadata. Summary-only records cannot
+be converted into invented samples. The request batching and 64-batch / 8 MiB
+host-bundle limits are shared with compile-perf. Conversion or write failure
+invalidates readiness, and the workflow reports export failures without blocking
+existing HTML publication.
 
-Follow #13625's publication policy: export reviewable payloads, submit only on the
-publishing path with the configured write key, and surface submission failures
-without blocking the existing report. Release backfill uses the same adapter
-with explicit release metadata and original measurement provenance. Do not infer
-a release date from the measurement date or a compiler SHA from a display label.
+Standalone runtime/release replay uses:
 
-Acceptance requires an archived runtime/reference/compile fixture, deterministic
-replay and failed-case tests, API ingestion, and a check that the deployed
-BenchView UI can overlay the requested metrics and implementation dimensions in
-both daily and release views. #13625's compile ingestion validation alone does
-not establish those runtime visualization capabilities.
+```sh
+python tools/compile-perf/runtime_benchview.py --manifest <attempt>/run.json \
+  --os Windows --output benchview-export
+```
+
+The intended BenchView view matches the HTML report's combined runtime and
+compile graphs. Local tests cover conversion, replay, failures and reference
+dimensions. Host collector acceptance of the runtime suite and deployed graph
+rendering remain end-to-end checks; successful local export does not establish
+those capabilities. Automated runtime release backfill remains separate work.
 
 Remaining reporting extensions are cached runtime measurements of the last five
 main releases (excluding patches), and
