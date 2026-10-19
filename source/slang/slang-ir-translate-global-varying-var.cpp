@@ -8,16 +8,157 @@
 
 namespace Slang
 {
+/// Return the first `VaryingInput` offset after the varying inputs that an entry point declares as
+/// its own parameters, or 0 when it declares none. A module-scope input that is appended to the
+/// entry point's parameters is placed relative to this offset: for `vsB(float4 extra : EXTRA)`,
+/// `extra` takes location 0, so an appended `in float3 gPos;` starts at location 1.
+static UInt getVaryingInputOffsetAfterParams(IRStructTypeLayout* paramsStructLayout)
+{
+    IRVarLayout* lastFieldVarLayout = nullptr;
+    for (auto attr : paramsStructLayout->getFieldLayoutAttrs())
+    {
+        if (attr->getLayout()->usesResourceKind(LayoutResourceKind::VaryingInput))
+            lastFieldVarLayout = attr->getLayout();
+    }
+    if (!lastFieldVarLayout)
+        return 0;
+
+    // `usesResourceKind` means the field has a `VaryingInput` offset, and a field that occupies
+    // varying input locations also has a `VaryingInput` size.
+    auto sizeAttr =
+        lastFieldVarLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::VaryingInput);
+    auto offsetAttr = lastFieldVarLayout->findOffsetAttr(LayoutResourceKind::VaryingInput);
+    SLANG_RELEASE_ASSERT(sizeAttr && offsetAttr);
+    return sizeAttr->getFiniteSize() + (UInt)offsetAttr->getOffset();
+}
+
+/// Return true if the module-scope input `input` is passed to a function parameter that must be
+/// bound to a shader input variable. Consider:
+///
+///     in float4 vColor;
+///     float4 readColor() { return interpolateAtCentroid(vColor); }
+///
+/// `interpolateAtCentroid` carries `RequireShaderInputParameterDecoration(0)`, and its argument is
+/// `vColor` itself, so this returns true for `vColor`. Lowering reports E31208 for any argument of
+/// such a parameter that is not a module-scope input, so only direct uses need to be checked.
+static bool isPassedToShaderInputParameter(IRInst* input)
+{
+    for (auto use = input->firstUse; use; use = use->nextUse)
+    {
+        auto call = as<IRCall>(use->getUser());
+        if (!call)
+            continue;
+        auto callee = getResolvedInstForDecorations(call->getCallee());
+        auto requirement = callee->findDecoration<IRRequireShaderInputParameterDecoration>();
+        if (requirement && use == call->getArgs() + requirement->getParameterIndex()->getValue())
+            return true;
+    }
+    return false;
+}
+
+/// How the translation of a module-scope input is shared between the entry points that reach it.
+///
+/// - `SingleEntryPoint`: one entry point reaches the input. It receives the input as a parameter,
+///   and on GLSL/SPIR-V `legalizeEntryPointParameterForGLSL` replaces the global with that
+///   entry point's input variable.
+/// - `SharedPrivate`: several entry points reach the input. Each of them receives its own
+///   parameter and stores it into the global, which stays a private variable.
+/// - `SharedInterpolant`: the input is passed to an interpolation function such as
+///   `interpolateAtCentroid`, which reads its argument through the address of a real input
+///   variable. The first entry point in module order that reaches it owns it as in the
+///   `SingleEntryPoint` case, and every other entry point that reaches it gets no parameter and
+///   reads the owner's input variable once the global is replaced by it. The choice of owner does
+///   not change the output, because we require every entry point to place the input at the same
+///   location (E58004 otherwise).
+enum class GlobalInputSharing
+{
+    SingleEntryPoint,
+    SharedPrivate,
+    SharedInterpolant,
+};
+
+/// Return how the translation of the module-scope input `input` is shared between the entry
+/// points that reach it, as recorded in `referencingEntryPoints` before any entry point is
+/// rewritten.
+static GlobalInputSharing classifyGlobalInput(
+    IRInst* input,
+    Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints)
+{
+    if (isPassedToShaderInputParameter(input))
+        return GlobalInputSharing::SharedInterpolant;
+    if (referencingEntryPoints.getValue(input).getCount() == 1)
+        return GlobalInputSharing::SingleEntryPoint;
+    return GlobalInputSharing::SharedPrivate;
+}
+
 struct GlobalVarTranslationContext
 {
     CodeGenContext* context;
+
+    /// The `VaryingInput` location at which an entry point would read a module-scope input.
+    /// `location` is unused for an input with a semantic, which is not placed by location.
+    struct InterpolantInputPlacement
+    {
+        bool hasSemantic;
+        UInt location;
+    };
+
+    /// The entry point that receives a module-scope input passed to an interpolation function,
+    /// and where it places that input.
+    struct InterpolantInputOwner
+    {
+        IRFunc* entryPoint;
+        InterpolantInputPlacement placement;
+    };
+
+    /// Return where `entryPoint` would place the module-scope input `input`, following the same
+    /// rules that the translation loop in `processModule` uses to build the input's layout.
+    InterpolantInputPlacement getInterpolantInputPlacement(IRInst* input, IRFunc* entryPoint)
+    {
+        InterpolantInputPlacement placement;
+        placement.hasSemantic = input->findDecoration<IRSemanticDecoration>() != nullptr;
+        placement.location = 0;
+        if (placement.hasSemantic)
+            return placement;
+
+        if (auto layoutDecor = entryPoint->findDecoration<IRLayoutDecoration>())
+        {
+            if (auto entryPointLayout = as<IREntryPointLayout>(layoutDecor->getLayout()))
+                placement.location =
+                    getVaryingInputOffsetAfterParams(getScopeStructLayout(entryPointLayout));
+        }
+        if (auto varLayout = findVarLayout(input))
+        {
+            if (auto offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                placement.location += (UInt)offsetAttr->getOffset();
+        }
+        return placement;
+    }
+
+    /// Diagnose `entryPoint` reaching the module-scope input `input` that `owner.entryPoint`
+    /// already receives, if the two entry points would place it differently. `entryPoint` gets
+    /// no parameter for `input`, so it reads the owner's input variable.
+    void checkInterpolantInputPlacement(
+        IRInst* input,
+        InterpolantInputOwner const& owner,
+        IRFunc* entryPoint)
+    {
+        auto placement = getInterpolantInputPlacement(input, entryPoint);
+        if (placement.hasSemantic || placement.location == owner.placement.location)
+            return;
+        context->getSink()->diagnose(Diagnostics::SharedGlobalInterpolantInputMismatch{
+            .inst = input,
+            .entryPoint = entryPoint,
+            .ownerEntryPoint = owner.entryPoint,
+            .location = input->sourceLoc});
+    }
 
     void processModule(IRModule* module)
     {
         Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
         buildEntryPointReferenceGraph(referencingEntryPoints, module);
 
-        List<IRInst*> entryPoints;
+        List<IRFunc*> entryPoints;
         List<IRInst*> getWorkGroupSizeInsts;
 
         // Traverse the module to find all entry points.
@@ -26,7 +167,7 @@ struct GlobalVarTranslationContext
         for (auto inst : module->getGlobalInsts())
         {
             if (inst->getOp() == kIROp_Func && inst->findDecoration<IREntryPointDecoration>())
-                entryPoints.add(inst);
+                entryPoints.add(cast<IRFunc>(inst));
             else if (inst->getOp() == kIROp_GetWorkGroupSize)
                 getWorkGroupSizeInsts.add(inst);
         }
@@ -34,7 +175,20 @@ struct GlobalVarTranslationContext
             materializeGetWorkGroupSize(module, referencingEntryPoints, inst);
         IRBuilder builder(module);
 
-        for (auto entryPoint : entryPoints)
+        // A global varying may be reached from several entry points that are emitted into one
+        // module, and each of them classifies and lays out the varying by reading the
+        // `GlobalInput`/`GlobalOutput`, semantic and layout decorations on the global. We
+        // therefore copy those decorations onto every entry point's struct key and remove them
+        // from the global only once all entry points have been processed. That leaves a global
+        // that is not replaced by an input variable as an ordinary global variable without a
+        // layout, which the C-like emitters assert (`emitGlobalVar` in slang-emit-c-like.cpp).
+        HashSet<IRInst*> translatedGlobalVars;
+
+        // The owners of `GlobalInputSharing::SharedInterpolant` inputs, keyed by input. An entry
+        // point that reaches an input already in this map gets no parameter for it.
+        Dictionary<IRInst*, InterpolantInputOwner> interpolantInputOwners;
+
+        for (auto entryPointFunc : entryPoints)
         {
             List<IRInst*> outputVars;
             List<IRInst*> inputVars;
@@ -42,7 +196,7 @@ struct GlobalVarTranslationContext
             {
                 if (auto referencingEntryPointSet = referencingEntryPoints.tryGetValue(inst))
                 {
-                    if (referencingEntryPointSet->contains((IRFunc*)entryPoint))
+                    if (referencingEntryPointSet->contains(entryPointFunc))
                     {
                         if (inst->findDecoration<IRGlobalOutputDecoration>())
                         {
@@ -50,7 +204,10 @@ struct GlobalVarTranslationContext
                         }
                         if (inst->findDecoration<IRGlobalInputDecoration>())
                         {
-                            inputVars.add(inst);
+                            if (auto owner = interpolantInputOwners.tryGetValue(inst))
+                                checkInterpolantInputPlacement(inst, *owner, entryPointFunc);
+                            else
+                                inputVars.add(inst);
                         }
                     }
                 }
@@ -62,14 +219,9 @@ struct GlobalVarTranslationContext
             if (!hasInput && !hasOutput)
                 continue;
 
-            auto entryPointFunc = as<IRFunc>(entryPoint);
-            if (!entryPointFunc)
-                continue;
-
             auto entryPointDecor = entryPointFunc->findDecoration<IREntryPointDecoration>();
 
             IRVarLayout* resultVarLayout = nullptr;
-            IRVarLayout* paramLayout = nullptr;
             IRType* resultType = entryPointFunc->getResultType();
 
             // Create a struct type to receive all inputs.
@@ -81,10 +233,8 @@ struct GlobalVarTranslationContext
             // replacement struct type first.
             //
             // We'll also need to fix up the offsets of the global varing inputs
-            // being added if we have any varing input entry point params. Set
-            // these to some defaults for now.
+            // being added if we have any varing input entry point params.
             UInt nextOffset = 0;
-            IRVarLayout* lastFieldVarLayout = nullptr;
 
             // If we have an existing entry point struct layout, we need to go through it and
             // add any of the struct field layout attributes as fields in the new struct type
@@ -110,32 +260,8 @@ struct GlobalVarTranslationContext
                             IRVarLayout* fieldLayout = attr->getLayout();
                             IRInst* key = attr->getFieldKey();
                             inputStructTypeLayoutBuilder.addField(key, fieldLayout);
-
-                            // Save the last VaryingInput type. This will be used to help
-                            // recalculate offsets for the global varying inputs.
-                            if (fieldLayout->usesResourceKind(LayoutResourceKind::VaryingInput))
-                                lastFieldVarLayout = fieldLayout;
                         }
-
-                        // Calculate the nextOffset if necessary. If entry params had no varying
-                        // inputs nextOffset will just be 0.
-                        if (lastFieldVarLayout)
-                        {
-                            // Find the size and offset of the last varying "in" kind
-                            // param in the entry point param struct. Adding these will give us
-                            // the starting offset that should be used for the first global.
-                            if (auto sizeAttr = lastFieldVarLayout->getTypeLayout()->findSizeAttr(
-                                    LayoutResourceKind::VaryingInput))
-                            {
-                                const auto finiteSize = sizeAttr->getFiniteSize();
-                                if (auto offsetAttr = lastFieldVarLayout->findOffsetAttr(
-                                        LayoutResourceKind::VaryingInput))
-                                {
-                                    UInt lastFieldOffset = offsetAttr->getOffset();
-                                    nextOffset = finiteSize + lastFieldOffset;
-                                }
-                            }
-                        }
+                        nextOffset = getVaryingInputOffsetAfterParams(entryPointParamsStructLayout);
                     }
                 }
             }
@@ -218,7 +344,9 @@ struct GlobalVarTranslationContext
                 }
                 auto varLayout = varLayoutBuilder.build();
                 inputStructTypeLayoutBuilder.addField(key, varLayout);
-                input->transferDecorationsTo(key);
+                for (auto decoration : input->getDecorations())
+                    cloneDecoration(decoration, key);
+                translatedGlobalVars.add(input);
 
                 // Emit a new param here to represent the global input var.
                 auto inputParam =
@@ -239,10 +367,8 @@ struct GlobalVarTranslationContext
                 newParams.add(inputParam);
             }
 
-            // Build the new layout that will replace the old entryPointLayout.
+            // Build the params type layout that will replace the old one.
             auto paramTypeLayout = inputStructTypeLayoutBuilder.build();
-            IRVarLayout::Builder paramVarLayoutBuilder(&builder, paramTypeLayout);
-            paramLayout = paramVarLayoutBuilder.build();
 
             // Initialize all global variables in the order of struct member declaration.
             for (Index i = inputVars.getCount() - 1; i >= 0; i--)
@@ -260,13 +386,23 @@ struct GlobalVarTranslationContext
 #endif
                 builder.emitStore(input, builder.emitLoad(newParams[i]));
 
-                // Relate the old "global variable" to a "global parameter" for use later in
-                // compilation to resolve a "global variable" shadowing a "global parameter"
-                // relationship.
-                builder.addGlobalVariableShadowingGlobalParameterDecoration(
-                    newParams[i],
-                    input,
-                    inputKeys[i]);
+                // The shadowing decoration makes `legalizeEntryPointParameterForGLSL` replace
+                // every use of `input` in the module with this entry point's input variable, so
+                // it is only added when no other entry point needs its own copy of `input`.
+                auto sharing = classifyGlobalInput(input, referencingEntryPoints);
+                if (sharing == GlobalInputSharing::SharedInterpolant)
+                {
+                    interpolantInputOwners.add(
+                        input,
+                        InterpolantInputOwner{
+                            entryPointFunc,
+                            getInterpolantInputPlacement(input, entryPointFunc)});
+                }
+                if (sharing != GlobalInputSharing::SharedPrivate)
+                    builder.addGlobalVariableShadowingGlobalParameterDecoration(
+                        newParams[i],
+                        input,
+                        inputKeys[i]);
             }
 
             // For each entry point, introduce a new parameter to represent each output parameter,
@@ -274,7 +410,7 @@ struct GlobalVarTranslationContext
             if (hasOutput)
             {
                 // If we have global outputs, the entry-point must not return anything itself.
-                if (as<IRFuncType>(entryPoint->getDataType())->getResultType()->getOp() !=
+                if (as<IRFuncType>(entryPointFunc->getDataType())->getResultType()->getOp() !=
                     kIROp_VoidType)
                 {
                     context->getSink()->diagnose(
@@ -288,43 +424,46 @@ struct GlobalVarTranslationContext
                 UInt outputVarIndex = 0;
                 for (auto output : outputVars)
                 {
+                    // An `in out` global has one declared semantic and layout, which this pass
+                    // applies to its input; its output field gets the stage's default semantic.
+                    // That is a known limitation for a semantic such as `SV_Coverage`, which
+                    // names both an input and an output.
+                    bool isInOutGlobal =
+                        output->findDecoration<IRGlobalInputDecoration>() != nullptr;
+                    IRVarLayout* declaredVarLayout =
+                        isInOutGlobal ? nullptr : findVarLayout(output);
+                    IRSemanticDecoration* declaredSemantic =
+                        isInOutGlobal ? nullptr : output->findDecoration<IRSemanticDecoration>();
+
                     auto key = builder.createStructKey();
                     auto ptrType = as<IRPtrTypeBase>(output->getDataType());
                     builder.createStructField(resultType, key, ptrType->getValueType());
 
-                    IRTypeLayout::Builder fieldTypeLayoutBuilder(&builder);
                     IRTypeLayout* fieldTypeLayout = nullptr;
-                    bool hasExistingLayout = false;
-                    if (auto existingLayoutDecoration =
-                            output->findDecoration<IRLayoutDecoration>())
+                    if (declaredVarLayout)
                     {
-                        if (auto existingVarLayout =
-                                as<IRVarLayout>(existingLayoutDecoration->getLayout()))
-                        {
-                            fieldTypeLayout = existingVarLayout->getTypeLayout();
-                            hasExistingLayout = true;
-                        }
+                        fieldTypeLayout = declaredVarLayout->getTypeLayout();
                     }
-
-                    if (!hasExistingLayout)
+                    else
                     {
+                        IRTypeLayout::Builder fieldTypeLayoutBuilder(&builder);
                         fieldTypeLayout = fieldTypeLayoutBuilder.build();
                     }
 
                     IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout);
                     varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
-                    if (auto semanticDecor = output->findDecoration<IRSemanticDecoration>())
+                    if (declaredSemantic)
                     {
                         varLayoutBuilder.setSystemValueSemantic(
-                            semanticDecor->getSemanticName(),
-                            semanticDecor->getEffectiveSemanticIndex());
+                            declaredSemantic->getSemanticName(),
+                            declaredSemantic->getEffectiveSemanticIndex());
                     }
                     else
                     {
-                        if (auto layoutDecor = findVarLayout(output))
+                        if (declaredVarLayout)
                         {
-                            if (auto offsetAttr =
-                                    layoutDecor->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                            if (auto offsetAttr = declaredVarLayout->findOffsetAttr(
+                                    LayoutResourceKind::VaryingOutput))
                             {
                                 varLayoutBuilder
                                     .findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)
@@ -352,7 +491,12 @@ struct GlobalVarTranslationContext
                         outputVarIndex++;
                     }
                     typeLayoutBuilder.addField(key, varLayoutBuilder.build());
-                    output->transferDecorationsTo(key);
+                    if (!isInOutGlobal)
+                    {
+                        for (auto decoration : output->getDecorations())
+                            cloneDecoration(decoration, key);
+                    }
+                    translatedGlobalVars.add(output);
                 }
                 auto resultTypeLayout = typeLayoutBuilder.build();
                 IRVarLayout::Builder resultVarLayoutBuilder(&builder, resultTypeLayout);
@@ -381,41 +525,29 @@ struct GlobalVarTranslationContext
             }
             if (entryPointLayout)
             {
-                if (paramLayout)
-                {
-                    // We try to respect the original entry point type layout when replacing it
-                    // below. The IRParameterGroupTypeLayout type layout is used when there are
-                    // things like uniform entry point params, otherwise the IRStructTypeLayout type
-                    // layout will normally represent the entry point type layout.
-                    if (auto paramGroupTypeLayout =
-                            as<IRParameterGroupTypeLayout>(entryPointParamsStructLayout))
-                    {
-                        // Build a new IRParameterGroupTypeLayout to replace the old one
-                        // representing the entryPointLayout. The ContainerVarLayout shouldn't have
-                        // changed, so resue that. Replace the rest with the new paramTypeLayout and
-                        // paramLayout that we calculated above
-                        IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(&builder);
-                        paramGroupTypeLayoutBuilder.setContainerVarLayout(
-                            paramGroupTypeLayout->getContainerVarLayout());
-                        paramGroupTypeLayoutBuilder.setElementVarLayout(paramLayout);
-                        paramGroupTypeLayoutBuilder.setOffsetElementTypeLayout(paramTypeLayout);
-                        builder.replaceOperand(
-                            entryPointLayout->getParamsLayout()->getOperands(),
-                            paramGroupTypeLayoutBuilder.build());
-                    }
-                    else if (as<IRStructTypeLayout>(entryPointParamsStructLayout))
-                    {
-                        builder.replaceOperand(
-                            entryPointLayout->getParamsLayout()->getOperands(),
-                            paramTypeLayout);
-                    }
-                    else
-                    {
-                        SLANG_UNEXPECTED("uhandled global-scope binding layout");
-                    }
-                }
-                if (resultVarLayout)
-                    builder.replaceOperand(entryPointLayout->getOperands() + 1, resultVarLayout);
+                // Layouts are hoisted and deduplicated, so entry points whose original layouts
+                // are identical share one `EntryPointLayout` and one params `VarLayout`. We
+                // therefore build new instances for this entry point and swap only its layout
+                // decoration, instead of modifying the shared ones in place.
+                //
+                // `getScopeStructLayout` has already looked through any parameter-group layout,
+                // so the params type layout becomes the rebuilt struct layout, including for an
+                // entry point with uniform parameters. Operand 0 of a `VarLayout` is its type
+                // layout; the remaining operands (offsets, semantics, stage) carry over.
+                IRVarLayout* originalParamsLayout = entryPointLayout->getParamsLayout();
+                List<IRInst*> paramsLayoutOperands;
+                paramsLayoutOperands.add(paramTypeLayout);
+                for (UInt i = 1; i < originalParamsLayout->getOperandCount(); i++)
+                    paramsLayoutOperands.add(originalParamsLayout->getOperand(i));
+                IRVarLayout* resultLayout =
+                    resultVarLayout ? resultVarLayout : entryPointLayout->getResultLayout();
+
+                entryPointLayoutDecor->removeAndDeallocate();
+                builder.addLayoutDecoration(
+                    entryPointFunc,
+                    builder.getEntryPointLayout(
+                        builder.getVarLayout(paramsLayoutOperands),
+                        resultLayout));
             }
             // Update func type for the entry point.
             List<IRType*> paramTypes;
@@ -425,6 +557,12 @@ struct GlobalVarTranslationContext
             }
             IRType* newFuncType = builder.getFuncType(paramTypes, resultType);
             entryPointFunc->setFullType(newFuncType);
+        }
+
+        for (auto globalVar : translatedGlobalVars)
+        {
+            while (auto decoration = globalVar->getFirstDecoration())
+                decoration->removeAndDeallocate();
         }
     }
 
