@@ -427,13 +427,12 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
 }
 
 // A physical pointer is a `T*`: a `Ptr` in the `UserPointer` address space, which holds a raw
-// memory address. The diagnostics call it a "pointer to a memory address". Parameter-passing types
-// such as `RefParam` also use the `UserPointer` address space, but they are not physical pointers.
+// memory address (`isUserPointerType`). The diagnostics call it a "pointer to a memory address".
+// Parameter-passing types such as `RefParam` also use the `UserPointer` address space, but they
+// are other types than `Ptr`, so they are not physical pointers.
 static bool isPhysicalPointerType(IRType* type)
 {
-    auto ptrType = as<IRPtrType>(type);
-    return ptrType && ptrType->hasAddressSpace() &&
-           ptrType->getAddressSpace() == AddressSpace::UserPointer;
+    return isUserPointerType(type);
 }
 
 static bool isBFloat16ScalarVectorOrMatrixType(IRType* type)
@@ -442,12 +441,17 @@ static bool isBFloat16ScalarVectorOrMatrixType(IRType* type)
         type = vectorType->getElementType();
     else if (auto matrixType = as<IRMatrixType>(type))
         type = matrixType->getElementType();
-    return type && type->getOp() == kIROp_BFloat16Type;
+    return type->getOp() == kIROp_BFloat16Type;
 }
 
 // Whether `type` matches `isLeaf`, or contains a type that does as a struct field, an array
-// element or a tuple element. The type a pointer points to is not searched.
-static bool containsType(IRType* type, bool (*isLeaf)(IRType*), HashSet<IRType*>& visited)
+// element or a tuple element. Unlike `findUnstorableOpaqueHandleType`, the type a pointer points
+// to is never searched: a pointer to a `BFloat16` is not itself a `BFloat16` value, and the
+// physical pointer check relies on a pointer-typed operand being a carrier, whatever it points to.
+static bool aggregateContainsType(
+    IRType* type,
+    bool (*isLeaf)(IRType*),
+    HashSet<IRType*>& visited)
 {
     if (!type)
         return false;
@@ -456,12 +460,12 @@ static bool containsType(IRType* type, bool (*isLeaf)(IRType*), HashSet<IRType*>
     if (!visited.add(type))
         return false;
     if (auto arrayType = as<IRArrayTypeBase>(type))
-        return containsType(arrayType->getElementType(), isLeaf, visited);
+        return aggregateContainsType(arrayType->getElementType(), isLeaf, visited);
     if (auto structType = as<IRStructType>(type))
     {
         for (auto field : structType->getFields())
         {
-            if (containsType(field->getFieldType(), isLeaf, visited))
+            if (aggregateContainsType(field->getFieldType(), isLeaf, visited))
                 return true;
         }
     }
@@ -469,17 +473,39 @@ static bool containsType(IRType* type, bool (*isLeaf)(IRType*), HashSet<IRType*>
     {
         for (UInt i = 0; i < tupleType->getOperandCount(); i++)
         {
-            if (containsType(as<IRType>(tupleType->getOperand(i)), isLeaf, visited))
+            if (aggregateContainsType(as<IRType>(tupleType->getOperand(i)), isLeaf, visited))
                 return true;
         }
     }
     return false;
 }
 
-static bool containsType(IRType* type, bool (*isLeaf)(IRType*))
+static bool aggregateContainsType(IRType* type, bool (*isLeaf)(IRType*))
 {
     HashSet<IRType*> visited;
-    return containsType(type, isLeaf, visited);
+    return aggregateContainsType(type, isLeaf, visited);
+}
+
+// Whether an operand of `inst` is a constant whose type contains one that `isLeaf` matches.
+// Constants (`nullptr`, a folded `BFloat16` literal, a vector built from such literals) are
+// hoisted to module scope, where `reportOncePerLocation` does not visit them, and every user of
+// one has an operand that carries the type, so no user counts as an introduction. Each user of
+// such a constant is reported instead. The module-scope values that `reportOncePerLocation` visits
+// itself (global parameters, constants and variables, functions) are not counted here.
+static bool usesConstantOfType(IRInst* inst, bool (*isLeaf)(IRType*))
+{
+    for (UInt i = 0; i < inst->getOperandCount(); i++)
+    {
+        auto operand = inst->getOperand(i);
+        if (!operand || !as<IRModuleInst>(operand->getParent()))
+            continue;
+        if (as<IRGlobalValueWithCode>(operand) || as<IRGlobalParam>(operand) ||
+            as<IRGlobalConstant>(operand) || as<IRGeneric>(operand))
+            continue;
+        if (aggregateContainsType(operand->getDataType(), isLeaf))
+            return true;
+    }
+    return false;
 }
 
 static bool isAnyPointerType(IRType* type)
@@ -487,30 +513,39 @@ static bool isAnyPointerType(IRType* type)
     return as<IRPtrTypeBase>(type) != nullptr;
 }
 
-// Whether `inst` introduces into its function a value whose type contains one that `isLeaf`
-// matches, rather than passing along a value introduced elsewhere. `isCarrier` matches the
-// operand types that pass such a value along: `isLeaf` itself, or for physical pointers any
-// pointer type, because address-space specialization can give the same pointer value another
-// address space (a `T*` parameter can become a `Function` pointer, for example).
+// Whether `inst` introduces a value whose type contains one that `isLeaf` matches: whether it is
+// where such a value enters the program, rather than passing along a value that entered it
+// elsewhere. Both checks below report exactly the introductions, so each unsupported value is
+// reported once. `isCarrier` matches the operand types that pass such a value along: `isLeaf`
+// itself, or for physical pointers any pointer type, because address-space specialization can
+// give the same pointer value another address space (a `T*` parameter can become a `Function`
+// pointer, for example).
 //
-// Every value of such a type is computed from values that were introduced, so reporting only the
-// introductions reports each unsupported value once, where it enters the program:
+// The introductions, and why everything else passes a value along:
 // - A value computed from operands that carry the type passes them along. This covers field and
 //   element extraction, construction from such values, and addresses derived from a pointer.
-// - A parameter passes along the arguments of its call sites, and a call result passes along what
-//   the callee returns; both are reported in the function that introduced them. The parameters of
-//   an entry point have no caller, so they are introductions.
+// - The parameters of an entry point have no caller, so they are introductions. The parameters of
+//   another function pass along the arguments of its call sites, which are reported in the
+//   caller.
+// - A call result passes along what the callee returns, which is reported in the callee, if the
+//   callee has a body. A callee without a body (an intrinsic) has nothing to report, so its result
+//   is an introduction unless an argument carries the type, as for any other instruction.
 // - An uninitialized value holds nothing yet.
-// - A module-scope constant is an introduction; its uses pass it along.
-// - A load introduces the value it reads, except from a local or module-scope variable (which reads
-//   back a value stored there earlier) and through a physical pointer (already reported). The root
-//   address is checked rather than the address space of the pointer type, because some locals have
-//   none: every local on HLSL, and the temporaries that phi elimination creates.
+// - A module-scope constant is an introduction (a global constant here; a hoisted literal at each
+//   of its users, see `usesConstantOfType`).
+// - A load introduces the value it reads, except from a local or module-scope variable (which
+//   reads back a value stored there earlier), from an `inout`/`out` parameter of a function other
+//   than an entry point (which reads the caller's value), and through a physical pointer (already
+//   reported). The root address is checked rather than the address space of the pointer type,
+//   because some locals have none: every local on HLSL, and the temporaries that phi elimination
+//   creates.
 // Addresses derived from logical storage (`&buffer[i]`, `groupshared` variables) are not
-// reported, even when they have a `T*` type.
+// reported, even when they have a `T*` type. That is sound only because such addresses cannot
+// reach these targets as values: `operator&` and `__getAddress` are capability-gated off HLSL and
+// WGSL (`core.meta.slang`), so a `T*` value always comes from one of the introductions above.
 static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*isCarrier)(IRType*))
 {
-    if (!containsType(inst->getDataType(), isLeaf))
+    if (!aggregateContainsType(inst->getDataType(), isLeaf))
         return false;
     switch (inst->getOp())
     {
@@ -518,12 +553,20 @@ static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*
         {
             auto block = as<IRBlock>(inst->getParent());
             auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
+            // Phi elimination has run, so every parameter is a function parameter.
+            SLANG_ASSERT(func && func->getFirstBlock() == block);
             return func && func->getFirstBlock() == block &&
                    func->findDecoration<IREntryPointDecoration>();
         }
     case kIROp_GlobalConstant:
         return true;
     case kIROp_Call:
+        {
+            auto callee = as<IRFunc>(as<IRCall>(inst)->getCallee());
+            if (callee && callee->getFirstBlock())
+                return false;
+            break;
+        }
     // An uninitialized value holds no pointer or `BFloat16` value yet, such as a local struct with
     // a pointer field that is never set.
     case kIROp_LoadFromUninitializedMemory:
@@ -533,15 +576,25 @@ static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*
         {
             auto address = inst->getOperand(0);
             auto root = getRootAddr(address);
-            return !as<IRVar>(root) && !as<IRGlobalVar>(root) &&
-                   !isPhysicalPointerType(address->getDataType());
+            if (as<IRVar>(root) || as<IRGlobalVar>(root) ||
+                isPhysicalPointerType(address->getDataType()))
+                return false;
+            if (auto param = as<IRParam>(root))
+            {
+                auto block = as<IRBlock>(param->getParent());
+                auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
+                if (func && !func->findDecoration<IREntryPointDecoration>() &&
+                    as<IRPtrTypeBase>(param->getDataType()))
+                    return false;
+            }
+            return true;
         }
     default:
         break;
     }
     for (UInt i = 0; i < inst->getOperandCount(); i++)
     {
-        if (containsType(inst->getOperand(i)->getDataType(), isCarrier))
+        if (aggregateContainsType(inst->getOperand(i)->getDataType(), isCarrier))
             return false;
     }
     return true;
@@ -617,17 +670,12 @@ void checkUnsupportedPhysicalPointers(IRModule* module, TargetRequest* target, D
         [](IRInst* inst)
         {
             // A physical pointer is introduced by a cast from an integer address, by `nullptr` (a
-            // hoisted `PtrLit` constant, so it is found among the operands), or as any other value
-            // that `introducesValueOfType` finds, such as a pointer loaded from memory.
+            // hoisted constant, so it is found among the operands), or as any other value that
+            // `introducesValueOfType` finds, such as a pointer loaded from memory.
             if (inst->getOp() == kIROp_CastIntToPtr)
                 return true;
-            for (UInt i = 0; i < inst->getOperandCount(); i++)
-            {
-                auto operand = inst->getOperand(i);
-                if (operand->getOp() == kIROp_PtrLit &&
-                    isPhysicalPointerType(operand->getDataType()))
-                    return true;
-            }
+            if (usesConstantOfType(inst, isPhysicalPointerType))
+                return true;
             return introducesValueOfType(inst, isPhysicalPointerType, isAnyPointerType);
         },
         [&](SourceLoc loc)
@@ -644,6 +692,9 @@ void checkUnsupportedBFloat16(IRModule* module, TargetRequest* target, Diagnosti
         module,
         [](IRInst* inst)
         {
+            // A folded `BFloat16` literal is a hoisted constant, found among the operands.
+            if (usesConstantOfType(inst, isBFloat16ScalarVectorOrMatrixType))
+                return true;
             return introducesValueOfType(
                 inst,
                 isBFloat16ScalarVectorOrMatrixType,
