@@ -25999,14 +25999,15 @@ struct HitObject
         // but OpHitObjectGetIntersectionTriangleVertexPositionsEXT (the only opcode for
         // this query) requires an OpTypeHitObjectEXT operand. There is no NV opcode, and
         // mixing an NV-typed HitObject with the EXT op produces invalid SPIR-V, so this
-        // combination is rejected at compile time rather than emitted. Note that
-        // spvShaderInvocationReorderNV inherits from spvShaderInvocationReorderEXT for
-        // capability purposes, but the emitted HitObject type still follows the NV/EXT
-        // split, so we cannot simply fall through to the EXT case below.
+        // combination is rejected at compile time rather than emitted. `case spirv:` below is
+        // the EXT path; an NV build also matches it (every SPIR-V capability set does), so this
+        // more specific NV case must take precedence, because an NV build emits
+        // OpTypeHitObjectNV.
         case spvShaderInvocationReorderNV:
             static_assert(false,
                 "GetTriangleVertexPositions() has no SPIRV NV equivalent. "
-                "Use the spvShaderInvocationReorderEXT capability instead.");
+                "Use SPV_EXT_shader_invocation_reorder (do not select "
+                "spvShaderInvocationReorderNV) instead.");
             return float3Arr3();
         case spirv:
             return spirv_asm
