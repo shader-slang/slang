@@ -64,6 +64,8 @@ static void _printHelp(bool experimental = false)
         "  status            Lock and graph readiness (details only when dirty).\n"
         "  validate [name] [--all]\n"
         "                    Check this package for sharing; NAME or --all checks locked trees.\n"
+        "  tag <version>\n"
+        "                    Tag HEAD as a canonical release after validation succeeds.\n"
         "  tree              Print the selected dependency graph.\n"
         "  why <name>        Print every graph path that requires a package.\n"
         "\n"
@@ -211,7 +213,7 @@ static bool _commandRequiresPackageRoot(int argc, const char* const* argv)
            command == "bundle" || command == "build" || command == "run" || command == "test" ||
            command == "docs" || command == "status" || command == "tree" || command == "why" ||
            _isDependencyCommand(command) || command == "edit" || command == "unedit" ||
-           command == "pin" || command == "unpin";
+           command == "pin" || command == "unpin" || command == "tag";
 }
 
 /// Write `slang-package-includes.txt` with the same export roots `bundle` passes to `slangc`.
@@ -1863,6 +1865,53 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     fprintf(stdout, "Package is valid and suitable for sharing.\n");
+    return SLANG_OK;
+}
+
+/// Tag the workspace checkout as a canonical release.
+///
+/// Consider `slang package tag 1.2.0`. Validation has to succeed first, because a tag names the
+/// commit a consumer will resolve. The tag text is `v1.2`: trailing zero components are not part
+/// of the release name. The command then fetches origin tags into the staging namespace and
+/// refuses to create `v1.2` when that name is already a different object. A repository with no
+/// origin is tagged locally.
+static SlangResult _tagRelease(
+    const String& projectRoot,
+    const String& versionText,
+    String& outError)
+{
+    PackageVersion version;
+    SLANG_RETURN_ON_FAIL(parseExactVersion(versionText, version, outError));
+    SLANG_RETURN_ON_FAIL(_validate(projectRoot, outError));
+    SLANG_RETURN_ON_FAIL(requireCleanReleaseCheckout(projectRoot, outError));
+    SLANG_RETURN_ON_FAIL(reconcileRemoteReleaseTags(projectRoot, outError));
+
+    List<String> tags;
+    SLANG_RETURN_ON_FAIL(listTagNames(projectRoot, tags, outError));
+    for (const auto& tag : tags)
+    {
+        PackageVersion parsed;
+        if (SLANG_FAILED(parseReleaseTag(tag, parsed)))
+            continue;
+        if (parsed == version)
+        {
+            outError = String("Release ") + formatExactVersion(version) + " already has a tag.";
+            return SLANG_FAIL;
+        }
+    }
+
+    String tagName = String("v") + formatExactVersion(version);
+    SLANG_RETURN_ON_FAIL(createAnnotatedTag(projectRoot, tagName, outError));
+    String commit;
+    SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(projectRoot, commit, outError));
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
+    fprintf(
+        stdout,
+        "Tagged '%s' as %s (%s).\n",
+        manifest.name.getBuffer(),
+        tagName.getBuffer(),
+        commit.getBuffer());
     return SLANG_OK;
 }
 
@@ -3530,6 +3579,15 @@ SlangResult executeInDirectory(
             }
         }
         return endPackageEdit(projectRoot, name, mode, tagVersion, clean, outError);
+    }
+    if (command == "tag")
+    {
+        if (argc != 3)
+        {
+            outError = "tag requires one version.";
+            return SLANG_FAIL;
+        }
+        return _tagRelease(projectRoot, argv[2], outError);
     }
     outError = String("Invalid command or arguments. Run '") + argv[0] + " help'.";
     return SLANG_FAIL;

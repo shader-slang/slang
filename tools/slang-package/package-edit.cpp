@@ -9,6 +9,7 @@
 #include "package-lock.h"
 #include "package-resolver.h"
 #include "package-tool.h"
+#include "package-validate.h"
 
 #include <stdio.h>
 
@@ -724,6 +725,13 @@ SlangResult endPackageEdit(
         }
         PackageVersion requested;
         SLANG_RETURN_ON_FAIL(parseExactVersion(tagVersionText, requested, outError));
+        Manifest checkoutManifest;
+        SLANG_RETURN_ON_FAIL(
+            readManifest(Path::combine(checkout, kPackageFileName), checkoutManifest, outError));
+        SLANG_RETURN_ON_FAIL(validatePublishablePackage(checkout, checkoutManifest, outError));
+        SLANG_RETURN_ON_FAIL(requireCleanReleaseCheckout(checkout, outError));
+        String cachePath = packageRepositoryPath(projectRoot, package.git);
+        SLANG_RETURN_ON_FAIL(refreshPackageCache(projectRoot, package.git, cachePath, outError));
         bool already = false;
         SLANG_RETURN_ON_FAIL(_releaseAlreadyTagged(checkout, requested, already, outError));
         if (already)

@@ -218,6 +218,168 @@ static SlangResult _parseReleaseTagLines(
 static const UnownedStringSlice kPublishedTagPrefix("refs/slang-cache/tags/");
 static const UnownedStringSlice kLocalTagPrefix("refs/tags/");
 
+struct TagObject
+{
+    String name;
+    String objectId;
+};
+
+static const TagObject* _findTagObject(const List<TagObject>& tags, const String& name)
+{
+    for (const auto& tag : tags)
+    {
+        if (tag.name == name)
+            return &tag;
+    }
+    return nullptr;
+}
+
+static SlangResult _readTagObjects(
+    const String& repositoryPath,
+    const UnownedStringSlice& prefix,
+    List<TagObject>& outTags,
+    String& outError)
+{
+    outTags.clear();
+    List<String> arguments;
+    arguments.add("for-each-ref");
+    arguments.add("--format=%(objectname) %(refname)");
+    arguments.add(prefix);
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    {
+        String row = line.trim();
+        if (!row.getLength())
+            continue;
+        Index space = row.indexOf(' ');
+        if (space <= 0)
+            continue;
+        String refName = String(row.getUnownedSlice().tail(space + 1));
+        if (!refName.startsWith(prefix))
+            continue;
+        TagObject tag;
+        tag.objectId = String(row.getUnownedSlice().head(space));
+        tag.name = String(refName.getUnownedSlice().tail(prefix.getLength()));
+        if (tag.name.getLength())
+            outTags.add(tag);
+    }
+    return SLANG_OK;
+}
+
+static bool _isCanonicalReleaseTag(const String& name)
+{
+    PackageVersion version;
+    return acceptCanonicalReleaseTag(name, version, nullptr);
+}
+
+/// Return whether every staged canonical tag is already the same `refs/tags` object.
+///
+/// A missing or different normal tag means a fetch landed in the staging namespace and has not
+/// been accepted. Local-only tags, which have no staged name, are not conflicts.
+static SlangResult _requireStagedTagsReconciled(const String& repositoryPath, String& outError)
+{
+    List<TagObject> staged;
+    SLANG_RETURN_ON_FAIL(_readTagObjects(repositoryPath, kPublishedTagPrefix, staged, outError));
+    List<TagObject> local;
+    SLANG_RETURN_ON_FAIL(_readTagObjects(repositoryPath, kLocalTagPrefix, local, outError));
+    StringBuilder conflicts;
+    for (const auto& tag : staged)
+    {
+        if (!_isCanonicalReleaseTag(tag.name))
+            continue;
+        const TagObject* existing = _findTagObject(local, tag.name);
+        if (existing && existing->objectId == tag.objectId)
+            continue;
+        if (conflicts.getLength())
+            conflicts << "\n";
+        conflicts << "Release tag '" << tag.name << "' was fetched and has not been accepted.";
+    }
+    if (!conflicts.getLength())
+        return SLANG_OK;
+    outError = conflicts.produceString();
+    return SLANG_FAIL;
+}
+
+/// Copy staged canonical tags into `refs/tags` when that does not replace a different tag.
+///
+/// `previous` is the staging namespace from before this fetch. A normal tag that disagrees with
+/// the new staged object is left in place. A canonical tag that was staged before and is gone
+/// now, while `refs/tags` still has it, is a remote deletion and is also left in place. Either
+/// case fails the call before any new tag is copied.
+static SlangResult _promoteStagedReleaseTags(
+    const String& repositoryPath,
+    const List<TagObject>& previous,
+    String& outError)
+{
+    List<TagObject> staged;
+    SLANG_RETURN_ON_FAIL(_readTagObjects(repositoryPath, kPublishedTagPrefix, staged, outError));
+    List<TagObject> local;
+    SLANG_RETURN_ON_FAIL(_readTagObjects(repositoryPath, kLocalTagPrefix, local, outError));
+
+    StringBuilder conflicts;
+    auto addConflict = [&](const String& text)
+    {
+        if (conflicts.getLength())
+            conflicts << "\n";
+        conflicts << text;
+    };
+    for (const auto& tag : previous)
+    {
+        if (!_isCanonicalReleaseTag(tag.name))
+            continue;
+        const TagObject* existing = _findTagObject(local, tag.name);
+        if (!existing)
+            continue;
+        const TagObject* updated = _findTagObject(staged, tag.name);
+        if (updated)
+            continue;
+        addConflict(
+            String("Release tag '") + tag.name + "' was removed on the remote. refs/tags/" +
+            tag.name +
+            " was left in place. Delete the local tag to accept the removal, or push it back "
+            "to the remote, then rerun the command.");
+    }
+    List<TagObject> toCreate;
+    for (const auto& tag : staged)
+    {
+        if (!_isCanonicalReleaseTag(tag.name))
+            continue;
+        const TagObject* existing = _findTagObject(local, tag.name);
+        if (!existing)
+        {
+            toCreate.add(tag);
+            continue;
+        }
+        if (existing->objectId == tag.objectId)
+            continue;
+        addConflict(
+            String("Release tag '") + tag.name +
+            "' does not match the fetched tag:\n  local:  refs/tags/" + tag.name + " " +
+            existing->objectId + "\n  remote: refs/slang-cache/tags/" + tag.name + " " +
+            tag.objectId +
+            "\nRename or delete the local tag to accept the remote tag, or restore the remote "
+            "tag to the local object, then rerun the command.");
+    }
+    if (conflicts.getLength())
+    {
+        outError = conflicts.produceString();
+        return SLANG_FAIL;
+    }
+
+    for (const auto& tag : toCreate)
+    {
+        List<String> arguments;
+        arguments.add("update-ref");
+        arguments.add(String(kLocalTagPrefix) + tag.name);
+        arguments.add(tag.objectId);
+        arguments.add("0000000000000000000000000000000000000000");
+        ExecuteResult result;
+        SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    }
+    return SLANG_OK;
+}
+
 /// Render `for-each-ref` rows as `show-ref --dereference` lines for `prefix`.
 ///
 /// An annotated tag's first line names the tag object and the following `^{}` line names the
@@ -269,22 +431,7 @@ SlangResult listReleaseTagsFromRepository(
     String& outError,
     List<String>* outWarnings)
 {
-    String publishedText;
-    bool publishedAny = false;
-    SLANG_RETURN_ON_FAIL(_dereferenceRefLines(
-        repositoryPath,
-        kPublishedTagPrefix,
-        publishedText,
-        publishedAny,
-        outError));
-    if (publishedAny)
-        return _parseReleaseTagLines(
-            publishedText,
-            kPublishedTagPrefix,
-            outCandidates,
-            outError,
-            outWarnings);
-
+    SLANG_RETURN_ON_FAIL(_requireStagedTagsReconciled(repositoryPath, outError));
     String localText;
     bool localAny = false;
     SLANG_RETURN_ON_FAIL(
@@ -384,15 +531,8 @@ SlangResult resolveCachedReference(
     }
     else if (!ref.getUnownedSlice().startsWith("refs/"))
     {
-        String publishedText;
-        bool publishedAny = false;
-        SLANG_RETURN_ON_FAIL(_dereferenceRefLines(
-            repositoryPath,
-            kPublishedTagPrefix,
-            publishedText,
-            publishedAny,
-            outError));
-        arguments.add(String(publishedAny ? kPublishedTagPrefix : kLocalTagPrefix) + ref);
+        SLANG_RETURN_ON_FAIL(_requireStagedTagsReconciled(repositoryPath, outError));
+        arguments.add(String(kLocalTagPrefix) + ref);
         arguments.add(String("refs/remotes/origin/") + ref);
     }
     else
@@ -993,6 +1133,10 @@ static SlangResult _ensureRepository(
     if (!allowRemote)
         return SLANG_OK;
 
+    List<TagObject> previousStaged;
+    SLANG_RETURN_ON_FAIL(
+        _readTagObjects(repositoryPath, kPublishedTagPrefix, previousStaged, outError));
+
     List<String> fetchArguments;
     fetchArguments.add("fetch");
     fetchArguments.add("--prune");
@@ -1001,7 +1145,8 @@ static SlangResult _ensureRepository(
     fetchArguments.add("+refs/heads/*:refs/remotes/origin/*");
     fetchArguments.add("+refs/tags/*:refs/slang-cache/tags/*");
     fetchArguments.add("+HEAD:refs/slang-cache/origin/HEAD");
-    return _runGit(repositoryPath, fetchArguments, result, outError);
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, fetchArguments, result, outError));
+    return _promoteStagedReleaseTags(repositoryPath, previousStaged, outError);
 }
 
 SlangResult refreshPackageCache(
@@ -1877,6 +2022,52 @@ SlangResult createAnnotatedTag(const String& repositoryPath, const String& tag, 
     arguments.add(tag);
     ExecuteResult result;
     return _runGit(repositoryPath, arguments, result, outError);
+}
+
+SlangResult requireCleanReleaseCheckout(const String& repositoryPath, String& outError)
+{
+    if (!_hasGitMetadata(repositoryPath))
+    {
+        outError = String("Package is not a Git checkout: ") + repositoryPath;
+        return SLANG_FAIL;
+    }
+    List<String> arguments;
+    arguments.add("status");
+    arguments.add("--porcelain");
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    if (result.standardOutput.trim().getLength())
+    {
+        outError = String("Commit outstanding changes before tagging a release: ") + repositoryPath;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+SlangResult reconcileRemoteReleaseTags(const String& repositoryPath, String& outError)
+{
+    List<String> originArguments;
+    originArguments.add("remote");
+    originArguments.add("get-url");
+    originArguments.add("origin");
+    ExecuteResult result;
+    int originCode = 0;
+    SLANG_RETURN_ON_FAIL(
+        _runGitCode(repositoryPath, originArguments, originCode, result, outError));
+    if (originCode != 0)
+        return SLANG_OK;
+
+    List<TagObject> previousStaged;
+    SLANG_RETURN_ON_FAIL(
+        _readTagObjects(repositoryPath, kPublishedTagPrefix, previousStaged, outError));
+    List<String> fetchArguments;
+    fetchArguments.add("fetch");
+    fetchArguments.add("--prune");
+    fetchArguments.add("--no-tags");
+    fetchArguments.add("origin");
+    fetchArguments.add("+refs/tags/*:refs/slang-cache/tags/*");
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, fetchArguments, result, outError));
+    return _promoteStagedReleaseTags(repositoryPath, previousStaged, outError);
 }
 
 SlangResult listTagNames(const String& repositoryPath, List<String>& outTags, String& outError)

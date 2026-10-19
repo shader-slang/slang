@@ -22,12 +22,11 @@ String packageRepositoryDirectoryName(const String& gitURL);
 /// List canonical dotted release tags already present in a local clone, without contacting a
 /// remote.
 ///
-/// Published tags are read from `refs/slang-cache/tags`. Tags under `refs/tags` are included only
-/// when that published namespace has no tags, so a normal repository still lists the tags created
-/// with `git tag`. A tag in `refs/tags` is not treated as a published release once the published
-/// namespace exists. A tag that names a release with a non-canonical spelling, such as `v1.2.0`
-/// when the canonical spelling is `v1.2`, is omitted. When `outWarnings` is set, each omitted tag
-/// is reported once.
+/// Release tags are read from `refs/tags`. `refs/slang-cache/tags` is only the fetch staging area
+/// and is not a release source. A tag that names a release with a non-canonical spelling, such as
+/// `v1.2.0` when the canonical spelling is `v1.2`, is omitted. When `outWarnings` is set, each
+/// omitted tag is reported once. A staged canonical tag that has not been copied to `refs/tags`,
+/// or that points at a different object, is an error.
 SlangResult listReleaseTagsFromRepository(
     const String& repositoryPath,
     List<TagCandidate>& outCandidates,
@@ -37,8 +36,7 @@ SlangResult listReleaseTagsFromRepository(
 /// Resolve `ref` from the origin-tracking refs and published tags already present in a package
 /// repository.
 ///
-/// A short tag name is read from `refs/slang-cache/tags` when that namespace has any tags, and
-/// from `refs/tags` otherwise. `HEAD` is `refs/slang-cache/origin/HEAD`.
+/// A short tag name is read from `refs/tags`. `HEAD` is `refs/slang-cache/origin/HEAD`.
 SlangResult resolveCachedReference(
     const String& repositoryPath,
     const String& ref,
@@ -112,11 +110,13 @@ SlangResult commitDeferredCacheReplacement(
 
 /// Create or refresh the permanent repository for `gitURL` at `repositoryPath`.
 ///
-/// The repository is bare. Published branches are stored as `refs/remotes/origin/*` and published
-/// tags as `refs/slang-cache/tags/*`. Fetch does not write or prune `refs/heads/*` or
-/// `refs/tags/*`. A directory that already records a different URL is left in place and the call
-/// fails. The `assumeYes` and unpushed-report arguments remain for callers that used to replace a
-/// cache; this function does not delete the repository.
+/// The repository is bare. Published branches are stored as `refs/remotes/origin/*`. Published tags
+/// are fetched into `refs/slang-cache/tags/*` and then copied to `refs/tags` when that name is
+/// absent. A `refs/tags` name that points at a different object is left unchanged and the call
+/// fails, as is a canonical tag that disappeared from the remote. Fetch does not prune
+/// `refs/heads/*` or delete `refs/tags/*`. A directory that already records a different URL is
+/// left in place and the call fails. The `assumeYes` and unpushed-report arguments remain for
+/// callers that used to replace a cache; this function does not delete the repository.
 SlangResult refreshPackageCache(
     const String& workingDirectory,
     const String& gitURL,
@@ -194,6 +194,20 @@ SlangResult discardUncommittedState(const String& repositoryPath, String& outErr
 
 /// Create an annotated tag at `HEAD`. The tag is local and is not pushed.
 SlangResult createAnnotatedTag(const String& repositoryPath, const String& tag, String& outError);
+
+/// Fail when `repositoryPath` is not a Git checkout or has uncommitted or untracked files.
+///
+/// A release tag names `HEAD`. Validation reads the working tree, so outstanding changes would
+/// make the tagged commit a different tree from the one that was checked.
+SlangResult requireCleanReleaseCheckout(const String& repositoryPath, String& outError);
+
+/// Fetch origin tags into `refs/slang-cache/tags` and copy non-conflicting canonical tags to
+/// `refs/tags`.
+///
+/// A repository with no `origin` is left unchanged. A canonical tag whose staged object differs
+/// from `refs/tags`, or a previously staged canonical tag that the remote no longer has while
+/// `refs/tags` still does, fails the call and leaves `refs/tags` unchanged.
+SlangResult reconcileRemoteReleaseTags(const String& repositoryPath, String& outError);
 
 /// List every tag name in the repository, including names that are not release tags.
 SlangResult listTagNames(const String& repositoryPath, List<String>& outTags, String& outError);

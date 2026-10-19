@@ -3258,6 +3258,81 @@ SLANG_UNIT_TEST(PackageValidateStructureAndLicense)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Companion")) >= 0);
 }
 
+SLANG_UNIT_TEST(PackageToolTagRequiresValidationAndCanonicalName)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+
+    const char* tagArguments[] = {"slang-package", "tag", "1.0.0"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(tagArguments), tagArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("license placeholder")) >= 0);
+
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Test license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
+        Path::combine(temp.path, Path::combine("src", "acme", "noise.slang")),
+        "// Primary module.\nmodule noise;\n")));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(tagArguments), tagArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("not a Git checkout")) >= 0);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeGitRepository(temp.path)));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(tagArguments), tagArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Commit outstanding")) >= 0);
+
+    List<String> arguments;
+    arguments.add("config");
+    arguments.add("user.email");
+    arguments.add("package-test@example.com");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(temp.path, arguments, error)));
+    arguments.clear();
+    arguments.add("config");
+    arguments.add("user.name");
+    arguments.add("package-test");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(temp.path, arguments, error)));
+    arguments.clear();
+    arguments.add("add");
+    arguments.add(".");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(temp.path, arguments, error)));
+    arguments.clear();
+    arguments.add("commit");
+    arguments.add("-q");
+    arguments.add("-m");
+    arguments.add("release");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(temp.path, arguments, error)));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(tagArguments), tagArguments, error)));
+    String head;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(temp.path, head, error)));
+    String tagged;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(resolveLocalRevision(temp.path, "refs/tags/v1", tagged, error)));
+    SLANG_CHECK(tagged == head);
+    String padded;
+    SLANG_CHECK(SLANG_FAILED(resolveLocalRevision(temp.path, "refs/tags/v1.0.0", padded, error)));
+
+    const char* nextArguments[] = {"slang-package", "tag", "1.2.0"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(nextArguments), nextArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(resolveLocalRevision(temp.path, "refs/tags/v1.2", tagged, error)));
+    SLANG_CHECK(tagged == head);
+    const char* duplicateArguments[] = {"slang-package", "tag", "1.2"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(duplicateArguments),
+        duplicateArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("already has a tag")) >= 0);
+}
+
 SLANG_UNIT_TEST(PackageValidateRejectsEscapingPathDependency)
 {
     TemporaryDirectory temp;
@@ -4785,7 +4860,9 @@ SLANG_UNIT_TEST(PackageRepositoriesKeepUrlWorktrees)
         resolveLocalRevision(repository, "refs/slang-cache/tags/v1", mirrored, error)));
     SLANG_CHECK(mirrored == publishedCommit);
     String localTag;
-    SLANG_CHECK(SLANG_FAILED(resolveLocalRevision(repository, "refs/tags/v1", localTag, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(resolveLocalRevision(repository, "refs/tags/v1", localTag, error)));
+    SLANG_CHECK(localTag == publishedCommit);
 
     String checkout = Path::combine(Path::combine(project, "deps"), "noise");
     bool didMaterialize = false;
@@ -4850,34 +4927,32 @@ SLANG_UNIT_TEST(PackageRepositoriesKeepUrlWorktrees)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(origin, arguments, error)));
     String movedCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(origin, movedCommit, error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(refreshPackageCache(project, origin, repository, error)));
+    SLANG_CHECK(SLANG_FAILED(refreshPackageCache(project, origin, repository, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not match")) >= 0);
 
     String mirrorAfter;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         resolveLocalRevision(repository, "refs/slang-cache/tags/v1", mirrorAfter, error)));
     SLANG_CHECK(mirrorAfter == movedCommit);
+    String keptRelease;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(resolveLocalRevision(repository, "refs/tags/v1", keptRelease, error)));
+    SLANG_CHECK(keptRelease == publishedCommit);
     String keptTag;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(resolveLocalRevision(repository, "refs/tags/local-tag", keptTag, error)));
     SLANG_CHECK(keptTag == localCommit);
+    String keptUserRelease;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        resolveLocalRevision(repository, "refs/tags/v9.9.9", keptUserRelease, error)));
+    SLANG_CHECK(keptUserRelease == localCommit);
     String keptBranch;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         resolveLocalRevision(repository, "refs/heads/local-only", keptBranch, error)));
     SLANG_CHECK(keptBranch == localCommit);
-
     List<TagCandidate> releases;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(listReleaseTagsFromRepository(repository, releases, error)));
-    bool sawPublished = false;
-    bool sawUserRelease = false;
-    for (const auto& release : releases)
-    {
-        if (release.ref == "v1")
-            sawPublished = true;
-        if (release.ref == "v9.9.9")
-            sawUserRelease = true;
-    }
-    SLANG_CHECK(sawPublished);
-    SLANG_CHECK(!sawUserRelease);
+    SLANG_CHECK(SLANG_FAILED(listReleaseTagsFromRepository(repository, releases, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has not been accepted")) >= 0);
 
     String otherOrigin = Path::combine(temp.path, "other.git");
     SLANG_CHECK_ABORT(Path::createDirectoryRecursive(otherOrigin));
