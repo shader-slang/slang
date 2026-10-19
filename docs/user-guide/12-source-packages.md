@@ -350,10 +350,11 @@ clear search paths or materialize `deps/`. A release is read at its locked commi
 when that repository contains the commit, otherwise from `.slang/repositories`. The committed manifest is
 read, not the working-tree file, so a dirty release checkout cannot change what the graph check
 sees. An edit is read from the working tree. Online commands fetch origin data only into
-`.slang/repositories`. Published branches are stored as `refs/remotes/origin/*` and published tags
-as `refs/slang-cache/tags/*`. Fetch does not update or delete `refs/heads/*` or `refs/tags/*`, so a
-branch or tag created in the worktree stays put. `deps/NAME` is a worktree of that repository and
-already sees the published refs. After materialization, they apply the publishable-package checks
+`.slang/repositories`. Published branches are stored as `refs/remotes/origin/*`. Published tags
+are fetched into `refs/slang-cache/tags/*` and copied to `refs/tags/*` when that name is free.
+Fetch does not update or delete `refs/heads/*`. A tag you created under `refs/tags` is left in
+place when the fetched tag is a different object, and the command fails until that collision is
+resolved. `deps/NAME` is a worktree of that repository and already sees both sets of refs. After materialization, they apply the publishable-package checks
 to each Git package whose checkout was newly created or changed, then check source layout and
 import uniqueness across the complete selected graph.
 The closure check includes unchanged packages because a new module can
@@ -370,8 +371,8 @@ something is dirty. The header says `incomplete` when the lock or Git pins are m
 `not buildable` only after those trees are present and the source check fails. Dirty checkouts and
 edits are listed by name. Like `git status`, reportable drift does not make the command fail.
 Status returns nonzero only when the required root manifest or an existing lock cannot be read and
-parsed well enough to produce a report, and when `slang-package-overlay.json` still contains
-entries. That file is no longer used. It also reports when a locked ref or commit is absent from
+parsed well enough to produce a report, and when `slang-package-overlay.json` contains
+entries. It also reports when a locked ref or commit is absent from
 the existing cache.
 It does not inspect `out/`, modify package state, or contact remotes.
 
@@ -415,8 +416,8 @@ relative to the primary (for example `__include "noise/hash";`), as shown in
 `slang package init` creates `slang-package.json` and the conventional directories in the current
 directory. It writes `tools.slang-toolchain` as `>=` the installed compiler version when that
 version can be parsed. It adds `.slang/`, `deps/`, `out/`, `slang-package-overlay.json`, and
-`slang-package-includes.txt` to `.gitignore`. The overlay filename remains ignored so an old file
-is not committed. A file that still contains entries is an error. `slang package help` lists
+`slang-package-includes.txt` to `.gitignore`. A `slang-package-overlay.json` that contains
+entries is an error. `slang package help` lists
 commands under the manifest, lock, and bundle.
 `.slang/repositories/` contains one permanent Git repository for each exact package URL that has
 been resolved. The directory name starts with the URL's repository name, for example `noise-`
@@ -464,8 +465,8 @@ exist. `pin NAME` while the dependency is edited sets the boolean only. `unpin N
 boolean and works during an edit. The branch stays. `update` will not move a pinned version.
 `edit NAME --advance` and `unedit` can, and they leave the boolean set.
 
-A non-empty `slang-package-overlay.json` is an error. There is no override command and no path
-dependency. An edit changes the branch of `deps/NAME`. It does not change where the package lives.
+A non-empty `slang-package-overlay.json` is an error. An edit changes the branch of `deps/NAME`.
+It does not change where the package lives.
 An edited lock is not something to commit. Run `unedit` first. A pinned release row can be
 committed.
 

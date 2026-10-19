@@ -26,7 +26,7 @@ slang-package <command> [<arguments>]
 
 The package tool manages source dependencies described by `slang-package.json`. It resolves Git
 release tags into `slang-package-lock.json` and materializes each dependency under `deps/` by
-default. Every dependency is a Git repository. There is no path dependency and no overlay.
+default. Every dependency is a Git repository. An edit is a branch of that checkout.
 
 Except for `init` and `help`, commands may be run from the package root or any ordinary
 subdirectory. The tool searches parent directories for the nearest `slang-package.json`; a nested
@@ -99,8 +99,8 @@ The directory name becomes the package name and must be a valid package name. Th
   version can be determined;
 - writes a placeholder `LICENSE` if one does not already exist; and
 - adds `.slang/`, `deps/`, `out/`, `slang-package-overlay.json`, and
-  `slang-package-includes.txt` to `.gitignore`. The overlay name stays ignored so an old file is
-  not committed. A file that still contains entries is an error.
+  `slang-package-includes.txt` to `.gitignore`. A `slang-package-overlay.json` that contains
+  entries is an error.
 
 The generated license is intentionally a reminder, not a distributable license. Replace its
 contents before running bare `validate`.
@@ -132,7 +132,7 @@ dotted release tag, and the lock records that tag and commit. Check out a branch
 [`edit`](#edit). Hold a solved release with [`pin`](#pin).
 
 A dependency is a Git repository checked out at `deps/<name>`. `<name>` identifies the package in
-the graph and must match the selected package manifest. `--path`, `--ref`, and `--as` are rejected.
+the graph and must match the selected package manifest.
 
 When `--git` is omitted, the command reads `SLANG_PACKAGE_INDEX`. `fetch` and `update` do not.
 Remapping an existing graph uses [`--remap-urls`](#update).
@@ -377,10 +377,14 @@ the commit just advanced to. A newer legal tag is named and then left unused. Th
 `--tag <version>`
 : Create a local annotated tag on the checked-out commit, then select it the way `--advance` does
 without moving `HEAD`. `<version>` is an exact dotted version. The tag name is `v` plus the
-canonical spelling, so `1.4.0` creates `v1.4`. The tag is not pushed. The command fails before
-creating the tag when:
+canonical spelling, so `1.4.0` creates `v1.4`. The package must pass the same publishability
+checks as [`validate <name>`](#named-package-validation), and the checkout must have no
+uncommitted changes, because the tag names `HEAD`. The tag is not pushed. Origin tags are fetched
+into `refs/slang-cache/tags` first. The command fails before creating the tag when:
 
-    - the release already has a tag;
+    - the package is not suitable for sharing, or the checkout has uncommitted changes;
+    - the release already has a tag, including one fetched from the remote;
+    - a fetched tag of that name points at a different object than `refs/tags`;
     - the version is not strictly greater than the version stored on the edit;
     - the version is not strictly greater than every canonical tag already on the edit line;
     - the version does not satisfy the constraints.
@@ -673,6 +677,30 @@ trees.
 `--all` cannot be combined with a package name. With no lock and no dependencies, it reports that
 there are no locked packages to validate.
 
+## `tag`
+
+### Synopsis
+
+```text
+slang package tag <version>
+```
+
+### Description
+
+Tag the workspace checkout as a release. `<version>` is an exact dotted version with no `v`
+prefix. The tag name is `v` plus the canonical spelling, so `1.4.0` creates `v1.4` and `1`
+creates `v1`. The tag is an annotated tag at `HEAD` and is not pushed.
+
+The command runs the workspace [`validate`](#workspace-validation) checks first and does not
+create a tag when they fail. The checkout must be a Git repository with no uncommitted or
+untracked changes, so the tagged commit is the tree that was validated.
+
+When the repository has an `origin`, its tags are fetched into `refs/slang-cache/tags` and
+copied to `refs/tags` where the name is free. The command fails without creating a tag when that
+name is already a release, or when a fetched tag disagrees with the local tag of the same name.
+Delete or rename the local tag to accept the remote object, or push the local object back to the
+remote, and run the command again.
+
 ## `tree`
 
 ### Synopsis
@@ -807,8 +835,7 @@ stay as published. A remap does not rewrite them.
 
 `slang-package-lock.json`
 : Committed exact selected graph. Optional `remap_index` is the `http` or `https` package index
-`update` reads on later resolves. `pinned` is recorded only when the boolean is set. A `path` field
-is rejected.
+`update` reads on later resolves. `pinned` is recorded only when the boolean is set.
 
     A release row records:
 
@@ -821,7 +848,7 @@ is rejected.
     is representing. That row is not something to commit.
 
 `slang-package-overlay.json`
-: No longer used. `init` still lists it in `.gitignore`. A file that contains entries is an error.
+: Must not contain entries. `init` lists the name in `.gitignore`.
 
 `slang-package-includes.txt`
 : Gitignored generated list of absolute dependency export directories. `fetch` and `update`
@@ -829,9 +856,12 @@ regenerate it.
 
 `.slang/repositories/`
 : One permanent bare Git repository for each exact package URL. The directory name is the URL's
-repository name plus an 8-character hash of that URL. Published branches are `refs/remotes/origin/*`
-and published tags are `refs/slang-cache/tags/*`. `deps/` checkouts are worktrees of these
-repositories. Online resolution updates them; offline resolution requires them.
+repository name plus an 8-character hash of that URL. Published branches are `refs/remotes/origin/*`.
+Published tags are fetched into `refs/slang-cache/tags/*` and copied to `refs/tags/*` when that
+name does not already point at a different object. A disagreement is left in place and fails the
+command. `deps/` checkouts are worktrees of these repositories and see both namespaces. Online
+resolution updates them; offline resolution requires them. The resolver reads release tags from
+`refs/tags`.
 
 `deps/`
 : Default materialization directory for locked Git checkouts. The path is configured by
@@ -848,20 +878,12 @@ a successful no-op. `status` also returns zero for reportable drift such as an i
 dirty checkout; it fails only when required package metadata cannot be read well enough to produce
 the report.
 
-## Removed
-
-`dependency pin`
-: Removed. Use [`pin`](#pin).
-
-`update --ignore-overrides`
-: Removed.
-
 ## See also
 
 - [Slang Source Packages](source-packages) — package and manifest concepts.
 - [Using Source Packages](source-package-workflow) — an end-to-end workflow.
-- [Growing an Application with Source Packages](source-package-command-use-cases) — detailed
-  application journeys and behavioral contracts.
+- [Growing an Application with Source Packages](source-package-command-use-cases) — application
+  journeys.
 - [Writing Module Files, Import, and Include](module-files) — source-layout rules enforced by
   validation.
 
