@@ -33,6 +33,17 @@ class ConstModifier : public Modifier
     FIDDLE(...)
 };
 
+/// A `const` modifier written after a function parameter list.
+///
+/// Specifies `ParamPassingMode::In` for the receiver parameter.
+/// Prefix `const` uses `ConstModifier`.
+/// Attribute spellings of receiver modes use `ReceiverParamModeSpecifierAttribute`.
+FIDDLE()
+class CppStyleTrailingReceiverParamConstModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class BuiltinModifier : public Modifier
 {
@@ -632,7 +643,7 @@ class MagicTypeModifier : public Modifier
     FIDDLE() uint32_t tag = uint32_t(0);
 };
 
-// A modifier that identifies a built-in type member or requirement by its semantic role.
+// A modifier that indicates a built-in associated type requirement (e.g., `Differential`)
 FIDDLE()
 class BuiltinRequirementModifier : public Modifier
 {
@@ -1429,12 +1440,21 @@ class VulkanHitObjectAttributesAttribute : public Attribute
     FIDDLE() int location;
 };
 
+/// An attribute that specifies the passing mode of a declaration's receiver parameter.
+///
+/// Trailing `const` is represented separately by `CppStyleTrailingReceiverParamConstModifier`.
+FIDDLE(abstract)
+class ReceiverParamModeSpecifierAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 // A `[mutating]` attribute, which indicates that a member
 // function is allowed to modify things through its `this`
 // argument.
 //
 FIDDLE()
-class MutatingAttribute : public Attribute
+class MutatingAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1444,7 +1464,7 @@ class MutatingAttribute : public Attribute
 // its `this` parameter.
 //
 FIDDLE()
-class NonmutatingAttribute : public Attribute
+class NonmutatingAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1466,7 +1486,7 @@ class NoDiscardAttribute : public Attribute
 // a member function should be passed by const reference.
 //
 FIDDLE()
-class ConstRefAttribute : public Attribute
+class ConstRefAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1475,7 +1495,7 @@ class ConstRefAttribute : public Attribute
 // a member function should be passed by reference.
 //
 FIDDLE()
-class RefAttribute : public Attribute
+class RefAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };

@@ -204,7 +204,7 @@ other workload in the suite measures.
 > One axis per workload is not a stylistic preference here. A mixed
 > "kitchen sink" cross-target shader was tried first and **failed**: a shared
 > super-linear front-end cost dominated it and flattened a 21× cuda/spirv
-> divergence to 1.1×. See `COVERAGE-ANALYSIS.md`.
+> divergence to 1.1×.
 
 | Test                   | Targets                        | What it generates                                                  | Isolates                                                                                                                                                                                         | Primary timers                                     |
 | ---------------------- | ------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
@@ -419,6 +419,10 @@ via `--results <checkout-path>`.
 | `results/releases/<tag>/sweep/`                         | complexity-sweep report for swept releases                                                                       |
 | `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
 | `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
+
+The publishing nightly also exports compile-performance results for BenchView;
+the benchmark host handles collection and delivery. Export failures do not block
+existing reports. For local or historical exports, see `python3 benchview.py --help`.
 
 ---
 

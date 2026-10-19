@@ -2380,24 +2380,9 @@ Type* BuiltinGenericType::getElementType() const
     return as<Type>(_getGenericTypeArg(getDeclRefBase(), 0));
 }
 
-Type* ResourceType::getTexelType()
-{
-    return as<Type>(_getGenericTypeArg(this, 0));
-}
-
 Type* ResourceType::getElementType()
 {
-    // Consider `Texture2D<RGBA16F>`. Its first generic argument remains `RGBA16F` so
-    // generic inference can recover the public type argument. The checked `_Texture.T`
-    // alias holds `Texel.DataType`; substituting it through this texture declaration
-    // resolves the payload to `float4` using the ordinary conformance witness.
-    auto astBuilder = getCurrentASTBuilder();
-    auto elementTypeDecl =
-        as<TypeDefDecl>(astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
-            BuiltinRequirementKind::TextureElementType));
-    SLANG_RELEASE_ASSERT(elementTypeDecl && elementTypeDecl->type);
-    SLANG_RELEASE_ASSERT(elementTypeDecl->parentDecl == getDeclRef().getDecl());
-    return getType(astBuilder, astBuilder->getMemberDeclRef(getDeclRef(), elementTypeDecl));
+    return as<Type>(_getGenericTypeArg(this, 0));
 }
 
 void ResourceType::_toTextOverride(StringBuilder& out)
@@ -2469,11 +2454,11 @@ void ResourceType::_toTextOverride(StringBuilder& out)
             return false;
         if (isShadow())
             return false;
-        auto texelType = getTexelType();
-        if (texelType)
+        auto elementType = getElementType();
+        if (elementType)
         {
             resultSB << "<";
-            resultSB << texelType->toString();
+            resultSB << elementType->toString();
             auto sampleCount = _getGenericTypeArg(this, 4);
             if (auto constIntVal = as<ConstantIntVal>(sampleCount))
             {
@@ -2500,12 +2485,12 @@ void ResourceType::_toTextOverride(StringBuilder& out)
 
 Val* TextureTypeBase::getSampleCount()
 {
-    return _getGenericTypeArg(this, 4);
+    return as<Type>(_getGenericTypeArg(this, 4));
 }
 
 Val* TextureTypeBase::getFormat()
 {
-    return _getGenericTypeArg(this, 8);
+    return as<Type>(_getGenericTypeArg(this, 8));
 }
 
 bool isCopyableType(Type* type)

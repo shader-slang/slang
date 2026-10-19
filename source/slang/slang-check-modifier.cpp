@@ -1467,11 +1467,6 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     attr->loc = uncheckedAttr->loc;
     attr->attributeDecl = attrDecl;
 
-    if (as<FormatAttribute>(attr) && isSlang2026OrLater(this))
-    {
-        getSink()->diagnose(Diagnostics::DeprecatedFormatAttribute{.location = attr->loc});
-    }
-
     // We will start with checking steps that can be applied independent
     // of the concrete attribute type that was selected. These only need
     // us to look at the attribute declaration itself.
@@ -2041,7 +2036,17 @@ Modifier* SemanticsVisitor::checkModifier(
             getSink()->diagnose(Diagnostics::ConstexprOnCallableIgnored{.modifier = m});
         }
     }
-    if (as<ConstModifier>(m))
+    if (as<CppStyleTrailingReceiverParamConstModifier>(m))
+    {
+        // We leave trailing `const` attached after the diagnostic so receiver checking can
+        // interpret the method as nonmutating while checking its body.
+        if (getSourceLanguage() != SourceLanguage::HLSL)
+        {
+            getSink()->diagnose(
+                Diagnostics::CppStyleTrailingReceiverParamConstRequiresHlsl{.modifier = m});
+        }
+    }
+    else if (as<ConstModifier>(m))
     {
         if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
         {
@@ -2614,6 +2619,9 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     }
 
     postProcessingOnModifiers(m_astBuilder, syntaxNode->modifiers);
+
+    if (auto decl = as<Decl>(syntaxNode))
+        checkReceiverParamModeSpecifiers(decl);
 }
 
 void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)

@@ -1590,17 +1590,24 @@ err(
 )
 
 err(
-    "this-param-mode-attribute-without-effective-this-param",
+    "receiver-param-mode-specifier-without-receiver-param",
     30428,
-    "attribute requires an effective `this` parameter",
-    span { loc = "attribute:Modifier", message = "attribute '~attribute' is only allowed on a declaration with an effective `this` parameter." }
+    "receiver-mode specifier requires an instance receiver",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is only allowed on an instance member that has a `this` parameter." }
 )
 
 err(
-    "this-param-mode-attribute-on-class-member",
+    "receiver-param-mode-specifier-on-class-member",
     30429,
-    "attribute cannot change a source-declared class member's effective `this` parameter",
-    span { loc = "attribute:Modifier", message = "attribute '~attribute' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value." }
+    "receiver-mode specifier is not allowed on a class member",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is not allowed on a class member; a class receiver always uses the `in` parameter-passing mode." }
+)
+
+err(
+    "cpp-style-trailing-receiver-param-const-requires-hlsl",
+    30443,
+    "trailing `const` is only allowed in the HLSL dialect",
+    span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`)." }
 )
 
 err(
@@ -3429,13 +3436,6 @@ warning(
     31231,
     "use of deprecated modifier",
     span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
-)
-
-warning(
-    "deprecated-format-attribute",
-    31232,
-    "use of deprecated [format(...)] attribute",
-    span { loc = "location", message = "[format(...)] has been deprecated; use explicit texture storage types such as `RWTexture2D<RGBA8Unorm>` instead. See https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/02-conventional-features.html#texture-types" }
 )
 
 -- Enums (320xx)
