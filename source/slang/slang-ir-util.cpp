@@ -3985,4 +3985,14 @@ bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool ha
     return isBindlessTextureNVEncodableResourceType(handleType->getResourceType());
 }
 
+bool hasWholeAccessAttr(IRInst* load)
+{
+    for (auto attr : load->getAllAttrs())
+    {
+        if (as<IRAlignedAttr>(attr) || as<IRMemoryScopeAttr>(attr))
+            return true;
+    }
+    return false;
+}
+
 } // namespace Slang
