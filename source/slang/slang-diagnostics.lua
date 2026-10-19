@@ -3431,13 +3431,6 @@ warning(
     span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
 )
 
-warning(
-    "deprecated-format-attribute",
-    31232,
-    "use of deprecated [format(...)] attribute",
-    span { loc = "location", message = "[format(...)] has been deprecated; use explicit texture storage types such as `RWTexture2D<RGBA8Unorm>` instead. See https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/02-conventional-features.html#texture-types" }
-)
-
 -- Enums (320xx)
 
 err(
@@ -4808,6 +4801,13 @@ warning(
     38040,
     "entry point parameter treated as uniform",
     span { loc = "param:Decl", message = "parameter '~param' is treated as 'uniform' because it does not have a system-value semantic." }
+)
+
+err(
+    "entry-point-param-has-reference-mode",
+    38054,
+    "entry-point parameter cannot use a reference passing mode",
+    span { loc = "param:Decl", message = "entry-point parameter '~param' cannot use the reference passing mode '~mode:ParamPassingMode', because an entry point exchanges values with the pipeline rather than with a caller's memory location" }
 )
 
 err(
