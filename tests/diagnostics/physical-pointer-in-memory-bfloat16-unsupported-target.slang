@@ -10,6 +10,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=BF16): -target wgsl -entry bfloat16Main -stage compute -O0
 //DIAGNOSTIC_TEST:SIMPLE(diag=BF16C): -target wgsl -entry bfloat16ConstantMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=BF16C): -target wgsl -entry bfloat16ConstantMain -stage compute -O0
+//DIAGNOSTIC_TEST:SIMPLE(diag=BF16M): -target wgsl -entry bfloat16MoreMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=BF16M): -target wgsl -entry bfloat16MoreMain -stage compute -O0
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry pointerMain -stage compute
 
 // WGSL and HLSL have no pointers to memory addresses, and WGSL has no bfloat16 type. A pointer read
@@ -137,4 +139,28 @@ void bfloat16ConstantMain(uint3 tid: SV_DispatchThreadID)
     outScalars[tid.x] = BFloat16(1.5);
 //BF16C:              ^ 'BFloat16' is not supported on this target
 //BF16C:              ^ this uses a 'BFloat16' value, and the current code generation target has no bfloat16 type
+}
+
+StructuredBuffer<matrix<BFloat16, 2, 2>> matrices;
+StructuredBuffer<float> floats;
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void bfloat16MoreMain(uint3 tid: SV_DispatchThreadID, uniform BFloat16 scale)
+{
+    // A matrix of `BFloat16`. Its storage is loaded by an instruction without a location, so it
+    // is diagnosed at the nearest use that has one.
+    const matrix<BFloat16, 2, 2> m = matrices[tid.x];
+    outputBuffer[tid.x] = float4(float(m[0][0]), float(m[1][1]), 0, 0);
+//BF16M:                                              ^ 'BFloat16' is not supported on this target
+//BF16M:                                              ^ this uses a 'BFloat16' value, and the current code generation target has no bfloat16 type
+    // A conversion to `BFloat16` at run time.
+    outScalars[tid.x] = BFloat16(floats[tid.x]);
+//BF16M:                        ^ 'BFloat16' is not supported on this target
+//BF16M:                        ^ this uses a 'BFloat16' value, and the current code generation target has no bfloat16 type
+    // A uniform parameter, which WGSL passes in a uniform buffer, so it is diagnosed where it is
+    // read.
+    outputBuffer[tid.x + 1] = float4(float(scale), 0, 0, 0);
+//BF16M:                                  ^ 'BFloat16' is not supported on this target
+//BF16M:                                  ^ this uses a 'BFloat16' value, and the current code generation target has no bfloat16 type
 }
