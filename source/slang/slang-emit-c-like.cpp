@@ -3397,8 +3397,11 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     case kIROp_CastUInt64ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToUInt64:
-        // A target whose handle type no expression converts to or from an integer (Metal's
-        // textures and samplers) emits the cast as a statement; elsewhere it is an expression.
+        // Usually an expression. A target may emit some of these casts as statements instead
+        // (Metal, for opaque handles; see `isOpaqueDescriptorHandleBitsCast`). Such a target must
+        // handle them in `tryEmitInstStmtImpl` and also return `FoldPolicy::Never` for them,
+        // because a folded use only reaches `tryEmitInstExprImpl`. They are not in the list above
+        // because the other targets have no statement form for them.
         if (!tryEmitInstStmtImpl(inst))
         {
             emitInstResultDecl(inst);

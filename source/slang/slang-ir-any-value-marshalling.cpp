@@ -675,8 +675,9 @@ struct AnyValueMarshallingContext
                     if (isMetalTarget(targetRequest) && sizeInBytes == 8)
                     {
                         // Metal: as_type<> can't cast a DescriptorHandle, which is a pointer
-                        // or an opaque texture/sampler. Convert through uint64 using
-                        // CastDescriptorHandleToUInt64, which the Metal emitter lowers.
+                        // or an opaque resource. Convert through uint64 using
+                        // CastDescriptorHandleToUInt64; `isOpaqueDescriptorHandleBitsCast` in
+                        // slang-emit-metal.cpp says how the emitter handles each kind.
                         auto uint64Val = builder->emitIntrinsicInst(
                             builder->getUInt64Type(),
                             kIROp_CastDescriptorHandleToUInt64,
@@ -1217,8 +1218,9 @@ struct AnyValueMarshallingContext
                     if (isMetalTarget(targetRequest) && sizeInBytes == 8)
                     {
                         // Metal: as_type<> can't cast a DescriptorHandle, which is a pointer
-                        // or an opaque texture/sampler. Reconstruct through uint64 using
-                        // CastUInt64ToDescriptorHandle, which the Metal emitter lowers.
+                        // or an opaque resource. Reconstruct through uint64 using
+                        // CastUInt64ToDescriptorHandle; `isOpaqueDescriptorHandleBitsCast` in
+                        // slang-emit-metal.cpp says how the emitter handles each kind.
                         auto srcAddr0 = builder->emitFieldAddress(
                             uintPtrType,
                             anyValueVar,

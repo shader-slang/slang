@@ -143,10 +143,15 @@ static IRType* unwrapDescriptorHandle(IRType* type)
 }
 
 // True for a cast between a `DescriptorHandle<T>` and its `uint64` bits when `T` is a texture,
-// sampler or acceleration structure. Metal spells such a handle as `T` itself, an opaque type that
-// neither a C-style cast nor `as_type` converts to or from an integer, so the cast reinterprets a
-// local through a `thread` pointer instead (see `tryEmitInstStmtImpl`). A handle to a buffer is a
-// pointer on Metal and keeps its C-style cast.
+// texture buffer, sampler or acceleration structure. Metal spells such a handle as `T` itself, an
+// opaque type that neither a C-style cast nor `as_type` converts to or from an integer, so the cast
+// reinterprets a local through a `thread` pointer instead (see `tryEmitInstStmtImpl`). The other
+// handle kinds are buffers, which Metal spells as pointers; they keep their C-style cast in
+// `tryEmitInstExprImpl`.
+//
+// On Metal these casts come only from AnyValue marshalling, which packs a handle only when it is
+// 8 bytes. A `TextureBuffer` handle has no layout on Metal, so a type holding one is rejected
+// before that (E41014); it is listed here so that it gets the opaque treatment if that changes.
 static bool isOpaqueDescriptorHandleBitsCast(IRInst* inst)
 {
     IRType* handleType = nullptr;
@@ -162,13 +167,16 @@ static bool isOpaqueDescriptorHandleBitsCast(IRInst* inst)
         return false;
     }
     auto resourceType = unwrapAttributedType(unwrapDescriptorHandle(handleType));
-    return as<IRTextureTypeBase>(resourceType) || as<IRSamplerStateTypeBase>(resourceType) ||
+    return as<IRTextureTypeBase>(resourceType) || as<IRTextureBufferType>(resourceType) ||
+           as<IRSamplerStateTypeBase>(resourceType) ||
            as<IRRaytracingAccelerationStructureType>(resourceType);
 }
 
 CLikeSourceEmitter::FoldPolicy MetalSourceEmitter::getFoldPolicy(IRInst* inst)
 {
-    // The reinterpretation needs a local to take the address of, so it is a statement.
+    // `tryEmitInstStmtImpl` emits these casts as a declaration followed by a block, which cannot
+    // appear inside an expression. A folded use would reach `tryEmitInstExprImpl` instead, whose
+    // C-style cast is invalid MSL for an opaque handle.
     if (isOpaqueDescriptorHandleBitsCast(inst))
         return FoldPolicy::Never;
     return Super::getFoldPolicy(inst);
@@ -749,20 +757,23 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             if (!isOpaqueDescriptorHandleBitsCast(inst))
                 return false;
 
-            // A texture, sampler or acceleration structure handle is an opaque 64-bit value,
-            // so its bits are read or rebuilt through memory, the same way as
-            // kIROp_MetalCastToDepthTexture above.
+            // An opaque handle is 8 bytes: Slang lays textures, samplers and acceleration
+            // structures out as 8 bytes on Metal (`slang-ir-layout.cpp`), the size of the
+            // `MTLResourceID` (`gpuResourceID`) a host writes into an argument buffer for them.
+            // So its bits are read or rebuilt through memory, the same way as
+            // kIROp_MetalCastToDepthTexture above. The local holds the handle when packing and
+            // the bits when unpacking.
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n{\n");
             m_writer->indent();
-            emitType(inst->getOperand(0)->getDataType(), String("_slang_handle_bits_src"));
+            emitType(inst->getOperand(0)->getDataType(), String("_slang_reinterpret_src"));
             m_writer->emit(" = ");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(";\n");
             m_writer->emit(getName(inst));
             m_writer->emit(" = *(");
             emitType(inst->getDataType());
-            m_writer->emit(" thread*)(&_slang_handle_bits_src);\n");
+            m_writer->emit(" thread*)(&_slang_reinterpret_src);\n");
             m_writer->dedent();
             m_writer->emit("}\n");
             return true;
@@ -938,7 +949,9 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
     case kIROp_CastDescriptorHandleToUInt64:
         {
-            // Metal: DescriptorHandle is a pointer; emit C-style cast to ulong.
+            // Metal: a buffer handle is a pointer; emit a C-style cast to ulong. An opaque handle
+            // is a statement (tryEmitInstStmtImpl) and never folded, so it cannot get here.
+            SLANG_ASSERT(!isOpaqueDescriptorHandleBitsCast(inst));
             // Precedence-wrapped like the kIROp_BitCast case below (#12732).
             EmitOpInfo outerPrec = inOuterPrec;
             bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
@@ -950,7 +963,8 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
     case kIROp_CastUInt64ToDescriptorHandle:
         {
-            // Metal: cast integer back to pointer type.
+            // Metal: cast the integer back to a buffer handle's pointer type (see above).
+            SLANG_ASSERT(!isOpaqueDescriptorHandleBitsCast(inst));
             // Precedence-wrapped like the kIROp_BitCast case below (#12732).
             EmitOpInfo outerPrec = inOuterPrec;
             bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
