@@ -15,32 +15,28 @@ namespace Slang
 // structures. These map to `OpTypeImage`/`OpTypeSampler`/`OpTypeSampledImage`/
 // `OpTypeAccelerationStructureKHR`, none of which may live in a function-local
 // variable.
-static bool isLeafUnstorableOpaqueHandleType(IRType* type)
+static bool isLeafUnstorableOpaqueHandleType(IRInst* type)
 {
     return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
            as<IRSubpassInputType>(type) || type->getOp() == kIROp_GLSLInputAttachmentType ||
            type->getOp() == kIROp_RaytracingAccelerationStructureType;
 }
 
-// Find an opaque handle type (see `isLeafUnstorableOpaqueHandleType`) that cannot
-// live in a function-local variable, recursing into the element/field types of
-// aggregates (arrays, structs, tuples) since storing an aggregate that contains
-// such a handle has the same problem. Returns the leaf handle type if found (for
-// diagnostics), or null otherwise. `visited` guards against cycles in
-// (potentially self-referential) aggregate types, mirroring the peer helper
-// `isOpaqueTypeImpl` in slang-legalize-types.cpp.
-//
-// Note: this is deliberately narrower than `isOpaqueType`. Buffer-backed
-// resources (structured / byte-address buffers) and pointers lower to
-// pointers and *can* be selected through control flow using SPIR-V variable
-// pointers, so they must not be rejected here. `RayQuery`/`HitObject` are also
-// excluded as they are legitimately declared as locals.
-static IRType* findUnstorableOpaqueHandleType(IRType* type, HashSet<IRType*>& visited)
+// Find a type that `isLeaf` matches: `type` itself, or, recursively, the element or field type
+// of an aggregate (array, struct, tuple) that contains it. Returns the matched type (for
+// diagnostics), or null. The type a pointer points to is not searched, because a pointer to a
+// value is not that value. A null `type` is an untyped instruction (a struct key, for example),
+// which contains nothing. `visited` guards against cycles in (potentially self-referential)
+// aggregate types, mirroring the peer helper `isOpaqueTypeImpl` in slang-legalize-types.cpp.
+static IRType* findLeafTypeInAggregate(
+    IRType* type,
+    bool (*isLeaf)(IRInst*),
+    HashSet<IRType*>& visited)
 {
     if (!type)
         return nullptr;
 
-    if (isLeafUnstorableOpaqueHandleType(type))
+    if (isLeaf(type))
         return type;
 
     // Only recurse once per aggregate type to avoid cycling on self-referential
@@ -49,13 +45,13 @@ static IRType* findUnstorableOpaqueHandleType(IRType* type, HashSet<IRType*>& vi
         return nullptr;
 
     if (auto arrayType = as<IRArrayTypeBase>(type))
-        return findUnstorableOpaqueHandleType(arrayType->getElementType(), visited);
+        return findLeafTypeInAggregate(arrayType->getElementType(), isLeaf, visited);
 
     if (auto structType = as<IRStructType>(type))
     {
         for (auto field : structType->getFields())
         {
-            if (auto found = findUnstorableOpaqueHandleType(field->getFieldType(), visited))
+            if (auto found = findLeafTypeInAggregate(field->getFieldType(), isLeaf, visited))
                 return found;
         }
     }
@@ -66,7 +62,7 @@ static IRType* findUnstorableOpaqueHandleType(IRType* type, HashSet<IRType*>& vi
         {
             if (auto elementType = as<IRType>(tupleType->getOperand(i)))
             {
-                if (auto found = findUnstorableOpaqueHandleType(elementType, visited))
+                if (auto found = findLeafTypeInAggregate(elementType, isLeaf, visited))
                     return found;
             }
         }
@@ -75,10 +71,24 @@ static IRType* findUnstorableOpaqueHandleType(IRType* type, HashSet<IRType*>& vi
     return nullptr;
 }
 
-static IRType* findUnstorableOpaqueHandleType(IRType* type)
+static IRType* findLeafTypeInAggregate(IRType* type, bool (*isLeaf)(IRInst*))
 {
     HashSet<IRType*> visited;
-    return findUnstorableOpaqueHandleType(type, visited);
+    return findLeafTypeInAggregate(type, isLeaf, visited);
+}
+
+// Find an opaque handle type (see `isLeafUnstorableOpaqueHandleType`) that cannot
+// live in a function-local variable, also inside an aggregate, since storing an
+// aggregate that contains such a handle has the same problem.
+//
+// Note: this is deliberately narrower than `isOpaqueType`. Buffer-backed
+// resources (structured / byte-address buffers) and pointers lower to
+// pointers and *can* be selected through control flow using SPIR-V variable
+// pointers, so they must not be rejected here. `RayQuery`/`HitObject` are also
+// excluded as they are legitimately declared as locals.
+static IRType* findUnstorableOpaqueHandleType(IRType* type)
+{
+    return findLeafTypeInAggregate(type, isLeafUnstorableOpaqueHandleType);
 }
 
 /// Return the innermost element type stored by a local variable after removing attributed wrappers
@@ -426,16 +436,12 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     }
 }
 
-// A physical pointer is a `T*`: a `Ptr` in the `UserPointer` address space, which holds a raw
-// memory address (`isUserPointerType`). The diagnostics call it a "pointer to a memory address".
-// Parameter-passing types such as `RefParam` also use the `UserPointer` address space, but they
-// are other types than `Ptr`, so they are not physical pointers.
-static bool isPhysicalPointerType(IRType* type)
-{
-    return isUserPointerType(type);
-}
+// The physical pointer check below matches `isUserPointerType`: a `T*`, a `Ptr` in the
+// `UserPointer` address space, which holds a raw memory address. The diagnostics call it a
+// "pointer to a memory address". The parameter-passing types (`RefParam` and the like) also use
+// that address space, but they are not `Ptr`s, so `isUserPointerType` does not match them.
 
-static bool isBFloat16ScalarVectorOrMatrixType(IRType* type)
+static bool isBFloat16ScalarVectorOrMatrixType(IRInst* type)
 {
     if (auto vectorType = as<IRVectorType>(type))
         type = vectorType->getElementType();
@@ -444,55 +450,25 @@ static bool isBFloat16ScalarVectorOrMatrixType(IRType* type)
     return type->getOp() == kIROp_BFloat16Type;
 }
 
-// Whether `type` matches `isLeaf`, or contains a type that does as a struct field, an array
-// element or a tuple element. Unlike `findUnstorableOpaqueHandleType`, the type a pointer points
-// to is never searched: a pointer to a `BFloat16` is not itself a `BFloat16` value, and the
-// physical pointer check relies on a pointer-typed operand being a carrier, whatever it points to.
-static bool aggregateContainsType(
-    IRType* type,
-    bool (*isLeaf)(IRType*),
-    HashSet<IRType*>& visited)
+static bool isAnyPointerType(IRInst* type)
 {
-    if (!type)
-        return false;
-    if (isLeaf(type))
-        return true;
-    if (!visited.add(type))
-        return false;
-    if (auto arrayType = as<IRArrayTypeBase>(type))
-        return aggregateContainsType(arrayType->getElementType(), isLeaf, visited);
-    if (auto structType = as<IRStructType>(type))
-    {
-        for (auto field : structType->getFields())
-        {
-            if (aggregateContainsType(field->getFieldType(), isLeaf, visited))
-                return true;
-        }
-    }
-    if (auto tupleType = as<IRTupleTypeBase>(type))
-    {
-        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
-        {
-            if (aggregateContainsType(as<IRType>(tupleType->getOperand(i)), isLeaf, visited))
-                return true;
-        }
-    }
-    return false;
+    return as<IRPtrTypeBase>(type) != nullptr;
 }
 
-static bool aggregateContainsType(IRType* type, bool (*isLeaf)(IRType*))
+static bool aggregateContainsType(IRType* type, bool (*isLeaf)(IRInst*))
 {
-    HashSet<IRType*> visited;
-    return aggregateContainsType(type, isLeaf, visited);
+    return findLeafTypeInAggregate(type, isLeaf) != nullptr;
 }
 
-// Whether an operand of `inst` is a constant whose type contains one that `isLeaf` matches.
-// Constants (`nullptr`, a folded `BFloat16` literal, a vector built from such literals) are
-// hoisted to module scope, where `reportOncePerLocation` does not visit them, and every user of
-// one has an operand that carries the type, so no user counts as an introduction. Each user of
-// such a constant is reported instead. The module-scope values that `reportOncePerLocation` visits
-// itself (global parameters, constants and variables, functions) are not counted here.
-static bool usesConstantOfType(IRInst* inst, bool (*isLeaf)(IRType*))
+// Whether an operand of `inst` is a hoisted constant whose type contains one that `isLeaf`
+// matches. Constants (`nullptr`, a folded `BFloat16` literal, a vector built from such literals)
+// are hoisted to module scope, where `reportOncePerLocation` does not visit them, and every user
+// of one has an operand that carries the type, so no user counts as an introduction. Each user of
+// such a constant is reported instead. The other module-scope operands are skipped: global
+// parameters, global constants, global variables and functions (`IRGlobalValueWithCode`) and
+// generics are visited by `reportOncePerLocation` themselves, and the rest (types, struct keys,
+// witness tables) have no value of the type.
+static bool usesConstantOfType(IRInst* inst, bool (*isLeaf)(IRInst*))
 {
     for (UInt i = 0; i < inst->getOperandCount(); i++)
     {
@@ -508,9 +484,12 @@ static bool usesConstantOfType(IRInst* inst, bool (*isLeaf)(IRType*))
     return false;
 }
 
-static bool isAnyPointerType(IRType* type)
+// The function that `param` is a parameter of, or null for a block parameter (a phi).
+static IRFunc* getParamFunc(IRParam* param)
 {
-    return as<IRPtrTypeBase>(type) != nullptr;
+    auto block = as<IRBlock>(param->getParent());
+    auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
+    return func && func->getFirstBlock() == block ? func : nullptr;
 }
 
 // Whether the arguments of `func` can come from outside the module: an entry point, or a function
@@ -523,11 +502,14 @@ static bool isCalledFromOutsideModule(IRFunc* func)
 
 // Whether `inst` introduces a value whose type contains one that `isLeaf` matches: whether it is
 // where such a value enters the program, rather than passing along a value that entered it
-// elsewhere. Both checks below report exactly the introductions, so each unsupported value is
-// reported once. `isCarrier` matches the operand types that pass such a value along: `isLeaf`
-// itself, or for physical pointers any pointer type, because address-space specialization can
-// give the same pointer value another address space (a `T*` parameter can become a `Function`
-// pointer, for example).
+// elsewhere. Reporting the introductions reports each unsupported value once, where it enters.
+// `isCarrier` matches the operand types that pass such a value along: `isLeaf` itself, or for
+// physical pointers any pointer type, because address-space specialization can give the same
+// pointer value another address space (a `T*` parameter can become a `Function` pointer, for
+// example). For pointers this over-approximates: an instruction that makes a `T*` from an
+// unrelated pointer operand is not an introduction. That can move a diagnostic but not lose it,
+// because `reportOncePerLocation` reports a `T*` that is left in the module when no introduction
+// was found.
 //
 // The introductions, and why everything else passes a value along:
 // - A value computed from operands that carry the type passes them along. This covers field and
@@ -535,24 +517,26 @@ static bool isCalledFromOutsideModule(IRFunc* func)
 // - The parameters of an entry point or of an exported function (`[keepAlive]`, e.g. `export` in
 //   an HLSL library) are set outside the module, so they are introductions. The parameters of
 //   another function pass along the arguments of its call sites, which are reported in the
-//   caller.
+//   caller. Phi elimination has run, so there are no block parameters; one that is left is
+//   treated as an introduction.
 // - A call result passes along what the callee returns, which is reported in the callee, if the
 //   callee has a body. A callee without a body (an intrinsic) has nothing to report, so its result
 //   is an introduction unless an argument carries the type, as for any other instruction.
-// - An uninitialized value holds nothing yet.
 // - A module-scope constant is an introduction (a global constant here; a hoisted literal at each
 //   of its users, see `usesConstantOfType`).
 // - A load introduces the value it reads, except from a local or module-scope variable (which
-//   reads back a value stored there earlier), from an `inout`/`out` parameter of a function whose
-//   callers are all in the module (which reads the caller's value), and through a physical
-//   pointer (already reported). The root address is checked rather than the address space of the
-//   pointer type, because some locals have none: every local on HLSL, and the temporaries that phi
-//   elimination creates.
+//   reads back a value stored there earlier), through a physical pointer (already reported), and
+//   through any pointer-typed parameter of a function whose callers are all in the module. Such a
+//   parameter (`inout`, `out`, `constref` and the other parameter-passing types, or a pointer) is
+//   an address that the caller passes, so the load reads a value that was reported in the caller.
+//   The root address is checked rather than the address space of the pointer type, because some
+//   locals have none: every local on HLSL, and the temporaries that phi elimination creates.
 // Addresses derived from logical storage (`&buffer[i]`, `groupshared` variables) are not
-// reported, even when they have a `T*` type. That is sound only because such addresses cannot
-// reach these targets as values: `operator&` and `__getAddress` are capability-gated off HLSL and
-// WGSL (`core.meta.slang`), so a `T*` value always comes from one of the introductions above.
-static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*isCarrier)(IRType*))
+// introductions, even when they have a `T*` type: `operator&` and `__getAddress` are
+// capability-gated off HLSL and WGSL (`core.meta.slang`). That gate is checked for the code that
+// the entry points reach, so an exported function that no entry point calls can still return
+// `&global` as a `T*`; `reportOncePerLocation` reports that pointer when nothing else is reported.
+static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRInst*), bool (*isCarrier)(IRInst*))
 {
     if (!aggregateContainsType(inst->getDataType(), isLeaf))
         return false;
@@ -560,11 +544,8 @@ static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*
     {
     case kIROp_Param:
         {
-            auto block = as<IRBlock>(inst->getParent());
-            auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
-            // Phi elimination has run, so every parameter is a function parameter.
-            SLANG_ASSERT(func && func->getFirstBlock() == block);
-            return func && func->getFirstBlock() == block && isCalledFromOutsideModule(func);
+            auto func = getParamFunc(as<IRParam>(inst));
+            return !func || isCalledFromOutsideModule(func);
         }
     case kIROp_GlobalConstant:
         return true;
@@ -575,22 +556,16 @@ static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*
                 return false;
             break;
         }
-    // An uninitialized value holds no pointer or `BFloat16` value yet, such as a local struct with
-    // a pointer field that is never set.
-    case kIROp_LoadFromUninitializedMemory:
-    case kIROp_Poison:
-        return false;
     case kIROp_Load:
         {
             auto address = inst->getOperand(0);
             auto root = getRootAddr(address);
             if (as<IRVar>(root) || as<IRGlobalVar>(root) ||
-                isPhysicalPointerType(address->getDataType()))
+                isUserPointerType(address->getDataType()))
                 return false;
             if (auto param = as<IRParam>(root))
             {
-                auto block = as<IRBlock>(param->getParent());
-                auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
+                auto func = getParamFunc(param);
                 if (func && !isCalledFromOutsideModule(func) &&
                     as<IRPtrTypeBase>(param->getDataType()))
                     return false;
@@ -608,33 +583,88 @@ static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*
     return true;
 }
 
+// The location of `inst`, or else of the nearest instruction that uses it, directly or through
+// other uses. Lowering and legalization can create an instruction without a location: the pointer
+// that `bit_cast` makes, or the load of a `BFloat16` matrix's storage struct and the extractions
+// from it, for example.
+static SourceLoc findNearestUseLoc(IRInst* inst)
+{
+    List<IRInst*> worklist;
+    HashSet<IRInst*> seen;
+    worklist.add(inst);
+    seen.add(inst);
+    for (Index i = 0; i < worklist.getCount(); i++)
+    {
+        auto current = worklist[i];
+        if (current->sourceLoc.isValid())
+            return current->sourceLoc;
+        for (auto use = current->firstUse; use; use = use->nextUse)
+        {
+            if (seen.add(use->getUser()))
+                worklist.add(use->getUser());
+        }
+    }
+    return SourceLoc();
+}
+
 // Calls `diagnose(loc)` for each instruction that `introduces` matches, among the global
 // parameters, the module-scope constants, the instructions of global variable initializers and
 // those of each function (including the function a module-level generic returns, as
 // `checkUnsupportedInst` does). Specialization and inlining copy an instruction's location to
-// every copy, so each location is diagnosed once. Instructions without a location (some are
-// created by legalization) are diagnosed once, without a location, and only if nothing else was:
-// emitting them would produce invalid code or abort the emitter.
+// every copy, so each location is diagnosed once.
+//
+// If no introduction is reported, but a type that `isLeaf` matches is still declared in the
+// module (as a struct field, a global or local variable, a parameter or a function result), the
+// first declaration that has it is reported instead, once, and without a location if it has none
+// (as is an introduction that has no location). Emitting that declaration would produce invalid
+// code or abort the emitter. This covers a pointer field that is never read, a pointer variable
+// that is never assigned, and a `T*` made from logical storage in an exported function. Other
+// instructions are not considered: an address derived from logical storage can have a `T*` type
+// (the field address of a `RefParam`, for example), but it is emitted as part of an expression,
+// not as a pointer.
 template<typename Introduces, typename Diagnose>
 static void reportOncePerLocation(
     IRModule* module,
+    bool (*isLeaf)(IRInst*),
     const Introduces& introduces,
     const Diagnose& diagnose)
 {
     HashSet<SourceLoc::RawValue> diagnosedLocations;
-    bool foundWithoutLocation = false;
+    bool typeIsPresent = false;
+    SourceLoc firstLocWithType;
+    auto noteType = [&](IRType* type, SourceLoc loc)
+    {
+        if (!aggregateContainsType(type, isLeaf))
+            return;
+        typeIsPresent = true;
+        if (!firstLocWithType.isValid())
+            firstLocWithType = loc;
+    };
     auto visit = [&](IRInst* inst)
     {
+        if (as<IRParam>(inst) || as<IRGlobalParam>(inst))
+            noteType(inst->getDataType(), inst->sourceLoc);
+        else if (auto var = as<IRVar>(inst))
+            noteType(var->getDataType()->getValueType(), inst->sourceLoc);
         if (!introduces(inst))
             return;
-        auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
-        if (!loc.isValid())
-            foundWithoutLocation = true;
-        else if (diagnosedLocations.add(loc.getRaw()))
+        typeIsPresent = true;
+        auto loc = findNearestUseLoc(inst);
+        if (loc.isValid() && diagnosedLocations.add(loc.getRaw()))
             diagnose(loc);
     };
     for (auto globalInst : module->getGlobalInsts())
     {
+        if (auto structType = as<IRStructType>(globalInst))
+        {
+            for (auto field : structType->getFields())
+            {
+                auto key = field->getKey();
+                auto loc = key->sourceLoc.isValid() ? key->sourceLoc : field->sourceLoc;
+                noteType(field->getFieldType(), loc);
+            }
+            continue;
+        }
         if (as<IRGlobalParam>(globalInst) || as<IRGlobalConstant>(globalInst))
         {
             visit(globalInst);
@@ -642,7 +672,10 @@ static void reportOncePerLocation(
         }
         if (auto globalVar = as<IRGlobalVar>(globalInst))
         {
-            // The instructions of an initializer that is still attached to its variable.
+            noteType(globalVar->getDataType()->getValueType(), globalVar->sourceLoc);
+            // An initializer that is still at module scope (HLSL keeps some there). The others
+            // have been moved into the entry points by `moveGlobalVarInitializationToEntryPoints`,
+            // and are visited with the entry points' instructions.
             for (auto block : globalVar->getBlocks())
             {
                 for (auto inst : block->getChildren())
@@ -655,36 +688,38 @@ static void reportOncePerLocation(
             func = as<IRFunc>(findGenericReturnVal(generic));
         if (!func)
             continue;
+        noteType(func->getResultType(), func->sourceLoc);
         for (auto block : func->getBlocks())
         {
             for (auto inst : block->getChildren())
                 visit(inst);
         }
     }
-    if (foundWithoutLocation && diagnosedLocations.getCount() == 0)
-        diagnose(SourceLoc());
+    if (diagnosedLocations.getCount() == 0 && typeIsPresent)
+        diagnose(firstLocWithType);
 }
 
 void checkUnsupportedPhysicalPointers(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
-    // HLSL, DXIL and WGSL have no physical pointers. The other targets do: SPIR-V has physical
-    // storage buffer pointers, GLSL buffer references, Metal device pointers, and CUDA and C++
-    // native pointers.
+    // The D3D targets (HLSL, DXBC, DXIL) and the WebGPU targets (WGSL, also when compiled on to
+    // SPIR-V) have no physical pointers.
     if (!isWGPUTarget(target) && !isD3DTarget(target))
         return;
 
     reportOncePerLocation(
         module,
+        isUserPointerType,
         [](IRInst* inst)
         {
-            // A physical pointer is introduced by a cast from an integer address, by `nullptr` (a
-            // hoisted constant, so it is found among the operands), or as any other value that
-            // `introducesValueOfType` finds, such as a pointer loaded from memory.
+            // A cast from an integer address makes a pointer to a memory address whatever the
+            // address space of its result, so it is reported even when that is not `UserPointer`
+            // (a cast to a `groupshared` pointer, for example).
             if (inst->getOp() == kIROp_CastIntToPtr)
                 return true;
-            if (usesConstantOfType(inst, isPhysicalPointerType))
+            // `nullptr` is a hoisted constant, so it is found among the operands.
+            if (usesConstantOfType(inst, isUserPointerType))
                 return true;
-            return introducesValueOfType(inst, isPhysicalPointerType, isAnyPointerType);
+            return introducesValueOfType(inst, isUserPointerType, isAnyPointerType);
         },
         [&](SourceLoc loc)
         { sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = loc}); });
@@ -692,12 +727,13 @@ void checkUnsupportedPhysicalPointers(IRModule* module, TargetRequest* target, D
 
 void checkUnsupportedBFloat16(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
-    // WGSL has no bfloat16 type.
+    // The WebGPU targets (WGSL, also when compiled on to SPIR-V) have no bfloat16 type.
     if (!isWGPUTarget(target))
         return;
 
     reportOncePerLocation(
         module,
+        isBFloat16ScalarVectorOrMatrixType,
         [](IRInst* inst)
         {
             // A folded `BFloat16` literal is a hoisted constant, found among the operands.
