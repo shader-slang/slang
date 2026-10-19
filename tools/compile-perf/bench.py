@@ -1166,6 +1166,8 @@ def main():
                      f"(only --prepare runs without them)")
 
     specs = manifest.WORKLOADS
+    if not args.only:
+        specs = [s for s in specs if not s.opt_in]
     if not args.api and not args.only:
         specs = [s for s in specs if s.mode != "api"]
     # Platform-bound workloads (downstream toolchains like dxc/nvrtc) leave the

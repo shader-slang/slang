@@ -1,7 +1,8 @@
 # Slang compile-time performance suite
 
 A harness that measures **compiler time** (how long `slangc` takes to compile),
-not GPU/runtime performance — built to **detect and localize compile-time
+with GPU/runtime measurements collected separately by `tools/runtime-perf` and
+published on the same report site. The compilation suite is built to **detect and localize compile-time
 regressions** and replay the measurement across historical Slang releases.
 
 Motivation: a compile-time slowdown was observed building Slang for Falcor.
@@ -204,7 +205,7 @@ other workload in the suite measures.
 > One axis per workload is not a stylistic preference here. A mixed
 > "kitchen sink" cross-target shader was tried first and **failed**: a shared
 > super-linear front-end cost dominated it and flattened a 21× cuda/spirv
-> divergence to 1.1×. See `COVERAGE-ANALYSIS.md`.
+> divergence to 1.1×.
 
 | Test                   | Targets                        | What it generates                                                  | Isolates                                                                                                                                                                                         | Primary timers                                     |
 | ---------------------- | ------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
@@ -420,6 +421,10 @@ via `--results <checkout-path>`.
 | `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
 | `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
 
+The publishing nightly also exports compile-performance results for BenchView;
+the benchmark host handles collection and delivery. Export failures do not block
+existing reports. For local or historical exports, see `python3 benchview.py --help`.
+
 ---
 
 ## Notes / caveats
@@ -488,3 +493,8 @@ the createGlobalSession delta, then each tracked workload's OWN memory
 (its peak minus the same point's floor for its mode, the pure workload
 signal) — because memory components do not tile a total and a stacked
 area would lie.
+
+The same BenchView host export includes archived runtime attempts via
+`benchview.py --runtime-manifest <attempt>/run.json`. Runtime, matched reference
+and paired compile observations share the Slang project under `runtime-perf`;
+see [the integration design](DESIGN.md#benchview-integration).

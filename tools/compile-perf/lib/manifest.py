@@ -94,6 +94,9 @@ class WorkloadSpec:
     api_cmd: str = None
     api_root: str = None
     api_flags: list = field(default_factory=list)
+    # Prototype paired runtime cases are available through --only without
+    # silently extending the established compile-only nightly corpus.
+    opt_in: bool = False
 
 
 # Standard target invocation avoids GPU drivers and stays comparable across
@@ -712,8 +715,8 @@ WORKLOADS = [
     # (gen_codegen) contains none of the constructs the target-specific passes
     # are gated on, so all six targets agree to within 1.18x. SPIR-V is carried
     # in every family as the control, since it is what every other workload in
-    # the suite measures. See COVERAGE-ANALYSIS.md for the measurements and for
-    # why a single mixed cross-target shader was rejected.
+    # the suite measures. A mixed cross-target shader was rejected because its
+    # shared front-end cost masked the target-specific back-end differences.
     #
     # Loads in one function: deferBufferLoad + simplifyNonSSAIR. Targets that
     # move globals into an explicit global context (CUDA) turn every parameter
@@ -920,6 +923,12 @@ WORKLOADS = [
         sweep_sizes=[100, 200, 400, 800],
     ),
 ]
+
+from . import runtime_workloads
+
+for _paired in runtime_workloads.compile_specs(WorkloadSpec):
+    _paired.opt_in = True
+    WORKLOADS.append(_paired)
 
 BY_NAME = {w.name: w for w in WORKLOADS}
 

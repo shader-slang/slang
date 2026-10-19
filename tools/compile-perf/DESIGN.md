@@ -35,6 +35,115 @@ on Windows). See `README.md` Quickstart for copy-paste commands.
 
 ## CI workflows
 
+### Shared runtime reporting and schedule
+
+`nightly-mdl-perf-test.yml` collects the existing runtime suite after compile
+measurements and confirmation, using the same ToT build, commit, and daily label.
+It retains the daily 05:00 UTC schedule, results repository, manual dispatch, and
+Pages deployment. Nightly and release-sweep workflows share a concurrency group
+so their measurements cannot overlap. No separate scheduled publisher is added.
+
+`tools/runtime-perf/nightly.py` archives immutable attempts under
+`daily/<label>/runtime/<run-id>-<attempt>/`. `run.json` records compiler and suite
+commits, expected backend coverage, selected calibration, commands, and failures.
+Vulkan and D3D12 require all 23 cases; CUDA requires the 20 compute cases (OptiX is
+outside this suite). The first run calibrates on its actual GPU. Later runs reuse
+compatible dimensions; runtime comparisons reject incompatible environments,
+workloads, harnesses, RHI versions, scene contracts, or measurement policies.
+A setup failure produces a failed manifest rather than successful empty coverage.
+
+The existing `report.py` renders the **GPU runtime** section through
+`runtime_report.py`. The landing page is titled **Slang performance**; existing
+compile report URLs are preserved and **API & RT compilation** is labeled
+explicitly. The runtime landing page lists each subtest and its backends, linking to a page
+with daily and main-release graphs for that subtest. Each backend/cadence has two graphs: GPU execution time combines suite Slang,
+matched-run Slang and equivalent reference; compilation time combines paired CLI
+wall time and internal compiler time. Runtime curves label their element counts,
+and only matching dimensions support direct reference comparisons. Changed
+measurement contracts produce separate curves on the same axes, and failed/missing points break lines. Tooltips show exact values. Raw run
+pages retain dispersion, phase/setup observations and downloadable bundles.
+The nightly also runs the six existing equivalent reference cases after primary
+measurements. Those paired comparisons are separately calibrated within each run;
+primary daily comparisons use the frozen normal-suite calibration. No tuned
+candidate is silently promoted to a nightly target.
+
+Both publishing workflows regenerate the runtime section from archived data.
+Compile-only history needs no migration. Failed/unsupported/missing measurements
+remain visible; valid compile results survive runtime failures. `publish=false`
+archives both suites without changing the results repository or Pages. Runtime
+coverage is enforced after publication. Performance deltas are advisory until
+repeat measurements on the CI GPU establish suitable confirmation thresholds.
+The compile suite's existing alert policy is unchanged.
+
+The Windows measurement host needs GPU access, Vulkan and D3D12, a CUDA toolkit
+with `CUDA_PATH` pointing to NVRTC, and `dxc` and `glslangValidator` on PATH for
+references. The workflow verifies a single NVIDIA GPU and records its name, UUID,
+and driver. Runner labels do not prove the VM exposes these capabilities: setup
+or coverage failures remain failures, with diagnostics archived. RTX 4090 local
+results cannot serve as the RTX 5090 machine's calibration.
+
+### BenchView integration
+
+The nightly uses the host-collection export introduced by
+[PR #13625](https://github.com/shader-slang/slang/pull/13625). Both suites are
+exported through `benchview.py --runtime-manifest <attempt>/run.json` into the
+same `benchview-export/submissions.json`. The shared exporter writes
+`submissions.ready` atomically only after the bounded bundle is complete. The
+existing versioned wrapper kind remains unchanged for host compatibility.
+The benchmark host owns validation, credentials, delivery and retries; the public
+workflow contains no BenchView URL, write key or HTTP client. A ready marker
+indicates export completion, not successful ingestion.
+
+`runtime_benchview.py` converts archived measurements into suite `runtime-perf`
+under the shared `slang` project. Each test uses `runtime-perf/<workload>`.
+Case dimensions identify backend, implementation, suite/matched-reference/
+compilation measurement, workload dimensions and the measurement-contract hash.
+The contract retains GPU, driver, source, harness, timer policy and scene identity,
+so incompatible measurements cannot silently become a connected trend. Compiler
+revision remains the independent variable. Original records are retained as
+artifacts; phase/setup diagnostics are not falsely represented as additive GPU
+or host breakdowns.
+
+GPU execution exports the original `gpu_iteration_ms` samples. Matched reference
+observations retain their own Slang samples at the same dimensions, independently
+of the larger suite measurement. Paired compile observations reuse the compile
+adapter's raw wall/internal timings, phase allocation and metric limits, with a
+separate stage dimension for multi-stage workloads. Compilation is exported once
+per source stage, not duplicated for each reference. Failed/unstable runtime
+results retain status and diagnostics without successful timing curves; valid
+paired compilation remains independently exportable. Unsupported measurements
+retain their original reason in the failed observation's source record.
+
+The export uses the archived measurement timestamp, full tested compiler SHA and
+immutable attempt identity. Replay keys are deterministic. Main-release archives
+use `run.metadata.release.label`; daily runs omit it. The combined CLI rejects
+mismatched compiler revisions or release metadata. Summary-only records cannot
+be converted into invented samples. The request batching and 64-batch / 8 MiB
+host-bundle limits are shared with compile-perf. Conversion or write failure
+invalidates readiness, and the workflow reports export failures without blocking
+existing HTML publication.
+
+Standalone runtime/release replay uses:
+
+```sh
+python tools/compile-perf/runtime_benchview.py --manifest <attempt>/run.json \
+  --os Windows --output benchview-export
+```
+
+The intended BenchView view matches the HTML report's combined runtime and
+compile graphs. Local tests cover conversion, replay, failures and reference
+dimensions. Host collector acceptance of the runtime suite and deployed graph
+rendering remain end-to-end checks; successful local export does not establish
+those capabilities. Automated runtime release backfill remains separate work.
+
+Remaining reporting extensions are cached runtime measurements of the last five
+main releases (excluding patches), and
+independently confirmed, frozen optimized reference targets. These do not alter
+the current workload set. The previous local release study remains a separate
+artifact until compatible runtime release bundles are archived by CI. Runtime
+confirmation/gating must use measured CI noise and interleaved reruns, not reuse
+the 5% within-run stability allowance as a regression threshold.
+
 Both run on the dedicated, quiesced NVIDIA RGFX perf pool, reached through the
 VM-based GitHub bridge (labels `[Windows, X64, nvrgfx-perf-kernelvm-bridge]`;
 the pre-VM `nvrgfx` runner group + `nvrgfx-perf` label pair was retired
@@ -408,3 +517,18 @@ perf runner; only pursue if Phases 1–2 prove insufficient.
 ladder as the internal benchmark's data (2026.5.2, 2026.12, 2026.12.2,
 `f4975a7`) and confirm they reproduce both signals (the release-boundary jump
 and the 2026-07-03 step). If they do, the dimension is captured.
+
+### Runtime release archives
+
+The shared report reads both `daily/<label>/runtime/<attempt>/run.json` and
+`releases/<tag>/runtime/<attempt>/run.json`, with the same bundle layout. A runner
+built against a release package can archive a main-release point with
+`tools/runtime-perf/nightly.py --kind release --label vYYYY.N` and the normal
+collector arguments. Patch tags are rejected by the collector and excluded from
+release charts. Automated release-package backfill remains separate from rendering.
+
+Each subtest page shows the last 30 daily labels and the last five main-release
+tags available for its backend. Release tags are sorted numerically. The latest
+attempt for a label is shown, including a failed attempt; earlier attempts remain
+in the raw archive. Compilation charts keep individual image stages separate.
+One-time reference compilation is not plotted as a repeated compile benchmark.
