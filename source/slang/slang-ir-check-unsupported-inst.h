@@ -17,24 +17,26 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
 void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
 
 /// Diagnose physical pointers (`T*`, a `Ptr` in the `UserPointer` address space, which holds a
-/// memory address) on WGSL and the D3D targets, which have none. Each pointer value is reported
-/// once, where it enters the program: a cast from an integer address, `nullptr` (at each use), a
-/// pointer (or a struct or array containing one) loaded from memory, a module-scope constant, a
-/// global parameter, a parameter of an entry point or of an exported function, or the result of a
-/// call to a function without a body. A value passed to a function, returned from one, or stored
-/// in a local or module-scope variable and read back is not reported again. Each source location
-/// is reported once.
+/// memory address) on the D3D targets (HLSL, DXBC, DXIL) and the WebGPU targets (WGSL, also when
+/// compiled on to SPIR-V), which cannot represent them. A program that would emit a physical
+/// pointer is diagnosed, so it does not reach the emitter. Each pointer value is reported once,
+/// where it enters the program (not again where it is passed to a function or stored and read
+/// back), and each source location once.
 ///
-/// This validation is required regardless of the selected optimization mode.
+/// This must run after specialization, inlining, phi elimination and address-space
+/// specialization, and after uniform parameters are moved into constant buffers. It is required
+/// regardless of the selected optimization mode.
 void checkUnsupportedPhysicalPointers(
     IRModule* module,
     TargetRequest* target,
     DiagnosticSink* sink);
 
 /// Diagnose `BFloat16` values (scalars, vectors and matrices, also inside structs and arrays) on
-/// WGSL, which has no bfloat16 type, where they enter the program, in the same way as
-/// `checkUnsupportedPhysicalPointers` (a `BFloat16` literal at each use, like `nullptr`).
+/// the WebGPU targets, which have no bfloat16 type. A program that would emit a `BFloat16` is
+/// diagnosed, so it does not reach the emitter. Each value is reported once, where it enters the
+/// program, and each source location once.
 ///
-/// This validation is required regardless of the selected optimization mode.
+/// The pipeline position is the same as for `checkUnsupportedPhysicalPointers`, and this is also
+/// required regardless of the selected optimization mode.
 void checkUnsupportedBFloat16(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
 } // namespace Slang
