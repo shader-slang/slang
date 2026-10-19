@@ -223,10 +223,11 @@ jobs:
     # and the run step's own timeout below is the hard stop for it.
     timeout-minutes: 420
     steps:
+      # pwsh, not bash: common-setup is what puts Git Bash on PATH.
       - name: Record the job start
         id: start
-        shell: bash
-        run: echo "at=$(date -u +%s)" >> "$GITHUB_OUTPUT"
+        shell: pwsh
+        run: echo "at=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" >> $env:GITHUB_OUTPUT
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
