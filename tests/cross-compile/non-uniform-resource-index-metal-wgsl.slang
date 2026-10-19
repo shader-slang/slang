@@ -17,6 +17,15 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=WGSL_UNBOUNDED): -target wgsl -stage compute -entry computeMain -DUNBOUNDED
+// Runs 4-6 repeat runs 1-3 and only check that no `NonUniformResourceIndex` is left anywhere in
+// the output: in the checks above, a `{{.*}}` could match across a call that was not dropped.
+//TEST:SIMPLE(filecheck=NOCALL): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=NOCALL): -target wgsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=NOCALL): -target wgsl -stage compute -entry computeMain -DUNBOUNDED
+
+// NOCALL-NOT: NonUniformResourceIndex
+// NOCALL: computeMain
+// NOCALL-NOT: NonUniformResourceIndex
 
 #ifdef UNBOUNDED
 Texture2D textures[];
