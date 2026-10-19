@@ -67,7 +67,7 @@ fn _slang_nonConstU32(x : u32) -> u32
 // Returns false if `inst` is not made only of 32-bit integer literals (e.g. a 16-bit or 64-bit
 // literal, or a value computed at run time); `outWords` then holds an incomplete list and must
 // not be used.
-static bool getConstantBitCastWords(IRInst* inst, List<uint32_t>& outWords)
+static bool tryCollectConstantU32Words(IRInst* inst, List<uint32_t>& outWords)
 {
     if (auto intLit = as<IRIntLit>(inst))
     {
@@ -83,19 +83,18 @@ static bool getConstantBitCastWords(IRInst* inst, List<uint32_t>& outWords)
     case kIROp_MakeVector:
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
-            if (!getConstantBitCastWords(inst->getOperand(i), outWords))
+            if (!tryCollectConstantU32Words(inst->getOperand(i), outWords))
                 return false;
         }
         return true;
     case kIROp_MakeVectorFromScalar:
         {
-            auto vectorType = as<IRVectorType>(inst->getDataType());
-            auto count = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
-            if (!count)
-                return false;
-            for (IRIntegerValue i = 0; i < count->getValue(); i++)
+            // Vector types are fully specialized by emit time (`getIntVal` fails loudly if not).
+            auto vectorType = cast<IRVectorType>(inst->getDataType());
+            auto count = getIntVal(vectorType->getElementCount());
+            for (IRIntegerValue i = 0; i < count; i++)
             {
-                if (!getConstantBitCastWords(inst->getOperand(0), outWords))
+                if (!tryCollectConstantU32Words(inst->getOperand(0), outWords))
                     return false;
             }
             return true;
@@ -109,8 +108,12 @@ static bool getConstantBitCastWords(IRInst* inst, List<uint32_t>& outWords)
 // values and at least one of the resulting values is NaN or infinity. WGSL would evaluate such a
 // bitcast as a const-expression and reject the shader, so the emitter must keep it out of const
 // evaluation. On success `outWords` holds the constant 32-bit words of `operand`; otherwise its
-// contents are unspecified. This looks at the IR (the target type and the constant operand), so
-// it applies to the `asfloat` intrinsics and to a `kIROp_BitCast` alike.
+// contents are unspecified.
+//
+// Handled shapes: `toType` is `f32` or a vector of `f32`, and `operand` is a 32-bit integer
+// literal or a vector of them (`MakeVector` or `MakeVectorFromScalar`) with one word per element
+// of `toType`, as `asfloat` guarantees. Returning false means the bitcast is finite or is not one
+// of these shapes: `f16` and `f64` targets and 16- or 64-bit literals are not handled here.
 static bool tryGetNonFiniteConstantBitCastWords(
     IRType* toType,
     IRInst* operand,
@@ -120,7 +123,7 @@ static bool tryGetNonFiniteConstantBitCastWords(
     auto elementType = getVectorElementType(toType);
     if (!elementType || elementType->getOp() != kIROp_FloatType)
         return false;
-    if (!getConstantBitCastWords(operand, outWords))
+    if (!tryCollectConstantU32Words(operand, outWords))
         return false;
     for (auto word : outWords)
     {
@@ -136,11 +139,6 @@ bool WGSLSourceEmitter::tryEmitNonFiniteConstantBitCast(IRType* toType, IRInst* 
     List<uint32_t> words;
     if (!tryGetNonFiniteConstantBitCastWords(toType, operand, words))
         return false;
-    // The helper call must not end up in a module-scope initializer, which WGSL requires to be a
-    // const-expression. Module-scope initializers are folded into their uses or moved into the
-    // entry points by `moveGlobalVarInitializationToEntryPoints`, and `isStaticConst` keeps such a
-    // bitcast out of a function-scope `const`.
-
     // Pass each constant word through a run-time helper, so the bitcast is not a const-expression
     // that evaluates to NaN or infinity and the bits are kept exactly.
     ensurePrelude(kWGSLBuiltinPreludeNonConstU32);
@@ -915,44 +913,15 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
     }
 }
 
-// Whether `inst` is a constant that is emitted with a run-time call: a NaN or infinite float
-// literal is emitted as a call to a prelude function, and a bitcast of constant NaN or infinity
-// bits as a bitcast of a run-time helper's result (see `tryEmitNonFiniteConstantBitCast`). So is a
-// vector or matrix built from such constants (SCCP folds `bit_cast<float2>(uint2(...))` of
-// constant bits into one). None of these is a const-expression.
-static bool isConstantWithRunTimeCall(IRInst* inst)
-{
-    if (auto floatLit = as<IRFloatLit>(inst))
-        return floatLit->getFloatKind() != IRConstant::FloatKind::Finite;
-    switch (inst->getOp())
-    {
-    case kIROp_BitCast:
-        {
-            List<uint32_t> words;
-            return tryGetNonFiniteConstantBitCastWords(
-                inst->getDataType(),
-                inst->getOperand(0),
-                words);
-        }
-    case kIROp_MakeVector:
-    case kIROp_MakeVectorFromScalar:
-    case kIROp_MakeMatrix:
-    case kIROp_MakeMatrixFromScalar:
-        for (UInt i = 0; i < inst->getOperandCount(); i++)
-        {
-            if (isConstantWithRunTimeCall(inst->getOperand(i)))
-                return true;
-        }
-        return false;
-    default:
-        return false;
-    }
-}
-
 static bool isStaticConst(IRInst* inst)
 {
-    if (isConstantWithRunTimeCall(inst))
-        return false;
+    // A NaN or infinite float literal is emitted as a call to a prelude function (see the
+    // `BaseType::Float` literal case in this file), which is not a const-expression. Literals live
+    // at module scope, so this check comes before the module-scope one. A value built from such a
+    // literal (e.g. a folded `bit_cast<float2>` of constant bits) reaches it through the operand
+    // recursion below. An `asfloat` call is never const (see `tryEmitNonFiniteConstantBitCast`).
+    if (auto floatLit = as<IRFloatLit>(inst))
+        return floatLit->getFloatKind() == IRConstant::FloatKind::Finite;
     if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
@@ -1331,6 +1300,8 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
                 case BaseType::Float:
                     {
+                        // NaN and infinity are emitted as calls, which are not
+                        // const-expressions; `isStaticConst` must agree.
                         IRConstant::FloatKind kind = litInst->getFloatKind();
                         switch (kind)
                         {
@@ -1681,8 +1652,6 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
     case kIROp_BitCast:
         {
-            if (tryEmitNonFiniteConstantBitCast(inst->getDataType(), inst->getOperand(0)))
-                return true;
             // In WGSL there is a built-in bitcast function!
             // https://www.w3.org/TR/WGSL/#bitcast-builtin
             m_writer->emit("bitcast");
@@ -1994,12 +1963,15 @@ void WGSLSourceEmitter::emitIntrinsicCallExprImpl(
         m_f16ExtensionEnabled = true;
     }
 
-    // `asfloat` and friends are defined as `bitcast<$TR>($0)` for WGSL. When the argument is a
-    // constant whose bits are NaN or infinity, emit the bitcast so the operand is kept out of
-    // const-expression evaluation.
-    if (intrinsicDefinition == toSlice("bitcast<$TR>($0)") && inst->getArgCount() == 1)
+    // Every WGSL bitcast intrinsic in hlsl.meta.slang (`asfloat`, `asint`, `asuint` and their
+    // vector overloads) is spelled `bitcast<$TR>($0)`, and tests/wgsl/asfloat-non-finite-constant
+    // checks the `asfloat` output, so respelling it fails that test. Only a float result can be
+    // NaN or infinity, which `tryEmitNonFiniteConstantBitCast` checks. These stay intrinsic calls
+    // rather than `kIROp_BitCast` on purpose: SCCP folds a constant `kIROp_BitCast` into a float
+    // literal, and a NaN literal is emitted as `_slang_getNan()`, which loses the payload
+    // (`asfloat(0x7FC00001u)` must keep its bits).
+    if (intrinsicDefinition == toSlice("bitcast<$TR>($0)"))
     {
-        // A call is never hoisted to module scope (see `tryEmitNonFiniteConstantBitCast`).
         SLANG_ASSERT(!as<IRModuleInst>(inst->getParent()));
         if (tryEmitNonFiniteConstantBitCast(inst->getDataType(), inst->getArg(0)))
             return;

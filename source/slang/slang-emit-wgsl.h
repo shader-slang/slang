@@ -72,7 +72,13 @@ public:
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* varDecl) SLANG_OVERRIDE;
 
     // Emits a bitcast of constant NaN or infinity bits to `toType` so that it is evaluated at run
-    // time, and returns true; returns false, emitting nothing, for any other bitcast.
+    // time, and returns true; returns false, emitting nothing, for any other bitcast. The emitted
+    // expression calls a prelude helper, so it is not a const-expression: it must not be emitted
+    // in a module-scope initializer or a `const`. The only caller, the `asfloat` intrinsic path,
+    // asserts that the call is not at module scope (module-scope initializers have been folded
+    // into their uses or moved into the entry points by
+    // `moveGlobalVarInitializationToEntryPoints`), and `isStaticConst` never treats a call as
+    // const.
     bool tryEmitNonFiniteConstantBitCast(IRType* toType, IRInst* operand);
 
     virtual void emitRequireExtension(IRRequireTargetExtension* inst) SLANG_OVERRIDE;
