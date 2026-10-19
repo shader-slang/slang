@@ -4767,9 +4767,12 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
                 namespaceDecl->nameAndLoc = nameAndLoc;
                 namespaceDecl->loc = nameAndLoc.loc;
                 AddMember(parentDecl, namespaceDecl);
-                if (auto parentNamespace = as<NamespaceDecl>(parentDecl))
+                // We push a scope only for the parent of a later component, because the
+                // parent of the first component is the scope we are already in.
+                if (result)
                 {
-                    parser->PushScope(parentDecl);
+                    auto parentNamespace = as<NamespaceDecl>(parentDecl);
+                    parser->PushScope(parentNamespace);
                     nestedNamespaceDecls.add(parentNamespace);
                 }
             }
