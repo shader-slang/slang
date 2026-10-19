@@ -71,6 +71,10 @@ public:
         EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* varDecl) SLANG_OVERRIDE;
 
+    // Emits a bitcast of constant NaN or infinity bits to `toType` so that it is evaluated at run
+    // time, and returns true; returns false, emitting nothing, for any other bitcast.
+    bool tryEmitNonFiniteConstantBitCast(IRType* toType, IRInst* operand);
+
     virtual void emitRequireExtension(IRRequireTargetExtension* inst) SLANG_OVERRIDE;
 
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
