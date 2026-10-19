@@ -1,6 +1,6 @@
 // A memory location that the caller cannot write may still be passed to a `__ref_readonly`
-// parameter: a `__ref_readonly` parameter, or a field, array element, vector element, or
-// swizzle of one. A `__constref` parameter is a borrow rather than a memory location, but
+// parameter: a `__ref_readonly` parameter, or a field, array element, vector element, matrix
+// element, tuple element, or swizzle of one. A `__constref` parameter is a borrow rather than a memory location, but
 // the body may write to it like any `in` parameter, so its fields are passed as l-values.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
@@ -33,7 +33,10 @@ int forwardLegacy(const __ref S s)
 
 int forwardScalar(__ref_readonly int x) { return leaf(x); }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+int forwardMatrixElement(__ref_readonly int4x4 m) { return leaf(m._m12); }
+int forwardTupleElement(__ref_readonly Tuple<int, int> t) { return leaf(t._1); }
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -54,4 +57,12 @@ void computeMain()
     outputBuffer[2] = forwardLegacy(s);
     // CHECK: 7
     outputBuffer[3] = forwardScalar(x);
+
+    int4x4 m = int4x4(0);
+    m[1][2] = 12;
+    Tuple<int, int> t = makeTuple(1, 9);
+    // CHECK: 12
+    outputBuffer[4] = forwardMatrixElement(m);
+    // CHECK: 9
+    outputBuffer[5] = forwardTupleElement(t);
 }

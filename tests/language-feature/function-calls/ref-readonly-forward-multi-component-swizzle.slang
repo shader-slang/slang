@@ -1,6 +1,7 @@
-// A swizzle of several distinct components passes semantic checking as an argument for a
-// `__ref_readonly` parameter, but like any reference argument it must have a single address,
-// and the components of `s.v.xy` do not.
+// A swizzle of adjacent components in order, such as `s.v.xy`, is a memory location, so it
+// passes semantic checking as an argument for a `__ref_readonly` parameter. Lowering cannot yet
+// form a pointer to several vector components, so it rejects the argument, as it does for
+// `__ref`.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 

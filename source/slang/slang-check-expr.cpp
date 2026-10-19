@@ -8443,8 +8443,11 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     }
 
     // A swizzle of a writable base can be used as an l-value as long as there were no
-    // duplicates in the list of components.
+    // duplicates in the list of components. Only a single element is a memory location,
+    // because the elements of a matrix row or column need not be adjacent.
     swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        elementCount == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
 
     return swizExpr;
 }
@@ -8557,9 +8560,24 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     }
 
     // A swizzle of a writable base can be used as an l-value as long as there were no
-    // duplicates in the list of components.
+    // duplicates in the list of components. A single element is a memory location, while
+    // several elements form a new tuple and so do not name one.
     swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        swizExpr->elementIndices.getCount() == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
     return swizExpr;
+}
+
+/// Return whether the components of a vector swizzle are adjacent and in increasing order, as in
+/// `v.y` or `v.yzw` but not `v.xz` or `v.yx`. Only such a swizzle names a memory location.
+static bool areSwizzleComponentsContiguous(ShortList<uint32_t, 4> const& elementIndices)
+{
+    for (Index i = 1; i < elementIndices.getCount(); i++)
+    {
+        if (elementIndices[i] != elementIndices[0] + uint32_t(i))
+            return false;
+    }
+    return true;
 }
 
 Expr* SemanticsVisitor::CheckSwizzleExpr(
@@ -8664,12 +8682,14 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
                 swizExpr->elementIndices.getCount())));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base && swizExpr->base->type &&
-                                 swizExpr->base->type.isLeftValue;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components. It is a memory location only if its components
+    // are adjacent and in order, as in `v.yz`; `v.xz` and `v.yx` can be written component by
+    // component but have no single address.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
     swizExpr->type.isReadOnlyMemoryLocation =
-        !anyDuplicates && swizExpr->base && swizExpr->base->type.isReadOnlyMemoryLocation;
+        areSwizzleComponentsContiguous(swizExpr->elementIndices) &&
+        swizExpr->base->type.isReadOnlyMemoryLocation;
 
     return swizExpr;
 }
