@@ -26,6 +26,7 @@
 // CHECK-DAG: OpHitObjectGetWorldRayOriginEXT
 // CHECK-DAG: OpHitObjectGetWorldRayDirectionEXT
 
+// POS-DAG: OpExtension "SPV_EXT_shader_invocation_reorder"
 // POS-DAG: OpCapability ShaderInvocationReorderEXT
 // POS-DAG: OpCapability RayTracingPositionFetchKHR
 // POS-DAG: OpHitObjectGetIntersectionTriangleVertexPositionsEXT
