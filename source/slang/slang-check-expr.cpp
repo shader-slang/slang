@@ -4225,18 +4225,6 @@ static bool _isOutInOutOrRefParam(FuncType* funcType, Index paramIndex)
     return as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType);
 }
 
-static const char* _getDirectionString(FuncType* funcType, Index paramIndex)
-{
-    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
-    if (as<OutParamType>(paramType))
-        return "out";
-    if (as<BorrowInOutParamType>(paramType))
-        return "inout";
-    if (as<RefParamTypeBase>(paramType))
-        return "ref";
-    return "in";
-}
-
 void SemanticsVisitor::_checkAliasedOutArguments(
     InvokeExpr* invoke,
     FuncType* funcType,
@@ -4286,9 +4274,9 @@ void SemanticsVisitor::_checkAliasedOutArguments(
                 paramNameSecond = paramDeclRefs[second].getName();
 
             getSink()->diagnose(Diagnostics::PotentiallyAliasedOutParameter{
-                .direction1 = _getDirectionString(funcType, first),
+                .direction1 = funcType->getParamPassingMode(first),
                 .param1 = paramNameFirst,
-                .direction2 = _getDirectionString(funcType, second),
+                .direction2 = funcType->getParamPassingMode(second),
                 .param2 = paramNameSecond,
                 .firstArg = invoke->arguments[first]});
             break; // One warning per outer index i is enough.

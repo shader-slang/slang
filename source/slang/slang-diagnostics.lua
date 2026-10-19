@@ -1509,7 +1509,7 @@ warning(
     "potentially-aliased-out-parameter",
     30051,
     "potentially aliased argument to 'out'/'inout'/'ref' parameter",
-    span { loc = "firstArg:Expr", message = "argument for '~direction1' parameter '~param1:Name' may alias argument for '~direction2' parameter '~param2:Name'; passing the same value to both may produce unexpected results" }
+    span { loc = "firstArg:Expr", message = "argument for '~direction1:ParamPassingMode' parameter '~param1:Name' may alias argument for '~direction2:ParamPassingMode' parameter '~param2:Name'; passing the same value to both may produce unexpected results" }
 )
 
 err(
