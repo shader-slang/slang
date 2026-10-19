@@ -1,47 +1,45 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CONST): -target wgsl -entry constantOffsetMain -stage compute
+//TEST:SIMPLE(filecheck=NOERR): -target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=NOERR): -target wgsl -entry constantOffsetMain -stage compute
+//TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry constantOffsetMain -stage compute
 
 // WGSL has `f16` but no 16-bit integer types. A byte-address-buffer load of
 // `half` data (scalars, vectors, and struct fields) must be lowered through
 // the containing 32-bit word, bit-cast to `vec2<f16>`, instead of through a
 // 16-bit integer.
 
-// CHECK-NOT: u16
+// The WGSL emitter writes nothing for a 16-bit integer type and reports E56103, so a regression
+// shows up as an error, not as `u16` in the output. NOERR searches the whole output for it, and
+// the TINT runs check that the bundled Tint accepts the module.
+// NOERR-NOT: {{error\[E[0-9]+\]}}
+// NOERR: @compute
+// NOERR-NOT: {{error\[E[0-9]+\]}}
+// TINT: OpEntryPoint
+
 // CHECK: enable f16;
-// CHECK-NOT: u16
 // CHECK: var<storage, read> pool_{{.*}} : array<u32>;
-// CHECK-NOT: u16
 // CHECK: fn computeMain
-// CHECK-NOT: u16
 // CHECK: bitcast<vec2<f16>>
-// CHECK-NOT: u16
 
 // With constant offsets the selected half-word is visible: the low half of a word is shifted by
 // 0 and the high half by 16, for scalars and for `Record` fields at 2-byte offsets.
-// CONST-NOT: u16
 // CONST: fn constantOffsetMain
-// CONST-NOT: u16
 // CONST: pool_{{[0-9]+}}[(u32(0))/4]
 // CONST-NEXT: bitcast<vec2<f16>>(({{.*}} >> (u32(0))))
-// CONST-NOT: u16
 // CONST: pool_{{[0-9]+}}[(u32(0))/4]
 // CONST-NEXT: bitcast<vec2<f16>>(({{.*}} >> (u32(16))))
-// CONST-NOT: u16
 // CONST: pool_{{[0-9]+}}[(u32(256))/4]
 // CONST-NEXT: bitcast<vec2<f16>>(({{.*}} >> (u32(0))))
-// CONST-NOT: u16
 // CONST: pool_{{[0-9]+}}[(u32(256))/4]
 // CONST-NEXT: bitcast<vec2<f16>>(({{.*}} >> (u32(16))))
-// CONST-NOT: u16
 // CONST: pool_{{[0-9]+}}[(u32(260))/4]
 // CONST-NEXT: bitcast<f32>(
-// CONST-NOT: u16
 // CONST: pool_{{[0-9]+}}[(u32(264))/4]
 // CONST-NEXT: bitcast<vec2<f16>>(({{.*}} >> (u32(0))))
-// CONST-NOT: u16
 // CONST: pool_{{[0-9]+}}[(u32(264))/4]
 // CONST: bitcast<vec2<f16>>(({{.*}} >> (u32(16))))
-// CONST-NOT: u16
 
 struct Record
 {
