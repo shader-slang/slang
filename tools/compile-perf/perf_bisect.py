@@ -62,13 +62,15 @@ import confirm
 from lib import analyze, corpus, manifest
 import trend
 
+# The A/A and A/B round counts, the 2% A/A ceiling and the 3% minimum effect are
+# the slang-perf-analyst policy in nanoclaw#1980 (PERF_POLICY.json).
 AA_ROUNDS = 20
 AB_ROUNDS = 12
 SAMPLES = 5
 AA_MAX_SPREAD = 0.02
 MIN_EFFECT = 0.03
-# A single A/A draw understates the spread that later batches show, so even on
-# a very quiet host a comparison counts as flat only within 1%.
+# A single A/A draw understates the spread that later batches show, so the noise
+# level never drops below 1%: a quiet host still gets a 1% flat band.
 NOISE_FLOOR = 0.01
 
 # Counters whose nightly samples are bimodal, so a confirmed change on them is
@@ -78,7 +80,7 @@ NOISE_FLOOR = 0.01
 KNOWN_FLAKY = {("api_module_graph", "apiGetCode")}
 
 CMAKE_FLAGS = [
-    # The nightly's flags (nightly-mdl-perf-test.yml, "Build Slang"), so probe
+    # The nightly's flags (nightly-mdl-perf-test.yml, step "Build Slang (tip of tree)"), so probe
     # timings compare with the nightly's own.
     "-DSLANG_SLANG_LLVM_FLAVOR=DISABLE",
     "-DCMAKE_COMPILE_WARNING_AS_ERROR=false",
@@ -114,6 +116,21 @@ def same_commit(a, b):
     return bool(a) and bool(b) and (a.startswith(b) or b.startswith(a))
 
 
+def on_master_check(repo, ref="origin/master"):
+    """Return a predicate: is a commit a full SHA that is an ancestor of `ref` in `repo`?
+
+    Nights record full SHAs, so anything shorter, or anything not on master
+    (a dispatch pointed at another branch's night, say), is refused rather than
+    built on the perf host.
+    """
+    def check(commit):
+        if not (isinstance(commit, str) and re.fullmatch(r"[0-9a-f]{40}", commit)):
+            return False
+        return subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", commit, ref],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    return check
+
+
 def night_values(night_dir):
     """Map (workload, counter) to the median a night's results.json recorded."""
     out = {}
@@ -145,7 +162,7 @@ def is_flat_night(values, change, limits):
 
 
 def select_targets(night_dir, nights_root, min_tier="regression", max_builds=12,
-                   source_run=None):
+                   source_run=None, on_master=None):
     """Choose what to bisect for one confirmed night, as a targets.json dict.
 
     The archive must already have passed `confirm.py report`, which checks that
@@ -161,6 +178,9 @@ def select_targets(night_dir, nights_root, min_tier="regression", max_builds=12,
     night skips 10-09 and the other slow nights, and lands before the step.
     Every base is still only presumed good: `run` measures the endpoints before
     it bisects.
+
+    When `on_master` is given, head and every base must satisfy it (see
+    on_master_check), so the perf host only ever builds merged master code.
     """
     night_dir = Path(night_dir)
     archive = analyze.read_json(night_dir / "confirmation.json")
@@ -191,11 +211,15 @@ def select_targets(night_dir, nights_root, min_tier="regression", max_builds=12,
         # Several nights can build one commit (weekends); one base per commit.
         if any(same_commit(commit, b["commit"]) for b in bases):
             continue
+        if on_master is not None and not on_master(commit):
+            continue
         values = night_values(night)
         if changes and all(is_flat_night(values, ch, limits) for ch in changes):
             bases.append({"label": label, "commit": commit})
 
-    if not changes:
+    if on_master is not None and not on_master(head):
+        reason = "head is not a master commit"
+    elif not changes:
         reason = ("only known-flaky counters changed" if confirmed
                   else "no confirmed change at the requested tier")
     elif not other_commit_seen:
@@ -470,9 +494,11 @@ class Bisector:
                 for name, by in pooled.items()}
 
     def flat(self, x, y):
+        """Return whether y differs from x by at most the noise, in either direction."""
         return abs(y / x - 1) <= self.noise
 
     def steps(self, x, y, key):
+        """Return whether y rose above x by max(MIN_EFFECT, 2 * noise) and the counter's absolute floor."""
         return y / x - 1 >= max(MIN_EFFECT, 2 * self.noise) and y - x >= self.floor[key]
 
     def _counter(self, key):
@@ -540,7 +566,7 @@ class Bisector:
         except ValueError as e:
             return self.finish("unclear", str(e))
         lo, hi = 0, len(seq) - 1
-        self._interval(seq, lo, hi, "interval")
+        self._interval(seq, lo, hi)
         failed = set()
         while hi - lo > 1:
             open_ = [i for i in range(lo + 1, hi) if seq[i] not in failed]
@@ -564,19 +590,24 @@ class Bisector:
             elif verdict == "bad":
                 hi = i
             else:
-                self._interval(seq, lo, hi, "interval")
+                self._interval(seq, lo, hi)
                 return self.finish("interval", f"probe {sha[:10]} was {verdict}; the change "
                                    "may span several commits")
-            self._interval(seq, lo, hi, "interval")
+            self._interval(seq, lo, hi)
         return self._verify(base, seq[lo], seq[hi])
 
-    def _interval(self, seq, lo, hi, status):
-        self.state.update(status=status, interval={
+    def _interval(self, seq, lo, hi):
+        self.state.update(status="interval", interval={
             "good": seq[lo], "bad": seq[hi], "commits": hi - lo})
         self.save()
 
     def _probe(self, base, sha, head):
-        """Classify one probe as good, bad, ambiguous, or drift (one retry each)."""
+        """Classify one probe as good, bad, ambiguous, or drift.
+
+        A probe whose batch is not good or bad gets one more batch, so at most
+        two. "drift" means the endpoints themselves did not step in that batch,
+        which leaves nothing to place the probe against.
+        """
         verdict = "ambiguous"
         for _ in range(2):
             m = self._batch([("base", base), ("probe", sha), ("head", head)], self.ab_rounds)
@@ -596,6 +627,7 @@ class Bisector:
         if parent != base:
             slots.insert(1, ("parent", parent))
         v = self._batch(slots, self.ab_rounds)
+        # With no parent slot the culprit directly follows base, so base is the parent.
         q = v.get("parent", v["base"])
         for key in self.kept:
             self._counter(key)["verify"] = {"base": v["base"][key], "parent": q[key],
@@ -611,6 +643,10 @@ class Bisector:
 
 # A change counts as real when the fastest sample moves: a slow tail alone is
 # what host noise looks like, while a code change also slows the best run.
+# MIN_SHIFT is 3%: replayed on the 8 archived quiet nights before 2026-09-30
+# (1,728 primary timers), the rule below fires on 2.3% of them (16.9% if it
+# compared with the lowest nightly minimum instead of their median).
+# TAIL_RATIO and TAIL_NIGHTS are the bimodal-history rule of nanoclaw#1980.
 MIN_SHIFT = 1.03
 TAIL_RATIO = 1.25
 TAIL_NIGHTS = 0.30
@@ -638,6 +674,9 @@ def triage(results_dir, label):
                         clears the absolute floor: real. The median, not the
                         lowest of those minima, because one unusually fast
                         night would otherwise make a quiet night look shifted.
+      below-floor       the fastest sample moved by MIN_SHIFT but by less than
+                        the absolute floor, which a short counter cannot reach:
+                        unclear, not noise.
       sibling-shifted   only the tail moved, but another counter of the same
                         workload is min-shifted: real.
       tail-only         only the tail moved: noise.
@@ -701,6 +740,8 @@ def triage(results_dir, label):
                 row["rule"] = "bimodal-history"
             elif best >= MIN_SHIFT * hist_best and best - hist_best >= floor:
                 row["rule"] = "min-shifted"
+            elif best >= MIN_SHIFT * hist_best:
+                row["rule"] = "below-floor"
             else:
                 row["rule"] = "tail-only"
         rows.append(row)
@@ -711,7 +752,9 @@ def triage(results_dir, label):
         r["verdict"] = TRIAGE_RULES[r["rule"]]
     # The night's verdict follows the tier that raised the alert: regressions
     # when there are any, so a red night is judged by the counters that made it
-    # red; warnings only on a night that confirmed nothing worse.
+    # red; warnings only on a night that confirmed nothing worse. Within that
+    # set the night is real if ANY counter is real, because one real step is
+    # enough to need a bisect; noise only if every counter is noise; else unclear.
     judged = [r for r in rows if r["rule"] != "known-flaky"]
     lead = [r for r in judged if r["tier"] == "regression"] or judged
     verdicts = {r["verdict"] for r in lead}
@@ -725,7 +768,7 @@ def triage(results_dir, label):
 TRIAGE_RULES = {"known-flaky": "skipped", "runner-changed": "unclear",
                 "thin-history": "unclear", "same-commit-flat": "noise",
                 "bimodal-history": "noise", "min-shifted": "real",
-                "sibling-shifted": "real", "tail-only": "noise"}
+                "sibling-shifted": "real", "below-floor": "unclear", "tail-only": "noise"}
 
 
 def triage_line(result):
@@ -734,11 +777,11 @@ def triage_line(result):
     The line leads with the tier the verdict was taken from and names the other
     tier after it, so it reads against the alert above it. Known-flaky counters
     are skipped rather than counted as noise, and are reported separately.
-    Rules other than "moved its fastest sample" are named in parentheses so a
+    Counters that do not look real are counted by rule in parentheses so a
     noise verdict says why. For the 2026-10-16 night, with 4 confirmed
     regressions and 12 confirmed warnings, one of them known-flaky: "Real or
-    noise: real. 4 of 4 confirmed regressions moved their fastest sample; 11 of
-    11 confirmed warnings did too (1 known-flaky counter skipped); compared with
+    noise: real. 4 of 4 confirmed regressions look real; 11 of 11 confirmed
+    warnings do too (1 known-flaky counter skipped); compared with
     the last 7 nights; f2b163c082..e49310561e."
     The line is assembled from fixed words, rule names, counts and validated
     SHAs only, the same contract as render().
@@ -767,10 +810,10 @@ def triage_line(result):
     other_tier = "warning" if lead_tier == "regression" else "regression"
     _, real, judged, notes = part(lead_tier)
     text = (f"Real or noise: {result['verdict']}. {real} of {judged} confirmed "
-            f"{lead_tier}s moved their fastest sample{notes}")
+            f"{lead_tier}s look real{notes}")
     group, o_real, o_judged, o_notes = part(other_tier)
     if o_judged:
-        text += f"; {o_real} of {o_judged} confirmed {other_tier}s did too{o_notes}"
+        text += f"; {o_real} of {o_judged} confirmed {other_tier}s do too{o_notes}"
     elif group:
         n = len(group)
         text += f"; {n} known-flaky {other_tier}{'' if n == 1 else 's'} skipped"
@@ -865,6 +908,7 @@ def github_output(**values):
 
 def builds_arg(value):
     n = int(value)
+    # 40 covers a 2^30-commit range plus fallbacks; it bounds runner time.
     if not 3 <= n <= 40:
         raise argparse.ArgumentTypeError("max builds must be 3..40 (head, base and a probe)")
     return n
@@ -884,6 +928,9 @@ def main(argv=None):
     t.add_argument("--min-tier", choices=("regression", "warning"), default="regression")
     t.add_argument("--max-builds", type=builds_arg, default=12)
     t.add_argument("--source-run", default=None)
+    t.add_argument("--master-repo", type=Path, default=None,
+                   help="a clone with master's history: head and bases must be on --master-ref")
+    t.add_argument("--master-ref", default="origin/master")
     t.add_argument("--out", required=True, type=Path)
     d = sub.add_parser("deadline", help="size the time budget and record it in targets.json")
     d.add_argument("--targets", required=True, type=Path)
@@ -908,7 +955,9 @@ def main(argv=None):
 
     if args.command == "targets":
         targets = select_targets(args.night, args.nights_root, args.min_tier,
-                                 args.max_builds, args.source_run)
+                                 args.max_builds, args.source_run,
+                                 on_master_check(args.master_repo, args.master_ref)
+                                 if args.master_repo else None)
         with analyze.open_output(str(args.out)) as fh:
             json.dump(targets, fh, indent=2)
         github_output(proceed="true" if targets["proceed"] else "false",
