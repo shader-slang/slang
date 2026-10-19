@@ -12,6 +12,9 @@ name: Claude Perf Bisect
 # Output goes only to job summaries and run artifacts. Nothing can be posted,
 # pushed or filed because the permissions blocks grant only read scopes: with
 # no id-token the runner falls back to github.token, which those blocks bound.
+# A run that finds another bisect in flight, or a nightly waiting, does not
+# bisect; a nightly queued in the seconds between that check and the bisect
+# job's queueing can still be replaced, which is the remaining race.
 # The procedure follows slang-coworkers/nanoclaw#1980 (slang-perf-regression).
 
 on:
@@ -52,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
-      proceed: ${{ steps.targets.outputs.proceed }}
+      proceed: ${{ steps.targets.outputs.proceed == 'true' && steps.contention.outputs.clear == 'true' }}
       label: ${{ steps.targets.outputs.label }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -168,6 +171,30 @@ jobs:
                        f"{'Bisecting.' if proceed else 'Not bisecting: ' + reason + '.'}\n")
           PY
 
+      # The bisect job shares the nightly's concurrency group, and a newly queued
+      # job replaces that group's pending one. If another bisect is in flight
+      # or a nightly is waiting, queueing ours could cancel a nightly, so the
+      # gate refuses instead. This runs last to keep the race window short.
+      - name: Check the perf pool's concurrency group
+        id: contention
+        if: steps.targets.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bisects=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/claude-perf-bisect.yml/runs?per_page=50" \
+            --jq "[.workflow_runs[] | select(.id != $GITHUB_RUN_ID and .status != \"completed\")] | length")
+          nightlies=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nightly-mdl-perf-test.yml/runs?per_page=20" \
+            --jq '[.workflow_runs[] | select(.status == "queued" or .status == "pending" or .status == "waiting" or .status == "requested")] | length')
+          if [ "$bisects" -gt 0 ] || [ "$nightlies" -gt 0 ]; then
+            msg="Not bisecting: $bisects other bisect run(s) in flight, $nightlies nightly run(s) waiting. Re-dispatch with run_id when the pool is idle."
+            echo "::warning::$msg"
+            printf '\n%s\n' "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "clear=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "clear=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: perf-bisect-targets-${{ github.run_id }}
@@ -179,7 +206,8 @@ jobs:
     # Timings are comparable only on the pool the nightly measured on.
     runs-on:
       labels: [Windows, X64, nvrgfx-perf-kernelvm-bridge]
-    # Shared with the nightly so a bisect never measures beside it.
+    # Shared with the nightly so a bisect never measures beside it; the gate's
+    # contention check keeps this job from replacing a pending nightly.
     concurrency:
       group: nightly-mdl-perf-test
       cancel-in-progress: false
