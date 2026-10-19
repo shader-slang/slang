@@ -513,6 +513,14 @@ static bool isAnyPointerType(IRType* type)
     return as<IRPtrTypeBase>(type) != nullptr;
 }
 
+// Whether the arguments of `func` can come from outside the module: an entry point, or a function
+// kept alive without a caller in the module (an exported library function).
+static bool isCalledFromOutsideModule(IRFunc* func)
+{
+    return func->findDecoration<IREntryPointDecoration>() ||
+           func->findDecoration<IRKeepAliveDecoration>();
+}
+
 // Whether `inst` introduces a value whose type contains one that `isLeaf` matches: whether it is
 // where such a value enters the program, rather than passing along a value that entered it
 // elsewhere. Both checks below report exactly the introductions, so each unsupported value is
@@ -524,7 +532,8 @@ static bool isAnyPointerType(IRType* type)
 // The introductions, and why everything else passes a value along:
 // - A value computed from operands that carry the type passes them along. This covers field and
 //   element extraction, construction from such values, and addresses derived from a pointer.
-// - The parameters of an entry point have no caller, so they are introductions. The parameters of
+// - The parameters of an entry point or of an exported function (`[keepAlive]`, e.g. `export` in
+//   an HLSL library) are set outside the module, so they are introductions. The parameters of
 //   another function pass along the arguments of its call sites, which are reported in the
 //   caller.
 // - A call result passes along what the callee returns, which is reported in the callee, if the
@@ -534,11 +543,11 @@ static bool isAnyPointerType(IRType* type)
 // - A module-scope constant is an introduction (a global constant here; a hoisted literal at each
 //   of its users, see `usesConstantOfType`).
 // - A load introduces the value it reads, except from a local or module-scope variable (which
-//   reads back a value stored there earlier), from an `inout`/`out` parameter of a function other
-//   than an entry point (which reads the caller's value), and through a physical pointer (already
-//   reported). The root address is checked rather than the address space of the pointer type,
-//   because some locals have none: every local on HLSL, and the temporaries that phi elimination
-//   creates.
+//   reads back a value stored there earlier), from an `inout`/`out` parameter of a function whose
+//   callers are all in the module (which reads the caller's value), and through a physical
+//   pointer (already reported). The root address is checked rather than the address space of the
+//   pointer type, because some locals have none: every local on HLSL, and the temporaries that phi
+//   elimination creates.
 // Addresses derived from logical storage (`&buffer[i]`, `groupshared` variables) are not
 // reported, even when they have a `T*` type. That is sound only because such addresses cannot
 // reach these targets as values: `operator&` and `__getAddress` are capability-gated off HLSL and
@@ -555,8 +564,7 @@ static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*
             auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
             // Phi elimination has run, so every parameter is a function parameter.
             SLANG_ASSERT(func && func->getFirstBlock() == block);
-            return func && func->getFirstBlock() == block &&
-                   func->findDecoration<IREntryPointDecoration>();
+            return func && func->getFirstBlock() == block && isCalledFromOutsideModule(func);
         }
     case kIROp_GlobalConstant:
         return true;
@@ -583,7 +591,7 @@ static bool introducesValueOfType(IRInst* inst, bool (*isLeaf)(IRType*), bool (*
             {
                 auto block = as<IRBlock>(param->getParent());
                 auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
-                if (func && !func->findDecoration<IREntryPointDecoration>() &&
+                if (func && !isCalledFromOutsideModule(func) &&
                     as<IRPtrTypeBase>(param->getDataType()))
                     return false;
             }

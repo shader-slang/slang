@@ -20,9 +20,10 @@ void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, Dia
 /// memory address) on WGSL and the D3D targets, which have none. Each pointer value is reported
 /// once, where it enters the program: a cast from an integer address, `nullptr` (at each use), a
 /// pointer (or a struct or array containing one) loaded from memory, a module-scope constant, a
-/// global or entry-point parameter, or the result of a call to a function without a body. A value
-/// passed to a function, returned from one, or stored in a local or module-scope variable and read
-/// back is not reported again. Each source location is reported once.
+/// global parameter, a parameter of an entry point or of an exported function, or the result of a
+/// call to a function without a body. A value passed to a function, returned from one, or stored
+/// in a local or module-scope variable and read back is not reported again. Each source location
+/// is reported once.
 ///
 /// This validation is required regardless of the selected optimization mode.
 void checkUnsupportedPhysicalPointers(
