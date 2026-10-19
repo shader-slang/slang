@@ -161,16 +161,20 @@ public:
     }
 
     // Push a new scope that makes the members of `containerDecl` visible to lookup,
-    // without replacing the scope that `containerDecl` owns. The semantic checker
-    // attaches scopes to `ownedScope` (for example, the namespaces of the same name
-    // that a module imports), so code that only needs lookup into an existing
-    // container uses this function to leave those attachments in place.
+    // without replacing the scope that `containerDecl` owns.
+    //
+    // A namespace gets one such scope per `{ ... }` body, and one more for each qualified
+    // declaration that names it, such as `A` in `namespace A::B`. We record all of them in
+    // `NamespaceDecl::lexicalScopes`, because the semantic checker attaches the imported
+    // namespaces of the same name to each one.
     void pushLookupScope(ContainerDecl* containerDecl)
     {
         Scope* newScope = astBuilder->create<Scope>();
         newScope->containerDecl = containerDecl;
         newScope->parent = currentScope;
         currentScope = newScope;
+        if (auto namespaceDecl = as<NamespaceDecl>(containerDecl))
+            namespaceDecl->lexicalScopes.add(newScope);
         resetLookupScope();
     }
 
@@ -4779,14 +4783,10 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
             else if (result)
             {
                 // Consider `namespace A::B { ... }` where both `A` and `B` already
-                // exist. The body must see the members this module declares in `A`,
-                // as it does when the user writes `namespace A { namespace B { ... } }`,
-                // so we push a scope for `A`. The checker attaches the imported
-                // namespaces named `A` to the scope that `A` owns. Every body of `A`,
-                // and the create branch above, replaces that scope, and the code in
-                // whichever body still owns it finds imported names through it. The
-                // scope we push here therefore leaves `ownedScope` alone, and it
-                // carries no imported members of `A` (see #13714).
+                // exist. The body must see the members of `A`, as it does when the
+                // user writes `namespace A { namespace B { ... } }`, so we push a
+                // scope for `A`. `A` already owns the scope of one of its own bodies,
+                // so this scope serves lookup only.
                 parser->pushLookupScope(parentDecl);
                 lookupScopeCount++;
             }
