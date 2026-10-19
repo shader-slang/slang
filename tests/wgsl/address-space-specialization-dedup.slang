@@ -2,15 +2,19 @@
 //TEST:SIMPLE(filecheck=DISTINCT): -target wgsl -entry computeMainDistinct -stage compute
 
 // Address-space specialization must reuse a specialization when a caller is processed again.
-// `f`, `g` and `h` are called 3, 2 and 1 times, and each passes `Span.load` a pointer into the
-// uniform address space: they must all share one `Span_load`, not get one copy each (#13643).
+// `f`, `g` and `h` each pass `Span.load` a pointer into the uniform address space, so they must all
+// share one `Span_load`, not get one copy each (#13643). The call counts (3, 2 and 1) matter: each
+// call site without pointer arguments puts its callee on the work list again, and before the fix
+// each later visit specialized the specialization the call already targeted, giving f -> 3rd copy,
+// g -> 2nd copy, h -> 1st copy. With equal counts the extra copies lose all their callers and are
+// removed, which would hide the bug.
 
-// SAME: fn Span_load_{{[0-9]+}}(
+// SAME-COUNT-1: fn Span_load_{{[0-9]+}}(
 // SAME-NOT: fn Span_load_{{[0-9]+}}(
-// SAME: fn f_{{[0-9]+}}(
 
 // When the pointers really are in different address spaces (uniform vs. workgroup), the
-// specializations differ and both must still be emitted.
+// specializations differ and both must still be emitted. This run gives two copies with or
+// without the fix: it guards against over-merging (e.g. a key that ignores address spaces).
 
 // DISTINCT-COUNT-2: fn Span_load_{{[0-9]+}}(
 // DISTINCT-NOT: fn Span_load_{{[0-9]+}}(

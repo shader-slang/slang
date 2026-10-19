@@ -99,9 +99,14 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     Dictionary<FuncSpecializationKey, IRFunc*> functionSpecializations;
 
-    // The function each specialization was cloned from, so that a call that already targets a
-    // specialization is keyed on the original function (and finds the existing specialization)
-    // when its caller is processed again.
+    // Maps each clone created by `specializeFunc` to the unspecialized function it was cloned
+    // from. A call can already target a specialization when its caller is processed: the work list
+    // holds a callee once per call site without pointer arguments, a caller is processed again when
+    // a callee's result address space changes, and a clone copies the calls of an original whose
+    // body was already processed. Keying such a call on the unspecialized function finds the
+    // existing specialization instead of specializing the specialization. The keys of
+    // `functionSpecializations` (`FuncSpecializationKey::getFunc()`) are always unspecialized
+    // functions, so one lookup is enough.
     Dictionary<IRFunc*, IRFunc*> specializationOrigin;
 
     IRFunc* specializeFunc(const FuncSpecializationKey& key)
@@ -139,6 +144,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         fixUpFuncType(specializedFunc);
 
         functionSpecializations[key] = specializedFunc;
+        SLANG_ASSERT(!specializationOrigin.containsKey(func));
         specializationOrigin[specializedFunc] = func;
         return specializedFunc;
     }
@@ -297,10 +303,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 // If callee doesn't have a body, don't specialize.
                                 if (!callee->getFirstBlock())
                                     break;
-                                IRFunc* originalCallee = callee;
+                                // `callee` can already be a specialization (see
+                                // `specializationOrigin`).
+                                IRFunc* unspecializedCallee = callee;
                                 if (auto origin = specializationOrigin.tryGetValue(callee))
-                                    originalCallee = *origin;
-                                FuncSpecializationKey key(originalCallee, argAddrSpaces);
+                                    unspecializedCallee = *origin;
+                                FuncSpecializationKey key(unspecializedCallee, argAddrSpaces);
                                 IRFunc* specializedCallee = nullptr;
                                 if (IRFunc** specializedFunc =
                                         functionSpecializations.tryGetValue(key))
@@ -319,7 +327,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                     callInst = as<IRCall>(builder.replaceOperand(
                                         callInst->getOperands(),
                                         specializedCallee));
-                                    // At this point, the original callee may be left without uses.
+                                    // At this point, the previous callee may be left without uses.
                                     functionsToConsiderRemoving.add(callee);
                                 }
                                 auto callResultAddrSpace =
