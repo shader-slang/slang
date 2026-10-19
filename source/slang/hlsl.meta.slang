@@ -19520,6 +19520,22 @@ uint4 WaveGetActiveMulti()
 // Shader model 6.5 stuff
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md
 
+// Loops over the lanes of the subgroup in the WGSL emulations (WaveMatch here, the WaveMultiPrefix
+// scans below).
+//
+// WGSL requires subgroup operations to be in uniform control flow. The loops are bounded by
+// `WaveGetLaneCount()`, so they are uniform when the subgroup size reaches the function as a value:
+// WGSL legalization passes entry-point inputs to callees as parameters instead of through a
+// module-scope `var<private>`, which WGSL's uniformity analysis treats as non-uniform. That pass
+// leaves the `var<private>` in place when the uses of the input do not have the shape it handles,
+// for example when several entry points are compiled into one module (`-whole-program`) and only
+// one of them declares the input, or when the function is used other than by a direct call. The
+// loop bound is then a `var<private>` read, and Tint rejects the module.
+//
+// On WGSL every subgroup builtin comes with the one `subgroups` extension, and `subgroup_ballot`
+// and `subgroup_shuffle` both reduce to `wgsl`, so each function names the capability of its main
+// operation only.
+
 // WGSL emulation of WaveMatch (WGSL has no partitioned subgroup operations).
 //
 // Why the loop gives each invocation its WaveMatch result:
@@ -19527,31 +19543,29 @@ uint4 WaveGetActiveMulti()
 //   `lane`, so the ballot is the set of invocations whose value matches that lane's value. An
 //   invocation keeps the ballot of the iteration where `lane` is its own lane; that ballot is the
 //   set of invocations with the same value as itself, i.e. its WaveMatch result.
-// - When `lane` is inactive or past the end of the subgroup, `subgroupShuffle` returns an
-//   indeterminate value and the ballot is meaningless, but it is always discarded: `lane == self`
-//   only holds for the lane of an active invocation.
+// - When `lane` is inactive, `subgroupShuffle` returns an indeterminate value and the ballot is
+//   meaningless, but it is always discarded: `lane == currentLane` only holds for the lane of an
+//   active invocation.
 // - The current lane's bit is ORed in, because WaveMatch always includes the current lane and a
 //   NaN component compares unequal to itself.
 //
-// The loop runs to `WaveGetLaneCount()` and is in uniform control flow, as WGSL requires for
-// subgroup operations, only because the subgroup size reaches the function as a value (WGSL
-// legalization passes entry-point inputs to callees as parameters instead of through a
-// module-scope `var<private>`). The cost is one `subgroupShuffle` and one `subgroupBallot` per lane
-// of the subgroup.
+// The loop is uniform under the condition stated above. The cost is one `subgroupShuffle` and one
+// `subgroupBallot` per lane of the subgroup.
 //
-// Precondition (both overloads): `T` is not `bool`; `subgroupShuffle` takes only numeric values.
-// WaveMatch converts bools to 0/1 `uint` first.
+// Precondition (both overloads, checked): `T` is not `bool`; `subgroupShuffle` takes only numeric
+// values. WaveMatch converts bools to 0/1 `uint` first.
 __generic<T : __BuiltinType>
 [ForceInline]
 [require(wgsl, subgroup_ballot)]
 uint4 __wgslWaveMatch(T value)
 {
-    const uint self = WaveGetLaneIndex();
+    static_assert(!(T is bool), "__wgslWaveMatch takes no bool");
+    const uint currentLane = WaveGetLaneIndex();
     uint4 result = uint4(0);
     for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
     {
         const uint4 matching = WaveActiveBallot(value == WaveReadLaneAt(value, int(lane)));
-        if (lane == self)
+        if (lane == currentLane)
             result = matching | WaveGetLaneEqMask();
     }
     return result;
@@ -19561,13 +19575,14 @@ __generic<T : __BuiltinType, let N : int>
 [require(wgsl, subgroup_ballot)]
 uint4 __wgslWaveMatch(vector<T, N> value)
 {
-    const uint self = WaveGetLaneIndex();
+    static_assert(!(T is bool), "__wgslWaveMatch takes no bool");
+    const uint currentLane = WaveGetLaneIndex();
     uint4 result = uint4(0);
     for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
     {
         const uint4 matching =
             WaveActiveBallot(all(value == WaveReadLaneAt(value, int(lane))));
-        if (lane == self)
+        if (lane == currentLane)
             result = matching | WaveGetLaneEqMask();
     }
     return result;
@@ -19953,20 +19968,25 @@ $}
 // `mask` that are also active. `mask` may name inactive lanes (e.g. a constant mask), and
 // `subgroupShuffle` from an inactive lane is indeterminate, so the partition is `mask` intersected
 // with `WaveActiveBallot(true)`. An exclusive scan combines the partition lanes below the
-// invocation's lane; an inclusive scan also combines the invocation's own lane.
+// invocation's lane; an inclusive scan also combines the invocation's own lane. As in HLSL, the
+// invocation's own lane must be set in `mask`; if it is not, the invocation is not in its own
+// partition and an inclusive scan leaves out its own value.
 //
 // Each helper reads every lane in turn with `subgroupShuffle` (through `WaveReadLaneAt`), in a
-// loop bounded by `WaveGetLaneCount()`. The loop is in uniform control flow, as WGSL requires for
-// subgroup operations, only because the subgroup size reaches the function as a value: WGSL
-// legalization passes entry-point inputs to callees as parameters instead of through a
-// module-scope `var<private>`, which WGSL's uniformity analysis would treat as non-uniform. The
-// cost is one `subgroupBallot` plus one `subgroupShuffle` per lane of the subgroup.
+// loop bounded by `WaveGetLaneCount()`; the loop is uniform under the condition stated above the
+// WaveMatch emulation. The cost is one `subgroupBallot` plus one `subgroupShuffle` per lane of the
+// subgroup.
 //
-// Precondition: `T` is not `bool`; `subgroupShuffle` takes only numeric values. Callers convert
-// bools to 0/1 `uint` first.
+// The helpers take numeric values only (`subgroupShuffle` takes no bool): the arithmetic ones are
+// constrained to `__BuiltinArithmeticType` and the bitwise ones take `uint`. The callers convert
+// `bool` to 0/1 `uint`, and bit-cast `int` to `uint` for the bitwise scans.
+//
+// `op` and `kind` are compile-time selections: every caller passes an enum literal from its table
+// row, and the helpers are `[ForceInline]`, so the comparisons on them fold away after inlining.
 
 // The operation and kind of a scan, named as in the scan tables' `spirvName` and
-// `spirvGroupOperation` columns, so each table row selects them by its existing entries.
+// `spirvGroupOperation` columns, so each table row selects them by its existing entries. A table
+// entry that names no case here fails the build of the core module.
 enum __WGSLArithmeticScanOp
 {
     Add,
@@ -20052,7 +20072,8 @@ vector<uint, N> __wgslBitwiseScanCombine(
         return a & b;
     case __WGSLBitwiseScanOp.Or:
         return a | b;
-    default:
+    case __WGSLBitwiseScanOp.Xor:
+    default: // The enum has no other case.
         return a ^ b;
     }
 }

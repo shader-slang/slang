@@ -75,9 +75,9 @@ void orMain(uint3 t: SV_DispatchThreadID)
 }
 
 // Inclusive xor (bool2): passed as 0/1 u32, starts at 0, xors, includes the own lane.
-// XOR: select(vec2<u32>(0u), vec2<u32>(1u),
+// XOR: var [[XOR_U:_S[0-9]+]] : vec2<u32> = (select(vec2<u32>(0u), vec2<u32>(1u),
 // XOR: result_{{[0-9]+}} = vec2<u32>(u32(0));
-// XOR-NOT: subgroupShuffle({{[^,]*}}bool
+// XOR: subgroupShuffle([[XOR_U]], i32(lane_{{[0-9]+}}))
 // XOR: lane_{{[0-9]+}} == _builtinWaveLaneIndex_{{[0-9]+}}
 // XOR: result_{{[0-9]+}} = (result_{{[0-9]+}} ^ (other_{{[0-9]+}}));
 [shader("compute")]

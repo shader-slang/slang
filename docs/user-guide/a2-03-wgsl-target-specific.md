@@ -90,20 +90,25 @@ With the WGSL `subgroups` extension, these wave and quad intrinsics are supporte
 and `QuadReadLaneAt`.
 
 Matrix overloads are supported for `WaveActiveSum`, `WaveActiveProduct`, `WaveActiveMin`,
-`WaveActiveMax`, `WavePrefixSum`, `WavePrefixProduct`, `WaveReadLaneAt`, `WaveReadLaneFirst`,
-`WaveBroadcastLaneAt` and `QuadReadLaneAt`. `WaveActiveAllEqual`, `WaveShuffle` and
-`QuadReadAcrossX`/`Y`/`Diagonal` take scalars and vectors only.
+`WaveActiveMax`, `WaveActiveBitAnd`, `WaveActiveBitOr`, `WaveActiveBitXor`, `WavePrefixSum`,
+`WavePrefixProduct`, `WaveReadLaneAt`, `WaveReadLaneFirst`, `WaveBroadcastLaneAt` and
+`QuadReadLaneAt`, and for the emulated `WaveMatch` and `WaveMultiPrefix*` scans listed below.
+`WaveActiveAllEqual`, `WaveShuffle` and `QuadReadAcrossX`/`Y`/`Diagonal` take scalars and vectors
+only.
 
 WGSL has no partitioned subgroup operations, so these are emulated:
 
 - `WaveMatch`, `WaveMultiPrefixSum`, `WaveMultiPrefixProduct`, `WaveMultiPrefixBitAnd`,
   `WaveMultiPrefixBitOr` and `WaveMultiPrefixBitXor`, including the `Inclusive`/`Exclusive` forms of
   the scans (`WaveMultiPrefixInclusiveSum`, `WaveMultiPrefixExclusiveBitOr`, ...), read every lane
-  of the subgroup in turn with `subgroupShuffle`, so their cost grows with the subgroup size.
+  of the subgroup in turn with `subgroupShuffle`, so their cost grows with the subgroup size:
+  `WaveMatch` does one `subgroupShuffle` and one `subgroupBallot` per lane, and each scan does one
+  `subgroupBallot` plus one `subgroupShuffle` per lane.
 - `WaveMultiPrefixCountBits` is one `subgroupBallot` and a bit count, with no per-lane loop.
 
 These are not supported on WGSL: the `WaveMask*` intrinsics, the `WaveMulti*` reductions,
-`WaveMultiPrefix` min/max, `WavePrefixMin`/`WavePrefixMax` and the clustered operations.
+`WaveMultiPrefix` min/max, `WavePrefixMin`/`WavePrefixMax`, `WavePrefixBitAnd`/`WavePrefixBitOr`/
+`WavePrefixBitXor` and the clustered operations.
 
 ### Switch Fall-Through
 

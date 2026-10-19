@@ -11,11 +11,19 @@
 RWStructuredBuffer<uint> outputBuffer;
 RWStructuredBuffer<float4> floatBuffer;
 
+// The bool overload compares 0/1 u32 values, so the shuffle never takes a bool. In the uint
+// overload, each lane ballots whether its value equals the shuffled value of `lane`, an
+// invocation keeps the ballot of its own lane, and its own bit is ORed in.
 // MATCH-NOT: var<private>
-// MATCH: subgroupShuffle(
-// MATCH: subgroupBallot(
-// MATCH: (u32(1) << (
-// MATCH-NOT: subgroupShuffle({{[^,]*}}bool
+// MATCH: fn WaveMatch_{{[0-9]+}}( [[B:value_[0-9]+]] : bool,
+// MATCH: var [[BU:_S[0-9]+]] : u32 = (select(u32(0u), u32(1u), ([[B]])));
+// MATCH: subgroupShuffle([[BU]], i32(lane_{{[0-9]+}}))
+// MATCH: fn WaveMatch_{{[0-9]+}}( [[V:value_[0-9]+]] : u32,  [[SELF:_builtinWaveLaneIndex_[0-9]+]] : u32,
+// MATCH: var [[OTHER:_S[0-9]+]] : u32 = subgroupShuffle([[V]], i32([[LANE:lane_[0-9]+]]));
+// MATCH-NEXT: var [[M:matching_[0-9]+]] : vec4<u32> = subgroupBallot([[V]] == [[OTHER]]);
+// MATCH-NEXT: if([[LANE]] == [[SELF]])
+// MATCH: (u32(1) << (bit_{{[0-9]+}}))
+// MATCH: result_{{[0-9]+}} = ([[M]] | ({{_S[0-9]+}}));
 // MATCH: fn matchMain({{.*}}@builtin(subgroup_size)
 // MATCH-NOT: var<private>
 [shader("compute")]
