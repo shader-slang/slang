@@ -878,6 +878,11 @@ A handle to any other kind of resource (a storage texture, a buffer or a combine
 compile-time error under this capability. The extension is experimental: Dawn exposes it behind the
 `chromium-experimental-sampling-resource-table` feature, which needs unsafe APIs to be allowed.
 
+> **Known issue:** until [Chromium issue 574322344](https://issues.chromium.org/issues/574322344) is
+> fixed, passing a texture or sampler returned by the resource table to a helper function crashes
+> Tint's SPIR-V and HLSL backends (and with them Chrome's GPU process). Keep the lookup in the function
+> that uses the resource, for example by passing the handle, not the resource, to the helper.
+
 ### Custom Descriptor Fetch
 
 If none of the above behaviors are desired, users can customize the conversion logic from descriptor handle
