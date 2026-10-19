@@ -1,6 +1,7 @@
 // A memory location that the caller cannot write may still be passed to a `__ref_readonly`
-// parameter: a `__ref_readonly` or `__constref` parameter, or a field, array element, vector
-// element, or swizzle of one.
+// parameter: a `__ref_readonly` parameter, or a field, array element, vector element, or
+// swizzle of one. A `__constref` parameter is a borrow rather than a memory location, but
+// the body may write to it like any `in` parameter, so its fields are passed as l-values.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -experimental-feature

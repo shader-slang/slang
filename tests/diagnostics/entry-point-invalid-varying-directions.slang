@@ -1,9 +1,7 @@
 // Test that invalid varying types are caught in `out` and `inout` parameters, with correct
 // direction labelling in the diagnostic text.
-//
-// `InOutModifier` inherits from `OutModifier` in the AST, so the direction
-// detection logic must check `InOutModifier` first to avoid mislabeling
-// `inout` parameters as "output".
+// An `inout` parameter is both a stage input and a stage output, so it must
+// not be labelled as only "output".
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=OUT,non-exhaustive):-target spirv -entry outParam -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=INOUT,non-exhaustive):-target spirv -entry inoutParam -stage fragment

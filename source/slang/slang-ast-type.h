@@ -897,7 +897,7 @@ class RefParamType : public RefParamTypeBase
     void _toTextOverride(StringBuilder& out);
 };
 
-// The type for a read-only by-reference parameter, e.g., `ref readonly T`
+// The type for a read-only by-reference parameter, e.g., `ref_readonly T`
 FIDDLE()
 class RefReadOnlyParamType : public RefParamTypeBase
 {
@@ -905,7 +905,7 @@ class RefReadOnlyParamType : public RefParamTypeBase
     void _toTextOverride(StringBuilder& out);
 };
 
-// The type for a write-only by-reference parameter, e.g., `ref writeonly T`
+// The type for a write-only by-reference parameter, e.g., `ref_writeonly T`
 FIDDLE()
 class RefWriteOnlyParamType : public RefParamTypeBase
 {

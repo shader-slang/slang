@@ -1,5 +1,5 @@
 // `__ref_readonly` and `__ref_writeonly` restrict a parameter's passing mode, so they are not
-// allowed on a field. Each keyword spells two modifiers, but it is reported once.
+// allowed on a field.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
 
