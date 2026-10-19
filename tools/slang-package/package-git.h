@@ -183,6 +183,10 @@ SlangResult createLocalBranch(
     const String& commit,
     String& outError);
 
+/// Delete the local branch `branch`, which must not be checked out. Used to withdraw a branch
+/// this tool just created.
+SlangResult deleteLocalBranch(const String& repositoryPath, const String& branch, String& outError);
+
 /// Check out `commit` with a detached `HEAD`.
 SlangResult checkoutDetachedCommit(
     const String& repositoryPath,
@@ -194,6 +198,9 @@ SlangResult discardUncommittedState(const String& repositoryPath, String& outErr
 
 /// Create an annotated tag at `HEAD`. The tag is local and is not pushed.
 SlangResult createAnnotatedTag(const String& repositoryPath, const String& tag, String& outError);
+
+/// Delete the local tag `tag`. Used to withdraw a tag this tool just created and has not pushed.
+SlangResult deleteLocalTag(const String& repositoryPath, const String& tag, String& outError);
 
 /// Fail when `repositoryPath` is not a Git checkout or has uncommitted or untracked files.
 ///

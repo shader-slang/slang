@@ -221,6 +221,63 @@ public:
     }
 };
 
+/// Forward to `inner`, adding `pending` to the release tags of one package.
+///
+/// The pending candidate's manifest is read from its commit through `inner`, which does not need
+/// a tag to read a revision. A published tag of the same version means the release is not
+/// pending, so that is reported as an error instead of listing the version twice.
+class PendingReleaseResolverSource : public IPackageResolverSource
+{
+public:
+    IPackageResolverSource* inner = nullptr;
+    const PendingRelease* pending = nullptr;
+
+    virtual SlangResult listReleaseTags(
+        const String& packageName,
+        const String& git,
+        List<TagCandidate>& outCandidates,
+        String& outError) override
+    {
+        SLANG_RETURN_ON_FAIL(inner->listReleaseTags(packageName, git, outCandidates, outError));
+        if (packageName != pending->packageName || git != pending->git)
+            return SLANG_OK;
+        Index insertAt = outCandidates.getCount();
+        for (Index i = 0; i < outCandidates.getCount(); ++i)
+        {
+            if (outCandidates[i].version == pending->candidate.version)
+            {
+                outError = String("Release ") + formatExactVersion(pending->candidate.version) +
+                           " of '" + packageName + "' already has a tag.";
+                return SLANG_FAIL;
+            }
+            if (insertAt == outCandidates.getCount() &&
+                pending->candidate.version > outCandidates[i].version)
+                insertAt = i;
+        }
+        outCandidates.insert(insertAt, pending->candidate);
+        return SLANG_OK;
+    }
+
+    virtual SlangResult loadManifest(
+        const String& packageName,
+        const String& git,
+        const TagCandidate& candidate,
+        ResolvedManifest& outManifest,
+        String& outError) override
+    {
+        return inner->loadManifest(packageName, git, candidate, outManifest, outError);
+    }
+
+    virtual SlangResult loadCheckoutManifest(
+        const String& packageName,
+        const LockedPackage& held,
+        ResolvedManifest& outManifest,
+        String& outError) override
+    {
+        return inner->loadCheckoutManifest(packageName, held, outManifest, outError);
+    }
+};
+
 class LocalPackageResolverSource : public IPackageResolverSource
 {
 public:
@@ -1387,7 +1444,8 @@ SlangResult resolveDependencies(
     ResolveReport* outReport,
     bool offline,
     const LockFile* heldLock,
-    const List<RepositoryLocation>* remapUrls)
+    const List<RepositoryLocation>* remapUrls,
+    const PendingRelease* pendingRelease)
 {
     GitPackageResolverSource source;
     source.projectRoot = projectRoot;
@@ -1395,8 +1453,12 @@ SlangResult resolveDependencies(
     source.allowRemote = !offline;
     source.warnings = outWarnings;
     SLANG_RETURN_ON_FAIL(source.initialize(outError));
+    PendingReleaseResolverSource pendingSource;
+    pendingSource.inner = &source;
+    pendingSource.pending = pendingRelease;
     Resolver resolver;
-    resolver.source = &source;
+    resolver.source = pendingRelease ? static_cast<IPackageResolverSource*>(&pendingSource)
+                                     : static_cast<IPackageResolverSource*>(&source);
     resolver.projectRoot = projectRoot;
     resolver.heldLock = heldLock;
     resolver.remapUrls = remapUrls;

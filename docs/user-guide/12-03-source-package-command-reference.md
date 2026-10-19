@@ -389,6 +389,21 @@ into `refs/slang-cache/tags` first. The command fails before creating the tag wh
     - the version is not strictly greater than every canonical tag already on the edit line;
     - the version does not satisfy the constraints.
 
+    A dependency that was pinned before the edit is pinned at the new tag. A dependency that was
+    not pinned is checked against the release a later `update` would select. When `update` would
+    move it off the new tag, the command prints why and asks for confirmation. The reasons are:
+
+    - a greater release satisfies every constraint;
+    - another package's requirement rejects the new version; or
+    - the new version conflicts with the newest releases of the other packages.
+
+    The command also solves the graph as `update` would with the dependency pinned at the new
+    tag. When that solve succeeds, the warning suggests running `slang package pin <name>` and
+    repeating `unedit --tag`. When it fails, the warning shows the conflict instead, since a pin
+    would leave `update` unable to resolve. These checks treat the new release as published
+    without creating its tag. The tag is created only after you confirm, so declining leaves the
+    repository and the edit unchanged.
+
 `--clean`
 : Discard uncommitted files, untracked files, and stashes so `HEAD` may move. It does not approve
 dropping commits that follow a tag. Apply it only for an ending that would move `HEAD`. A dirty

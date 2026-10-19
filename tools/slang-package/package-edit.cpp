@@ -7,6 +7,7 @@
 #include "package-git.h"
 #include "package-json.h"
 #include "package-lock.h"
+#include "package-report.h"
 #include "package-resolver.h"
 #include "package-tool.h"
 #include "package-validate.h"
@@ -404,12 +405,18 @@ SlangResult beginPackageEdit(
     if (!exists)
         SLANG_RETURN_ON_FAIL(createLocalBranch(checkout, branch, package.commit, outError));
     String representedCommit = package.commit;
-    if (SLANG_FAILED(checkoutLocalBranch(checkout, branch, outError)))
+    // A failed edit returns the checkout to the commit it was on and, when this command created
+    // the branch, deletes it, so the repository is as it was before the command ran.
+    auto abandon = [&]() -> SlangResult
     {
         String restoreError;
-        checkoutDetachedCommit(checkout, representedCommit, restoreError);
+        if (SLANG_SUCCEEDED(checkoutDetachedCommit(checkout, representedCommit, restoreError)) &&
+            !exists && SLANG_FAILED(deleteLocalBranch(checkout, branch, restoreError)))
+            outError = outError + "\nBranch '" + branch + "' was left in place: " + restoreError;
         return SLANG_FAIL;
-    }
+    };
+    if (SLANG_FAILED(checkoutLocalBranch(checkout, branch, outError)))
+        return abandon();
 
     bool pinned = package.pinned;
     String version = package.version;
@@ -417,12 +424,9 @@ SlangResult beginPackageEdit(
     package.pinned = pinned;
     LockFile resolved;
     if (SLANG_FAILED(_resolveFrozen(projectRoot, manifest, lock, name, pinned, resolved, outError)))
-    {
-        String restoreError;
-        checkoutDetachedCommit(checkout, representedCommit, restoreError);
-        return SLANG_FAIL;
-    }
-    SLANG_RETURN_ON_FAIL(_writeLock(projectRoot, resolved, outError));
+        return abandon();
+    if (SLANG_FAILED(_writeLock(projectRoot, resolved, outError)))
+        return abandon();
     fprintf(
         stdout,
         "Editing '%s' on branch '%s' as %s.\n",
@@ -624,7 +628,11 @@ static SlangResult _releaseAlreadyTagged(
     return SLANG_OK;
 }
 
-static SlangResult _landRelease(
+/// Solve the lock that ends the edit at row `index` on release `version` (`tag` at `commit`).
+///
+/// Every other release is held where it is. `pinned` is the flag the landed row keeps, so a row
+/// that was pinned before the edit is pinned at the new release afterwards.
+static SlangResult _solveLandedRelease(
     const String& projectRoot,
     const Manifest& manifest,
     LockFile lock,
@@ -633,9 +641,7 @@ static SlangResult _landRelease(
     const String& tag,
     const String& commit,
     bool pinned,
-    const String& branchToRestore,
-    bool checkoutMoved,
-    const String& checkout,
+    LockFile& outResolved,
     String& outError)
 {
     LockedPackage& package = lock.packages[index];
@@ -644,25 +650,334 @@ static SlangResult _landRelease(
     package.commit = commit;
     package.branch = String();
     package.pinned = true;
+    return _resolveFrozen(projectRoot, manifest, lock, package.name, pinned, outResolved, outError);
+}
+
+static SlangResult _writeLandedRelease(
+    const String& projectRoot,
+    const LockFile& resolved,
+    const String& name,
+    const String& version,
+    const String& commit,
+    String& outError)
+{
+    SLANG_RETURN_ON_FAIL(_writeLock(projectRoot, resolved, outError));
+    fprintf(
+        stdout,
+        "Package '%s' is a release at %s (%s).\n",
+        name.getBuffer(),
+        version.getBuffer(),
+        commit.getBuffer());
+    return SLANG_OK;
+}
+
+/// End the edit at row `index` on the existing release `tag` at `commit`.
+///
+/// The landed lock is solved before the checkout is touched, because the solve reads the release
+/// by commit rather than from `deps/NAME`. Only then, when `moveCheckout` is set, are uncommitted
+/// files discarded (if `discard` is set) and `commit` checked out. A solve that fails therefore
+/// leaves the checkout, its uncommitted files, and the lock exactly as they were. If writing the
+/// lock fails after the checkout moved, the checkout returns to `branchToRestore`.
+static SlangResult _landRelease(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const LockFile& lock,
+    Index index,
+    const String& version,
+    const String& tag,
+    const String& commit,
+    bool pinned,
+    const String& branchToRestore,
+    bool moveCheckout,
+    bool discard,
+    const String& checkout,
+    String& outError)
+{
     LockFile resolved;
-    if (SLANG_FAILED(
-            _resolveFrozen(projectRoot, manifest, lock, package.name, pinned, resolved, outError)))
+    SLANG_RETURN_ON_FAIL(_solveLandedRelease(
+        projectRoot,
+        manifest,
+        lock,
+        index,
+        version,
+        tag,
+        commit,
+        pinned,
+        resolved,
+        outError));
+    if (moveCheckout)
     {
-        if (checkoutMoved)
+        if (discard)
+            SLANG_RETURN_ON_FAIL(discardUncommittedState(checkout, outError));
+        SLANG_RETURN_ON_FAIL(checkoutDetachedCommit(checkout, commit, outError));
+    }
+    if (SLANG_FAILED(_writeLandedRelease(
+            projectRoot,
+            resolved,
+            lock.packages[index].name,
+            version,
+            commit,
+            outError)))
+    {
+        if (moveCheckout)
         {
             String restoreError;
             checkoutLocalBranch(checkout, branchToRestore, restoreError);
         }
         return SLANG_FAIL;
     }
-    SLANG_RETURN_ON_FAIL(_writeLock(projectRoot, resolved, outError));
-    fprintf(
-        stdout,
-        "Package '%s' is a release at %s (%s).\n",
-        package.name.getBuffer(),
-        version.getBuffer(),
-        commit.getBuffer());
     return SLANG_OK;
+}
+
+/// Solve `landed` the way `slang package update` would, with `name` pinned when `pinTarget` is set.
+///
+/// `update` starts from the lock on disk, keeps pinned and edited rows, and moves every other row
+/// to the greatest release the constraints allow. Repositories were refreshed earlier in the
+/// command, so the solve reads `.slang/repositories` without fetching again.
+static SlangResult _solveLikeUpdate(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const LockFile& landed,
+    const String& name,
+    bool pinTarget,
+    const List<RepositoryLocation>* remapPackages,
+    const PendingRelease& pending,
+    LockFile& outLock,
+    ResolveReport& outReport,
+    String& outError)
+{
+    LockFile held = landed;
+    Index heldIndex = findLockedPackageIndex(held, name);
+    if (heldIndex >= 0)
+        held.packages[heldIndex].pinned = pinTarget;
+    List<String> ignoredWarnings;
+    return resolveDependencies(
+        projectRoot,
+        manifest,
+        outLock,
+        outError,
+        &ignoredWarnings,
+        &outReport,
+        true,
+        &held,
+        remapPackages,
+        &pending);
+}
+
+/// Format the conflict that ended a failed solve, falling back to the error text when the solver
+/// did not record a package conflict.
+static String _describeFailedSolve(const ResolveReport& report, const String& error)
+{
+    String text =
+        report.failure.packageName.getLength() ? formatResolveFailure(report.failure) : error;
+    if (!text.endsWith("\n"))
+        text = text + "\n";
+    return text;
+}
+
+/// Ask whether to end an unpinned edit on a release that a later `update` would move away from.
+///
+/// Consider a workspace whose `noise` row is not pinned, and `unedit noise --tag 1.4` on a branch
+/// whose newest tag was `v1.3`. A `v1.5` may already exist on another branch, or another
+/// dependency may move during `update` to a release that requires `noise <1.4`. `landed` is the
+/// lock this command is about to write, with `noise` at `version` and `commit`.
+///
+/// The lock is solved twice the way `update` would solve it: once as written, and once with
+/// `noise` pinned. When the first solve keeps `commit`, `outApproved` is true without a prompt.
+/// Otherwise the warning names why `update` moves the release. Pinning is suggested only when the
+/// pinned solve succeeds; when it fails, the warning shows that conflict instead, because a pin
+/// would leave `update` unable to resolve the workspace.
+static SlangResult _confirmUpdateKeepsRelease(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const LockFile& landed,
+    const String& name,
+    const PackageVersion& version,
+    const String& tag,
+    const String& commit,
+    bool& outApproved,
+    String& outError)
+{
+    outApproved = false;
+    List<RepositoryLocation> remapPackages;
+    if (landed.remapIndex.getLength())
+        SLANG_RETURN_ON_FAIL(readPackageIndex(landed.remapIndex, remapPackages, outError));
+    const List<RepositoryLocation>* remap =
+        landed.remapIndex.getLength() ? &remapPackages : nullptr;
+    Index landedIndex = findLockedPackageIndex(landed, name);
+    SLANG_RELEASE_ASSERT(landedIndex >= 0);
+    PendingRelease pending;
+    pending.packageName = name;
+    pending.git = landed.packages[landedIndex].git;
+    pending.candidate.ref = tag;
+    pending.candidate.commit = commit;
+    pending.candidate.version = version;
+
+    LockFile unpinned;
+    ResolveReport unpinnedReport;
+    String unpinnedError;
+    bool unpinnedSolved = SLANG_SUCCEEDED(_solveLikeUpdate(
+        projectRoot,
+        manifest,
+        landed,
+        name,
+        false,
+        remap,
+        pending,
+        unpinned,
+        unpinnedReport,
+        unpinnedError));
+    Index selectedIndex = unpinnedSolved ? findLockedPackageIndex(unpinned, name) : -1;
+    if (selectedIndex >= 0 && unpinned.packages[selectedIndex].commit == commit)
+    {
+        outApproved = true;
+        return SLANG_OK;
+    }
+
+    LockFile pinned;
+    ResolveReport pinnedReport;
+    String pinnedError;
+    bool pinnedSolved = SLANG_SUCCEEDED(_solveLikeUpdate(
+        projectRoot,
+        manifest,
+        landed,
+        name,
+        true,
+        remap,
+        pending,
+        pinned,
+        pinnedReport,
+        pinnedError));
+
+    String versionText = formatExactVersion(version);
+    StringBuilder warning;
+    bool namesRequirement = false;
+    if (unpinnedSolved)
+    {
+        warning << "'slang package update' would move '" << name << "' off " << tag;
+        if (selectedIndex >= 0)
+            warning << " to " << unpinned.packages[selectedIndex].ref << " ("
+                    << unpinned.packages[selectedIndex].commit << ")";
+        else
+            warning << " and remove it from the lock";
+        warning << " because '" << name << "' is not pinned:\n";
+
+        PackageVersion selectedVersion;
+        String parseError;
+        String rejections = formatReleaseRejections(unpinnedReport, name, version);
+        if (selectedIndex >= 0 &&
+            SLANG_SUCCEEDED(parseExactVersion(
+                unpinned.packages[selectedIndex].version,
+                selectedVersion,
+                parseError)) &&
+            selectedVersion > version)
+        {
+            warning << "  " << unpinned.packages[selectedIndex].ref
+                    << " is a greater release that satisfies every constraint.\n";
+        }
+        else if (rejections.getLength())
+        {
+            warning << rejections;
+            namesRequirement = true;
+        }
+        else if (!pinnedSolved)
+        {
+            warning << "  " << versionText
+                    << " cannot be combined with the newest releases of the other packages.\n";
+        }
+        else
+        {
+            warning << "  the solver reaches another release before " << versionText
+                    << " when the other packages move to their newest releases.\n";
+        }
+    }
+    else
+    {
+        warning << "'slang package update' cannot resolve the workspace with '" << name
+                << "' unpinned at " << tag << ":\n"
+                << _describeFailedSolve(unpinnedReport, unpinnedError);
+    }
+
+    if (pinnedSolved)
+    {
+        warning << "To keep '" << name << "' at " << tag
+                << " instead, answer no, run 'slang package pin " << name
+                << "', and run this unedit again.";
+        if (namesRequirement)
+            warning << " Changing the requirement named above also keeps it.";
+    }
+    else
+    {
+        warning << "Pinning '" << name << "' would not keep it at " << tag << ". With '" << name
+                << "' pinned at " << versionText << ", 'slang package update' fails:\n"
+                << _describeFailedSolve(pinnedReport, pinnedError)
+                << "Resolve that conflict before ending the edit on " << tag << ".";
+    }
+    fprintf(stderr, "slang-package: warning: %s\n", warning.produceString().getBuffer());
+
+    StringBuilder prompt;
+    prompt << "End the edit on " << tag << " without a pin?";
+    return _confirm(prompt.getBuffer(), outApproved, outError);
+}
+
+/// End an edit on a new release tag `tag` at `commit`, creating the tag only once the release is
+/// accepted.
+///
+/// The frozen solve reads the landed row by commit, and `_confirmUpdateKeepsRelease` sees the
+/// release as a pending candidate, so neither needs the tag. Declining the prompt leaves the
+/// repository unchanged. The tag is created just before the lock is written, and deleted again if
+/// that write fails, because the lock would otherwise not name it.
+static SlangResult _landTaggedRelease(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const LockFile& lock,
+    Index index,
+    const PackageVersion& version,
+    const String& tag,
+    const String& commit,
+    const String& checkout,
+    String& outError)
+{
+    const LockedPackage& package = lock.packages[index];
+    String versionText = formatExactVersion(version);
+    LockFile resolved;
+    bool approved = package.pinned;
+    SlangResult result = _solveLandedRelease(
+        projectRoot,
+        manifest,
+        lock,
+        index,
+        versionText,
+        tag,
+        commit,
+        package.pinned,
+        resolved,
+        outError);
+    if (SLANG_SUCCEEDED(result) && !package.pinned)
+    {
+        result = _confirmUpdateKeepsRelease(
+            projectRoot,
+            manifest,
+            resolved,
+            package.name,
+            version,
+            tag,
+            commit,
+            approved,
+            outError);
+    }
+    if (SLANG_FAILED(result) || !approved)
+        return result;
+    SLANG_RETURN_ON_FAIL(createAnnotatedTag(checkout, tag, outError));
+    result =
+        _writeLandedRelease(projectRoot, resolved, package.name, versionText, commit, outError);
+    if (SLANG_FAILED(result))
+    {
+        String deleteError;
+        if (SLANG_FAILED(deleteLocalTag(checkout, tag, deleteError)))
+            outError = outError + "\nTag " + tag + " was left in place: " + deleteError;
+    }
+    return result;
 }
 
 SlangResult endPackageEdit(
@@ -758,18 +1073,14 @@ SlangResult endPackageEdit(
         SLANG_RETURN_ON_FAIL(
             _requireVersionAccepted(projectRoot, manifest, lock, name, requested, outError));
         String tagName = String("v") + formatExactVersion(requested);
-        SLANG_RETURN_ON_FAIL(createAnnotatedTag(checkout, tagName, outError));
-        return _landRelease(
+        return _landTaggedRelease(
             projectRoot,
             manifest,
             lock,
             index,
-            formatExactVersion(requested),
+            requested,
             tagName,
             head,
-            package.pinned,
-            package.branch,
-            false,
             checkout,
             outError);
     }
@@ -786,9 +1097,9 @@ SlangResult endPackageEdit(
         if (!approved)
             return SLANG_OK;
         bool moves = head != package.commit;
+        bool dirty = false;
         if (moves)
         {
-            bool dirty = false;
             SLANG_RETURN_ON_FAIL(_checkoutIsDirty(checkout, dirty, outError));
             if (dirty && !clean)
             {
@@ -796,9 +1107,6 @@ SlangResult endPackageEdit(
                            ". Commit them or re-run with --clean.";
                 return SLANG_FAIL;
             }
-            if (dirty)
-                SLANG_RETURN_ON_FAIL(discardUncommittedState(checkout, outError));
-            SLANG_RETURN_ON_FAIL(checkoutDetachedCommit(checkout, package.commit, outError));
         }
         return _landRelease(
             projectRoot,
@@ -811,6 +1119,7 @@ SlangResult endPackageEdit(
             package.pinned,
             package.branch,
             moves,
+            dirty,
             checkout,
             outError);
     };
@@ -854,9 +1163,9 @@ SlangResult endPackageEdit(
         SLANG_RETURN_ON_FAIL(
             countCommitsAfter(checkout, newer.commit, head, commitsAfter, outError));
     bool moves = commitsAfter != 0;
+    bool dirty = false;
     if (moves)
     {
-        bool dirty = false;
         SLANG_RETURN_ON_FAIL(_checkoutIsDirty(checkout, dirty, outError));
         if (dirty && !clean)
         {
@@ -873,9 +1182,6 @@ SlangResult endPackageEdit(
         SLANG_RETURN_ON_FAIL(_confirm(prompt.getBuffer(), approved, outError));
         if (!approved)
             return SLANG_OK;
-        if (dirty)
-            SLANG_RETURN_ON_FAIL(discardUncommittedState(checkout, outError));
-        SLANG_RETURN_ON_FAIL(checkoutDetachedCommit(checkout, newer.commit, outError));
     }
     return _landRelease(
         projectRoot,
@@ -888,6 +1194,7 @@ SlangResult endPackageEdit(
         package.pinned,
         package.branch,
         moves,
+        dirty,
         checkout,
         outError);
 }

@@ -132,5 +132,16 @@ String formatResolveSummary(
     const LockFile& next,
     const ResolveReport& report);
 
+/// Format why the solve recorded in `report` did not select release `version` of `packageName`.
+///
+/// Each line names an incoming constraint that rejects `version`, with the package that imposed
+/// it, or a skip the solver recorded for `version` such as a retraction or a workspace exclusion.
+/// The result is empty when nothing recorded in the report rejects `version`; the solver then
+/// chose a greater release, or backtracked past `version` because of its own dependencies.
+String formatReleaseRejections(
+    const ResolveReport& report,
+    const String& packageName,
+    const PackageVersion& version);
+
 } // namespace PackageTool
 } // namespace Slang

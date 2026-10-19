@@ -68,6 +68,19 @@ public:
 
 struct ResolveReport;
 
+/// A release the solver treats as published although its tag has not been created yet.
+///
+/// Consider `slang package unedit noise --tag 1.4`. Before creating `v1.4`, the command asks
+/// whether a later `update` would keep that release. The solver sees `candidate` among the
+/// release tags of `packageName` at `git`, and reads its manifest from `candidate.commit`, so the
+/// question can be answered without writing a tag that might be withdrawn.
+struct PendingRelease
+{
+    String packageName;
+    String git;
+    TagCandidate candidate;
+};
+
 /// Resolve dependencies using an explicitly supplied package source.
 SlangResult resolveDependenciesWithSource(
     const Manifest& manifest,
@@ -90,7 +103,8 @@ SlangResult resolveDependenciesWithSource(
 /// Resolve dependencies from Git repositories, using a cache under the workspace root.
 ///
 /// When `offline` is true, Git packages are resolved from `.slang/repositories` only. A missing
-/// repository, ref, or object fails instead of cloning or fetching the package URL.
+/// repository, ref, or object fails instead of cloning or fetching the package URL. A non-null
+/// `pendingRelease` is listed among that package's release tags as if it were published.
 SlangResult resolveDependencies(
     const String& projectRoot,
     const Manifest& manifest,
@@ -100,7 +114,8 @@ SlangResult resolveDependencies(
     ResolveReport* outReport = nullptr,
     bool offline = false,
     const LockFile* heldLock = nullptr,
-    const List<RepositoryLocation>* remapUrls = nullptr);
+    const List<RepositoryLocation>* remapUrls = nullptr,
+    const PendingRelease* pendingRelease = nullptr);
 
 /// Resolve dependencies using registered local manifests and Git for the remaining packages.
 SlangResult resolveDependenciesFromLocalPackages(

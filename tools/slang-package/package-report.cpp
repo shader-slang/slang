@@ -241,6 +241,24 @@ static bool _constraintMatches(const ResolveConstraintNote& note, const PackageV
     return note.constraint.matches(version);
 }
 
+/// Write one line for each incoming constraint on `explanation` that `version` fails, naming the
+/// owner so a reader knows which package to change.
+static void _appendConstraintRejections(
+    StringBuilder& builder,
+    const ResolvePackageExplanation& explanation,
+    const PackageVersion& version,
+    const String& versionText,
+    const char* indent)
+{
+    for (const auto& note : explanation.constraints)
+    {
+        if (_constraintMatches(note, version))
+            continue;
+        builder << indent << versionText << " rejected by " << _ownerLabel(note) << ": "
+                << note.text << "\n";
+    }
+}
+
 static void _appendRejectedPrevious(StringBuilder& builder, const ResolveChange& change)
 {
     if (!change.previousVersion.getLength() || !change.explanation)
@@ -249,13 +267,12 @@ static void _appendRejectedPrevious(StringBuilder& builder, const ResolveChange&
     String error;
     if (SLANG_FAILED(parseExactVersion(change.previousVersion, previous, error)))
         return;
-    for (const auto& note : change.explanation->constraints)
-    {
-        if (_constraintMatches(note, previous))
-            continue;
-        builder << "    " << change.previousVersion << " rejected by " << _ownerLabel(note) << ": "
-                << note.text << "\n";
-    }
+    _appendConstraintRejections(
+        builder,
+        *change.explanation,
+        previous,
+        change.previousVersion,
+        "    ");
 }
 
 static void _appendSelectionReason(StringBuilder& builder, const ResolveChange& change)
@@ -549,6 +566,27 @@ String formatResolveSummary(
     List<ResolveChange> changes;
     _collectChanges(rootManifest, previous, next, report, changes);
     return _countLine(changes, false);
+}
+
+String formatReleaseRejections(
+    const ResolveReport& report,
+    const String& packageName,
+    const PackageVersion& version)
+{
+    const ResolvePackageExplanation* explanation = _findExplanation(report, packageName);
+    if (!explanation)
+        return String();
+    StringBuilder builder;
+    String versionText = formatExactVersion(version);
+    _appendConstraintRejections(builder, *explanation, version, versionText, "  ");
+    for (const auto& skip : explanation->skips)
+    {
+        PackageVersion skipped;
+        String error;
+        if (SLANG_SUCCEEDED(parseExactVersion(skip.version, skipped, error)) && skipped == version)
+            builder << "  skipped " << versionText << ": " << skip.reason << "\n";
+    }
+    return builder.produceString();
 }
 
 } // namespace PackageTool

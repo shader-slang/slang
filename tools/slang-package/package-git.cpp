@@ -1968,6 +1968,16 @@ SlangResult checkoutLocalBranch(
     return _runGit(repositoryPath, arguments, result, outError);
 }
 
+SlangResult deleteLocalBranch(const String& repositoryPath, const String& branch, String& outError)
+{
+    List<String> arguments;
+    arguments.add("branch");
+    arguments.add("-D");
+    arguments.add(branch);
+    ExecuteResult result;
+    return _runGit(repositoryPath, arguments, result, outError);
+}
+
 SlangResult createLocalBranch(
     const String& repositoryPath,
     const String& branch,
@@ -2019,6 +2029,16 @@ SlangResult createAnnotatedTag(const String& repositoryPath, const String& tag, 
     arguments.add("-a");
     arguments.add(tag);
     arguments.add("-m");
+    arguments.add(tag);
+    ExecuteResult result;
+    return _runGit(repositoryPath, arguments, result, outError);
+}
+
+SlangResult deleteLocalTag(const String& repositoryPath, const String& tag, String& outError)
+{
+    List<String> arguments;
+    arguments.add("tag");
+    arguments.add("-d");
     arguments.add(tag);
     ExecuteResult result;
     return _runGit(repositoryPath, arguments, result, outError);
