@@ -13,6 +13,9 @@ this module to find out:
     run       on the perf host: build and measure commits between base and
               head, rewriting bisect.json and bisect.md after every step.
     report    print bisect.md again from bisect.json.
+    triage    in the nightly's analyze job: say from the archived samples
+              alone whether a confirmed change looks real or like noise, as one
+              line for the existing Slack message.
 
 The measurement rules live here rather than in a prompt so that two runs on the
 same data follow the same rules, and so that test_perf_bisect.py can check
@@ -606,6 +609,175 @@ class Bisector:
         return self.finish("interval", "the parent-to-culprit step did not reproduce")
 
 
+# A change counts as real when the fastest sample moves: a slow tail alone is
+# what host noise looks like, while a code change also slows the best run.
+MIN_SHIFT = 1.03
+TAIL_RATIO = 1.25
+TAIL_NIGHTS = 0.30
+MIN_HISTORY = 3
+
+
+def triage(results_dir, label):
+    """Judge each confirmed change of one night as real, noise or unclear.
+
+    The rules use only what the nightly has already stored: the night's two
+    batches and its trailing baseline nights on the same runner. Per counter,
+    in order:
+      known-flaky       a counter listed in KNOWN_FLAKY: noise.
+      runner-changed    no baseline night ran on tonight's runner: unclear.
+      thin-history      fewer than MIN_HISTORY such nights: unclear.
+      same-commit-flat  the newest such night built head's commit and was flat
+                        on this counter, so the same code measured fast a day
+                        earlier: noise.
+      bimodal-history   at least TAIL_NIGHTS of the nights had a sample
+                        TAIL_RATIO above their median, reaching within 5% of
+                        tonight's fastest sample: noise.
+      min-shifted       tonight's fastest sample (either batch) is MIN_SHIFT
+                        above the nights' fastest and clears the absolute
+                        floor: real.
+      sibling-shifted   only the tail moved, but another counter of the same
+                        workload is min-shifted: real.
+      tail-only         only the tail moved: noise.
+    The night is real if any counter is real, noise if all are noise, and
+    unclear otherwise.
+    """
+    night = Path(results_dir) / "daily" / label
+    archive = analyze.read_json(night / "confirmation.json")
+    plan = archive["plan"]
+    original = analyze.read_json(night / "results.json")
+    errors, warnings, _ = confirm.confirmed_changes(plan, original, archive["repeated"])
+    meta = analyze.read_json(night / "meta.json")
+    head, runner = meta.get("commit", ""), meta.get("runner", "")
+    limits = plan["thresholds"]
+
+    history = []
+    for hist_label in plan["baseline_labels"]:
+        hist = Path(results_dir) / "daily" / hist_label
+        if not (hist / "meta.json").exists() or not (hist / "results.json").exists():
+            continue
+        hist_meta = analyze.read_json(hist / "meta.json")
+        if runner and hist_meta.get("runner") == runner:
+            runs = {r["workload"]: r for r in analyze.canonical_runs(
+                analyze.read_json(hist / "results.json")) if r.get("ok")}
+            history.append({"label": hist_label, "commit": hist_meta.get("commit", ""),
+                            "runs": runs})
+    tonight = [{r["workload"]: r for r in analyze.canonical_runs(batch)}
+               for batch in (original, archive["repeated"])]
+
+    def stat(runs, workload, counter):
+        return ((runs.get(workload) or {}).get("timers") or {}).get(counter) or {}
+
+    rows = []
+    for tier, change in [("regression", c) for c in errors] + [("warning", c) for c in warnings]:
+        wl, ct = change.workload, change.counter
+        row = {"tier": tier, "workload": wl, "counter": ct, "min_ratio": None}
+        stats = [stat(h["runs"], wl, ct) for h in history]
+        stats = [x for x in stats if all(isinstance(x.get(k), (int, float))
+                                         for k in ("min", "max", "median"))]
+        best = min(stat(b, wl, ct).get("min", math.inf) for b in tonight)
+        if (wl, ct) in KNOWN_FLAKY:
+            row["rule"] = "known-flaky"
+        elif not history:
+            row["rule"] = "runner-changed"
+        elif len(stats) < MIN_HISTORY or not math.isfinite(best):
+            row["rule"] = "thin-history"
+        else:
+            hist_best = min(x["min"] for x in stats)
+            row["min_ratio"] = round(best / hist_best, 4)
+            floor = trend.abs_floor_for(ct, limits["abs"])
+            newest = history[-1]
+            tails = [x for x in stats if x["max"] >= TAIL_RATIO * x["median"]]
+            change_dict = {"workload": wl, "counter": ct, "baseline": change.baseline}
+            if same_commit(newest["commit"], head) and is_flat_night(
+                    {(wl, ct): stat(newest["runs"], wl, ct).get("median")}, change_dict, limits):
+                row["rule"] = "same-commit-flat"
+            elif (len(tails) >= TAIL_NIGHTS * len(stats)
+                  and max(x["max"] for x in tails) >= 0.95 * best):
+                row["rule"] = "bimodal-history"
+            elif best >= MIN_SHIFT * hist_best and best - hist_best >= floor:
+                row["rule"] = "min-shifted"
+            else:
+                row["rule"] = "tail-only"
+        rows.append(row)
+    shifted = {r["workload"] for r in rows if r["rule"] == "min-shifted"}
+    for r in rows:
+        if r["rule"] == "tail-only" and r["workload"] in shifted:
+            r["rule"] = "sibling-shifted"
+        r["verdict"] = TRIAGE_RULES[r["rule"]]
+    # The night's verdict follows the tier that raised the alert: regressions
+    # when there are any, so a red night is judged by the counters that made it
+    # red; warnings only on a night that confirmed nothing worse.
+    lead = [r for r in rows if r["tier"] == "regression"] or rows
+    verdicts = {r["verdict"] for r in lead}
+    verdict = ("none" if not lead else "real" if "real" in verdicts
+               else "noise" if verdicts == {"noise"} else "unclear")
+    return {"label": label, "head": head,
+            "previous": history[-1]["commit"] if history else None,
+            "history_nights": len(history), "verdict": verdict, "counters": rows}
+
+
+TRIAGE_RULES = {"known-flaky": "noise", "runner-changed": "unclear",
+                "thin-history": "unclear", "same-commit-flat": "noise",
+                "bimodal-history": "noise", "min-shifted": "real",
+                "sibling-shifted": "real", "tail-only": "noise"}
+
+
+def triage_line(result):
+    """Return the one Slack line for a triage result, or "" when there is nothing to say.
+
+    The line leads with the tier the verdict was taken from and names the other
+    tier after it, so it reads against the alert above it. Known-flaky counters
+    are skipped rather than counted as noise, and are reported separately.
+    Rules other than "moved its fastest sample" are named in parentheses so a
+    noise verdict says why. For the 2026-10-16 night, with 4 confirmed
+    regressions and 12 confirmed warnings, one of them known-flaky: "Real or
+    noise: real. 4 of 4 confirmed regressions moved their fastest sample; 11 of
+    11 confirmed warnings did too (1 known-flaky counter skipped); compared with
+    the last 7 nights; f2b163c082..e49310561e."
+    The line is assembled from fixed words, rule names, counts and validated
+    SHAs only, the same contract as render().
+    """
+    if result.get("verdict") not in ("real", "noise", "unclear"):
+        return ""
+    rows = [r for r in result.get("counters") or [] if r.get("rule") in TRIAGE_RULES
+            and r.get("tier") in ("regression", "warning")]
+
+    def part(tier):
+        group = [r for r in rows if r["tier"] == tier]
+        judged = [r for r in group if r["rule"] != "known-flaky"]
+        real = sum(1 for r in judged if TRIAGE_RULES[r["rule"]] == "real")
+        other = {}
+        for r in judged:
+            if TRIAGE_RULES[r["rule"]] != "real":
+                other[r["rule"]] = other.get(r["rule"], 0) + 1
+        notes = [f"{rule} {n}" for rule, n in sorted(other.items())]
+        flaky = len(group) - len(judged)
+        if flaky:
+            notes.append(f"{flaky} known-flaky counter{'s' if flaky > 1 else ''} skipped")
+        return group, real, len(judged), (f" ({'; '.join(notes)})" if notes else "")
+
+    lead_tier = "regression" if any(r["tier"] == "regression" for r in rows) else "warning"
+    other_tier = "warning" if lead_tier == "regression" else "regression"
+    _, real, judged, notes = part(lead_tier)
+    text = (f"Real or noise: {result['verdict']}. {real} of {judged} confirmed "
+            f"{lead_tier}s moved their fastest sample{notes}")
+    group, o_real, o_judged, o_notes = part(other_tier)
+    if group:
+        text += f"; {o_real} of {o_judged} confirmed {other_tier}s did too{o_notes}"
+    nights = result.get("history_nights")
+    if isinstance(nights, int) and not isinstance(nights, bool):
+        compared = ("compared with the last night" if nights == 1
+                    else f"compared with the last {nights} nights")
+    else:
+        compared = "compared with recent nights"
+
+    def sha(s):
+        return s[:10] if isinstance(s, str) and SHA_RE.fullmatch(s) else "?"
+
+    return (f"{text}; {compared}; "
+            f"{sha(result.get('previous'))}..{sha(result.get('head'))}.")
+
+
 SHA_RE = re.compile(r"[0-9a-f]{7,40}")
 NAME_RE = re.compile(r"[A-Za-z0-9_]{1,64}")
 STATUSES = ("unclear", "not-reproduced", "interval", "culprit")
@@ -718,6 +890,10 @@ def main(argv=None):
     r.add_argument("--samples", type=int, default=SAMPLES)
     p = sub.add_parser("report", help="print bisect.md from bisect.json")
     p.add_argument("--out", required=True, type=Path)
+    g = sub.add_parser("triage", help="judge a confirmed night real or noise from its samples")
+    g.add_argument("--results", required=True, type=Path, help="the results repo checkout")
+    g.add_argument("--label", required=True)
+    g.add_argument("--out", type=Path, default=None, help="where to write triage.json")
     args = ap.parse_args(argv)
 
     if args.command == "targets":
@@ -729,9 +905,10 @@ def main(argv=None):
                       head=targets["head"],
                       base=targets["bases"][0]["commit"] if targets["bases"] else "",
                       reason=targets["reason"])
+        n, b = len(targets["changes"]), len(targets["bases"])
         trend.write_step_summary(
-            f"### Bisect targets\n\n{len(targets['changes'])} target counter(s); "
-            f"{len(targets['bases'])} candidate base night(s); head `{targets['head'][:10]}`. "
+            f"### Bisect targets\n\n{n} target counter{'' if n == 1 else 's'}; "
+            f"{b} candidate base night{'' if b == 1 else 's'}; head `{targets['head'][:10]}`. "
             + ("Bisecting." if targets["proceed"] else f"Not bisecting: {targets['reason']}."))
     elif args.command == "deadline":
         now = (datetime.datetime.fromisoformat(args.now) if args.now
@@ -761,6 +938,15 @@ def main(argv=None):
         else:
             state = runner.run()
         print(f"perf_bisect: {state['status']}")
+    elif args.command == "triage":
+        result = triage(args.results, args.label)
+        if args.out:
+            with analyze.open_output(str(args.out)) as fh:
+                json.dump(result, fh, indent=2)
+        line = triage_line(result)
+        github_output(verdict=result["verdict"], line=line)
+        if line:
+            trend.write_step_summary(f"### Real or noise\n\n{line}")
     else:
         sys.stdout.write(render(analyze.read_json(args.out / "bisect.json")))
 
