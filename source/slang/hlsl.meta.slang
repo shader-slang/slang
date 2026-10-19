@@ -11393,7 +11393,8 @@ uint f32tof16(float value)
     case hlsl: __intrinsic_asm "f32tof16($0)";
     case cuda: __intrinsic_asm "__half_as_ushort(__float2half($0))";
     case cpp: __intrinsic_asm "f32tof16($0)";
-    case metal: __intrinsic_asm "as_type<ushort>((half)($0))";
+    // `as_type<ushort>` alone is a `ushort`; widen it so the result is a `uint` as declared.
+    case metal: __intrinsic_asm "uint(as_type<ushort>((half)($0)))";
     case spirv:
     {
         return spirv_asm {
