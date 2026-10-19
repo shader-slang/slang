@@ -1,8 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry computeMain -force-glsl-scalar-layout
+//TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry computeMain -fvk-use-c-layout
 
 // Entry-point uniforms are placed in a `var<uniform>`, where WGSL requires a 16-byte array
-// stride. Forcing the scalar layout must not drop the std140 array wrapper there, or the
+// stride. Forcing the scalar or C layout must not drop the std140 array wrapper there, or the
 // shader is rejected at creation and no longer matches the reflected offsets.
 
 // CHECK: struct _Array_std140_int2_0
