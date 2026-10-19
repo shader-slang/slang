@@ -142,6 +142,38 @@ static IRType* unwrapDescriptorHandle(IRType* type)
     return type;
 }
 
+// True for a cast between a `DescriptorHandle<T>` and its `uint64` bits when `T` is a texture,
+// sampler or acceleration structure. Metal spells such a handle as `T` itself, an opaque type that
+// neither a C-style cast nor `as_type` converts to or from an integer, so the cast reinterprets a
+// local through a `thread` pointer instead (see `tryEmitInstStmtImpl`). A handle to a buffer is a
+// pointer on Metal and keeps its C-style cast.
+static bool isOpaqueDescriptorHandleBitsCast(IRInst* inst)
+{
+    IRType* handleType = nullptr;
+    switch (inst->getOp())
+    {
+    case kIROp_CastUInt64ToDescriptorHandle:
+        handleType = inst->getDataType();
+        break;
+    case kIROp_CastDescriptorHandleToUInt64:
+        handleType = inst->getOperand(0)->getDataType();
+        break;
+    default:
+        return false;
+    }
+    auto resourceType = unwrapAttributedType(unwrapDescriptorHandle(handleType));
+    return as<IRTextureTypeBase>(resourceType) || as<IRSamplerStateTypeBase>(resourceType) ||
+           as<IRRaytracingAccelerationStructureType>(resourceType);
+}
+
+CLikeSourceEmitter::FoldPolicy MetalSourceEmitter::getFoldPolicy(IRInst* inst)
+{
+    // The reinterpretation needs a local to take the address of, so it is a statement.
+    if (isOpaqueDescriptorHandleBitsCast(inst))
+        return FoldPolicy::Never;
+    return Super::getFoldPolicy(inst);
+}
+
 void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
@@ -706,6 +738,31 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(" = *(");
             emitType(inst->getDataType());
             m_writer->emit(" thread*)(&_slang_ordinary_texture);\n");
+            m_writer->dedent();
+            m_writer->emit("}\n");
+            return true;
+        }
+    case kIROp_CastUInt64ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt64:
+        {
+            // A buffer handle is a pointer; tryEmitInstExprImpl casts it as an expression.
+            if (!isOpaqueDescriptorHandleBitsCast(inst))
+                return false;
+
+            // A texture, sampler or acceleration structure handle is an opaque 64-bit value,
+            // so its bits are read or rebuilt through memory, the same way as
+            // kIROp_MetalCastToDepthTexture above.
+            emitType(inst->getDataType(), getName(inst));
+            m_writer->emit(";\n{\n");
+            m_writer->indent();
+            emitType(inst->getOperand(0)->getDataType(), String("_slang_handle_bits_src"));
+            m_writer->emit(" = ");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            m_writer->emit(getName(inst));
+            m_writer->emit(" = *(");
+            emitType(inst->getDataType());
+            m_writer->emit(" thread*)(&_slang_handle_bits_src);\n");
             m_writer->dedent();
             m_writer->emit("}\n");
             return true;

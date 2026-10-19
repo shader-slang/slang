@@ -674,9 +674,9 @@ struct AnyValueMarshallingContext
                 {
                     if (isMetalTarget(targetRequest) && sizeInBytes == 8)
                     {
-                        // Metal: DescriptorHandle is a pointer; as_type<> can't cast
-                        // between pointer and non-pointer types. Convert through uint64
-                        // using CastDescriptorHandleToUInt64 which emits a C-style cast.
+                        // Metal: as_type<> can't cast a DescriptorHandle, which is a pointer
+                        // or an opaque texture/sampler. Convert through uint64 using
+                        // CastDescriptorHandleToUInt64, which the Metal emitter lowers.
                         auto uint64Val = builder->emitIntrinsicInst(
                             builder->getUInt64Type(),
                             kIROp_CastDescriptorHandleToUInt64,
@@ -1216,9 +1216,9 @@ struct AnyValueMarshallingContext
                 {
                     if (isMetalTarget(targetRequest) && sizeInBytes == 8)
                     {
-                        // Metal: DescriptorHandle is a pointer; as_type<> can't cast
-                        // between pointer and non-pointer types. Reconstruct through
-                        // uint64 using CastUInt64ToDescriptorHandle.
+                        // Metal: as_type<> can't cast a DescriptorHandle, which is a pointer
+                        // or an opaque texture/sampler. Reconstruct through uint64 using
+                        // CastUInt64ToDescriptorHandle, which the Metal emitter lowers.
                         auto srcAddr0 = builder->emitFieldAddress(
                             uintPtrType,
                             anyValueVar,

@@ -3395,6 +3395,18 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         emitInstStmt(inst);
         break;
 
+    case kIROp_CastUInt64ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt64:
+        // A target whose handle type no expression converts to or from an integer (Metal's
+        // textures and samplers) emits the cast as a statement; elsewhere it is an expression.
+        if (!tryEmitInstStmtImpl(inst))
+        {
+            emitInstResultDecl(inst);
+            emitInstExpr(inst, getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+        }
+        break;
+
     case kIROp_LiveRangeStart:
     case kIROp_LiveRangeEnd:
         emitLiveness(inst);
