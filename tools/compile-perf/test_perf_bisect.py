@@ -692,7 +692,8 @@ class CliOutputTests(unittest.TestCase):
         root = Path(tempfile.mkdtemp(prefix="perf_bisect_out_"))
         self.addCleanup(shutil.rmtree, root)
         out = root / "github_output"
-        with patch.dict(os.environ, {"GITHUB_OUTPUT": str(out)}), \
+        with patch.dict(os.environ, {"GITHUB_OUTPUT": str(out),
+                                     "GITHUB_STEP_SUMMARY": str(root / "summary")}), \
                 patch("sys.stdout", new_callable=lambda: open(os.devnull, "w")):
             perf_bisect.main([a.replace("@", str(root)) for a in argv])
         return dict(l.split("=", 1) for l in out.read_text().splitlines())
