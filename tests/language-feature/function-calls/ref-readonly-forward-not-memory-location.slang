@@ -1,9 +1,10 @@
 // A `__ref_readonly` argument must still be a memory location, and a read-only location is still
-// not writable. A swizzle that repeats a component does not name a memory location.
+// not writable. A swizzle that repeats a component does not name a memory location, and neither
+// does a property, whose getter returns a temporary.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
-struct S { int a; int4 v; }
+struct S { int a; int4 v; property int p { get { return a; } } }
 
 int leaf(__ref_readonly int x) { return x; }
 int leaf2(__ref_readonly int2 x) { return x.x; }
@@ -16,6 +17,9 @@ int forward(__ref_readonly S s)
     leaf2(s.v.xx);
 //CHECK:      ^^ E30047
 //CHECK:      ^^ argument passed to parameter '0' must be l-value.
+    leaf(s.p);
+//CHECK:   ^ E30047
+//CHECK:   ^ argument passed to parameter '0' must be l-value.
     return leaf(s.a + 1);
 //CHECK:            ^ E30047
 //CHECK:            ^ argument passed to parameter '0' must be l-value.
