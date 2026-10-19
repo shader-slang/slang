@@ -41,6 +41,11 @@ void legalizeEntryPointVaryingParamsForWGSL(
 
 void depointerizeInputParams(IRFunc* entryPoint);
 
+// Converts `val` to `toType` (a vector reshape or a scalar extract, then a cast), as is done for a
+// system value whose declared type the target does not allow. Returns null if there is no such
+// conversion.
+IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType);
+
 // SystemValueSemanticName member definition macro
 #define SYSTEM_VALUE_SEMANTIC_NAMES(M)                   \
     M(Position, SV_Position)                             \
