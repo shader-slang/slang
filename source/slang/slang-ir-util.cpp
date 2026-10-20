@@ -2546,14 +2546,6 @@ IRVarLayout* findVarLayout(IRInst* value)
     return nullptr;
 }
 
-IRVarLayout* getGlobalParamBindingVarLayout(IRVarLayout* varLayout)
-{
-    auto typeLayout = varLayout->getTypeLayout()->unwrapArray();
-    if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
-        return parameterGroupTypeLayout->getContainerVarLayout();
-    return varLayout;
-}
-
 UnownedStringSlice getBuiltinFuncName(IRInst* callee)
 {
     auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();

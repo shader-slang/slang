@@ -616,15 +616,6 @@ IRBlock* getBlock(IRInst* inst);
 
 IRVarLayout* findVarLayout(IRInst* value);
 
-/// Return the var layout that decides how a global shader parameter is bound: the container var
-/// layout when `varLayout` describes a parameter group such as `ConstantBuffer<T>` (or an array of
-/// them), and `varLayout` itself otherwise.
-///
-/// For a parameter group, the element var layout describes the fields inside the buffer, while the
-/// container var layout records the resource the buffer itself occupies, for example a
-/// `PushConstantBuffer` slot or a descriptor binding.
-IRVarLayout* getGlobalParamBindingVarLayout(IRVarLayout* varLayout);
-
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
 KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);
 

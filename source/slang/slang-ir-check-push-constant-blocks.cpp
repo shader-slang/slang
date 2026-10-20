@@ -11,8 +11,12 @@ namespace Slang
 bool isPushConstantBlockByLayout(IRInst* globalParam)
 {
     auto varLayout = findVarLayout(globalParam);
-    return varLayout && getGlobalParamBindingVarLayout(varLayout)->usesResourceKind(
-                            LayoutResourceKind::PushConstantBuffer);
+    if (!varLayout)
+        return false;
+    auto typeLayout = varLayout->getTypeLayout()->unwrapArray();
+    if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+        varLayout = parameterGroupTypeLayout->getContainerVarLayout();
+    return varLayout->usesResourceKind(LayoutResourceKind::PushConstantBuffer);
 }
 
 /// Return the struct type that holds the `uniform` parameters in the push-constant block that
