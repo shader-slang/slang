@@ -4,6 +4,7 @@
 // Write-only textures do not declare `fence()` and get none. (shader-slang/slang#13771)
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain -line-directive-mode none
+//TEST:SIMPLE(filecheck=LOOP): -target metal -stage compute -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=NOFENCE): -target metal -stage compute -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=ROV): -target metal -stage fragment -entry fragMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
@@ -37,11 +38,29 @@ void writeLayer(uint2 p)
     layers[uint3(p, 1)] = 2.0;
 }
 
+// Each iteration reads the texel the previous iteration wrote, so the fence stays in the loop
+// body after the write rather than moving before the loop or after it.
+// LOOP-LABEL: void accumulate
+// LOOP: for
+// LOOP: img{{.*}}.read(
+// LOOP: img{{.*}}.write(
+// LOOP-NEXT: _slang_textureFence({{.*}}img
+// LOOP-NEXT: i_{{[0-9]+}} = i_{{[0-9]+}} + 1U;
+// LOOP-NEXT: }
+[noinline]
+void accumulate(uint2 p, uint count)
+{
+    for (uint i = 0; i < count; i++)
+        img[p] = img[p] + float(i);
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void computeMain(uint3 id: SV_DispatchThreadID)
 {
     uint2 p = id.xy;
+
+    accumulate(p, id.z);
 
     // The read-modify-write from the issue: the second read must see the write.
     // CHECK-LABEL: void computeMain
