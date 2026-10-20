@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#failure-modes
-//META: doc_section_digest=a90b198ea2328d6f79a99f07405f80975c42e7ee4f6f90cb3a7ef552183ec66f
+//META: doc_section_digest=917434add55b557b228b443846eefc5d6962c4a14daa202ebe626eecee22d1ca
 //META: purpose=Verifies an empty parenthesized expression `()` in value position is rejected with E20005.
 //META: intent=characterization
 //META: covers=source/slang/slang-parser.cpp

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#c
-//META: doc_section_digest=4ed4fc77ddb6304c3ae38741787b9e7677099af5a2fe3317e5d4972aacd81339
+//META: doc_section_digest=5b9e945f54cc27badb08f8b17ccb7603498ae85174a41efe649eb4a0d86fa5d7
 //META: purpose=The C++ backend emits C++ source paired with `slang-cpp-prelude.h` and exports the compute entry point through `SLANG_PRELUDE_EXPORT` shims.
 //META: intent=functional
 //META: pipeline_stage=emit

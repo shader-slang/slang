@@ -1698,6 +1698,56 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
     return candidateCost;
 }
 
+bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType)
+{
+    // Only builtin scalars are eligible, and `bool` is excluded: it already has
+    // a dedicated implicit conversion from any `__EnumType` (core.meta.slang),
+    // so routing it through the enum->tag->bool composite would introduce a
+    // second, competing representation of the same conversion.
+    auto toBasicType = as<BasicExpressionType>(toType);
+    if (!toBasicType || toBasicType->getBaseType() == BaseType::Bool)
+        return false;
+
+    // The enum must be unscoped, tested through the shared `isUnscopedEnum`
+    // predicate (also used by the parser). It recognizes `UnscopedEnumAttribute`
+    // — attached for `-unscoped-enum` (non-generic enums only) or an explicit
+    // `[UnscopedEnum]` (any enum) — as well as a still-unchecked `[UnscopedEnum]`
+    // for parser-time callers; by the time coercion runs the attribute is checked.
+    if (!isUnscopedEnum(enumDecl))
+        return false;
+
+    // The widening is an HLSL-compatibility feature, so it applies only when the
+    // current translation unit is the HLSL-flavored dialect. The translation
+    // unit request is absent on some paths (e.g. entry-point specialization and
+    // reflection), which correctly reads as "not HLSL".
+    auto translationUnit = getShared()->getTranslationUnitRequest();
+    return translationUnit && translationUnit->sourceLanguage == SourceLanguage::HLSL;
+}
+
+static bool isMatrixLayoutConversion(Type* toType, Type* fromType)
+{
+    if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
+    {
+        auto toMatrixType = as<MatrixExpressionType>(toType);
+        return toMatrixType &&
+               fromMatrixType->getElementType()->equals(toMatrixType->getElementType()) &&
+               fromMatrixType->getRowCount()->equals(toMatrixType->getRowCount()) &&
+               fromMatrixType->getColumnCount()->equals(toMatrixType->getColumnCount());
+    }
+    if (auto fromArrayType = as<ArrayExpressionType>(fromType))
+    {
+        auto toArrayType = as<ArrayExpressionType>(toType);
+        if (!toArrayType || !as<ConstantIntVal>(fromArrayType->getElementCount()) ||
+            fromArrayType->isUnsized() ||
+            !fromArrayType->getElementCount()->equals(toArrayType->getElementCount()))
+            return false;
+        return isMatrixLayoutConversion(
+            toArrayType->getElementType(),
+            fromArrayType->getElementType());
+    }
+    return false;
+}
+
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
@@ -1891,6 +1941,28 @@ bool SemanticsVisitor::_coerce(
                     if (outCost)
                         *outCost = kConversionCost_SizedArrayToUnsizedArray;
                     return true;
+                }
+
+                if (toArrayType->isUnsized())
+                {
+                    auto sizedToType = m_astBuilder->getArrayType(
+                        toArrayType->getElementType(),
+                        fromArrayType->getElementCount());
+                    if (isMatrixLayoutConversion(sizedToType, fromType))
+                    {
+                        if (outToExpr)
+                        {
+                            auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                            castExpr->type = sizedToType;
+                            castExpr->loc = fromExpr->loc;
+                            castExpr->base = fromExpr;
+                            *outToExpr = castExpr;
+                        }
+                        if (outCost)
+                            *outCost = kConversionCost_MatrixLayout +
+                                       kConversionCost_SizedArrayToUnsizedArray;
+                        return true;
+                    }
                 }
             }
         }
@@ -2192,6 +2264,58 @@ bool SemanticsVisitor::_coerce(
             }
             return true;
         }
+
+        // HLSL compatibility: an unscoped enum in an
+        // HLSL-dialect translation unit may also convert implicitly to any
+        // builtin scalar its tag type can reach, performed as two implicit
+        // rounds that mirror the reverse composite below: first enum -> tag,
+        // then tag -> destination. Consider `enum Color { Red, Green, Blue };
+        // float f = Color.Green;` in a `.hlsl` file compiled with
+        // `-unscoped-enum`: `Color` coerces to `int` (its tag), then `int` to
+        // `float`. This fires only at implicit sites; explicit casts such as
+        // `float(Color.Green)` already succeed through the target's initializer path.
+        if (site != CoercionSite::ExplicitCoercion &&
+            isEnumToBuiltinScalarConversionEnabled(enumDecl, toType))
+        {
+            Expr* tagExpr = nullptr;
+            if (fromExpr)
+            {
+                auto castToTag = getASTBuilder()->create<BuiltinCastExpr>();
+                castToTag->type = tagType;
+                castToTag->loc = fromExpr->loc;
+                castToTag->base = fromExpr;
+                tagExpr = castToTag;
+            }
+
+            Expr* convertedExpr = nullptr;
+            ConversionCost innerCost = kConversionCost_None;
+            if (_coerce(
+                    site,
+                    toType,
+                    outToExpr ? &convertedExpr : nullptr,
+                    QualType(tagType),
+                    tagExpr,
+                    sink,
+                    &innerCost,
+                    nullptr))
+            {
+                // Cost is additive across the two rounds: the enum -> tag leg
+                // reuses kConversionCost_RankPromotion (matching the direct
+                // enum -> tag case above) plus the inner tag -> destination cost.
+                // This keeps enum -> tag (150) cheaper than enum -> float
+                // (150 + 400 = 550), so overload resolution still prefers the
+                // tag. No E30081 "unrecommended implicit conversion" warning
+                // fires on this path: we return here, before the
+                // initializer-overload branch that emits it, and the inner leg
+                // (int -> float, 400) stays below that branch's threshold (500).
+                if (outCost)
+                    *outCost = kConversionCost_RankPromotion + innerCost;
+                if (outToExpr)
+                    *outToExpr = convertedExpr;
+                setWitnessOfConversionToBuiltinConversion();
+                return true;
+            }
+        }
     }
 
     // The reverse direction is not an implicit conversion, but explicit cast/constructor syntax
@@ -2235,29 +2359,21 @@ bool SemanticsVisitor::_coerce(
     }
 
     // matrix types with different layouts are convertible
-    if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
+    if (isMatrixLayoutConversion(toType, fromType))
     {
-        if (auto toMatrixType = as<MatrixExpressionType>(toType))
+        if (outCost)
         {
-            if (fromMatrixType->getElementType()->equals(toMatrixType->getElementType()) &&
-                fromMatrixType->getRowCount()->equals(toMatrixType->getRowCount()) &&
-                fromMatrixType->getColumnCount()->equals(toMatrixType->getColumnCount()))
-            {
-                if (outCost)
-                {
-                    *outCost = kConversionCost_MatrixLayout;
-                }
-                if (outToExpr)
-                {
-                    auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
-                    castExpr->type = toType;
-                    castExpr->loc = fromExpr->loc;
-                    castExpr->base = fromExpr;
-                    *outToExpr = castExpr;
-                }
-                return true;
-            }
+            *outCost = kConversionCost_MatrixLayout;
         }
+        if (outToExpr)
+        {
+            auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+            castExpr->type = toType;
+            castExpr->loc = fromExpr->loc;
+            castExpr->base = fromExpr;
+            *outToExpr = castExpr;
+        }
+        return true;
     }
 
     // We allow a value of a `struct` type to be coerced to a function

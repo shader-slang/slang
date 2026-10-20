@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: b1bdc35e6450db41fb8de1d6f36d65568470482319b625b0c5892390b1b7c893
+model: gpt-5.6-sol
+generated_at: 2026-09-16T06:40:19Z
+source_commit: d3b56927b854c14fa1ac169b72da6e080ea80833
+watched_paths_digest: e5562b67ea74e46a354528907747105d65758aab1f148a8f97bb280be9e810f9
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -562,7 +562,7 @@ flowchart TD
 | 20 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` | |
 | 21 | `legalizeArrayReturnType` | [slang-ir-legalize-array-return-type.cpp](../../../../source/slang/slang-ir-legalize-array-return-type.cpp) | `!isMetalTarget && !isSPIRV` (true for CUDA) | |
 | 22 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always; pass at line 2476) | `loweringPolicyKind = Default` for CUDA. The policy is selected by a four-way branch at lines 2464-2474: `WGSL` (WGPU), `KhronosTarget`, `Metal` (when `isMetalTarget`), else `Default`. CUDA matches none of the named branches and falls through to `Default`. |
-| 23 | `lowerImmutableBufferLoadForCUDA` | [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp) | `isCUDATarget(targetRequest)` (line 2512, pass at line 2514) | **CUDA-only.** Translates immutable buffer loads to use `__ldg` for cache-hint performance. |
+| 23 | `lowerImmutableBufferLoadForCUDA` | [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp) | `isCUDATarget(targetRequest)` (line 2660, pass at line 2662) | **CUDA-only.** Translates eligible immutable global-memory loads to `__ldg`; direct fields of the emitted `__constant__` global parameter group are excluded. |
 | 24 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
 | 25 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
 | 26 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | With `removeTrivialSingleIterationLoops = true`. |
@@ -1097,15 +1097,31 @@ wrapper (lines 1089-1093) and dispatches the renamed kernel.
 
 ### `lowerImmutableBufferLoadForCUDA`
 
-Phase C, line 2563, gated only on `isCUDATarget(targetRequest)` —
+Phase C, line 2662, gated only on `isCUDATarget(targetRequest)` —
 this is the one pass in `linkAndOptimizeIR` that exists solely for
-this target family. It rewrites a load whose root address
-`isPointerToImmutableLocation` accepts — both a plain `kIROp_Load`
-and a `kIROp_StructuredBufferLoad`, the latter first turned into
-an element pointer — into CUDA's `__ldg` read-only-cache load,
-represented in the IR as `kIROp_CUDALDG`
+this target family. For a plain `kIROp_Load`, it requires both that
+`isPointerToImmutableLocation` accept the root address and that
+`isAddressIntoCudaConstantParameterGroup` reject the original
+address. A `kIROp_StructuredBufferLoad` is first turned into an
+element pointer and is likewise rewritten when its value type has a
+supported load method. Successful rewrites become CUDA's `__ldg`
+read-only-cache load, represented in the IR as `kIROp_CUDALDG`
 ([slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp)
-line 140).
+line 128).
+
+The second ordinary-load condition is a CUDA memory-space rule, not
+an immutability rule. The front end collects top-level declarations
+such as `uniform uint gValue` into an `IRUniformParameterGroupType`
+global. `CUDASourceEmitter::emitParameterGroupImpl` emits that group
+as `extern "C" __constant__ ... SLANG_globalParams`, so a direct
+field read is immutable but does not address CUDA global memory.
+Because `__ldg` lowers to PTX `ld.global.nc`, using it for that
+`__constant__` address would be invalid. The pass therefore leaves
+the direct field read unchanged. A pointer stored in the group, such
+as the backing pointer for a `StructuredBuffer<T>` or
+`ConstantBuffer<T>`, remains eligible: after the pointer itself is
+loaded, that `Load` rather than `SLANG_globalParams` roots the
+pointed-to access.
 
 The rewrite is type-directed, because `__ldg` only accepts a fixed
 set of operand types. A scalar (`float`, `half`, `double`, the
@@ -1119,7 +1135,7 @@ call.
 
 The types `createLoadFuncForType` recognizes are exactly those:
 the scalars listed above, `kIROp_VectorType`, `kIROp_MatrixType`,
-`kIROp_ArrayType`, and `kIROp_StructType` (lines 85-266). The
+`kIROp_ArrayType`, and `kIROp_StructType` (lines 113-295). The
 `kIROp_MatrixType` arm is not reachable for a matrix that is a
 *buffer element*, which is the case this pass otherwise exists for:
 buffer element types are rewritten ahead of it into a
@@ -1131,14 +1147,14 @@ line 150), so the load that arrives here is a struct-of-array and
 takes the `kIROp_StructType` arm. Read the matrix row as covering a
 matrix-typed load that is not a buffer element. Any
 other type op falls off the end of the switch and yields an empty
-`LoadMethod` (line 269), and an array or struct whose element or
+`LoadMethod` (line 297), and an array or struct whose element or
 field walk hits one discards the half-built load function and
-returns empty as well (lines 231-235 and 257-261). So the
+returns empty as well (lines 259-263 and 285-289). So the
 unrewritten arm belongs to a load of an opaque leaf — a resource
 handle or a pointer, say — not to any composite built out of the
 five recognized ops. In that case `processInst` leaves the
 original `kIROp_Load` / `kIROp_StructuredBufferLoad` exactly as it
-found it (lines 292-330), so this is a best-effort optimization
+found it (lines 320-365), so this is a best-effort optimization
 rather than a legalization: correctness does not depend on it.
 
 ### `undoParameterCopy` and `transformParamsToConstRef`

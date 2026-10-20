@@ -240,6 +240,8 @@ FIDDLE() namespace Slang
         OperatorAddressOf,
         WaveIsFirstLane,
         WaveReadLaneFirst,
+        CallShader,
+        ReportHit = 16,
         COUNT
     };
 
@@ -1363,28 +1365,18 @@ FIDDLE() namespace Slang
             // instead.
             SuperType,
 
-            // The lookup process considered a member of an
-            // enclosing type as being in scope, so that any
-            // reference to that member needs to use a `this`
-            // expression as appropriate.
-            This,
+            // A member of an enclosing type is referenced through an implicit `this` expression.
+            // Expression checking determines its type and mutability, including for
+            // constructor-local `this`.
+            ThisExpr,
+
+            // A member of an enclosing type is referenced through its `This` type, as in a
+            // static method or a reference from a nested type to an enclosing type's member.
+            ThisType,
         };
 
         // The kind of lookup step that was performed
         Kind kind;
-
-        // For the `Kind::This` case, what does the implicit
-        // `this` or `This` parameter refer to?
-        //
-        enum class ThisParameterMode : uint8_t
-        {
-            ImmutableValue, // An immutable `this` value
-            MutableValue,   // A mutable `this` value
-            Type,           // A `This` type
-
-            Default = ImmutableValue,
-        };
-        ThisParameterMode thisParameterMode = ThisParameterMode::Default;
 
         // As needed, a reference to the declaration that faciliated
         // the lookup step.
@@ -1408,18 +1400,28 @@ FIDDLE() namespace Slang
             DeclRef<Decl> declRef,
             Val* val,
             RefPtr<LookupResultItem_Breadcrumb> next,
-            ThisParameterMode thisParameterMode = ThisParameterMode::Default)
-            : kind(kind)
-            , thisParameterMode(thisParameterMode)
-            , declRef(declRef)
-            , val(val)
-            , next(next)
+            Scope* thisExprScope = nullptr)
+            : kind(kind), declRef(declRef), val(val), next(next), thisExprScope(thisExprScope)
         {
+            SLANG_RELEASE_ASSERT((kind == Kind::ThisExpr) == (thisExprScope != nullptr));
+        }
+
+        Scope* getThisExprScope() const
+        {
+            SLANG_RELEASE_ASSERT(kind == Kind::ThisExpr);
+            SLANG_RELEASE_ASSERT(thisExprScope);
+            return thisExprScope;
         }
 
     protected:
         // Needed for serialization
         LookupResultItem_Breadcrumb() = default;
+
+    private:
+        // The scope where lookup began for a `Kind::ThisExpr` step. `ConstructLookupResultExpr`
+        // checks an implicit `ThisExpr` in this scope to determine its type and mutability.
+        // Other breadcrumb kinds leave this field null.
+        Scope* thisExprScope = nullptr;
     };
 
     // Represents one item found during lookup
@@ -1908,6 +1910,50 @@ FIDDLE() namespace Slang
         ///
         Ref,
     };
+
+    /// Combined semantic information about a parameter's type and parameter-passing mode.
+    ///
+    /// The two fields deliberately use the same decomposition as a parameter type with a
+    /// parameter-passing-mode wrapper: `type` is the value type *inside* that wrapper, while
+    /// `mode` identifies the wrapper. Thus `type` never contains an `OutParamType`,
+    /// `BorrowInOutParamType`, `BorrowInParamType`, or `RefParamType`.
+    ///
+    /// Other modifiers that are part of the parameter's semantic value type remain encoded in
+    /// `type`. In particular, a `no_diff` parameter uses a `ModifiedType` carrying
+    /// `NoDiffModifierVal`. Producers and consumers must preserve this decomposition so that a
+    /// `ParamInfo` and its wrapped parameter-type representation encode the same information.
+    FIDDLE()
+    struct ParamInfo
+    {
+        FIDDLE(...)
+
+        /// The effective parameter value type, including semantic type modifiers such as
+        /// `no_diff`, but excluding any parameter-passing-mode wrapper.
+        FIDDLE() Type* type = nullptr;
+
+        /// The effective parameter-passing mode, stored separately from `type`.
+        FIDDLE() ParamPassingMode mode = ParamPassingMode::In;
+    };
+
+    /// Returns whether `mode` passes writable storage to the callee.
+    inline bool doesParamPassingModeIndicateWritableStorage(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::Out:
+        case ParamPassingMode::BorrowInOut:
+        case ParamPassingMode::Ref:
+            return true;
+
+        case ParamPassingMode::In:
+        case ParamPassingMode::BorrowIn:
+            return false;
+
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN(false);
+        }
+    }
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#reverse-mode
-//META: doc_section_digest=b18c139464f823deeeb4d040a62520838e80b082fa7e2f42dee8680582a5dec9
+//META: doc_section_digest=50d50fc11cd5cf0d2c306ba5b1a1d9c8f2003b1c2a912a6b97e3c47bfd1c314a
 //META: purpose=Reverse mode gives the propagate function the s_bwdProp_ prefix and the full intermediate-context struct the s_bwdCallableCtx_ prefix, so f yields s_bwdProp_f alongside a s_bwdCallableCtx_f struct.
 //META: intent=functional
 //META: pipeline_stage=emit
@@ -18,7 +18,12 @@
 // `s_bwdProp_myfunc_<n>`; asserting the struct as `struct s_bwdCallableCtx...`
 // rather than as a bare substring keeps it from being satisfied by the
 // per-parameter `s_paramCtx_s_bwdCallableCtx_...` wrapper the emitter also
-// produces, which would leave the actual context struct unchecked.
+// produces, which would leave the actual context struct unchecked. The Metal
+// and CUDA pipelines expand the captured context into separate arguments of
+// the propagate function, so no context struct is emitted for those two
+// targets. Each of those runs forbids the struct before requiring the propagate
+// function name, because a forbidden pattern is only checked up to the next
+// match, and the struct would precede the function if it were emitted.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
@@ -48,11 +53,11 @@ void main()
 //HLSL: s_bwdProp_myfunc_{{[0-9]+}}(
 //GLSL: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //GLSL: s_bwdProp_myfunc_{{[0-9]+}}(
-//METAL: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
+//METAL-NOT: struct s_bwdCallableCtx_myfunc
 //METAL: s_bwdProp_myfunc_{{[0-9]+}}(
 //WGSL: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //WGSL: s_bwdProp_myfunc_{{[0-9]+}}(
-//CUDA: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
+//CUDA-NOT: struct s_bwdCallableCtx_myfunc
 //CUDA: s_bwdProp_myfunc_{{[0-9]+}}(
 //CPP: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //CPP: s_bwdProp_myfunc_{{[0-9]+}}(

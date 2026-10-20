@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#size-alignment-count
-//META: doc_section_digest=b6a68a06f518f5bd44e3459811096c15e9f474df3116276f35e51d90ca68eef0
+//META: doc_section_digest=51c06a6e0b203ac03018c20cb45a976514904e23b0cc64a11c4371e0ec15da9d
 //META: purpose=`sizeof(T)` and `alignof(T)` on a generic type parameter emit `sizeOf` / `alignOf` insts carrying the type operand plus a data-layout operand.
 //META: intent=functional
 //META: pipeline_stage=lower

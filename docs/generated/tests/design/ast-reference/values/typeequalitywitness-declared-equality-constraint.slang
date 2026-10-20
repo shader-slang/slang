@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#typeequalitywitness
-//META: doc_section_digest=c16dad74c952cb93b7b85512859a8d1adcb70dbac3706ab1b925f60f97892662
+//META: doc_section_digest=0ab8c1fa1d9846989f4716589afc4f99128eb23a189f72adae1f27c156bc6578
 //META: purpose=A declared equality constraint such as where T == U is its own spelling of equality evidence, and it discharges the subtype obligation in both directions inside the generic body.
 //META: intent=functional
 //META: pipeline_stage=check

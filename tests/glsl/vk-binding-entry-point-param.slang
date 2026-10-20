@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=GLSL): -allow-glsl -target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage compute
 
 // `doesTargetSupportVkBindingOnEntryPointParameters` is true for all Khronos
 // targets, which includes the GLSL emit path (separate from SPIR-V). Verify the

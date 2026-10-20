@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#tuplefieldlayout-and-caselayout
-//META: doc_section_digest=1b1b95a05054a92661513c3c0fbf09d1389ad761014d04f6bae616ed38737743
+//META: doc_section_digest=5e9dcb4f0c88f0d0e2b50fec3329457a3f334bba6a8cf0c8d66afad8ec8aa089
 //META: purpose=The dormant tuple and union layout opcodes (tupleTypeLayout, tupleFieldLayout, caseLayout) have no producer in the compiler, so none of them appears in any IR dump.
 //META: intent=negative
 //META: pipeline_stage=ir-pass

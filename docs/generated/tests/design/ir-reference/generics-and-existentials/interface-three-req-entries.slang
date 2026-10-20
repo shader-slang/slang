@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
-//META: doc_section_digest=c07446d42292314ac54df96997ac71db597f857c5d132648cd782bcb15b2b00f
+//META: doc_section_digest=3d4216cefef36ce708cafd9c66371f56fd839503c450dd29b88109b773aaa1f2
 //META: purpose=A 3-method interface emits three interface_req_entry instructions, one per method requirement.
 //META: intent=boundary
 //META: pipeline_stage=lower

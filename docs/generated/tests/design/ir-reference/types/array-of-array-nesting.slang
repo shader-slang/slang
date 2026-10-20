@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#arrays
-//META: doc_section_digest=c077a7ede5d6d5b6b14b9cd00c6b8c5162dbde144a6ae57c354c39ace0febb74
+//META: doc_section_digest=9dceac67990e87c52cd34a468863d86ce004f41ad1f40482a90f8aeac1862aaa
 //META: purpose=Stress: array-of-array nests Array operands; int[3][4] surfaces as Array(Array(Int, 4 : Int), 3 : Int).
 //META: intent=stress
 //META: pipeline_stage=lower

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#stripfrontendonlyinstructions
-//META: doc_section_digest=6d9c3e171509715bc06e848e926d607a7687b1fec0c44f072b66721b314e4dc1
+//META: doc_section_digest=57420d24e2dc17a71a5e3f65861f45230cb1af0eeed42c1782b19ae3c3c29310
 //META: purpose=Phase D's stripFrontEndOnlyInstructions (D10) always removes the front-end-only IRHighLevelDeclDecoration before the module is handed on for code generation.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

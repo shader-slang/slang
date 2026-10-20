@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/struct-construct.slang -target spirv -stage vertex -entry main -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/struct-construct.slang -target spirv -stage vertex -entry main
 
 #version 310 es
 layout(location = 0) in highp vec4 a_position;

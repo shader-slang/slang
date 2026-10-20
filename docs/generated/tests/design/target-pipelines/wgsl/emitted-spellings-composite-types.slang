@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#emitted-spellings
-//META: doc_section_digest=a72c747d5e5fa9684a460e1b5d345a74da1aee6a2a789ea6d65d147ba60563d3
+//META: doc_section_digest=87914046308910100ab0c8a274000df53692baa35676d04a99d0ace2786a772d
 //META: purpose=Composite type spellings on WGSL: vector<T,N> becomes vecN<T>, a one-element vector collapses to the bare scalar type, matrix<T,R,C> becomes matRxC<T>, a sized array becomes array<T, i32(N)> and an unsized one array<T>.
 //META: intent=functional
 //META: pipeline_stage=emit

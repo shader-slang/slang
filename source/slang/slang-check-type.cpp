@@ -586,4 +586,12 @@ Expr* SemanticsExprVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)
     return expr;
 }
 
+Expr* SemanticsExprVisitor::visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr)
+{
+    // This spelling denotes the built-in type directly, so a declaration named `uint` cannot
+    // shadow it through ordinary name lookup.
+    expr->type = m_astBuilder->getTypeType(m_astBuilder->getUIntType());
+    return expr;
+}
+
 } // namespace Slang

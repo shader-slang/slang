@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#literals-constant-group
-//META: doc_section_digest=a21e27fcb958e56d332244ee6c703427ccee0763e9b85ea940b9fe964f929d86
+//META: doc_section_digest=2af74fe101592dfb5656c7a6b5028e47c5e6545eef68c317594cf05d217a39d6
 //META: purpose=A `void`-returning function's terminator is `return_val(void_constant)`, surfacing the unique `void` value the doc lists as `VoidLit`.
 //META: intent=functional
 //META: pipeline_stage=lower

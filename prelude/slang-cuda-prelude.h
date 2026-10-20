@@ -603,6 +603,29 @@ SLANG_CUDA_VECTOR_TRAITS(__half4, bool4, 4, false, false)
             result.w = thisVal.w op other.w;                             \
         return result;                                                   \
     }
+/* A shift's result has the type of its left operand, and its amount may be any integer vector of
+   the same width, as in `int3 >> uint3`. The `T, U` overload below handles the mixed case; for two
+   operands of the same type, the `T, T` overload above is more specialized and is chosen instead.
+   The result keeps the left operand's signedness, so an `int` vector stays an arithmetic shift. */
+#define SLANG_CUDA_VECTOR_SHIFT_OP(op)                                                        \
+    template<                                                                                 \
+        typename T,                                                                           \
+        typename U,                                                                           \
+        typename SlangCudaVectorEnableIf<                                                     \
+            SlangCudaVectorTraits<T>::kIsIntegral && SlangCudaVectorTraits<U>::kIsIntegral && \
+            SlangCudaVectorTraits<T>::kWidth == SlangCudaVectorTraits<U>::kWidth>::Type* =    \
+            nullptr>                                                                          \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator op(T thisVal, U other)                      \
+    {                                                                                         \
+        T result;                                                                             \
+        result.x = thisVal.x op other.x;                                                      \
+        result.y = thisVal.y op other.y;                                                      \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 3)                                  \
+            result.z = thisVal.z op other.z;                                                  \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 4)                                  \
+            result.w = thisVal.w op other.w;                                                  \
+        return result;                                                                        \
+    }
 #define SLANG_CUDA_VECTOR_COMPARE_OP(op)                                                          \
     template<typename T, SLANG_CUDA_VECTOR_ENABLE_IF>                                             \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL typename SlangCudaVectorTraits<T>::BoolVector operator op( \
@@ -644,6 +667,8 @@ SLANG_CUDA_VECTOR_BINARY_OP(&, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
 SLANG_CUDA_VECTOR_BINARY_OP(|, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
 SLANG_CUDA_VECTOR_BINARY_OP(>>, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
 SLANG_CUDA_VECTOR_BINARY_OP(<<, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
+SLANG_CUDA_VECTOR_SHIFT_OP(>>)
+SLANG_CUDA_VECTOR_SHIFT_OP(<<)
 SLANG_CUDA_VECTOR_COMPARE_OP(>)
 SLANG_CUDA_VECTOR_COMPARE_OP(<)
 SLANG_CUDA_VECTOR_COMPARE_OP(>=)
@@ -1663,7 +1688,10 @@ SLANG_SURF1DWRITE_CONVERT_IMPL(float, "f")
 SLANG_SURF1DWRITE_CONVERT_IMPL(uint, "r")
 SLANG_SURF1DWRITE_CONVERT_IMPL(int, "r")
 
-// surf1DLayeredwrite_convert (not supported)
+// surf1DLayeredwrite_convert
+
+// CUDA has no formatted layered surface-write API, so we use PTX `sust.p.a1d` directly. Its
+// coordinate vector is {layer, x}.
 
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert(
@@ -1671,12 +1699,63 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert(
     cudaSurfaceObject_t surfObj,
     int x,
     int layer,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    // TODO: static_assert(false) can fail on some compilers, even if template is not instantiated.
-    // We should check for this in hlsl.meta.slang instead.
-    // static_assert(false, "CUDA doesn't support formatted surface writes on 1D array surfaces");
-}
+    cudaSurfaceBoundaryMode boundaryMode);
+
+#define SLANG_SURF1DLAYEREDWRITE_CONVERT_IMPL(T, c)                                            \
+    template<>                                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert<T>(                     \
+        T v,                                                                                   \
+        cudaSurfaceObject_t surfObj,                                                           \
+        int x,                                                                                 \
+        int layer,                                                                             \
+        cudaSurfaceBoundaryMode boundaryMode)                                                  \
+    {                                                                                          \
+        asm volatile(                                                                          \
+            "sust.p.a1d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1, %2}], {%3};" ::"l"(surfObj), \
+            "r"(layer),                                                                        \
+            "r"(x),                                                                            \
+            c(v));                                                                             \
+    }                                                                                          \
+    template<>                                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert<T##2>(                  \
+        T##2 v,                                                                                \
+        cudaSurfaceObject_t surfObj,                                                           \
+        int x,                                                                                 \
+        int layer,                                                                             \
+        cudaSurfaceBoundaryMode boundaryMode)                                                  \
+    {                                                                                          \
+        const T vx = v.x, vy = v.y;                                                            \
+        asm volatile(                                                                          \
+            "sust.p.a1d.v2.b32." SLANG_PTX_BOUNDARY_MODE                                       \
+            " [%0, {%1, %2}], {%3, %4};" ::"l"(surfObj),                                       \
+            "r"(layer),                                                                        \
+            "r"(x),                                                                            \
+            c(vx),                                                                             \
+            c(vy));                                                                            \
+    }                                                                                          \
+    template<>                                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert<T##4>(                  \
+        T##4 v,                                                                                \
+        cudaSurfaceObject_t surfObj,                                                           \
+        int x,                                                                                 \
+        int layer,                                                                             \
+        cudaSurfaceBoundaryMode boundaryMode)                                                  \
+    {                                                                                          \
+        const T vx = v.x, vy = v.y, vz = v.z, vw = v.w;                                        \
+        asm volatile(                                                                          \
+            "sust.p.a1d.v4.b32." SLANG_PTX_BOUNDARY_MODE                                       \
+            " [%0, {%1, %2}], {%3, %4, %5, %6};" ::"l"(surfObj),                               \
+            "r"(layer),                                                                        \
+            "r"(x),                                                                            \
+            c(vx),                                                                             \
+            c(vy),                                                                             \
+            c(vz),                                                                             \
+            c(vw));                                                                            \
+    }
+
+SLANG_SURF1DLAYEREDWRITE_CONVERT_IMPL(float, "f")
+SLANG_SURF1DLAYEREDWRITE_CONVERT_IMPL(uint, "r")
+SLANG_SURF1DLAYEREDWRITE_CONVERT_IMPL(int, "r")
 
 // surf2Dwrite_convert
 
@@ -1744,7 +1823,10 @@ SLANG_SURF2DWRITE_CONVERT_IMPL(float, "f")
 SLANG_SURF2DWRITE_CONVERT_IMPL(uint, "r")
 SLANG_SURF2DWRITE_CONVERT_IMPL(int, "r")
 
-// surf2DLayeredwrite_convert (not supported)
+// surf2DLayeredwrite_convert
+
+// The `sust.p.a2d` coordinate vector is {layer, x, y, unused}; we repeat y in the unused slot, as
+// nvcc does for `surf2DLayeredwrite`.
 
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert(
@@ -1753,12 +1835,70 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert(
     int x,
     int y,
     int layer,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    // TODO: static_assert(false) can fail on some compilers, even if template is not instantiated.
-    // We should check for this in hlsl.meta.slang instead.
-    // static_assert(false, "CUDA doesn't support formatted surface writes on 2D array surfaces");
-}
+    cudaSurfaceBoundaryMode boundaryMode);
+
+#define SLANG_SURF2DLAYEREDWRITE_CONVERT_IMPL(T, c)                           \
+    template<>                                                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert<T>(    \
+        T v,                                                                  \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        int y,                                                                \
+        int layer,                                                            \
+        cudaSurfaceBoundaryMode boundaryMode)                                 \
+    {                                                                         \
+        asm volatile(                                                         \
+            "sust.p.a2d.b32." SLANG_PTX_BOUNDARY_MODE                         \
+            " [%0, {%1, %2, %3, %3}], {%4};" ::"l"(surfObj),                  \
+            "r"(layer),                                                       \
+            "r"(x),                                                           \
+            "r"(y),                                                           \
+            c(v));                                                            \
+    }                                                                         \
+    template<>                                                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert<T##2>( \
+        T##2 v,                                                               \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        int y,                                                                \
+        int layer,                                                            \
+        cudaSurfaceBoundaryMode boundaryMode)                                 \
+    {                                                                         \
+        const T vx = v.x, vy = v.y;                                           \
+        asm volatile(                                                         \
+            "sust.p.a2d.v2.b32." SLANG_PTX_BOUNDARY_MODE                      \
+            " [%0, {%1, %2, %3, %3}], {%4, %5};" ::"l"(surfObj),              \
+            "r"(layer),                                                       \
+            "r"(x),                                                           \
+            "r"(y),                                                           \
+            c(vx),                                                            \
+            c(vy));                                                           \
+    }                                                                         \
+    template<>                                                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert<T##4>( \
+        T##4 v,                                                               \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        int y,                                                                \
+        int layer,                                                            \
+        cudaSurfaceBoundaryMode boundaryMode)                                 \
+    {                                                                         \
+        const T vx = v.x, vy = v.y, vz = v.z, vw = v.w;                       \
+        asm volatile(                                                         \
+            "sust.p.a2d.v4.b32." SLANG_PTX_BOUNDARY_MODE                      \
+            " [%0, {%1, %2, %3, %3}], {%4, %5, %6, %7};" ::"l"(surfObj),      \
+            "r"(layer),                                                       \
+            "r"(x),                                                           \
+            "r"(y),                                                           \
+            c(vx),                                                            \
+            c(vy),                                                            \
+            c(vz),                                                            \
+            c(vw));                                                           \
+    }
+
+SLANG_SURF2DLAYEREDWRITE_CONVERT_IMPL(float, "f")
+SLANG_SURF2DLAYEREDWRITE_CONVERT_IMPL(uint, "r")
+SLANG_SURF2DLAYEREDWRITE_CONVERT_IMPL(int, "r")
 
 // surf3Dwrite_convert
 
@@ -1871,10 +2011,21 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void F16_sincos(__half f, __half* s, __half* 
     *c = ::hcos(f);
 }
 
+// Forward-declared here because the F32 section follows the F16 section; F16_tan/F16_pow
+// just below promote to float through these gated wrappers to inherit the fast-math
+// redirect (the SLANG_CUDA_ENABLE_FAST_MATH policy is documented above F32_sin).
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_tan(float f);
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_pow(float a, float b);
+
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_tan(__half f)
 {
-    return __float2half(::tanf(__half2float(f)));
+    // Route through F32_tan (not ::tanf directly) so half tan honors the same
+    // SLANG_CUDA_ENABLE_FAST_MATH redirect as float tan; no native half `htan`.
+    return __float2half(F32_tan(__half2float(f)));
 }
+// asin/acos/atan (and the hyperbolics below) also promote to float, but unlike tan/pow
+// they have no gated fast intrinsic, so routing them through F32 would be pointless
+// indirection; they call the precise libm form directly.
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_asin(__half f)
 {
     return __float2half(::asinf(__half2float(f)));
@@ -1981,7 +2132,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_max(__half a, __half b)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_pow(__half a, __half b)
 {
-    return __float2half(::powf(__half2float(a), __half2float(b)));
+    // Route through F32_pow (not ::powf directly) so half pow honors the same
+    // SLANG_CUDA_ENABLE_FAST_MATH redirect as float pow; no native half `hpow`.
+    return __float2half(F32_pow(__half2float(a), __half2float(b)));
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_fmod(__half a, __half b)
 {
@@ -2041,21 +2194,44 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_round(float f)
 {
     return ::roundf(f);
 }
+// SLANG_CUDA_ENABLE_FAST_MATH is emitted (as `1`) into the CUDA output by Slang's
+// CUDA back-end under `-fp-mode fast`. When nonzero, the transcendental wrappers that
+// have an approximate `__*f` CUDA intrinsic redirect to it, trading accuracy for a
+// much smaller instruction count; otherwise they use the precise `::` form. Only
+// the wrappers with such an intrinsic are gated (sin/cos/sincos/tan/log/log2/log10/
+// exp/pow, plus half tan/pow which route through the float wrappers); exp2/atan2/
+// asin/acos/atan/sqrt and all F64 wrappers have no fast form and stay precise.
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_sin(float f)
 {
+#if SLANG_CUDA_ENABLE_FAST_MATH
+    return __sinf(f);
+#else
     return ::sinf(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_cos(float f)
 {
+#if SLANG_CUDA_ENABLE_FAST_MATH
+    return __cosf(f);
+#else
     return ::cosf(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void F32_sincos(float f, float* s, float* c)
 {
+#if SLANG_CUDA_ENABLE_FAST_MATH
+    __sincosf(f, s, c);
+#else
     ::sincosf(f, s, c);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_tan(float f)
 {
+#if SLANG_CUDA_ENABLE_FAST_MATH
+    return __tanf(f);
+#else
     return ::tanf(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_asin(float f)
 {
@@ -2095,23 +2271,41 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_atanh(float f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log2(float f)
 {
+#if SLANG_CUDA_ENABLE_FAST_MATH
+    return __log2f(f);
+#else
     return ::log2f(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log(float f)
 {
+#if SLANG_CUDA_ENABLE_FAST_MATH
+    return __logf(f);
+#else
     return ::logf(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log10(float f)
 {
+#if SLANG_CUDA_ENABLE_FAST_MATH
+    return __log10f(f);
+#else
     return ::log10f(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_exp2(float f)
 {
+    // No `__exp2f` fast intrinsic exists in CUDA (only base-e `__expf` and
+    // base-10 `__exp10f`), so exp2 is not redirected by SLANG_CUDA_ENABLE_FAST_MATH.
     return ::exp2f(f);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_exp(float f)
 {
+#if SLANG_CUDA_ENABLE_FAST_MATH
+    return __expf(f);
+#else
     return ::expf(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_abs(float f)
 {
@@ -2162,7 +2356,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_max(float a, float b)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_pow(float a, float b)
 {
+#if SLANG_CUDA_ENABLE_FAST_MATH
+    return __powf(a, b);
+#else
     return ::powf(a, b);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_fmod(float a, float b)
 {
@@ -2386,11 +2584,31 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U8_countbits(uint8_t v)
     return __popc(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint8_t U8_min(uint8_t a, uint8_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint8_t U8_max(uint8_t a, uint8_t b)
+{
+    return a > b ? a : b;
+}
+
 // ----------------------------- I8 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I8_countbits(int8_t v)
 {
     return U8_countbits(uint8_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int8_t I8_min(int8_t a, int8_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int8_t I8_max(int8_t a, int8_t b)
+{
+    return a > b ? a : b;
 }
 
 // ----------------------------- U16 -----------------------------------------
@@ -2401,11 +2619,31 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U16_countbits(uint16_t v)
     return __popc(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint16_t U16_min(uint16_t a, uint16_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint16_t U16_max(uint16_t a, uint16_t b)
+{
+    return a > b ? a : b;
+}
+
 // ----------------------------- I16 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I16_countbits(int16_t v)
 {
     return U16_countbits(uint16_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int16_t I16_min(int16_t a, int16_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int16_t I16_max(int16_t a, int16_t b)
+{
+    return a > b ? a : b;
 }
 
 // ----------------------------- U32 -----------------------------------------
@@ -2458,9 +2696,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbitlow(uint32_t v)
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
 {
-    // maps to hlsl firstbithigh
-    if ((int32_t)v < 0)
-        v = ~v;
+    // Find the highest set bit without interpreting the unsigned input's sign bit.
     if (v == 0)
         return ~0u;
     return 31 - __clz(v);
@@ -2518,6 +2754,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbitlow(int32_t v)
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbithigh(int32_t v)
 {
+    // Negative signed inputs search for the highest zero bit, so complement before counting.
+    if (v < 0)
+        v = ~v;
     return U32_firstbithigh(uint32_t(v));
 }
 

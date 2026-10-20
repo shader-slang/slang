@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#packbranch
-//META: doc_section_digest=64305dc5798875e516872edb40432c593b099dd7219dbb653d2016c5a0eabb98
+//META: doc_section_digest=e0e6ed9321345263feddfacd8fd4ec57444115af8f291ea35e91e561d89de63b
 //META: purpose=`__packBranch(pack, emptyValue, nonEmptyValue)` lowers to a three-operand `PackBranch` inst typed as a witness table when the branch selects a conformance.
 //META: intent=functional
 //META: pipeline_stage=lower

@@ -277,11 +277,18 @@ ray tracing entry point parameters for the '~stage' stage". A
 as a backstop for any future null-rules caller.
 
 The Metal, CPU, and LLVM layout-rules families return `nullptr` from
-all three accessors, and the CUDA family from
-`getCallablePayloadParameterRules` alone; the SPIR-V/GLSL,
-HLSL/DXIL, and WGSL families supply all three. So this entry point
-compiles for `-target spirv` but is rejected with error `39032` for
-`-target metal` and `-target cpp`.
+all three accessors; the CUDA, GLSL, HLSL/DXIL and WGSL families
+supply all three. So this entry point compiles for `-target spirv`
+but is rejected with error `39032` for `-target metal` and
+`-target cpp`.
+
+CUDA is worth calling out because it moved. It used to return
+`nullptr` from `getCallablePayloadParameterRules` alone, so a
+`callable` entry point taking a payload was rejected on CUDA while
+`miss` and `closesthit` were not. Commit `5ed83a468c` ("Add callable
+shader support to CUDA/OptiX backend", #12182) gave that accessor real
+rules, so CUDA now accepts all three parameter kinds and the
+asymmetry is gone.
 
 The WGSL third of that sentence is a statement about its layout-rules
 family, and the example below cannot demonstrate it: WGSL rejects
