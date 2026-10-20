@@ -68,6 +68,18 @@ if [ "$race_exit" -ne 66 ] ||
   ! grep -q 'canary.c:' "$canary_dir/report.txt"; then
   clang-18 --version
   ldd "$canary_dir/racy"
+  clang-18 -fsanitize=thread -shared-libsan -g -O1 -pthread -S -emit-llvm \
+    "$canary_dir/canary.c" -o "$canary_dir/canary.ll"
+  grep -E 'define |__tsan_|store volatile|pthread_create' "$canary_dir/canary.ll"
+  TSAN_OPTIONS="verbosity=2:halt_on_error=1:abort_on_error=0:exitcode=66" \
+    "$canary_dir/racy" || true
+  TSAN_OPTIONS="verbosity=2:halt_on_error=1:abort_on_error=0:exitcode=66" \
+    LD_PRELOAD="$(clang-18 -print-file-name=libclang_rt.tsan-x86_64.so)" \
+    "$canary_dir/racy" || true
+  clang-18 -fsanitize=thread -g -O1 -pthread \
+    "$canary_dir/canary.c" -o "$canary_dir/static-runtime"
+  TSAN_OPTIONS="verbosity=2:halt_on_error=1:abort_on_error=0:exitcode=66" \
+    "$canary_dir/static-runtime" || true
   echo "::error::TSan canary did not produce a symbolized race report with exit code 66"
   exit 1
 fi
