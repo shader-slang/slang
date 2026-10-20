@@ -1265,8 +1265,9 @@ Decl* getEntryPointCapabilityDiagnosticDecl(EntryPoint* entryPoint)
 // the source identity and derives a legal physical symbol for targets that cannot spell a dot.
 // The logical input signature is not a native shader ABI, so the caller skips native varying
 // checks and uses the returned capabilities with the shared target/profile validator instead.
-// A name that does not select a struct leaves `outFoundStructuralStage` false, allowing ordinary
-// function entry-point lookup to continue.
+// The caller tries ordinary function lookup first and only calls this helper when experimental
+// features are enabled. A name that does not select a struct leaves `outFoundStructuralStage`
+// false, so the caller can report the original function-not-found diagnostic.
 RefPtr<EntryPoint> tryCreateStructuralRayTracingEntryPoint(
     FrontEndEntryPointRequest* entryPointReq,
     bool* outFoundStructuralStage,

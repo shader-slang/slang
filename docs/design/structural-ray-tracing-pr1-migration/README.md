@@ -285,6 +285,18 @@ method. Selecting `SkyMiss` as an entry point or listing it in a schema does not
 or run a constructor. Generated adapters must call the static implementation with its input. The
 function's IR therefore has an input parameter and no hidden `this` parameter.
 
+Entry-point lookup first tries the ordinary function name. If that fails and
+`-experimental-feature` is enabled, it tries the structural stage type. A temporary diagnostic
+sink holds only the function-not-found diagnostic until the structural fallback has either
+recognized the type or failed, so selecting `SkyMiss` does not report a missing function. Other
+lookup diagnostics, including generic-argument conversion warnings, go directly to the real sink.
+
+Ordinary conformance checking already validates the selected `invoke` signature. Structural
+entries skip `validateEntryPoint`'s native parameter classification and validation because the
+compiler supplies their RT input. They reuse `_validateEntryPointTargetCapabilities` to check the
+selected implementation and primitive against the requested target and profile. For example,
+a correctly typed `invoke` that calls a Metal-only helper must still be rejected for HLSL.
+
 An `invoke` method can be called as an ordinary static function with an existing input. For example:
 
 ```slang

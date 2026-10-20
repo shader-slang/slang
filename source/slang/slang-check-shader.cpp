@@ -925,7 +925,13 @@ bool isPrimaryDecl(CallableDecl* decl)
     return (!decl->primaryDecl) || (decl == decl->primaryDecl);
 }
 
-DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, DiagnosticSink* sink)
+// Finds a function by name, optionally sending only the not-found diagnostic to a separate sink.
+// Entry-point selection uses that sink while trying a structural stage type as a fallback.
+DeclRef<FuncDecl> findFunctionDeclByName(
+    Module* translationUnit,
+    Name* name,
+    DiagnosticSink* sink,
+    DiagnosticSink* notFoundSink = nullptr)
 {
     DeclRef<FuncDecl> entryPointFuncDeclRef;
 
@@ -960,9 +966,10 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
     if (!entryPointFuncDeclRef)
     {
         auto translationUnitSyntax = translationUnit->getModuleDecl();
-        sink->diagnose(Diagnostics::EntryPointFunctionNotFound{
-            .name = name->text,
-            .location = translationUnitSyntax->loc});
+        (notFoundSink ? notFoundSink : sink)
+            ->diagnose(Diagnostics::EntryPointFunctionNotFound{
+                .name = name->text,
+                .location = translationUnitSyntax->loc});
     }
     return entryPointFuncDeclRef;
 }
@@ -2904,28 +2911,49 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
 
     auto entryPointName = entryPointReq->getName();
     auto entryPointProfile = entryPointReq->getProfile();
-    bool foundStructuralStage = false;
-    CapabilitySet structuralEntryPointCaps;
-    auto structuralEntryPoint = tryCreateStructuralRayTracingEntryPoint(
-        entryPointReq,
-        &foundStructuralStage,
-        &structuralEntryPointCaps);
-    if (foundStructuralStage)
-    {
-        if (!structuralEntryPoint)
-            return nullptr;
 
-        List<GenericStructTypeUse> signatureStructUses;
-        _validateEntryPointTargetCapabilities(
-            structuralEntryPoint,
-            structuralEntryPointCaps,
-            signatureStructUses,
-            sink);
-        return sink->getErrorCount() ? nullptr : structuralEntryPoint;
+    // Consider `-entry SkyMiss`, where SkyMiss implements rt::IMissShader. Ordinary function
+    // lookup reports that no function has that name, but experimental lookup may still select
+    // the struct's checked invoke implementation. Hold only the not-found diagnostic until that
+    // fallback has had a chance to recognize the struct. Other lookup diagnostics must reach the
+    // real sink: `SkyMiss<1.5>` can warn when converting a generic argument to int, and the
+    // structural fallback reuses the cached lookup result without diagnosing that conversion again.
+    DiagnosticSink notFoundSink(linkage->getSourceManager(), sink->getSourceLocationLexer(), sink);
+    DeclRef<FuncDecl> entryPointFuncDeclRef =
+        findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink, &notFoundSink);
+    if (!entryPointFuncDeclRef &&
+        linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+    {
+        bool foundStructuralStage = false;
+        CapabilitySet structuralEntryPointCaps;
+        auto structuralEntryPoint = tryCreateStructuralRayTracingEntryPoint(
+            entryPointReq,
+            &foundStructuralStage,
+            &structuralEntryPointCaps);
+        if (foundStructuralStage)
+        {
+            if (!structuralEntryPoint)
+                return nullptr;
+
+            // Conformance already checks invoke's signature. Its RT input is supplied by the
+            // compiler, so native uniform/varying parameter rules do not apply. The selected
+            // implementation and primitive must still support the requested target/profile.
+            List<GenericStructTypeUse> signatureStructUses;
+            _validateEntryPointTargetCapabilities(
+                structuralEntryPoint,
+                structuralEntryPointCaps,
+                signatureStructUses,
+                sink);
+            return sink->getErrorCount() ? nullptr : structuralEntryPoint;
+        }
     }
 
-    DeclRef<FuncDecl> entryPointFuncDeclRef =
-        findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
+    if (notFoundSink.outputBuffer.getLength())
+    {
+        sink->diagnoseRaw(
+            notFoundSink.getErrorCount() ? Severity::Error : Severity::Warning,
+            notFoundSink.outputBuffer.getUnownedSlice());
+    }
 
     // Did we find a function declaration in our search?
     if (!entryPointFuncDeclRef)

@@ -1,5 +1,12 @@
 //TEST:SIMPLE: -experimental-feature -entry M<P> -stage miss -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=CODEGEN): -experimental-feature -entry M<P> -stage miss -target hlsl
+//TEST:SIMPLE(filecheck=WARNING): -experimental-feature -entry ValueMiss<1.5> -stage miss -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR): -experimental-feature -entry ValueMiss<1.5> -stage miss -no-codegen -warnings-as-errors all
+
+// Resolving the entry-point name converts its value argument from float to int. Structural
+// fallback must preserve that warning, including when warnings are treated as errors.
+//WARNING: warning[E30081]: implicit conversion not recommended
+//ERROR: error[E30081]: implicit conversion not recommended
 
 import slang.raytracing;
 
@@ -35,4 +42,10 @@ struct M<PayloadType> : rt::IMissShader
                 ^^^^^^ structural ray-tracing entry point 'M.invoke' must be converted to a native adapter before target code generation
 */
     {}
+}
+
+struct ValueMiss<let N : int> : rt::IMissShader
+{
+    typealias Context = MissContext<P>;
+    static void invoke(in rt::MissInput<Context> input) {}
 }
