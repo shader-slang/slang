@@ -26,12 +26,16 @@ struct MissContext<PayloadType> : rt::IPayloadContext
     typealias Record = R;
 }
 
-// Selecting this closed specialization must preserve `P` on the `invoke` declaration reference.
-// Reducing the conformance witness to its bare `FuncDecl` leaves `PayloadType` unbound and causes
-// AST-to-IR lowering to reject the free generic type. The no-codegen run covers that selection.
-// The HLSL run intentionally reaches the unlowered-adapter diagnostic, proving that linking moved
-// the specialization-specific structural metadata from the `IRSpecialize` to the resulting
-// `IRFunc` instead of losing it or attaching it to the shared generic body.
+// The first two commands select `M<P>`, so the compiler must use `P` wherever this entry point
+// uses `PayloadType`, including inside `MissContext<PayloadType>`.
+//
+// The first command uses `-no-codegen`: it checks the program without producing target shader
+// code and should succeed. This catches the compiler forgetting `P` while selecting `invoke`.
+//
+// The second command asks for HLSL output. Generating an HLSL ray-tracing entry point from
+// `M<P>.invoke` is not implemented yet, so this command should report the error below.
+// Reaching that specific error also checks that the compiler still recognizes `M<P>.invoke`
+// as a structural ray-tracing entry point after replacing `PayloadType` with `P`.
 struct M<PayloadType> : rt::IMissShader
 {
     typealias Context = MissContext<PayloadType>;
