@@ -33,14 +33,15 @@ struct EntryPointParamDirections
     bool isOutput = false;
 };
 
-/// Get whether entry-point parameter `param` is a stage input, a stage output, or both.
-///
-/// `validateEntryPoint` rejects reference passing modes on entry-point parameters before it
-/// computes any directions, so only the value modes reach this function.
-static EntryPointParamDirections getEntryPointParamDirections(ParamDecl* param)
+/// Check the passing mode of entry-point parameter `param`, and return whether the parameter is a
+/// stage input, a stage output, or both.
+static EntryPointParamDirections checkEntryPointParamPassingMode(
+    ParamDecl* param,
+    DiagnosticSink* sink)
 {
     EntryPointParamDirections directions;
-    switch (getParamPassingMode(param))
+    const auto mode = getParamPassingMode(param);
+    switch (mode)
     {
     case ParamPassingMode::In:
     case ParamPassingMode::BorrowIn:
@@ -51,6 +52,25 @@ static EntryPointParamDirections getEntryPointParamDirections(ParamDecl* param)
         break;
     case ParamPassingMode::BorrowInOut:
         directions.isInput = true;
+        directions.isOutput = true;
+        break;
+
+    // An entry point receives values from the previous pipeline stage and passes values to the
+    // next one, so there is no caller's memory location for a reference parameter to bind to. A
+    // borrow such as `__constref` has value semantics and may be implemented by copying, so only
+    // the reference modes are rejected. We still give each one the direction its access implies,
+    // so that the remaining entry-point checks report their own problems with the parameter.
+    case ParamPassingMode::RefReadWrite:
+        sink->diagnose(Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
+        directions.isInput = true;
+        directions.isOutput = true;
+        break;
+    case ParamPassingMode::RefReadOnly:
+        sink->diagnose(Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
+        directions.isInput = true;
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        sink->diagnose(Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
         directions.isOutput = true;
         break;
     default:
@@ -2033,27 +2053,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
-    // An entry point receives values from the previous pipeline stage and passes values to the
-    // next one, so there is no caller's memory location for a reference parameter to bind to. We
-    // reject only the reference modes: a borrow such as `__constref` has value semantics and may
-    // be implemented by copying, so it remains valid here. The checks from here on, starting with
-    // system-value semantic validation, classify each parameter as a stage input, output, or
-    // both, so we stop after reporting every such parameter rather than have them add
-    // diagnostics for a parameter that is already invalid.
+    // The checks from here on classify each parameter as a stage input, output, or both.
+    List<ParamDecl*> params;
+    List<EntryPointParamDirections> paramDirections;
+    for (auto param : entryPointFuncDecl->getParameters())
     {
-        bool hasReferenceParam = false;
-        for (const auto& param : entryPointFuncDecl->getParameters())
-        {
-            const auto mode = getParamPassingMode(param);
-            if (isByReferenceParamPassingMode(mode))
-            {
-                sink->diagnose(
-                    Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
-                hasReferenceParam = true;
-            }
-        }
-        if (hasReferenceParam)
-            return;
+        params.add(param);
+        paramDirections.add(checkEntryPointParamPassingMode(param, sink));
     }
 
     // The entry point's effective requirements, seeded from the decl's inferred set and augmented
@@ -2083,9 +2089,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         if (auto scope = linkage->getSessionImpl()->coreLanguageScope)
         {
             // Validate system value semantics for entry point parameters
-            for (const auto& param : entryPointFuncDecl->getParameters())
+            for (Index i = 0; i < params.getCount(); ++i)
             {
-                const auto directions = getEntryPointParamDirections(param);
+                const auto param = params[i];
+                const auto directions = paramDirections[i];
                 if (directions.isInput && directions.isOutput)
                 {
                     validateSystemValueSemantic(
@@ -2153,12 +2160,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         auto astBuilder = getCurrentASTBuilder();
         List<HLSLSimpleSemantic*> depthOutputSemantics;
-        for (const auto& param : entryPointFuncDecl->getParameters())
+        for (Index i = 0; i < params.getCount(); ++i)
         {
             // Depth semantics are output-only (setter-only in the core module; any input use
             // is already rejected), so only output parameters can carry one.
-            if (getEntryPointParamDirections(param).isOutput)
-                collectDepthOutputSemantics(astBuilder, param, depthOutputSemantics);
+            if (paramDirections[i].isOutput)
+                collectDepthOutputSemantics(astBuilder, params[i], depthOutputSemantics);
         }
         // The return value is also an output of the entry point.
         collectDepthOutputSemantics(astBuilder, entryPointFuncDecl, depthOutputSemantics);
@@ -2427,8 +2434,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
         // Validate each parameter that would be treated as varying. Parameters
         // that were auto-marked uniform by the loop above are skipped here.
-        for (const auto& param : entryPointFuncDecl->getParameters())
+        for (Index i = 0; i < params.getCount(); ++i)
         {
+            const auto param = params[i];
             if (param->hasModifier<HLSLUniformModifier>())
                 continue;
             if (isUniformParameterType(param->getType()))
@@ -2439,7 +2447,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.sink = sink;
             ctx.entryPointName = entryPointName;
             ctx.loc = param->loc;
-            const auto directions = getEntryPointParamDirections(param);
+            const auto directions = paramDirections[i];
             ctx.direction =
                 directions.isOutput ? (directions.isInput ? "input/output" : "output") : "input";
 
@@ -2485,12 +2493,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
         if (!hasSvPosition)
         {
-            for (const auto& param : entryPointFuncDecl->getParameters())
+            for (Index i = 0; i < params.getCount(); ++i)
             {
                 // Only outputs (or in/out) of the entry point can carry
                 // SV_Position for the rasterizer.
-                if (!getEntryPointParamDirections(param).isOutput)
+                if (!paramDirections[i].isOutput)
                     continue;
+                const auto param = params[i];
                 hasOutputs = true;
                 if (_outputDeclHasSemantic(astBuilder, param, param->getType(), svPosition))
                 {
