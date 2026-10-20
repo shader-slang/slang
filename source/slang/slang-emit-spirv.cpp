@@ -11709,6 +11709,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // This keeps track of the named IDs used in the asm block
         Dictionary<UnownedStringSlice, SpvWord> idMap;
 
+        // The named IDs that an annotation in this block refers to, such as `%c` in
+        // `OpDecorate %c RelaxedPrecision`. A constant with one of these names is not
+        // memoized (see below), so that its decorations stay on it alone.
+        HashSet<UnownedStringSlice> decoratedIds;
+        for (const auto spvInst : inst->getInsts())
+        {
+            if (spvInst->getOpcodeOperand()->getOp() == kIROp_SPIRVAsmOperandTruncate)
+                continue;
+            const auto info = m_grammarInfo->opInfos.lookup(SpvOp(spvInst->getOpcodeOperandWord()));
+            if (!info || info->class_ != SPIRVCoreGrammarInfo::OpInfo::Annotation)
+                continue;
+            for (const auto operand : spvInst->getSPIRVOperands())
+            {
+                if (operand->getOp() == kIROp_SPIRVAsmOperandId)
+                    decoratedIds.add(cast<IRStringLit>(operand->getValue())->getStringSlice());
+            }
+        }
+
+        const auto isDecoratedAsmId = [&](IRSPIRVAsmOperand* operand)
+        {
+            return operand && operand->getOp() == kIROp_SPIRVAsmOperandId &&
+                   decoratedIds.contains(cast<IRStringLit>(operand->getValue())->getStringSlice());
+        };
+
         for (const auto spvInst : inst->getInsts())
         {
             const bool isLast = spvInst == inst->getLastChild();
@@ -12115,10 +12139,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 // `%c = OpConstantTrue $$bool` that is inlined twice into one entry point
                 // would give two different `%c`, and an `OpExecutionModeId __entryPoint ... %c`
                 // in it would be emitted twice for that entry point. Specialization constants
-                // are not memoized: each one is a separate value.
+                // are not memoized: each one is a separate value. Nor is a constant that this
+                // block decorates: sharing its id would apply the decoration to the other
+                // constants too.
                 bool memoizeConstantInst = false;
                 if (opParent == getSection(SpvLogicalSectionID::ConstantsAndTypes) && opInfo &&
-                    opInfo->resultIdIndex == 1)
+                    opInfo->resultIdIndex == 1 &&
+                    !isDecoratedAsmId(as<IRSPIRVAsmOperand>(spvInst->getOperand(2))))
                 {
                     switch (opcode)
                     {
