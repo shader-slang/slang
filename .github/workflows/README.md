@@ -225,6 +225,29 @@ No trigger of their own; see the first diagram for who calls them. The
 | `pr-board-sync.yml`                                            | The PR-board reconciliation engine.      |
 | `issue-board-onboard.yml`                                      | Onboard a new issue onto Slang-All.      |
 
+### Sanitizer selection
+
+`ci-slang-sanitizer.yml` accepts `sanitizer: asan` (the default, including UBSan)
+or `sanitizer: tsan`. PR CI continues to use ASan. The nightly calls the same
+workflow twice, with separate builds, caches, and logs. Its manual dispatch
+accepts `all`, `asan`, or `tsan` so either job can be validated independently.
+The existing `sanitizer-binaries` artifact remains ASan-only.
+
+TSan runs on a GitHub-hosted Linux x86_64 CPU runner. Its container allows the
+`personality` syscall and runs shell steps through `setarch -R`; instrumented
+build generators and test children inherit disabled ASLR without changing the
+host kernel settings. Before building Slang, a clean threaded canary must pass
+and a deliberately racy canary must produce a symbolized TSan report.
+
+The TSan job explicitly exercises `parallelGenericEntryPointCompile` through a
+test server, then runs the full CPU-capable suite in process to limit memory use.
+It fails on any nonempty TSan report, unsuccessful test exit, or missing/empty
+suite result. Unlike ASan's PR attribution policy, TSan does not downgrade
+pre-existing findings. No race suppressions are introduced with the job; findings
+need investigation before adding an issue-linked exception. Reports and test
+output are retained in `tsan-logs`. Vulkan execution coverage remains separate
+work tracked by #12798.
+
 ## 3. Scheduled
 
 Work too slow, too noisy, or too repetitive to gate a PR. Cadences are in each
