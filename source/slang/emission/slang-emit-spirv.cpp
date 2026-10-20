@@ -11995,6 +11995,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ensureExtensionDeclaration(
                         as<IRStringLit>(spvInst->getOperand(1)->getOperand(0))->getStringSlice());
                     continue;
+                case SpvOpExecutionModeId:
+                    // An `OpExecutionModeId` that names its entry point (e.g. `$main`) is
+                    // emitted as written. The `__entryPoint` form is expanded below, as for
+                    // `OpExecutionMode`.
+                    if (spvInst->getOperandCount() < 2 ||
+                        spvInst->getOperand(1)->getOp() != kIROp_SPIRVAsmOperandEntryPoint)
+                        break;
+                    [[fallthrough]];
                 case SpvOpExecutionMode:
                     {
                         if (auto refEntryPointSet =
@@ -12005,7 +12013,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 emitInstMemoizedNoResultIDCustomOperandFunc(
                                     getSection(SpvLogicalSectionID::ExecutionModes),
                                     nullptr,
-                                    SpvOpExecutionMode,
+                                    opcode,
                                     [&]()
                                     {
                                         emitOperand(entryPoint);
