@@ -47,7 +47,10 @@ The HitObject API provides cross-platform SER functionality. The API is based on
 
 - [ReorderThread](#reorder-thread)
 
-## Fused Functions (Vulkan EXT only)
+## Fused Functions
+
+On Vulkan with the EXT extension these lower to a single fused instruction. On every other SER
+target they lower to the equivalent separate calls.
 
 - [ReorderExecute](#reorder-execute)
 - [TraceReorderExecute](#trace-reorder-execute)
@@ -919,7 +922,9 @@ void ReorderThread(HitObject HitOrMiss);
 
 Fused operation that reorders threads by HitObject and then executes the shader. Equivalent to calling `ReorderThread` followed by `HitObject.Invoke`.
 
-**Note**: **Vulkan EXT only**. Available via `hitObjectReorderExecuteEXT` in GLSL.
+**Note**: Lowers to `OpHitObjectReorderExecuteShaderEXT` on SPIR-V and to `hitObjectReorderExecuteEXT` in GLSL
+with the EXT extension. Other SER targets (Vulkan NV, D3D12 DXR 1.3, CUDA) use `ReorderThread` followed by
+`HitObject.Invoke`. Not available for NVAPI, whose `HitObject.Invoke` requires an AccelerationStructure.
 
 ## Signature
 
@@ -947,7 +952,9 @@ void ReorderExecute<payload_t>(
 
 Fused operation that traces a ray, reorders threads by the resulting HitObject, and executes the shader. Equivalent to calling `HitObject.TraceRay`, `ReorderThread`, and `HitObject.Invoke` in sequence.
 
-**Note**: **Vulkan EXT only**. Available via `hitObjectTraceReorderExecuteEXT` in GLSL.
+**Note**: Lowers to `OpHitObjectTraceReorderExecuteEXT` on SPIR-V and to `hitObjectTraceReorderExecuteEXT` in
+GLSL with the EXT extension. Other SER targets (Vulkan NV, D3D12 NVAPI and DXR 1.3, CUDA) use the separate
+`HitObject.TraceRay`, `ReorderThread` and `HitObject.Invoke` calls.
 
 ## Signature
 
@@ -985,9 +992,12 @@ void TraceReorderExecute<payload_t>(
 
 ## Description
 
-Fused operation for motion blur that traces a motion ray, reorders threads, and executes the shader.
+Fused operation for motion blur that traces a motion ray, reorders threads, and executes the shader. Equivalent to calling `HitObject.TraceMotionRay`, `ReorderThread`, and `HitObject.Invoke` in sequence.
 
-**Note**: **Vulkan EXT only**. Available via `hitObjectTraceMotionReorderExecuteEXT` in GLSL. Requires motion blur support.
+**Note**: Requires motion blur support. Lowers to `OpHitObjectTraceMotionReorderExecuteEXT` on SPIR-V and to
+`hitObjectTraceMotionReorderExecuteEXT` in GLSL with the EXT extension. Vulkan NV and CUDA use the separate
+`HitObject.TraceMotionRay`, `ReorderThread` and `HitObject.Invoke` calls. Not available on D3D12, which has
+no `TraceMotionRay`.
 
 ## Signature
 
