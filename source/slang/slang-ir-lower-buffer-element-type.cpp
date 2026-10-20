@@ -14,6 +14,8 @@
 /// buffer element. Examples are:
 /// - In SPIRV, `bool` is considered a logical type, meaning it cannot appear inside
 ///   buffers. bool vectors and matrices needs to be lowered into arrays.
+/// - In WGSL, `bool` is not host-shareable, so it cannot appear in uniform or storage
+///   buffers either; it is stored as `u32`.
 /// - In SPIRV, if `T` is used to declare a buffer, then every member in `T` must have
 ///   explicit offset. But if it is used to declare a local variable, then it cannot
 ///   have explicit member offset. This means that we cannot use the same `Foo` struct
@@ -305,6 +307,12 @@ struct LoweredElementTypeInfo
     ConversionMethod convertLoweredToOriginal;
 };
 
+static bool isBoolOrBoolVectorType(IRType* type)
+{
+    return as<IRBoolType>(type) ||
+           (as<IRVectorType>(type) && as<IRBoolType>(getVectorElementType(type)));
+}
+
 /// Defines target-specific behavior of how to lower buffer element types.
 struct BufferElementTypeLoweringPolicy : public RefObject
 {
@@ -358,12 +366,12 @@ struct BufferElementTypeLoweringPolicy : public RefObject
     /// which extracts the pointee struct as its own element type.
     ///
     /// The base-class default covers the historical set of lowerable leaf
-    /// types (struct, matrix, array, bool). Override to discover additional
-    /// leaf types.
+    /// types (struct, matrix, array, bool and bool vectors). Override to discover
+    /// additional leaf types.
     virtual bool needsElementLowering(IRType* elementType)
     {
         return as<IRStructType>(elementType) || as<IRMatrixType>(elementType) ||
-               as<IRArrayType>(elementType) || as<IRBoolType>(elementType);
+               as<IRArrayType>(elementType) || isBoolOrBoolVectorType(elementType);
     }
 
     /// Controls whether a pass invocation re-processes types that a prior
@@ -648,6 +656,69 @@ struct LoweredElementTypeContext
         return func;
     }
 
+    /// Create a function that reads an array element stored as the 16-byte-aligned vector
+    /// `packedType` and returns it as `leafInfo.originalType`: the vector is first reshaped to
+    /// the leaf's lowered type, then converted by the leaf's own conversion. For example, a
+    /// `bool3` array element in a WGSL uniform buffer is stored as `vec4<u32>`, read back as
+    /// `vec3<u32>`, and then cast to `vec3<bool>`. The leaf conversion must be an opcode: the
+    /// only policy that widens std140 array elements (WGSL) converts leaves with `BuiltinCast`.
+    IRFunc* createWidenedLeafUnpackFunc(IRType* packedType, LoweredElementTypeInfo leafInfo)
+    {
+        SLANG_RELEASE_ASSERT(
+            leafInfo.convertLoweredToOriginal.kind == ConversionMethodKind::Opcode);
+
+        IRBuilder builder(packedType);
+        builder.setInsertAfter(packedType);
+        auto func = builder.createFunc();
+        auto refPackedType = builder.getRefParamType(packedType, AddressSpace::Generic);
+        func->setFullType(builder.getFuncType(1, (IRType**)&refPackedType, leafInfo.originalType));
+        builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+        auto packedParam = builder.emitParam(refPackedType);
+        auto leafLoweredVal =
+            builder.emitVectorReshape(leafInfo.loweredType, builder.emitLoad(packedParam));
+        auto originalVal = builder.emitIntrinsicInst(
+            leafInfo.originalType,
+            leafInfo.convertLoweredToOriginal.op,
+            1,
+            &leafLoweredVal);
+        builder.emitReturn(originalVal);
+        return func;
+    }
+
+    /// Create the inverse of `createWidenedLeafUnpackFunc`.
+    IRFunc* createWidenedLeafPackFunc(IRType* packedType, LoweredElementTypeInfo leafInfo)
+    {
+        SLANG_RELEASE_ASSERT(
+            leafInfo.convertOriginalToLowered.kind == ConversionMethodKind::Opcode);
+
+        IRBuilder builder(packedType);
+        builder.setInsertAfter(packedType);
+        auto func = builder.createFunc();
+        auto refPackedType = builder.getRefParamType(packedType, AddressSpace::Generic);
+        IRType* paramTypes[] = {refPackedType, leafInfo.originalType};
+        func->setFullType(builder.getFuncType(2, paramTypes, builder.getVoidType()));
+        builder.addNameHintDecoration(func, UnownedStringSlice("packStorage"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+        auto outParam = builder.emitParam(refPackedType);
+        IRInst* originalParam = builder.emitParam(leafInfo.originalType);
+        auto leafLoweredVal = builder.emitIntrinsicInst(
+            leafInfo.loweredType,
+            leafInfo.convertOriginalToLowered.op,
+            1,
+            &originalParam);
+        auto packedVal = as<IRVectorType>(leafInfo.loweredType)
+                             ? builder.emitVectorReshape(packedType, leafLoweredVal)
+                             : builder.emitMakeVectorFromScalar(packedType, leafLoweredVal);
+        builder.emitStore(outParam, packedVal);
+        builder.emitReturn();
+        return func;
+    }
+
     LoweredElementTypeInfo getLoweredTypeInfoImpl(IRType* type, TypeLoweringConfig config)
     {
         IRBuilder builder(type);
@@ -668,8 +739,9 @@ struct LoweredElementTypeContext
                 // We only need to handle the case where the element type is a scalar or vector
                 // type here, because if the element type is a matrix type or struct type,
                 // the size promotion will be handled during lowering of the element type.
+                auto leafLoweredType = loweredInnerTypeInfo.loweredType;
                 IRType* packedVectorType = nullptr;
-                if (auto vectorType = as<IRVectorType>(loweredInnerTypeInfo.loweredType))
+                if (auto vectorType = as<IRVectorType>(leafLoweredType))
                 {
                     packedVectorType = builder.getVectorType(
                         vectorType->getElementType(),
@@ -677,19 +749,39 @@ struct LoweredElementTypeContext
                             target,
                             vectorType->getElementType(),
                             getIntVal(vectorType->getElementCount()))));
-                    if (packedVectorType != loweredInnerTypeInfo.originalType)
+                }
+                else if (auto scalarType = as<IRBasicType>(leafLoweredType))
+                {
+                    packedVectorType = builder.getVectorType(
+                        leafLoweredType,
+                        get16ByteAlignedVectorElementCount(target, scalarType, 1));
+                }
+                if (packedVectorType && packedVectorType != leafLoweredType)
+                {
+                    // Leaf conversions are always set in pairs. If the leaf is stored as a
+                    // different type (e.g. `bool3` as `vector<uint,3>`), the widened element
+                    // goes through both the reshape and the leaf conversion; otherwise only
+                    // the reshape is needed.
+                    SLANG_ASSERT(
+                        !loweredInnerTypeInfo.convertLoweredToOriginal ==
+                        !loweredInnerTypeInfo.convertOriginalToLowered);
+                    if (loweredInnerTypeInfo.convertLoweredToOriginal)
+                    {
+                        loweredInnerTypeInfo.convertLoweredToOriginal =
+                            createWidenedLeafUnpackFunc(packedVectorType, loweredInnerTypeInfo);
+                        loweredInnerTypeInfo.convertOriginalToLowered =
+                            createWidenedLeafPackFunc(packedVectorType, loweredInnerTypeInfo);
+                    }
+                    else if (as<IRVectorType>(leafLoweredType))
                     {
                         loweredInnerTypeInfo.convertLoweredToOriginal = kIROp_VectorReshape;
                         loweredInnerTypeInfo.convertOriginalToLowered = kIROp_VectorReshape;
                     }
-                }
-                else if (auto scalarType = as<IRBasicType>(loweredInnerTypeInfo.loweredType))
-                {
-                    packedVectorType = builder.getVectorType(
-                        loweredInnerTypeInfo.loweredType,
-                        get16ByteAlignedVectorElementCount(target, scalarType, 1));
-                    loweredInnerTypeInfo.convertLoweredToOriginal = kIROp_VectorReshape;
-                    loweredInnerTypeInfo.convertOriginalToLowered = kIROp_MakeVectorFromScalar;
+                    else
+                    {
+                        loweredInnerTypeInfo.convertLoweredToOriginal = kIROp_VectorReshape;
+                        loweredInnerTypeInfo.convertOriginalToLowered = kIROp_MakeVectorFromScalar;
+                    }
                 }
                 if (packedVectorType)
                 {
@@ -1801,7 +1893,7 @@ struct LoweredElementTypeContext
             // can define their own discovery criteria (e.g., the Metal
             // pointer policy recurses through structs/arrays looking for
             // pointer fields, while the base class checks for the
-            // historical set of struct/matrix/array/bool).
+            // historical set of struct/matrix/array/bool/bool vector).
             //
             if (!leafTypeLoweringPolicy->needsElementLowering(elementType))
                 continue;
@@ -1923,6 +2015,23 @@ struct LoweredElementTypeContext
         }
     }
 
+    /// Returns true if the storage-typed value at `src` can be stored into `dest` with
+    /// `copyLogical`, and false if it must be unpacked to its logical type and packed again.
+    /// `copyLogical` is a plain store when both storage types match, and a `CopyLogical`
+    /// otherwise. Only SPIR-V lowers `CopyLogical`, and the Khronos policy (the only one that
+    /// cannot keep storage types in locals) never widens std140 array elements, so its two
+    /// storage types for one logical type pair up field by field and element by element. On
+    /// other targets two layouts can differ in shape (a std140 `float[2]` is stored as
+    /// `vec4<f32>` elements, a std430 one is not), so we only copy when the types match.
+    bool canCopyStorageDirectly(IRBuilder& builder, IRInst* dest, IRInst* src)
+    {
+        if (!leafTypeLoweringPolicy->canUseStorageTypeInLocalVar())
+            return true;
+        return isTypeEqual(
+            tryGetPointedToType(&builder, dest->getDataType()),
+            tryGetPointedToType(&builder, src->getDataType()));
+    }
+
     void copyLogical(IRBuilder& builder, IRInst* dest, IRInst* src)
     {
         auto destValType = tryGetPointedToType(&builder, dest->getDataType());
@@ -1978,10 +2087,11 @@ struct LoweredElementTypeContext
                     &builder,
                     getElementPtr->getBase()->getDataType())))
             {
-                // For WGSL, an array of scalar or vector type will always be converted to
-                // an array of 16-byte aligned vector type. In this case, we will run into a
-                // GetElementPtr where the result type is different from the element type of
-                // the base array.
+                // An array of scalars or vectors may be stored with a different element type:
+                // WGSL widens std140 array elements to 16-byte aligned vectors, and `bool`
+                // elements are stored as an integer on WGSL and SPIR-V. In this case, we will
+                // run into a GetElementPtr where the result type is different from the element
+                // type of the base array.
                 // We should setup loweredElementTypeInfo so the remaining logic can handle
                 // this case and insert proper packing/unpacking logic around it.
                 if (arrayType->getElementType() != originalElementType &&
@@ -2105,7 +2215,8 @@ struct LoweredElementTypeContext
                                     addr,
                                     alignedAttr->getAlignment());
                             }
-                            if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref)
+                            if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref &&
+                                canCopyStorageDirectly(builder, addr, originalVal->getOperand(0)))
                             {
                                 auto valAddr = originalVal->getOperand(0);
 
@@ -2117,6 +2228,8 @@ struct LoweredElementTypeContext
                             }
                             else
                             {
+                                // `originalVal` is a logical value here; a storage value in
+                                // another layout is unpacked to one when its cast materializes.
                                 loweredElementTypeInfo.convertOriginalToLowered
                                     .applyDestinationDriven(builder, addr, originalVal);
                             }
@@ -2610,6 +2723,26 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
             defaultMatrixLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
     }
 
+    /// Lower `bool` or `vector<bool,N>` to `intType` or `vector<intType,N>`, for targets where
+    /// `bool` cannot be stored in a buffer. Loads and stores convert with `BuiltinCast`.
+    static LoweredElementTypeInfo lowerBoolToIntStorage(IRType* type, IRType* intType)
+    {
+        SLANG_RELEASE_ASSERT(isBoolOrBoolVectorType(type));
+
+        LoweredElementTypeInfo info = {};
+        info.originalType = type;
+        info.loweredType = intType;
+        if (auto vectorType = as<IRVectorType>(type))
+        {
+            IRBuilder builder(type);
+            builder.setInsertBefore(type);
+            info.loweredType = builder.getVectorType(intType, vectorType->getElementCount());
+        }
+        info.convertLoweredToOriginal = kIROp_BuiltinCast;
+        info.convertOriginalToLowered = kIROp_BuiltinCast;
+        return info;
+    }
+
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config)
     {
         if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout &&
@@ -2896,52 +3029,36 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     {
         if (target->shouldEmitSPIRVDirectly())
         {
-            LoweredElementTypeInfo info = {};
-            info.originalType = type;
-
             switch (target->getTargetReq()->getTarget())
             {
             case CodeGenTarget::SPIRV:
             case CodeGenTarget::SPIRVAssembly:
+                if (isBoolOrBoolVectorType(type))
                 {
-                    auto scalarType = type;
-                    auto vectorType = as<IRVectorType>(scalarType);
-                    if (vectorType)
-                        scalarType = vectorType->getElementType();
+                    // Bool is an abstract type in SPIRV, so we need to lower them into an int.
                     IRBuilder builder(type);
                     builder.setInsertBefore(type);
 
-                    if (as<IRBoolType>(scalarType))
+                    // Find an integer type of the correct size for the current layout rule.
+                    IRType* intType = nullptr;
+                    IRSizeAndAlignment boolSizeAndAlignment;
+                    if (getSizeAndAlignment(
+                            target->getTargetReq(),
+                            config.getLayoutRule(),
+                            getVectorElementType(type),
+                            &boolSizeAndAlignment) == SLANG_OK)
                     {
-                        // Bool is an abstract type in SPIRV, so we need to lower them into an int.
-
-                        // Find an integer type of the correct size for the current layout rule.
-                        IRSizeAndAlignment boolSizeAndAlignment;
-                        if (getSizeAndAlignment(
-                                target->getTargetReq(),
-                                config.getLayoutRule(),
-                                scalarType,
-                                &boolSizeAndAlignment) == SLANG_OK)
-                        {
-                            IntInfo ii;
-                            ii.width = boolSizeAndAlignment.size * 8;
-                            ii.isSigned = true;
-                            info.loweredType = builder.getType(getIntTypeOpFromInfo(ii));
-                        }
-                        else
-                        {
-                            // Just in case that fails for some reason, just use an int.
-                            info.loweredType = builder.getIntType();
-                        }
-
-                        if (vectorType)
-                            info.loweredType = builder.getVectorType(
-                                info.loweredType,
-                                vectorType->getElementCount());
-                        info.convertLoweredToOriginal = kIROp_BuiltinCast;
-                        info.convertOriginalToLowered = kIROp_BuiltinCast;
-                        return info;
+                        IntInfo ii;
+                        ii.width = boolSizeAndAlignment.size * 8;
+                        ii.isSigned = true;
+                        intType = builder.getType(getIntTypeOpFromInfo(ii));
                     }
+                    else
+                    {
+                        // Just in case that fails for some reason, just use an int.
+                        intType = builder.getIntType();
+                    }
+                    return lowerBoolToIntStorage(type, intType);
                 }
                 break;
             default:
@@ -2971,7 +3088,7 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
     }
 
     // Discover top-level vector buffer elements for lowering; the base class's
-    // set (struct/matrix/array/bool) does not include bare vectors. The actual
+    // set (struct/matrix/array/bool/bool vector) does not include other vectors. The actual
     // decision is `needsPackedVectorStorage`, shared with vector fields found
     // inside lowered composites.
     bool needsElementLowering(IRType* elementType) override
@@ -3276,6 +3393,20 @@ struct WGSLBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
     virtual bool shouldTranslateArrayElementTo16ByteAlignedVectorForConstantBuffer() override
     {
         return true;
+    }
+
+    LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
+    {
+        // WGSL `bool` is not host-shareable, so it cannot appear in uniform or storage buffers.
+        // Every layout rule WGSL uses sizes `bool` at 4 bytes, so `u32` keeps offsets and
+        // reflection unchanged. Bool matrices reach this as arrays of bool vectors, because
+        // `legalizeMatrixTypes` runs first.
+        if (isBoolOrBoolVectorType(type))
+        {
+            IRBuilder builder(type);
+            return lowerBoolToIntStorage(type, builder.getUIntType());
+        }
+        return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
     }
 };
 
