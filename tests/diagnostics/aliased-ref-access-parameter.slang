@@ -88,43 +88,43 @@ void test()
     int x = 0;
 
     readOnlyAndRef(x, x);
-//CHECK:              ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:              ^ potentially aliased argument to a parameter that may be written
 //CHECK:              ^ argument for 'ref' parameter 'b' may alias argument for 'ref_readonly' parameter 'a'
 
     writeOnlyAndReadOnly(x, x);
-//CHECK:                 ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:                 ^ potentially aliased argument to a parameter that may be written
 //CHECK:                 ^ argument for 'ref_writeonly' parameter 'a' may alias argument for 'ref_readonly' parameter 'b'
 
     writeOnlyAndWriteOnly(x, x);
-//CHECK:                  ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:                  ^ potentially aliased argument to a parameter that may be written
 //CHECK:                  ^ argument for 'ref_writeonly' parameter 'a' may alias argument for 'ref_writeonly' parameter 'b'
 
     borrowAndRef(x, x);
-//CHECK:            ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:            ^ potentially aliased argument to a parameter that may be written
 //CHECK:            ^ argument for 'ref' parameter 'b' may alias argument for 'borrow' parameter 'a'
 
     readOnlyAndInout(x, x);
-//CHECK:                ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:                ^ potentially aliased argument to a parameter that may be written
 //CHECK:                ^ argument for 'inout' parameter 'b' may alias argument for 'ref_readonly' parameter 'a'
 
     readOnlyAndOut(x, x);
-//CHECK:              ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:              ^ potentially aliased argument to a parameter that may be written
 //CHECK:              ^ argument for 'out' parameter 'b' may alias argument for 'ref_readonly' parameter 'a'
 
     refAndInout(x, x);
-//CHECK:        ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:        ^ potentially aliased argument to a parameter that may be written
 //CHECK:        ^ argument for 'ref' parameter 'a' may alias argument for 'inout' parameter 'b'
 
     writeOnlyAndOut(x, x);
-//CHECK:            ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:            ^ potentially aliased argument to a parameter that may be written
 //CHECK:            ^ argument for 'ref_writeonly' parameter 'a' may alias argument for 'out' parameter 'b'
 
     borrowAndInout(x, x);
-//CHECK:              ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:              ^ potentially aliased argument to a parameter that may be written
 //CHECK:              ^ argument for 'inout' parameter 'b' may alias argument for 'borrow' parameter 'a'
 
     borrowAndOut(x, x);
-//CHECK:            ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:            ^ potentially aliased argument to a parameter that may be written
 //CHECK:            ^ argument for 'out' parameter 'b' may alias argument for 'borrow' parameter 'a'
 
     readOnlyAndReadOnly(x, x);

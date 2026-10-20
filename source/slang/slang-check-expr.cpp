@@ -4602,10 +4602,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            // Check for potentially aliased out/inout/ref arguments.
-            // If two arguments refer to the same root variable and at
-            // least one of them is out/inout/ref, the behavior is
-            // undefined (issue #10699).
+            // Warn when the same storage is passed to two parameters that may both be references
+            // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
