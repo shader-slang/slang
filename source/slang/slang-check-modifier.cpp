@@ -2558,24 +2558,12 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     }
 
     // Check for mutually exclusive modifier conflicts
-    //
-    // On a parameter, `const __ref` is the legacy spelling of `__ref_readonly`, so `const`
-    // alongside `__ref_readonly` or `__ref_writeonly` spells a second passing mode.
-    bool hasRefAccessModifier = false;
-    if (as<ParamDecl>(syntaxNode))
-    {
-        for (modifier = resultModifiers; modifier; modifier = modifier->next)
-            hasRefAccessModifier = hasRefAccessModifier || as<RefReadOnlyModifier>(modifier) ||
-                                   as<RefWriteOnlyModifier>(modifier);
-    }
     for (modifier = resultModifiers; modifier; modifier = modifier->next)
     {
         // Check if a modifier belonging to the same conflict group is already
         // defined.
         Modifier* existingModifier = nullptr;
-        auto conflictGroup = hasRefAccessModifier && as<ConstModifier>(modifier)
-                                 ? getModifierConflictGroupKind(ASTNodeType::RefModifier)
-                                 : getModifierConflictGroupKind(modifier->astNodeType);
+        auto conflictGroup = getModifierConflictGroupKind(modifier->astNodeType);
         if (conflictGroup != ASTNodeType::NodeBase)
         {
             if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
@@ -2585,6 +2573,37 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
                     .modifier = modifier});
             }
             mapExclusiveGroupToModifier[conflictGroup] = modifier;
+        }
+    }
+
+    // On a parameter, `const __ref` is the legacy spelling of `__ref_readonly`, so `const`
+    // alongside `__ref_readonly` or `__ref_writeonly` spells a second passing mode. `const` keeps
+    // its own conflict group because it is not a passing mode on any other parameter.
+    if (as<ParamDecl>(syntaxNode))
+    {
+        Modifier* constModifier = nullptr;
+        Modifier* refAccessModifier = nullptr;
+        for (modifier = resultModifiers; modifier; modifier = modifier->next)
+        {
+            Modifier* existingModifier = nullptr;
+            if (as<ConstModifier>(modifier) && !constModifier)
+            {
+                constModifier = modifier;
+                existingModifier = refAccessModifier;
+            }
+            else if (
+                (as<RefReadOnlyModifier>(modifier) || as<RefWriteOnlyModifier>(modifier)) &&
+                !refAccessModifier)
+            {
+                refAccessModifier = modifier;
+                existingModifier = constModifier;
+            }
+            if (existingModifier)
+            {
+                getSink()->diagnose(Diagnostics::DuplicateModifier{
+                    .existingModifier = existingModifier,
+                    .modifier = modifier});
+            }
         }
     }
 
