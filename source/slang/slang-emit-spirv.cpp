@@ -1457,6 +1457,48 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return spvInst;
     }
 
+    // Emits a SPV Inst with a result type and a result id (such as `OpConstantTrue`) with
+    // deduplication. `f` emits the operands without the result id: the result type first,
+    // then the rest. The result id is inserted after the result type.
+    template<typename OperandEmitFunc>
+    SpvInst* emitInstMemoizedWithResultTypeCustomOperandFunc(
+        SpvInstParent* parent,
+        IRInst* irInst,
+        SpvOp opcode,
+        const OperandEmitFunc& f)
+    {
+        List<SpvWord> ourOperands;
+        {
+            auto scopePeek = OperandMemoizeScope(this);
+            f();
+            ourOperands = std::move(m_operandStack);
+        }
+        SLANG_ASSERT(ourOperands.getCount() >= 1);
+
+        SpvInstKey key;
+        key.instWords.add(opcode);
+        key.instWords.addRange(ourOperands);
+
+        if (SpvInst** memoized = m_memoizedSpvInsts.tryGetValue(key))
+        {
+            if (irInst)
+                m_mapIRInstToSpvInst.addIfNotExists(irInst, *memoized);
+            return *memoized;
+        }
+
+        InstConstructScope scopeInst(this, opcode, irInst);
+        SpvInst* spvInst = scopeInst;
+        m_memoizedSpvInsts[key] = spvInst;
+
+        m_operandStack.add(ourOperands[0]);
+        emitOperand(kResultID);
+        for (Index i = 1; i < ourOperands.getCount(); i++)
+            m_operandStack.add(ourOperands[i]);
+
+        parent->addInst(spvInst);
+        return spvInst;
+    }
+
     template<typename OperandEmitFunc>
     SpvInst* emitInstMemoizedNoResultIDCustomOperandFunc(
         SpvInstParent* parent,
@@ -12065,10 +12107,32 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 const auto opParent = parentForOpCode(opcode, parent);
                 const auto opInfo = m_grammarInfo->opInfos.lookup(opcode);
 
-                // TODO: handle resultIdIndex == 1, for constants
                 const bool memoizeTypeInst =
                     opParent == getSection(SpvLogicalSectionID::ConstantsAndTypes) && opInfo &&
                     opInfo->resultIdIndex == 0;
+                // Constants (result type, then result id) are memoized too, so that identical
+                // constants written in `spirv_asm` share one id. Otherwise a helper with
+                // `%c = OpConstantTrue $$bool` that is inlined twice into one entry point
+                // would give two different `%c`, and an `OpExecutionModeId __entryPoint ... %c`
+                // in it would be emitted twice for that entry point. Specialization constants
+                // are not memoized: each one is a separate value.
+                bool memoizeConstantInst = false;
+                if (opParent == getSection(SpvLogicalSectionID::ConstantsAndTypes) && opInfo &&
+                    opInfo->resultIdIndex == 1)
+                {
+                    switch (opcode)
+                    {
+                    case SpvOpConstantTrue:
+                    case SpvOpConstantFalse:
+                    case SpvOpConstant:
+                    case SpvOpConstantComposite:
+                    case SpvOpConstantNull:
+                        memoizeConstantInst = true;
+                        break;
+                    default:
+                        break;
+                    }
+                }
                 // Only no-result instructions in the annotations section are safe to memoize.
                 // Result-producing annotations like OpDecorationGroup must keep
                 // distinct IDs because later group decorations reference them.
@@ -12108,6 +12172,33 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     // memoized instructions is that they come before their
                     // uses.
                     const auto resOperand = cast<IRSPIRVAsmOperand>(spvInst->getOperand(1));
+                    if (resOperand->getOp() == kIROp_SPIRVAsmOperandId)
+                    {
+                        const auto idName =
+                            cast<IRStringLit>(resOperand->getValue())->getStringSlice();
+                        idMap[idName] = last->id;
+                    }
+                }
+                else if (memoizeConstantInst)
+                {
+                    last = emitInstMemoizedWithResultTypeCustomOperandFunc(
+                        opParent,
+                        assignedInst,
+                        opcode,
+                        [&]()
+                        {
+                            // Operand 0 is the result type and operand 1 the result id, which
+                            // the helper inserts itself.
+                            Index i = 0;
+                            for (const auto operand : spvInst->getSPIRVOperands())
+                            {
+                                if (i++ != 1)
+                                    emitSpvAsmOperand(operand);
+                            }
+                        });
+
+                    // As for types above: point the result id at the memoized instruction.
+                    const auto resOperand = cast<IRSPIRVAsmOperand>(spvInst->getOperand(2));
                     if (resOperand->getOp() == kIROp_SPIRVAsmOperandId)
                     {
                         const auto idName =
