@@ -196,6 +196,12 @@ class EntryPoint;
 struct IRModule;
 struct IRFunc;
 
+/// Attaches the structural metadata and source/target names to a newly created entry point.
+void initializeStructuralRayTracingEntryPoint(
+    EntryPoint* entryPoint,
+    Name* entryPointName,
+    const StructuralRayTracingEntryPointInfo& structuralInfo);
+
 /// Returns the source-stage capabilities, including synthesized structural stages.
 CapabilitySet getEntryPointStageCapabilities(EntryPoint* entryPoint);
 

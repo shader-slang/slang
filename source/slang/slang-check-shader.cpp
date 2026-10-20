@@ -2959,6 +2959,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
             &structuralInfo);
     }
 
+    // A recognized structural type already supplies either the entry point or its own diagnostic.
     if (!foundStructuralStage && notFoundSink.outputBuffer.getLength())
     {
         sink->diagnoseRaw(
@@ -2996,15 +2997,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
         EntryPoint::create(linkage, entryPointFuncDeclRef, entryPointProfile);
     if (foundStructuralStage)
     {
-        // For `-entry Stages.Miss`, retain the selected type as the public name and derive a
-        // legal target symbol. The function reference still names its checked invoke method.
-        entryPoint->setNameOverride(entryPointName);
-        auto sourceTypeName = getStructuralRayTracingSourceTypeName(
-            linkage->getASTBuilder(),
-            structuralInfo.stageType);
-        entryPoint->setEntryPointNameOverride(
-            getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice()));
-        entryPoint->setStructuralRayTracingInfo(structuralInfo);
+        initializeStructuralRayTracingEntryPoint(entryPoint, entryPointName, structuralInfo);
     }
 
     // Now that we've *found* the entry point, it is time to validate

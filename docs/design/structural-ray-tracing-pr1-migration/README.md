@@ -292,9 +292,10 @@ recognized the type or failed, so selecting `SkyMiss` does not report a missing 
 lookup diagnostics, including generic-argument conversion warnings, go directly to the real sink.
 
 Both lookup paths return a `DeclRef<FuncDecl>`. `findAndValidateEntryPoint` creates the entry
-once, attaches the structural metadata and name overrides when needed, and calls
-`validateEntryPoint`. The structural finder also supplies the stage selected by conformance;
-native entries resolve their stage through the usual function attributes.
+once and calls `initializeStructuralRayTracingEntryPoint` in the RT checker to attach structural
+metadata and name overrides when needed, then calls `validateEntryPoint`. The structural finder
+also supplies the stage selected by conformance; native entries resolve their stage through the
+usual function attributes.
 
 Ordinary conformance checking already validates the selected `invoke` signature. At the start
 of `validateEntryPoint`, structural entries collect the implementation and primitive requirements,

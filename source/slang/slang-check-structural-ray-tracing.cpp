@@ -1225,6 +1225,23 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     return invokeMethod;
 }
 
+// Attaches the structural metadata and names to a newly created entry point.
+// For `-entry Stages.Miss`, retain the selected type as the public name and derive a legal target
+// symbol. The function reference still names the checked invoke method selected by conformance.
+void initializeStructuralRayTracingEntryPoint(
+    EntryPoint* entryPoint,
+    Name* entryPointName,
+    const StructuralRayTracingEntryPointInfo& structuralInfo)
+{
+    entryPoint->setNameOverride(entryPointName);
+    auto sourceTypeName = getStructuralRayTracingSourceTypeName(
+        entryPoint->getLinkage()->getASTBuilder(),
+        structuralInfo.stageType);
+    entryPoint->setEntryPointNameOverride(
+        getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice()));
+    entryPoint->setStructuralRayTracingInfo(structuralInfo);
+}
+
 // Uses the source stage's capabilities when its native entry point will be synthesized.
 //
 // Consider `struct MyMiss : rt::IMissShader { ... }` compiled for Metal. The source role is
