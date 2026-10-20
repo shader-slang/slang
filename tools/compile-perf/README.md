@@ -420,8 +420,9 @@ via `--results <checkout-path>`.
 | `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
 | `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
 
-The publishing nightly also exports compile-performance results for BenchView;
-the benchmark host handles collection and delivery. Export failures do not block
+The publishing nightly also exports daily results and newly measured releases for
+BenchView; release exports include only active tests at their current default sizes.
+Runs with `sweep=true` skip BenchView. The benchmark host handles collection and delivery. Export failures do not block
 existing reports. For local or historical exports, see `python3 benchview.py --help`.
 
 ---

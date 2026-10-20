@@ -1,0 +1,54 @@
+"""Verify the handoff from successful release measurements to BenchView export."""
+import contextlib
+import io
+import json
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import new_release_check
+
+
+class CompletedReleaseTests(unittest.TestCase):
+    """Only completed release batches may be handed to the nightly exporter."""
+
+    def test_completed_manifest(self):
+        """No-new and failed sweeps clear stale manifests; successful sweeps list their tags."""
+        for new, returncode in ((False, 0), (True, 0), (True, 1)):
+            with self.subTest(new=new, returncode=returncode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                index = root / "index.json"
+                index.write_text(json.dumps([] if new else [{"tag": "v2026.20"}]))
+                completed = root / "completed.json"
+                completed.write_text('[{"tag":"stale"}]')
+                info = {"tag": "v2026.20", "commit": "b" * 40,
+                        "commit_time": "2026-10-17T00:00:00Z",
+                        "released_at": "2026-10-17T04:00:00Z"}
+                argv = ["new_release_check.py", "--results", tmp, "--repo", tmp,
+                        "--completed", str(completed)]
+                with patch.object(sys, "argv", argv), \
+                     patch.object(new_release_check.fetch_releases, "window_tags",
+                                  return_value=[("2026-10-17", "v2026.20")]), \
+                     patch.object(new_release_check, "release_export_info", return_value=info), \
+                     patch.object(new_release_check.subprocess, "run") as run, \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    run.return_value.returncode = returncode
+                    if new and returncode:
+                        with self.assertRaises(SystemExit):
+                            new_release_check.main()
+                    else:
+                        new_release_check.main()
+                result = json.loads(completed.read_text())
+                if new and not returncode:
+                    self.assertEqual(result[0]["tag"], "v2026.20")
+                    self.assertEqual(result[0]["released_at"], info["released_at"])
+                    self.assertIn("observed_at", result[0])
+                    self.assertEqual(run.call_count, 4)
+                else:
+                    self.assertEqual(result, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -17,12 +17,14 @@ complete cleanly, their results directories are removed so the tracked history
 never contains a partial release point; the next nightly retries.
 """
 import argparse
+import datetime
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -50,6 +52,18 @@ def version_tuple(tag):
     return tuple(int(x) for x in m.groups(default="0"))
 
 
+def release_export_info(repo, tag):
+    """Record the tested tag's commit and actual publication time for result export."""
+    commit = subprocess.check_output(
+        ["git", "-C", repo, "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}"],
+        text=True).strip()
+    commit_time = subprocess.check_output(
+        ["git", "-C", repo, "show", "-s", "--format=%cI", commit], text=True).strip()
+    release = fetch_releases.gh_get(f"{fetch_releases.API}/releases/tags/{tag}")
+    return {"tag": tag, "commit": commit, "commit_time": commit_time,
+            "released_at": release["published_at"]}
+
+
 # The selection boundary governs permanent tracked-history membership, so pin
 # the documented cases at import time (fail-loud, per this tool's idiom):
 # the cutoff release itself and its patches are in, older patches and
@@ -67,7 +81,13 @@ def main():
     ap.add_argument("--repo", default=fetch_releases.DEFAULT_REPO,
                     help="slang checkout (release tags are read from its git)")
     ap.add_argument("--samples", type=int, default=5)
+    ap.add_argument("--completed", type=Path,
+                    help="write metadata for releases successfully measured by this invocation")
     args = ap.parse_args()
+    # An empty manifest also covers no-new-release and failed-sweep runs.
+    if args.completed:
+        args.completed.parent.mkdir(parents=True, exist_ok=True)
+        args.completed.write_text("[]\n", encoding="utf-8")
 
     ipath = os.path.join(args.results, "index.json")
     known = set()
@@ -92,6 +112,10 @@ def main():
         return
 
     print(f"new-release check: sweeping {', '.join(new)}")
+    export_info = [release_export_info(args.repo, tag) for tag in new] if args.completed else []
+    observed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    for info in export_info:
+        info["observed_at"] = observed_at
     py = sys.executable
 
     def run(*cmd):
@@ -125,6 +149,8 @@ def main():
         sys.exit(f"new-release sweep of {', '.join(new)} failed; "
                  f"partial results removed, next nightly retries")
     print(f"new-release check: {', '.join(new)} added to the tracked history")
+    if args.completed:
+        args.completed.write_text(json.dumps(export_info) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

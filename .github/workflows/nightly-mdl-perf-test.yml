@@ -277,7 +277,8 @@ jobs:
           set -euo pipefail
           cd "$SUITE"
           python3 new_release_check.py --results "$GITHUB_WORKSPACE/perf-results" \
-            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES"
+            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES" \
+            --completed "$GITHUB_WORKSPACE/benchview-completed-releases.json"
 
       - name: Push results
         if: env.PUBLISH == 'true'
@@ -311,6 +312,8 @@ jobs:
             --meta "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/meta.json" \
             --os Windows --observed-at "$PERF_OBSERVED_AT" \
             --execution-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --completed-releases "$GITHUB_WORKSPACE/benchview-completed-releases.json" \
+            --release-results "$GITHUB_WORKSPACE/perf-results/releases" \
             "${args[@]}" \
             --output "$GITHUB_WORKSPACE/benchview-export"
 

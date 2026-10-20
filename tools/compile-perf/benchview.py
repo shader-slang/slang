@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 from lib.buckets import TREE, SOURCE_TREE, API_TREE, buckets, tree_for
+from lib.manifest import BY_NAME
 
 
 def metric(metric_id, name, unit, stats):
@@ -220,6 +221,26 @@ def export(payloads, output):
     write_atomic(ready, b"ready\n")
 
 
+def release_submissions(completed, results_dir, daily_meta, os_name, execution):
+    """Export completed releases at current default sizes using their own compiler revisions."""
+    payloads = []
+    for info in completed:
+        tag = info["tag"]
+        if not re.fullmatch(r"v\d{4}\.\d+(?:\.\d+)?", tag):
+            raise ValueError("Invalid completed release tag")
+        records = json.loads((results_dir / tag / "results.json").read_text(encoding="utf-8"))
+        selected = [r for r in records if r["workload"] in BY_NAME
+                    and type(r["size"]) is type(BY_NAME[r["workload"]].default_size)
+                    and r["size"] == BY_NAME[r["workload"]].default_size]
+        meta = dict(daily_meta, commit=info["commit"], commit_time=info["commit_time"],
+                    kind="release", tag=tag, date=info["observed_at"][:10],
+                    observed_at_basis="Start of the new-release benchmark batch")
+        payloads.extend(submissions(selected, meta, os_name, info["observed_at"],
+                        execution + "-" + tag, {"label": tag, "releasedAt": info["released_at"]},
+                        branch="master"))
+    return payloads
+
+
 def main():
     """Export results for collection and delivery by the benchmark host."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -231,6 +252,10 @@ def main():
     parser.add_argument("--branch")
     parser.add_argument("--release", help="Slang version tested, e.g. v2026.19")
     parser.add_argument("--released-at", help="Actual release timestamp, if known")
+    parser.add_argument("--completed-releases", type=Path,
+                        help="Metadata written by new_release_check.py for this invocation")
+    parser.add_argument("--release-results", type=Path,
+                        help="Directory containing the completed releases' results")
     parser.add_argument("--output", required=True, type=Path,
                         help="Directory for submissions.json and its submissions.ready marker")
     args = parser.parse_args()
@@ -238,12 +263,21 @@ def main():
     (args.output / "submissions.ready").unlink(missing_ok=True)
     if args.released_at and not args.release:
         parser.error("--released-at requires --release")
+    if bool(args.completed_releases) != bool(args.release_results):
+        parser.error("--completed-releases and --release-results must be used together")
+    if args.completed_releases and args.release:
+        parser.error("--completed-releases cannot be combined with --release")
     release = {"label": args.release} if args.release else None
     if args.released_at:
         release["releasedAt"] = args.released_at
+    meta = json.loads(args.meta.read_text(encoding="utf-8"))
     payloads = submissions(json.loads(args.results.read_text(encoding="utf-8")),
-                           json.loads(args.meta.read_text(encoding="utf-8")), args.os,
+                           meta, args.os,
                            args.observed_at, args.execution_id, release, args.branch)
+    if args.completed_releases:
+        payloads.extend(release_submissions(
+            json.loads(args.completed_releases.read_text(encoding="utf-8")),
+            args.release_results, meta, args.os, args.execution_id))
     export(payloads, args.output)
     print(f"Exported {sum(len(p['observations']) for p in payloads)} observations")
 

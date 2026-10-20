@@ -70,6 +70,56 @@ class BenchViewTests(unittest.TestCase):
             self.assertEqual(tagged["run"]["vcs"]["branch"], branch)
             self.assertEqual(tagged["run"]["key"], detached["run"]["key"])
 
+    def test_daily_and_new_releases_export_together(self):
+        """New releases carry their own revisions, tags and only current default cases."""
+        size = benchview.BY_NAME["mdl_dxr"].default_size
+        default = dict(self.record, size=size)
+        records = [default, dict(default, size=size + 1),
+                   dict(default, workload="retired_workload")]
+        completed = [
+            {"tag": tag, "commit": revision * 40, "commit_time": "2026-10-17T00:00:00Z",
+             "released_at": "2026-10-17T04:00:00Z", "observed_at": "2026-10-20T06:00:00Z"}
+            for tag, revision in (("v2026.20", "b"), ("v2026.20.1", "c"))]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "daily.json").write_text(json.dumps([default]))
+            (root / "meta.json").write_text(json.dumps(self.meta))
+            for info in completed:
+                folder = root / info["tag"]
+                folder.mkdir()
+                (folder / "results.json").write_text(json.dumps(records))
+            for releases in (completed, []):
+                (root / "completed.json").write_text(json.dumps(releases))
+                argv = ["benchview.py", "--results", str(root / "daily.json"),
+                        "--meta", str(root / "meta.json"), "--os", "Windows",
+                        "--observed-at", "2026-10-20T05:00:00Z", "--execution-id", "job-1",
+                        "--branch", "master", "--completed-releases", str(root / "completed.json"),
+                        "--release-results", str(root), "--output", str(root / "export")]
+                with patch.object(sys, "argv", argv), patch("sys.stdout", new=io.StringIO()):
+                    benchview.main()
+                payloads = json.loads((root / "export/submissions.json").read_text())["submissions"]
+                self.assertEqual(len(payloads), 1 + len(releases))
+                self.assertNotIn("metadata", payloads[0]["run"])
+                for payload, info in zip(payloads[1:], releases):
+                    self.assertEqual(payload["run"]["vcs"]["revision"], info["commit"])
+                    self.assertEqual(payload["run"]["vcs"]["branch"], "master")
+                    self.assertEqual(payload["run"]["metadata"]["release"],
+                                     {"label": info["tag"], "releasedAt": info["released_at"]})
+                    self.assertEqual(len(payload["observations"]), 1)
+                    observation = payload["observations"][0]
+                    self.assertEqual(observation["case"]["dimensions"]["size"], size)
+                    self.assertEqual(observation["observedAt"], info["observed_at"])
+                    self.assertEqual(json.loads(observation["artifacts"][0]["content"]["text"]),
+                                     default)
+                self.assertTrue((root / "export/submissions.ready").exists())
+        self.assertEqual(self.meta["commit"], "a" * 40)
+
+    def test_release_paths_reject_non_tags(self):
+        """Completed metadata cannot address paths outside the release result directory."""
+        with self.assertRaisesRegex(ValueError, "Invalid completed release tag"):
+            benchview.release_submissions([{"tag": "../daily"}], Path("."),
+                                          self.meta, "Windows", "job-1")
+
     def test_samples_and_breakdown(self):
         """Allocated phases conserve each root sample despite overlapping timers."""
         metrics = self.convert()[0]["observations"][0]["metrics"]
