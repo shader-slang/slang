@@ -81,6 +81,7 @@ def observation(record, observed, runner, os_name):
     for name in selected:
         entry = timer_metrics[name]
         if name in ("compileInner", "apiTotal"):
+            entry["name"] = "Total compile time" if name == "compileInner" else "Total API time"
             tree = compiler_tree if name == "compileInner" else API_TREE
             if any(len(timers[n]["samples"]) != len(timers[name]["samples"])
                    for n in tree_names(tree) if n in timers):
@@ -100,7 +101,9 @@ def observation(record, observed, runner, os_name):
     if len(source.encode()) > 262144:
         raise ValueError("Source record exceeds BenchView's inline artifact limit")
     result = {
-        "test": {"id": "compile-perf/" + record["workload"], "name": record["workload"]},
+        "test": {"id": "compile-perf/" + record["workload"], "name": record["workload"],
+                 "metadata": {"primaryMetric": "compile.timer.apitotal" if record["mode"] == "api"
+                              else "compile.timer.compileinner"}},
         "case": {"dimensions": {"size": record["size"], "mode": record["mode"]}},
         "observedAt": observed, "status": "passed" if record["ok"] else "failed",
         "environment": {"identity": {"machine": runner, "os": {"name": os_name}}},

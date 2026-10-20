@@ -300,11 +300,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Use the measured checkout's branch, not the workflow or suite ref.
+          # Detached commits and tags have no unambiguous branch.
+          branch=$(git -C "$GITHUB_WORKSPACE" symbolic-ref --quiet --short HEAD || true)
+          args=()
+          if [[ -n "$branch" ]]; then args+=(--branch "$branch"); fi
           python3 "$SUITE/benchview.py" \
             --results "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/results.json" \
             --meta "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/meta.json" \
             --os Windows --observed-at "$PERF_OBSERVED_AT" \
             --execution-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            "${args[@]}" \
             --output "$GITHUB_WORKSPACE/benchview-export"
 
       - name: Archive BenchView submission payloads

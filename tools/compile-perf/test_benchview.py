@@ -39,10 +39,41 @@ class BenchViewTests(unittest.TestCase):
         self.assertNotEqual(daily["run"]["key"], release["run"]["key"])
         self.assertEqual(self.convert()[0], daily)
 
+    def test_primary_metric_and_total_labels(self):
+        """Select each workload's total without discarding diagnostic measurements."""
+        for mode, timer, label in (("target", "compileInner", "Total compile time"),
+                                   ("api", "apiTotal", "Total API time")):
+            with self.subTest(mode=mode):
+                record = copy.deepcopy(self.record)
+                record["mode"] = mode
+                record["timers"][timer] = {"samples": [10, 20]}
+                observation = self.convert([record])[0]["observations"][0]
+                primary = "compile.timer." + timer.lower()
+                self.assertEqual(observation["test"]["metadata"]["primaryMetric"], primary)
+                metric = next(m for m in observation["metrics"] if m["id"] == primary)
+                self.assertEqual(metric["name"], label)
+                self.assertEqual(metric["distribution"]["samples"], [10, 20])
+                self.assertIn("compile.timer.linkandoptimizeir",
+                              [m["id"] for m in observation["metrics"]])
+                self.assertEqual(json.loads(observation["artifacts"][0]["content"]["text"]), record)
+                record["ok"] = False
+                failed = self.convert([record])[0]["observations"][0]
+                self.assertEqual(failed["test"], observation["test"])
+                self.assertEqual(failed["metrics"], [])
+
+    def test_branch_preserves_run_identity(self):
+        """Branch display metadata must not create a different logical run."""
+        detached = self.convert()[0]
+        self.assertNotIn("branch", detached["run"]["vcs"])
+        for branch in ("master", "test/perf"):
+            tagged = self.convert(branch=branch)[0]
+            self.assertEqual(tagged["run"]["vcs"]["branch"], branch)
+            self.assertEqual(tagged["run"]["key"], detached["run"]["key"])
+
     def test_samples_and_breakdown(self):
         """Allocated phases conserve each root sample despite overlapping timers."""
         metrics = self.convert()[0]["observations"][0]["metrics"]
-        root = next(m for m in metrics if m["name"] == "compileInner")
+        root = next(m for m in metrics if m["id"] == "compile.timer.compileinner")
         self.assertEqual(root["distribution"], {"samples": [10, 20]})
         components = root["breakdown"]["components"]
         for i, total in enumerate([10, 20]):
@@ -54,7 +85,7 @@ class BenchViewTests(unittest.TestCase):
         with patch('sys.stderr', new_callable=io.StringIO) as stderr:
             observation = self.convert()[0]["observations"][0]
         self.assertEqual(observation["status"], "passed")
-        root = next(m for m in observation["metrics"] if m["name"] == "compileInner")
+        root = next(m for m in observation["metrics"] if m["id"] == "compile.timer.compileinner")
         self.assertNotIn("breakdown", root)
         self.assertEqual(root["distribution"]["samples"], [10, 20])
         self.assertIn("breakdownOmitted", root["metadata"])
@@ -69,7 +100,7 @@ class BenchViewTests(unittest.TestCase):
         self.record["timers"].update({f"aaa{i}": {"samples": [1, 2]} for i in range(80)})
         metrics = self.convert()[0]["observations"][0]["metrics"]
         self.assertIn("emitEntryPointsSourceFromIR", [m["name"] for m in metrics])
-        root = next(m for m in metrics if m["name"] == "compileInner")
+        root = next(m for m in metrics if m["id"] == "compile.timer.compileinner")
         actual = {c["name"]: c["distribution"]["samples"]
                   for c in root["breakdown"]["components"]}
         for i in range(2):
