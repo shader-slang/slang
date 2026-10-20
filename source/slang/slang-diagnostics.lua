@@ -4019,9 +4019,9 @@ err(
 )
 
 err(
-    "groupshared-parameter-cannot-be-constref",
+    "groupshared-parameter-cannot-be-borrow",
     30712,
-    "'__constref' cannot be used with 'groupshared' -- use 'const groupshared' for a read-only reference",
+    "'~modifier' cannot be used with 'groupshared' -- use 'const groupshared' for a read-only reference",
     span { loc = "modifier:Modifier" }
 )
 
@@ -4835,10 +4835,10 @@ err(
 )
 
 warning(
-    "groupshared-parameter-of-differentiable-function-treated-as-no-diff",
+    "reference-parameter-of-differentiable-function-treated-as-no-diff",
     38038,
-    "'~spelling' parameter of a differentiable function is treated as 'no_diff'",
-    span { loc = "modifier:Modifier", message = "a 'groupshared' parameter is passed by reference, so no derivative is propagated through it; mark it 'no_diff' to make that explicit." }
+    "parameter '~param:Decl' is passed by reference, so a differentiable function treats it as 'no_diff'",
+    span { loc = "param:Decl", message = "no derivative is propagated through a reference parameter; mark it 'no_diff' to make that explicit." }
 )
 
 err(

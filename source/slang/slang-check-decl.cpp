@@ -15063,10 +15063,11 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
                 .modifier = directionModifier});
 
         // Unlike a reference, a borrow may be a copy, which would leave a callee that reads after
-        // a group barrier looking at a stale snapshot, so `__constref` is an error here.
+        // a group barrier looking at a stale snapshot, so `__borrow` (or its alias `__constref`)
+        // is an error here.
         if (auto borrowModifier = paramDecl->findModifier<BorrowModifier>())
             getSink()->diagnose(
-                Diagnostics::GroupsharedParameterCannotBeConstref{.modifier = borrowModifier});
+                Diagnostics::GroupsharedParameterCannotBeBorrow{.modifier = borrowModifier});
     }
 
     // Only texture types are allowed to have memory qualifiers on parameters
@@ -16005,23 +16006,21 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
                     addModifier(paramDecl, noDiffModifier);
                 }
             }
-            // A `groupshared` parameter refers to memory that other invocations share, and only
-            // the user knows where its derivative would live and how updates to it are
-            // synchronized. Automatic differentiation therefore treats the parameter as
-            // `no_diff`. A user who needs gradients for shared memory passes a
-            // pointer-differentiable handle instead. Because a user may not expect the implicit
-            // `no_diff`, we warn when they did not write it. A parameter whose type has no
-            // derivative was already marked `no_diff` above and loses nothing, so it gets no
-            // warning.
-            if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>();
-                groupSharedModifier && !paramDecl->hasModifier<NoDiffModifier>())
+            // A reference parameter (`__ref`, `__ref_readonly`, `__ref_writeonly`, or
+            // `groupshared`) names storage that the caller, and for `groupshared` other
+            // invocations, may also access, and only the user knows where its derivative would
+            // live and how updates to it are synchronized. Automatic differentiation therefore
+            // treats the parameter as `no_diff`. A user who needs gradients through such storage
+            // passes a pointer-differentiable handle or their own pair type instead. Because a
+            // user may not expect the implicit `no_diff`, we warn when they did not write it. A
+            // parameter whose type has no derivative was already marked `no_diff` above and loses
+            // nothing, so it gets no warning.
+            if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)) &&
+                !paramDecl->hasModifier<NoDiffModifier>())
             {
                 getSink()->diagnose(
-                    Diagnostics::GroupsharedParameterOfDifferentiableFunctionTreatedAsNoDiff{
-                        .spelling = paramDecl->hasModifier<ConstModifier>()
-                                        ? UnownedStringSlice("const groupshared")
-                                        : UnownedStringSlice("groupshared"),
-                        .modifier = groupSharedModifier});
+                    Diagnostics::ReferenceParameterOfDifferentiableFunctionTreatedAsNoDiff{
+                        .param = paramDecl});
                 auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
                 noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
                 addModifier(paramDecl, noDiffModifier);
@@ -16734,7 +16733,6 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     }
 
     maybeInferPrefixModifierForOperator(decl);
-
 
     // Check that no parameter without a default value follows a parameter with one.
     bool seenDefaultParam = false;

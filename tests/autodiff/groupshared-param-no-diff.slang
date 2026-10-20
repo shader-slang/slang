@@ -3,7 +3,7 @@
 // differentiable value parameters. The unmarked spelling behaves the same way after warning.
 
 // The warning for the unmarked spelling is covered by
-// tests/diagnostics/groupshared-param-differentiable.slang.
+// tests/diagnostics/reference-param-differentiable.slang.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -Xslang -warnings-disable -Xslang 38038
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -Xslang -warnings-disable -Xslang 38038

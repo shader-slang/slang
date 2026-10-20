@@ -2606,7 +2606,6 @@ Result linkAndOptimizeIR(
         // As a fallback, if the above specialization steps failed to remove resource type
         // parameters, we will inline the functions in question to make sure we can produce
         // valid GLSL.
-        //
         SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram);
     }
     validateIRModuleIfEnabled(codeGenContext, irModule);

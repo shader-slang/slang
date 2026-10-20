@@ -37,7 +37,7 @@ struct WriterForReadOnly : IReadOnly
 {
     void f(groupshared uint a[8]) { a[0] = 1; }
 //diag:                     ^ E38108
-//diag:                     ^ parameter 'a' direction 'ref' does not match interface requirement 'ref readonly'.
+//diag:                     ^ parameter 'a' direction 'ref' does not match interface requirement 'ref_readonly'.
 }
 
 interface ISharedWrite
@@ -50,7 +50,7 @@ struct ReadsOnly : ISharedWrite
 {
     void touch(const groupshared uint a[8]) {}
 //diag:                               ^ E38108
-//diag:                               ^ parameter 'a' direction 'ref readonly' does not match interface requirement 'ref'.
+//diag:                               ^ parameter 'a' direction 'ref_readonly' does not match interface requirement 'ref'.
 }
 
 // --- Accepted: the same qualifiers, or an implementation that asks for less storage ---

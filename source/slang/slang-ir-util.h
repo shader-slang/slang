@@ -104,7 +104,7 @@ struct ParameterDirectionInfo
     }
 
     ParameterDirectionInfo()
-        : kind(Kind::In), addressSpace((AddressSpace)0), accessQualifier(AccessQualifier::ReadWrite)
+        : kind(Kind::In), addressSpace((AddressSpace)0)
     {
     }
 
