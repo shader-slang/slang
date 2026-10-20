@@ -41,6 +41,17 @@
 # language-reference/expressions-operators bundle.
 docs/generated/tests/conformance/expressions-operators/conditional-does-not-short-circuit.slang
 
+# https://github.com/shader-slang/slang/issues/13518 — the test pins the
+# invalid `Atomic<T>.load(MemoryOrder.AcquireRelease)` emission, which the
+# compiler rejects with E41405 on every target. These entries can be removed
+# once the bundle is regenerated with a diagnostic test for invalid orders,
+# as its _prompt.md asks. That needs the bundle's source_doc re-anchored:
+# shader-slang/slang#13439 moved it to shader-slang/spec, so `regenerate.py`
+# cannot regenerate the bundle until then.
+docs/generated/tests/conformance/basics-memory-model-consistency/atomic-acqrel-spirv-emission.slang
+docs/generated/tests/conformance/basics-memory-model-consistency/atomic-acqrel-spirv-emission.slang.1
+docs/generated/tests/conformance/basics-memory-model-consistency/atomic-acqrel-spirv-emission.slang.2
+
 # Pending: docs/generated/tests/_meta/findings/slangi-vm-vector-scalar-binary-op-wrong-values.yaml
 # slangi VM computes `int4(1,2,3,4) - 1` as `int4(0,0,0,0)` instead
 # of `int4(0,1,2,3)`. Vector-scalar binary op broadcast appears

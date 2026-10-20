@@ -42,6 +42,11 @@
     "repro_line_cap": 40
   },
   "findings": {
+    "atomic-load-acqrel-invalid-spirv-semantics": {
+      "dup_of": 13518,
+      "note": "the load(AcquireRelease) case is one of the invalid order combinations #13518 reports; the fix rejects it with E41405",
+      "title": "Atomic<T>.load(AcquireRelease) emits OpAtomicLoad with invalid semantics"
+    },
     "cast-enum-to-int-spirv-unimplemented": {
       "issue": 11315,
       "labels": [
