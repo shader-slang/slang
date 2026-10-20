@@ -1,8 +1,16 @@
 // #13774: the documented SER fused functions `TraceReorderExecute`, `ReorderExecute` and
 // `TraceMotionReorderExecute` lower to one SPV_EXT_shader_invocation_reorder fused instruction on
-// SPIR-V and to the GLSL `hitObject*ReorderExecuteEXT` builtins on GLSL. Targets without a fused
-// form (SPIR-V/GLSL NV, DXR 1.3, NVAPI, CUDA) get the equivalent TraceRay -> ReorderThread ->
-// Invoke sequence. Each overload has its own entry point, so each module has one payload variable.
+// SPIR-V and to the GLSL `hitObject*ReorderExecuteEXT` builtins on GLSL EXT. Targets without a
+// fused form use the equivalent separate calls:
+//   TraceReorderExecute        TraceRay -> ReorderThread -> Invoke  (SPIR-V/GLSL NV, DXR, NVAPI, CUDA)
+//   ReorderExecute             ReorderThread -> Invoke              (SPIR-V/GLSL NV, DXR, CUDA)
+//   TraceMotionReorderExecute  TraceMotionRay -> ReorderThread -> Invoke  (SPIR-V/GLSL NV, CUDA)
+// `ReorderExecute` on NVAPI and `TraceMotionReorderExecute` on D3D12 are diagnosed errors; see
+// hit-object-fused-reorder-execute-diagnostics.slang.
+//
+// Each overload has its own entry point, so each module has exactly one RayPayloadKHR variable;
+// the `%[[P]]` captures below rely on that to check that the fused instruction and the copy-back
+// load use the same variable.
 
 // SPIR-V, default profile and explicit EXT capability: one fused instruction, no sequence.
 //TEST:SIMPLE(filecheck=TRACE): -target spirv -entry traceReorderExecute -stage raygeneration -emit-spirv-directly
@@ -39,6 +47,18 @@
 //TEST:SIMPLE(filecheck=GLSLMOTION): -target glsl -entry traceMotionReorderExecute -stage raygeneration -capability GL_EXT_shader_invocation_reorder_motion
 //TEST:SIMPLE(filecheck=GLSLNV): -target glsl -entry traceReorderExecuteHint -stage raygeneration -capability GL_NV_shader_invocation_reorder
 //TEST:SIMPLE(filecheck=GLSLNVREORDER): -target glsl -entry reorderExecuteHint -stage raygeneration -capability GL_NV_shader_invocation_reorder
+//TEST:SIMPLE(filecheck=GLSLNVTRACE0): -target glsl -entry traceReorderExecute -stage raygeneration -capability GL_NV_shader_invocation_reorder
+//TEST:SIMPLE(filecheck=GLSLNVREORDER0): -target glsl -entry reorderExecute -stage raygeneration -capability GL_NV_shader_invocation_reorder
+//TEST:SIMPLE(filecheck=GLSLEXTONLY): -target glsl -entry traceReorderExecute -stage raygeneration
+//TEST:SIMPLE(filecheck=GLSLEXTONLY): -target glsl -entry traceReorderExecuteHint -stage raygeneration
+//TEST:SIMPLE(filecheck=GLSLEXTONLY): -target glsl -entry reorderExecute -stage raygeneration
+//TEST:SIMPLE(filecheck=GLSLEXTONLY): -target glsl -entry reorderExecuteHint -stage raygeneration
+//TEST:SIMPLE(filecheck=GLSLEXTONLY): -target glsl -entry traceMotionReorderExecute -stage raygeneration -capability GL_EXT_shader_invocation_reorder_motion
+//TEST:SIMPLE(filecheck=GLSLNVONLY): -target glsl -entry traceReorderExecute -stage raygeneration -capability GL_NV_shader_invocation_reorder
+//TEST:SIMPLE(filecheck=GLSLNVONLY): -target glsl -entry traceReorderExecuteHint -stage raygeneration -capability GL_NV_shader_invocation_reorder
+//TEST:SIMPLE(filecheck=GLSLNVONLY): -target glsl -entry reorderExecute -stage raygeneration -capability GL_NV_shader_invocation_reorder
+//TEST:SIMPLE(filecheck=GLSLNVONLY): -target glsl -entry reorderExecuteHint -stage raygeneration -capability GL_NV_shader_invocation_reorder
+//TEST:SIMPLE(filecheck=GLSLNVONLY): -target glsl -entry traceMotionReorderExecute -stage raygeneration -capability GL_NV_shader_invocation_reorder -capability GL_NV_ray_tracing_motion_blur
 
 // D3D12 (DXR 1.3 and NVAPI) and CUDA use the sequence.
 //TEST:SIMPLE(filecheck=DXRTRACE0): -target hlsl -entry traceReorderExecute -stage raygeneration -profile sm_6_9 -capability ser_dxr
@@ -48,6 +68,7 @@
 //TEST:SIMPLE(filecheck=DXRTRACE): -target hlsl -entry traceReorderExecuteHint -stage raygeneration -profile sm_6_9 -capability ser_dxr
 //TEST:SIMPLE(filecheck=DXRREORDER): -target hlsl -entry reorderExecuteHint -stage raygeneration -profile sm_6_9 -capability ser_dxr
 //TEST:SIMPLE(filecheck=NVAPI): -target hlsl -entry traceReorderExecuteHint -stage raygeneration -profile sm_6_5 -capability ser_nvapi
+//TEST:SIMPLE(filecheck=NVAPI0): -target hlsl -entry traceReorderExecute -stage raygeneration -profile sm_6_5 -capability ser_nvapi
 //TEST:SIMPLE(filecheck=CUDATRACE): -target cuda -entry traceReorderExecuteHint -stage raygeneration
 //TEST:SIMPLE(filecheck=CUDAREORDER): -target cuda -entry reorderExecuteHint -stage raygeneration
 //TEST:SIMPLE(filecheck=CUDAMOTION): -target cuda -entry traceMotionReorderExecute -stage raygeneration
@@ -72,14 +93,12 @@ RayDesc makeRay()
     return ray;
 }
 
-// GLSL EXT output calls only the fused builtins; GLSL NV output never calls them.
-// GLSLTRACE-NOT: reorderThreadEXT
-// GLSLTRACE-NOT: hitObjectExecuteShaderEXT
-// GLSLREORDERHINT-NOT: reorderThreadEXT
-// GLSLREORDERHINT-NOT: hitObjectExecuteShaderEXT
-// GLSLNV-NOT: ReorderExecuteEXT
-// GLSLNVREORDER-NOT: ReorderExecuteEXT
-// GLSLNVMOTION-NOT: ReorderExecuteEXT
+// GLSL EXT output calls only the fused builtins, and GLSL NV output never calls them. These
+// prefixes have only `-NOT` lines, so each check covers the whole output.
+// GLSLEXTONLY-NOT: reorderThreadEXT
+// GLSLEXTONLY-NOT: hitObjectExecuteShaderEXT
+// GLSLEXTONLY-NOT: hitObjectTraceRayEXT
+// GLSLNVONLY-NOT: ReorderExecuteEXT
 
 // No instruction of the separate sequence survives in a fused SPIR-V module.
 // FUSED: OpEntryPoint RayGenerationKHR
@@ -119,6 +138,12 @@ void traceReorderExecute()
     // CUDATRACE0: optixTraverse(
     // CUDATRACE0: optixReorder();
     // CUDATRACE0: optixInvoke(
+    // GLSLNVTRACE0: hitObjectTraceRayNV(
+    // GLSLNVTRACE0: reorderThreadNV({{[^,]*}});
+    // GLSLNVTRACE0: hitObjectExecuteShaderNV(
+    // NVAPI0: NvTraceRayHitObject(
+    // NVAPI0: NvReorderThread({{[^,]*}});
+    // NVAPI0: NvInvokeHitObject({{[^,]*}}, {{[^,]*}}, {{[^,]*}});
     TraceReorderExecute(scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, makeRay(), payload);
 
     outputBuffer[DispatchRaysIndex().x] = payload.color;
@@ -173,6 +198,8 @@ void reorderExecute()
     // CUDAREORDER0: __raygen__reorderExecute
     // CUDAREORDER0: optixReorder();
     // CUDAREORDER0: optixInvoke(
+    // GLSLNVREORDER0: reorderThreadNV({{[^,]*}});
+    // GLSLNVREORDER0: hitObjectExecuteShaderNV(
     ReorderExecute(hit, payload);
 
     outputBuffer[DispatchRaysIndex().x] = payload.color;
@@ -225,12 +252,3 @@ void traceMotionReorderExecute()
 
     outputBuffer[DispatchRaysIndex().x] = payload.color;
 }
-
-// Repeated after the last positive match so the GLSL exclusions cover the whole output.
-// GLSLTRACE-NOT: reorderThreadEXT
-// GLSLTRACE-NOT: hitObjectExecuteShaderEXT
-// GLSLREORDERHINT-NOT: reorderThreadEXT
-// GLSLREORDERHINT-NOT: hitObjectExecuteShaderEXT
-// GLSLNV-NOT: ReorderExecuteEXT
-// GLSLNVREORDER-NOT: ReorderExecuteEXT
-// GLSLNVMOTION-NOT: ReorderExecuteEXT
