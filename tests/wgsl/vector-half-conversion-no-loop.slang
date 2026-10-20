@@ -5,7 +5,9 @@
 
 // WGSL-NOT: loop
 // WGSL: fn computeMain
+// WGSL-NOT: loop
 // WGSL: vec3<f32>((halfs
+// WGSL-NOT: loop
 // WGSL: vec3<f16>((floats
 // WGSL-NOT: loop
 

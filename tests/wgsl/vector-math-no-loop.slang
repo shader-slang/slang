@@ -9,7 +9,8 @@
 // scalar overload on each component (#13765).
 
 // NOLOOP-NOT: loop
-// NOLOOP-NOT: for (
+// NOLOOP-NOT: for{{[ \t]*}}(
+// NOLOOP-NOT: while{{[ \t]*}}(
 
 // WGSL-DAG: unpack2x16float(
 // WGSL-DAG: pack2x16float(
