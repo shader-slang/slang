@@ -1619,12 +1619,35 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
+// Return whether `inst` writes only the texel data of a texture.
+static bool doesInstOnlyWriteTexelMemory(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_ImageStore:
+    case kIROp_MetalTextureFence:
+        return true;
+    default:
+        return as<IRAtomicOperation>(inst) &&
+               as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
+    }
+}
+
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
     IRInst* addr,
     Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
+    // A texel holds scalar or vector data, never a resource handle, so a write that only reaches
+    // texel memory cannot change a location that holds resources.
+    if (doesInstOnlyWriteTexelMemory(inst))
+    {
+        auto ptrType = as<IRPtrTypeBase>(addr->getDataType());
+        if (ptrType && isResourceType(ptrType->getValueType()))
+            return false;
+    }
+
     switch (inst->getOp())
     {
     case kIROp_Store:
