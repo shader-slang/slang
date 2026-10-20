@@ -25,6 +25,9 @@
 //TEST:SIMPLE(filecheck=NOEXT): -target spirv -entry reorderExecuteHint -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
 //TEST:SIMPLE(filecheck=NVMOTION): -target spirv -entry traceMotionReorderExecute -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderMotionNV
 //TEST:SIMPLE(filecheck=NOEXT): -target spirv -entry traceMotionReorderExecute -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderMotionNV
+//TEST:SIMPLE(filecheck=NVMOTION): -target spirv -entry traceMotionReorderExecute -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
+//TEST:SIMPLE(filecheck=NOEXT): -target spirv -entry traceMotionReorderExecute -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
+//TEST:SIMPLE(filecheck=GLSLNVMOTION): -target glsl -entry traceMotionReorderExecute -stage raygeneration -capability GL_NV_shader_invocation_reorder -capability GL_NV_ray_tracing_motion_blur
 
 // GLSL EXT uses the fused builtins; GLSL NV uses the sequence.
 //TEST:SIMPLE(filecheck=GLSLTRACE): -target glsl -entry traceReorderExecute -stage raygeneration
@@ -112,10 +115,10 @@ void traceReorderExecuteHint()
     // GLSLNV: hitObjectExecuteShaderNV(
     // DXRTRACE: dx::HitObject::TraceRay(
     // DXRTRACE: dx::MaybeReorderThread({{.*}}, 5U, 3U);
-    // DXRTRACE: dx::HitObject::Invoke(
+    // DXRTRACE: dx::HitObject::Invoke({{[^,]*}}, {{[^,]*}});
     // NVAPI: NvTraceRayHitObject(
     // NVAPI: NvReorderThread({{.*}}, 5U, 3U);
-    // NVAPI: NvInvokeHitObject(
+    // NVAPI: NvInvokeHitObject({{[^,]*}}, {{[^,]*}}, {{[^,]*}});
     // CUDATRACE: __raygen__traceReorderExecuteHint
     // CUDATRACE: optixTraverse(
     // CUDATRACE: optixReorder({{.*}}5U{{.*}}3U{{.*}});
@@ -154,7 +157,7 @@ void reorderExecuteHint()
     // NVREORDER: OpHitObjectExecuteShaderNV
     // GLSLREORDERHINT: hitObjectReorderExecuteEXT({{.*}}, 7U, 2U, {{[0-9]+}});
     // DXRREORDER: dx::MaybeReorderThread({{.*}}, 7U, 2U);
-    // DXRREORDER: dx::HitObject::Invoke(
+    // DXRREORDER: dx::HitObject::Invoke({{[^,]*}}, {{[^,]*}});
     // CUDAREORDER: __raygen__reorderExecuteHint
     // CUDAREORDER: optixReorder({{.*}}7U{{.*}}2U{{.*}});
     // CUDAREORDER: optixInvoke(
@@ -175,6 +178,9 @@ void traceMotionReorderExecute()
     // NVMOTION: OpHitObjectTraceRayMotionNV
     // NVMOTION: OpReorderThreadWithHitObjectNV %{{[A-Za-z0-9_]+}} %uint_4 %uint_2
     // NVMOTION: OpHitObjectExecuteShaderNV
+    // GLSLNVMOTION: hitObjectTraceRayMotionNV(
+    // GLSLNVMOTION: reorderThreadNV({{.*}}, 4U, 2U);
+    // GLSLNVMOTION: hitObjectExecuteShaderNV(
     // GLSLMOTION: hitObjectTraceMotionReorderExecuteEXT({{.*}}, 0.5, 4U, 2U, {{[0-9]+}});
     // CUDAMOTION: __raygen__traceMotionReorderExecute
     // CUDAMOTION: optixTraverse(

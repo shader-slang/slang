@@ -27490,16 +27490,11 @@ void ReorderThread( HitObject HitOrMiss )
     }
 }
 
-// Fused SER functions: `ReorderExecute`, `TraceReorderExecute` and `TraceMotionReorderExecute`.
-//
-// SPV_EXT_shader_invocation_reorder and GL_EXT_shader_invocation_reorder have one instruction for
-// each of these, which we emit directly. The other SER targets have no fused form, so we emit the
-// equivalent HitObject.TraceRay -> ReorderThread -> HitObject.Invoke sequence there instead.
-//
-// The target-specific helpers below are free functions rather than HitObject members because the
-// capability checker joins a free function's `[require]` into the calling `__target_switch` case.
-// That gives the fused `case spirv` the same ray-generation-only capabilities as the NV sequence
-// case before it, which the checker requires of two cases on the same target.
+// The helpers for the fused SER functions below are free functions rather than HitObject members
+// because the capability checker joins the `[require]` of a free function into the calling
+// `__target_switch` case, but not that of a static member called as `HitObject::name`. That gives
+// the fused `case spirv` the same ray-generation-only capabilities as the NV sequence case before
+// it, which the checker requires of two cases on the same target.
 
 [require(spirv, ser_raygen)]
 void __spirvReorderExecuteShaderEXT<payload_t>(HitObject hitObject, inout payload_t p)
@@ -27775,6 +27770,38 @@ void __hlslInvokeHitObject<payload_t>(
     case hlsl_nvapi: __intrinsic_asm "NvInvokeHitObject";
     case hlsl: __intrinsic_asm "dx::HitObject::Invoke($1, $2)";
     }
+}
+
+// `HitObject.TraceMotionRay` needs motion-blur capabilities on every target, so the sequence
+// fallback of `TraceMotionReorderExecute` goes through a helper that requires them; the plain NV
+// case labels can then come ahead of the EXT cases.
+[ForceInline]
+[require(cuda_glsl_spirv, ser_motion_raygen)]
+void __traceMotionReorderInvoke<payload_t>(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint RayFlags,
+    uint InstanceInclusionMask,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    uint MissShaderIndex,
+    RayDesc Ray,
+    float CurrentTime,
+    uint CoherenceHint,
+    uint NumCoherenceHintBitsFromLSB,
+    inout payload_t Payload)
+{
+    HitObject hitObj = HitObject::TraceMotionRay(
+        AccelerationStructure,
+        RayFlags,
+        InstanceInclusionMask,
+        RayContributionToHitGroupIndex,
+        MultiplierForGeometryContributionToHitGroupIndex,
+        MissShaderIndex,
+        Ray,
+        CurrentTime,
+        Payload);
+    ReorderThread(hitObj, CoherenceHint, NumCoherenceHintBitsFromLSB);
+    HitObject::Invoke(hitObj, Payload);
 }
 
     /// Reorders threads by `HitOrMiss` and then invokes its closesthit or miss shader.
@@ -28076,23 +28103,21 @@ void TraceMotionReorderExecute<payload_t>(
 {
     __target_switch
     {
-    case _GL_NV_shader_invocation_reorder_motion:
+    case _GL_NV_shader_invocation_reorder:
     case cuda:
-    case spvShaderInvocationReorderMotionNV:
-        {
-            HitObject hitObj = HitObject::TraceMotionRay(
-                AccelerationStructure,
-                RayFlags,
-                InstanceInclusionMask,
-                RayContributionToHitGroupIndex,
-                MultiplierForGeometryContributionToHitGroupIndex,
-                MissShaderIndex,
-                Ray,
-                CurrentTime,
-                Payload);
-            ReorderThread(hitObj, CoherenceHint, NumCoherenceHintBitsFromLSB);
-            HitObject::Invoke(hitObj, Payload);
-        }
+    case spvShaderInvocationReorderNV:
+        __traceMotionReorderInvoke(
+            AccelerationStructure,
+            RayFlags,
+            InstanceInclusionMask,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            Ray,
+            CurrentTime,
+            CoherenceHint,
+            NumCoherenceHintBitsFromLSB,
+            Payload);
     case glsl:
         {
             [__vulkanRayPayload]
