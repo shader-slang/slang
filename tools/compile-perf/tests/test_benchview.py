@@ -70,6 +70,32 @@ class BenchViewTests(unittest.TestCase):
             self.assertEqual(tagged["run"]["vcs"]["branch"], branch)
             self.assertEqual(tagged["run"]["key"], detached["run"]["key"])
 
+    def test_missing_primary_does_not_abort_export(self):
+        """Partial passed records keep measurements without declaring a missing total."""
+        for mode, primary in (("target", "compileInner"), ("api", "apiTotal")):
+            with self.subTest(mode=mode):
+                partial = dict(self.record, workload="partial", mode=mode,
+                               timers={"linkAndOptimizeIR": {"samples": [12, 25]}})
+                with patch("sys.stderr", new=io.StringIO()) as warnings:
+                    observations = self.convert([self.record, partial])[0]["observations"]
+                self.assertIn(primary, warnings.getvalue())
+                self.assertIn("metadata", observations[0]["test"])
+                self.assertNotIn("metadata", observations[1]["test"])
+                self.assertEqual(observations[1]["status"], "passed")
+                self.assertEqual(observations[1]["metrics"][0]["distribution"]["samples"],
+                                 [12, 25])
+                self.assertEqual(json.loads(observations[1]["artifacts"][0]["content"]["text"]),
+                                 partial)
+
+    def test_primary_omitted_by_metric_limit(self):
+        """A total excluded by the metric cap cannot be advertised as exported."""
+        self.record["memory"] = {f"memory{i}": {"samples": [1, 2]} for i in range(64)}
+        with patch("sys.stderr", new=io.StringIO()) as warnings:
+            observation = self.convert()[0]["observations"][0]
+        self.assertEqual(len(observation["metrics"]), 64)
+        self.assertNotIn("metadata", observation["test"])
+        self.assertIn("compileInner", warnings.getvalue())
+
     def test_daily_and_new_releases_export_together(self):
         """New releases carry their own revisions, tags and only current default cases."""
         size = benchview.BY_NAME["mdl_dxr"].default_size

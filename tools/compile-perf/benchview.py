@@ -73,6 +73,13 @@ def observation(record, observed, runner, os_name):
     if len(metrics) > 64:
         raise ValueError("Memory metrics exceed BenchView's per-observation limit")
     selected = names[:64 - len(metrics)]
+    primary_name = "apiTotal" if record["mode"] == "api" else "compileInner"
+    test = {"id": "compile-perf/" + record["workload"], "name": record["workload"]}
+    if not record["ok"] or primary_name in selected:
+        test["metadata"] = {"primaryMetric": "compile.timer." + primary_name.lower()}
+    else:
+        print(f"Warning: {record['workload']}: omitted primaryMetric; "
+              f"{primary_name} is not exported", file=sys.stderr)
     # Validate distributions before selecting a tree or aligning samples. The
     # median selects the same source-emission hierarchy as the existing reports.
     timer_metrics = {name: metric("timer." + name.lower(), name, "ms", timers[name])
@@ -102,9 +109,7 @@ def observation(record, observed, runner, os_name):
     if len(source.encode()) > 262144:
         raise ValueError("Source record exceeds BenchView's inline artifact limit")
     result = {
-        "test": {"id": "compile-perf/" + record["workload"], "name": record["workload"],
-                 "metadata": {"primaryMetric": "compile.timer.apitotal" if record["mode"] == "api"
-                              else "compile.timer.compileinner"}},
+        "test": test,
         "case": {"dimensions": {"size": record["size"], "mode": record["mode"]}},
         "observedAt": observed, "status": "passed" if record["ok"] else "failed",
         "environment": {"identity": {"machine": runner, "os": {"name": os_name}}},
