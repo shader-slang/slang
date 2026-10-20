@@ -225,7 +225,8 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
                     getSink()->diagnose(Diagnostics::WaveSizeNotDivisorOfWorkgroupX{
                         .workgroupSizeX = int(sizeAlongAxis[0]),
                         .waveSize = int(waveSize),
-                        .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+                        .target =
+                            TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
                         .location = irFunc->sourceLoc});
                 }
                 _requireExtension(toSlice("subgroups"));
