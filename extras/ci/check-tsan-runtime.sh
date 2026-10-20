@@ -3,6 +3,7 @@
 # Run before the Slang build: its instrumented generators need a working runtime too.
 set -euo pipefail
 
+compiler=${CC:-gcc}
 canary_dir=$(mktemp -d)
 trap 'rm -rf "$canary_dir"' EXIT
 
@@ -50,9 +51,9 @@ int main(void)
 }
 CANARY
 
-clang-18 -fsanitize=thread -shared-libsan -g -O1 -pthread \
+"$compiler" -fsanitize=thread -g -O1 -pthread \
   -DCLEAN "$canary_dir/canary.c" -o "$canary_dir/clean"
-clang-18 -fsanitize=thread -shared-libsan -g -O1 -pthread \
+"$compiler" -fsanitize=thread -g -O1 -pthread \
   "$canary_dir/canary.c" -o "$canary_dir/racy"
 
 # A clean program must start and exit normally. A startup abort is not evidence
@@ -66,20 +67,8 @@ echo "Racy canary exit status: $race_exit"
 if [ "$race_exit" -ne 66 ] ||
   ! grep -q 'WARNING: ThreadSanitizer: data race' "$canary_dir/report.txt" ||
   ! grep -q 'canary.c:' "$canary_dir/report.txt"; then
-  clang-18 --version
+  "$compiler" --version
   ldd "$canary_dir/racy"
-  clang-18 -fsanitize=thread -shared-libsan -g -O1 -pthread -S -emit-llvm \
-    "$canary_dir/canary.c" -o "$canary_dir/canary.ll"
-  grep -E 'define |__tsan_|store volatile|pthread_create' "$canary_dir/canary.ll"
-  TSAN_OPTIONS="verbosity=2:halt_on_error=1:abort_on_error=0:exitcode=66" \
-    "$canary_dir/racy" || true
-  TSAN_OPTIONS="verbosity=2:halt_on_error=1:abort_on_error=0:exitcode=66" \
-    LD_PRELOAD="$(clang-18 -print-file-name=libclang_rt.tsan-x86_64.so)" \
-    "$canary_dir/racy" || true
-  clang-18 -fsanitize=thread -g -O1 -pthread \
-    "$canary_dir/canary.c" -o "$canary_dir/static-runtime"
-  TSAN_OPTIONS="verbosity=2:halt_on_error=1:abort_on_error=0:exitcode=66" \
-    "$canary_dir/static-runtime" || true
   echo "::error::TSan canary did not produce a symbolized race report with exit code 66"
   exit 1
 fi

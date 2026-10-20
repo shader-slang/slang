@@ -44,6 +44,9 @@ jobs:
 
     env:
       SANITIZER: ${{ inputs.sanitizer }}
+      # Clang 18's shared TSan runtime misses the deliberate canary race on
+      # this image. GCC's supported TSan path avoids changing Slang's DSO linkage.
+      SANITIZER_COMPILER: ${{ inputs.sanitizer == 'tsan' && 'gcc' || 'clang-18' }}
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
 
     defaults:
@@ -113,9 +116,9 @@ jobs:
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
-          key: sccache-linux-clang-18-x86_64-${{ inputs.sanitizer }}-v2-${{ github.sha }}
+          key: sccache-linux-${{ env.SANITIZER_COMPILER }}-x86_64-${{ inputs.sanitizer }}-v2-${{ github.sha }}
           restore-keys: |
-            sccache-linux-clang-18-x86_64-${{ inputs.sanitizer }}-v2-
+            sccache-linux-${{ env.SANITIZER_COMPILER }}-x86_64-${{ inputs.sanitizer }}-v2-
 
       - name: Setup LLVM from GCS
         uses: ./.github/actions/setup-llvm-from-gcs
@@ -132,7 +135,7 @@ jobs:
         uses: ./.github/actions/common-setup
         with:
           os: linux
-          compiler: clang-18
+          compiler: ${{ env.SANITIZER_COMPILER }}
           platform: x86_64
           config: releaseWithDebugInfo
           build-llvm: true
@@ -141,8 +144,14 @@ jobs:
       - name: Set up sanitizer runtime
         run: |
           mkdir -p "$SANITIZER-logs"
-          CLANG_RUNTIME_DIR=$(clang-18 -print-runtime-dir)
-          echo "LD_LIBRARY_PATH=${lib_dir}:${CLANG_RUNTIME_DIR}:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          if [ "$SANITIZER" = tsan ]; then
+            tsan_runtime=$("$CC" -print-file-name=libtsan.so)
+            test -f "$tsan_runtime"
+            runtime_dir=$(dirname "$tsan_runtime")
+          else
+            runtime_dir=$(clang-18 -print-runtime-dir)
+          fi
+          echo "LD_LIBRARY_PATH=${lib_dir}:${runtime_dir}:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
           if [ "$SANITIZER" = tsan ]; then
             # Include build generators and every test child; keep the deliberate
             # canary reports outside this directory so they cannot fail the suite.
@@ -159,7 +168,7 @@ jobs:
           echo "cmake version: $(cmake --version)"
           sanitizer_defines=()
           if [ "$SANITIZER" = tsan ]; then
-            echo "Building with ThreadSanitizer"
+            echo "Building with GCC ThreadSanitizer"
             sanitizer_defines=(-DSLANG_ENABLE_ASAN=OFF -DSLANG_ENABLE_TSAN=ON -DSLANG_ENABLE_MIMALLOC=OFF)
           else
             echo "Building with AddressSanitizer and UndefinedBehaviorSanitizer"
@@ -201,7 +210,7 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
-          key: sccache-linux-clang-18-x86_64-${{ inputs.sanitizer }}-v2-${{ github.sha }}
+          key: sccache-linux-${{ env.SANITIZER_COMPILER }}-x86_64-${{ inputs.sanitizer }}-v2-${{ github.sha }}
 
       - name: Verify ASan runtime is active
         if: steps.build.outcome == 'success' && inputs.sanitizer == 'asan'

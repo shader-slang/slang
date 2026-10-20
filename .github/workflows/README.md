@@ -233,7 +233,10 @@ workflow twice, with separate builds, caches, and logs. Its manual dispatch
 accepts `all`, `asan`, or `tsan` so either job can be validated independently.
 The existing `sanitizer-binaries` artifact remains ASan-only.
 
-TSan runs on a GitHub-hosted Linux x86_64 CPU runner. Its container allows the
+TSan uses GCC from the existing CI container on a GitHub-hosted Linux x86_64 CPU
+runner. Clang 18's shared TSan runtime missed the canary race in this image; its
+runtime integration remains follow-up work under #13120. ASan still uses Clang 18.
+The TSan container allows the
 `personality` syscall and runs shell steps through `setarch -R`; instrumented
 build generators and test children inherit disabled ASLR without changing the
 host kernel settings. Before building Slang, a clean threaded canary must pass
