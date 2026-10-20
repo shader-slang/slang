@@ -1258,61 +1258,6 @@ Decl* getEntryPointCapabilityDiagnosticDecl(EntryPoint* entryPoint)
     return stageType->getDeclRef().getDecl();
 }
 
-// Creates the logical entry point selected by a stage-struct name and collects its requirements.
-//
-// Consider `-entry Stages.Miss` selecting a nested struct that implements `rt::IMissShader`.
-// Conformance lookup chooses the exact `invoke` witness, but reflection keeps `Stages.Miss` as
-// the source identity and derives a legal physical symbol for targets that cannot spell a dot.
-// The logical input signature is not a native shader ABI, so the caller skips native varying
-// checks and uses the returned capabilities with the shared target/profile validator instead.
-// The caller tries ordinary function lookup first and only calls this helper when experimental
-// features are enabled. A name that does not select a struct leaves `outFoundStructuralStage`
-// false, so the caller can report the original function-not-found diagnostic.
-RefPtr<EntryPoint> tryCreateStructuralRayTracingEntryPoint(
-    FrontEndEntryPointRequest* entryPointReq,
-    bool* outFoundStructuralStage,
-    CapabilitySet* outCapabilities)
-{
-    auto compileRequest = entryPointReq->getCompileRequest();
-    auto linkage = compileRequest->getLinkage();
-    auto entryPointName = entryPointReq->getName();
-    auto entryPointProfile = entryPointReq->getProfile();
-    StructuralRayTracingEntryPointInfo structuralInfo;
-    auto implementation = findStructuralRayTracingEntryPointByName(
-        linkage,
-        entryPointReq->getTranslationUnit()->getModule(),
-        entryPointName,
-        entryPointProfile,
-        compileRequest->getSink(),
-        outFoundStructuralStage,
-        &structuralInfo);
-    if (!implementation)
-        return nullptr;
-
-    auto entryPoint = EntryPoint::create(linkage, implementation, entryPointProfile);
-    entryPoint->setNameOverride(entryPointName);
-    auto sourceTypeName =
-        getStructuralRayTracingSourceTypeName(linkage->getASTBuilder(), structuralInfo.stageType);
-    entryPoint->setEntryPointNameOverride(
-        getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice()));
-    entryPoint->setStructuralRayTracingInfo(structuralInfo);
-
-    *outCapabilities = CapabilitySet{entryPoint->getInferredCapabilityRequirements()};
-    if (structuralInfo.primitiveType)
-    {
-        // Consider a closest-hit context with `typealias Primitive = rt::CurvePrimitive`.
-        // The primitive selects a Metal-only ABI even if `invoke` never reads its attributes.
-        // Read the exact resolved associated type's declared requirement so the target validator
-        // sees that constraint without rebuilding a primitive-to-capability table.
-        auto primitiveType = as<DeclRefType>(structuralInfo.primitiveType->resolve());
-        SLANG_RELEASE_ASSERT(primitiveType);
-        auto primitiveDecl = primitiveType->getDeclRef().getDecl();
-        SLANG_RELEASE_ASSERT(primitiveDecl->inferredCapabilityRequirements);
-        outCapabilities->nonDestructiveJoin(primitiveDecl->inferredCapabilityRequirements);
-    }
-    return entryPoint;
-}
-
 // Checks the structural representations that must be consumed before native ABI legalization.
 //
 // For example, compiling `-entry MyMiss` must not send its logical `MissInput<C>` parameter to

@@ -291,11 +291,16 @@ sink holds only the function-not-found diagnostic until the structural fallback 
 recognized the type or failed, so selecting `SkyMiss` does not report a missing function. Other
 lookup diagnostics, including generic-argument conversion warnings, go directly to the real sink.
 
-Ordinary conformance checking already validates the selected `invoke` signature. Structural
-entries skip `validateEntryPoint`'s native parameter classification and validation because the
-compiler supplies their RT input. They reuse `_validateEntryPointTargetCapabilities` to check the
-selected implementation and primitive against the requested target and profile. For example,
-a correctly typed `invoke` that calls a Metal-only helper must still be rejected for HLSL.
+Both lookup paths return a `DeclRef<FuncDecl>`. `findAndValidateEntryPoint` creates the entry
+once, attaches the structural metadata and name overrides when needed, and calls
+`validateEntryPoint`. The structural finder also supplies the stage selected by conformance;
+native entries resolve their stage through the usual function attributes.
+
+Ordinary conformance checking already validates the selected `invoke` signature. At the start
+of `validateEntryPoint`, structural entries collect the implementation and primitive requirements,
+call `_validateEntryPointTargetCapabilities`, and return. They skip native parameter classification
+and validation because the compiler supplies their RT input. For example, a correctly typed
+`invoke` that calls a Metal-only helper must still be rejected for HLSL.
 
 An `invoke` method can be called as an ordinary static function with an existing input. For example:
 

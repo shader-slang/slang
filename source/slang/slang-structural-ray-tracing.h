@@ -191,7 +191,6 @@ String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type)
 /// synthesized entry points agree on one physical name.
 String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName);
 
-struct FrontEndEntryPointRequest;
 struct CapabilitySet;
 class EntryPoint;
 struct IRModule;
@@ -202,12 +201,6 @@ CapabilitySet getEntryPointStageCapabilities(EntryPoint* entryPoint);
 
 /// Returns the public entry-point declaration used by capability diagnostics.
 Decl* getEntryPointCapabilityDiagnosticDecl(EntryPoint* entryPoint);
-
-/// Creates a structural entry point if the request selects a stage struct.
-RefPtr<EntryPoint> tryCreateStructuralRayTracingEntryPoint(
-    FrontEndEntryPointRequest* entryPointReq,
-    bool* outFoundStructuralStage,
-    CapabilitySet* outCapabilities);
 
 /// Rejects structural source representations that remain before native ABI legalization.
 SlangResult diagnoseUnloweredStructuralRayTracing(
