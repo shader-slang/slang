@@ -83,6 +83,26 @@ int borrowAndIn(__borrow int a, int b)
     return a + b;
 }
 
+void refAndIn(__ref int a, int b)
+{
+    a = b;
+}
+
+void inAndOut(int a, out int b)
+{
+    b = a;
+}
+
+int borrowAndConstRef(__borrow int a, __constref int b)
+{
+    return a + b;
+}
+
+int constRefAndReadOnly(const __ref int a, __ref_readonly int b)
+{
+    return a + b;
+}
+
 void test()
 {
     int x = 0;
@@ -132,4 +152,8 @@ void test()
     readOnlyAndIn(x, x);
     writeOnlyAndIn(x, x);
     borrowAndIn(x, x);
+    refAndIn(x, x);
+    inAndOut(x, x);
+    borrowAndConstRef(x, x);
+    constRefAndReadOnly(x, x);
 }
