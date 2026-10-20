@@ -2049,12 +2049,18 @@ static SlangResult _innerMain(
         RenderTestApp app;
         renderDocBeginFrame();
         SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
-        // A failure in `update` (binding, dispatch, or writing the output file) must reach the
-        // caller. Otherwise render-test exits successfully with an empty output file, and the
-        // test fails later with an unexplained FileCheck mismatch.
-        const SlangResult updateResult = app.update();
+        // A failure reported by `update` (binding the parameters or writing the output) means the
+        // test output was not produced or cannot be trusted. We return it only after the frame-end
+        // cleanup, so that the RenderDoc frame opened above is closed on this path as well.
+        //
+        // SLANG_E_NOT_AVAILABLE is turned into a failure because the test harness reads it as
+        // "ignore this test", and that outcome is reserved for the device and feature gating
+        // earlier in this function.
+        SlangResult updateResult = app.update();
         renderDocEndFrame();
         app.finalize();
+        if (updateResult == SLANG_E_NOT_AVAILABLE)
+            updateResult = SLANG_FAIL;
         SLANG_RETURN_ON_FAIL(updateResult);
     }
 
