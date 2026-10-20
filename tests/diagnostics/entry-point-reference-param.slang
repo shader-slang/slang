@@ -2,6 +2,10 @@
 // of its parameters may use a reference passing mode: `__ref`, `const __ref`, `__ref_readonly`,
 // or `__ref_writeonly`. Each such parameter is reported. A borrow such as `__constref` has
 // value semantics and remains valid.
+//
+// A rejected parameter still reaches the remaining entry-point checks, as an input for
+// `__ref_readonly`, an output for `__ref_writeonly`, and both for `__ref`, so those checks report
+// their own problems with it.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=REF):-target spirv -entry refParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=REF):-target hlsl -entry refParam -stage fragment -experimental-feature
@@ -11,6 +15,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNIFORM):-target spirv -entry uniformRefParam -stage compute -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=MULTI):-target spirv -entry multiRefParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=BORROW):-target spirv -entry constRefBorrowParam -stage fragment -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=RODEPTH):-target spirv -entry readOnlyDepth -stage fragment -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=WODEPTH):-target spirv -entry writeOnlyTwoDepths -stage fragment -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=REFPOS):-target spirv -entry refPosition -stage vertex -experimental-feature
 
 [shader("fragment")]
 float4 refParam(__ref float4 color : COLOR0) : SV_Target
@@ -69,4 +76,37 @@ float4 multiRefParam(__ref float4 a : COLOR0, float4 ok : COLOR1, __ref float4 b
 float4 constRefBorrowParam(__constref float4 color : COLOR0) : SV_Target
 {
     return color;
+}
+
+[shader("fragment")]
+float4 readOnlyDepth(__ref_readonly float depth : SV_Depth) : SV_Target
+//RODEPTH:                                ^^^^^ E38054
+//RODEPTH:                                ^^^^^ entry-point parameter 'depth' cannot use the reference passing mode 'ref_readonly'
+//RODEPTH:                                ^^^^^ system value semantic 'SV_Depth' cannot be used as input in 'pixel' shader stage
+{
+    return depth;
+}
+
+[shader("fragment")]
+float4 writeOnlyTwoDepths(
+    __ref_writeonly float a : SV_Depth,
+//WODEPTH:                ^ E38054
+//WODEPTH:                ^ entry-point parameter 'a' cannot use the reference passing mode 'ref_writeonly'
+    __ref_writeonly float b : SV_DepthGreaterEqual) : SV_Target
+//WODEPTH:                ^ E38054
+//WODEPTH:                ^ entry-point parameter 'b' cannot use the reference passing mode 'ref_writeonly'
+//WODEPTH:                    ^^^^^^^^^^^^^^^^^^^^ a fragment entry point can declare at most one depth output, but 'SV_DepthGreaterEqual' conflicts with the earlier 'SV_Depth'
+{
+    a = 0;
+    b = 0;
+    return 0;
+}
+
+[shader("vertex")]
+float4 refPosition(__ref float4 position : SV_Position) : SV_Position
+//REFPOS:                       ^^^^^^^^ E38054
+//REFPOS:                       ^^^^^^^^ entry-point parameter 'position' cannot use the reference passing mode 'ref'
+//REFPOS:                       ^^^^^^^^ system value semantic 'SV_Position' cannot be used as input in 'vertex' shader stage
+{
+    return position;
 }

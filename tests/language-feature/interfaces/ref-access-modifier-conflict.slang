@@ -1,5 +1,6 @@
 // A parameter has at most one reference access, so `__ref_readonly` and `__ref_writeonly`
-// conflict with each other, with `__ref`, with themselves, and with `const` on a `__ref`.
+// conflict with each other, with `__ref`, with themselves, and with `const`, because `const __ref`
+// is the legacy spelling of `__ref_readonly`. That spelling, in either order, remains valid.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
@@ -34,6 +35,16 @@ void readOnlyThenConst(__ref_readonly const int x) {}
 void writeOnlyThenConst(__ref_writeonly const int x) {}
 //CHECK:                                ^^^^^ E31202
 //CHECK:                                ^^^^^ modifier 'const' is redundant or conflicting with existing modifier '__ref_writeonly'
+
+void constRefThenReadOnly(const __ref __ref_readonly int x) {}
+//CHECK:                              ^^^^^^^^^^^^^^ E31202
+//CHECK:                              ^^^^^^^^^^^^^^ modifier '__ref_readonly' is redundant or conflicting with existing modifier '__ref'
+//CHECK:                              ^^^^^^^^^^^^^^ E31202
+//CHECK:                              ^^^^^^^^^^^^^^ modifier '__ref_readonly' is redundant or conflicting with existing modifier 'const'
+
+void legacyConstRef(const __ref int x) {}
+
+void legacyRefConst(__ref const int x) {}
 
 [numthreads(1, 1, 1)]
 void main()

@@ -1,7 +1,8 @@
 // A `__ref_readonly` argument must still be a memory location, and a read-only location is still
 // not writable. A swizzle names a memory location only if its components are adjacent and in
 // order, so `v.xx`, `v.xz`, and `v.yx` do not. Neither does a property, whose getter returns a
-// temporary. A matrix or tuple element of a read-only location is itself read-only.
+// temporary. A matrix or tuple element of a read-only location is itself read-only, while a swizzle
+// of several matrix or tuple elements does not name a memory location.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
@@ -28,6 +29,22 @@ int forwardTuple(__ref_readonly Tuple<int, int> t)
 //CHECK: ^ E30011
 //CHECK: ^ left of '=' is not an l-value.
     return t._1;
+}
+
+int leafTuple(__ref_readonly Tuple<int, int> x) { return x._0; }
+
+int forwardMatrixSwizzle(__ref_readonly int4x4 m)
+{
+    return leaf2(m._m00_m01);
+//CHECK:           ^^^^^^^^ E30047
+//CHECK:           ^^^^^^^^ argument passed to parameter '0' must be l-value.
+}
+
+int forwardTupleSwizzle(__ref_readonly Tuple<int, int, int> t)
+{
+    return leafTuple(t._0_1);
+//CHECK:               ^^^^ E30047
+//CHECK:               ^^^^ argument passed to parameter '0' must be l-value.
 }
 
 int forward(__ref_readonly S s)
