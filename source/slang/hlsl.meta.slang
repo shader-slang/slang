@@ -27765,8 +27765,8 @@ void __glslTraceMotionReorderExecuteEXT(
 // HitObject.Invoke has no single overload for both D3D12 SER flavours: NVAPI only has the
 // AccelerationStructure form and DXR 1.3 only has the form without it. This helper takes the
 // AccelerationStructure and drops it for DXR, so `TraceReorderExecute` can keep one `case hlsl`
-// for both. Splitting that case into `hlsl_nvapi` and `hlsl` cases that call the two existing
-// `Invoke` overloads fails for DXR: the NVAPI overload's switch has no DXR case (E41011).
+// for both. The three-argument HitObject::Invoke overload enters an NVAPI-only switch with no DXR
+// case (E41011); this helper selects the target-specific intrinsic directly.
 [require(nvapi, ser_raygen)]
 [require(hlsl, ser_dxr_raygen)]
 void __hlslInvokeHitObject<payload_t>(
@@ -27816,9 +27816,8 @@ void __traceMotionReorderExecuteSequence<payload_t>(
 }
 
 // The two-argument `HitObject.Invoke` that `ReorderExecute` lowers to on D3D12 has no NVAPI form,
-// so NVAPI targets get this diagnostic, which names the function the user actually called. It is a
-// function rather than a `static_assert` inline in `case hlsl_nvapi` because its `[require]` keeps
-// that case's capability set compatible with `case hlsl` (an inline assert fails with E36120).
+// so NVAPI targets get a diagnostic naming the function they called. This helper's
+// `[require(nvapi, ser_raygen)]` makes the NVAPI case compatible with `case hlsl` (E36120).
 [require(nvapi, ser_raygen)]
 void __diagnoseReorderExecuteOnNVAPI()
 {
