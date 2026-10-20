@@ -7,7 +7,8 @@ struct IRModule;
 class DiagnosticSink;
 class TargetProgram;
 
-// Lower int/uint/bool matrix types to arrays for SPIRV, WGSL, GLSL, and Metal targets
+// Lower matrix types the target cannot represent natively to arrays of row vectors, for SPIR-V,
+// GLSL, Metal, WGSL and LLVM CPU targets (see `shouldLowerMatrixType` for the per-target rule).
 void legalizeMatrixTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 } // namespace Slang
