@@ -11978,16 +11978,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ensureExtensionDeclaration(
                         as<IRStringLit>(spvInst->getOperand(1)->getOperand(0))->getStringSlice());
                     continue;
-                case SpvOpExecutionModeId:
-                    // An `OpExecutionModeId` that names its entry point (e.g. `$main`) is
-                    // emitted as written. The `__entryPoint` form is expanded below, as for
-                    // `OpExecutionMode`.
-                    if (spvInst->getOperandCount() < 2 ||
-                        spvInst->getOperand(1)->getOp() != kIROp_SPIRVAsmOperandEntryPoint)
-                        break;
-                    [[fallthrough]];
                 case SpvOpExecutionMode:
+                case SpvOpExecutionModeId:
                     {
+                        // Both opcodes follow the same rule. With `__entryPoint` as the entry
+                        // point operand, the mode is applied to every entry point that calls the
+                        // enclosing function. With a named entry point (e.g. `$main`), it is
+                        // emitted as written, for that entry point only. Either way, each
+                        // distinct instruction is emitted once, even when the block is inlined
+                        // into several call sites.
+                        if (spvInst->getOperandCount() < 2)
+                            break;
+                        if (spvInst->getOperand(1)->getOp() != kIROp_SPIRVAsmOperandEntryPoint)
+                        {
+                            emitInstMemoizedNoResultIDCustomOperandFunc(
+                                getSection(SpvLogicalSectionID::ExecutionModes),
+                                nullptr,
+                                opcode,
+                                [&]()
+                                {
+                                    for (const auto operand : spvInst->getSPIRVOperands())
+                                        emitSpvAsmOperand(operand);
+                                });
+                            continue;
+                        }
                         if (auto refEntryPointSet =
                                 m_referencingEntryPoints.tryGetValue(getParentFunc(inst)))
                         {
