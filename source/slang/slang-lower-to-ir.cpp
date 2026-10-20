@@ -2941,11 +2941,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitRefParamTypeBase(RefParamTypeBase* type)
     {
         auto paramInfo = getParamInfoFromTypeWithModeWrapper(type);
-        auto access = getRefParamPassingModeAccess(paramInfo.mode);
-        IRInst* operands[] = {
+        return getBuilder()->getRefParamType(
             lowerType(context, paramInfo.type),
-            getBuilder()->getIntValue(getBuilder()->getUInt64Type(), (IRIntegerValue)access)};
-        return getBuilder()->getType(kIROp_RefParamType, 2, operands);
+            getRefParamPassingModeAccess(paramInfo.mode),
+            AddressSpace::Generic);
     }
 
     IRType* visitResourceType(ResourceType* type) { return lowerSimpleIntrinsicType(type); }
