@@ -49,8 +49,9 @@ The HitObject API provides cross-platform SER functionality. The API is based on
 
 ## Fused Functions
 
-On Vulkan with the EXT extension these lower to a single fused instruction. On every other SER
-target they lower to the equivalent separate calls.
+On Vulkan with the EXT extension these lower to a single fused instruction. On the other SER targets
+that support them they lower to the equivalent separate calls; the notes on each function list the
+exceptions.
 
 - [ReorderExecute](#reorder-execute)
 - [TraceReorderExecute](#trace-reorder-execute)
