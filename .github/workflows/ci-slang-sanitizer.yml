@@ -3,11 +3,11 @@ name: CI Sanitizer Workflow
 on:
   workflow_call:
     inputs:
-      sanitizer:
-        description: "Sanitizer family: asan (includes UBSan) or tsan"
+      enable-tsan:
+        description: "Run a separate TSan build after ASan/UBSan in this job"
         required: false
-        type: string
-        default: asan
+        type: boolean
+        default: false
       runs-on:
         required: true
         type: string
@@ -20,7 +20,7 @@ on:
         type: number
         default: 120
       upload-binaries:
-        # ASan only: publish the instrumented build as a `sanitizer-binaries`
+        # Publish the ASan-instrumented build as a `sanitizer-binaries`
         # artifact so downstream projects can run their own ASan suites
         # against ToT Slang without building from source.
         required: false
@@ -38,30 +38,18 @@ jobs:
 
     container:
       image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
-      # TSan needs a predictable address layout. Allow setarch's personality syscall
-      # only in this container; do not change the runner host's ASLR settings.
-      options: ${{ inputs.sanitizer == 'tsan' && '--user root --security-opt seccomp=unconfined' || '--user root' }}
+      # TSan's setarch invocation needs the personality syscall inside the
+      # container. The runner host's ASLR settings are not modified.
+      options: ${{ inputs.enable-tsan && '--user root --security-opt seccomp=unconfined' || '--user root' }}
 
     env:
-      SANITIZER: ${{ inputs.sanitizer }}
-      # Clang 18's shared TSan runtime misses the deliberate canary race on
-      # this image. GCC's supported TSan path avoids changing Slang's DSO linkage.
-      SANITIZER_COMPILER: ${{ inputs.sanitizer == 'tsan' && 'gcc' || 'clang-18' }}
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
 
     defaults:
       run:
-        # Instrumented build generators and test children inherit this personality.
-        shell: ${{ inputs.sanitizer == 'tsan' && 'setarch x86_64 -R bash --noprofile --norc -eo pipefail {0}' || 'bash' }}
+        shell: bash
 
     steps:
-      - name: Validate sanitizer selection
-        run: |
-          case "$SANITIZER" in
-            asan|tsan) ;;
-            *) echo "::error::Unknown sanitizer: $SANITIZER"; exit 1 ;;
-          esac
-
       - name: Configure Git safe directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
@@ -71,10 +59,6 @@ jobs:
           # Need full history to diff PR changes against the base branch
           # for classifying sanitizer findings as PR-related vs pre-existing.
           fetch-depth: "0"
-
-      - name: Test TSan result handling
-        if: inputs.sanitizer == 'tsan'
-        run: python3 -m unittest discover -s extras/tests -p test_summarize_tsan.py -v
 
       - name: Compute PR changed files
         env:
@@ -116,9 +100,9 @@ jobs:
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
-          key: sccache-linux-${{ env.SANITIZER_COMPILER }}-x86_64-${{ inputs.sanitizer }}-v2-${{ github.sha }}
+          key: sccache-linux-clang-18-x86_64-asan-v2-${{ github.sha }}
           restore-keys: |
-            sccache-linux-${{ env.SANITIZER_COMPILER }}-x86_64-${{ inputs.sanitizer }}-v2-
+            sccache-linux-clang-18-x86_64-asan-v2-
 
       - name: Setup LLVM from GCS
         uses: ./.github/actions/setup-llvm-from-gcs
@@ -132,53 +116,40 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Setup
+        id: setup
         uses: ./.github/actions/common-setup
         with:
           os: linux
-          compiler: ${{ env.SANITIZER_COMPILER }}
+          compiler: clang-18
           platform: x86_64
           config: releaseWithDebugInfo
           build-llvm: true
           use-cached-llvm: false
 
-      - name: Set up sanitizer runtime
-        run: |
-          mkdir -p "$SANITIZER-logs"
-          if [ "$SANITIZER" = tsan ]; then
-            tsan_runtime=$("$CC" -print-file-name=libtsan.so)
-            test -f "$tsan_runtime"
-            runtime_dir=$(dirname "$tsan_runtime")
-          else
-            runtime_dir=$(clang-18 -print-runtime-dir)
-          fi
-          echo "LD_LIBRARY_PATH=${lib_dir}:${runtime_dir}:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
-          if [ "$SANITIZER" = tsan ]; then
-            # Include build generators and every test child; keep the deliberate
-            # canary reports outside this directory so they cannot fail the suite.
-            echo "TSAN_OPTIONS=halt_on_error=0:exitcode=66:log_path=$PWD/tsan-logs/tsan" >> "$GITHUB_ENV"
-          fi
-
-      - name: Verify TSan startup and race detection
-        if: inputs.sanitizer == 'tsan'
-        run: bash extras/ci/check-tsan-runtime.sh
+      - name: Create sanitizer log directory
+        run: mkdir -p asan-logs
 
       - name: Build Slang with Sanitizers
         id: build
         run: |
           echo "cmake version: $(cmake --version)"
-          sanitizer_defines=()
-          if [ "$SANITIZER" = tsan ]; then
-            echo "Building with GCC ThreadSanitizer"
-            sanitizer_defines=(-DSLANG_ENABLE_ASAN=OFF -DSLANG_ENABLE_TSAN=ON -DSLANG_ENABLE_MIMALLOC=OFF)
-          else
-            echo "Building with AddressSanitizer and UndefinedBehaviorSanitizer"
-            sanitizer_defines=(-DSLANG_ENABLE_ASAN=ON -DSLANG_ENABLE_TSAN=OFF)
-          fi
+          echo "Building with AddressSanitizer and UndefinedBehaviorSanitizer"
 
-          # Leak detection only applies to the ASan build's short-lived generators.
-          if [ "$SANITIZER" = asan ]; then
-            export ASAN_OPTIONS=detect_leaks=0
-          fi
+          # Binaries built with -shared-libsan dynamically link libclang_rt.asan.
+          # Persist LD_LIBRARY_PATH so both build-time generators and test steps
+          # can locate the sanitizer runtime.
+          CLANG_RUNTIME_DIR=$(clang-18 -print-runtime-dir)
+          export LD_LIBRARY_PATH="${CLANG_RUNTIME_DIR}:${LD_LIBRARY_PATH:-}"
+          echo "Clang runtime dir: $CLANG_RUNTIME_DIR"
+
+          # Also include the build lib directory so that dlopen() can find
+          # sibling modules like libslang-llvm.so at test time.
+          export LD_LIBRARY_PATH="${lib_dir}:${LD_LIBRARY_PATH}"
+          echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+
+          # Disable leak detection during build: generators are short-lived
+          # build tools and LSan's non-zero exit code would break the build.
+          export ASAN_OPTIONS=detect_leaks=0
 
           if command -v sccache &> /dev/null; then
             echo "sccache statistics (pre-build):"
@@ -193,7 +164,7 @@ jobs:
           fi
 
           cmake --preset default --fresh \
-            "${sanitizer_defines[@]}" \
+            -DSLANG_ENABLE_ASAN=ON \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DSLANG_ENABLE_EXAMPLES=OFF \
             "${cmake_launcher_defines[@]}"
@@ -210,10 +181,10 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
-          key: sccache-linux-${{ env.SANITIZER_COMPILER }}-x86_64-${{ inputs.sanitizer }}-v2-${{ github.sha }}
+          key: sccache-linux-clang-18-x86_64-asan-v2-${{ github.sha }}
 
-      - name: Verify ASan runtime is active
-        if: steps.build.outcome == 'success' && inputs.sanitizer == 'asan'
+      - name: Verify sanitizer runtime is active
+        if: steps.build.outcome == 'success'
         run: |
           # Build and run a small program with a known ASan error to confirm
           # the sanitizer runtime is loaded and producing log files.
@@ -237,14 +208,6 @@ jobs:
           fi
           rm -f /tmp/canary.* /tmp/asan-canary /tmp/asan-canary.c
 
-      - name: Exercise concurrent compilation under TSan
-        if: steps.build.outcome == 'success' && inputs.sanitizer == 'tsan'
-        run: |
-          export SLANG_DISABLE_AVX512=1
-          "$bin_dir/slang-test" slang-unit-test-tool/parallelGenericEntryPointCompile \
-            -use-test-server -server-count 2 2>&1 | tee tsan-logs/concurrent-compile.txt && test_exit=0 || test_exit=$?
-          echo "TSAN_CONCURRENT_EXIT=$test_exit" >> "$GITHUB_ENV"
-
       - name: Run Tests with Sanitizers
         if: steps.build.outcome == 'success'
         env:
@@ -263,20 +226,17 @@ jobs:
           # modern ASan default, made explicit). Findings across our own
           # instrumented DSOs enumerate the header-defined globals that also
           # break downstream mixed ASan builds.
-          if [ "$SANITIZER" = asan ]; then
-            export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_odr_violation=2:log_path=$PWD/asan-logs/asan"
-            export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan"
-            export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
+          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_odr_violation=2:log_path=$PWD/asan-logs/asan"
+          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan"
+          export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
-            # //TEST:EXECUTABLE: cases launch generated host programs that are not
-            # themselves ASan-linked. Resolve the runtime here so slang-test can
-            # preload it only when executing those programs.
-            ASAN_RUNTIME=$(clang-18 -print-file-name=libclang_rt.asan-x86_64.so)
-            if [ ! -f "$ASAN_RUNTIME" ]; then
-              echo "::error::Clang shared ASan runtime not found: $ASAN_RUNTIME"
-              exit 1
-            fi
-            export SLANG_TEST_EXECUTABLE_LD_PRELOAD="$ASAN_RUNTIME${LD_PRELOAD:+:$LD_PRELOAD}"
+          # //TEST:EXECUTABLE: cases launch generated host programs that are not
+          # themselves ASan-linked. Resolve the runtime here so slang-test can
+          # preload it only when executing those programs.
+          ASAN_RUNTIME=$(clang-18 -print-file-name=libclang_rt.asan-x86_64.so)
+          if [ ! -f "$ASAN_RUNTIME" ]; then
+            echo "::error::Clang shared ASan runtime not found: $ASAN_RUNTIME"
+            exit 1
           fi
 
           export SLANG_RUN_SPIRV_VALIDATION=1
@@ -311,12 +271,13 @@ jobs:
           printf ' %q' "${slang_test_args[@]}"
           printf '\n'
 
-          # Collect test exits and reports before deciding the result in the
-          # sanitizer-specific summary. TSan also requires successful test exits.
+          # Non-zero exits are expected (sanitizer errors, test failures); this
+          # job gates only on sanitizer log output in the Summary step.
           # Keep LD_PRELOAD out of slang-test's environment so uninstrumented
           # compiler and linker subprocesses do not produce LeakSanitizer noise.
           # slang-test converts this value to LD_PRELOAD only for generated executables.
-          "$bin_dir/slang-test" "${slang_test_args[@]}" 2>&1 | tee "$SANITIZER-logs/slang-test.txt" && slang_test_exit=0 || slang_test_exit=$?
+          SLANG_TEST_EXECUTABLE_LD_PRELOAD="$ASAN_RUNTIME${LD_PRELOAD:+:$LD_PRELOAD}" \
+            "$bin_dir/slang-test" "${slang_test_args[@]}" && slang_test_exit=0 || slang_test_exit=$?
           echo "SLANG_TEST_EXIT=$slang_test_exit" >> "$GITHUB_ENV"
           if [ "$slang_test_exit" -ne 0 ]; then
             echo "::warning::slang-test exited with code $slang_test_exit"
@@ -325,27 +286,19 @@ jobs:
       - name: Run slangc tests with Sanitizers
         if: steps.build.outcome == 'success'
         run: |
-          if [ "$SANITIZER" = asan ]; then
-            # Same ASan checks as the slang-test step above; see the comment there.
-            export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_odr_violation=2:log_path=$PWD/asan-logs/asan-slangc"
-            export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan-slangc"
-            export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
-          fi
+          # Same ASan checks as the slang-test step above; see the comment there.
+          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_odr_violation=2:log_path=$PWD/asan-logs/asan-slangc"
+          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan-slangc"
+          export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
-          PATH=$bin_dir:$PATH tools/slangc-test/test.sh 2>&1 | tee "$SANITIZER-logs/slangc-test.txt" && slangc_test_exit=0 || slangc_test_exit=$?
+          PATH=$bin_dir:$PATH tools/slangc-test/test.sh && slangc_test_exit=0 || slangc_test_exit=$?
           echo "SLANGC_TEST_EXIT=$slangc_test_exit" >> "$GITHUB_ENV"
           if [ "$slangc_test_exit" -ne 0 ]; then
             echo "::warning::slangc tests exited with code $slangc_test_exit"
           fi
 
-      - name: TSan Summary
-        if: always() && inputs.sanitizer == 'tsan'
-        env:
-          BUILD_OUTCOME: ${{ steps.build.outcome }}
-        run: python3 extras/ci/summarize-tsan.py tsan-logs
-
       - name: Sanitizer Summary
-        if: always() && inputs.sanitizer == 'asan'
+        if: always()
         env:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
         run: |
@@ -725,7 +678,7 @@ jobs:
         # storage is not metered, and at ~226 MB with 3-day retention the
         # rolling footprint stays under 1 GB. always() is needed because the
         # summary step exits non-zero on violation.
-        if: always() && inputs.upload-binaries && steps.build.outcome == 'success' && inputs.sanitizer == 'asan'
+        if: always() && inputs.upload-binaries && steps.build.outcome == 'success'
         run: |
           # Bundle the instrumented build for downstream ASan users. Binaries
           # are built with -shared-libsan, so ship the matching dynamic ASan
@@ -754,7 +707,7 @@ jobs:
           ls -lh sanitizer-binaries.tar.gz
 
       - name: Upload ASan-instrumented binaries
-        if: always() && inputs.upload-binaries && steps.build.outcome == 'success' && inputs.sanitizer == 'asan'
+        if: always() && inputs.upload-binaries && steps.build.outcome == 'success'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: sanitizer-binaries
@@ -769,7 +722,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: ${{ inputs.sanitizer == 'asan' && 'sanitizer-logs' || 'tsan-logs' }}
-          path: ${{ inputs.sanitizer }}-logs/
+          name: sanitizer-logs
+          path: asan-logs/
           retention-days: 7
           if-no-files-found: ignore
+
+      # Keep collecting TSan results even when ASan reports a finding. Both
+      # phases contribute to this job's result and the existing notification.
+      - name: Build and test with ThreadSanitizer
+        if: ${{ !cancelled() && inputs.enable-tsan && steps.setup.outcome == 'success' }}
+        uses: ./.github/actions/run-tsan

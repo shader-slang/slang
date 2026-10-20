@@ -1,0 +1,131 @@
+name: Run ThreadSanitizer
+description: Build and test with TSan after the sanitizer workflow's shared setup
+
+runs:
+  using: composite
+  steps:
+    - name: Configure TSan environment
+      id: setup
+      if: ${{ !cancelled() }}
+      shell: setarch x86_64 -R bash --noprofile --norc -eo pipefail {0}
+      run: |
+        # Clang 18's shared runtime misses the deliberate canary race in this
+        # image. Use the existing GCC TSan path without changing DSO linkage.
+        tsan_runtime=$(gcc -print-file-name=libtsan.so)
+        test -f "$tsan_runtime"
+        mkdir -p tsan-logs /tmp/.cache/sccache-tsan
+        {
+          echo "CC=gcc"
+          echo "CXX=g++"
+          echo "tsan_bin_dir=$PWD/build-tsan/RelWithDebInfo/bin"
+          # Replace the ASan library path so dlopen cannot load an ASan DSO.
+          echo "LD_LIBRARY_PATH=$PWD/build-tsan/RelWithDebInfo/lib:$(dirname "$tsan_runtime")"
+          echo "TSAN_OPTIONS=halt_on_error=0:exitcode=66:log_path=$PWD/tsan-logs/tsan"
+          echo "SCCACHE_DIR=/tmp/.cache/sccache-tsan"
+        } >> "$GITHUB_ENV"
+        # sccache's daemon captures its cache directory at startup. Restart it
+        # before switching caches; no running daemon is also a valid state.
+        sccache --stop-server || true
+
+    - name: Test TSan result handling
+      id: result-tests
+      if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+      shell: bash
+      run: python3 -m unittest discover -s extras/tests -p test_summarize_tsan.py -v
+
+    - name: Verify TSan startup and race detection
+      id: canary
+      if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+      shell: setarch x86_64 -R bash --noprofile --norc -eo pipefail {0}
+      run: bash extras/ci/check-tsan-runtime.sh
+
+    - name: Restore TSan sccache cache
+      if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+      continue-on-error: true
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      with:
+        path: /tmp/.cache/sccache-tsan
+        key: sccache-linux-gcc-x86_64-tsan-v2-${{ github.sha }}
+        restore-keys: |
+          sccache-linux-gcc-x86_64-tsan-v2-
+
+    - name: Build Slang with TSan
+      id: build
+      if: ${{ !cancelled() && steps.canary.outcome == 'success' && steps.result-tests.outcome == 'success' }}
+      shell: setarch x86_64 -R bash --noprofile --norc -eo pipefail {0}
+      run: |
+        cmake_launcher_defines=()
+        if [[ -n "${sccache_path:-}" ]]; then
+          cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${sccache_path}")
+          cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${sccache_path}")
+          cmake_launcher_defines+=("-DSLANG_ENABLE_PCH=OFF")
+        fi
+        cmake --preset default -B build-tsan --fresh \
+          -DSLANG_ENABLE_ASAN=OFF \
+          -DSLANG_ENABLE_TSAN=ON \
+          -DSLANG_ENABLE_MIMALLOC=OFF \
+          -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+          -DSLANG_ENABLE_EXAMPLES=OFF \
+          "${cmake_launcher_defines[@]}"
+        cmake --build build-tsan --config RelWithDebInfo -j"$(nproc)" --verbose
+        sccache --show-stats || true
+
+    - name: Save TSan sccache cache
+      if: ${{ !cancelled() && steps.build.outcome == 'success' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      continue-on-error: true
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      with:
+        path: /tmp/.cache/sccache-tsan
+        key: sccache-linux-gcc-x86_64-tsan-v2-${{ github.sha }}
+
+    - name: Exercise concurrent compilation under TSan
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      shell: setarch x86_64 -R bash --noprofile --norc -eo pipefail {0}
+      run: |
+        export SLANG_DISABLE_AVX512=1
+        "$tsan_bin_dir/slang-test" slang-unit-test-tool/parallelGenericEntryPointCompile \
+          -use-test-server -server-count 2 2>&1 | tee tsan-logs/concurrent-compile.txt && test_exit=0 || test_exit=$?
+        echo "TSAN_CONCURRENT_EXIT=$test_exit" >> "$GITHUB_ENV"
+
+    - name: Run tests with TSan
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      shell: setarch x86_64 -R bash --noprofile --norc -eo pipefail {0}
+      run: |
+        export SLANG_RUN_SPIRV_VALIDATION=1
+        export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+        export SLANG_DISABLE_AVX512=1
+        # Run the full suite in process to limit TSan memory overhead. The
+        # compiler unit tests themselves create threads for concurrent work.
+        "$tsan_bin_dir/slang-test" \
+          -expected-failure-list tests/expected-failure-github.txt \
+          -expected-failure-list tests/expected-failure-no-gpu.txt \
+          -expected-failure-list tests/expected-failure-linux.txt \
+          -skip-reference-image-generation \
+          -show-adapter-info \
+          -enable-debug-layers false \
+          2>&1 | tee tsan-logs/slang-test.txt && test_exit=0 || test_exit=$?
+        echo "TSAN_TEST_EXIT=$test_exit" >> "$GITHUB_ENV"
+
+    - name: Run slangc tests with TSan
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      shell: setarch x86_64 -R bash --noprofile --norc -eo pipefail {0}
+      run: |
+        PATH=$tsan_bin_dir:$PATH tools/slangc-test/test.sh \
+          2>&1 | tee tsan-logs/slangc-test.txt && test_exit=0 || test_exit=$?
+        echo "TSAN_SLANGC_TEST_EXIT=$test_exit" >> "$GITHUB_ENV"
+
+    - name: TSan summary
+      if: always()
+      shell: bash
+      env:
+        BUILD_OUTCOME: ${{ steps.build.outcome }}
+      run: python3 extras/ci/summarize-tsan.py tsan-logs
+
+    - name: Upload TSan logs
+      if: always()
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
+        name: tsan-logs
+        path: tsan-logs/
+        retention-days: 7
+        if-no-files-found: ignore

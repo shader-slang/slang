@@ -22,8 +22,8 @@ def summarize(log_dir, env):
 
     for variable, label in (
         ("TSAN_CONCURRENT_EXIT", "Concurrent compilation"),
-        ("SLANG_TEST_EXIT", "slang-test"),
-        ("SLANGC_TEST_EXIT", "slangc tests"),
+        ("TSAN_TEST_EXIT", "slang-test"),
+        ("TSAN_SLANGC_TEST_EXIT", "slangc tests"),
     ):
         status = env.get(variable)
         if status != "0":

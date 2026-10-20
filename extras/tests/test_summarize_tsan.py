@@ -21,8 +21,8 @@ class TSanSummaryTests(unittest.TestCase):
         self.env = {
             "BUILD_OUTCOME": "success",
             "TSAN_CONCURRENT_EXIT": "0",
-            "SLANG_TEST_EXIT": "0",
-            "SLANGC_TEST_EXIT": "0",
+            "TSAN_TEST_EXIT": "0",
+            "TSAN_SLANGC_TEST_EXIT": "0",
         }
         for name in ("concurrent-compile.txt", "slang-test.txt"):
             (self.logs / name).write_text("100% of tests passed (1/1), 4 tests ignored\n")
@@ -45,12 +45,20 @@ class TSanSummaryTests(unittest.TestCase):
         self.assertTrue(self.failures())
 
     def test_crash_without_report_fails(self):
-        self.env["SLANG_TEST_EXIT"] = "139"
+        self.env["TSAN_TEST_EXIT"] = "139"
         self.assertTrue(self.failures())
 
     def test_missing_test_step_fails(self):
         del self.env["TSAN_CONCURRENT_EXIT"]
         self.assertTrue(self.failures())
+
+    def test_asan_results_cannot_satisfy_missing_tsan_results(self):
+        del self.env["TSAN_TEST_EXIT"]
+        del self.env["TSAN_SLANGC_TEST_EXIT"]
+        self.env.update(SLANG_TEST_EXIT="0", SLANGC_TEST_EXIT="0")
+        failures = self.failures()
+        self.assertIn("slang-test: exit status missing (not completed).", failures)
+        self.assertIn("slangc tests: exit status missing (not completed).", failures)
 
     def test_ignored_or_unfinished_suite_fails(self):
         for output in ("no tests run\n", "100% of tests passed (0/0)\n", ""):
