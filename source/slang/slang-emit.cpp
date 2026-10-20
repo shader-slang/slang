@@ -2472,6 +2472,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRVAssembly:
         {
             SLANG_PASS(legalizeImageSubscript, targetRequest, sink);
+            if (isMetalTarget(targetRequest))
+                SLANG_PASS(insertMetalTextureFences);
         }
         break;
     default:

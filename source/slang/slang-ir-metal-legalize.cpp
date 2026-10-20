@@ -461,4 +461,52 @@ void specializeAddressSpaceForMetal(IRModule* module)
     specializeAddressSpace(module, &metalAddressSpaceAssigner);
 }
 
+// Return the texture that `inst` writes, or null if it writes none. Texture atomics other than
+// loads also store to their texel, so they count as writes along with `ImageStore`.
+static IRInst* getWrittenTexture(IRInst* inst)
+{
+    if (auto imageStore = as<IRImageStore>(inst))
+        return imageStore->getImage();
+    if (as<IRAtomicOperation>(inst) && !as<IRAtomicLoad>(inst))
+    {
+        if (auto imageSubscript = as<IRImageSubscript>(getRootAddr(inst->getOperand(0))))
+            return imageSubscript->getImage();
+    }
+    return nullptr;
+}
+
+// MSL makes a thread's write to an `access::read_write` texture visible to that thread's
+// later reads of the texture only after a `fence()` on it (MSL 4.1 section 6.13.17); HLSL,
+// SPIR-V and WGSL order these accesses implicitly. Every texture write reaches this pass as an
+// `ImageStore` or a texture atomic, including the read-then-write that `legalizeImageSubscript`
+// creates for a partial texel store such as `tex[p].x = 1`, so we fence after each write.
+// A write-only texture is emitted as `access::write`, which has no `fence()` and cannot be
+// read back.
+void insertMetalTextureFences(IRModule* module)
+{
+    IRBuilder builder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getModifiableChildren())
+            {
+                auto texture = getWrittenTexture(inst);
+                if (!texture)
+                    continue;
+                auto textureType = as<IRTextureTypeBase>(texture->getDataType());
+                SLANG_RELEASE_ASSERT(textureType);
+                if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_WRITE)
+                    continue;
+                builder.setInsertAfter(inst);
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
+            }
+        }
+    }
+}
+
 } // namespace Slang

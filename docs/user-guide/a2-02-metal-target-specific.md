@@ -122,6 +122,12 @@ Raster-ordered access resources receive the `[[raster_order_group(0)]]`
 attribute, for example `texture2d<float, access::read_write> tex
 [[raster_order_group(0)]]`.
 
+Metal makes a thread's write to an `access::read_write` texture visible to
+that thread's later reads only after a `fence()` on the texture. HLSL, SPIR-V
+and WGSL do not need one, so Slang emits a fence after every write to such a
+texture, including texture atomics and the read-modify-write that a partial
+texel store such as `tex[p].x = 1.0` becomes.
+
 ## Array Types
 
 Array types in Metal are declared using the array template:
