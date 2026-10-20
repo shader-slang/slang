@@ -373,8 +373,7 @@ public:
             // buffers. In release builds the assert also hands that invariant to GCC 14+, which
             // otherwise, after inlining a run of `add` calls, pairs the allocation size of one
             // growth step with the copy count of a later one and reports a false
-            // -Wstringop-overflow. The fix depends on this exact condition: GCC 14 and 15 still
-            // warn if it also tests `m_count >= 0`.
+            // -Wstringop-overflow.
             SLANG_ASSERT(m_count <= m_capacity);
             T* newBuffer = _allocate(size);
             if (m_capacity)
