@@ -2049,9 +2049,13 @@ static SlangResult _innerMain(
         RenderTestApp app;
         renderDocBeginFrame();
         SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
-        app.update();
+        // A failure in `update` (binding, dispatch, or writing the output file) must reach the
+        // caller. Otherwise render-test exits successfully with an empty output file, and the
+        // test fails later with an unexplained FileCheck mismatch.
+        const SlangResult updateResult = app.update();
         renderDocEndFrame();
         app.finalize();
+        SLANG_RETURN_ON_FAIL(updateResult);
     }
 
     return SLANG_OK;
