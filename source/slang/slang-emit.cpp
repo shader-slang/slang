@@ -3084,7 +3084,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         // passes have been performed, we can emit target code from
         // the IR module.
         //
+        const Index errorCountBeforeEmit = sink->getErrorCount();
         sourceEmitter->emitModule(irModule, sink);
+        if (sink->getErrorCount() > errorCountBeforeEmit)
+            return SLANG_FAIL;
     }
 
     String code = sourceWriter.getContent();
