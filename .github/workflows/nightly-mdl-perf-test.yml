@@ -198,6 +198,7 @@ jobs:
           # (daily labels share the swept commit's DATE, so several points can
           # share a date and series order alone cannot identify this run's).
           echo "PERF_LABEL=$LABEL" >> "$GITHUB_ENV"
+          echo "PERF_OBSERVED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
           # Also a job OUTPUT, not only job-scoped env: the analyze job runs on
           # a different machine and cannot see this job's $GITHUB_ENV.
           echo "perf_label=$LABEL" >> "$GITHUB_OUTPUT"
@@ -290,6 +291,35 @@ jobs:
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -m "nightly ToT $(date -u +%Y-%m-%d) ($(cd "$GITHUB_WORKSPACE" && git rev-parse --short HEAD))"
           git push
+
+      # The benchmark host owns collection, credentials and delivery.
+      - name: Export nightly results for BenchView
+        id: benchview
+        if: env.PUBLISH == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$SUITE/benchview.py" \
+            --results "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/results.json" \
+            --meta "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/meta.json" \
+            --os Windows --observed-at "$PERF_OBSERVED_AT" \
+            --execution-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --output "$GITHUB_WORKSPACE/benchview-export"
+
+      - name: Archive BenchView submission payloads
+        if: always() && env.PUBLISH == 'true' && steps.benchview.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: benchview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/benchview-export/
+          if-no-files-found: warn
+
+      - name: Report BenchView export failure
+        if: always() && steps.benchview.outcome == 'failure'
+        shell: bash
+        run: echo "::warning::BenchView export failed; see the BenchView step and payload artifact"
 
       # Remove the PAT credential that actions/checkout baked into perf-results'
       # .git/config — on a persistent self-hosted runner this would otherwise
