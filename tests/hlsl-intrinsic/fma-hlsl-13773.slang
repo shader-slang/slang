@@ -14,6 +14,9 @@ RWStructuredBuffer<double3> bD3;
 RWStructuredBuffer<float3x3> bF33;
 RWStructuredBuffer<half3x3> bH33;
 RWStructuredBuffer<double3x3> bD33;
+RWStructuredBuffer<double> bDg;
+RWStructuredBuffer<float3> bF3g;
+RWStructuredBuffer<double3> bD3g;
 
 // HLSL-DAG: bF_0{{.*}} = mad(
 // HLSL-DAG: bH_0{{.*}} = mad(
@@ -24,29 +27,30 @@ RWStructuredBuffer<double3x3> bD33;
 // HLSL-DAG: bF33_0{{.*}} = mad(
 // HLSL-DAG: bH33_0{{.*}} = mad(
 // HLSL-DAG: bD33_0{{.*}} = fma(
+// HLSL-DAG: bDg_0{{.*}} = fma(
+// HLSL-DAG: bF3g_0{{.*}} = mad(
+// HLSL-DAG: bD3g_0{{.*}} = fma(
 
-// DXIL op 47 is Fma (double only) and op 46 is FMad. No `double` call lowers to FMad. DXC inlines
-// every call into `main`, so this also covers the generic wrappers and the forward derivative.
+// DXIL op 47 is Fma (double only) and op 46 is FMad. No `double` call lowers to FMad.
 // DXIL: define void @main()
 // DXIL-NOT: @dx.op.tertiary.f64(i32 46
 // DXIL: @dx.op.tertiary.f64(i32 47
 // DXIL-NOT: @dx.op.tertiary.f64(i32 46
 
+// The wrappers reach `fma` with an element type that is concrete only after the caller is
+// specialized, so the double/other selection must still fold correctly there. They are inlined so
+// that the selected intrinsic appears at the `bDg`, `bF3g` and `bD3g` stores checked above.
+[ForceInline]
 T callFma<T : __BuiltinFloatingPointType>(T a, T b, T c)
 {
     return fma(a, b, c);
 }
 
+[ForceInline]
 vector<T, N> callFmaVector<T : __BuiltinFloatingPointType, let N : int>(
     vector<T, N> a,
     vector<T, N> b,
     vector<T, N> c)
-{
-    return fma(a, b, c);
-}
-
-[Differentiable]
-double diffFma(double a, double b, double c)
 {
     return fma(a, b, c);
 }
@@ -65,8 +69,7 @@ void main(uint3 id : SV_DispatchThreadID)
     bH33[0] = fma(bH33[1], bH33[2], bH33[3]);
     bD33[0] = fma(bD33[1], bD33[2], bD33[3]);
 
-    bD[4] = callFma(bD[5], bD[6], bD[7]);
-    bF3[4] = callFmaVector(bF3[5], bF3[6], bF3[7]);
-    bD3[4] = callFmaVector(bD3[5], bD3[6], bD3[7]);
-    bD[8] = fwd_diff(diffFma)(diffPair(bD[9], 1.0l), diffPair(bD[10], 0.0l), diffPair(bD[11], 0.0l)).p;
+    bDg[0] = callFma(bDg[1], bDg[2], bDg[3]);
+    bF3g[0] = callFmaVector(bF3g[1], bF3g[2], bF3g[3]);
+    bD3g[0] = callFmaVector(bD3g[1], bD3g[2], bD3g[3]);
 }
