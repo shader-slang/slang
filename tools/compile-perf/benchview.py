@@ -87,10 +87,12 @@ def observation(record, observed, runner, os_name):
                      for name in names}
     compiler_tree = tree_for({name: statistics.median(entry["distribution"]["samples"])
                               for name, entry in timer_metrics.items()})
+    # Labels follow the timer itself, including non-primary totals in mixed records.
+    total_labels = {"compileInner": "Total compile time", "apiTotal": "Total API time"}
     for name in selected:
         entry = timer_metrics[name]
-        if name in ("compileInner", "apiTotal"):
-            entry["name"] = "Total compile time" if name == "compileInner" else "Total API time"
+        if name in total_labels:
+            entry["name"] = total_labels[name]
             tree = compiler_tree if name == "compileInner" else API_TREE
             if any(len(timers[n]["samples"]) != len(timers[name]["samples"])
                    for n in tree_names(tree) if n in timers):
@@ -157,6 +159,8 @@ def submissions(records, meta, os_name, observed, execution, release=None, branc
            "dimensions": dimensions}
     if meta.get("commit_time"):
         run["vcs"]["commitTime"] = meta["commit_time"]
+    # Branch is verified revision provenance, not just a display grouping; callers
+    # omit it for detached daily checkouts or unverified release targets.
     if branch:
         run["vcs"]["branch"] = branch
     if release:
