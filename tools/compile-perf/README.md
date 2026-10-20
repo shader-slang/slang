@@ -429,6 +429,9 @@ existing reports. For local or historical exports, see `python3 benchview.py --h
 
 ## Notes / caveats
 
+Run the regression tests from the repository root with
+`python3 -m unittest discover -s tools/compile-perf/tests -t tools/compile-perf -p 'test_*.py'`.
+
 - **`parse` is sema-dominated:** `parseTranslationUnit` is cheap even for huge
   files; use that timer (not `frontEndExecute`) for the pure-parse signal.
 - **Summed timers can exceed `compileInner`:** timers invoked many times
