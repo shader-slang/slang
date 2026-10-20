@@ -376,11 +376,13 @@ static ImageFormat getImageFormat(IRTextureType* texType)
 
 static bool wgslFormatSupportsReadWrite(ImageFormat fmt)
 {
-    // Per https://www.w3.org/TR/WGSL/#storage-texel-formats, rgba16float is explicitly
-    // prohibited from read_write access even when the readonly_and_readwrite_storage_textures
-    // WGSL feature is available. All other formats that Slang's WGSL backend emits
-    // (r32float, rg32float, rgba32float, rgba8unorm, bgra8unorm, and their integer
-    // variants) support read_write under that feature.
+    // Only rgba16float is diagnosed here; WebGPU checks every other format/access pair at
+    // pipeline creation. Core WebGPU allows read_write on r32float/uint/sint only, and the
+    // `texture-formats-tier2` feature adds r8unorm/uint/sint, r16float/uint/sint and
+    // rgba8unorm, rgba8/16/32uint, rgba8/16/32sint, rgba16float and rgba32float. Any other
+    // format, for example rg32float, bgra8unorm, rg8unorm or rgb10a2unorm, compiles with
+    // read_write here and is rejected by every device. Which pairs Slang should diagnose is
+    // tracked in shader-slang/slang#13768.
     switch (fmt)
     {
     case ImageFormat::rgba16f:
@@ -472,9 +474,10 @@ const char* WGSLSourceEmitter::getWgslImageFormat(IRTextureTypeBase* type)
     case ImageFormat::bgra8:
         return "bgra8unorm";
 
-    // The remaining texel formats belong to the `texture_formats_tier1` language extension,
-    // so a device must enable the WebGPU `texture-formats-tier1` feature to use them, and
-    // `texture-formats-tier2` for `read_write` access on the formats that allow it.
+    // These 23 texel formats belong to the `texture_formats_tier1` language extension, so a
+    // device must enable the WebGPU `texture-formats-tier1` feature to use them. Of these,
+    // only r8unorm, r8uint, r8sint, r16uint, r16sint and r16float allow read_write, and
+    // only with `texture-formats-tier2`.
     case ImageFormat::r8:
         return "r8unorm";
     case ImageFormat::r8_snorm:
@@ -526,6 +529,7 @@ const char* WGSLSourceEmitter::getWgslImageFormat(IRTextureTypeBase* type)
         // Unlike SPIR-V, WGSL doesn't have a texel format for "unknown".
         return "rgba32float";
     default:
+        // Only r64ui and r64i reach this point; WGSL has no 64-bit texel format.
         const auto imageFormatInfo = getImageFormatInfo(imageFormat);
         getSink()->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
             .format = imageFormatInfo.name,

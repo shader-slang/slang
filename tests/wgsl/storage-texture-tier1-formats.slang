@@ -29,9 +29,9 @@
 // CHECK-DAG: var t_rgb10_a2ui{{_[0-9]+}} : texture_storage_2d<rgb10a2uint, write>
 // CHECK-DAG: var t_r11f_g11f_b10f{{_[0-9]+}} : texture_storage_2d<rg11b10ufloat, write>
 
-// The access mode is independent of the format mapping: a read-write texture keeps
-// `read_write` and names its own format. (`r16float` with `read_write` additionally
-// needs the WebGPU `texture-formats-tier2` feature at pipeline creation.)
+// A read-write r16f texture keeps `read_write` and names its own format. r16float is one
+// of the tier1 formats that allow read_write, and only with the WebGPU
+// `texture-formats-tier2` feature.
 // CHECK-DAG: var rw_r16f{{_[0-9]+}} : texture_storage_2d<r16float, read_write>
 
 [format("r8")] WTexture2D<float> t_r8;
