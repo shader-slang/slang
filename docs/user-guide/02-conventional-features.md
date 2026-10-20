@@ -443,8 +443,10 @@ Swizzles can reorder elements (`v.yx`) or include duplicate elements (`v.yyy`).
 > Unlike GLSL, Slang only supports `xyzw` and `rgba` as swizzle elements, and not the seldom-used `stpq`.
 
 Matrix values also support HLSL-style matrix swizzles such as `m._m00_m01` and
-`m._41_32`. Matrix swizzle l-values may be assigned, and constant-indexed
-subscripts of matrix swizzles may be used where an l-value is required.
+`m._41_32`. A matrix swizzle without duplicate elements is an l-value when the
+matrix itself is an l-value: it may be assigned, and its constant-indexed
+subscripts may be used where an l-value is required. As with vector swizzles,
+a swizzle of a `let` or `const` matrix cannot be assigned.
 
 Statements
 ----------
