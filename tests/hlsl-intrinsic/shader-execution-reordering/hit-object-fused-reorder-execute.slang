@@ -19,6 +19,8 @@
 
 // SPIR-V NV has no fused instruction, and `spvShaderInvocationReorderNV` implies the EXT capability,
 // so the NV sequence has to be selected ahead of the EXT case.
+//TEST:SIMPLE(filecheck=NVTRACE0): -target spirv -entry traceReorderExecute -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
+//TEST:SIMPLE(filecheck=NVREORDER0): -target spirv -entry reorderExecute -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
 //TEST:SIMPLE(filecheck=NVTRACE): -target spirv -entry traceReorderExecuteHint -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
 //TEST:SIMPLE(filecheck=NOEXT): -target spirv -entry traceReorderExecuteHint -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
 //TEST:SIMPLE(filecheck=NVREORDER): -target spirv -entry reorderExecuteHint -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
@@ -93,6 +95,9 @@ void traceReorderExecute()
     // TRACE: OpHitObjectTraceReorderExecuteEXT %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %[[P]]{{$}}
     // TRACE: OpLoad %{{[A-Za-z0-9_]+}} %[[P]]
     // GLSLTRACE: hitObjectTraceReorderExecuteEXT({{.*}}, {{[0-9]+}});
+    // NVTRACE0: OpHitObjectTraceRayNV
+    // NVTRACE0: OpReorderThreadWithHitObjectNV %{{[A-Za-z0-9_]+}}{{$}}
+    // NVTRACE0: OpHitObjectExecuteShaderNV
     TraceReorderExecute(scene, RAY_FLAG_NONE, 0xFF, 0, 1, 0, makeRay(), payload);
 
     outputBuffer[DispatchRaysIndex().x] = payload.color;
@@ -140,6 +145,8 @@ void reorderExecute()
     // REORDER: OpHitObjectReorderExecuteShaderEXT %{{[A-Za-z0-9_]+}} %[[P]]{{$}}
     // REORDER: OpLoad %{{[A-Za-z0-9_]+}} %[[P]]
     // GLSLREORDER: hitObjectReorderExecuteEXT({{[^,]*}}, {{[0-9]+}});
+    // NVREORDER0: OpReorderThreadWithHitObjectNV %{{[A-Za-z0-9_]+}}{{$}}
+    // NVREORDER0: OpHitObjectExecuteShaderNV
     ReorderExecute(hit, payload);
 
     outputBuffer[DispatchRaysIndex().x] = payload.color;
