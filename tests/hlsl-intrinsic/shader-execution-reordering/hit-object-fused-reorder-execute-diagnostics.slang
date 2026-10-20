@@ -1,5 +1,6 @@
 // #13774: the SER fused functions are ray-generation-only, and the two-argument `ReorderExecute`
 // has no NVAPI lowering because NVAPI `HitObject::Invoke` requires an AccelerationStructure.
+// The NVAPI diagnostic names `ReorderExecute`, the function the user called.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=STAGE,non-exhaustive): -target spirv -entry closestHitMain -stage closesthit
 //DIAGNOSTIC_TEST:SIMPLE(diag=NVAPI,non-exhaustive): -target hlsl -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -capability ser_nvapi
@@ -22,6 +23,6 @@ void rayGenerationMain()
     MyPayload payload = { float4(0) };
     HitObject hit = HitObject::MakeNop();
     //NVAPI: 41400
-    //NVAPI: has no NVAPI form
+    //NVAPI: ReorderExecute has no NVAPI form
     ReorderExecute(hit, payload);
 }
