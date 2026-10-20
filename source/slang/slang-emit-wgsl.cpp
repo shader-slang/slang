@@ -471,6 +471,57 @@ const char* WGSLSourceEmitter::getWgslImageFormat(IRTextureTypeBase* type)
         return "rgba32float";
     case ImageFormat::bgra8:
         return "bgra8unorm";
+
+    // The remaining texel formats belong to the `texture_formats_tier1` language extension,
+    // so a device must enable the WebGPU `texture-formats-tier1` feature to use them, and
+    // `texture-formats-tier2` for `read_write` access on the formats that allow it.
+    case ImageFormat::r8:
+        return "r8unorm";
+    case ImageFormat::r8_snorm:
+        return "r8snorm";
+    case ImageFormat::r8ui:
+        return "r8uint";
+    case ImageFormat::r8i:
+        return "r8sint";
+    case ImageFormat::rg8:
+        return "rg8unorm";
+    case ImageFormat::rg8_snorm:
+        return "rg8snorm";
+    case ImageFormat::rg8ui:
+        return "rg8uint";
+    case ImageFormat::rg8i:
+        return "rg8sint";
+    case ImageFormat::r16:
+        return "r16unorm";
+    case ImageFormat::r16_snorm:
+        return "r16snorm";
+    case ImageFormat::r16ui:
+        return "r16uint";
+    case ImageFormat::r16i:
+        return "r16sint";
+    case ImageFormat::r16f:
+        return "r16float";
+    case ImageFormat::rg16:
+        return "rg16unorm";
+    case ImageFormat::rg16_snorm:
+        return "rg16snorm";
+    case ImageFormat::rg16ui:
+        return "rg16uint";
+    case ImageFormat::rg16i:
+        return "rg16sint";
+    case ImageFormat::rg16f:
+        return "rg16float";
+    case ImageFormat::rgba16:
+        return "rgba16unorm";
+    case ImageFormat::rgba16_snorm:
+        return "rgba16snorm";
+    case ImageFormat::rgb10_a2:
+        return "rgb10a2unorm";
+    case ImageFormat::rgb10_a2ui:
+        return "rgb10a2uint";
+    case ImageFormat::r11f_g11f_b10f:
+        return "rg11b10ufloat";
+
     case ImageFormat::unknown:
         // Unlike SPIR-V, WGSL doesn't have a texel format for "unknown".
         return "rgba32float";
