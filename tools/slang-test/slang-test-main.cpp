@@ -3110,7 +3110,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
             LanguageServerProtocol::CompletionItem resolved;
