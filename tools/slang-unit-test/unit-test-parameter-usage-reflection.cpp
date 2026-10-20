@@ -202,3 +202,198 @@ SLANG_UNIT_TEST(isParameterLocationUsedParameterBlockConstantBuffer)
         SLANG_CHECK(isUsed == expectation.expectedUsed);
     }
 }
+
+namespace
+{
+struct ParameterLocationExpectation
+{
+    SlangParameterCategory category;
+    SlangUInt spaceIndex;
+    SlangUInt registerIndex;
+    bool expectedUsed;
+};
+
+// Check each expectation against the per-entry-point metadata of `main` in `source`. We query
+// `getEntryPointMetadata` rather than `getTargetMetadata` because renderers build one pipeline
+// layout per entry point from it, which is where a false "used" adds a phantom binding.
+void checkEntryPointParameterLocationUsage(
+    slang::IGlobalSession* globalSession,
+    const char* source,
+    SlangCompileTarget format,
+    const char* profile,
+    ParameterLocationExpectation const* expectations,
+    Index expectationCount)
+{
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = format;
+    targetDesc.profile = profile ? globalSession->findProfile(profile) : SLANG_PROFILE_UNKNOWN;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "isParameterLocationUsedMixedConstantBuffer",
+        "mixed-cb.slang",
+        source,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK_ABORT(
+        module->findAndCheckEntryPoint(
+            "main",
+            SLANG_STAGE_COMPUTE,
+            entryPoint.writeRef(),
+            diagnosticBlob.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    SLANG_CHECK_ABORT(
+        session->createCompositeComponentType(
+            components,
+            2,
+            compositeProgram.writeRef(),
+            diagnosticBlob.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    SLANG_CHECK_ABORT(compositeProgram->link(linkedProgram.writeRef(), nullptr) == SLANG_OK);
+
+    ComPtr<slang::IMetadata> metadata;
+    SLANG_CHECK_ABORT(
+        linkedProgram
+            ->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnosticBlob.writeRef()) ==
+        SLANG_OK);
+
+    for (Index i = 0; i < expectationCount; ++i)
+    {
+        auto const& expectation = expectations[i];
+        bool isUsed = false;
+        SLANG_CHECK(
+            metadata->isParameterLocationUsed(
+                expectation.category,
+                expectation.spaceIndex,
+                expectation.registerIndex,
+                isUsed) == SLANG_OK);
+        SLANG_CHECK(isUsed == expectation.expectedUsed);
+    }
+}
+} // namespace
+
+// A constant buffer that holds both ordinary data and resources is split by type legalization
+// into a data-only buffer plus one parameter per resource. A resource field that the shader never
+// reads must be reported as unused, even though the data-only buffer is still live.
+SLANG_UNIT_TEST(isParameterLocationUsedMixedConstantBuffer)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    // The entry-point `uniform` parameters are collected into one implicit constant buffer.
+    const char* entryPointSource = R"(
+        RWStructuredBuffer<float4> Output;
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uniform float4 tint,
+                  uniform StructuredBuffer<float4> usedBuf,
+                  uniform StructuredBuffer<float4> unusedBuf,
+                  uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = usedBuf[tid.x] * tint;
+        }
+    )";
+
+    // On SPIR-V the entry-point constant buffer is a push-constant block with no binding, so
+    // `usedBuf` and `unusedBuf` are at bindings 1 and 2.
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 0, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 2, false},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            entryPointSource,
+            SLANG_SPIRV,
+            "spirv_1_5",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+
+    // On WGSL the entry-point constant buffer takes binding 1, so `usedBuf` and `unusedBuf` are at
+    // bindings 2 and 3.
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 0, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 2, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 3, false},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            entryPointSource,
+            SLANG_WGSL,
+            nullptr,
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+
+    // On HLSL `usedBuf` and `unusedBuf` are at t0 and t1, and the constant buffer is at b0.
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 0, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 1, false},
+            {SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER, 0, 0, true},
+            {SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS, 0, 0, true},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            entryPointSource,
+            SLANG_HLSL,
+            "sm_5_0",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+
+    // A global `ConstantBuffer<P>` that mixes data and resources is split the same way.
+    const char* globalSource = R"(
+        struct P
+        {
+            float4 tint;
+            StructuredBuffer<float4> usedBuf;
+            StructuredBuffer<float4> unusedBuf;
+        };
+
+        RWStructuredBuffer<float4> Output;
+        ConstantBuffer<P> gP;
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = gP.usedBuf[tid.x] * gP.tint;
+        }
+    )";
+
+    // `gP` takes binding 1 for its own buffer, then `usedBuf` and `unusedBuf` take 2 and 3.
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 0, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 2, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 3, false},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            globalSource,
+            SLANG_SPIRV,
+            "spirv_1_5",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+}
