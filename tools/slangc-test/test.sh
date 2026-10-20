@@ -10,7 +10,7 @@ test_count=0
 
 test() {
   local name
-  local exit_code
+  local exit_code=0
   name=$1
   shift
   pushd "$name" 1>/dev/null 2>&1
@@ -21,6 +21,7 @@ test() {
     summary=("${summary[@]}" "  success")
   else
     summary=("${summary[@]}" "  failure (exit code: $exit_code)")
+    failure_count=$((failure_count + 1))
   fi
   popd 1>/dev/null 2>&1
   echo

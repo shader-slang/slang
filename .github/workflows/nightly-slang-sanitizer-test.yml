@@ -15,12 +15,15 @@ jobs:
       # available); this maximizes coverage of CPU, SPIRV-emit, and
       # diagnostic tests under sanitizer.
       server-count: 1
-      timeout-minutes: 90
+      # ASan/UBSan and TSan run sequentially in this job. Allow for both cold
+      # builds; reduce this provisional budget after measuring nightly runs.
+      timeout-minutes: 360
+      enable-tsan: true
       upload-binaries: true
     secrets: inherit
 
   notify:
-    needs: [sanitizer-nightly]
+    needs: sanitizer-nightly
     if: always() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -30,7 +33,7 @@ jobs:
         with:
           payload: |
             {
-              "Sanitizer-Nightly": ":green-check-mark: Sanitizer nightly: clean (${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+              "Sanitizer-Nightly": ":green-check-mark: Sanitizer nightly: ASan/UBSan and TSan clean (${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SANITIZER_NIGHTLY_WEBHOOK_URL }}
@@ -41,7 +44,7 @@ jobs:
         with:
           payload: |
             {
-              "Sanitizer-Nightly": ":alert: Sanitizer nightly: ${{ needs.sanitizer-nightly.result }}\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "Sanitizer-Nightly": ":alert: Sanitizer nightly: ASan/UBSan and TSan ${{ needs.sanitizer-nightly.result }}\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SANITIZER_NIGHTLY_WEBHOOK_URL }}

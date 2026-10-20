@@ -3,6 +3,11 @@ name: CI Sanitizer Workflow
 on:
   workflow_call:
     inputs:
+      enable-tsan:
+        description: "Run a separate TSan build after ASan/UBSan in this job"
+        required: false
+        type: boolean
+        default: false
       runs-on:
         required: true
         type: string
@@ -33,7 +38,9 @@ jobs:
 
     container:
       image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
-      options: --user root
+      # TSan's setarch invocation needs the personality syscall inside the
+      # container. The runner host's ASLR settings are not modified.
+      options: ${{ inputs.enable-tsan && '--user root --security-opt seccomp=unconfined' || '--user root' }}
 
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
@@ -109,6 +116,7 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Setup
+        id: setup
         uses: ./.github/actions/common-setup
         with:
           os: linux
@@ -718,3 +726,9 @@ jobs:
           path: asan-logs/
           retention-days: 7
           if-no-files-found: ignore
+
+      # Keep collecting TSan results even when ASan reports a finding. Both
+      # phases contribute to this job's result and the existing notification.
+      - name: Build and test with ThreadSanitizer
+        if: ${{ !cancelled() && inputs.enable-tsan && steps.setup.outcome == 'success' }}
+        uses: ./.github/actions/run-tsan

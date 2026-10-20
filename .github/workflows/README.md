@@ -225,6 +225,37 @@ No trigger of their own; see the first diagram for who calls them. The
 | `pr-board-sync.yml`                                            | The PR-board reconciliation engine.      |
 | `issue-board-onboard.yml`                                      | Onboard a new issue onto Slang-All.      |
 
+### Sanitizer phases
+
+`ci-slang-sanitizer.yml` builds and tests with ASan/UBSan. The existing nightly
+also sets `enable-tsan: true`, which runs a separate TSan build and test phase
+in the **same job**, after ASan/UBSan. Checkout, dependencies, and LLVM setup
+are shared. TSan still runs if ASan reports findings, and either phase can fail
+the job. The existing nightly notification reports their combined result.
+Manual dispatch runs the same combined job. PR CI retains its ASan/UBSan scope.
+
+ASan uses `build/`; TSan uses `build-tsan/`. They have separate compiler caches
+and log artifacts. The existing `sanitizer-binaries` artifact remains ASan-only
+and is uploaded before TSan starts. The nightly has a provisional six-hour
+budget for both cold builds and test runs.
+
+TSan uses GCC from the existing CI container on a GitHub-hosted Linux x86_64 CPU
+runner. Clang 18's shared TSan runtime missed the canary race in this image; its
+runtime integration remains follow-up work under #13120. ASan still uses Clang 18.
+When TSan is enabled, the container permits the `personality` syscall. Only the
+TSan phase runs through `setarch -R`; instrumented build generators and test
+children inherit disabled ASLR without changing the host kernel settings.
+Before building Slang, a clean threaded canary must pass and a deliberately
+racy canary must produce a symbolized TSan report.
+
+The TSan phase explicitly exercises `parallelGenericEntryPointCompile` through a
+test server, then runs the full CPU-capable suite in process to limit memory use.
+It fails on any nonempty TSan report, unsuccessful test exit, or missing/empty
+suite result. TSan does not downgrade pre-existing findings. No race suppressions
+are introduced; findings need investigation before adding an issue-linked
+exception. Reports and test output are retained in `tsan-logs`. Vulkan execution
+coverage remains separate work tracked by #12798.
+
 ## 3. Scheduled
 
 Work too slow, too noisy, or too repetitive to gate a PR. Cadences are in each
