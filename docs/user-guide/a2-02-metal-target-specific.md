@@ -128,6 +128,13 @@ and WGSL do not need one, so Slang emits a fence after every write to such a
 texture, including texture atomics and the read-modify-write that a partial
 texel store such as `tex[p].x = 1.0` becomes.
 
+The fence orders only the writing thread's own accesses. To make one thread's
+texture write visible to other threads in the same threadgroup, use `DeviceMemoryBarrier` or
+`AllMemoryBarrier` (or their `WithGroupSync` forms), which lower to
+`threadgroup_barrier` with `mem_flags::mem_texture`. `GroupMemoryBarrier` and
+`GroupMemoryBarrierWithGroupSync` lower to `mem_flags::mem_threadgroup` only
+and, as in HLSL, cover groupshared memory but not textures.
+
 ## Array Types
 
 Array types in Metal are declared using the array template:
