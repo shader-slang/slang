@@ -261,13 +261,39 @@ jobs:
           path: bench-results/
           if-no-files-found: ignore
 
+      - name: Check BenchView tooling support
+        id: benchview_tools
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "daily=false" >> "$GITHUB_OUTPUT"
+          echo "releases=false" >> "$GITHUB_OUTPUT"
+          if [[ ! -f "$SUITE/benchview.py" ]]; then
+            echo "::warning::Selected suite has no BenchView exporter; release discovery is deferred."
+            exit 0
+          fi
+          help=$(python3 "$SUITE/benchview.py" --help)
+          if [[ "$help" != *"--output"* || "$help" != *"--branch"* ]]; then
+            echo "::warning::Selected suite lacks host-collector export support; release discovery is deferred."
+            exit 0
+          fi
+          echo "daily=true" >> "$GITHUB_OUTPUT"
+          release_help=$(python3 "$SUITE/new_release_check.py" --help)
+          if [[ "$help" == *"--completed-releases"* && "$release_help" == *"--completed"* ]]; then
+            echo "releases=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Selected suite supports daily export only; release discovery is deferred."
+          fi
+
       # New releases (majors + patch releases from v2026.13 on) are swept into
       # the tracked history the night they ship, riding the same results push
       # below. continue-on-error: a failing new-release sweep must not cost the
       # night's own point — the script removes partial baselines and the next
       # nightly retries.
       - name: Sweep newly published releases
-        if: env.PUBLISH == 'true'
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview_tools.outputs.releases == 'true'
         continue-on-error: true
         shell: bash
         env:
@@ -297,9 +323,11 @@ jobs:
       # Complexity sweeps stay in the existing reports, not BenchView.
       - name: Export nightly results for BenchView
         id: benchview
-        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true'
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview_tools.outputs.daily == 'true'
         continue-on-error: true
         shell: bash
+        env:
+          EXPORT_RELEASES: ${{ steps.benchview_tools.outputs.releases }}
         run: |
           set -euo pipefail
           # Use the measured checkout's branch, not the workflow or suite ref.
@@ -307,13 +335,15 @@ jobs:
           branch=$(git -C "$GITHUB_WORKSPACE" symbolic-ref --quiet --short HEAD || true)
           args=()
           if [[ -n "$branch" ]]; then args+=(--branch "$branch"); fi
+          if [[ "$EXPORT_RELEASES" == "true" ]]; then
+            args+=(--completed-releases "$GITHUB_WORKSPACE/benchview-completed-releases.json"
+                   --release-results "$GITHUB_WORKSPACE/perf-results/releases")
+          fi
           python3 "$SUITE/benchview.py" \
             --results "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/results.json" \
             --meta "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/meta.json" \
             --os Windows --observed-at "$PERF_OBSERVED_AT" \
             --execution-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
-            --completed-releases "$GITHUB_WORKSPACE/benchview-completed-releases.json" \
-            --release-results "$GITHUB_WORKSPACE/perf-results/releases" \
             "${args[@]}" \
             --output "$GITHUB_WORKSPACE/benchview-export"
 

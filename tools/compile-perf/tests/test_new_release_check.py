@@ -4,6 +4,7 @@ import io
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -13,6 +14,34 @@ import new_release_check
 
 class CompletedReleaseTests(unittest.TestCase):
     """Only completed release batches may be handed to the nightly exporter."""
+
+    def test_release_branch_requires_verified_ancestry(self):
+        """A maintenance tag must not inherit an unrelated default release target."""
+        with tempfile.TemporaryDirectory() as tmp:
+            def git(*args):
+                """Run isolated Git commands without changing the user's Git configuration."""
+                return subprocess.check_output(
+                    ["git", "-C", tmp, "-c", "user.name=Test",
+                     "-c", "user.email=test@example.com", *args],
+                    text=True, stderr=subprocess.DEVNULL).strip()
+
+            git("init")
+            git("commit", "--allow-empty", "-m", "base")
+            git("update-ref", "refs/remotes/origin/master", "HEAD")
+            git("checkout", "-b", "release/2026.20")
+            git("commit", "--allow-empty", "-m", "maintenance")
+            git("tag", "v2026.20")
+            git("update-ref", "refs/remotes/origin/release/2026.20", "HEAD")
+            revision = git("rev-parse", "HEAD")
+            for target, expected in (("master", None), ("release/2026.20", "release/2026.20"),
+                                     (revision, None), ("missing", None), (None, None)):
+                with self.subTest(target=target), patch.object(
+                        new_release_check.fetch_releases, "gh_get",
+                        return_value={"published_at": "2026-10-17T04:00:00Z",
+                                      "target_commitish": target}):
+                    info = new_release_check.release_export_info(tmp, "v2026.20")
+                    self.assertEqual(info["commit"], revision)
+                    self.assertEqual(info.get("branch"), expected)
 
     def test_completed_manifest(self):
         """No-new and failed sweeps clear stale manifests; successful sweeps list their tags."""

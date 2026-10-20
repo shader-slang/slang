@@ -60,8 +60,20 @@ def release_export_info(repo, tag):
     commit_time = subprocess.check_output(
         ["git", "-C", repo, "show", "-s", "--format=%cI", commit], text=True).strip()
     release = fetch_releases.gh_get(f"{fetch_releases.API}/releases/tags/{tag}")
-    return {"tag": tag, "commit": commit, "commit_time": commit_time,
+    info = {"tag": tag, "commit": commit, "commit_time": commit_time,
             "released_at": release["published_at"]}
+    # target_commitish may name a branch or a SHA, and can be stale for an
+    # existing tag. Only report it as a branch if the fetched ref contains the tag.
+    target = release.get("target_commitish")
+    if isinstance(target, str) and subprocess.run(
+            ["git", "check-ref-format", "refs/heads/" + target],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+        if subprocess.run(
+                ["git", "-C", repo, "merge-base", "--is-ancestor", commit,
+                 "refs/remotes/origin/" + target],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+            info["branch"] = target
+    return info
 
 
 # The selection boundary governs permanent tracked-history membership, so pin

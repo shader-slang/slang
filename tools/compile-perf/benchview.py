@@ -242,7 +242,7 @@ def release_submissions(completed, results_dir, daily_meta, os_name, execution):
                     observed_at_basis="Start of the new-release benchmark batch")
         payloads.extend(submissions(selected, meta, os_name, info["observed_at"],
                         execution + "-" + tag, {"label": tag, "releasedAt": info["released_at"]},
-                        branch="master"))
+                        branch=info.get("branch")))
     return payloads
 
 

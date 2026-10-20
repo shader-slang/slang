@@ -106,6 +106,7 @@ class BenchViewTests(unittest.TestCase):
             {"tag": tag, "commit": revision * 40, "commit_time": "2026-10-17T00:00:00Z",
              "released_at": "2026-10-17T04:00:00Z", "observed_at": "2026-10-20T06:00:00Z"}
             for tag, revision in (("v2026.20", "b"), ("v2026.20.1", "c"))]
+        completed[1]["branch"] = "release/2026.20"
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "daily.json").write_text(json.dumps([default]))
@@ -128,7 +129,7 @@ class BenchViewTests(unittest.TestCase):
                 self.assertNotIn("metadata", payloads[0]["run"])
                 for payload, info in zip(payloads[1:], releases):
                     self.assertEqual(payload["run"]["vcs"]["revision"], info["commit"])
-                    self.assertEqual(payload["run"]["vcs"]["branch"], "master")
+                    self.assertEqual(payload["run"]["vcs"].get("branch"), info.get("branch"))
                     self.assertEqual(payload["run"]["metadata"]["release"],
                                      {"label": info["tag"], "releasedAt": info["released_at"]})
                     self.assertEqual(len(payload["observations"]), 1)

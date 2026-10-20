@@ -422,7 +422,9 @@ via `--results <checkout-path>`.
 
 The publishing nightly also exports daily results and newly measured releases for
 BenchView; release exports include only active tests at their current default sizes.
-Runs with `sweep=true` skip BenchView. The benchmark host handles collection and delivery. Export failures do not block
+Runs with `sweep=true` skip BenchView and defer new-release discovery. Older suite
+checkouts defer release discovery when they lack release-export support.
+The benchmark host handles collection and delivery. Export failures do not block
 existing reports. For local or historical exports, see `python3 benchview.py --help`.
 
 ---
