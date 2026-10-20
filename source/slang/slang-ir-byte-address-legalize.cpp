@@ -200,17 +200,19 @@ struct ByteAddressBufferLegalizationContext
                 return false;
             }
 
-            // For Metal targets, 64-bit integer types need special handling
-            // because Metal doesn't support as_type casts from 64-bit to 32-bit.
-            // These types should be lowered to two 32-bit operations.
-            //
+            // Targets that set `lowerBasicTypeOps` represent byte-address buffers as arrays of
+            // 32-bit words. A scalar 8-bit or 16-bit access therefore extracts or updates part
+            // of a word, as struct fields already do, and a 64-bit access uses two words.
+            // Without this, Metal emits `as_type<half>(uint)`, which the Metal compiler rejects
+            // because the sizes differ. WGSL also sets `useBitCastFromUInt`, so the check
+            // above already legalizes these types there.
             if (m_options.lowerBasicTypeOps)
             {
-                // getSameSizeUIntBaseType should convert any 64-bit types to UInt64
                 auto unsignedBaseType = getSameSizeUIntBaseType(type->getOp());
-                if (unsignedBaseType == BaseType::UInt64)
+                if (unsignedBaseType == BaseType::UInt8 || unsignedBaseType == BaseType::UInt16 ||
+                    unsignedBaseType == BaseType::UInt64)
                 {
-                    return false; // Force legalization for 64-bit integer types
+                    return false;
                 }
             }
 
