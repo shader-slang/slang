@@ -1001,7 +1001,7 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
             }
             break;
 
-        case LookupResultItem::Breadcrumb::Kind::This:
+        case LookupResultItem::Breadcrumb::Kind::ThisType:
             {
                 // We expect a `this` to always come
                 // at the start of a chain.
@@ -1013,59 +1013,65 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                 //
                 auto thisType = calcThisType(breadcrumb->declRef);
 
-                // Next we construct an appropriate expression to stand in for the `this` value or
-                // `This` type used as the lookup base.
+                // If we are in a static context, then we do not have a `this` expression, and
+                // the expression we construct will need to start with the `This` type.
                 //
-                // The lookup process will have computed the appropriate mode for that base.
+                // Because we are constrained to yield an expression
+                // here, we must construct an expression that
+                // references `This`, and the *type* of that expression
+                // will be `typeof(This)`, which conceptually
+                // `typeof(typeof(this))`
                 //
-                auto thisParameterMode = breadcrumb->thisParameterMode;
-                if (thisParameterMode == LookupResultItem::Breadcrumb::ThisParameterMode::Type)
-                {
-                    // If we are in a static context, then we do not have a `this` expression, and
-                    // the expression we construct will need to start with the `This` type.
-                    //
-                    // Because we are constrained to yield an expression
-                    // here, we must construct an expression that
-                    // references `This`, and the *type* of that expression
-                    // will be `typeof(This)`, which conceptually
-                    // `typeof(typeof(this))`
-                    //
-                    auto thisTypeType = m_astBuilder->getTypeType(thisType);
+                auto thisTypeType = m_astBuilder->getTypeType(thisType);
 
-                    auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
-                    typeExpr->type.type = thisTypeType;
-                    typeExpr->base.type = thisType;
+                auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
+                typeExpr->type.type = thisTypeType;
+                typeExpr->base.type = thisType;
 
-                    bb = typeExpr;
-                }
-                else
-                {
-                    // In a context where both static and instance members can
-                    // be referenced, we will construct a reference to `this`,
-                    // and then rely on downstream logic to ensure that a
-                    // refernece to `this.someStaticMember` will be translated
-                    // over to `This.someStaticMember`.
-                    //
-                    ThisExpr* expr = m_astBuilder->create<ThisExpr>();
-                    expr->type.type = thisType;
-                    expr->loc = loc;
-                    if (auto declRefExpr = as<DeclRefExpr>(originalExpr))
-                        expr->scope = declRefExpr->scope;
-                    else if (auto invokeExpr = as<InvokeExpr>(originalExpr))
-                    {
-                        if (auto calleeDeclRefExpr =
-                                as<DeclRefExpr>(invokeExpr->originalFunctionExpr))
-                            expr->scope = calleeDeclRefExpr->scope;
-                    }
-                    // Whether the `this` value is mutable depends on the context in which it is
-                    // used, and lookup has recorded that result in the breadcrumb.
-                    //
-                    expr->type.isLeftValue =
-                        thisParameterMode ==
-                        LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
+                bb = typeExpr;
+            }
+            break;
 
-                    bb = expr;
-                }
+        case LookupResultItem::Breadcrumb::Kind::ThisExpr:
+            {
+                // We expect a `this` to always come
+                // at the start of a chain.
+                SLANG_ASSERT(bb == nullptr);
+
+                auto thisExpr = m_astBuilder->create<ThisExpr>();
+                thisExpr->loc = loc;
+                thisExpr->scope = breadcrumb->getThisExprScope();
+
+                // Lookup switches to `ThisType` after leaving a static callable or property scope,
+                // or a nested type or extension scope. For a `ThisExpr` breadcrumb, member lookup
+                // and `this` checking therefore use the same enclosing type context from the
+                // original scope. For a valid breadcrumb, `checkThisExprWithoutCapturing` cannot
+                // exhaust that scope chain and diagnose `this` outside a type declaration.
+                //
+                // Consider this HLSL example:
+                //
+                //     struct Counter
+                //     {
+                //         static const int elementCount = 4;
+                //         void replace(int[elementCount] values) {}
+                //     };
+                //
+                // Checking the parameter type currently constructs an implicit `this` before
+                // checking has attached `replace`'s receiver parameter information. We check
+                // implicit and explicit `this` expressions through the same routine. We defer
+                // lambda capture until the surrounding member expression has been constructed.
+                //
+                // TODO(tfoley): When implicit `this` denotes a receiver parameter, we should use
+                // its stored parameter information. We currently compute it during signature
+                // checking even for a static member such as `elementCount`, which needs no receiver
+                // value. Issue #13674 tracks separating visibility from accessibility so we can
+                // remove that early receiver parameter computation:
+                // https://github.com/shader-slang/slang/issues/13674
+                bb = checkThisExprWithoutCapturing(thisExpr);
+
+                // This direct helper call bypasses `CheckTerm`, which normally marks the returned
+                // expression as checked.
+                bb->checked = true;
             }
             break;
 
@@ -3598,24 +3604,31 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
     bool needDeref = false;
-    auto baseExpr = checkBaseForMemberExpr(
-        subscriptExpr->baseExpression,
-        CheckBaseContext::Subscript,
-        needDeref);
+    Expr* baseExpr = nullptr;
+    {
+        // As in `visitInvokeExpr`, an enclosing `try` covers the subscript call but not its
+        // operands.
+        OperandTryCoverageRAII operandTryCoverage(this, nullptr);
 
-    // If the base expression is a type, it means that this is an array declaration,
-    // then we should disable short-circuit in case there is logical expression in
-    // the subscript
+        baseExpr = checkBaseForMemberExpr(
+            subscriptExpr->baseExpression,
+            CheckBaseContext::Subscript,
+            needDeref);
+
+        // If the base expression is a type, it means that this is an array declaration,
+        // then we should disable short-circuit in case there is logical expression in
+        // the subscript
+        auto subVisitor = (as<TypeType>(baseExpr->type.Ptr()) && m_shouldShortCircuitLogicExpr)
+                              ? SemanticsVisitor(disableShortCircuitLogicalExpr())
+                              : *this;
+
+        for (auto& arg : subscriptExpr->indexExprs)
+        {
+            arg = subVisitor.CheckTerm(arg);
+        }
+    }
     auto baseType = baseExpr->type.Ptr();
     auto baseTypeType = as<TypeType>(baseType);
-    auto subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)
-                          ? SemanticsVisitor(disableShortCircuitLogicalExpr())
-                          : *this;
-
-    for (auto& arg : subscriptExpr->indexExprs)
-    {
-        arg = subVisitor.CheckTerm(arg);
-    }
 
     // If anything went wrong in the base expression,
     // then just move along...
@@ -4283,6 +4296,41 @@ void SemanticsVisitor::_checkAliasedOutArguments(
     }
 }
 
+void SemanticsVisitor::checkThrowingCallIsCovered(InvokeExpr* invoke)
+{
+    if (m_enclosingTryClauseType != TryClauseType::None)
+        return;
+    if (m_pendingTryCoverage)
+    {
+        m_pendingTryCoverage->add(invoke);
+        return;
+    }
+    getSink()->diagnose(Diagnostics::MustUseTryClauseToCallAThrowFunc{.invoke = invoke});
+}
+
+bool SemanticsVisitor::shouldDeferArgumentTryCoverage(InvokeExpr* expr)
+{
+    if (expr->arguments.getCount() != 1 || as<OperatorExpr>(expr))
+        return false;
+    return m_enclosingTryClauseType != TryClauseType::None || m_pendingTryCoverage;
+}
+
+void SemanticsVisitor::settlePendingTryCoverage(
+    Expr* checkedExpr,
+    List<InvokeExpr*> const& pendingCalls)
+{
+    // A call that the conversion resolved to takes the conversion's place, as `f()` does in
+    // `int(f())`, so the same `try` covers it. A call nested deeper, as in `int(f().x)`, is not
+    // covered.
+    for (auto invoke : pendingCalls)
+    {
+        if (invoke == checkedExpr)
+            checkThrowingCallIsCovered(invoke);
+        else
+            getSink()->diagnose(Diagnostics::MustUseTryClauseToCallAThrowFunc{.invoke = invoke});
+    }
+}
+
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
     auto rs = ResolveInvoke(expr);
@@ -4304,14 +4352,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
         {
             if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
-            {
-                // If the callee throws, make sure we are inside a try clause.
-                if (m_enclosingTryClauseType == TryClauseType::None)
-                {
-                    getSink()->diagnose(
-                        Diagnostics::MustUseTryClauseToCallAThrowFunc{.invoke = invoke});
-                }
-            }
+                checkThrowingCallIsCovered(invoke);
 
             auto funcDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr);
             List<DeclRef<ParamDecl>> paramDeclRefs;
@@ -5208,23 +5249,38 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         expr->originalFunctionExpr = expr->functionExpr;
     auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
     m_treatAsDifferentiableExpr = nullptr;
-    // Next check the argument expressions
-    for (auto& arg : expr->arguments)
+    // An enclosing `try` covers this call but not the calls in its operands, so we check the
+    // arguments and the callee outside it. A throwing call in the argument of a possible identity
+    // conversion waits for this call to resolve, as in `try int(f())`.
+    List<InvokeExpr*> pendingTryCoverage;
     {
-        arg = CheckExpr(arg);
+        OperandTryCoverageRAII operandTryCoverage(
+            this,
+            shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr);
+        // Next check the argument expressions
+        for (auto& arg : expr->arguments)
+        {
+            arg = CheckExpr(arg);
+        }
     }
 
     // if the expression is '&&' or '||', we will convert it
     // to use short-circuit evaluation.
     if (auto newExpr = convertToLogicOperatorExpr(expr))
+    {
+        settlePendingTryCoverage(newExpr, pendingTryCoverage);
         return newExpr;
+    }
 
     // Fast path: a builtin arithmetic/comparison/bitwise/shift/unary operator on
     // scalar/vector/matrix operands (`a + b`, `a < b`, `v * s`, `-x`, etc.; same or mixed
     // builtin type) is rewritten to a `BuiltinOperatorExpr` and skips generic operator
     // overload resolution.
     if (auto builtinOp = convertToBuiltinArithmeticOp(expr))
+    {
+        settlePendingTryCoverage(builtinOp, pendingTryCoverage);
         return builtinOp;
+    }
 
     // Check for comma operator usage and emit warning if not in for-loop side effect context
     // Skip warning in Slang 2026+ mode where parentheses create tuples
@@ -5260,7 +5316,10 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         }
     }
 
-    expr->functionExpr = CheckTerm(expr->functionExpr);
+    {
+        OperandTryCoverageRAII operandTryCoverage(this, nullptr);
+        expr->functionExpr = CheckTerm(expr->functionExpr);
+    }
 
     if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
     {
@@ -5291,7 +5350,9 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
             if (!diagnosed)
                 getSink()->diagnose(
                     Diagnostics::CallOperatorNotFound{.type = baseType, .expr = expr});
-            return CreateErrorExpr(expr);
+            auto errorExpr = CreateErrorExpr(expr);
+            settlePendingTryCoverage(errorExpr, pendingTryCoverage);
+            return errorExpr;
         }
         auto callFuncExpr = createLookupResultExpr(
             operatorName,
@@ -5315,6 +5376,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     }
 
     auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
+    settlePendingTryCoverage(checkedExpr, pendingTryCoverage);
 
     // Perform additional validation for known built-in functions.
     maybeCheckKnownBuiltinInvocation(checkedExpr);
@@ -7636,22 +7698,35 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
     if (expr->type)
         return expr;
 
-    // Check the term we are applying first
-    auto funcExpr = expr->functionExpr;
-    funcExpr = CheckTerm(funcExpr);
-
-    // Now ensure that the term represents a (proper) type.
+    // As in `visitInvokeExpr`, an enclosing `try` covers the cast but not its operand, and a
+    // throwing call in the operand waits for the cast to resolve, as in `try (int)f()`.
+    List<InvokeExpr*> pendingTryCoverage;
     TypeExp typeExp;
-    typeExp.exp = funcExpr;
-    typeExp = CheckProperType(typeExp);
+    {
+        OperandTryCoverageRAII operandTryCoverage(this, nullptr);
+
+        // Check the term we are applying first
+        auto funcExpr = expr->functionExpr;
+        funcExpr = CheckTerm(funcExpr);
+
+        // Now ensure that the term represents a (proper) type.
+        typeExp.exp = funcExpr;
+        typeExp = CheckProperType(typeExp);
+    }
 
     expr->functionExpr = typeExp.exp;
     expr->type.type = typeExp.type;
 
-    // Next check the argument expression (there should be only one)
-    for (auto& arg : expr->arguments)
     {
-        arg = CheckTerm(arg);
+        OperandTryCoverageRAII operandTryCoverage(
+            this,
+            shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr);
+
+        // Next check the argument expression (there should be only one)
+        for (auto& arg : expr->arguments)
+        {
+            arg = CheckTerm(arg);
+        }
     }
 
     if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang202cOrLater(this))
@@ -7729,6 +7804,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                             getSink()->diagnose(
                                 Diagnostics::DeprecatedStructCastFromZero{.expr = expr});
 
+                        settlePendingTryCoverage(nullptr, pendingTryCoverage);
                         return coerce(
                             CoercionSite::General,
                             typeExp.type,
@@ -7745,6 +7821,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
     // and constructor calls are semantically equivalent).
     //
     auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
+    settlePendingTryCoverage(checkedExpr, pendingTryCoverage);
 
     if (m_parentDifferentiableAttr)
     {
@@ -8434,9 +8511,9 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount)));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
 
     return swizExpr;
 }
@@ -8548,9 +8625,9 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         swizExpr->type = QualType(m_astBuilder->getTupleType(types.getArrayView()));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
     return swizExpr;
 }
 
@@ -8656,8 +8733,8 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
                 swizExpr->elementIndices.getCount())));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components.
     swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base && swizExpr->base->type &&
                                  swizExpr->base->type.isLeftValue;
 
@@ -9437,8 +9514,7 @@ Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
     return expr;
 }
 
-// Perform semantic checking of an object-oriented `this` expression.
-Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
+Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
 {
     // A `this` expression will default to immutable.
     expr->type.isLeftValue = false;
@@ -9478,12 +9554,18 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
                 //         func f(values: int[this.N]) {}
                 //     }
                 //
-                // Checking `this.N` must use the same effective-parameter computation that will
-                // publish the callable's checked information at the end of the transition. Asking
-                // the ordinary semantic query here would instead try to ensure the in-progress
-                // callable to `SignatureChecked` and report a spurious cyclic reference. Defer
-                // diagnostics to the publishing call so each invalid modifier is still reported
-                // exactly once.
+                // Checking `this.N` currently reaches this branch before the callable's checked
+                // receiver parameter information is published. The ordinary semantic query would
+                // try to ensure the in-progress callable to `SignatureChecked` and report a cyclic
+                // reference. We defer diagnostics to the publishing call so each invalid modifier
+                // is reported exactly once.
+                //
+                // TODO(tfoley): We should remove this workaround and read `ThisParamInfoAttribute`
+                // instead of recomputing receiver parameter information while checking a signature.
+                // Issue #13674 tracks deciding where a visible `this` binding is accessible, so
+                // signature checking can reject unavailable receiver uses before requiring their
+                // mode:
+                // https://github.com/shader-slang/slang/issues/13674
                 thisParamInfo = checkEffectiveThisParamInfo(
                     funcDeclBase,
                     /* shouldDiagnoseModeAttributes */ false);
@@ -9499,33 +9581,18 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
                 expr->type.isLeftValue = isThisExprWritable(
                     getDefaultDeclRef(funcDeclBase).as<CallableDecl>(),
                     *thisParamInfo);
-                if (m_parentLambdaExpr)
-                {
-                    return maybeRegisterLambdaCapture(expr);
-                }
                 return expr;
             }
         }
         else if (auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl))
         {
             expr->type.type = calcThisType(makeDeclRef(typeOrExtensionDecl));
-            if (m_parentLambdaExpr)
-            {
-                return maybeRegisterLambdaCapture(expr);
-            }
             return expr;
         }
         else if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
         {
             expr->type.type =
                 DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
-            // A `this` referenced from a lambda body must be registered as a closure
-            // capture, mirroring the AggTypeDeclBase branch above; otherwise the
-            // synthesized closure struct has no field for it (issue #12923).
-            if (m_parentLambdaExpr)
-            {
-                return maybeRegisterLambdaCapture(expr);
-            }
             return expr;
         }
 #if 0
@@ -9567,6 +9634,19 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         sink->diagnose(Diagnostics::ThisExpressionOutsideOfTypeDecl{.expr = expr});
 
     return CreateErrorExpr(expr);
+}
+
+Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
+{
+    auto checkedExpr = checkThisExprWithoutCapturing(expr);
+    if (IsErrorExpr(checkedExpr))
+        return checkedExpr;
+
+    if (m_parentLambdaExpr)
+    {
+        return maybeRegisterLambdaCapture(checkedExpr);
+    }
+    return checkedExpr;
 }
 
 Expr* SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)

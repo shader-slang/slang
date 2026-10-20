@@ -1708,6 +1708,13 @@ enum
 };
 
 
+void getMatrixLayoutAxisCounts(
+    size_t rowCount,
+    size_t columnCount,
+    MatrixLayoutMode matrixLayoutMode,
+    size_t& outLayoutMajorCount,
+    size_t& outLayoutMinorCount);
+
 /// Get layout information for a simple varying parameter type.
 ///
 /// A simple varying parameter is a scalar, vector, or matrix.

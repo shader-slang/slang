@@ -1604,17 +1604,24 @@ err(
 )
 
 err(
-    "this-param-mode-attribute-without-effective-this-param",
+    "receiver-param-mode-specifier-without-receiver-param",
     30428,
-    "attribute requires an effective `this` parameter",
-    span { loc = "attribute:Modifier", message = "attribute '~attribute' is only allowed on a declaration with an effective `this` parameter." }
+    "receiver-mode specifier requires an instance receiver",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is only allowed on an instance member that has a `this` parameter." }
 )
 
 err(
-    "this-param-mode-attribute-on-class-member",
+    "receiver-param-mode-specifier-on-class-member",
     30429,
-    "attribute cannot change a source-declared class member's effective `this` parameter",
-    span { loc = "attribute:Modifier", message = "attribute '~attribute' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value." }
+    "receiver-mode specifier is not allowed on a class member",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is not allowed on a class member; a class receiver always uses the `in` parameter-passing mode." }
+)
+
+err(
+    "cpp-style-trailing-receiver-param-const-requires-hlsl",
+    30443,
+    "trailing `const` is only allowed in the HLSL dialect",
+    span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`)." }
 )
 
 err(
@@ -4808,6 +4815,13 @@ warning(
     38040,
     "entry point parameter treated as uniform",
     span { loc = "param:Decl", message = "parameter '~param' is treated as 'uniform' because it does not have a system-value semantic." }
+)
+
+err(
+    "entry-point-param-has-reference-mode",
+    38054,
+    "entry-point parameter cannot use a reference passing mode",
+    span { loc = "param:Decl", message = "entry-point parameter '~param' cannot use the reference passing mode '~mode:ParamPassingMode', because an entry point exchanges values with the pipeline rather than with a caller's memory location" }
 )
 
 err(
