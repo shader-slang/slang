@@ -632,6 +632,24 @@ bool isRefinedInfoType(IRInst* type)
     }
 }
 
+// Returns the info for the value that an address argument refers to, or nullptr (no info) if
+// `argInfo` does not describe an address.
+//
+// An argument for an `out`, `inout`, `__constref` or `__ref` parameter is an address, so its info
+// is usually a pointer type. A `ConstantBuffer<T>` or `ParameterBlock<T>` can also be passed
+// as the address of its `T` element without first taking a pointer to it, for example as the
+// argument for a `__constref T` parameter. The info for such an argument is the parameter group
+// type itself, and its element type describes the value.
+//
+IRInst* getAddressedValueInfo(IRInst* argInfo)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(argInfo))
+        return ptrType->getValueType();
+    if (auto parameterGroupType = as<IRParameterGroupType>(argInfo))
+        return parameterGroupType->getElementType();
+    return nullptr;
+}
+
 // Create info for `type`, which is a concrete type or info that an earlier `specializeDynamicInsts`
 // run left in its place (see `isRefinedInfoType`), using `paramType` as a union mask to determine
 // how much structural decomposition to perform.
@@ -2140,12 +2158,11 @@ struct TypeFlowSpecializationContext
                         case ParameterDirectionInfo::Kind::Ref:
                             {
                                 IRBuilder builder(module);
-                                if (!argInfo)
+                                auto addressedValueInfo = getAddressedValueInfo(argInfo);
+                                if (!addressedValueInfo)
                                     break;
 
-                                auto valueInfo = matchAttributes(
-                                    as<IRPtrTypeBase>(argInfo)->getValueType(),
-                                    paramType);
+                                auto valueInfo = matchAttributes(addressedValueInfo, paramType);
                                 auto newInfo = fromDirectionAndType(
                                     &builder,
                                     paramDirection,
@@ -4758,9 +4775,16 @@ struct TypeFlowSpecializationContext
                         case ParameterDirectionInfo::Kind::BorrowInOut:
                         case ParameterDirectionInfo::Kind::BorrowIn:
                             {
+                                // `argInfo` is usually a pointer, but it can also be a
+                                // `ConstantBuffer` or `ParameterBlock` passed directly as
+                                // the address of its element (see `getAddressedValueInfo`).
+                                //
+                                auto valueInfo = getAddressedValueInfo(argInfo);
+                                if (!valueInfo)
+                                    break;
                                 IRBuilder builder(module);
                                 paramInfo = builder.getPtrTypeWithAddressSpace(
-                                    as<IRPtrTypeBase>(argInfo)->getValueType(),
+                                    (IRType*)valueInfo,
                                     as<IRPtrTypeBase>(paramType));
                                 break;
                             }
