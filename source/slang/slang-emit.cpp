@@ -85,6 +85,7 @@
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-conditional-type.h"
 #include "slang-ir-lower-coopvec.h"
+#include "slang-ir-lower-copy-logical.h"
 #include "slang-ir-lower-cpu-resource-types.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
@@ -2641,6 +2642,12 @@ Result linkAndOptimizeIR(
         lowerBufferElementTypeToStorageType,
         targetProgram,
         bufferElementTypeLoweringOptions);
+
+    // Loading a whole struct that has an int/uint/bool matrix member copies the buffer storage
+    // type into the logical type with a `CopyLogical` inst. SPIR-V has `OpCopyLogical` for it,
+    // but GLSL has no such operation, so we lower it into element-wise copies here.
+    if (target == CodeGenTarget::GLSL)
+        SLANG_PASS(lowerCopyLogical);
 
     // On SPIR-V, GLSL, WGSL and Metal, `legalizeMatrixTypes` rewrites an int/uint/bool matrix into
     // an array of row vectors, because the int/uint/bool types are not allowed as the matrix
