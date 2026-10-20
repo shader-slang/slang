@@ -225,3 +225,12 @@ void traceMotionReorderExecute()
 
     outputBuffer[DispatchRaysIndex().x] = payload.color;
 }
+
+// Repeated after the last positive match so the GLSL exclusions cover the whole output.
+// GLSLTRACE-NOT: reorderThreadEXT
+// GLSLTRACE-NOT: hitObjectExecuteShaderEXT
+// GLSLREORDERHINT-NOT: reorderThreadEXT
+// GLSLREORDERHINT-NOT: hitObjectExecuteShaderEXT
+// GLSLNV-NOT: ReorderExecuteEXT
+// GLSLNVREORDER-NOT: ReorderExecuteEXT
+// GLSLNVMOTION-NOT: ReorderExecuteEXT
