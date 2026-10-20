@@ -20669,7 +20669,7 @@ $}
                 {
                 case hlsl: __intrinsic_asm "($0)[$1] = $2";
                 case glsl: __intrinsic_asm "imageStore($0, int($1), $V2)";
-                case metal: __intrinsic_asm "$0.write($2, $1)";
+                case metal: __metalImageStore(this, index, newValue);
                 case spirv: spirv_asm {
                         OpImageWrite $this $index __convertTexel(newValue);
                     };
