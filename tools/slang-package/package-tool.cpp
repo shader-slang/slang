@@ -47,11 +47,10 @@ static void _printHelp(bool experimental = false)
         "  unpin <name>      Clear a pin. An edit stays on its branch.\n"
         "  edit <name> --branch <branch> [--create]\n"
         "                    Check out a branch of a solved dependency.\n"
-        "  edit <name> --advance\n"
-        "                    Move an edit's stored version to the latest canonical tag on that\n"
-        "                    branch. Intermediate tags are not separate steps.\n"
-        "  unedit <name> [--restore | --advance | --tag <version>] [--clean]\n"
-        "                    End an edit on a release tag. There is no --yes.\n"
+        "  unedit <name> [--abort | --tag <version>]\n"
+        "                    End an edit. Without an option the edit must have no changes.\n"
+        "                    --abort returns to the release the edit started from. --tag\n"
+        "                    releases the checked-out commit. There is no --yes.\n"
         "  fetch [--clean] [--yes] [--skip-validate] [--remap-urls <url>]\n"
         "                    Install the lock. Missing lock runs update. --clean discards "
         "checkout state.\n"
@@ -2122,7 +2121,7 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
         }
 
         // An edit is supposed to move ahead of the release it represents. That commit is what
-        // `unedit --restore` returns to, not the commit status should demand HEAD sit on.
+        // `unedit --abort` returns to, not the commit status should demand HEAD sit on.
         if (isEditedLockedPackage(package))
         {
             String branch;
@@ -3480,7 +3479,7 @@ SlangResult executeInDirectory(
     {
         if (argc < 3)
         {
-            outError = "edit requires a package name and --branch <branch>, or --advance.";
+            outError = "edit requires a package name and --branch <branch>.";
             return SLANG_FAIL;
         }
         String name = argv[2];
@@ -3491,7 +3490,6 @@ SlangResult executeInDirectory(
         }
         String branch;
         bool create = false;
-        bool advance = false;
         for (int i = 3; i < argc; ++i)
         {
             String flag = argv[i];
@@ -3499,22 +3497,11 @@ SlangResult executeInDirectory(
                 branch = argv[++i];
             else if (flag == "--create")
                 create = true;
-            else if (flag == "--advance")
-                advance = true;
             else
             {
                 outError = String("Unknown edit option: ") + flag;
                 return SLANG_FAIL;
             }
-        }
-        if (advance)
-        {
-            if (branch.getLength() || create)
-            {
-                outError = "edit --advance cannot be combined with --branch or --create.";
-                return SLANG_FAIL;
-            }
-            return advancePackageEdit(projectRoot, name, outError);
         }
         if (!branch.getLength())
         {
@@ -3537,39 +3524,16 @@ SlangResult executeInDirectory(
             return SLANG_FAIL;
         }
         UneditMode mode = UneditMode::Plain;
-        bool clean = false;
         String tagVersion;
         for (int i = 3; i < argc; ++i)
         {
             String flag = argv[i];
-            if (flag == "--clean")
-                clean = true;
-            else if (flag == "--advance")
-            {
-                if (mode != UneditMode::Plain)
-                {
-                    outError = "unedit accepts only one of --advance, --restore, and --tag.";
-                    return SLANG_FAIL;
-                }
-                mode = UneditMode::Advance;
-            }
-            else if (flag == "--restore")
-            {
-                if (mode != UneditMode::Plain)
-                {
-                    outError = "unedit accepts only one of --advance, --restore, and --tag.";
-                    return SLANG_FAIL;
-                }
-                mode = UneditMode::Restore;
-            }
+            UneditMode flagMode = UneditMode::Plain;
+            if (flag == "--abort")
+                flagMode = UneditMode::Abort;
             else if (flag == "--tag" && i + 1 < argc)
             {
-                if (mode != UneditMode::Plain)
-                {
-                    outError = "unedit accepts only one of --advance, --restore, and --tag.";
-                    return SLANG_FAIL;
-                }
-                mode = UneditMode::Tag;
+                flagMode = UneditMode::Tag;
                 tagVersion = argv[++i];
             }
             else
@@ -3577,8 +3541,14 @@ SlangResult executeInDirectory(
                 outError = String("Unknown unedit option: ") + flag;
                 return SLANG_FAIL;
             }
+            if (mode != UneditMode::Plain)
+            {
+                outError = "unedit accepts only one of --abort and --tag.";
+                return SLANG_FAIL;
+            }
+            mode = flagMode;
         }
-        return endPackageEdit(projectRoot, name, mode, tagVersion, clean, outError);
+        return endPackageEdit(projectRoot, name, mode, tagVersion, outError);
     }
     if (command == "tag")
     {

@@ -10,12 +10,15 @@ namespace PackageTool
 enum class UneditMode
 {
     Plain,
-    Advance,
-    Restore,
+    Abort,
     Tag,
 };
 
 /// Set the lock pin. A version is required when `name` is not edited, and rejected when it is.
+///
+/// Pinning a version rewrites only that row; the next `update` reconciles the rest of the lock.
+/// When that `update` would change other packages because of the pin, or fail, the command says so
+/// and asks first.
 SlangResult pinLockedPackage(
     const String& projectRoot,
     const String& name,
@@ -30,7 +33,8 @@ SlangResult unpinLockedPackage(const String& projectRoot, const String& name, St
 ///
 /// Without `create`, `branch` must already exist. With `create`, a missing branch is created at
 /// the commit the lock currently records, and an existing branch is checked out without being
-/// reset. The row keeps its version and its pin flag, and replaces the commit with the branch.
+/// reset. The row keeps its version, tag, commit, and pin flag, and records the branch beside them.
+/// The rest of the lock is not resolved; the next `update` reads the edited working tree.
 SlangResult beginPackageEdit(
     const String& projectRoot,
     const String& name,
@@ -38,21 +42,18 @@ SlangResult beginPackageEdit(
     bool create,
     String& outError);
 
-/// Move an edit's stored version to the latest canonical tag on its edit line.
+/// End an edit on a release row without resolving the rest of the lock.
 ///
-/// The line runs from the branch tip back to the represented commit. When several newer tags on
-/// that line satisfy the constraints, this stores the greatest one, not the next tag after the
-/// represented version. The checkout is not moved. When no such tag exists, the row is left
-/// unchanged.
-SlangResult advancePackageEdit(const String& projectRoot, const String& name, String& outError);
-
-/// End an edit on a release row. Declining a prompt leaves the edit in place.
+/// `Plain` is accepted only when the edit has no commits and no uncommitted files, so ending it
+/// cannot lose work. `Abort` returns the checkout to the release the edit started from; it refuses
+/// uncommitted files and leaves branch commits on the branch. `Tag` creates `tagVersion` on the
+/// checked-out commit after warning, and asking, when a later `update` would not keep it.
+/// Declining a prompt leaves the edit in place. The next `update` reconciles the other rows.
 SlangResult endPackageEdit(
     const String& projectRoot,
     const String& name,
     UneditMode mode,
     const String& tagVersion,
-    bool clean,
     String& outError);
 
 } // namespace PackageTool

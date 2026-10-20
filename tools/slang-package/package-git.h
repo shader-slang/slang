@@ -193,9 +193,6 @@ SlangResult checkoutDetachedCommit(
     const String& commit,
     String& outError);
 
-/// Discard uncommitted files, untracked files, and stashes. Commits are left in place.
-SlangResult discardUncommittedState(const String& repositoryPath, String& outError);
-
 /// Create an annotated tag at `HEAD`. The tag is local and is not pushed.
 SlangResult createAnnotatedTag(const String& repositoryPath, const String& tag, String& outError);
 

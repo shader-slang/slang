@@ -2005,23 +2005,6 @@ SlangResult checkoutDetachedCommit(
     return _runGit(repositoryPath, arguments, result, outError);
 }
 
-SlangResult discardUncommittedState(const String& repositoryPath, String& outError)
-{
-    ExecuteResult result;
-    List<String> arguments;
-    arguments.add("reset");
-    arguments.add("--hard");
-    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
-    arguments.clear();
-    arguments.add("clean");
-    arguments.add("-fd");
-    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
-    arguments.clear();
-    arguments.add("stash");
-    arguments.add("clear");
-    return _runGit(repositoryPath, arguments, result, outError);
-}
-
 SlangResult createAnnotatedTag(const String& repositoryPath, const String& tag, String& outError)
 {
     List<String> arguments;

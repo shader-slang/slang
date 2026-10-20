@@ -171,9 +171,7 @@ component must fit in 32 bits. At most 32 components are accepted, counted befor
 are removed. `schema_version` in `slang-package.json` is only the file format version.
 A release row records the Git URL, canonical tag, exact version, and commit.
 An edit row records the Git URL, branch, and the version, canonical tag, and commit of the release
-that branch is representing. `edit <name> --advance` moves that version, tag, and commit together. `pinned`
-is a boolean on the row and is
-omitted when it is false.
+that branch started from. `pinned` is a boolean on the row and is omitted when it is false.
 
 The optional top-level `retractions` array is publisher advice not to select releases matching a
 version constraint. Each entry requires `version` and a non-empty `reason`. To retract a published
@@ -394,8 +392,9 @@ and resolves from the manifest URLs again. `fetch --remap-urls URL` sets the sam
 `fetch` without the option installs the locked URLs and does not read the index. These add and
 remove commands change only `slang-package.json` until
 `update` also rewrites the lock; inspect
-`status` and run `update` afterward. `slang package pin NAME VERSION` holds a solved release at
-that exact version, and `slang package unpin NAME` clears that hold. The boolean lives in the lock,
+`status` and run `update` afterward. `slang package pin NAME VERSION` holds the dependency at
+that exact release, checking it out and rewriting only its row, and asks first when the next
+`update` would change other packages because of it. `slang package unpin NAME` clears that hold. The boolean lives in the lock,
 not the manifest. `slang package tree` prints
 the selected lock graph, while
 `slang package why NAME` prints every current root-to-package path and incoming requirement. Why
@@ -429,41 +428,28 @@ Fetched source remains visible there; generated files go under `out/`.
 `slang package edit NAME --branch BRANCH` checks out `BRANCH` in the already-resolved
 `deps/NAME` checkout. `--create` creates a missing branch from the commit the dependency is
 resolved to and does not reset a branch that already exists. The lock keeps the version, tag, and
-commit it already had, and records the branch beside them. The pin boolean is unchanged.
-`edit NAME --advance` moves that version, tag, and commit, in one step, to the greatest canonical
-tag on the line of history from the branch tip back to the commit the row is representing. A tag
-between the represented release and that latest tag is not a separate step. The tag must still
-satisfy incoming constraints. The checkout does not move. `--advance` cannot be combined with
-`--branch` or `--create`. The package name stays the first argument, so a dependency named
-`advance` is edited with `edit advance --branch BRANCH`.
+commit it already had, and records the branch beside them. The pin boolean is unchanged. `edit`
+does not resolve the lock; the next `update` reads the edited working tree.
 
-`slang package unedit NAME` ends the edit on a release tag. `--advance`, `--restore`, and
-`--tag VERSION` select one ending and cannot be combined. There is no `--yes`. Declining a prompt
-leaves the edit. A run without a terminal that needs approval fails and leaves the edit. None of
-the endings changes the pin boolean.
+`slang package unedit NAME` ends the edit and rewrites only that row; it never discards work and
+does not resolve the rest of the lock. None of the endings changes the pin boolean.
 
-Plain `unedit` selects the greatest canonical tag on that same line that is strictly newer than
-the represented release and that still satisfies incoming constraints. When that tag is the
-checked-out commit, the lock switches to it without a prompt and without moving `HEAD`. When the
-tag is behind `HEAD`, the command says how many commits would leave the workspace and asks whether
-to check out the tag. Declining does not fall through to the represented release. When no newer
-tag satisfies the constraints, the only ending offered is the release the edit is already
-representing, and that still asks. `--advance` requires a newer legal tag. `--restore` returns to
-that same represented release, including after `edit NAME --advance`, and always asks.
-`--tag VERSION` creates a local annotated tag, `v` plus the canonical spelling, on `HEAD` and then
-selects it. The tag is not pushed. The command fails before creating the tag when the release
-already has a tag, the version is not strictly greater than the stored version and every canonical
-tag already on the edit line, or the version does not satisfy the constraints.
+- `--tag VERSION` creates a local annotated tag, `v` plus the canonical spelling, on `HEAD` and
+  ends the edit on it. The tag is not pushed. The command fails before creating the tag when the
+  release already has a tag, or the version is not strictly greater than the stored version and
+  every canonical tag between the edit's starting commit and `HEAD`. When a later `update` would
+  not keep the new tag, the command says what `update` would do and why, and asks first. There is
+  no `--yes`; declining, or running without a terminal, leaves the edit.
+- `--abort` returns to the release the edit started from. Commits stay on the branch, and
+  uncommitted or untracked files block it.
+- With neither option, the edit must have no changes.
 
-`--clean` discards uncommitted files, untracked files, and stashes so `HEAD` may move. It does not
-approve dropping commits that follow a tag. A dirty checkout blocks any ending that would move
-`HEAD` until those changes are committed or `--clean` is passed.
+See the [command reference](source-package-command-reference#unedit) for the messages.
 
-`slang package pin NAME VERSION` sets the lock boolean and stores that exact release when the
-dependency is not edited. The version must satisfy incoming constraints, and a canonical tag must
-exist. `pin NAME` while the dependency is edited sets the boolean only. `unpin NAME` clears the
-boolean and works during an edit. The branch stays. `update` will not move a pinned version.
-`edit NAME --advance` and `unedit` can, and they leave the boolean set.
+`slang package pin NAME VERSION` holds a release that is not edited; `pin NAME` during an edit
+makes the release the edit ends on stay held. `unpin NAME` clears the hold. A pin is local to the
+workspace and is not a version constraint. See
+[How pins work](source-package-command-reference#how-pins-work).
 
 A non-empty `slang-package-overlay.json` is an error. An edit changes the branch of `deps/NAME`.
 It does not change where the package lives.

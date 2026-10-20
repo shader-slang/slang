@@ -1615,6 +1615,33 @@ SLANG_UNIT_TEST(PackageToolUneditRejectsConflictingOptions)
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(refArguments), refArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown unedit option")) >= 0);
+
+    for (const char* removed : {"--advance", "--restore", "--clean"})
+    {
+        const char* removedArguments[] = {"slang-package", "unedit", "noise", removed};
+        SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+            temp.path,
+            SLANG_COUNT_OF(removedArguments),
+            removedArguments,
+            error)));
+        SLANG_CHECK(
+            error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown unedit option")) >= 0);
+    }
+    const char* editAdvanceArguments[] = {"slang-package", "edit", "noise", "--advance"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(editAdvanceArguments),
+        editAdvanceArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown edit option")) >= 0);
+    const char* bothEndingsArguments[] =
+        {"slang-package", "unedit", "noise", "--abort", "--tag", "1.1"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(bothEndingsArguments),
+        bothEndingsArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("only one of")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolUpdateRejectsBundleCaseConflict)
@@ -3386,29 +3413,27 @@ SLANG_UNIT_TEST(PackageToolUneditTagKeepsPinAndWarnsWhenUpdateWouldMove)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(project, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
 
-    // An edit whose solve fails leaves no branch behind. Here the root range no longer admits the
-    // locked release, so the edit is rejected after `--create` made the branch.
+    // `edit` records the branch without resolving the lock, so it succeeds even when the root
+    // range no longer admits the locked release; the next `update` reports that.
     String checkout = Path::combine(Path::combine(project, "deps"), "noise");
+    String lockPath = Path::combine(project, kLockFileName);
     String lockedCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, lockedCommit, error)));
     root.dependencies[0].version = ">=2.0.0";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
     const char* editArguments[] =
         {"slang-package", "edit", "noise", "--branch", "work", "--create"};
-    SLANG_CHECK(SLANG_FAILED(
-        executeInDirectory(project, SLANG_COUNT_OF(editArguments), editArguments, error)));
-    bool branchExists = true;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(localBranchExists(checkout, "work", branchExists, error)));
-    SLANG_CHECK(!branchExists);
-    String headAfterFailedEdit;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, headAfterFailedEdit, error)));
-    SLANG_CHECK(headAfterFailedEdit == lockedCommit);
-    root.dependencies[0].version = ">=1.0.0";
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
-
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(project, SLANG_COUNT_OF(editArguments), editArguments, error)));
+    PackageTool::LockFile lock;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, lock, error)));
+    Index editIndex = findLockedPackageIndex(lock, "noise");
+    SLANG_CHECK_ABORT(editIndex >= 0);
+    SLANG_CHECK(lock.packages[editIndex].branch == "work");
+    SLANG_CHECK(lock.packages[editIndex].version == "1");
+    SLANG_CHECK(lock.packages[editIndex].commit == lockedCommit);
+    root.dependencies[0].version = ">=1.0.0";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGitArguments(
         checkout,
         {"config", "user.email", "package-test@example.com"},
@@ -3421,13 +3446,26 @@ SLANG_UNIT_TEST(PackageToolUneditTagKeepsPinAndWarnsWhenUpdateWouldMove)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_runPackageGitArguments(checkout, {"commit", "-q", "-m", "fix"}, error)));
 
+    // Ending an edit without a release never loses work. A plain unedit refuses an edit with
+    // commits, and `--abort` refuses uncommitted files.
+    const char* plainArguments[] = {"slang-package", "unedit", "noise"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(project, SLANG_COUNT_OF(plainArguments), plainArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has changes since v1")) >= 0);
+    String scratchPath = Path::combine(checkout, "scratch.txt");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(scratchPath, "unsaved\n")));
+    const char* abortArguments[] = {"slang-package", "unedit", "noise", "--abort"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(project, SLANG_COUNT_OF(abortArguments), abortArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("uncommitted changes")) >= 0);
+    SLANG_CHECK(File::exists(scratchPath));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::remove(scratchPath)));
+
     // With no greater release anywhere, `update` would keep the new release, so an unpinned
     // unedit lands without a prompt. The solver has to see the release before its tag exists.
-    String lockPath = Path::combine(project, kLockFileName);
     const char* firstTagArguments[] = {"slang-package", "unedit", "noise", "--tag", "1.2"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(project, SLANG_COUNT_OF(firstTagArguments), firstTagArguments, error)));
-    PackageTool::LockFile lock;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, lock, error)));
     Index firstIndex = findLockedPackageIndex(lock, "noise");
     SLANG_CHECK_ABORT(firstIndex >= 0);
@@ -3487,6 +3525,108 @@ SLANG_UNIT_TEST(PackageToolUneditTagKeepsPinAndWarnsWhenUpdateWouldMove)
     SLANG_CHECK(released.version == "1.4");
     SLANG_CHECK(released.ref == "v1.4");
     SLANG_CHECK(released.commit == workCommit);
+
+    // `--abort` returns to the release the edit started from and leaves the branch's commits on
+    // the branch. The pin is unchanged.
+    const char* abandonEditArguments[] =
+        {"slang-package", "edit", "noise", "--branch", "abandoned", "--create"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        project,
+        SLANG_COUNT_OF(abandonEditArguments),
+        abandonEditArguments,
+        error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(checkout, "abandoned.txt"), "not released\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGitArguments(checkout, {"add", "."}, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _runPackageGitArguments(checkout, {"commit", "-q", "-m", "abandoned"}, error)));
+    String abandonedCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, abandonedCommit, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(project, SLANG_COUNT_OF(abortArguments), abortArguments, error)));
+    String headAfterAbort;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, headAfterAbort, error)));
+    SLANG_CHECK(headAfterAbort == workCommit);
+    String abandonedTip;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        resolveLocalRevision(checkout, "refs/heads/abandoned", abandonedTip, error)));
+    SLANG_CHECK(abandonedTip == abandonedCommit);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, lock, error)));
+    Index abortedIndex = findLockedPackageIndex(lock, "noise");
+    SLANG_CHECK_ABORT(abortedIndex >= 0);
+    SLANG_CHECK(!lock.packages[abortedIndex].branch.getLength());
+    SLANG_CHECK(lock.packages[abortedIndex].pinned);
+    SLANG_CHECK(lock.packages[abortedIndex].commit == workCommit);
+
+    // A plain unedit is accepted when the edit changed nothing.
+    const char* idleEditArguments[] =
+        {"slang-package", "edit", "noise", "--branch", "idle", "--create"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(project, SLANG_COUNT_OF(idleEditArguments), idleEditArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(project, SLANG_COUNT_OF(plainArguments), plainArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, lock, error)));
+    Index idleIndex = findLockedPackageIndex(lock, "noise");
+    SLANG_CHECK_ABORT(idleIndex >= 0);
+    SLANG_CHECK(!lock.packages[idleIndex].branch.getLength());
+    SLANG_CHECK(lock.packages[idleIndex].commit == workCommit);
+
+    // `pin NAME VERSION` asks first when the next `update` would fail because of the pin. Here
+    // the root range rejects 1.2, so the pin needs confirmation and the lock is unchanged.
+    root.dependencies[0].version = ">=1.3.0";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+    const char* pinVersionArguments[] = {"slang-package", "pin", "noise", "1.2"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        project,
+        SLANG_COUNT_OF(pinVersionArguments),
+        pinVersionArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires confirmation")) >= 0);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, lock, error)));
+    Index refusedPinIndex = findLockedPackageIndex(lock, "noise");
+    SLANG_CHECK_ABORT(refusedPinIndex >= 0);
+    SLANG_CHECK(lock.packages[refusedPinIndex].ref == "v1.4");
+
+    // With no impact on other packages, there is no prompt. Uncommitted files still block the
+    // pin, because it checks out the pinned commit.
+    root.dependencies[0].version = ">=1.0.0";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(scratchPath, "unsaved\n")));
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        project,
+        SLANG_COUNT_OF(pinVersionArguments),
+        pinVersionArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("uncommitted changes")) >= 0);
+    SLANG_CHECK(File::exists(scratchPath));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::remove(scratchPath)));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        project,
+        SLANG_COUNT_OF(pinVersionArguments),
+        pinVersionArguments,
+        error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, lock, error)));
+    Index pinnedIndex = findLockedPackageIndex(lock, "noise");
+    SLANG_CHECK_ABORT(pinnedIndex >= 0);
+    SLANG_CHECK(lock.packages[pinnedIndex].ref == "v1.2");
+    SLANG_CHECK(lock.packages[pinnedIndex].pinned);
+    String headAfterPin;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, headAfterPin, error)));
+    SLANG_CHECK(headAfterPin == lock.packages[pinnedIndex].commit);
+
+    // A missing checkout is created at the pinned commit.
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGitArguments(
+        packageRepositoryPath(project, origin),
+        {"worktree", "remove", "--force", checkout.getBuffer()},
+        error)));
+    SLANG_CHECK(!File::exists(checkout));
+    const char* pinNewerArguments[] = {"slang-package", "pin", "noise", "1.4"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(project, SLANG_COUNT_OF(pinNewerArguments), pinNewerArguments, error)));
+    String headAfterRecreate;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, headAfterRecreate, error)));
+    SLANG_CHECK(headAfterRecreate == workCommit);
 }
 
 SLANG_UNIT_TEST(PackageValidateRejectsEscapingPathDependency)

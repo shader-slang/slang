@@ -177,9 +177,8 @@ inline String getWorkspaceOutputDirectory(const Manifest& manifest)
 /// - Git pin: `git`, `ref`, `version`, and `commit` are set; `path` is empty. Fetch materializes
 ///   `workspace.dependencies/<name>` at that commit. `ref` is the canonical tag for `version`.
 /// - Edit: `branch`, `ref`, `version`, and `commit` are set. The checkout is expected to be on
-///   `branch`. `version`, `ref`, and `commit` are the release the solver is matching. `edit
-///   advance` moves all three together. `unedit --restore` returns to that same commit. `fetch`
-///   does not check it out.
+///   `branch`. `version`, `ref`, and `commit` are the release the edit started from. `unedit
+///   --abort` returns to that same commit. `fetch` does not check it out.
 ///
 /// `pinned` is a lock boolean. While it is set, `update` does not move a release row's version.
 /// `edit` and `unedit` leave the boolean as they found it. A `path` field is rejected when a lock

@@ -229,13 +229,16 @@ slang package pin <name>
 
 Set the pin boolean on a lock row. The boolean lives in `slang-package-lock.json`, not in
 `slang-package.json`. The manifest range is left as it was. `update` will not move a pinned
-version. `edit` and `unedit` leave the boolean as they found it. `edit <name> --advance` and an
-ending of `unedit` can move the version and leave the boolean set.
+version. `edit` and `unedit` leave the boolean as they found it. `unedit --tag` moves the version
+to the new release and leaves the boolean set.
 
 Not edited
-: `<version>` is required. It is an exact dotted version. The command resolves the canonical tag
-for that release, such as `v1.2` for `1.2` or `1.2.0`, stores that version and the tag's commit,
-and sets the boolean. The version has to satisfy every incoming constraint.
+: `<version>` is required. It is an exact dotted version. The command finds the canonical tag for
+that release, such as `v1.2` for `1.2` or `1.2.0`, stores that version and the tag's commit, and
+sets the boolean. It checks out that commit in `deps/<name>`, creating the checkout if it is
+missing, so the workspace builds what the lock names. Uncommitted or untracked files block the
+command until they are committed or stashed. Only that row is rewritten; the next `update`
+reconciles the rest of the lock.
 
 Edited
 : `pin <name>` sets the boolean and leaves the version and the branch alone.
@@ -244,8 +247,65 @@ The command fails and leaves the row unchanged when:
 
 - `<version>` is omitted and the dependency is not edited;
 - `<version>` is passed while the dependency is edited;
-- the version does not satisfy every incoming constraint;
-- no canonical tag exists for that release.
+- no canonical tag exists for that release;
+- `deps/<name>` has uncommitted changes, or cannot be moved without discarding work.
+
+Before writing a version, the command solves the workspace the way `update` would, once as it is
+and once with the pin, without writing anything. When the pin changes nothing else, there is no
+message. Otherwise it prints one warning and asks `Pin 'noise' at v1.2?`. Answering no, or running
+without a terminal, leaves the row unchanged. The warning lists each other package the pin would
+move, add, or remove, followed by the reason when the solver recorded one:
+
+```text
+slang-package: warning: after this pin, 'slang package update' would change other packages:
+  select 'grain' v1.2 (...) instead of v1.3 (...)
+```
+
+When a requirement rejects the pinned version, or the pin leaves no solution, the warning says
+`update` would fail and shows the conflict:
+
+```text
+slang-package: warning: after this pin, 'slang package update' would fail:
+Locked version 1.2 of package 'noise' does not satisfy >=1.3.0 required by project.
+```
+
+When the workspace fails to resolve even without the pin, the warning says so instead.
+
+### How pins work
+
+A pin is a decision recorded by this workspace: this lock row holds this release on purpose, and
+`update` must not replace it with a newer one. It is a hold, not a version constraint. It does not
+widen or narrow any range, and every incoming requirement still has to accept the pinned version.
+When a manifest range changes so that it excludes a pinned version, `update` fails and names the
+requirement rather than moving the pin. Unpin it, or pin a release the range accepts.
+
+A pin stays in this workspace. It is stored only in `slang-package-lock.json`, and a package's
+consumers do not read its lock, so pinning a dependency of a library does not change what that
+library's consumers resolve. To limit what consumers can select, change the `version` range in
+`slang-package.json`.
+
+When `--remap-urls` points a pinned dependency at another remote, the pin keeps its version and
+takes that version's canonical tag on the new remote. The remap fails when that tag is missing.
+
+During an edit, the pin does not freeze anything. The workspace reads the edited working tree
+wherever the branch is. What the boolean decides is what happens after the edit ends. Every
+`unedit` ending lands the row on one release and leaves the boolean as it was, so a pinned row
+stays pinned on that release and an unpinned row is free for the next `update` to replace.
+
+Consider `color-encoding` resolved at `v1`, and `v1.1` on another branch of its repository:
+
+```sh
+slang package edit color-encoding --branch fix --create
+# Commit a fix on 'fix' in deps/color-encoding.
+slang package pin color-encoding
+slang package unedit color-encoding --tag 1.0.1
+```
+
+The row ends at `1.0.1`, tag `v1.0.1`, still pinned, and `update` leaves it there. The command
+prints `Pin on 'color-encoding' moved from v1 (...) to v1.0.1 (...)`. Without the `pin`, the row
+still lands at `1.0.1`, but the next `update` would select `v1.1`, the greater release. `unedit
+--tag` warns about that before creating the tag and asks whether to go ahead. `unedit --abort`
+keeps the pin the same way, on the release the edit started from.
 
 ## `unpin`
 
@@ -257,8 +317,18 @@ slang package unpin <name>
 
 ### Description
 
-Clear the pin boolean. This works during an edit. The branch stays checked out. After `unedit`,
-the next `update` may select a different tag.
+Clear the pin boolean on a lock row. Nothing else changes: the version, tag, and commit stay as
+they are, the manifest is not touched, `deps/<name>` is not touched, and nothing is resolved. The
+next `update` treats the row like any other unpinned row and may select a newer release that every
+requirement accepts. Until then, `fetch` keeps installing the locked commit.
+
+During an edit, `unpin` leaves the branch checked out and only changes what happens after the edit
+ends: the release the edit lands on is no longer held. `unedit --tag` then predicts whether a later
+`update` would keep the new tag, and asks first if it would not. See
+[How pins work](#how-pins-work).
+
+The command fails when `<name>` has no lock row. Unpinning a row that is not pinned succeeds and
+changes nothing.
 
 ## `edit`
 
@@ -267,7 +337,6 @@ the next `update` may select a different tag.
 ```text
 slang package edit <name> --branch <branch>
 slang package edit <name> --branch <branch> --create
-slang package edit <name> --advance
 ```
 
 ### Description
@@ -275,139 +344,110 @@ slang package edit <name> --advance
 `edit` applies to a dependency that is already resolved. The lock row keeps the version, tag, and
 commit it already had, and records the branch beside them. The pin boolean is unchanged. Editing a
 pinned dependency starts the branch at the pinned commit. Editing a dependency that is not pinned
-does not set the boolean. `fetch` does not check out the represented commit.
+does not set the boolean. `edit` does not resolve the lock; the next `update` reads the edited
+working tree and solves whatever its manifest depends on. `fetch` does not check out the
+represented commit.
 
 ### Options
 
 `--branch <branch>`
 : Check out `<branch>` in `deps/<name>`. The branch must already exist unless `--create` is also
-given. Required, except with `--advance`.
+given. Required.
 
 `--create`
 : Create a missing branch from the commit the dependency is resolved to. Requires `--branch`.
 Does not reset a branch that already exists.
-
-`--advance`
-: Replace the represented release with the greatest newer canonical tag on one line of history,
-as described below. Cannot be combined with `--branch` or `--create`. The package name is the
-first argument, so a dependency named `advance` is edited with `edit advance --branch <branch>`.
-`update` does not run this, and it does not change an edited checkout.
-
-### Advancing the represented release
-
-`edit <name> --advance` looks for canonical release tags from the branch tip back to the commit of
-the release the row is representing. At a merge, a parent that does not contain that commit is
-skipped. When more than one parent contains it, the walk takes the first parent.
-
-Consider a branch created at the `v1.2` commit, then updated by merging `main`:
-
-```text
-v1.2 -- fix -- M (tip)
-         \    /
-          v1.4
-```
-
-`M` lists `fix` as its first parent and the `v1.4` commit as its second. Both parents contain the
-`v1.2` commit, so the ancestor test does not separate them. Parent order does: the walk takes
-`fix` and never visits `v1.4`. A tag created on `fix` after `v1.2` is the one `--advance` can
-adopt. The same merge performed the other way around, with `main` checked out, would record
-`v1.4` as the first parent, and the walk would see `v1.4` on its way back to `v1.2`. The result
-follows whichever line was current at the merge.
-
-One `edit <name> --advance`:
-
-- replaces the version, the tag, and the commit with the greatest canonical tag on that walk that
-  is newer than the stored version and that still satisfies incoming constraints;
-- when `v1.3` and `v1.4` are both on the line, makes the row `1.4`, rather than stopping at the
-  next tag;
-- leaves the branch checked out and does not move the checkout.
-
-When no such tag exists, or the walk never visits that commit, the command says so and leaves the
-row unchanged.
 
 ## `unedit`
 
 ### Synopsis
 
 ```text
-slang package unedit <name> [--restore | --advance | --tag <version>] [--clean]
+slang package unedit <name>
+slang package unedit <name> --abort
+slang package unedit <name> --tag <version>
 ```
 
 ### Description
 
-End an edit on a release row: a version and a commit. None of the endings changes the pin boolean.
-An ending that needs approval asks. There is no `--yes`. Declining a prompt leaves the edit. A run
-without a terminal fails and leaves the edit.
+End an edit on a release row: a version, a tag, and a commit. `unedit` never discards work, and it
+rewrites only the edited row. It does not resolve the rest of the lock; run `update` afterwards
+when you want the other rows reconciled with the release the edit ended on. None of the endings
+changes the pin boolean.
 
-The command looks for a canonical release tag on the same line of history
-[`edit --advance`](#advancing-the-represented-release) uses. The candidate is the greatest such tag
-that is strictly newer than the represented release and that still satisfies the dependency
-constraints. A tag that arrived only through a merge of some other line is not a candidate.
+With no option, the edit must have no changes: the branch tip is the commit the edit started from,
+and there are no uncommitted or untracked files. The row returns to that release. Otherwise the
+command fails and names the two endings:
 
-With no ending flag, the command picks one of these outcomes:
-
-Checked-out commit is that newer tag
-: The lock switches to that version and commit. The checkout does not move, and there is no prompt.
-
-Newer tag is behind `HEAD`
-: The command tells how many commits would leave the workspace and asks whether to check out the
-tag. Approving writes that version and that tag's commit. Declining does not fall through to the
-older release.
-
-A newer tag exists and none satisfy the constraints
-: The command says which tag was rejected and why, then offers only the release the edit is already
-representing.
-
-No newer satisfying tag
-: The only ending is that same release. That requires approval even when the checkout is already on
-that commit.
+```text
+'noise' has changes since v1.2. Run 'slang package unedit noise --tag <version>' to release them,
+or '--abort' to return to v1.2.
+```
 
 ### Options
 
-`--advance`, `--restore`, and `--tag` select one ending and cannot be combined.
+`--abort` and `--tag` cannot be combined.
 
-`--advance`
-: Select the newer tag. Fail when no newer tag on that line satisfies the constraints. Ask only
-when the checkout would move.
-
-`--restore`
-: Check out the version and commit the edit is representing. After `edit <name> --advance`, that is
-the commit just advanced to. A newer legal tag is named and then left unused. This always asks.
+`--abort`
+: Check out the release the edit started from and return the row to it. Commits on the branch stay
+on the branch, which is not deleted, and the command says how many it kept. Uncommitted or
+untracked files block the command until they are committed or stashed. Stashes are left alone.
 
 `--tag <version>`
-: Create a local annotated tag on the checked-out commit, then select it the way `--advance` does
-without moving `HEAD`. `<version>` is an exact dotted version. The tag name is `v` plus the
-canonical spelling, so `1.4.0` creates `v1.4`. The package must pass the same publishability
-checks as [`validate <name>`](#named-package-validation), and the checkout must have no
-uncommitted changes, because the tag names `HEAD`. The tag is not pushed. Origin tags are fetched
-into `refs/slang-cache/tags` first. The command fails before creating the tag when:
+: Create a local annotated tag on the checked-out commit and end the edit on it, without moving
+`HEAD`. `<version>` is an exact dotted version. The tag name is `v` plus the canonical spelling,
+so `1.4.0` creates `v1.4`. The package must pass the same publishability checks as
+[`validate <name>`](#named-package-validation), and the checkout must have no uncommitted
+changes, because the tag names `HEAD`. The tag is not pushed. Origin tags are fetched into
+`refs/slang-cache/tags` first. The command fails before creating the tag when:
 
     - the package is not suitable for sharing, or the checkout has uncommitted changes;
     - the release already has a tag, including one fetched from the remote;
     - a fetched tag of that name points at a different object than `refs/tags`;
     - the version is not strictly greater than the version stored on the edit;
-    - the version is not strictly greater than every canonical tag already on the edit line;
-    - the version does not satisfy the constraints.
+    - the version is not strictly greater than every canonical tag between the commit the edit
+      started from and `HEAD`.
 
-    A dependency that was pinned before the edit is pinned at the new tag. A dependency that was
-    not pinned is checked against the release a later `update` would select. When `update` would
-    move it off the new tag, the command prints why and asks for confirmation. The reasons are:
+### Predicting the next `update`
 
-    - a greater release satisfies every constraint;
-    - another package's requirement rejects the new version; or
-    - the new version conflicts with the newest releases of the other packages.
+Before `unedit --tag` creates the tag, it solves the workspace the way `update` would, with the new
+release treated as published and the row's pin as it is. Nothing is written by that solve. When
+`update` would keep the new tag, there is no prompt. Otherwise the command prints one warning and
+asks `Create v1.4 and end the edit?`. Answering yes creates the tag and ends the edit on it.
+Answering no, or running without a terminal, changes nothing and leaves the edit in place. There is
+no `--yes`.
 
-    The command also solves the graph as `update` would with the dependency pinned at the new
-    tag. When that solve succeeds, the warning suggests running `slang package pin <name>` and
-    repeating `unedit --tag`. When it fails, the warning shows the conflict instead, since a pin
-    would leave `update` unable to resolve. These checks treat the new release as published
-    without creating its tag. The tag is created only after you confirm, so declining leaves the
-    repository and the edit unchanged.
+The warning says what `update` would do and lists the reasons:
 
-`--clean`
-: Discard uncommitted files, untracked files, and stashes so `HEAD` may move. It does not approve
-dropping commits that follow a tag. Apply it only for an ending that would move `HEAD`. A dirty
-checkout blocks that move until the changes are committed or `--clean` is passed.
+```text
+slang-package: warning: after this unedit, 'slang package update' would move 'noise' from v1.4 to v1.5 (...):
+  v1.5 is a greater release that every requirement accepts.
+```
+
+Consider `grain`, which requires `noise >=1, <2`, and `unedit noise --tag 2`. An unpinned row
+would move back to an accepted release, and the reason names the requirement:
+
+```text
+slang-package: warning: after this unedit, 'slang package update' would move 'noise' from v2 to v1.2 (...):
+  2 rejected by grain@1.0: >=1, <2
+```
+
+When no release works, which is always the case for a pinned row that a requirement rejects, the
+warning says `update` would fail and shows the conflict. A conflict reached through the new
+release's own requirements, such as `noise` 1.4 requiring `hash >=2` while `color-encoding`
+requires `hash <2`, is reported the same way. When the workspace fails to resolve even without the
+new release, the warning says `'slang package update' already fails without v1.4` instead.
+
+After the edit ends, the command prints what changed:
+
+```text
+Created tag v1.4 at def456... in deps/noise.
+Pin on 'noise' moved from v1.2 (abc123...) to v1.4 (def456...).
+```
+
+An unpinned row prints `Package 'noise' is a release at 1.4 (def456...), was 1.2 (abc123...).`
+When the new release requires a package the lock does not contain, the command names it; `fetch`
+fails until `update` adds it.
 
 ## `fetch`
 
@@ -838,53 +878,12 @@ Confirmation can cover:
 - checkout state discarded by `--clean`;
 - commits or tags that are not on a remote, before a separate Git repository that holds them is
   deleted;
-- existing tags or origin-tracking branches in a separate `deps/` Git repository that would move; and
-- an `unedit` ending that would leave the branch or move `HEAD`. `unedit` has no `--yes`.
+- existing tags or origin-tracking branches in a separate `deps/` Git repository that would move;
+- `unedit --tag` when the next `update` would not keep the new tag; and
+- `pin <name> <version>` when the next `update` would change other packages because of the pin, or
+  fail.
 
-## Files
-
-`slang-package.json`
-: Committed package intent: package identity, exports, licenses, dependency constraints,
-retractions, workspace policy, toolchain requirements, and build settings. Dependency Git URLs
-stay as published. A remap does not rewrite them.
-
-`slang-package-lock.json`
-: Committed exact selected graph. Optional `remap_index` is the `http` or `https` package index
-`update` reads on later resolves. `pinned` is recorded only when the boolean is set.
-
-    A release row records:
-
-    - `git`
-    - `ref` — the resolved canonical tag
-    - `commit`
-    - `version`
-
-    An edit row records those fields plus `branch`. The tag and commit are the release the branch
-    is representing. That row is not something to commit.
-
-`slang-package-overlay.json`
-: Must not contain entries. `init` lists the name in `.gitignore`.
-
-`slang-package-includes.txt`
-: Gitignored generated list of absolute dependency export directories. `fetch` and `update`
-regenerate it.
-
-`.slang/repositories/`
-: One permanent bare Git repository for each exact package URL. The directory name is the URL's
-repository name plus an 8-character hash of that URL. Published branches are `refs/remotes/origin/*`.
-Published tags are fetched into `refs/slang-cache/tags/*` and copied to `refs/tags/*` when that
-name does not already point at a different object. A disagreement is left in place and fails the
-command. `deps/` checkouts are worktrees of these repositories and see both namespaces. Online
-resolution updates them; offline resolution requires them. The resolver reads release tags from
-`refs/tags`.
-
-`deps/`
-: Default materialization directory for locked Git checkouts. The path is configured by
-`workspace.dependencies`.
-
-`out/`
-: Default output directory for source bundles and documentation. The path is configured by
-`workspace.output`. `bundle` refreshes `out/docs`.
+`unedit` and `pin` have no `--yes`.
 
 ## Exit status
 
@@ -978,3 +977,56 @@ root.
 
 `--binary` must immediately follow `run`. It executes the native artifact under `out/host/` from
 the last `build`, including an executable primary nested below the export root.
+
+## Files
+
+Each file holds one kind of information, and the kinds do not overlap. Intent is written by
+people and published with the package. Decisions belong to one workspace and are committed there
+but never published. Everything else is a cache or a derived copy that the tool can rebuild,
+except for work you create inside a dependency checkout.
+
+`slang-package.json` (intent)
+: What this package is and what it accepts: its name, exports, licenses, the dependencies it needs
+and the version ranges it allows, releases it retracts, toolchain requirements, and build
+settings. You write it and commit it, and it ships with every release, so consumers read it. Its
+workspace settings, such as exclusions and the `deps/` and `out/` paths, apply only when this
+package is the root of the workspace. Dependency Git URLs stay as published; a remap does not
+rewrite them.
+
+`slang-package-lock.json` (decisions)
+: What this workspace selected: one row per package in the graph, with the Git URL, version,
+canonical tag (`ref`), and commit. A row may also record that the selection was made on purpose
+(`pinned`, see [How pins work](#how-pins-work)) or that the package is being edited (`branch`).
+`remap_index` records a package index whose URLs replace the published ones. `update`, `pin`,
+`unpin`, `edit`, and `unedit` write it. Commit it so every clone builds the same graph. Consumers
+never read it, so nothing in it constrains them. An edit row describes local work in progress and
+is not something to commit; end the edit first.
+
+`.slang/repositories/` (cache)
+: One Git repository per exact package URL, holding the history the tool has downloaded. Published
+tags arrive in `refs/slang-cache/tags/*` and are copied to `refs/tags/*` when that name does not
+already point at a different object; a disagreement is left in place and fails the command. The
+resolver reads release tags from `refs/tags`. Offline commands require these repositories; online
+commands refresh them. The checkouts in `deps/` share these repositories, so branches, commits, and
+tags you create in a checkout are stored here too.
+
+`deps/` (working copies)
+: One checkout per locked package, at the commit the lock names, or on the branch an edit records.
+A checkout that is not edited should hold nothing of its own: `fetch` and `update` create it or move
+it to the locked commit, and refuse, without `--clean`, when it has changes. Make changes on an
+edit branch instead. The path is configured by `workspace.dependencies`.
+
+`slang-package-includes.txt` (derived)
+: The absolute export directories of the materialized graph, for compiler sessions that consume
+it. `fetch` and `update` regenerate it; do not edit it.
+
+`out/` (derived)
+: Source bundles, documentation, and experimental build output. `bundle` and `build` regenerate
+it. The path is configured by `workspace.output`.
+
+`slang-package-overlay.json`
+: Reserved. A file with entries is an error.
+
+`init` adds `.slang/`, `deps/`, `out/`, `slang-package-includes.txt`, and
+`slang-package-overlay.json` to `.gitignore`. Because `.slang/repositories/` holds the commits and
+tags you create in an edited checkout, push them before deleting `.slang/`.

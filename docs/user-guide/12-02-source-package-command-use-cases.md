@@ -124,29 +124,29 @@ dependencies that manifest declares. `fetch` leaves the edit alone. `status` lis
 `validate` rejects the application while the edit is open. `validate color-encoding` checks that
 package on its own.
 
-`edit color-encoding --advance` moves the represented release forward to the greatest canonical
-tag on the line of history from the branch tip back to the commit the row is representing. The
-files at `HEAD` stay put. Use this after you have merged or rebased onto a newer published
-release and want the lock to say which release the branch now contains.
-
-`pin color-encoding` during the edit sets the boolean only. `unpin` clears it. `update` will not
-move a pinned version onto a newer tag.
+`pin color-encoding` during the edit does not freeze the branch. It makes the release the edit
+ends on stay held, so a later `update` does not replace it with a newer tag. `unpin` clears it. See
+[How pins work](source-package-command-reference#how-pins-work).
 
 When the fix should become the locked release, end the edit:
 
 ```sh
-slang package unedit color-encoding
+slang package unedit color-encoding --tag 1.2
 ```
 
-Plain `unedit` selects the greatest newer canonical tag on that line that still satisfies
-incoming constraints. `--restore` returns to the release the edit started from. `--advance`
-checks out a newer legal tag. `--tag 1.2` creates a local annotated tag `v1.2` on the current
-commit and selects it; you push that tag yourself. These endings cannot be combined. Dropping
-commits asks, and declining leaves the edit. `--clean` discards uncommitted files so the checkout
-may move.
+`--tag 1.2` creates a local annotated tag `v1.2` on the current commit and ends the edit on it;
+you push that tag yourself. Before creating it, the command predicts what the next `update` would
+do. If `update` would select another release, for example a greater tag on another branch or an
+older one because some requirement rejects `1.2`, the command prints why and asks before going
+ahead. `unedit` rewrites only this row, so run `update` afterwards to reconcile the rest of the
+lock.
 
-Push the branch when you want it on a remote. After `unedit` selects a tag you have pushed,
-commit the application's lock.
+To drop the fix instead, `unedit color-encoding --abort` returns to the release the edit started
+from. The commits stay on `luma-fix`, and uncommitted files block it. Plain `unedit` is accepted
+only when the edit has no changes.
+
+Push the branch when you want it on a remote. After you push the tag, commit the application's
+lock.
 
 ## Journey 5: a consumed package adds a dependency
 

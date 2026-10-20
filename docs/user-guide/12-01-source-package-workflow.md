@@ -220,27 +220,21 @@ commands inside `deps/color-encoding`. `fetch` and `update` do not move an edite
 exists. Bare `validate` still rejects the workspace while any dependency is edited. The includes
 file points at the edited tree; do not commit it.
 
-`edit color-encoding --advance` moves the represented release up to the greatest canonical tag on
-the line of history from the branch tip back to the commit the row is representing. The checkout
-stays where it is. When no such tag exists, the row is unchanged.
+`pin` and `unpin` set or clear the lock boolean. `update` will not move a pinned version. During an
+edit, the pin decides whether the release the edit ends on is held afterwards; see
+[How pins work](source-package-command-reference#how-pins-work).
 
-`pin` and `unpin` set or clear the lock boolean. During an edit, `pin NAME` sets only that
-boolean. `update` will not move a pinned version. `edit --advance` and `unedit` can, and they
-leave the boolean set.
+`unedit` ends the edit on a release and never discards work:
 
-`unedit` ends the edit on a release tag. These endings cannot be combined:
+- `unedit color-encoding --tag 1.2` creates a local annotated tag `v1.2` on `HEAD` and ends the
+  edit on it. The tag is not pushed. When a later `update` would not keep `v1.2`, the command says
+  why and asks first.
+- `unedit color-encoding --abort` returns to the release the edit started from. Commits stay on
+  `luma-fix`; uncommitted files block it.
+- Plain `unedit color-encoding` is accepted only when the edit has no changes.
 
-- plain `unedit color-encoding` selects the greatest newer canonical tag on that line that still
-  satisfies incoming constraints;
-- `--advance` requires a newer legal tag and checks it out;
-- `--restore` returns to the release the edit is representing;
-- `--tag 1.2` creates a local annotated tag `v1.2` on `HEAD` and selects it. The tag is not
-  pushed.
-
-An ending that would drop commits asks. Declining leaves the edit. `--clean`
-discards uncommitted files so `HEAD` may move; it does not approve dropping commits. The full
-choice of tag is in the
-[command reference](source-package-command-reference#unedit).
+`unedit` does not resolve the rest of the lock. Run `update` afterwards to reconcile it. The
+details are in the [command reference](source-package-command-reference#unedit).
 
 Push `luma-fix` yourself when you want it on a remote. After `unedit`, commit the resulting
 release row if it should be what the next clone fetches.
