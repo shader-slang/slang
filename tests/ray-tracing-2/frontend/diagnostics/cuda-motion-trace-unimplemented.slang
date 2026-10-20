@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -target cuda -whole-program
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -target cuda -whole-program -DTEST_NO_PAYLOAD
+//DIAGNOSTIC_TEST:SIMPLE(diag=PAYLOAD): -experimental-feature -target cuda -whole-program
+//DIAGNOSTIC_TEST:SIMPLE(diag=NO_PAYLOAD): -experimental-feature -target cuda -whole-program -DTEST_NO_PAYLOAD
 
 import slang.raytracing;
 
@@ -7,6 +7,8 @@ import slang.raytracing;
 // entry point or requiring a concrete descriptor's target layout. This lets the pending CUDA
 // motion branch report its own assertion. Check each overload independently: the no-payload
 // wrapper must forward to the same implementation instead of silently doing nothing.
+// The packaged library reports these errors without source locations, so each message check
+// is placed beside the call that reaches the assertion.
 #ifdef TEST_NO_PAYLOAD
 [require(cuda, structural_raytracing_trace)]
 export void traceWithoutPayload<Schema : rt::ITraceProgramSchema>(
@@ -17,6 +19,8 @@ export void traceWithoutPayload<Schema : rt::ITraceProgramSchema>(
 {
     rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program);
+//NO_PAYLOAD: error E41400
+//NO_PAYLOAD: CUDA structural ray-tracing motion is not implemented
 }
 #else
 [require(cuda, structural_raytracing_trace)]
@@ -29,8 +33,7 @@ export void traceWithPayload<Schema : rt::ITraceProgramSchema, Payload>(
 {
     rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
+//PAYLOAD: error E41400
+//PAYLOAD: CUDA structural ray-tracing motion is not implemented
 }
 #endif
-
-// The packaged module does not retain the assertion message.
-// CHECK: error[E41400]: static assertion failed

@@ -1,11 +1,10 @@
 //TEST:SIMPLE: -experimental-feature -entry main -stage compute -target hlsl -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CODEGEN): -experimental-feature -entry main -stage compute -target hlsl
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CODEGEN): -experimental-feature -entry main -stage compute -target glsl
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CODEGEN): -experimental-feature -entry main -stage compute -target spirv
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CODEGEN): -experimental-feature -entry main -stage compute -target cuda
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CODEGEN): -experimental-feature -entry main -stage compute -target metal
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CODEGEN): -experimental-feature -entry main -stage compute -target hlsl -minimum-slang-optimization
-//CODEGEN: structural ray-tracing program descriptor must be lowered before target code generation
+//DIAGNOSTIC_TEST:SIMPLE(diag=CODEGEN): -experimental-feature -entry main -stage compute -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CODEGEN): -experimental-feature -entry main -stage compute -target glsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CODEGEN): -experimental-feature -entry main -stage compute -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CODEGEN): -experimental-feature -entry main -stage compute -target cuda
+//DIAGNOSTIC_TEST:SIMPLE(diag=CODEGEN): -experimental-feature -entry main -stage compute -target metal
+//DIAGNOSTIC_TEST:SIMPLE(diag=CODEGEN): -experimental-feature -entry main -stage compute -target hlsl -minimum-slang-optimization
 
 import slang.raytracing;
 
@@ -43,4 +42,8 @@ void main()
     // remains a value handle, so ordinary generic code may copy one supplied by host binding.
     rt::TraceProgramDescriptor<Schema> copy = identity(descriptor);
     copy = identity(bindings.descriptor);
+/*CODEGEN:
+                   ^ structural ray-tracing program descriptor must be lowered before target code generation
+                   ^ target adapter lowering must choose the descriptor's physical representation
+*/
 }

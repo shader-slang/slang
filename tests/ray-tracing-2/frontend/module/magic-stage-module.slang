@@ -4,7 +4,7 @@
 //TEST:COMPILE: tests/ray-tracing-2/frontend/module/magic_stage_secondary_library.slang -experimental-feature -o tests/ray-tracing-2/frontend/module/magic-second-stage-cache.slang-module
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -r tests/ray-tracing-2/frontend/module/magic-first-stage-cache.slang-module -r tests/ray-tracing-2/frontend/module/magic-second-stage-cache.slang-module -entry FirstMiss<Payload> -dump-ir -no-codegen
 //TEST:SIMPLE: -experimental-feature -r tests/ray-tracing-2/frontend/module/magic-first-stage-cache.slang-module -r tests/ray-tracing-2/frontend/module/magic-second-stage-cache.slang-module -entry SecondMiss -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CODEGEN): -experimental-feature -r tests/ray-tracing-2/frontend/module/magic-first-stage-cache.slang-module -r tests/ray-tracing-2/frontend/module/magic-second-stage-cache.slang-module -entry FirstMiss<Payload> -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CODEGEN): -experimental-feature -r tests/ray-tracing-2/frontend/module/magic-first-stage-cache.slang-module -r tests/ray-tracing-2/frontend/module/magic-second-stage-cache.slang-module -entry FirstMiss<Payload> -target hlsl
 
 import slang.raytracing;
 import magic_stage_library;
@@ -41,6 +41,10 @@ struct FirstMiss<P> : first::IBackgroundStage
 {
     typealias Context = FirstContext<P>;
     static void invoke(in rt::MissInput<Context> input) {}
+/*CODEGEN:
+                ^^^^^^ structural ray-tracing entry point was not lowered
+                ^^^^^^ structural ray-tracing entry point 'FirstMiss.invoke' must be converted to a native adapter before target code generation
+*/
 }
 
 struct SecondContext : rt::IPayloadContext
@@ -55,5 +59,3 @@ struct SecondMiss : second::IBackgroundStage
     typealias Context = SecondContext;
     static void invoke(in rt::MissInput<Context> input) {}
 }
-
-// CODEGEN: structural ray-tracing entry point 'FirstMiss.invoke' must be converted to a native adapter before target code generation

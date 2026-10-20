@@ -57,6 +57,11 @@
 // lines are ignored. The caret position directly indicates the column in the
 // preceding source line.
 //
+// Annotations for different test runs may appear together after the same source
+// line. For example, adjacent /*METAL: ... */ and /*HLSL: ... */ blocks both
+// refer to the source line before the first block. Inactive prefixes are skipped
+// when locating the source line, for both line and block annotations.
+//
 // POSITION-BASED vs SUBSTRING MATCHING
 // -------------------------------------
 //

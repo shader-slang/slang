@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -target metal -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -target metal -no-codegen
 
 import slang.raytracing;
 
@@ -35,39 +35,75 @@ struct MultiLevelContext : rt::IHitContext
 void checkPortableClosestHit(rt::ClosestHitInput<PortableContext> input)
 {
     let limit = input.maxInstanceCount;
-//CHECK-DAG: 'maxInstanceCount' is not a member of 'rt.ClosestHitInput<PortableContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^^^^ 'maxInstanceCount' is not a member of 'rt.ClosestHitInput<PortableContext>'.
+*/
     let count = input.instanceCount;
-//CHECK-DAG: 'instanceCount' is not a member of 'rt.ClosestHitInput<PortableContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^ 'instanceCount' is not a member of 'rt.ClosestHitInput<PortableContext>'.
+*/
     let index = input.getInstanceIndex(0);
-//CHECK-DAG: 'getInstanceIndex' is not a member of 'rt.ClosestHitInput<PortableContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^^^^ 'getInstanceIndex' is not a member of 'rt.ClosestHitInput<PortableContext>'.
+*/
     let id = input.getInstanceID(0);
-//CHECK-DAG: 'getInstanceID' is not a member of 'rt.ClosestHitInput<PortableContext>'.
+/*CHECK:
+                   ^^^^^^^^^^^^^ member not found
+                   ^^^^^^^^^^^^^ 'getInstanceID' is not a member of 'rt.ClosestHitInput<PortableContext>'.
+*/
 }
 
 [require(structural_raytracing_anyhit)]
 void checkPortableAnyHit(rt::AnyHitInput<PortableContext> input)
 {
     let limit = input.maxInstanceCount;
-//CHECK-DAG: 'maxInstanceCount' is not a member of 'rt.AnyHitInput<PortableContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^^^^ 'maxInstanceCount' is not a member of 'rt.AnyHitInput<PortableContext>'.
+*/
     let count = input.instanceCount;
-//CHECK-DAG: 'instanceCount' is not a member of 'rt.AnyHitInput<PortableContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^ 'instanceCount' is not a member of 'rt.AnyHitInput<PortableContext>'.
+*/
     let index = input.getInstanceIndex(0);
-//CHECK-DAG: 'getInstanceIndex' is not a member of 'rt.AnyHitInput<PortableContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^^^^ 'getInstanceIndex' is not a member of 'rt.AnyHitInput<PortableContext>'.
+*/
     let id = input.getInstanceID(0);
-//CHECK-DAG: 'getInstanceID' is not a member of 'rt.AnyHitInput<PortableContext>'.
+/*CHECK:
+                   ^^^^^^^^^^^^^ member not found
+                   ^^^^^^^^^^^^^ 'getInstanceID' is not a member of 'rt.AnyHitInput<PortableContext>'.
+*/
 }
 
 [require(structural_raytracing_intersection)]
 void checkPortableIntersection(rt::IntersectionInput<PortableContext> input)
 {
     let limit = input.maxInstanceCount;
-//CHECK-DAG: 'maxInstanceCount' is not a member of 'rt.IntersectionInput<PortableContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^^^^ 'maxInstanceCount' is not a member of 'rt.IntersectionInput<PortableContext>'.
+*/
     let count = input.instanceCount;
-//CHECK-DAG: 'instanceCount' is not a member of 'rt.IntersectionInput<PortableContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^ 'instanceCount' is not a member of 'rt.IntersectionInput<PortableContext>'.
+*/
     let index = input.getInstanceIndex(0);
-//CHECK-DAG: 'getInstanceIndex' is not a member of 'rt.IntersectionInput<PortableContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^^^^ 'getInstanceIndex' is not a member of 'rt.IntersectionInput<PortableContext>'.
+*/
     let id = input.getInstanceID(0);
-//CHECK-DAG: 'getInstanceID' is not a member of 'rt.IntersectionInput<PortableContext>'.
+/*CHECK:
+                   ^^^^^^^^^^^^^ member not found
+                   ^^^^^^^^^^^^^ 'getInstanceID' is not a member of 'rt.IntersectionInput<PortableContext>'.
+*/
 }
 
 // No instance level is silently selected for the existing scalar properties.
@@ -75,9 +111,15 @@ void checkPortableIntersection(rt::IntersectionInput<PortableContext> input)
 void checkMultiLevelScalars(rt::ClosestHitInput<MultiLevelContext> input)
 {
     let index = input.instanceIndex;
-//CHECK-DAG: 'instanceIndex' is not a member of 'rt.ClosestHitInput<MultiLevelContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^ 'instanceIndex' is not a member of 'rt.ClosestHitInput<MultiLevelContext>'.
+*/
     let id = input.instanceID;
-//CHECK-DAG: 'instanceID' is not a member of 'rt.ClosestHitInput<MultiLevelContext>'.
+/*CHECK:
+                   ^^^^^^^^^^ member not found
+                   ^^^^^^^^^^ 'instanceID' is not a member of 'rt.ClosestHitInput<MultiLevelContext>'.
+*/
 }
 
 // A miss has no hit path, even when its trace context uses multilevel traversal.
@@ -85,15 +127,30 @@ void checkMultiLevelScalars(rt::ClosestHitInput<MultiLevelContext> input)
 void checkMiss(rt::MissInput<MultiLevelContext> input)
 {
     let limit = input.maxInstanceCount;
-//CHECK-DAG: 'maxInstanceCount' is not a member of 'rt.MissInput<MultiLevelContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^^^^ 'maxInstanceCount' is not a member of 'rt.MissInput<MultiLevelContext>'.
+*/
     let count = input.instanceCount;
-//CHECK-DAG: 'instanceCount' is not a member of 'rt.MissInput<MultiLevelContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^ 'instanceCount' is not a member of 'rt.MissInput<MultiLevelContext>'.
+*/
     let index = input.getInstanceIndex(0);
-//CHECK-DAG: 'getInstanceIndex' is not a member of 'rt.MissInput<MultiLevelContext>'.
+/*CHECK:
+                      ^^^^^^^^^^^^^^^^ member not found
+                      ^^^^^^^^^^^^^^^^ 'getInstanceIndex' is not a member of 'rt.MissInput<MultiLevelContext>'.
+*/
     let id = input.getInstanceID(0);
-//CHECK-DAG: 'getInstanceID' is not a member of 'rt.MissInput<MultiLevelContext>'.
+/*CHECK:
+                   ^^^^^^^^^^^^^ member not found
+                   ^^^^^^^^^^^^^ 'getInstanceID' is not a member of 'rt.MissInput<MultiLevelContext>'.
+*/
 }
 
 // The extension-selection marker is an implementation detail, not another application protocol.
 struct FakeMultiLevel : rt::IMultiLevelAccelerationStructure {}
-//CHECK-DAG: 'IMultiLevelAccelerationStructure' is not accessible from the current context.
+/*CHECK:
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ declaration not accessible
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 'IMultiLevelAccelerationStructure' is not accessible from the current context.
+*/

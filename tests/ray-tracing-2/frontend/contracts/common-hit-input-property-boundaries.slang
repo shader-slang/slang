@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
 
 import slang.raytracing;
 
@@ -27,9 +27,15 @@ struct Intersection : rt::IIntersectionShader
     static void invoke(in rt::IntersectionInput<Context> input)
     {
         let distance = input.distance;
-//CHECK-DAG: 'distance' is not a member of 'rt.IntersectionInput<HitContext>'.
+/*CHECK:
+                             ^^^^^^^^ member not found
+                             ^^^^^^^^ 'distance' is not a member of 'rt.IntersectionInput<HitContext>'.
+*/
         let hitKind = input.hitKind;
-//CHECK-DAG: 'hitKind' is not a member of 'rt.IntersectionInput<HitContext>'.
+/*CHECK:
+                            ^^^^^^^ member not found
+                            ^^^^^^^ 'hitKind' is not a member of 'rt.IntersectionInput<HitContext>'.
+*/
     }
 }
 
@@ -42,14 +48,26 @@ struct Miss : rt::IMissShader
     static void invoke(in rt::MissInput<Context> input)
     {
         let primitiveIndex = input.primitiveIndex;
-//CHECK-DAG: 'primitiveIndex' is not a member of 'rt.MissInput<HitContext>'.
+/*CHECK:
+                                   ^^^^^^^^^^^^^^ member not found
+                                   ^^^^^^^^^^^^^^ 'primitiveIndex' is not a member of 'rt.MissInput<HitContext>'.
+*/
         let objectToWorld = input.objectToWorld;
-//CHECK-DAG: 'objectToWorld' is not a member of 'rt.MissInput<HitContext>'.
+/*CHECK:
+                                  ^^^^^^^^^^^^^ member not found
+                                  ^^^^^^^^^^^^^ 'objectToWorld' is not a member of 'rt.MissInput<HitContext>'.
+*/
         let worldToObject = input.worldToObject;
-//CHECK-DAG: 'worldToObject' is not a member of 'rt.MissInput<HitContext>'.
+/*CHECK:
+                                  ^^^^^^^^^^^^^ member not found
+                                  ^^^^^^^^^^^^^ 'worldToObject' is not a member of 'rt.MissInput<HitContext>'.
+*/
     }
 }
 
 // Sharing implementations must not create an erased public runtime stage-view interface.
 struct FakeCommonHitInput : rt::ICommonHitInput {}
-//CHECK-DAG: 'ICommonHitInput' is not accessible from the current context.
+/*CHECK:
+                                ^^^^^^^^^^^^^^^ declaration not accessible
+                                ^^^^^^^^^^^^^^^ 'ICommonHitInput' is not accessible from the current context.
+*/

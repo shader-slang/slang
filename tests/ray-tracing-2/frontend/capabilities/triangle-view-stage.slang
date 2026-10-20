@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry main -target metal -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -experimental-feature -entry main -target metal -no-codegen
 
 import slang.raytracing;
 
@@ -8,10 +8,11 @@ RWStructuredBuffer<uint> output;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main()
+/*CHECK:
+     ^^^^ unavailable features in entry point
+     ^^^^ 'compute' stage
+*/
 {
     rt::TriangleData attributes = {};
     output[0] = uint(attributes.frontFacing);
 }
-
-//CHECK: unavailable features in entry point
-//CHECK: 'compute' stage

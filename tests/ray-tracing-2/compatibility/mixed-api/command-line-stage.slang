@@ -1,10 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry legacyMiss -stage miss -no-codegen
 //TEST:COMPILE: tests/ray-tracing-2/compatibility/mixed-api/command-line-stage.slang -experimental-feature -o tests/ray-tracing-2/compatibility/mixed-api/command-line-stage-cache.slang-module
-//DIAGNOSTIC_TEST:SIMPLE_EX(filecheck=SERIALIZED): -experimental-feature tests/ray-tracing-2/compatibility/mixed-api/command-line-stage-cache.slang-module -entry legacyMiss -stage miss -no-codegen
-
-// The module is serialized without source locations; check its diagnostic text instead.
-//SERIALIZED: error[E38057]: cannot mix legacy and structural ray-tracing APIs in one module
-//SERIALIZED: note: the same module also uses the structural API
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=SERIALIZED): -experimental-feature tests/ray-tracing-2/compatibility/mixed-api/command-line-stage-cache.slang-module -entry legacyMiss -stage miss -no-codegen
 
 import slang.raytracing;
 
@@ -25,6 +21,8 @@ struct StructuralMiss : rt::IMissShader
 /*CHECK:
        ^^^^^^^^^^^^^^ the same module also uses the structural API
 */
+// The serialized module has no source locations, so its expectations have no carets.
+//SERIALIZED: the same module also uses the structural API
 {
     typealias Context = MissContext;
     static void invoke(in rt::MissInput<Context> input) {}
@@ -38,3 +36,5 @@ void legacyMiss() {}
      ^^^^^^^^^^ cannot mix legacy and structural ray-tracing APIs in one module
      ^^^^^^^^^^ this declaration uses the legacy API
 */
+//SERIALIZED: cannot mix legacy and structural ray-tracing APIs in one module
+//SERIALIZED: this declaration uses the legacy API

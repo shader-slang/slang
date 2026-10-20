@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry Miss -target metal -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry Miss -target metal -no-codegen
 
 import slang.raytracing;
 
@@ -36,6 +36,9 @@ struct Miss : rt::IMissShader
         // A compiler-provided stage input may be read by this stage. It cannot become mutable
         // payload storage merely because trace infers its type as an ordinary generic argument.
         tracer.trace({}, scene, program, input);
-        // CHECK: ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be used as a generic type argument
+/*CHECK:
+               ^^^^^ ray-tracing stage input cannot be used as a generic type argument
+               ^^^^^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be used as a generic type argument
+*/
     }
 }

@@ -1,12 +1,12 @@
 //TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry main -stage compute -dump-ir -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=OPTIONAL_ALIAS): -experimental-feature -DTEST_OPTIONAL_ALIAS -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=OPTIONAL_STRUCT): -experimental-feature -DTEST_OPTIONAL_STRUCT -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=STATIC): -experimental-feature -DTEST_STATIC -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=OPTIONAL_ALIAS): -experimental-feature -DTEST_OPTIONAL_ALIAS -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=OPTIONAL_STRUCT): -experimental-feature -DTEST_OPTIONAL_STRUCT -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -experimental-feature -DTEST_STATIC -no-codegen
 //TEST:COMPILE: tests/ray-tracing-2/frontend/module/descriptor_library.slang -experimental-feature -o tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module
 //TEST:SIMPLE(filecheck=CHECK): -experimental-feature -r tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module -entry main -stage compute -dump-ir -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=OPTIONAL_ALIAS): -experimental-feature -r tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module -DTEST_OPTIONAL_ALIAS -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=OPTIONAL_STRUCT): -experimental-feature -r tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module -DTEST_OPTIONAL_STRUCT -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=STATIC): -experimental-feature -r tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module -DTEST_STATIC -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=OPTIONAL_ALIAS): -experimental-feature -r tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module -DTEST_OPTIONAL_ALIAS -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=OPTIONAL_STRUCT): -experimental-feature -r tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module -DTEST_OPTIONAL_STRUCT -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -experimental-feature -r tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module -DTEST_STATIC -no-codegen
 //TEST:SIMPLE_EX(filecheck=CHECK): -experimental-feature -lang glsl tests/ray-tracing-2/frontend/module/intrinsic-descriptor.slang -r tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module -entry main -stage compute -dump-ir -no-codegen
 
 import slang.raytracing;
@@ -59,14 +59,23 @@ struct Bindings
 
 #if defined(TEST_OPTIONAL_ALIAS)
 Optional<Descriptor> optionalDescriptor;
-// OPTIONAL_ALIAS: 'Optional<T>' cannot wrap a resource or opaque type
+/*OPTIONAL_ALIAS:
+^^^^^^^^ 'Optional<T>' cannot wrap a resource or opaque type
+^^^^^^^^ 'rt.TraceProgramDescriptor<Schema>' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'.
+*/
 #elif defined(TEST_OPTIONAL_STRUCT)
 Optional<Bindings> optionalBindings;
-// OPTIONAL_STRUCT: 'Optional<T>' cannot wrap a resource or opaque type
+/*OPTIONAL_STRUCT:
+^^^^^^^^ 'Optional<T>' cannot wrap a resource or opaque type
+^^^^^^^^ 'Bindings' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'.
+*/
 #elif defined(TEST_STATIC)
 static Descriptor staticDescriptor;
-// STATIC: global variable cannot have opaque type
-// STATIC: do you intend to define a `uniform` parameter instead?
+/*STATIC:
+                  ^^^^^^^^^^^^^^^^ global variable cannot have opaque type
+                  ^^^^^^^^^^^^^^^^ global variable cannot have opaque type.
+                  ^^^^^^^^^^^^^^^^ do you intend to define a `uniform` parameter instead?
+*/
 #endif
 
 // Descriptor parameters use host bindings without an explicit uniform modifier, through either

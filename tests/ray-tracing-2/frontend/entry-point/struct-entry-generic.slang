@@ -1,6 +1,4 @@
 //TEST:SIMPLE: -experimental-feature -entry M<P> -stage miss -no-codegen
-//TEST:SIMPLE(filecheck=WARNING): -experimental-feature -entry ValueMiss<1.5> -stage miss -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR): -experimental-feature -entry ValueMiss<1.5> -stage miss -no-codegen -warnings-as-errors all
 
 import slang.raytracing;
 
@@ -28,10 +26,11 @@ struct M<PayloadType> : rt::IMissShader
     static void invoke(in rt::MissInput<Context> input) {}
 }
 
-// The `ValueMiss<1.5>` commands pass a float to the integer parameter `N` below. This conversion
-// must produce a warning, or an error with `-warnings-as-errors all`. The diagnostic comes from
-// the command-line entry-point name, so it has no source-file location to check with a caret.
+// These commands pass 1.5 to the integer parameter N. The diagnostic comes from the command
+// line, so keep each locationless expectation beside the command that produces it.
+//TEST:SIMPLE(filecheck=WARNING): -experimental-feature -entry ValueMiss<1.5> -stage miss -no-codegen
 //WARNING: warning[E30081]: implicit conversion not recommended
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR): -experimental-feature -entry ValueMiss<1.5> -stage miss -no-codegen -warnings-as-errors all
 //ERROR: error[E30081]: implicit conversion not recommended
 struct ValueMiss<let N : int> : rt::IMissShader
 {

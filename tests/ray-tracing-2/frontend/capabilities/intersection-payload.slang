@@ -1,8 +1,8 @@
 //TEST:SIMPLE: -experimental-feature -entry AccessPayload -stage intersection -target cuda -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry AccessPayload -stage intersection -target metal -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=UNSUPPORTED): -experimental-feature -entry AccessPayload -stage intersection -target hlsl -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=UNSUPPORTED): -experimental-feature -entry AccessPayload -stage intersection -target glsl -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=UNSUPPORTED): -experimental-feature -entry AccessPayload -stage intersection -target spirv -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED,non-exhaustive): -experimental-feature -entry AccessPayload -stage intersection -target hlsl -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED,non-exhaustive): -experimental-feature -entry AccessPayload -stage intersection -target glsl -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED,non-exhaustive): -experimental-feature -entry AccessPayload -stage intersection -target spirv -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry ReadRecord -stage intersection -target hlsl -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry ReadRecord -stage intersection -target glsl -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry ReadRecord -stage intersection -target spirv -no-codegen
@@ -51,6 +51,9 @@ void accessPayload<C : rt::IHitContext>(in rt::IntersectionInput<C> input)
 }
 
 struct AccessPayload : rt::IIntersectionShader
+/*UNSUPPORTED:
+       ^^^^^^^^^^^^^ unavailable features in entry point
+*/
 {
     typealias Context = HitContext;
 
@@ -89,5 +92,3 @@ struct GuardedPayload : rt::IIntersectionShader
         }
     }
 }
-
-//UNSUPPORTED: unavailable features in entry point

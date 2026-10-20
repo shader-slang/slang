@@ -1,16 +1,9 @@
 // Native trace calls retain their opaque structural descriptor until target adapter lowering
 // chooses its representation. Callable dispatch also retains its unfinished operation marker.
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=TRACE): -experimental-feature -entry traceMain -stage raygeneration -target hlsl
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=PAYLOAD): -experimental-feature -entry tracePayloadMain -stage raygeneration -target hlsl
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CALL): -experimental-feature -entry callMain -stage raygeneration -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=TRACE): -experimental-feature -entry traceMain -stage raygeneration -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=TRACE): -experimental-feature -entry tracePayloadMain -stage raygeneration -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CALL): -experimental-feature -entry callMain -stage raygeneration -target hlsl
 
-// TRACE-NOT: structural ray-tracing operation 'trace'
-// TRACE: structural ray-tracing program descriptor must be lowered before target code generation
-// TRACE-NOT: structural ray-tracing operation 'trace'
-// PAYLOAD-NOT: structural ray-tracing operation 'trace'
-// PAYLOAD: structural ray-tracing program descriptor must be lowered before target code generation
-// PAYLOAD-NOT: structural ray-tracing operation 'trace'
-// CALL: structural ray-tracing operation 'callShader' reachable from this entry point must be lowered
 
 import slang.raytracing;
 
@@ -85,6 +78,14 @@ struct Schema : rt::ITraceProgramSchema
 
 rt::AccelerationStructure scene;
 rt::TraceProgramDescriptor<Schema> descriptor;
+/*TRACE:
+                                   ^^^^^^^^^^ structural ray-tracing program descriptor must be lowered before target code generation
+                                   ^^^^^^^^^^ target adapter lowering must choose the descriptor's physical representation
+*/
+/*CALL:
+                                   ^^^^^^^^^^ structural ray-tracing program descriptor must be lowered before target code generation
+                                   ^^^^^^^^^^ target adapter lowering must choose the descriptor's physical representation
+*/
 
 [shader("raygeneration")]
 void traceMain()
@@ -103,6 +104,10 @@ void tracePayloadMain()
 
 [shader("raygeneration")]
 void callMain()
+/*CALL:
+     ^^^^^^^^ structural ray-tracing source operation was not lowered
+     ^^^^^^^^ structural ray-tracing operation 'callShader' reachable from this entry point must be lowered before target code generation
+*/
 {
     rt::RayTracer<Schema> tracer;
     CallableData data = {};

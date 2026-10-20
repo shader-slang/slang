@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
 
 import slang.raytracing;
 
@@ -39,7 +39,10 @@ struct InvalidClosestHit : rt::IClosestHitShader
     {
         let attributes = input.attributes;
         let value = attributes.value;
-//CHECK: 'value' is not a member of 'rt.TriangleData'.
+/*CHECK:
+                               ^^^^^ member not found
+                               ^^^^^ 'value' is not a member of 'rt.TriangleData'.
+*/
     }
 }
 
@@ -50,7 +53,10 @@ struct InvalidProceduralAnyHit : rt::IAnyHitShader
     {
         let attributes = input.attributes;
         let frontFacing = attributes.frontFacing;
-//CHECK: 'frontFacing' is not a member of 'CustomAttributes'.
+/*CHECK:
+                                     ^^^^^^^^^^^ member not found
+                                     ^^^^^^^^^^^ 'frontFacing' is not a member of 'CustomAttributes'.
+*/
     }
 }
 
@@ -63,7 +69,10 @@ struct InvalidGenericClosestHit<C : rt::IHitContext> : rt::IClosestHitShader
     static void invoke(rt::ClosestHitInput<Context> input)
     {
         rt::TriangleData attributes = input.attributes;
-//CHECK: expected an expression of type 'rt.TriangleData', got 'C.Primitive.Attributes'
+/*CHECK:
+                                            ^^^^^^^^^^ type mismatch in expression
+                                            ^^^^^^^^^^ expected an expression of type 'rt.TriangleData', got 'C.Primitive.Attributes'
+*/
     }
 }
 
@@ -75,6 +84,9 @@ struct InvalidGenericAnyHit<C : rt::IHitContext> : rt::IAnyHitShader
     {
         let attributes = input.attributes;
         let barycentricCoord = attributes.barycentricCoord;
-//CHECK: 'barycentricCoord' is not a member of 'C.Primitive.Attributes'.
+/*CHECK:
+                                          ^^^^^^^^^^^^^^^^ member not found
+                                          ^^^^^^^^^^^^^^^^ 'barycentricCoord' is not a member of 'C.Primitive.Attributes'.
+*/
     }
 }

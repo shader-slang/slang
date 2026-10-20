@@ -1,18 +1,17 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry NativeNoMotionMiss -target metal -profile metallib_2_4
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry NativePrimitiveMotionMiss -target metal -profile metallib_2_4
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry NativeInstanceMotionMiss -target metal -profile metallib_2_4
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry NativeCombinedMotionMiss -target metal -profile metallib_2_4
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry MultilevelNoMotionMiss -target metal -profile metallib_2_4
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry MultilevelPrimitiveMotionMiss -target metal -profile metallib_2_4
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry MultilevelInstanceMotionMiss -target metal -profile metallib_2_4
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry MultilevelCombinedMotionMiss -target metal -profile metallib_2_4
+//DIAGNOSTIC_TEST:SIMPLE(diag=NATIVE_NO_MOTION,non-exhaustive): -experimental-feature -entry NativeNoMotionMiss -target metal -profile metallib_2_4
+//DIAGNOSTIC_TEST:SIMPLE(diag=NATIVE_PRIMITIVE_MOTION,non-exhaustive): -experimental-feature -entry NativePrimitiveMotionMiss -target metal -profile metallib_2_4
+//DIAGNOSTIC_TEST:SIMPLE(diag=NATIVE_INSTANCE_MOTION,non-exhaustive): -experimental-feature -entry NativeInstanceMotionMiss -target metal -profile metallib_2_4
+//DIAGNOSTIC_TEST:SIMPLE(diag=NATIVE_COMBINED_MOTION,non-exhaustive): -experimental-feature -entry NativeCombinedMotionMiss -target metal -profile metallib_2_4
+//DIAGNOSTIC_TEST:SIMPLE(diag=MULTILEVEL_NO_MOTION,non-exhaustive): -experimental-feature -entry MultilevelNoMotionMiss -target metal -profile metallib_2_4
+//DIAGNOSTIC_TEST:SIMPLE(diag=MULTILEVEL_PRIMITIVE_MOTION,non-exhaustive): -experimental-feature -entry MultilevelPrimitiveMotionMiss -target metal -profile metallib_2_4
+//DIAGNOSTIC_TEST:SIMPLE(diag=MULTILEVEL_INSTANCE_MOTION,non-exhaustive): -experimental-feature -entry MultilevelInstanceMotionMiss -target metal -profile metallib_2_4
+//DIAGNOSTIC_TEST:SIMPLE(diag=MULTILEVEL_COMBINED_MOTION,non-exhaustive): -experimental-feature -entry MultilevelCombinedMotionMiss -target metal -profile metallib_2_4
 
 // Every no-payload overload must forward to the actual trace operation. These checks need no
 // Metal runtime: code generation must reject the unfinished operation reached through the wrapper.
 // Structural miss entries use the supported Metal stage contract; native Metal ray-generation
 // functions are not supported. The missing-entry-adapter error alone does not satisfy this check:
 // if a wrapper loses its forwarding call, the trace-operation diagnostic must disappear.
-// CHECK: structural ray-tracing operation 'trace' reachable from this entry point must be lowered
 
 import slang.raytracing;
 
@@ -68,6 +67,10 @@ struct NativeNoMotionMiss : rt::IMissShader
     typealias Context = MissContext<NativeNoMotion.TraceContext>;
 
     static void invoke(rt::MissInput<Context> input)
+/*NATIVE_NO_MOTION:
+                ^^^^^^ structural ray-tracing source operation was not lowered
+                ^^^^^^ structural ray-tracing operation 'trace' reachable from this entry point must be lowered before target code generation
+*/
     {
         rt::RayTracer<NativeNoMotion> tracer;
         tracer.trace({}, nativeScene, nativeNoMotionProgram);
@@ -79,6 +82,10 @@ struct NativePrimitiveMotionMiss : rt::IMissShader
     typealias Context = MissContext<NativePrimitiveMotion.TraceContext>;
 
     static void invoke(rt::MissInput<Context> input)
+/*NATIVE_PRIMITIVE_MOTION:
+                ^^^^^^ structural ray-tracing source operation was not lowered
+                ^^^^^^ structural ray-tracing operation 'trace' reachable from this entry point must be lowered before target code generation
+*/
     {
         rt::RayTracer<NativePrimitiveMotion> tracer;
         tracer.trace({}, nativeScene, nativePrimitiveMotionProgram);
@@ -90,6 +97,10 @@ struct NativeInstanceMotionMiss : rt::IMissShader
     typealias Context = MissContext<NativeInstanceMotion.TraceContext>;
 
     static void invoke(rt::MissInput<Context> input)
+/*NATIVE_INSTANCE_MOTION:
+                ^^^^^^ structural ray-tracing source operation was not lowered
+                ^^^^^^ structural ray-tracing operation 'trace' reachable from this entry point must be lowered before target code generation
+*/
     {
         rt::RayTracer<NativeInstanceMotion> tracer;
         tracer.trace({}, nativeScene, nativeInstanceMotionProgram);
@@ -101,6 +112,10 @@ struct NativeCombinedMotionMiss : rt::IMissShader
     typealias Context = MissContext<NativeCombinedMotion.TraceContext>;
 
     static void invoke(rt::MissInput<Context> input)
+/*NATIVE_COMBINED_MOTION:
+                ^^^^^^ structural ray-tracing source operation was not lowered
+                ^^^^^^ structural ray-tracing operation 'trace' reachable from this entry point must be lowered before target code generation
+*/
     {
         rt::RayTracer<NativeCombinedMotion> tracer;
         tracer.trace({}, nativeScene, nativeCombinedMotionProgram);
@@ -112,6 +127,10 @@ struct MultilevelNoMotionMiss : rt::IMissShader
     typealias Context = MissContext<MultilevelNoMotion.TraceContext>;
 
     static void invoke(rt::MissInput<Context> input)
+/*MULTILEVEL_NO_MOTION:
+                ^^^^^^ structural ray-tracing source operation was not lowered
+                ^^^^^^ structural ray-tracing operation 'trace' reachable from this entry point must be lowered before target code generation
+*/
     {
         rt::RayTracer<MultilevelNoMotion> tracer;
         tracer.trace({}, multilevelScene, multilevelNoMotionProgram);
@@ -123,6 +142,10 @@ struct MultilevelPrimitiveMotionMiss : rt::IMissShader
     typealias Context = MissContext<MultilevelPrimitiveMotion.TraceContext>;
 
     static void invoke(rt::MissInput<Context> input)
+/*MULTILEVEL_PRIMITIVE_MOTION:
+                ^^^^^^ structural ray-tracing source operation was not lowered
+                ^^^^^^ structural ray-tracing operation 'trace' reachable from this entry point must be lowered before target code generation
+*/
     {
         rt::RayTracer<MultilevelPrimitiveMotion> tracer;
         tracer.trace({}, multilevelScene, multilevelPrimitiveMotionProgram);
@@ -134,6 +157,10 @@ struct MultilevelInstanceMotionMiss : rt::IMissShader
     typealias Context = MissContext<MultilevelInstanceMotion.TraceContext>;
 
     static void invoke(rt::MissInput<Context> input)
+/*MULTILEVEL_INSTANCE_MOTION:
+                ^^^^^^ structural ray-tracing source operation was not lowered
+                ^^^^^^ structural ray-tracing operation 'trace' reachable from this entry point must be lowered before target code generation
+*/
     {
         rt::RayTracer<MultilevelInstanceMotion> tracer;
         tracer.trace({}, multilevelScene, multilevelInstanceMotionProgram);
@@ -145,6 +172,10 @@ struct MultilevelCombinedMotionMiss : rt::IMissShader
     typealias Context = MissContext<MultilevelCombinedMotion.TraceContext>;
 
     static void invoke(rt::MissInput<Context> input)
+/*MULTILEVEL_COMBINED_MOTION:
+                ^^^^^^ structural ray-tracing source operation was not lowered
+                ^^^^^^ structural ray-tracing operation 'trace' reachable from this entry point must be lowered before target code generation
+*/
     {
         rt::RayTracer<MultilevelCombinedMotion> tracer;
         tracer.trace({}, multilevelScene, multilevelCombinedMotionProgram);

@@ -33,8 +33,7 @@ interface IClosestHitContract : rt::IClosestHitShader
 class InvalidClosestHit : rt::IClosestHitShader
 /*CHECK:
       ^^^^^^^^^^^^^^^^^ invalid structural ray-tracing stage implementation
-      ^^^^^^^^^^^^^^^^^ structural ray-tracing stage implementation 'InvalidClosestHit' must be
-   declared as a struct
+      ^^^^^^^^^^^^^^^^^ structural ray-tracing stage implementation 'InvalidClosestHit' must be declared as a struct
 */
 {
     typealias Context = HitContext;
@@ -43,6 +42,7 @@ class InvalidClosestHit : rt::IClosestHitShader
 
 extension float : rt::IClosestHitShader
 //CHECK:              ^^^^^^^^^^^^^^^^^ invalid structural ray-tracing stage implementation
+//CHECK:              ^^^^^^^^^^^^^^^^^ structural ray-tracing stage implementation 'float' must be declared as a struct
 {
     typealias Context = HitContext;
     static void invoke(rt::ClosestHitInput<Context> input) {}
