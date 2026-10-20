@@ -2011,6 +2011,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         // Conformance already checks invoke's signature. Its RT input is supplied by the
         // compiler, so native uniform/varying parameter rules do not apply. The selected
         // implementation and primitive must still support the requested target/profile.
+        // WAR for #13793: member typealias requirements do not propagate to the enclosing struct.
+        // Include the selected primitive's requirements explicitly until that is fixed.
         CapabilitySet entryPointInferredCaps{entryPoint->getInferredCapabilityRequirements()};
         auto& structuralInfo = entryPoint->getStructuralRayTracingInfo();
         if (structuralInfo.primitiveType)
