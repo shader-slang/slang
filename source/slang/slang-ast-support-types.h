@@ -1998,12 +1998,12 @@ FIDDLE() namespace Slang
         case ParamPassingMode::Out:
         case ParamPassingMode::BorrowInOut:
         case ParamPassingMode::RefReadWrite:
-        case ParamPassingMode::RefReadOnly:
         case ParamPassingMode::RefWriteOnly:
             return true;
 
         case ParamPassingMode::In:
         case ParamPassingMode::BorrowIn:
+        case ParamPassingMode::RefReadOnly:
             return false;
 
         default:

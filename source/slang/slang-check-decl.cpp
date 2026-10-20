@@ -7175,6 +7175,7 @@ static void populateParams(
         synArg->declRef = makeDeclRef(paramDecl);
         synArg->type.type = paramInfo.type;
         synArg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(paramInfo.mode);
+        synArg->type.isReadOnlyMemoryLocation = paramInfo.mode == ParamPassingMode::RefReadOnly;
         synArg->loc = synthesizedLoc;
         synArgs.add(synArg);
     }

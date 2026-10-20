@@ -114,10 +114,9 @@ void computeMain()
 //CHECK:   ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
 //CHECK:   ^ argument for 'out' parameter 'a' may alias argument for 'out' parameter 'b'; passing the same value to both may produce unexpected results
 
-    // Positive: same variable to in and inout params.
+    // Negative: same variable to in and inout params — no warning expected,
+    // because the `in` parameter is a copy taken before the call.
     inAndInout(a, a);
-//CHECK:          ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
-//CHECK:          ^ argument for 'inout' parameter 'b' may alias argument for 'in' parameter 'a'; passing the same value to both may produce unexpected results
 
     // Positive: same variable to two ref params.
     twoRef(a, a);

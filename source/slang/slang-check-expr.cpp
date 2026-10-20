@@ -4232,10 +4232,45 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     return false;
 }
 
-static bool _isOutInOutOrRefParam(FuncType* funcType, Index paramIndex)
+/// Return whether a parameter of mode `mode` may be a reference to its argument's storage during
+/// the call, rather than a copy of it.
+static bool _mayParamBeReferenceToArgumentStorage(ParamPassingMode mode)
 {
-    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
-    return as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType);
+    // An `in` parameter may become a borrow in `transformParamsToConstRef`, but that borrow is
+    // never a reference to argument storage the call can modify.
+    if (mode == ParamPassingMode::In)
+        return false;
+
+    // The `ref` modes are always references. The language defines `out`, `inout`, and borrow
+    // parameters as copies, but lets the compiler pass them by reference instead, on the
+    // assumption that well-written code cannot tell the difference. Targets make different
+    // choices: when `addArg` lowers such an argument that names a memory location, it passes the
+    // address of that location, which HLSL and GLSL then emit as copying parameters, while SPIR-V,
+    // Metal, CUDA, C++, and WGSL keep it as a pointer to the caller's variable.
+    return true;
+}
+
+/// Return whether passing the same argument storage to parameters of modes `first` and `second`
+/// may give unexpected results, so that the potential-aliasing warning applies.
+static bool _mayAliasedArgumentsInterfere(ParamPassingMode first, ParamPassingMode second)
+{
+    // A copy is taken before the call, so nothing done through the other parameter can affect it.
+    if (!_mayParamBeReferenceToArgumentStorage(first) ||
+        !_mayParamBeReferenceToArgumentStorage(second))
+        return false;
+
+    // Both parameters may be references to the same storage. Two read-only references
+    // (`ref_readonly`, `borrow`, `constref`) cannot change it, but a write through either one
+    // makes the result depend on how the target passed them. Consider this example:
+    //
+    //     int f(inout int a, __borrow int b) { a = 5; return b; }
+    //     int x = 1;
+    //     f(x, x);
+    //
+    // On HLSL, `a` and `b` are copies of `x`, so `f` returns 1. On Metal, both are pointers to
+    // `x`, so `f` returns 5.
+    return doesParamPassingModeIndicateWritableStorage(first) ||
+           doesParamPassingModeIndicateWritableStorage(second);
 }
 
 void SemanticsVisitor::_checkAliasedOutArguments(
@@ -4255,29 +4290,28 @@ void SemanticsVisitor::_checkAliasedOutArguments(
     Index checkCount = Math::Min(argCount, paramCount);
 
     // For each pair of arguments, check if they refer to the same storage
-    // and at least one parameter is out/inout/ref. We compare expressions
-    // structurally: bare variables (a == a), member accesses (s.x == s.x
-    // but not s.x == s.y), and constant-index subscripts (arr[0] == arr[0]
-    // but not arr[0] == arr[1]).
+    // and their parameters' modes let the aliasing interfere. We compare
+    // expressions structurally: bare variables (a == a), member accesses
+    // (s.x == s.x but not s.x == s.y), and constant-index subscripts
+    // (arr[0] == arr[0] but not arr[0] == arr[1]).
     for (Index i = 0; i < checkCount; ++i)
     {
-        bool iIsOut = _isOutInOutOrRefParam(funcType, i);
+        const auto iMode = funcType->getParamPassingMode(i);
 
         for (Index j = i + 1; j < checkCount; ++j)
         {
-            // At least one of the two must be out/inout/ref.
-            bool jIsOut = _isOutInOutOrRefParam(funcType, j);
-            if (!iIsOut && !jIsOut)
+            const auto jMode = funcType->getParamPassingMode(j);
+            if (!_mayAliasedArgumentsInterfere(iMode, jMode))
                 continue;
 
             if (!_exprsDefinitelyAlias(invoke->arguments[i], invoke->arguments[j]))
                 continue;
 
-            // Both arguments refer to the same variable and at least
-            // one is out/inout/ref. Put the out/inout/ref parameter
-            // first in the diagnostic for clarity.
-            Index first = iIsOut ? i : j;
-            Index second = iIsOut ? j : i;
+            // Both arguments refer to the same variable. Put a parameter that
+            // may be written first in the diagnostic for clarity.
+            const bool iMayBeWritten = doesParamPassingModeIndicateWritableStorage(iMode);
+            Index first = iMayBeWritten ? i : j;
+            Index second = iMayBeWritten ? j : i;
 
             Name* paramNameFirst = nullptr;
             Name* paramNameSecond = nullptr;
