@@ -8511,9 +8511,9 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount)));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
 
     return swizExpr;
 }
@@ -8625,9 +8625,9 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         swizExpr->type = QualType(m_astBuilder->getTupleType(types.getArrayView()));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
     return swizExpr;
 }
 
@@ -8733,8 +8733,8 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
                 swizExpr->elementIndices.getCount())));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components.
     swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base && swizExpr->base->type &&
                                  swizExpr->base->type.isLeftValue;
 
