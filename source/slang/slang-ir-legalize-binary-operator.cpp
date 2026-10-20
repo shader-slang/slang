@@ -2,6 +2,8 @@
 
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-matrix-types.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -19,15 +21,46 @@ static bool isVectorOrMatrix(IRType* type)
     }
 };
 
-static bool isDivisionByMatrix(IRInst* inst)
+// Return whether `type` is a matrix that the target emits as a matrix. An int/uint/bool matrix is
+// still a matrix here but becomes an array of row vectors later, and its operations become
+// operations on those rows, which Metal and WGSL support.
+static bool isNativeMatrix(TargetProgram* targetProgram, IRType* type)
 {
-    return (inst->getOp() == kIROp_Div) && (as<IRMatrixType>(inst->getOperand(1)->getDataType()));
+    auto matrixType = as<IRMatrixType>(type);
+    return matrixType && !isMatrixTypeLoweredToArray(targetProgram->getTargetReq(), matrixType);
 }
 
-static bool isMatrixDividedByScalar(IRInst* inst)
+static bool isDivisionByMatrix(IRInst* inst, TargetProgram* targetProgram)
 {
-    return (inst->getOp() == kIROp_Div) && (as<IRMatrixType>(inst->getOperand(0)->getDataType())) &&
+    return (inst->getOp() == kIROp_Div) &&
+           isNativeMatrix(targetProgram, inst->getOperand(1)->getDataType());
+}
+
+static bool isMatrixDividedByScalar(IRInst* inst, TargetProgram* targetProgram)
+{
+    return (inst->getOp() == kIROp_Div) &&
+           isNativeMatrix(targetProgram, inst->getOperand(0)->getDataType()) &&
            (as<IRBasicType>(inst->getOperand(1)->getDataType()));
+}
+
+// Return a composite type with the shape of `compositeType` and the element type `scalarType`.
+// For example, `matrix<int,2,3>` and `uint` give `matrix<uint,2,3>`.
+static IRType* getCompositeTypeWithElementType(
+    IRBuilder& builder,
+    IRType* compositeType,
+    IRType* scalarType)
+{
+    if (auto matrixType = as<IRMatrixType>(compositeType))
+    {
+        return builder.getMatrixType(
+            scalarType,
+            matrixType->getRowCount(),
+            matrixType->getColumnCount(),
+            matrixType->getLayout());
+    }
+    auto vectorType = as<IRVectorType>(compositeType);
+    SLANG_ASSERT(vectorType);
+    return builder.getVectorType(scalarType, vectorType->getElementCount());
 }
 
 // If one operand is a composite type (vector or matrix), and the other one is a scalar
@@ -43,11 +76,8 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
         IRInst* scalarValue = inst->getOperand(1);
         // Retain the scalar type for shifts
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
-        {
-            auto vectorType = as<IRVectorType>(compositeType);
             compositeType =
-                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
-        }
+                getCompositeTypeWithElementType(builder, compositeType, scalarValue->getDataType());
         auto newRhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands() + 1, newRhs);
     }
@@ -61,11 +91,8 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
         IRInst* scalarValue = inst->getOperand(0);
         // Retain the scalar type for shifts
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
-        {
-            auto vectorType = as<IRVectorType>(compositeType);
             compositeType =
-                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
-        }
+                getCompositeTypeWithElementType(builder, compositeType, scalarValue->getDataType());
         auto newLhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands(), newLhs);
     }
@@ -73,9 +100,9 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
 
 // Replaces a division by scalar operation by a multiplication.
 // This is done for WGSL where matrix divided by scalar operations are not supported.
-static void replaceMatrixDividedByScalarWithMul(IRInst* inst)
+static void replaceMatrixDividedByScalarWithMul(IRInst* inst, TargetProgram* targetProgram)
 {
-    SLANG_ASSERT(isMatrixDividedByScalar(inst));
+    SLANG_ASSERT(isMatrixDividedByScalar(inst, targetProgram));
 
     IRBuilder builder(inst);
     builder.setInsertBefore(inst);
@@ -95,7 +122,7 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
     builder.setInsertBefore(inst);
 
     // Division by matrix is not supported on Metal and WGSL.
-    if (isDivisionByMatrix(inst))
+    if (isDivisionByMatrix(inst, targetProgram))
     {
         sink->diagnose(Diagnostics::DivisionByMatrixNotSupported{.location = inst->sourceLoc});
         return;
@@ -107,19 +134,20 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
     {
         IRInst* shiftAmount = inst->getOperand(1);
         IRType* shiftAmountType = shiftAmount->getDataType();
-        if (auto shiftAmountVectorType = as<IRVectorType>(shiftAmountType))
+        if (as<IRVectorType>(shiftAmountType) || as<IRMatrixType>(shiftAmountType))
         {
-            IRType* shiftAmountElementType = shiftAmountVectorType->getElementType();
+            IRType* shiftAmountElementType =
+                getMatrixElementType(getVectorElementType(shiftAmountType));
             IntInfo opIntInfo =
                 getIntTypeInfo(targetProgram->getTargetReq(), shiftAmountElementType);
             if (opIntInfo.isSigned)
             {
                 opIntInfo.isSigned = false;
-                shiftAmountElementType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
-                shiftAmountVectorType = builder.getVectorType(
-                    shiftAmountElementType,
-                    shiftAmountVectorType->getElementCount());
-                IRInst* newShiftAmount = builder.emitCast(shiftAmountVectorType, shiftAmount);
+                auto unsignedShiftAmountType = getCompositeTypeWithElementType(
+                    builder,
+                    shiftAmountType,
+                    builder.getType(getIntTypeOpFromInfo(opIntInfo)));
+                IRInst* newShiftAmount = builder.emitCast(unsignedShiftAmountType, shiftAmount);
                 builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
             }
         }
@@ -138,14 +166,14 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
 
     // For matrix divided by scalar operations, do not convert scalar divisor to dividend's matrix
     // type. Division by matrix is not supported on Metal and WGSL.
-    if (!isMatrixDividedByScalar(inst))
+    if (!isMatrixDividedByScalar(inst, targetProgram))
     {
         legalizeScalarOperandsToMatchComposite(inst);
     }
     else if (isWGPUTarget(targetProgram->getTargetReq()->getTarget()))
     {
         // WGSL does not support matrix division by scalar, convert it to multiplication.
-        replaceMatrixDividedByScalarWithMul(inst);
+        replaceMatrixDividedByScalarWithMul(inst, targetProgram);
     }
     else
     {
@@ -195,7 +223,7 @@ void legalizeLogicalAndOr(IRInst* inst, TargetProgram* targetProgram)
 
             SLANG_ASSERT(
                 as<IRMatrixType>(operandDataType) || as<IRVectorType>(operandDataType) ||
-                as<IRArrayType>(operandDataType) || as<IRBoolType>(operandDataType));
+                as<IRBoolType>(operandDataType));
 
             if (auto vecType = as<IRVectorType>(operandDataType))
             {
@@ -222,8 +250,7 @@ void legalizeLogicalAndOr(IRInst* inst, TargetProgram* targetProgram)
         IRInst* newInst = nullptr;
 
         SLANG_ASSERT(
-            as<IRMatrixType>(dataType) || as<IRVectorType>(dataType) || as<IRBoolType>(dataType) ||
-            as<IRArrayType>(dataType));
+            as<IRMatrixType>(dataType) || as<IRVectorType>(dataType) || as<IRBoolType>(dataType));
         if (auto vecType = as<IRVectorType>(dataType))
         {
             if (!as<IRBoolType>(vecType->getElementType()))
@@ -243,54 +270,6 @@ void legalizeLogicalAndOr(IRInst* inst, TargetProgram* targetProgram)
                 newInst = builder.emitCast(dataType, newInst);
             }
         }
-        else if (auto arrayType = as<IRArrayType>(dataType))
-        {
-            // Handle lowered matrices (arrays of vectors)
-            auto arrayVecType = as<IRVectorType>(arrayType->getElementType());
-            SLANG_ASSERT(arrayVecType);
-
-            // At this point, lhs and rhs should already be converted to bool arrays
-            auto lhsArrayType = as<IRArrayType>(lhs->getDataType());
-            auto rhsArrayType = as<IRArrayType>(rhs->getDataType());
-            SLANG_ASSERT(lhsArrayType && rhsArrayType);
-
-            auto lhsVecType = as<IRVectorType>(lhsArrayType->getElementType());
-            auto rhsVecType = as<IRVectorType>(rhsArrayType->getElementType());
-            SLANG_ASSERT(lhsVecType && rhsVecType);
-
-            SLANG_ASSERT(
-                as<IRBoolType>(lhsVecType->getElementType()) &&
-                as<IRBoolType>(rhsVecType->getElementType()));
-
-            auto arraySize = arrayType->getElementCount();
-            List<IRInst*> resultElements;
-
-            // Extract each vector from both arrays, perform AND/OR, collect results
-            for (IRIntegerValue i = 0; i < getIntVal(arraySize); i++)
-            {
-                auto indexVal = builder.getIntValue(builder.getIntType(), i);
-                auto lhsElement = builder.emitElementExtract(lhs, indexVal);
-                auto rhsElement = builder.emitElementExtract(rhs, indexVal);
-
-                IRInst* resultElement;
-                if (inst->getOp() == kIROp_And)
-                {
-                    resultElement =
-                        builder.emitAnd(lhsElement->getDataType(), lhsElement, rhsElement);
-                }
-                else
-                {
-                    resultElement =
-                        builder.emitOr(lhsElement->getDataType(), lhsElement, rhsElement);
-                }
-                resultElements.add(resultElement);
-            }
-
-            // Construct the result array from the individual vector results
-            newInst =
-                builder.emitMakeArray(dataType, getIntVal(arraySize), resultElements.getBuffer());
-        }
-
         if (newInst && inst != newInst)
         {
             inst->replaceUsesWith(newInst);

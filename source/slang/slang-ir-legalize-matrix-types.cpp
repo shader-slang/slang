@@ -9,12 +9,12 @@
 namespace Slang
 {
 
-static bool targetLegalizesMatrixTypes(TargetProgram* targetProgram)
+bool targetLegalizesMatrixTypes(TargetRequest* targetRequest)
 {
-    if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
+    if (isCPUTargetViaLLVM(targetRequest))
         return true;
 
-    switch (targetProgram->getTargetReq()->getTarget())
+    switch (targetRequest->getTarget())
     {
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
@@ -29,6 +29,22 @@ static bool targetLegalizesMatrixTypes(TargetProgram* targetProgram)
     default:
         return false;
     }
+}
+
+bool isMatrixTypeLoweredToArray(TargetRequest* targetRequest, IRMatrixType* matrixType)
+{
+    if (!targetLegalizesMatrixTypes(targetRequest))
+        return false;
+
+    if (isCPUTargetViaLLVM(targetRequest))
+    {
+        // Always lower all matrices on LLVM; we'd need to break them up
+        // like this for data layout reasons anyway.
+        return true;
+    }
+
+    auto elementType = matrixType->getElementType();
+    return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) || as<IRIntType>(elementType);
 }
 
 struct MatrixTypeLoweringContext
@@ -64,18 +80,8 @@ struct MatrixTypeLoweringContext
 
     bool shouldLowerMatrixType(IRMatrixType* matrixType)
     {
-        SLANG_ASSERT(targetLegalizesMatrixTypes(targetProgram));
-
-        if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
-        {
-            // Always lower all matrices on LLVM; we'd need to break them up
-            // like this for data layout reasons anyway.
-            return true;
-        }
-
-        auto elementType = matrixType->getElementType();
-        return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
-               as<IRIntType>(elementType);
+        SLANG_ASSERT(targetLegalizesMatrixTypes(targetProgram->getTargetReq()));
+        return isMatrixTypeLoweredToArray(targetProgram->getTargetReq(), matrixType);
     }
 
     IRInst* legalizeMatrixTypeDeclaration(IRInst* inst)
@@ -715,7 +721,7 @@ void legalizeMatrixTypes(IRModule* module, TargetProgram* targetProgram, Diagnos
 {
     // Early-out #1 (O(1)): targets that never lower matrices (HLSL, DXIL, CUDA, C++/host, ...) make
     // this whole pass a guaranteed no-op — skip without walking the module.
-    if (!targetLegalizesMatrixTypes(targetProgram))
+    if (!targetLegalizesMatrixTypes(targetProgram->getTargetReq()))
         return;
 
     MatrixTypeLoweringContext context(targetProgram, module);

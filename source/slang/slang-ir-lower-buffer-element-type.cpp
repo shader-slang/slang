@@ -3,6 +3,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -1279,7 +1280,8 @@ struct LoweredElementTypeContext
                                         SLANG_ASSERT(user->getOp() == kIROp_GetElementPtr);
                                         lowerMatrixAddresses(
                                             module,
-                                            MatrixAddrWorkItem{user, config});
+                                            MatrixAddrWorkItem{user, config},
+                                            castInstWorkList);
                                         break;
                                     }
                                 }
@@ -2240,8 +2242,43 @@ struct LoweredElementTypeContext
         }
     }
 
-    // Lower all getElementPtr insts of a lowered matrix out of existance.
-    void lowerMatrixAddresses(IRModule* module, MatrixAddrWorkItem workItem)
+    // Return the logical row of type `logicalRowType` held in `storageRow`, a row loaded from a
+    // `_MatrixStorage` type. The storage row can be wider than the logical one, as when std140
+    // pads an `int3` row to an `int4`, and can hold another element type, as when SPIR-V stores
+    // a `bool` as an `int`.
+    IRInst* loadStorageRowAsLogicalRow(
+        IRBuilder& builder,
+        IRType* logicalRowType,
+        IRInst* storageRow)
+    {
+        auto logicalVectorType = as<IRVectorType>(logicalRowType);
+        auto storageVectorType = as<IRVectorType>(storageRow->getDataType());
+        IRInst* row = storageRow;
+        if (storageVectorType && !logicalVectorType)
+        {
+            // A row of a matrix with one column is a scalar after 1-vector legalization.
+            row = builder.emitVectorReshape(storageVectorType->getElementType(), row);
+        }
+        else if (
+            storageVectorType && getIntVal(storageVectorType->getElementCount()) !=
+                                     getIntVal(logicalVectorType->getElementCount()))
+        {
+            row = builder.emitVectorReshape(
+                builder.getVectorType(
+                    storageVectorType->getElementType(),
+                    logicalVectorType->getElementCount()),
+                row);
+        }
+        return builder.emitCast(logicalRowType, row);
+    }
+
+    // Lower all getElementPtr insts of a lowered matrix out of existance. An element address whose
+    // storage type differs from the logical element type becomes a `CastStorageToLogical`, which
+    // is appended to `castInstWorkList` so the caller defers it like any other cast.
+    void lowerMatrixAddresses(
+        IRModule* module,
+        MatrixAddrWorkItem workItem,
+        List<IRCastStorageToLogicalBase*>& castInstWorkList)
     {
         IRBuilder builder(module);
         auto majorAddr = workItem.matrixAddrInst;
@@ -2290,7 +2327,7 @@ struct LoweredElementTypeContext
                                     builder.emitLoad(builder.emitElementAddress(dataPtr, i));
                                 auto element =
                                     builder.emitElementExtract(vector, majorGEP->getIndex());
-                                args.add(element);
+                                args.add(builder.emitCast(matrixType->getElementType(), element));
                             }
                             resultInst = builder.emitMakeVector(
                                 builder.getVectorType(
@@ -2310,6 +2347,13 @@ struct LoweredElementTypeContext
                                 auto vectorType = as<IRVectorType>(user->getDataType());
                                 SLANG_ASSERT(vectorType);
                                 resultInst = builder.emitMakeVector(vectorType, 1, &resultInst);
+                            }
+                            else
+                            {
+                                resultInst = loadStorageRowAsLogicalRow(
+                                    builder,
+                                    user->getDataType(),
+                                    resultInst);
                             }
                         }
                         user->replaceUsesWith(resultInst);
@@ -2334,9 +2378,15 @@ struct LoweredElementTypeContext
                                 auto vectorAddr = builder.emitElementAddress(dataPtr, i);
                                 auto elementAddr =
                                     builder.emitElementAddress(vectorAddr, majorGEP->getIndex());
+                                IRInst* row = storeInst->getVal();
+                                IRInst* element = as<IRVectorType>(row->getDataType())
+                                                      ? builder.emitElementExtract(row, i)
+                                                      : row;
                                 builder.emitStore(
                                     elementAddr,
-                                    builder.emitElementExtract(storeInst->getVal(), i));
+                                    builder.emitCast(
+                                        tryGetPointedToType(&builder, elementAddr->getDataType()),
+                                        element));
                             }
                             user->removeAndDeallocate();
                         }
@@ -2351,9 +2401,50 @@ struct LoweredElementTypeContext
                                 // storage form (MSL `packed_float3(float3)`).
                                 value = builder.emitMakeVector(minorPackedType, 1, &value);
                             }
+                            else
+                            {
+                                value = builder.emitCast(
+                                    tryGetPointedToType(&builder, rowAddr->getDataType()),
+                                    value);
+                            }
                             builder.emitStore(rowAddr, value);
                             user->removeAndDeallocate();
                         }
+                        break;
+                    }
+                case kIROp_SwizzledStore:
+                    {
+                        // A column-major row spans several storage columns, so a row swizzle
+                        // cannot be stored as one vector; each element is stored on its own.
+                        auto swizzledStore = cast<IRSwizzledStore>(user);
+                        SLANG_ASSERT(swizzledStore->getDest() == majorAddr);
+                        auto dataPtr = builder.emitFieldAddress(
+                            getLoweredPtrLikeType(
+                                majorAddr->getDataType(),
+                                matrixTypeInfo->loweredInnerArrayType),
+                            storageBase,
+                            matrixTypeInfo->loweredInnerStructKey);
+                        bool isColMajor =
+                            getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+                        auto source = swizzledStore->getSource();
+                        for (UInt i = 0; i < swizzledStore->getElementCount(); i++)
+                        {
+                            IRInst* vectorIndex = majorGEP->getIndex();
+                            IRInst* elementIndex = swizzledStore->getElementIndex(i);
+                            if (isColMajor)
+                                Swap(vectorIndex, elementIndex);
+                            auto vectorAddr = builder.emitElementAddress(dataPtr, vectorIndex);
+                            auto elementAddr = builder.emitElementAddress(vectorAddr, elementIndex);
+                            IRInst* value = source;
+                            if (as<IRVectorType>(source->getDataType()))
+                                value = builder.emitElementExtract(source, (IRIntegerValue)i);
+                            builder.emitStore(
+                                elementAddr,
+                                builder.emitCast(
+                                    tryGetPointedToType(&builder, elementAddr->getDataType()),
+                                    value));
+                        }
+                        user->removeAndDeallocate();
                         break;
                     }
                 case kIROp_GetElementPtr:
@@ -2372,7 +2463,20 @@ struct LoweredElementTypeContext
                             storageBase,
                             matrixTypeInfo->loweredInnerStructKey);
                         auto vectorAddr = builder.emitElementAddress(dataPtr, rowIndex);
-                        auto elementAddr = builder.emitElementAddress(vectorAddr, colIndex);
+                        IRInst* elementAddr = builder.emitElementAddress(vectorAddr, colIndex);
+                        if (!isTypeEqual(
+                                tryGetPointedToType(&builder, elementAddr->getDataType()),
+                                matrixType->getElementType()))
+                        {
+                            // The element is stored as another type (an `int` holding a
+                            // `bool`), so it is converted where it is accessed, like a field
+                            // of that type.
+                            elementAddr = builder.emitCastStorageToLogical(
+                                gep2->getFullType(),
+                                elementAddr,
+                                emitTypeLoweringConfigToIR(builder, workItem.config));
+                            castInstWorkList.add(cast<IRCastStorageToLogical>(elementAddr));
+                        }
                         gep2->replaceUsesWith(elementAddr);
                         gep2->removeAndDeallocate();
                         break;
@@ -2622,6 +2726,10 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
         return true;
     }
 
+    // The matrix pack and unpack functions convert each element between the storage element type
+    // and the matrix element type with `emitCast`, which is the identity unless the storage holds
+    // another type, as SPIR-V stores a `bool` as an `int`; that is the same conversion
+    // `lowerLeafLogicalType` gives a `bool` field.
     IRFunc* createMatrixUnpackFunc(
         IRMatrixType* matrixType,
         IRStructType* structType,
@@ -2652,7 +2760,8 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
                 for (IRIntegerValue r = 0; r < rowCount; r++)
                 {
                     auto element = builder.emitElementExtract(vector, r);
-                    args[(Index)(r * colCount + c)] = element;
+                    args[(Index)(r * colCount + c)] =
+                        builder.emitCast(matrixType->getElementType(), element);
                 }
             }
         }
@@ -2664,7 +2773,8 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
                 for (IRIntegerValue c = 0; c < colCount; c++)
                 {
                     auto element = builder.emitElementExtract(vector, c);
-                    args[(Index)(r * colCount + c)] = element;
+                    args[(Index)(r * colCount + c)] =
+                        builder.emitCast(matrixType->getElementType(), element);
                 }
             }
         }
@@ -2703,7 +2813,8 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
             for (IRIntegerValue c = 0; c < colCount; c++)
             {
                 auto element = builder.emitElementExtract(vector, c);
-                elements[(Index)(r * colCount + c)] = element;
+                elements[(Index)(r * colCount + c)] =
+                    builder.emitCast(vectorType->getElementType(), element);
             }
         }
         List<IRInst*> vectors;
@@ -2797,6 +2908,10 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
             auto structKey = builder.createStructKey();
             builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
             auto vectorSize = isColMajor ? matrixType->getRowCount() : matrixType->getColumnCount();
+            // The rows or columns hold the storage form of the element type, so that a `bool`
+            // matrix is stored the way a `bool` field is.
+            auto storageElementType =
+                lowerLeafLogicalType(matrixType->getElementType(), config).loweredType;
             if (config.layoutRuleName == IRTypeLayoutRuleName::Std140 &&
                 shouldTranslateArrayElementTo16ByteAlignedVectorForConstantBuffer())
             {
@@ -2804,11 +2919,11 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
                 // we are required to ensure array element types has 16-byte stride.
                 vectorSize = builder.getIntValue(get16ByteAlignedVectorElementCount(
                     target,
-                    matrixType->getElementType(),
+                    storageElementType,
                     getIntVal(vectorSize)));
             }
 
-            auto vectorType = builder.getVectorType(matrixType->getElementType(), vectorSize);
+            auto vectorType = builder.getVectorType(storageElementType, vectorSize);
             IRSizeAndAlignment elementSizeAlignment;
             getSizeAndAlignment(
                 target->getTargetReq(),
@@ -2859,12 +2974,20 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
     {
-        // For spirv, we generally want to lower all matrix types, because SPIRV does not support
-        // specifying matrix layout/stride if the matrix type is used in places other than
+        // SPIR-V and GLSL have no matrix type for int/uint/bool elements, so such a matrix in
+        // memory always needs a storage type that records its layout; otherwise
+        // `legalizeMatrixTypes` turns it into row vectors regardless of `column_major`. A stage
+        // input or output (both use `AddressSpace::Input` here) has no memory layout and keeps
+        // those row vectors.
+        if (isMatrixTypeLoweredToArray(target->getTargetReq(), matrixType))
+            return config.addressSpace != AddressSpace::Input;
+
+        // For spirv, we generally want to lower all float matrix types, because SPIRV does not
+        // support specifying matrix layout/stride if the matrix type is used in places other than
         // defining a struct field. This means that if a matrix is used to define a varying
         // parameter, we always want to wrap it in a struct.
-        // Matrices within uniform and storage buffers are already members in the overall buffer
-        // struct type, hence do not need to be lowered.
+        // Float matrices within uniform and storage buffers are already members in the overall
+        // buffer struct type, hence do not need to be lowered.
         if (target->shouldEmitSPIRVDirectly())
         {
             switch (config.addressSpace)
