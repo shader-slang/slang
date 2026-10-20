@@ -293,9 +293,10 @@ jobs:
           git push
 
       # The benchmark host owns collection, credentials and delivery.
+      # Complexity sweeps stay in the existing reports, not BenchView.
       - name: Export nightly results for BenchView
         id: benchview
-        if: env.PUBLISH == 'true'
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true'
         continue-on-error: true
         shell: bash
         run: |
@@ -314,7 +315,7 @@ jobs:
             --output "$GITHUB_WORKSPACE/benchview-export"
 
       - name: Archive BenchView submission payloads
-        if: always() && env.PUBLISH == 'true' && steps.benchview.outcome != 'skipped'
+        if: always() && env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview.outcome != 'skipped'
         continue-on-error: true
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
