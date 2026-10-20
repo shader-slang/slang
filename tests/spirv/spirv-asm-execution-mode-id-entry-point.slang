@@ -30,7 +30,9 @@
 
 // One `OpExecutionModeId` per entry point: the `__entryPoint` line written twice in one block
 // is emitted once per entry point, and the `$computeD` line is not applied to `computeA`, and is
-// emitted once although the helper is inlined into two entry points.
+// emitted once although the helper is inlined into two entry points. `computeC` calls a helper
+// with an in-block constant twice: the two copies of the constant share one id, so it also gets
+// the mode once.
 // COUNT-COUNT-4: OpExecutionModeId
 // COUNT-NOT: OpExecutionModeId
 
@@ -118,6 +120,7 @@ void computeB(uint3 tid: SV_DispatchThreadID)
 [numthreads(1, 1, 1)]
 void computeC(uint3 tid: SV_DispatchThreadID)
 {
+    enableOpacityMicromap();
     enableOpacityMicromap();
     outputBuffer[tid.x] = 3;
 }
