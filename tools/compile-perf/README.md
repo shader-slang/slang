@@ -425,7 +425,10 @@ BenchView; release exports include only active tests at their current default si
 Runs with `sweep=true` skip BenchView and defer new-release discovery. Older suite
 checkouts defer release discovery when they lack release-export support.
 The benchmark host handles collection and delivery. Export failures do not block
-existing reports. For local or historical exports, see `python3 benchview.py --help`.
+existing reports; an invalid release export also leaves the daily export intact.
+Skipped or failed release exports require a separate export of the archived results;
+they are not automatically retried after the release enters the tracked history.
+For local or historical exports, see `python3 benchview.py --help`.
 
 ---
 

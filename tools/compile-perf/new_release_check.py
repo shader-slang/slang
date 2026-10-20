@@ -124,10 +124,7 @@ def main():
         return
 
     print(f"new-release check: sweeping {', '.join(new)}")
-    export_info = [release_export_info(args.repo, tag) for tag in new] if args.completed else []
     observed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    for info in export_info:
-        info["observed_at"] = observed_at
     py = sys.executable
 
     def run(*cmd):
@@ -162,6 +159,15 @@ def main():
                  f"partial results removed, next nightly retries")
     print(f"new-release check: {', '.join(new)} added to the tracked history")
     if args.completed:
+        export_info = []
+        for tag in new:
+            try:
+                info = release_export_info(args.repo, tag)
+                info["observed_at"] = observed_at
+                export_info.append(info)
+            except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError) as error:
+                print(f"Warning: skipped BenchView metadata for {tag}: {error}; "
+                      "export its archived results separately to retry", file=sys.stderr)
         args.completed.write_text(json.dumps(export_info) + "\n", encoding="utf-8")
 
 

@@ -288,8 +288,9 @@ jobs:
           fi
 
       # New releases (majors + patch releases from v2026.13 on) are swept into
-      # the tracked history the night they ship, riding the same results push
-      # below. continue-on-error: a failing new-release sweep must not cost the
+      # the tracked history on non-sweep runs with release-export support.
+      # Deferring keeps tags new until a capable nightly can measure and export them.
+      # continue-on-error: a failing new-release sweep must not cost the
       # night's own point — the script removes partial baselines and the next
       # nightly retries.
       - name: Sweep newly published releases

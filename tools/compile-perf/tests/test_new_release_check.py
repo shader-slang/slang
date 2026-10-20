@@ -43,6 +43,42 @@ class CompletedReleaseTests(unittest.TestCase):
                     self.assertEqual(info["commit"], revision)
                     self.assertEqual(info.get("branch"), expected)
 
+    def test_metadata_failure_preserves_tracked_history(self):
+        """An unavailable release API cannot prevent measurement or undo the tracked results."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            completed = root / "completed.json"
+            index = root / "index.json"
+            index.write_text("[]")
+            calls = []
+
+            def run(cmd, **kwargs):
+                """Simulate the successful tracking producer, including its index update."""
+                calls.append(cmd)
+                if "merge-index" in cmd:
+                    index.write_text('[{"tag":"v2026.20"}]')
+                return subprocess.CompletedProcess(cmd, 0)
+
+            def unavailable(url):
+                """Metadata is requested only after all four tracking steps succeeded."""
+                self.assertEqual(len(calls), 4)
+                raise OSError("release API unavailable")
+
+            argv = ["new_release_check.py", "--results", tmp, "--repo", tmp,
+                    "--completed", str(completed)]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(new_release_check.fetch_releases, "window_tags",
+                              return_value=[("2026-10-17", "v2026.20")]), \
+                 patch.object(new_release_check.subprocess, "run", side_effect=run), \
+                 patch.object(new_release_check.subprocess, "check_output", return_value="a" * 40), \
+                 patch.object(new_release_check.fetch_releases, "gh_get", side_effect=unavailable), \
+                 contextlib.redirect_stdout(io.StringIO()), \
+                 contextlib.redirect_stderr(io.StringIO()) as warnings:
+                new_release_check.main()
+            self.assertEqual(json.loads(completed.read_text()), [])
+            self.assertEqual(json.loads(index.read_text()), [{"tag": "v2026.20"}])
+            self.assertIn("skipped BenchView metadata", warnings.getvalue())
+
     def test_completed_manifest(self):
         """No-new and failed sweeps clear stale manifests; successful sweeps list their tags."""
         for new, returncode in ((False, 0), (True, 0), (True, 1)):
