@@ -4,6 +4,7 @@
 // Write-only textures do not declare `fence()` and get none. (shader-slang/slang#13771)
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain -line-directive-mode none
+//TEST:SIMPLE(filecheck=ARRAY): -target metal -stage compute -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=LOOP): -target metal -stage compute -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=NOFENCE): -target metal -stage compute -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=ROV): -target metal -stage fragment -entry fragMain -line-directive-mode none
@@ -18,6 +19,7 @@ RWTexture2DArray<float> layers;
 RWBuffer<float> texels;
 RWTexture2D<uint> counters;
 RWTexture2D<float4> channels;
+RWTexture2D<float4> tiles[4];
 WTexture2D<float4> writeOnly;
 Texture2D<float4> readOnly;
 RWStructuredBuffer<float4> outputBuffer;
@@ -54,6 +56,18 @@ void accumulate(uint2 p, uint count)
         img[p] = img[p] + float(i);
 }
 
+// The fence on an element of a texture array names the same element as the write, so the array
+// of handles stays in the kernel context instead of being copied into a local.
+// ARRAY-LABEL: void writeTile
+// ARRAY-NOT: array<texture2d
+// ARRAY: ->tiles_{{[0-9]+}}[i_{{[0-9]+}}].write(
+// ARRAY-NEXT: _slang_textureFence({{.*}}->tiles_{{[0-9]+}}[i_{{[0-9]+}}])
+[noinline]
+void writeTile(uint i, uint2 p)
+{
+    tiles[i][p] = float4(6.0);
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void computeMain(uint3 id: SV_DispatchThreadID)
@@ -61,6 +75,7 @@ void computeMain(uint3 id: SV_DispatchThreadID)
     uint2 p = id.xy;
 
     accumulate(p, id.z);
+    writeTile(id.z & 3, p);
 
     // The read-modify-write from the issue: the second read must see the write.
     // CHECK-LABEL: void computeMain
