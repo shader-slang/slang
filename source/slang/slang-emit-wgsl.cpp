@@ -380,8 +380,8 @@ static bool wgslFormatSupportsReadWrite(ImageFormat fmt)
     // pipeline creation. Core WebGPU allows read_write on r32float/uint/sint only, and the
     // `texture-formats-tier2` feature adds r8unorm/uint/sint, r16float/uint/sint and
     // rgba8unorm, rgba8/16/32uint, rgba8/16/32sint, rgba16float and rgba32float. Any other
-    // format, for example rg32float, bgra8unorm, rg8unorm or rgb10a2unorm, compiles with
-    // read_write here and is rejected by every device. Which pairs Slang should diagnose is
+    // emitted format, for example rg32float, bgra8unorm, rg8unorm or rgb10a2unorm, compiles
+    // with read_write here and is rejected by every device. Which pairs Slang should diagnose is
     // tracked in shader-slang/slang#13768.
     switch (fmt)
     {
