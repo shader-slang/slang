@@ -925,7 +925,8 @@ Fused operation that reorders threads by HitObject and then executes the shader.
 
 **Note**: Lowers to `OpHitObjectReorderExecuteShaderEXT` on SPIR-V and to `hitObjectReorderExecuteEXT` in GLSL
 with the EXT extension. Other SER targets (Vulkan NV, D3D12 DXR 1.3, CUDA) use `ReorderThread` followed by
-`HitObject.Invoke`. Not available for NVAPI, whose `HitObject.Invoke` requires an AccelerationStructure.
+`HitObject.Invoke`. Not available for NVAPI, whose `HitObject.Invoke` requires an AccelerationStructure;
+use `TraceReorderExecute`, or `ReorderThread` followed by `HitObject.Invoke(AccelerationStructure, HitOrMiss, Payload)`.
 
 ## Signature
 
