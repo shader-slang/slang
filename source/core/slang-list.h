@@ -369,11 +369,10 @@ public:
         // negative).
         if (UIndex(size) > UIndex(m_capacity))
         {
-            // `m_count <= m_capacity` is a class invariant, so the copy below stays inside both
-            // buffers. In release builds the assert also hands that invariant to GCC 14+, which
-            // otherwise, after inlining a run of `add` calls, pairs the allocation size of one
-            // growth step with the copy count of a later one and reports a false
-            // -Wstringop-overflow.
+            // `m_count <= m_capacity < size` keeps the loop below inside both buffers. In release
+            // builds the assert also gives GCC 14+ that bound; without it, inlining several `add`
+            // calls (see #13770, tools/slang-unit-test/unit-test-string.cpp) produces a false
+            // -Wstringop-overflow on the move loop.
             SLANG_ASSERT(m_count <= m_capacity);
             T* newBuffer = _allocate(size);
             if (m_capacity)
