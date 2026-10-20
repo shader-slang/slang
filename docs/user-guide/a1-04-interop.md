@@ -241,7 +241,7 @@ uint InstanceIndex()
 ```
 
 
-To set an execution mode from a function that is not itself an entry point, use the `__entryPoint` operand in an `OpExecutionMode` or `OpExecutionModeId` instruction. The execution mode is applied to every entry point that calls the function, so the block can live in a shared helper. An instruction that names its entry point instead, such as `OpExecutionMode $main ...`, applies only to that entry point. In `OpExecutionModeId`, the remaining operands are ids, such as a specialization constant:
+To set an execution mode from a function that is not itself an entry point, use the `__entryPoint` operand in an `OpExecutionMode` or `OpExecutionModeId` instruction. The execution mode is applied to every entry point that calls the function, directly or indirectly, so the block can live in a shared helper. An instruction that names its entry point instead, such as `OpExecutionMode $main ...` where `main` is an entry point function, applies only to that entry point. In `OpExecutionModeId`, the remaining operands are ids. Prefer a Slang constant, such as a `[vk::constant_id]` specialization constant referenced with `$`: a specialization constant or decorated constant defined inside the block gets a new id each time the block is inlined, so the mode would be repeated. For example:
 ```cpp
 [vk::constant_id(2)]
 const bool kEnableOpacityMicromap = false;
