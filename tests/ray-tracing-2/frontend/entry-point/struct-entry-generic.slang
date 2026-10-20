@@ -3,11 +3,6 @@
 //TEST:SIMPLE(filecheck=WARNING): -experimental-feature -entry ValueMiss<1.5> -stage miss -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR): -experimental-feature -entry ValueMiss<1.5> -stage miss -no-codegen -warnings-as-errors all
 
-// Resolving the entry-point name converts its value argument from float to int. Structural
-// fallback must preserve that warning, including when warnings are treated as errors.
-//WARNING: warning[E30081]: implicit conversion not recommended
-//ERROR: error[E30081]: implicit conversion not recommended
-
 import slang.raytracing;
 
 struct P {}
@@ -26,16 +21,11 @@ struct MissContext<PayloadType> : rt::IPayloadContext
     typealias Record = R;
 }
 
-// The first two commands select `M<P>`, so the compiler must use `P` wherever this entry point
-// uses `PayloadType`, including inside `MissContext<PayloadType>`.
+// `M<P>` chooses `P` for `PayloadType`. The `-no-codegen` test checks that this succeeds.
 //
-// The first command uses `-no-codegen`: it checks the program without producing target shader
-// code and should succeed. This catches the compiler forgetting `P` while selecting `invoke`.
-//
-// The second command asks for HLSL output. Generating an HLSL ray-tracing entry point from
-// `M<P>.invoke` is not implemented yet, so this command should report the error below.
-// Reaching that specific error also checks that the compiler still recognizes `M<P>.invoke`
-// as a structural ray-tracing entry point after replacing `PayloadType` with `P`.
+// The separate HLSL test checks CODEGEN below. Its two lines match one error: the short title
+// and the explanation at `invoke`. "Not lowered" means that this method has not been converted
+// into the shader entry function HLSL expects. That conversion is not implemented yet.
 struct M<PayloadType> : rt::IMissShader
 {
     typealias Context = MissContext<PayloadType>;
@@ -48,6 +38,11 @@ struct M<PayloadType> : rt::IMissShader
     {}
 }
 
+// The `ValueMiss<1.5>` commands pass a float to the integer parameter `N` below. This conversion
+// must produce a warning, or an error with `-warnings-as-errors all`. The diagnostic comes from
+// the command-line entry-point name, so it has no source-file location to check with a caret.
+//WARNING: warning[E30081]: implicit conversion not recommended
+//ERROR: error[E30081]: implicit conversion not recommended
 struct ValueMiss<let N : int> : rt::IMissShader
 {
     typealias Context = MissContext<P>;
