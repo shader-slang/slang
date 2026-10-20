@@ -27490,11 +27490,19 @@ void ReorderThread( HitObject HitOrMiss )
     }
 }
 
-// The helpers for the fused SER functions below are free functions rather than HitObject members
-// because the capability checker joins the `[require]` of a free function into the calling
-// `__target_switch` case, but not that of a static member called as `HitObject::name`. That gives
-// the fused `case spirv` the same ray-generation-only capabilities as the more specific NV sequence
-// case, which the checker requires of two cases on the same target.
+// Fused SER functions: `ReorderExecute`, `TraceReorderExecute` and `TraceMotionReorderExecute`.
+//
+// Each `__target_switch` lists the NV labels (`_GL_NV_shader_invocation_reorder`,
+// `spvShaderInvocationReorderNV`) with the separate-call sequence, because the NV atoms imply the
+// EXT atoms: a target with only the NV capability then picks the more specific NV case instead of
+// the EXT fused instruction, which is invalid on an NV hit object. `case hlsl` covers both D3D12
+// flavours (DXR 1.3 and NVAPI) unless a function lists `hlsl_nvapi` separately.
+//
+// The checker that validates these switches requires that, for two cases on the same target, one
+// case's capability set is a subset of the other's (E36120). A case's set includes the `[require]`
+// of the free functions its body calls, but not that of a generic static member called as
+// `HitObject::name<T>`. The generic SPIR-V helpers below are free functions for that reason: it
+// gives `case spirv` the same ray-generation-only set as the NV sequence case.
 
 [require(spirv, ser_raygen)]
 void __spirvReorderExecuteShaderEXT<payload_t>(HitObject hitObject, inout payload_t p)
@@ -27755,8 +27763,10 @@ void __glslTraceMotionReorderExecuteEXT(
 }
 
 // HitObject.Invoke has no single overload for both D3D12 SER flavours: NVAPI only has the
-// AccelerationStructure form and DXR 1.3 only has the form without it. Like `__hlslTraceRay`, this
-// helper takes the AccelerationStructure and drops it for DXR.
+// AccelerationStructure form and DXR 1.3 only has the form without it. This helper takes the
+// AccelerationStructure and drops it for DXR, so `TraceReorderExecute` can keep one `case hlsl`
+// for both. Splitting that case into `hlsl_nvapi` and `hlsl` cases that call the two existing
+// `Invoke` overloads fails for DXR: the NVAPI overload's switch has no DXR case (E41011).
 [require(nvapi, ser_raygen)]
 [require(hlsl, ser_dxr_raygen)]
 void __hlslInvokeHitObject<payload_t>(
@@ -27771,13 +27781,14 @@ void __hlslInvokeHitObject<payload_t>(
     }
 }
 
-// `HitObject.TraceMotionRay` needs motion-blur capabilities on every target, so the sequence
-// fallback of `TraceMotionReorderExecute` goes through a helper that requires them. That lets the
-// fallback use the plain NV case labels, which a target with only `spvShaderInvocationReorderNV`
-// prefers over `case spirv`.
+// The separate-call sequence for `TraceMotionReorderExecute` on targets without a fused form. Its
+// `[require]` gives that function's NV case the motion-blur capabilities of the fused cases, so
+// the case can use the plain NV labels. With motion-only NV labels instead, a target with just
+// `spvShaderInvocationReorderNV` would pick `case spirv` and emit the EXT fused instruction on an
+// NV hit object, which spirv-val rejects.
 [ForceInline]
 [require(cuda_glsl_spirv, ser_motion_raygen)]
-void __traceMotionReorderInvoke<payload_t>(
+void __traceMotionReorderExecuteSequence<payload_t>(
     RaytracingAccelerationStructure AccelerationStructure,
     uint RayFlags,
     uint InstanceInclusionMask,
@@ -27805,9 +27816,11 @@ void __traceMotionReorderInvoke<payload_t>(
 }
 
 // The two-argument `HitObject.Invoke` that `ReorderExecute` lowers to on D3D12 has no NVAPI form,
-// so NVAPI targets get this diagnostic, which names the function the user actually called.
+// so NVAPI targets get this diagnostic, which names the function the user actually called. It is a
+// function rather than a `static_assert` inline in `case hlsl_nvapi` because its `[require]` keeps
+// that case's capability set compatible with `case hlsl` (an inline assert fails with E36120).
 [require(nvapi, ser_raygen)]
-void __reorderExecuteHasNoNVAPIForm()
+void __diagnoseReorderExecuteOnNVAPI()
 {
     static_assert(false, "ReorderExecute has no NVAPI form, because NVAPI HitObject::Invoke requires "
         "an AccelerationStructure; call TraceReorderExecute, or ReorderThread followed by "
@@ -27817,6 +27830,7 @@ void __reorderExecuteHasNoNVAPIForm()
     /// Reorders threads by `HitOrMiss` and then invokes its closesthit or miss shader.
     /// Equivalent to `ReorderThread(HitOrMiss)` followed by `HitObject.Invoke(HitOrMiss, Payload)`,
     /// so it is not available for NVAPI, whose `Invoke` requires an AccelerationStructure.
+// NVAPI is listed so that NVAPI users get the targeted diagnostic instead of a capability error.
 [ForceInline]
 [require(hlsl, ser_dxr_raygen)]
 [require(nvapi, ser_raygen)]
@@ -27826,7 +27840,7 @@ void ReorderExecute<payload_t>(HitObject HitOrMiss, inout payload_t Payload)
     __target_switch
     {
     case hlsl_nvapi:
-        __reorderExecuteHasNoNVAPIForm();
+        __diagnoseReorderExecuteOnNVAPI();
     case hlsl:
     case _GL_NV_shader_invocation_reorder:
     case cuda:
@@ -27856,6 +27870,7 @@ void ReorderExecute<payload_t>(HitObject HitOrMiss, inout payload_t Payload)
     /// miss shader. Equivalent to `ReorderThread(HitOrMiss, CoherenceHint, NumCoherenceHintBitsFromLSB)`
     /// followed by `HitObject.Invoke(HitOrMiss, Payload)`, so it is not available for NVAPI, whose
     /// `Invoke` requires an AccelerationStructure.
+// NVAPI is listed so that NVAPI users get the targeted diagnostic instead of a capability error.
 [ForceInline]
 [require(hlsl, ser_dxr_raygen)]
 [require(nvapi, ser_raygen)]
@@ -27869,7 +27884,7 @@ void ReorderExecute<payload_t>(
     __target_switch
     {
     case hlsl_nvapi:
-        __reorderExecuteHasNoNVAPIForm();
+        __diagnoseReorderExecuteOnNVAPI();
     case hlsl:
     case _GL_NV_shader_invocation_reorder:
     case cuda:
@@ -28120,7 +28135,7 @@ void TraceMotionReorderExecute<payload_t>(
     case _GL_NV_shader_invocation_reorder:
     case cuda:
     case spvShaderInvocationReorderNV:
-        __traceMotionReorderInvoke(
+        __traceMotionReorderExecuteSequence(
             AccelerationStructure,
             RayFlags,
             InstanceInclusionMask,
