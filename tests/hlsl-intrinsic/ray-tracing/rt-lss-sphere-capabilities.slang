@@ -35,7 +35,7 @@
 
 struct Payload
 {
-    float4 color;
+    float4 sphere;
     float2x4 lss;
     bool isHit;
 };
@@ -44,7 +44,7 @@ struct Payload
 void main(inout Payload payload, BuiltInTriangleIntersectionAttributes attr)
 {
 #if defined(GLOBAL_SPHERE_POSITION_AND_RADIUS)
-    payload.color = GetSpherePositionAndRadius();
+    payload.sphere = GetSpherePositionAndRadius();
 #elif defined(GLOBAL_IS_SPHERE_HIT)
     payload.isHit = IsSphereHit();
 #elif defined(GLOBAL_LSS_POSITIONS_AND_RADII)
@@ -56,7 +56,7 @@ void main(inout Payload payload, BuiltInTriangleIntersectionAttributes attr)
 #else
     HitObject hitObject = HitObject.MakeNop();
 #if defined(HIT_OBJECT_SPHERE_POSITION_AND_RADIUS)
-    payload.color = hitObject.GetSpherePositionAndRadius();
+    payload.sphere = hitObject.GetSpherePositionAndRadius();
 #elif defined(HIT_OBJECT_IS_SPHERE_HIT)
     payload.isHit = hitObject.IsSphereHit();
 #elif defined(HIT_OBJECT_LSS_POSITIONS_AND_RADII)
