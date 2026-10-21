@@ -58,7 +58,7 @@ on:
       run-via-glsl:
         required: true
         type: boolean
-        description: "Run the via-glsl pass on release pull requests. API-split jobs run the same pass, so only one of them needs it."
+        description: "Run the via-glsl pass on pull requests. API-split jobs run the same pass, so only one of them needs it."
       api:
         required: false
         type: string
@@ -266,8 +266,8 @@ jobs:
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
-        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.run-via-glsl && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Run GLSL backend tests for pull requests, and not on merge_group, to reduce CI load.
+        if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.run-via-glsl && github.event_name == 'pull_request'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -282,6 +282,10 @@ jobs:
           if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
             via_glsl_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
           fi
+          # Skip most neural tests in debug builds to reduce CI time
+          if [[ "${{ inputs.config }}" == "debug" ]]; then
+            via_glsl_args+=("-skip-list" "tests/skip-list-debug.txt")
+          fi
           printf '+ %q' "$bin_dir/slang-test"
           printf ' %q' "${via_glsl_args[@]}"
           printf '\n'
@@ -289,8 +293,8 @@ jobs:
           "$bin_dir/slang-test" "${via_glsl_args[@]}"
 
       - name: Check via-glsl slang-test worktree cleanliness
-        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: always() && inputs.os != 'macos' && inputs.full-gpu-tests && inputs.run-via-glsl && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Run GLSL backend tests for pull requests, and not on merge_group, to reduce CI load.
+        if: always() && inputs.os != 'macos' && inputs.full-gpu-tests && inputs.run-via-glsl && github.event_name == 'pull_request'
         run: |
           status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
           if [[ -n "$status" ]]; then
