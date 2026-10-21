@@ -1449,6 +1449,7 @@ struct SemanticsContext
 {
 public:
     friend struct OuterScopeContextRAII;
+    friend struct OperandTryCoverageRAII;
 
     explicit SemanticsContext(SharedSemanticsContext* shared)
         : m_shared(shared)
@@ -1470,6 +1471,16 @@ public:
     SharedSemanticsContext* getShared() { return m_shared; }
     CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
+
+    /// Return the language of the translation unit being checked.
+    ///
+    /// Returns `SourceLanguage::Unknown` for reflection and specialization contexts that have no
+    /// translation unit.
+    SourceLanguage getSourceLanguage()
+    {
+        auto translationUnit = getShared()->getTranslationUnitRequest();
+        return translationUnit ? translationUnit->sourceLanguage : SourceLanguage::Unknown;
+    }
 
     DiagnosticSink* getSink() { return m_sink; }
 
@@ -1732,18 +1743,26 @@ protected:
     /// The linked list of lexically surrounding statements.
     OuterStmtInfo* m_outerStmts = nullptr;
 
-    /// The type of a try clause (if any) enclosing current expr.
-    TryClauseType m_enclosingTryClauseType = TryClauseType::None;
-
     /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
     /// is considered valid in the current context.
     bool m_allowStaticReferenceToNonStaticMember = false;
 
+    bool m_allowDroppingDerivatives = false;
+
+    /// The type of the try clause (if any) that covers the call being checked. A `try` covers only
+    /// the call it wraps, so `visitInvokeExpr`, `visitIndexExpr` and `visitTypeCastExpr` check
+    /// their operands under an `OperandTryCoverageRAII`, where this is `None`.
+    TryClauseType m_enclosingTryClauseType = TryClauseType::None;
+
+    /// The throwing calls whose coverage waits for the single-argument call around them to
+    /// resolve. Consider `try int(f())` where `f` returns `int`: `ResolveInvoke` reduces the
+    /// identity conversion `int(...)` to `f()` itself, so the `try` covers `f()`, but that is only
+    /// known after `f()` has been checked. Any other kind of operand is checked with this null.
+    List<InvokeExpr*>* m_pendingTryCoverage = nullptr;
+
     /// Whether or not we are in a `no_diff` environment (and therefore should treat the call to
     /// a non-differentiable function as differentiable and not issue a diagnostic).
     TreatAsDifferentiableExpr* m_treatAsDifferentiableExpr = nullptr;
-
-    bool m_allowDroppingDerivatives = false;
 
     ASTBuilder* m_astBuilder = nullptr;
 
@@ -1789,6 +1808,35 @@ struct OuterScopeContextRAII
     }
 
     ~OuterScopeContextRAII() { m_context->m_outerScope = m_oldOuterScope; }
+};
+
+/// Checks the operands of a call, which a `try` on that call does not cover, on the current
+/// context for the lifetime of this object. A throwing call found in an operand is diagnosed, or
+/// collected in `pendingTryCoverage` when that is non-null (see `m_pendingTryCoverage`).
+///
+/// We change the context in place so that each recursive operand level does not hold a copy of it;
+/// a long operator chain, as in `tests/glsl-intrinsic/intrinsic-texture.slang`, would otherwise
+/// overflow the stack of a Debug build.
+struct OperandTryCoverageRAII
+{
+    SemanticsContext* m_context;
+    TryClauseType m_oldEnclosingTryClauseType;
+    List<InvokeExpr*>* m_oldPendingTryCoverage;
+
+    OperandTryCoverageRAII(SemanticsContext* context, List<InvokeExpr*>* pendingTryCoverage)
+        : m_context(context)
+        , m_oldEnclosingTryClauseType(context->m_enclosingTryClauseType)
+        , m_oldPendingTryCoverage(context->m_pendingTryCoverage)
+    {
+        context->m_enclosingTryClauseType = TryClauseType::None;
+        context->m_pendingTryCoverage = pendingTryCoverage;
+    }
+
+    ~OperandTryCoverageRAII()
+    {
+        m_context->m_enclosingTryClauseType = m_oldEnclosingTryClauseType;
+        m_context->m_pendingTryCoverage = m_oldPendingTryCoverage;
+    }
 };
 
 #define SLANG_OUTER_SCOPE_CONTEXT_RAII(context, scope) \
@@ -1929,6 +1977,12 @@ public:
 
     Scope* getScope(SyntaxNode* node);
 
+    /// Diagnose use of a deprecated or removed declaration at `loc`.
+    ///
+    /// Requires a resolved `declRef` and a diagnostic sink. Uses the current module's language
+    /// version to decide whether removal applies; reports nothing when no module is available.
+    /// Inspects `originalExpr`, when non-null, to suppress repeats and uses at the declaration's
+    /// name location.
     void diagnoseDeprecatedAndRemovedDeclRefUsage(
         DeclRef<Decl> declRef,
         SourceLoc loc,
@@ -1955,6 +2009,12 @@ public:
             getDefaultDeclRef(declToSpecialize));
     }
 
+    /// Construct a checked variable or member expression for `declRef`.
+    ///
+    /// Requires a resolved declaration reference and a checked `baseExpr` when one is provided.
+    /// Selects the expression kind from the base and whether the declaration is static. The result
+    /// includes the declaration's type and the read/write restrictions of any instance-member
+    /// access.
     DeclRefExpr* ConstructDeclRefExpr(
         DeclRef<Decl> declRef,
         Expr* baseExpr,
@@ -2195,6 +2255,14 @@ public:
 
     Expr* _CheckTerm(Expr* term);
 
+    /// Checks an object-oriented `this` expression without registering a lambda capture.
+    ///
+    /// `ConstructLookupResultExpr` uses this operation when it reconstructs an implicit `this`
+    /// expression, because capture registration belongs to the surrounding expression-checking
+    /// path. The ordinary `this` expression visitor registers its own capture after calling this
+    /// operation.
+    Expr* checkThisExprWithoutCapturing(ThisExpr* expr);
+
     /// If inside a lambda body, check whether `exprIn` (or its base sub-expression chain)
     /// references an outer-scope variable that needs to be captured into the lambda struct.
     /// This handles the case where an expression was already checked by the parser's
@@ -2228,8 +2296,10 @@ public:
     Type* tryGetDifferentialPairType(Type* primalType);
 
     // Convert a function's original type to it's forward/backward diff'd type.
-    Type* getForwardDiffFuncType(FuncType* originalType, QualType thisType);
-    Type* getBackwardDiffFuncType(FuncType* originalType, QualType thisType = QualType());
+    Type* getForwardDiffFuncType(FuncType* originalType, std::optional<ParamInfo> thisParamInfo);
+    Type* getBackwardDiffFuncType(
+        FuncType* originalType,
+        std::optional<ParamInfo> thisParamInfo = std::nullopt);
 
     /// Registers a type as conforming to IDifferentiable, along with a witness
     /// describing the relationship.
@@ -2480,6 +2550,12 @@ public:
         bool ignoreUnallowedModifier);
 
     void checkModifiers(ModifiableSyntaxNode* syntaxNode);
+
+    /// Diagnoses repeated or conflicting receiver parameter mode specifiers attached to `decl`.
+    ///
+    /// Requires checked modifiers, so attributes have their concrete attribute classes.
+    void checkReceiverParamModeSpecifiers(Decl* decl);
+
     void checkVisibility(Decl* decl);
 
     bool doesAccessorMatchRequirement(
@@ -3192,6 +3268,34 @@ public:
     /// Determine what type `This` should refer to in an extension of `type`.
     Type* calcThisType(Type* type);
 
+    /// Compute the effective `this` parameter information for `decl`, if it has one.
+    ///
+    /// This operation is only used while advancing a declaration to
+    /// `DeclCheckState::SignatureChecked`. Other semantic-checking code should use the queries
+    /// below so that it reads the information attached to the declaration. A `this` expression in
+    /// the declaration's own signature is the exception: it needs this computation before the
+    /// transition can finish, but leaves diagnostics to the final call that publishes the result.
+    std::optional<ParamInfo> checkEffectiveThisParamInfo(
+        Decl* decl,
+        bool shouldDiagnoseModeAttributes);
+
+    /// Return the receiver parameter mode used for `decl` when no specifier is present.
+    ///
+    /// Setters and non-synthesized HLSL methods default to `ParamPassingMode::BorrowInOut`;
+    /// other declarations use `ParamPassingMode::In`.
+    /// For a non-synthesized `FuncDecl`, requires the context for its owning translation unit.
+    ParamPassingMode getDefaultReceiverParamMode(Decl* decl);
+
+    /// Compute and attach the effective `this` parameter information owned by `decl`.
+    void checkAndAttachEffectiveThisParamInfo(Decl* decl);
+
+    /// Return the effective `this` parameter information for `decl`, if it has one.
+    ///
+    /// These wrappers first ensure that the declaration has completed signature checking. The
+    /// underlying passive queries assert that precondition themselves.
+    std::optional<ParamInfo> findEffectiveThisParamInfo(DeclRef<Decl> const& declRef);
+    ParamInfo getEffectiveThisParamInfo(DeclRef<Decl> const& declRef);
+
     DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
 
     /// Calculate the builtin differentiable function interface type for a callable-as-type.
@@ -3533,8 +3637,23 @@ public:
 
     SubtypeWitness* isTypeDifferentiable(Type* type);
 
+    /// Determine whether `type` has the storage property identified by `tag`.
+    ///
+    /// Returns whether `getTypeTags` establishes the property. A false result does not prove
+    /// that a later specialization or linked replacement will lack it.
     bool doesTypeHaveTag(Type* type, TypeTag tag);
 
+    /// Compute the storage properties of `type`, including its specialized instance fields.
+    ///
+    /// Checks aggregate and field declarations only far enough to use their types. Field
+    /// initializers are checked only when needed to infer a type or array bound. For example,
+    /// `struct Box<T> { T value; };` has an opaque field when instantiated as `Box<Texture2D>`,
+    /// but not as `Box<float>`.
+    /// Returns established flags, rather than proof that absent properties cannot occur.
+    /// Unsubstituted generic parameters have no established flags. Includes `TypeTag::Incomplete`
+    /// for externally replaceable definitions and link-time aliases, and when recursive
+    /// inspection stops at a cycle or the nesting limit. Ordinary type validation diagnoses
+    /// invalid recursion; linked-type validation checks restrictions after replacement.
     TypeTag getTypeTags(Type* type);
 
     Type* getConstantBufferElementType(Type* type);
@@ -3713,7 +3832,7 @@ public:
     };
 
     // count the number of parameters required/allowed for a callable
-    ParamCounts CountParameters(FilteredMemberRefList<ParamDecl> params);
+    ParamCounts CountParameters(List<DeclRef<ParamDecl>> const& params);
 
     // count the number of parameters required/allowed for a generic
     ParamCounts CountParameters(DeclRef<GenericDecl> genericRef);
@@ -3785,6 +3904,10 @@ public:
     //
     // If the candidate isn't actually applicable, this is
     // where we'd start reporting the issue(s).
+    //
+    // A call whose callee expression has an `ErrorType` is itself returned with an
+    // `ErrorType`, as in `ResolveInvoke`, so consumers such as `visitTryExpr` can rely
+    // on any call that is not an error having a `FuncType`-typed callee.
     Expr* CompleteOverloadCandidate(OverloadResolveContext& context, OverloadCandidate& candidate);
 
     // Implement a comparison operation between overload candidates,
@@ -4056,8 +4179,23 @@ public:
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,
-        FunctionDeclBase* funcDeclBase);
+        List<DeclRef<ParamDecl>> const& paramDeclRefs);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
+
+    /// Diagnose `invoke`, a call whose callee may throw, unless a `try` covers it. While its
+    /// coverage is pending, `invoke` is added to `m_pendingTryCoverage` instead.
+    void checkThrowingCallIsCovered(InvokeExpr* invoke);
+
+    /// Return whether the coverage of the throwing calls in the argument of `expr` waits for
+    /// `expr` to resolve: `expr` is a single-argument call that is not an operator, so it may
+    /// resolve to an identity conversion of its argument, and a `try` covers or may cover it.
+    bool shouldDeferArgumentTryCoverage(InvokeExpr* expr);
+
+    /// Settle the coverage of `pendingCalls`, collected while the argument of a call was checked.
+    /// A pending call that the call resolved to (`checkedExpr`) is covered when the call would be;
+    /// no `try` covers any other pending call.
+    void settlePendingTryCoverage(Expr* checkedExpr, List<InvokeExpr*> const& pendingCalls);
+
     // Get the type to use when referencing a declaration
     QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
 
@@ -4549,10 +4687,6 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 
     ConstructorDecl* createCtor(AggTypeDecl* decl, DeclVisibility ctorVisibility);
 };
-
-QualType getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl);
-
-QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef);
 
 bool isUnsizedArrayType(Type* type);
 

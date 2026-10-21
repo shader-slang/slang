@@ -1464,7 +1464,26 @@ LanguageServerResult<LanguageServerProtocol::CompletionItem> LanguageServerCore:
     }
 
     LanguageServerProtocol::CompletionItem resolvedItem = args;
-    int itemId = stringToInt(args.data);
+    // `data` is "<completion version serial>:<candidate index>" for an item that has a completion
+    // candidate. Items without a candidate (keywords, which use "-1", and the other non-member
+    // items) have no colon and are deliberately returned unchanged: there is nothing to resolve.
+    // The index is only meaningful for the completion version that produced the item, so an item
+    // from an earlier completion request (or with malformed data) is also returned unresolved
+    // instead of being resolved against an unrelated declaration.
+    auto data = args.data.getUnownedSlice();
+    auto colon = data.indexOf(':');
+    if (colon == -1)
+    {
+        return resolvedItem;
+    }
+    int64_t serial = 0;
+    Int itemId = 0;
+    if (SLANG_FAILED(StringUtil::parseInt64(data.head(colon), serial)) || serial < 0 ||
+        uint64_t(serial) != m_workspace->getCompletionVersionSerial() ||
+        SLANG_FAILED(StringUtil::parseInt(data.tail(colon + 1), itemId)))
+    {
+        return resolvedItem;
+    }
     auto version = m_workspace->getCurrentCompletionVersion();
     if (!version || !version->linkage)
     {
@@ -2354,6 +2373,34 @@ void sendRefreshRequests(JSONRPCConnection* connection)
     connection->sendCall(UnownedStringSlice("workspace/inlayHint/refresh"), JSONValue::makeInt(0));
 }
 
+static bool isNullConfigValue(const JSONValue& value)
+{
+    return value.getKind() == JSONValue::Kind::Null;
+}
+
+// Apply one client setting from a `workspace/configuration` reply or a
+// `workspace/didChangeConfiguration` notification to `option`. An invalid `value` means the message
+// did not mention the setting, as when a notification passes `JSONValue()` for the other arguments
+// of an updater that takes several settings, so `option` keeps its current value. JSON null means
+// the client has no value for the setting now, so `option` takes `defaultValue`; LSP requires a
+// client to answer null for a setting it cannot provide. Any other value is converted into
+// `option`.
+//
+// The remaining updaters already interpret the converter's empty string or list for null as their
+// default.
+template<typename T>
+static void applyConfigValue(
+    JSONToNativeConverter& converter,
+    const JSONValue& value,
+    T& option,
+    const T& defaultValue)
+{
+    if (isNullConfigValue(value))
+        option = defaultValue;
+    else if (value.isValid())
+        converter.convert(value, &option);
+}
+
 void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
 {
     if (macros.isValid())
@@ -2390,18 +2437,13 @@ void LanguageServer::updateSearchPaths(const JSONValue& value)
 
 void LanguageServer::updateSearchInWorkspace(const JSONValue& value)
 {
-    if (value.isValid())
+    auto container = m_connection->getContainer();
+    JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
+    bool searchInWorkspace = m_core.m_workspace->searchInWorkspace;
+    applyConfigValue(converter, value, searchInWorkspace, Workspace::kDefaultSearchInWorkspace);
+    if (m_core.m_workspace->updateSearchInWorkspace(searchInWorkspace))
     {
-        auto container = m_connection->getContainer();
-        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
-        bool searchPaths;
-        if (SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
-        {
-            if (m_core.m_workspace->updateSearchInWorkspace(searchPaths))
-            {
-                sendRefreshRequests(m_connection);
-            }
-        }
+        sendRefreshRequests(m_connection);
     }
 }
 
@@ -2440,24 +2482,36 @@ void LanguageServer::updateFormattingOptions(
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
-    if (enableFormatOnType.isValid())
-        converter.convert(enableFormatOnType, &m_core.m_formatOptions.enableFormatOnType);
-    if (clangFormatLoc.isValid())
-        converter.convert(clangFormatLoc, &m_core.m_formatOptions.clangFormatLocation);
-    if (clangFormatStyle.isValid())
-        converter.convert(clangFormatStyle, &m_core.m_formatOptions.style);
-    if (clangFormatFallbackStyle.isValid())
-        converter.convert(clangFormatFallbackStyle, &m_core.m_formatOptions.fallbackStyle);
-    if (allowLineBreakOnType.isValid())
-        converter.convert(
-            allowLineBreakOnType,
-            &m_core.m_formatOptions.allowLineBreakInOnTypeFormatting);
-    if (allowLineBreakInRange.isValid())
-        converter.convert(
-            allowLineBreakInRange,
-            &m_core.m_formatOptions.allowLineBreakInRangeFormatting);
-    if (m_core.m_formatOptions.style.getLength() == 0)
-        m_core.m_formatOptions.style = Slang::FormatOptions().style;
+    const FormatOptions defaultOptions;
+    auto& options = m_core.m_formatOptions;
+    applyConfigValue(
+        converter,
+        enableFormatOnType,
+        options.enableFormatOnType,
+        defaultOptions.enableFormatOnType);
+    applyConfigValue(
+        converter,
+        clangFormatLoc,
+        options.clangFormatLocation,
+        defaultOptions.clangFormatLocation);
+    applyConfigValue(converter, clangFormatStyle, options.style, defaultOptions.style);
+    applyConfigValue(
+        converter,
+        clangFormatFallbackStyle,
+        options.fallbackStyle,
+        defaultOptions.fallbackStyle);
+    applyConfigValue(
+        converter,
+        allowLineBreakOnType,
+        options.allowLineBreakInOnTypeFormatting,
+        defaultOptions.allowLineBreakInOnTypeFormatting);
+    applyConfigValue(
+        converter,
+        allowLineBreakInRange,
+        options.allowLineBreakInRangeFormatting,
+        defaultOptions.allowLineBreakInRangeFormatting);
+    if (options.style.getLength() == 0)
+        options.style = defaultOptions.style;
 }
 
 void LanguageServer::updateInlayHintOptions(
@@ -2466,10 +2520,15 @@ void LanguageServer::updateInlayHintOptions(
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
-    bool showDeducedType = false;
-    bool showParameterNames = false;
-    converter.convert(deducedTypes, &showDeducedType);
-    converter.convert(parameterNames, &showParameterNames);
+    const Slang::InlayHintOptions defaultOptions;
+    bool showDeducedType = m_core.m_inlayHintOptions.showDeducedType;
+    bool showParameterNames = m_core.m_inlayHintOptions.showParameterNames;
+    applyConfigValue(converter, deducedTypes, showDeducedType, defaultOptions.showDeducedType);
+    applyConfigValue(
+        converter,
+        parameterNames,
+        showParameterNames,
+        defaultOptions.showParameterNames);
     if (showDeducedType != m_core.m_inlayHintOptions.showDeducedType ||
         showParameterNames != m_core.m_inlayHintOptions.showParameterNames)
     {
@@ -2509,8 +2568,11 @@ void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
         String str;
         if (SLANG_SUCCEEDED(converter.convert(value, &str)))
         {
-            WorkspaceFlavor flavor = WorkspaceFlavor::Standard;
-            if (str == "standard")
+            // `standard` and `vfx` select that flavor. An empty value selects `standard`: there is
+            // no unset flavor, and `standard` is the default the VS Code extension declares for
+            // `slang.workspaceFlavor`. Any other value is logged and the previous flavor is kept.
+            WorkspaceFlavor flavor;
+            if (str.getLength() == 0 || str == "standard")
             {
                 flavor = WorkspaceFlavor::Standard;
             }
@@ -2518,8 +2580,27 @@ void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
             {
                 flavor = WorkspaceFlavor::VFX;
             }
+            else
+            {
+                logMessage(
+                    2 /* warning */,
+                    String("slang.workspaceFlavor: unknown flavor '") + str +
+                        "'; keeping the previous setting.");
+                return;
+            }
 
-            m_core.m_workspace->workspaceFlavor = flavor;
+            if (m_core.m_workspace->updateWorkspaceFlavor(flavor))
+            {
+                // The flavor changes how every open document compiles, and the next
+                // publishDiagnostics() starts from a new workspace version that only holds the
+                // modules it loads itself. Queue the open documents so that it recompiles them
+                // under the new flavor instead of clearing their published diagnostics.
+                for (const auto& [path, _] : m_core.m_workspace->openedDocuments)
+                {
+                    m_pendingModulesToUpdateDiagnostics.add(path);
+                }
+                sendRefreshRequests(m_connection);
+            }
         }
     }
 }

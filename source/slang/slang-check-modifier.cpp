@@ -2017,7 +2017,17 @@ Modifier* SemanticsVisitor::checkModifier(
             getSink()->diagnose(Diagnostics::ConstexprOnCallableIgnored{.modifier = m});
         }
     }
-    if (as<ConstModifier>(m))
+    if (as<CppStyleTrailingReceiverParamConstModifier>(m))
+    {
+        // We leave trailing `const` attached after the diagnostic so receiver checking can
+        // interpret the method as nonmutating while checking its body.
+        if (getSourceLanguage() != SourceLanguage::HLSL)
+        {
+            getSink()->diagnose(
+                Diagnostics::CppStyleTrailingReceiverParamConstRequiresHlsl{.modifier = m});
+        }
+    }
+    else if (as<ConstModifier>(m))
     {
         if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
         {
@@ -2578,6 +2588,9 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     }
 
     postProcessingOnModifiers(m_astBuilder, syntaxNode->modifiers);
+
+    if (auto decl = as<Decl>(syntaxNode))
+        checkReceiverParamModeSpecifiers(decl);
 }
 
 void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)

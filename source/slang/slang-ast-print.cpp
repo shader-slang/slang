@@ -1630,6 +1630,11 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
     else
     {
     }
+
+    if (maybeGetInner(declRef.getDecl())->hasModifier<CppStyleTrailingReceiverParamConstModifier>())
+    {
+        sb << " const";
+    }
 }
 
 void ASTPrinter::addDeclKindPrefix(Decl* decl)
@@ -1640,6 +1645,11 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
     }
     for (auto modifier : decl->modifiers)
     {
+        // We omit trailing `const` because this loop prints prefix modifiers. For example,
+        // `int read() const` must not be displayed as `const func read() -> int`.
+        if (as<CppStyleTrailingReceiverParamConstModifier>(modifier))
+            continue;
+
         if (modifier->getKeywordName())
         {
             if (m_optionFlags & OptionFlag::NoInternalKeywords)

@@ -975,7 +975,7 @@ bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedF
 namespace
 { // anonymous
 
-// Inlines calls that involve String types
+// Inlines calls whose parameter or result types need legalization before target emission.
 struct TypeInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
@@ -983,6 +983,7 @@ struct TypeInliningPass : InliningPassBase
     TargetProgram* targetProgram;
 
     bool shouldInlineBorrowRefTypesForSPIRV = false;
+    bool shouldInlineNonDefaultMatrixAggregatesForHLSL = false;
 
     TypeInliningPass(IRModule* module, TargetProgram* inTargetProgram)
         : Super(module), targetProgram(inTargetProgram)
@@ -991,6 +992,60 @@ struct TypeInliningPass : InliningPassBase
         {
             shouldInlineBorrowRefTypesForSPIRV = true;
         }
+        auto target = targetProgram->getTargetReq()->getTarget();
+        shouldInlineNonDefaultMatrixAggregatesForHLSL = target == CodeGenTarget::HLSL ||
+                                                        target == CodeGenTarget::DXIL ||
+                                                        target == CodeGenTarget::DXILAssembly;
+    }
+
+    // Returns whether a value type contains a matrix whose layout differs from the target default.
+    // Matrix layouts are resolved before this pass. Only by-value struct fields and array elements
+    // contribute to aggregate storage; pointers and resource handles do not.
+    bool containsMatrixWithNonDefaultLayout(IRType* type)
+    {
+        if (auto matrixType = as<IRMatrixType>(type))
+        {
+            return getIntVal(matrixType->getLayout()) !=
+                   targetProgram->getOptionSet().getMatrixLayoutMode();
+        }
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+            return containsMatrixWithNonDefaultLayout(arrayType->getElementType());
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                if (containsMatrixWithNonDefaultLayout(field->getFieldType()))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    // Returns whether an out/inout parameter needs inlining to preserve its matrix elements in DXC.
+    bool doesHLSLAggregateParamRequireInlining(IRType* type)
+    {
+        if (!shouldInlineNonDefaultMatrixAggregatesForHLSL)
+            return false;
+        auto valueType = cast<IRPtrTypeBase>(type)->getValueType();
+        if (!as<IRStructType>(valueType) && !as<IRArrayTypeBase>(valueType))
+            return false;
+
+        // DXC can reorder component accesses inside aggregate output parameters when a matrix
+        // field's layout differs from its command-line default. Consider this example:
+        //
+        //     struct S { column_major float2x3 m; };
+        //     void fill(out S s)
+        //     {
+        //         s.m = (float2x3)0;
+        //         s.m[0][1] = 1;
+        //         s.m[1][0] = 3;
+        //     }
+        //
+        // With -Zpr, the caller reads 0 at [0][1] and 1 at [1][0], rather than 1 and 3.
+        // Bare matrix parameters and ordinary aggregate copies work correctly. Inlining
+        // these aggregate calls before DXC removes the faulty parameter copy without
+        // changing the fields' storage layout or the default layout of other matrices.
+        return containsMatrixWithNonDefaultLayout(valueType);
     }
 
     bool doesTypeRequireInline(IRType* type, IRInst* arg, IRFunc* callee)
@@ -1003,14 +1058,19 @@ struct TypeInliningPass : InliningPassBase
         const auto op = type->getOp();
         switch (op)
         {
+        case kIROp_OutParamType:
+            return doesHLSLAggregateParamRequireInlining(type);
         case kIROp_RefParamType:
             {
                 if (callee->findDecoration<IRNoRefInlineDecoration>())
                     return false;
                 return true;
             }
-        case kIROp_BorrowInParamType:
         case kIROp_BorrowInOutParamType:
+            if (doesHLSLAggregateParamRequireInlining(type))
+                return true;
+            [[fallthrough]];
+        case kIROp_BorrowInParamType:
             {
                 if (shouldInlineBorrowRefTypesForSPIRV)
                 {

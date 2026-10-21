@@ -151,6 +151,33 @@ struct IRGLSLOuterArrayDecoration : IRDecoration
     UnownedStringSlice getOuterArrayName() { return getOuterArrayNameOperand()->getStringSlice(); }
 };
 
+/// The grouping of compute shader invocations used to evaluate derivatives.
+enum class DerivativeGroupMode
+{
+    Quad,
+    Linear,
+};
+
+FIDDLE()
+struct IRDerivativeGroupDecoration : IRDecoration
+{
+    FIDDLE(baseInst())
+
+    /// Returns the grouping selected by this decoration.
+    DerivativeGroupMode getMode()
+    {
+        switch (getOp())
+        {
+        case kIROp_DerivativeGroupQuadDecoration:
+            return DerivativeGroupMode::Quad;
+        case kIROp_DerivativeGroupLinearDecoration:
+            return DerivativeGroupMode::Linear;
+        default:
+            SLANG_UNEXPECTED("unexpected derivative-group decoration");
+        }
+    }
+};
+
 enum class IRInterpolationMode
 {
     Linear,
@@ -5032,6 +5059,14 @@ $(type_info.return_type) $(type_info.method_name)(
     {
         addDecoration(value, kIROp_PatchConstantFuncDecoration, patchConstantFunc);
     }
+
+    /// Marks a global variable as belonging to the patch constant interface of a
+    /// tessellation shader, so that emit can distinguish it from per-control-point I/O:
+    /// SPIR-V emits the `Patch` decoration (SpvDecorationPatch), while GLSL emits the
+    /// patch storage qualifier. The interface consists of patch constant function
+    /// outputs in a hull (tessellation control) shader and patch constant inputs in a
+    /// domain (tessellation evaluation) shader.
+    void addGLSLPatchDecoration(IRInst* value) { addDecoration(value, kIROp_GLSLPatchDecoration); }
 
     void addImportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
