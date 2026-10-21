@@ -40,7 +40,6 @@ tests/neural/tiled-mma-load-test-unAligned-width-height-A.slang
 
 # Skip unit tests that start many slangc processes or a nested slang-test.
 # They are slow in debug builds.
-# Prefix matching is case-sensitive, so TestServerParentMonitor* still runs.
 slang-unit-test-tool/testServer
 slang-unit-test-tool/Slangc
 slang-unit-test-tool/DepfileOutput
