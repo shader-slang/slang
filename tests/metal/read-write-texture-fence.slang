@@ -30,6 +30,7 @@ RWStructuredBuffer<float4> outputBuffer;
 struct Targets
 {
     RWTexture2D<float4> color;
+    RWTexture2D<uint> counter;
 }
 ParameterBlock<Targets> targets;
 
@@ -120,6 +121,7 @@ void computeMain(uint3 id: SV_DispatchThreadID)
     // CHECK: [[PAIR:_S[0-9]+]] = uint4(1U, 2U,
     // CHECK-NEXT: _slang_textureFence({{.*}}pairs
     // CHECK-NEXT: pairs{{.*}}.write([[PAIR]],
+    // CHECK-NEXT: _slang_textureFence({{.*}}pairs
     pairs[p.x] = uint2(1, 2);
 
     // A later ordinary texture read must see the atomic write.
@@ -151,8 +153,16 @@ void computeMain(uint3 id: SV_DispatchThreadID)
     // CHECK-NEXT: _slang_textureFence([[COLOR]])
     targets.color[p] = float4(4.0);
 
-    // A write-only texture has no `fence()`, and nothing else is written from here to the end of
-    // the kernel, so no fence of any texture may appear between these two lines.
+    // An atomic on a texture in a parameter block is fenced like any other texture atomic.
+    // CHECK: [[COUNTER:_S[0-9]+]] = {{.*}}->counter
+    // CHECK-NEXT: _slang_textureFence([[COUNTER]])
+    // CHECK-NEXT: [[COUNTER]].atomic_fetch_add(
+    // CHECK-NEXT: _slang_textureFence([[COUNTER]])
+    InterlockedAdd(targets.counter[p], 1, previous);
+
+    // A write-only texture has no `fence()`, and no other texture is written from here to the end
+    // of the kernel, so no fence of any texture may appear between these two lines.
+    // CHECK-NOT: _slang_textureFence({{.*}}writeOnly
     // CHECK: writeOnly{{.*}}.write(
     // CHECK-NOT: _slang_textureFence
     // CHECK: readOnly{{.*}}.read(

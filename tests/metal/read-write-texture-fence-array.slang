@@ -11,7 +11,7 @@ RWTexture2D<float4> colors[];
 RWTexture2D<uint> counters[];
 RWTexture2D<float4> sizedColors[8];
 
-// CHECK-LABEL: void paint
+// CHECK-LABEL: void paint_
 // CHECK-NOT: _S{{[0-9]+}}[] =
 // CHECK: ->colors_{{[0-9]+}}[i_{{[0-9]+}}].write(
 // CHECK-NEXT: _slang_textureFence({{.*}}->colors_{{[0-9]+}}[i_{{[0-9]+}}])

@@ -477,9 +477,10 @@ static IRInst* getWrittenTexture(IRInst* inst)
 
 // MSL makes a thread's write to an `access::read_write` texture visible to that thread's
 // later reads of the texture only after a `fence()` on it (MSL 4.1 section 6.13.17); HLSL,
-// SPIR-V and WGSL order these accesses implicitly. We fence after each write so that later
-// reads see it, and before each write so that it cannot move ahead of an earlier read of the
-// same texel. Dawn needed the fence before writes for a write-after-read failure on Apple M1
+// SPIR-V and WGSL order these accesses implicitly. The fence after each write is that
+// specified requirement. The fence before each write is not in section 6.13.17: it keeps the
+// write from moving ahead of an earlier read of the same texel, a write-after-read failure that
+// Dawn observed on Apple M1 hardware while it already fenced after every write
 // (crbug.com/417296309).
 //
 // The pass sees every texture write because Metal texture stores in the core module lower to
