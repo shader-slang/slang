@@ -500,10 +500,10 @@ struct ByteAddressBufferLegalizationContext
 
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
-                // We load the whole array at once only when the access is known to be aligned to
-                // the array's size and the target does not set `scalarizeVectorLoadStore`, which
-                // splits arrays as well as vectors. WGSL and Metal, for example, see the buffer as
-                // an array of 32-bit words, so a whole-array leaf load there reads one word.
+                // We load the whole array with one `emitSimpleLoad` only when the access is known
+                // to be aligned to the array's size and the target does not set
+                // `scalarizeVectorLoadStore`. When that option is set, no constant-size array or
+                // vector reaches `emitSimpleLoad`; such accesses are split into their elements.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
@@ -614,8 +614,6 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                // Emit an aligned vector load operation when using a LoadAligned inst.
-                // Else, fallback to scalarizing the loads.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
@@ -1464,6 +1462,7 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
+                // The whole-array vs. per-element decision matches the load side.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
@@ -1571,9 +1570,7 @@ struct ByteAddressBufferLegalizationContext
         {
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                // Emit an aligned vector store operation when using a StoreAligned inst.
-                // Else, fallback to scalarizing the stores.
-
+                // The whole-vector vs. per-element decision matches the load side.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
