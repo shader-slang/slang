@@ -221,11 +221,11 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
                 // A specialization-constant axis names its `override`, so the pipeline can set
                 // the workgroup size. WGSL requires every `@workgroup_size` argument to have the
                 // same type, so we keep literal axes as bare abstract-int literals (which convert
-                // to either i32 or u32) and convert every override that is not `i32` to `i32`.
+                // to either i32 or u32) and convert a `u32` override to `i32`.
                 // We pick `i32` because semantic checking canonicalizes `[numthreads]` extents
                 // to `int` and `WorkgroupSize()` returns `int3`. After enum lowering the only
-                // other override type valid in `@workgroup_size` is `u32`; a 64-bit spec constant
-                // already has no valid WGSL `override` declaration.
+                // other override type valid in `@workgroup_size` is `u32`, so any other type (a
+                // 64-bit spec constant) is reported as unsupported.
                 m_writer->emit("@workgroup_size(");
                 for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
                 {
@@ -237,15 +237,22 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
                         continue;
                     }
                     auto specConst = numThreadsDecor->getOperand(ii);
-                    if (specConst->getDataType()->getOp() == kIROp_IntType)
+                    switch (specConst->getDataType()->getOp())
                     {
+                    case kIROp_IntType:
                         m_writer->emit(getName(specConst));
-                    }
-                    else
-                    {
+                        break;
+                    case kIROp_UIntType:
                         m_writer->emit("i32(");
                         m_writer->emit(getName(specConst));
                         m_writer->emit(")");
+                        break;
+                    default:
+                        getSink()->diagnose(
+                            Diagnostics::UnsupportedSpecializationConstantForNumThreads{
+                                .location = numThreadsDecor->sourceLoc});
+                        m_writer->emit(getName(specConst));
+                        break;
                     }
                 }
                 m_writer->emit(")\n");
