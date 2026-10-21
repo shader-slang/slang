@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Scalar `exp10` and tuple `concat` have bodies in `hlsl.meta.slang` and
-// `core.meta.slang` that HLSL emit writes out as separate functions, so
-// each function gets a `#line` naming its meta-module, and the entry
-// point gets a `#line` naming this file.
+// A `#line` names the file that the emitted code's source location is in.
+// `exp10` (hlsl.meta.slang) and `concat` (core.meta.slang) keep a Slang body
+// on HLSL and are not inlined, so each is emitted as its own function under
+// a meta-module `#line`. Only these two calls matter to the meta CHECKs.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 
