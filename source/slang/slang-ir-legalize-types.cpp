@@ -3373,8 +3373,8 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
     return newTypeLayoutBuilder.build();
 }
 
-/// Create an array type layout that holds `newElementTypeLayout` and scales each of its resource
-/// kinds the same way `oldArrayTypeLayout` scales its own element.
+/// Create an array type layout with `newElementTypeLayout` as its element, scaling each resource
+/// kind by the factor that `oldArrayTypeLayout` applies to its own element.
 ///
 /// An array does not scale every kind by its element count. Consider:
 ///
@@ -3386,15 +3386,11 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
 /// with `Texture2D gMaterials_tex[4]`, the new array must use the same amounts, so we read the
 /// factor for each kind from the original array instead of recomputing it.
 ///
-/// An unbounded array of structs gives each resource field a whole register space, and the
-/// original array then has no usage for that field's kind. The new array is then unbounded in
-/// its own space, like a plain `Texture2D textures[]`.
+/// The new layout leaves out the ordinary bytes, because they stay in the enclosing buffer, and an
+/// array's byte size includes padding between elements, so it is not a whole multiple of the
+/// element's.
 ///
-/// Only resource kinds reach this function, so every finite factor is a whole number. The
-/// ordinary bytes of an array include padding between elements and are not a multiple of the
-/// element size, but they never appear here.
-///
-static IRTypeLayout* _createArrayTypeLayoutLike(
+static IRTypeLayout* _createArrayTypeLayoutWithElement(
     IRBuilder* irBuilder,
     IRArrayTypeLayout* oldArrayTypeLayout,
     IRTypeLayout* newElementTypeLayout)
@@ -3405,46 +3401,60 @@ static IRTypeLayout* _createArrayTypeLayoutLike(
     for (auto sizeAttr : newElementTypeLayout->getSizeAttrs())
     {
         auto kind = sizeAttr->getResourceKind();
-        auto newSize = sizeAttr->getSize();
+        if (kind == LayoutResourceKind::Uniform)
+            continue;
+
+        LayoutSize newSize = sizeAttr->getSize();
+        auto oldElementSizeAttr = oldElementTypeLayout->findSizeAttr(kind);
+        if (!oldElementSizeAttr)
+        {
+            // Some passes build an element layout whose fields carry usage that the struct
+            // itself does not record; `lowerCombinedTextureSamplers` does this for a
+            // `Sampler2D`. The original array then gives no factor, so we keep the field's own
+            // usage, which is what the original layout recorded for it.
+            newArrayTypeLayoutBuilder.addResourceUsage(kind, newSize);
+            continue;
+        }
+        auto oldElementSize = oldElementSizeAttr->getSize();
 
         auto oldArraySizeAttr = oldArrayTypeLayout->findSizeAttr(kind);
-        auto oldElementSizeAttr = oldElementTypeLayout->findSizeAttr(kind);
-        if (oldElementSizeAttr && !oldArraySizeAttr)
+        if (!oldArraySizeAttr)
         {
-            // The original array is unbounded and moved this kind into whole register spaces,
-            // so the new array fills its space the way a plain unbounded resource array does.
-            newSize = LayoutSize::infinite();
+            // The array has no usage for a kind its element uses only when it holds no elements,
+            // or when it is an unbounded array of structs. The latter moves this kind into a
+            // whole register space per field (`SubElementRegisterSpace`), so the new array fills
+            // its space the way a plain `Texture2D textures[]` does.
+            newSize = oldArrayTypeLayout->findSizeAttr(LayoutResourceKind::SubElementRegisterSpace)
+                          ? LayoutSize::infinite()
+                          : LayoutSize(0);
         }
-        else if (oldArraySizeAttr && oldElementSizeAttr)
+        else if (!oldArraySizeAttr->getSize().isFinite() || !oldElementSize.isFinite())
         {
-            auto oldArraySize = oldArraySizeAttr->getSize();
-            auto oldElementSize = oldElementSizeAttr->getSize();
-            if (!oldArraySize.isFinite())
-            {
-                newSize = oldArraySize;
-            }
-            else if (oldElementSize.isFinite() && oldElementSize.getFiniteValueOr(0) != 0)
-            {
-                auto oldArrayCount = oldArraySize.getFiniteValueOr(0);
-                auto oldElementCount = oldElementSize.getFiniteValueOr(0);
-                SLANG_ASSERT(oldArrayCount % oldElementCount == 0);
-                newSize *= LayoutSize(oldArrayCount / oldElementCount);
-            }
+            // The array is unbounded for this kind, or the element itself holds an unbounded
+            // array, so the new array is unbounded too.
+            newSize = oldArraySizeAttr->getSize();
+        }
+        else
+        {
+            auto oldArrayUnits = oldArraySizeAttr->getSize().getFiniteValueOr(0);
+            auto oldElementUnits = oldElementSize.getFiniteValueOr(0);
+            SLANG_RELEASE_ASSERT(oldElementUnits != 0 && oldArrayUnits % oldElementUnits == 0);
+            newSize *= LayoutSize(oldArrayUnits / oldElementUnits);
         }
         newArrayTypeLayoutBuilder.addResourceUsage(kind, newSize);
-        if (auto alignmentAttr = oldArrayTypeLayout->findAlignmentAttr(kind))
-            newArrayTypeLayoutBuilder.addAlignment(alignmentAttr);
     }
     return newArrayTypeLayoutBuilder.build();
 }
 
-/// Wrap `fieldTypeLayout` in one array type layout for each array layer of
-/// `parentTypeLayout`, innermost first.
+/// Wrap `fieldTypeLayout` in the leading array layers of `parentTypeLayout`, so that the result
+/// has the same array nesting, each layer scaled the way that layer scales its element.
 ///
 /// Legalization turns an array of structs with resource fields into one array per field
 /// (`Material gMaterials[4]` becomes `Texture2D gMaterials_tex[4]`), and `getFieldLayout`
 /// looks through the array layers to find the field, so the field's own layout only
-/// describes one element.
+/// describes one element. `getFieldLayout` also looks through parameter-group layers, but we
+/// stop there, because a parameter group does not wrap an array around the legalized type of
+/// its fields.
 ///
 static IRTypeLayout* _wrapFieldTypeLayoutInParentArrays(
     IRBuilder* irBuilder,
@@ -3459,12 +3469,16 @@ static IRTypeLayout* _wrapFieldTypeLayoutInParentArrays(
         irBuilder,
         parentArrayTypeLayout->getElementTypeLayout(),
         fieldTypeLayout);
-    return _createArrayTypeLayoutLike(irBuilder, parentArrayTypeLayout, elementFieldTypeLayout);
+    return _createArrayTypeLayoutWithElement(
+        irBuilder,
+        parentArrayTypeLayout,
+        elementFieldTypeLayout);
 }
 
-/// Create the type layout for the ordinary part of a value that legalization has split into an
-/// ordinary part and a special (resource) part. `typeLayout` is the layout of the whole value,
-/// and `pairInfo` records which of its fields went to which part.
+/// Create the type layout for the ordinary part of a split parameter group: what stays in the
+/// original buffer once legalization has moved its resource fields out to parameters of their
+/// own. `typeLayout` is the layout of the whole group (or an array of groups), and `pairInfo`
+/// records which fields of its element moved out.
 ///
 /// Consider:
 ///
@@ -3474,19 +3488,20 @@ static IRTypeLayout* _wrapFieldTypeLayoutInParentArrays(
 /// When targeting Vulkan, `gP` uses three `binding`s: one for the constant buffer, plus those of
 /// `a` and `b`, which bleed through it. Resource legalization turns `gP` into a constant buffer
 /// that holds only `tint`, plus stand-alone parameters for `a` and `b` with their own layouts.
-/// The leftover buffer must then claim only its own binding. Otherwise the parameter usage
-/// metadata reports the bindings of `a` and `b` as used, even after one of them has been
-/// removed as dead code.
+/// `collectMetadata` reports every kind in a parameter's size attributes as used at that
+/// parameter's offsets, so the leftover buffer must claim only its own binding. Otherwise the
+/// bindings of `a` and `b` are reported as used, even after one of them has been removed as
+/// dead code.
 ///
 /// We add up the usage of the parts that stay ordinary instead of subtracting the parts that
 /// moved, because a moved part does not always count its usage the way the group did. For
 /// example, an unbounded array of textures takes a whole register space in the group, but its
 /// own layout counts registers.
 ///
-/// A parameter group keeps its container, element and offset element layouts. The offsets of
-/// the variable that holds the ordinary part are derived from the kinds its layout uses, so an
-/// offset for a kind that moved out is dropped too. Emitters read those offsets, but only for
-/// kinds the variable itself binds.
+/// The struct case is only reached through an enclosing parameter group, which masks the
+/// struct's ordinary bytes, so it returns only the resource usage of the fields that stay. Those
+/// can still hold resources: a nested `ConstantBuffer<Q>` field stays in the group's element
+/// when `Q` is itself split.
 ///
 static IRTypeLayout* _createOrdinaryPartTypeLayout(
     IRBuilder* irBuilder,
@@ -3499,7 +3514,7 @@ static IRTypeLayout* _createOrdinaryPartTypeLayout(
             irBuilder,
             arrayTypeLayout->getElementTypeLayout(),
             pairInfo);
-        return _createArrayTypeLayoutLike(irBuilder, arrayTypeLayout, elementTypeLayout);
+        return _createArrayTypeLayoutWithElement(irBuilder, arrayTypeLayout, elementTypeLayout);
     }
 
     if (auto paramGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
@@ -3510,9 +3525,10 @@ static IRTypeLayout* _createOrdinaryPartTypeLayout(
         auto ordinaryElementTypeLayout =
             _createOrdinaryPartTypeLayout(irBuilder, elementVarLayout->getTypeLayout(), pairInfo);
 
-        // The original group already leaves out every kind that it masks, so we only consider
-        // the kinds it uses. The ordinary bytes of the element are always masked, because they
-        // live in the group's own buffer.
+        // `_addUnmaskedResourceUsage` (slang-type-layout.cpp) decides which kinds of the element
+        // a group masks: the ordinary bytes always, other registers and bindings when the group
+        // has its own space or set. The original group already leaves out every kind it masks,
+        // so we only consider the kinds it uses.
         //
         // A group always passes up the whole register spaces and existential slots of its
         // element, and those stay with the group: the parameters split out of it report their
@@ -3545,6 +3561,10 @@ static IRTypeLayout* _createOrdinaryPartTypeLayout(
                 newTypeLayoutBuilder.addAlignment(alignmentAttr);
         }
 
+        // The element and offset element layouts still describe the fields that moved out. The
+        // ordinary part keeps them because its remaining fields find their offsets through them
+        // (`getFieldLayout`, and the emitters' element var chain); nothing reads the moved-out
+        // fields through this group.
         newTypeLayoutBuilder.setContainerVarLayout(containerVarLayout);
         newTypeLayoutBuilder.setElementVarLayout(elementVarLayout);
         newTypeLayoutBuilder.setOffsetElementTypeLayout(
@@ -3566,12 +3586,9 @@ static IRTypeLayout* _createOrdinaryPartTypeLayout(
             if (!(element.flags & PairInfo::kFlag_hasOrdinary))
                 continue;
 
-            // Legalization can produce a field key that the original layout does not know (the
-            // tuple case in `declareVars` meets the same keys). We then keep the usage of the
-            // whole struct, which can over-report but never drops a binding.
+            // The pair's fields come from the struct's own fields, and so does its layout.
             auto fieldLayout = getFieldLayout(structTypeLayout, element.key);
-            if (!fieldLayout)
-                return typeLayout;
+            SLANG_RELEASE_ASSERT(fieldLayout);
 
             auto fieldTypeLayout = fieldLayout->getTypeLayout();
             if (element.flags & PairInfo::kFlag_hasSpecial)
@@ -3590,8 +3607,9 @@ static IRTypeLayout* _createOrdinaryPartTypeLayout(
         return newTypeLayoutBuilder.build();
     }
 
-    // For any other layout we keep the usage of the whole value. That can report a binding of
-    // the special part as used, but it never drops a binding that the ordinary part uses.
+    // A pointer field such as `Inner* p` is also split when `Inner` holds resources, but the
+    // pointer is laid out as an address and has no resource usage to remove.
+    SLANG_RELEASE_ASSERT(as<IRPointerTypeLayout>(typeLayout));
     return typeLayout;
 }
 
@@ -3691,9 +3709,10 @@ static LegalVal declareVars(
             auto pairType = type.getPair();
 
             // The special side keeps the original layout, because its fields find their own
-            // layouts through it. When the value is a parameter group, or an array of them,
-            // the ordinary side no longer holds those fields, so it gets a layout without
-            // their resource usage.
+            // layouts through it. The ordinary side gets a layout without their resource usage
+            // whenever it is itself a parameter, which happens when the value is a parameter
+            // group or an array of them: a struct with resources is always wrapped in a group
+            // (the global or entry-point constant buffer) before it reaches this point.
             IRTypeLayout* ordinaryTypeLayout = typeLayout;
             if (typeLayout && as<IRParameterGroupTypeLayout>(typeLayout->unwrapArray()))
             {
@@ -3744,8 +3763,9 @@ static LegalVal declareVars(
                 // A simple, tuple or implicit-deref element under an array has had the array
                 // wrapped around its own type, so its layout needs the same array layers. An
                 // implicit-deref element then sees the same layout as a top-level array of
-                // constant buffers. A pair element reads its layout as a parameter group, so it
-                // keeps the layout of the field itself.
+                // constant buffers. A pair element under an array would be an array of parameter
+                // groups, which D3D and Metal layout rejects ("array of parameter group") and
+                // which only uses one binding on Vulkan, so it keeps the field's own layout.
                 if (fieldTypeLayout && (ee.type.flavor == LegalType::Flavor::simple ||
                                         ee.type.flavor == LegalType::Flavor::tuple ||
                                         ee.type.flavor == LegalType::Flavor::implicitDeref))
