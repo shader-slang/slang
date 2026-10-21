@@ -45,7 +45,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // constants are materialized rather than folded into each read.
     uint i = tid.x;
 
-    // Slots 0-3: scalar `asfloat` of the uint and int overloads.
+    // Slots 0-3 check that both scalar overloads fold non-finite bits into the runtime helpers.
     outputBuffer[0] = asuint(asfloat(0xFFFFFFFFu));
     outputBuffer[1] = asuint(asfloat(0x7F800000u));
     outputBuffer[2] = asuint(asfloat(int(0xFF800000u)));
@@ -69,7 +69,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[12] = asuint(w[i]);
     outputBuffer[13] = asuint(w[i + 1]);
 
-    // Slots 14-16: a vector mixing a run-time lane with constant non-finite lanes.
+    // Slots 14-16 keep one lane dynamic, so the vector bit cast is split per element after SCCP
+    // and the constant lanes are folded later, including under -minimum-slang-optimization.
     float3 m = asfloat(uint3(0xFFFFFFFFu, tid.x, 0xFF800000u));
     outputBuffer[14] = asuint(m[i]);
     outputBuffer[15] = asuint(m[i + 1]);
