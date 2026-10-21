@@ -1384,8 +1384,8 @@ local insts = {
 	{ metalSetPrimitive = { operands = { { "index" }, { "elementValue" } } } },
 	{ metalSetIndices = { operands = { { "index" }, { "elementValue" } } } },
 	{ MetalCastToDepthTexture = { operands = { { "texture" } } } },
-	-- Make this thread's earlier writes to an `access::read_write` texture visible to its
-	-- later reads of that texture (MSL `texture.fence()`).
+	-- Order this thread's accesses to an `access::read_write` texture across this point
+	-- (MSL `texture.fence()`); `insertMetalTextureFences` puts one before and after each write.
 	{ metalTextureFence = { operands = { { "texture" } } } },
 	-- Construct a vector from a scalar
 	-- %dst = MakeVectorFromScalar %T %N %val
