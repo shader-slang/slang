@@ -88,7 +88,15 @@ protected:
  * A writer can be shared between threads (for example the process-wide stdout writer), so the
  * append buffer is owned by the calling thread rather than by the writer, and no lock is held
  * between beginAppendBuffer and endAppendBuffer. Sharing a writer between threads is then safe
- * if its write method is, as FileWriter's is. */
+ * if its write method is, as FileWriter's is. The rules this gives callers are:
+ *
+ * - Each thread has at most one append buffer per writer. A second beginAppendBuffer on the same
+ *   writer and thread, without an endAppendBuffer in between, abandons the first buffer and
+ *   reuses its storage.
+ * - endAppendBuffer must run on the thread that began the buffer. Otherwise it returns
+ *   SLANG_E_INVALID_ARG and writes nothing.
+ * - write may itself append to the same writer, because endAppendBuffer detaches the buffer
+ *   before calling write. */
 class AppendBufferWriter : public BaseWriter
 {
 public:
@@ -105,6 +113,9 @@ public:
     }
 };
 
+/* Passes text to a diagnostic callback. It keeps its append buffer in the writer itself, so,
+ * unlike an AppendBufferWriter, one CallbackWriter must not be used from several threads at
+ * once. */
 class CallbackWriter : public BaseWriter
 {
 public:

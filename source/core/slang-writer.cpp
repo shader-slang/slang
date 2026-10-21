@@ -73,13 +73,17 @@ ISlangUnknown* BaseWriter::getInterface(const Guid& guid)
 
 namespace
 {
-/// An append buffer that the current thread has begun on `writer` and not yet ended.
+/// An append buffer that the current thread has begun on `writer` and not yet ended. `writer`
+/// is only compared, never dereferenced. If a writer is destroyed with an abandoned buffer, a
+/// later writer at the same address takes that entry over, and its next begin resizes it anyway.
 struct ActiveAppendBuffer
 {
     const AppendBufferWriter* writer = nullptr;
     List<char> buffer;
 };
 
+/// The append buffers of one thread. `_getThreadAppendBuffers` returns the calling thread's
+/// instance, including for calls made after its thread_local storage has been destroyed.
 struct ThreadAppendBuffers
 {
     /// The append buffers this thread has begun and not yet ended. Each writer allows one active
@@ -92,18 +96,48 @@ struct ThreadAppendBuffers
     /// repeated begin/end pairs do not allocate.
     List<char> spare;
 
+    /// Returns the index in `active` of the entry for `writer`, or -1 if there is none.
     Index find(const AppendBufferWriter* writer) const
     {
         return active.findFirstIndex([&](const ActiveAppendBuffer& activeAppendBuffer)
                                      { return activeAppendBuffer.writer == writer; });
     }
 };
+
+/// Set when this thread's `ThreadAppendBuffers` has been destroyed at thread exit. A destructor
+/// that runs later on the same thread (a static object's at process exit, or another
+/// thread_local's) can still print to a writer, so it gets a separate instance instead.
+thread_local bool t_isThreadAppendBuffersDestroyed = false;
+thread_local ThreadAppendBuffers* t_lateThreadAppendBuffers = nullptr;
+
+struct ThreadAppendBuffersHolder
+{
+    ThreadAppendBuffers buffers;
+    ~ThreadAppendBuffersHolder() { t_isThreadAppendBuffersDestroyed = true; }
+};
 } // namespace
 
 static ThreadAppendBuffers& _getThreadAppendBuffers()
 {
-    thread_local ThreadAppendBuffers threadAppendBuffers;
-    return threadAppendBuffers;
+    if (!t_isThreadAppendBuffersDestroyed)
+    {
+        thread_local ThreadAppendBuffersHolder holder;
+        return holder.buffers;
+    }
+    // A plain pointer has no destructor to run, so it stays usable this late. The instance is
+    // freed by the end that closes its last append buffer.
+    if (!t_lateThreadAppendBuffers)
+        t_lateThreadAppendBuffers = new ThreadAppendBuffers();
+    return *t_lateThreadAppendBuffers;
+}
+
+static void _releaseLateThreadAppendBuffersIfIdle()
+{
+    if (t_lateThreadAppendBuffers && t_lateThreadAppendBuffers->active.getCount() == 0)
+    {
+        delete t_lateThreadAppendBuffers;
+        t_lateThreadAppendBuffers = nullptr;
+    }
 }
 
 SLANG_NO_THROW char* SLANG_MCALL AppendBufferWriter::beginAppendBuffer(size_t maxNumChars)
@@ -134,6 +168,7 @@ AppendBufferWriter::endAppendBuffer(char* buffer, size_t numChars)
     {
         // The append buffer belongs to the thread that began it, so an end without a begin on
         // this thread is reported rather than writing from memory this thread does not own.
+        _releaseLateThreadAppendBuffersIfIdle();
         return SLANG_E_INVALID_ARG;
     }
 
@@ -143,11 +178,17 @@ AppendBufferWriter::endAppendBuffer(char* buffer, size_t numChars)
     appendBuffer.swapWith(appendBuffers.active[index].buffer);
     appendBuffers.active.fastRemoveAt(index);
 
+    // A missing begin can come from a caller that followed the contract on another thread, so it
+    // fails in every build. A mismatched buffer can only come from a caller that broke the
+    // contract, so it is only asserted.
     SLANG_ASSERT(appendBuffer.getBuffer() == buffer && buffer + numChars <= appendBuffer.end());
     const SlangResult res = write(buffer, numChars);
 
+    // A write that appends to this writer again can end with the late instance freed, so this
+    // thread's buffers are looked up again instead of reusing `appendBuffers`.
     appendBuffer.clear();
-    appendBuffers.spare.swapWith(appendBuffer);
+    _getThreadAppendBuffers().spare.swapWith(appendBuffer);
+    _releaseLateThreadAppendBuffersIfIdle();
     return res;
 }
 
@@ -213,6 +254,8 @@ FileWriter::~FileWriter()
     }
 }
 
+// A single fwrite per call makes this safe to call from several threads, because the C library
+// locks the stream for each call.
 SlangResult FileWriter::write(const char* text, size_t numChars)
 {
     const size_t numWritten = ::fwrite(text, sizeof(char), numChars, m_file);
