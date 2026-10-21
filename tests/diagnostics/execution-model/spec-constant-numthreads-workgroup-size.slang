@@ -1,6 +1,8 @@
-// Test that a specialization constant in numthreads still produces an error, rather than a
-// crash, on targets without specialization-constant support when the entry point calls
-// WorkgroupSize().
+// Test that a specialization constant in numthreads still produces an error on targets without
+// specialization-constant support when the entry point calls WorkgroupSize(). On these targets
+// the numthreads operand names a global parameter that collectGlobalUniformParameters has
+// already removed, so WorkgroupSize() materialization must not convert it (that read its
+// cleared type and crashed the compiler).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive):-target hlsl -entry main
 

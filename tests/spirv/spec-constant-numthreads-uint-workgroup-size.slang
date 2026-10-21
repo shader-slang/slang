@@ -3,10 +3,10 @@
 
 // `WorkgroupSize()` returns `int3`, so a `uint` specialization constant in `[numthreads]`
 // is converted to `int` before it becomes a vector element. Without the conversion the
-// generated SPIR-V builds a `v3int` from a `uint` constituent and fails validation.
-// The converted value is an `OpSpecConstantOp`, so the vector is built with
-// `OpCompositeConstruct` (an `OpConstantComposite` cannot take a spec constant).
-// See shader-slang/slang#13767.
+// generated SPIR-V builds a `v3int` from a `uint` constituent and fails validation. SPIR-V
+// spells the same-width sign change as `OpSpecConstantOp %int IAdd %kX 0`. The `kY` axis
+// already keeps this vector in the function; the `-literal-axes` test covers the case where
+// only the converted value does. See shader-slang/slang#13767.
 
 // CHECK-DAG: OpExecutionModeId %computeMain LocalSizeId %[[X:[0-9A-Za-z_]+]] %[[Y:[0-9A-Za-z_]+]] %{{[0-9A-Za-z_]+}}
 // CHECK-DAG: %[[X]] = OpSpecConstant %uint 8

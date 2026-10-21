@@ -199,7 +199,7 @@ Translates to:
 ```
 
 A specialization constant can also set the workgroup size. When it is used in `[numthreads]`, the `@workgroup_size` attribute names the `override`, so the size can be set when the pipeline is created (through `GPUProgrammableStage.constants`, keyed by the `@id` number).
-WGSL requires all `@workgroup_size` arguments to have the same type, so literal axes are emitted as untyped integers and an override that is not `i32` is converted with `i32(...)`.
+WGSL requires all `@workgroup_size` arguments to have the same type, so literal axes are emitted as abstract-int literals (which convert to either type) and every override that is not `i32` is converted with `i32(...)`, even when it is the only override.
 For example:
 
 ```csharp

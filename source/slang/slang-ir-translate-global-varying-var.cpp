@@ -428,25 +428,30 @@ struct GlobalVarTranslationContext
         }
     }
 
-    // Literal operands are already `int`, but a specialization-constant operand keeps its
-    // declared type (for example `uint`), so we convert it to the element type of `vectorType`
-    // to keep the vector well-typed.
+    // Return the `int3` value of `WorkgroupSize()` for an entry point, made from the operands of
+    // its `[numthreads]` decoration.
     //
-    IRInst* emitWorkgroupSizeVector(
-        IRBuilder& builder,
-        IRType* vectorType,
-        IRNumThreadsDecoration* numthreadsDecor)
+    // A specialization-constant operand keeps its declared type (for example `uint`), so we
+    // convert it to `int`. We convert only spec-const-rate operands. On a target without
+    // specialization constants, `collectGlobalUniformParameters` has already removed the global
+    // parameter that such an operand names, and left the `[numthreads]` use in place so that
+    // emit can report E55205; the operand's type is cleared, so `emitCast` must not read it, and
+    // `isSpecConstRateType` is false for it. Literal operands are left unchanged: semantic
+    // checking canonicalizes `[numthreads]` literals to `int`, although a GLSL
+    // `layout(local_size_x = 4u)` literal currently keeps its `uint` type.
+    //
+    IRInst* emitWorkgroupSizeVector(IRBuilder& builder, IRNumThreadsDecoration* numthreadsDecor)
     {
-        auto elementType = getVectorElementType(vectorType);
+        auto intType = builder.getIntType();
         IRInst* values[3];
         for (int i = 0; i < 3; ++i)
         {
             auto value = numthreadsDecor->getOperand(i);
             if (isSpecConstRateType(value->getFullType()))
-                value = builder.emitCast(elementType, value);
+                value = builder.emitCast(intType, value);
             values[i] = value;
         }
-        return builder.emitMakeVector(vectorType, 3, values);
+        return builder.emitMakeVector(builder.getVectorType(intType, 3), 3, values);
     }
 
     // If we see a `GetWorkGroupSize` instruction, we should materialize it by replacing its uses
@@ -481,10 +486,7 @@ struct GlobalVarTranslationContext
                         if (!numthreadsDecor)
                             return;
                         builder.setInsertBefore(use->getUser());
-                        auto workgroupSize = emitWorkgroupSizeVector(
-                            builder,
-                            builder.getVectorType(builder.getIntType(), 3),
-                            numthreadsDecor);
+                        auto workgroupSize = emitWorkgroupSizeVector(builder, numthreadsDecor);
                         builder.replaceOperand(use, workgroupSize);
                     }
                 }
@@ -523,10 +525,7 @@ struct GlobalVarTranslationContext
                 if (!firstBlock)
                     continue;
                 builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
-                auto workgroupSize = emitWorkgroupSizeVector(
-                    builder,
-                    workgroupSizeInst->getFullType(),
-                    numthreadsDecor);
+                auto workgroupSize = emitWorkgroupSizeVector(builder, numthreadsDecor);
                 builder.emitStore(globalVar, workgroupSize);
             }
         }
