@@ -20,19 +20,10 @@ struct ApiFilterTestDirectory
     }
 };
 
-enum class ApiFilterSelection
-{
-    Baseline,
-    Filtered,
-    SmokeCategory,
-    SkipApiSteps,
-    CompileSubtest,
-    SynthesizedApiSteps,
-};
-
 // Exercise discovery, synthesis, and dispatch in the real runner. The child selects only
 // temporary file tests, so it cannot recursively invoke this unit test. API steps are ignored
-// or explicitly skipped; the mixed file's compile step must still execute alongside them.
+// or explicitly skipped in the mixed-file cases; its compile step must still execute.
+// The API-only cases dispatch on CPU and check its result, so ignoring that file cannot pass.
 SLANG_UNIT_TEST(slangTestSkipApiIndependentFiles)
 {
     ApiFilterTestDirectory directory;
@@ -66,25 +57,104 @@ SLANG_UNIT_TEST(slangTestSkipApiIndependentFiles)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(mixed, mixedText)));
 
     const String apiOnly = directory.getPath("api-only.slang");
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(File::writeAllText(apiOnly, "//TEST:COMPARE_COMPUTE: -cpu\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        apiOnly,
+        "//TEST:COMPARE_COMPUTE: -cpu\n"
+        "//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer\n"
+        "RWStructuredBuffer<uint> outputBuffer;\n"
+        "[numthreads(1, 1, 1)]\n"
+        "void computeMain(uint3 id : SV_DispatchThreadID) { outputBuffer[0] = 1; }\n")));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(apiOnly + ".expected.txt", "1\n")));
 
     const String skipList = directory.getPath("skip.txt");
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::writeAllText(skipList, mixed + ".1\n" + mixed + ".2\n")));
 
+    struct Scenario
+    {
+        const char* name;
+        List<String> arguments;
+        String prefix;
+        bool expectIndependentOutput;
+        bool expectMixedOutput;
+        String expectedReport;
+    };
+
+    const String apiPassed = "passed test: '" + apiOnly + " (cpu)'";
+    const String synthesizedSkipped = "skipping excluded subtest: " + mixed + ".2 syn (cpu)";
+    const Scenario scenarios[] = {
+        {"baseline",
+         {"-api", "none", "-synthesizedTestApi", "none"},
+         directory.path,
+         true,
+         true,
+         ""},
+        {"filtered",
+         {"-api", "none", "-synthesizedTestApi", "none", "-skip-api-independent-tests"},
+         directory.path,
+         false,
+         true,
+         ""},
+        {"smoke category",
+         {"-api",
+          "none",
+          "-synthesizedTestApi",
+          "none",
+          "-skip-api-independent-tests",
+          "-category",
+          "smoke"},
+         directory.path,
+         false,
+         true,
+         ""},
+        {"API steps skipped",
+         {"-api",
+          "none",
+          "-synthesizedTestApi",
+          "none",
+          "-skip-api-independent-tests",
+          "-skip-list",
+          skipList},
+         directory.path,
+         false,
+         true,
+         ""},
+        {"compile subtest",
+         {"-api", "none", "-synthesizedTestApi", "none", "-skip-api-independent-tests"},
+         mixed + ".0",
+         false,
+         true,
+         ""},
+        {"synthesized API step skipped",
+         {"-api",
+          "cpu",
+          "-synthesizedTestApi",
+          "cpu",
+          "-skip-api-independent-tests",
+          "-skip-list",
+          skipList},
+         mixed,
+         false,
+         true,
+         synthesizedSkipped},
+        {"API-only baseline",
+         {"-api", "cpu", "-synthesizedTestApi", "none"},
+         apiOnly,
+         false,
+         false,
+         apiPassed},
+        {"API-only filtered",
+         {"-api", "cpu", "-synthesizedTestApi", "none", "-skip-api-independent-tests"},
+         apiOnly,
+         false,
+         false,
+         apiPassed},
+    };
+
     for (bool useServer : {false, true})
     {
-        // The baseline proves both compile steps really run. The filtered cases must remove
-        // only the independent file, including when subtest selection hides the API steps.
-        for (auto selection : {
-                 ApiFilterSelection::Baseline,
-                 ApiFilterSelection::Filtered,
-                 ApiFilterSelection::SmokeCategory,
-                 ApiFilterSelection::SkipApiSteps,
-                 ApiFilterSelection::CompileSubtest,
-                 ApiFilterSelection::SynthesizedApiSteps,
-             })
+        for (const auto& scenario : scenarios)
         {
             File::remove(independentOutput);
             File::remove(mixedOutput);
@@ -95,60 +165,44 @@ SLANG_UNIT_TEST(slangTestSkipApiIndependentFiles)
             command.addArg("-test-dir");
             command.addArg(directory.path);
             command.addArg("-skip-api-detection");
-            command.addArg("-api");
-            command.addArg(selection == ApiFilterSelection::SynthesizedApiSteps ? "cpu" : "none");
-            command.addArg("-synthesizedTestApi");
-            command.addArg(selection == ApiFilterSelection::SynthesizedApiSteps ? "cpu" : "none");
+            command.addArg("-disable-retries");
+            command.addArg("-v");
+            for (const auto& argument : scenario.arguments)
+                command.addArg(argument);
             if (useServer)
             {
                 command.addArg("-use-test-server");
                 command.addArg("-server-count");
                 command.addArg("2");
             }
-            if (selection != ApiFilterSelection::Baseline)
-                command.addArg("-skip-api-independent-tests");
-            if (selection == ApiFilterSelection::SmokeCategory)
-            {
-                command.addArg("-category");
-                command.addArg("smoke");
-            }
-            if (selection == ApiFilterSelection::SkipApiSteps ||
-                selection == ApiFilterSelection::SynthesizedApiSteps)
-            {
-                command.addArg("-skip-list");
-                command.addArg(skipList);
-            }
-            command.addArg(
-                selection == ApiFilterSelection::CompileSubtest
-                    ? mixed + ".0"
-                    : (selection == ApiFilterSelection::SynthesizedApiSteps ? mixed
-                                                                            : directory.path));
-            if (selection == ApiFilterSelection::SynthesizedApiSteps)
-                command.addArg("-v");
+            command.addArg(scenario.prefix);
 
             ExecuteResult result;
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(ProcessUtil::execute(command, result)));
+            const SlangResult executeResult = ProcessUtil::execute(command, result);
             const bool independentMatches =
-                File::exists(independentOutput) == (selection == ApiFilterSelection::Baseline);
-            const bool mixedCompiled = File::exists(mixedOutput);
-
-            // Synthesis is limited to enabled APIs. Enable CPU only in this case, then skip
-            // both dispatches explicitly. The verbose skip message proves the variant exists
-            // while the output file proves the compile step still runs alongside it.
-            const String expected = "skipping excluded subtest: " + mixed + ".2 syn (cpu)";
-            const bool synthesizedSkipped = selection != ApiFilterSelection::SynthesizedApiSteps ||
-                                            result.standardOutput.indexOf(expected) >= 0 ||
-                                            result.standardError.indexOf(expected) >= 0;
-            if (result.resultCode != 0 || !independentMatches || !mixedCompiled ||
-                !synthesizedSkipped)
+                File::exists(independentOutput) == scenario.expectIndependentOutput;
+            const bool mixedMatches = File::exists(mixedOutput) == scenario.expectMixedOutput;
+            const bool reportMatches =
+                scenario.expectedReport.getLength() == 0 ||
+                result.standardOutput.indexOf(scenario.expectedReport) >= 0 ||
+                result.standardError.indexOf(scenario.expectedReport) >= 0;
+            if (SLANG_FAILED(executeResult) || result.resultCode != 0 || !independentMatches ||
+                !mixedMatches || !reportMatches)
+            {
                 printf(
-                    "%s\n%s\n",
+                    "Scenario '%s' (%s): launch=0x%08x, exit=%d\n%s\n%s\n",
+                    scenario.name,
+                    useServer ? "test-server" : "direct",
+                    unsigned(executeResult),
+                    result.resultCode,
                     result.standardOutput.getBuffer(),
                     result.standardError.getBuffer());
+            }
+            SLANG_CHECK(SLANG_SUCCEEDED(executeResult));
             SLANG_CHECK(result.resultCode == 0);
             SLANG_CHECK(independentMatches);
-            SLANG_CHECK(mixedCompiled);
-            SLANG_CHECK(synthesizedSkipped);
+            SLANG_CHECK(mixedMatches);
+            SLANG_CHECK(reportMatches);
         }
     }
 }
