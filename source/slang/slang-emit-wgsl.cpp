@@ -812,6 +812,11 @@ static bool isStaticConst(IRInst* inst)
     // functions that use it.
     if (isNonFiniteFloatLit(inst))
         return false;
+    // A specialization constant is emitted as an `override`, and an expression that reads one is
+    // an override-expression, which a WGSL `const` initializer cannot hold.
+    if (auto layout = findVarLayout(inst);
+        layout && layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
+        return false;
     if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
