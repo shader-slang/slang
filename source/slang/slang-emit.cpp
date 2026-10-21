@@ -3301,10 +3301,11 @@ private:
     List<SpvWord> m_headerWords;
 };
 
-// Helper function that takes an artifact populated with SPIRV instructions
-// after the spirv-opt step, and a previously created but empty
-// strippedArtifact. The artifact is unmodified, and the strippedArtifact
-// will contain all the artifact's instructions except for debug instructions.
+// Helper function that takes an artifact populated with the final SPIRV module
+// (natively emitted, linked or optimized) and a previously created but empty
+// strippedArtifact. The artifact's contents are unmodified, but it is renamed to
+// the module's debug build identifier, and the strippedArtifact will contain all
+// the artifact's instructions except for debug instructions.
 static SlangResult stripDbgSpirvFromArtifact(
     ComPtr<IArtifact>& artifact,
     ComPtr<IArtifact>& strippedArtifact)
@@ -3514,14 +3515,13 @@ static SlangResult createArtifactFromIR(
     // already a complete, valid module. The downstream `slang-glslang` compiler is only needed
     // to: (a) run the SPIRV-Tools optimizer when an optimization level above `None` is
     // requested; (b) link multiple SPIR-V modules together when separately compiled / embedded
-    // downstream modules are present; (c) validate the result when SPIR-V validation is enabled;
-    // or (d) emit separate debug info, which is produced as a side effect of the downstream
-    // compile step. When none of these apply -- for example a single-module `-O0 -target spirv`
-    // compile -- the natively emitted SPIR-V is the final output, so we skip loading
-    // `slang-glslang` entirely and leave the artifact as-is. This keeps a default `-O0` SPIR-V
-    // compile free of any dependency on the `slang-glslang` module (issue #11662); without this
-    // gate the load was unconditional and a build without `slang-glslang` failed with E00100
-    // even though no downstream work was needed.
+    // downstream modules are present; or (c) validate the result when SPIR-V validation is
+    // enabled. Separate debug info is not on this list: Slang splits the final module itself
+    // (`stripDbgSpirvFromArtifact`). When none of these apply -- for example a single-module
+    // `-O0 -target spirv` compile -- the natively emitted SPIR-V is the final output, so we skip
+    // loading `slang-glslang` entirely and leave the artifact as-is. A build without
+    // `slang-glslang` can therefore still produce `-O0` SPIR-V, with or without separate debug
+    // info (issues #11662 and #13795).
     bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::EmbedDownstreamIR);
 
@@ -3569,8 +3569,8 @@ static SlangResult createArtifactFromIR(
     const bool needsLink = downstreamLinkingAllowed && spirvFiles.getCount() > 1;
     // `-Xspirv-opt <flag>` selects individual optimizer passes explicitly, so it must run the
     // optimizer even at `-O0` (where the preset is empty). Detecting them here also keeps a plain
-    // `-O0` compile -- with no such flags, and no link/validation/separate-debug-info -- from
-    // loading `slang-glslang` (issue #11662).
+    // `-O0` compile -- with no such flags, and no link/validation -- from loading `slang-glslang`
+    // (issue #11662).
     List<String> spirvOptArgs =
         codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt");
     const bool needsOptimization =
@@ -3578,9 +3578,7 @@ static SlangResult createArtifactFromIR(
             OptimizationLevel::None ||
         spirvOptArgs.getCount() != 0;
     const bool needsValidation = shouldRunSPIRVValidation(codeGenContext);
-    const bool needsSeparateDebugInfo = targetCompilerOptions.shouldEmitSeparateDebugInfo();
-    const bool needsDownstreamCompiler =
-        needsLink || needsOptimization || needsValidation || needsSeparateDebugInfo;
+    const bool needsDownstreamCompiler = needsLink || needsOptimization || needsValidation;
 
     artifact->addRepresentationUnknown(
         needsDownstreamCompiler ? ListBlob::create(spirv) : ListBlob::moveCreate(spirv));
@@ -3652,61 +3650,68 @@ static SlangResult createArtifactFromIR(
             }
         }
 
-        ComPtr<IArtifact> optimizedArtifact;
-        DownstreamCompileOptions downstreamOptions;
-        downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
-        downstreamOptions.targetType = SLANG_SPIRV;
-        downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+        if (needsOptimization)
+        {
+            ComPtr<IArtifact> optimizedArtifact;
+            DownstreamCompileOptions downstreamOptions;
+            downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
+            downstreamOptions.targetType = SLANG_SPIRV;
+            downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
 
-        // Forward the `-Xspirv-opt` args (collected above) to the downstream optimizer, where they
-        // register on top of the `-OX` preset -- or as the only passes at `-O0`, whose preset is
-        // empty. The allocator owns the copied arg strings and slice array, so it must outlive the
-        // compile() call below.
-        SliceAllocator allocator;
-        downstreamOptions.compilerSpecificArguments = allocator.allocate(spirvOptArgs);
-        switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
-        {
-        case OptimizationLevel::None:
-            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
-            break;
-        case OptimizationLevel::Default:
-            downstreamOptions.optimizationLevel =
-                DownstreamCompileOptions::OptimizationLevel::Default;
-            break;
-        case OptimizationLevel::High:
-            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;
-            break;
-        case OptimizationLevel::Maximal:
-            downstreamOptions.optimizationLevel =
-                DownstreamCompileOptions::OptimizationLevel::Maximal;
-            break;
-        default:
-            SLANG_ASSERT(!"Unhandled optimization level");
-            break;
-        }
-        auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-        if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
-        {
-            // Check if we need to output a separate SPIRV file containing debug info. If so
-            // then strip all debug instructions from the artifact. The dbgArtifact will still
-            // contain all instructions.
-            if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+            // Forward the `-Xspirv-opt` args (collected above) to the downstream optimizer, where
+            // they register on top of the `-OX` preset -- or as the only passes at `-O0`, whose
+            // preset is empty. The allocator owns the copied arg strings and slice array, so it
+            // must outlive the compile() call below.
+            SliceAllocator allocator;
+            downstreamOptions.compilerSpecificArguments = allocator.allocate(spirvOptArgs);
+            switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
             {
-                auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
-                SLANG_RETURN_ON_FAIL(
-                    stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
-                artifact = _Move(strippedArtifact);
-                dbgArtifact = _Move(optimizedArtifact);
+            case OptimizationLevel::None:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::None;
+                break;
+            case OptimizationLevel::Default:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::Default;
+                break;
+            case OptimizationLevel::High:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::High;
+                break;
+            case OptimizationLevel::Maximal:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::Maximal;
+                break;
+            default:
+                SLANG_ASSERT(!"Unhandled optimization level");
+                break;
             }
-            else
+            auto downstreamStartTime = std::chrono::high_resolution_clock::now();
+            if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
+            {
                 artifact = _Move(optimizedArtifact);
-        }
-        auto downstreamElapsedTime =
-            (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
-        codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
+            }
+            auto downstreamElapsedTime =
+                (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() *
+                0.000000001;
+            codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        SLANG_RETURN_ON_FAIL(
-            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+            SLANG_RETURN_ON_FAIL(
+                passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+        }
+    }
+
+    // Separate debug info splits whichever module is final -- natively emitted, linked or
+    // optimized -- into a stripped main output and the full module as the debug output. The split
+    // is Slang's own word filter, so it needs no downstream compiler, and it runs after the
+    // optimizer's diagnostics have been reported so that a failed optimization is not masked by
+    // a failed split.
+    if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+    {
+        auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
+        SLANG_RETURN_ON_FAIL(stripDbgSpirvFromArtifact(artifact, strippedArtifact));
+        dbgArtifact = _Move(artifact);
+        artifact = _Move(strippedArtifact);
     }
 
     return SLANG_OK;
@@ -3743,6 +3748,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     // and produce a .dbg.spv file for this child artifact.
     if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
     {
+        SLANG_RELEASE_ASSERT(dbgArtifact);
         artifact->addAssociated(dbgArtifact);
 
         auto artifactPostEmitMetadata =
