@@ -3,6 +3,8 @@
 
 #include "slang-ast-builder.h"
 
+#include <optional>
+
 namespace Slang
 {
 
@@ -301,7 +303,7 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
     return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
 }
 
-/// Get the user-perceived type of a parameters.
+/// Get the user-perceived type of a parameter.
 ///
 /// This type will use the declared type of the parameter, as well as modifiers
 /// on the parameter, such as `no_diff`, that are semantically relevant to the
@@ -313,6 +315,15 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
 ///
 Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
 
+/// Get the semantic information for a parameter declaration.
+///
+/// The returned value type includes substitutions from `paramDeclRef` and semantic type modifiers
+/// such as `no_diff`. Its mode is determined solely from the underlying parameter declaration and
+/// that declaration's unspecialized type. Applying substitutions must never change a parameter's
+/// mode, because doing so would make specialized call sites disagree with the callee's declared
+/// ABI.
+ParamInfo getParamInfo(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
+
 /// Get the type of a parameter including any wrapper type necessary to convey its parameter-passing
 /// mode.
 ///
@@ -321,6 +332,10 @@ Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 /// `OutParam<int>`.
 ///
 Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
+
+/// Encode `paramInfo` as a parameter type, adding the wrapper selected by `paramInfo.mode` around
+/// its value type when necessary.
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, ParamInfo const& paramInfo);
 
 /// If necessary, wrap the value type of a parameter up with the wrapper type corresponding to its
 /// mode.
@@ -560,13 +575,38 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 
 /// Get the parameter-passing mode to use for a parameter.
 ///
-/// The actual mode to use takes into account both the explicit
-/// modifiers on the declaration, as well as the declared type
-/// of the parameter. In cases where the parameter's type
-/// is not copyable, the mode implied by its declaration may be
-/// adjusted to something else.
+/// The actual mode takes into account both the explicit modifiers on the declaration and the
+/// declaration's unspecialized type. In cases where that declared type is not copyable, the mode
+/// implied by the declaration may be adjusted to something else. A specialized parameter type
+/// must never be used to recompute this result.
 ///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
+
+/// Finds the checked information for `declRef`'s effective `this` parameter.
+///
+/// The declaration must have reached `DeclCheckState::SignatureChecked`. A declaration has a
+/// `ThisParamInfoAttribute` if and only if it has an effective `this` parameter, so an empty result
+/// means that the checked declaration has no such parameter. The returned value type includes the
+/// substitutions carried by `declRef`, but its mode is the declaration-derived mode recorded
+/// during signature checking and is never recomputed after substitution. When a declaration with
+/// an effective receiver is looked up through a callable-as-type, the result is the callable lookup
+/// source's checked information; receiverless requirements remain receiverless.
+std::optional<ParamInfo> findEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
+
+/// Gets the checked information for `declRef`'s effective `this` parameter.
+///
+/// The declaration must have reached `DeclCheckState::SignatureChecked` and must have an effective
+/// `this` parameter. The returned value type includes the substitutions carried by `declRef`, but
+/// the declaration-derived mode is invariant under those substitutions.
+ParamInfo getEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
+
+/// Returns whether a `this` expression in `callableDeclRef`'s body is writable.
+///
+/// The effective parameter mode normally determines this property. A class setter is the one
+/// exception: its effective `this` parameter has `In` mode, but the class value still names an
+/// object whose fields the setter body is expected to mutate. This exception affects expression
+/// checking only; it does not change the effective parameter mode used for calls or lowering.
+bool isThisExprWritable(DeclRef<CallableDecl> callableDeclRef, ParamInfo const& thisParamInfo);
 
 /// Returns true if `type` or one of its modified-type bases carries `no_diff`.
 bool doesTypeHaveNoDiffModifier(Type* type);
@@ -617,9 +657,15 @@ inline FilteredMemberRefList<ParamDecl> getParameters(
     return getMembersOfType<ParamDecl>(astBuilder, declRef);
 }
 
-std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
+/// Gets the ordinary parameters that form a callable's complete function signature.
+///
+/// An accessor nested under a callable storage declaration receives that parent's parameters
+/// before its own. For example, a subscript setter's signature contains its subscript indices
+/// followed by its new-value parameter. The effective `this` parameter, when present, is not part
+/// of this list and is queried separately.
+List<DeclRef<ParamDecl>> getParametersForCallableSignature(
     ASTBuilder* astBuilder,
-    Type* paramTypeWithDirection);
+    DeclRef<CallableDecl> declRef);
 
 inline Decl* getInner(DeclRef<GenericDecl> declRef)
 {
