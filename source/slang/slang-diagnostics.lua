@@ -1186,6 +1186,20 @@ err(
 )
 
 err(
+    "spirv-snippet-undefined-id",
+    29001,
+    "undefined id in SPIR-V snippet",
+    span { loc = "location", message = "undefined SPIR-V id '%~id' in target intrinsic snippet: ~snippet" }
+)
+
+err(
+    "spirv-snippet-unknown-operand",
+    29002,
+    "unknown operand in SPIR-V snippet",
+    span { loc = "location", message = "unknown operand '~operand' in target intrinsic snippet: ~snippet" }
+)
+
+err(
     "unrecognized-spirv-opcode",
     29100,
     "unrecognized SPIR-V opcode",
@@ -1590,17 +1604,24 @@ err(
 )
 
 err(
-    "this-param-mode-attribute-without-effective-this-param",
+    "receiver-param-mode-specifier-without-receiver-param",
     30428,
-    "attribute requires an effective `this` parameter",
-    span { loc = "attribute:Modifier", message = "attribute '~attribute' is only allowed on a declaration with an effective `this` parameter." }
+    "receiver-mode specifier requires an instance receiver",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is only allowed on an instance member that has a `this` parameter." }
 )
 
 err(
-    "this-param-mode-attribute-on-class-member",
+    "receiver-param-mode-specifier-on-class-member",
     30429,
-    "attribute cannot change a source-declared class member's effective `this` parameter",
-    span { loc = "attribute:Modifier", message = "attribute '~attribute' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value." }
+    "receiver-mode specifier is not allowed on a class member",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is not allowed on a class member; a class receiver always uses the `in` parameter-passing mode." }
+)
+
+err(
+    "cpp-style-trailing-receiver-param-const-requires-hlsl",
+    30443,
+    "trailing `const` is only allowed in the HLSL dialect",
+    span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`)." }
 )
 
 err(
@@ -3424,13 +3445,6 @@ warning(
     span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
 )
 
-warning(
-    "deprecated-format-attribute",
-    31232,
-    "use of deprecated [format(...)] attribute",
-    span { loc = "location", message = "[format(...)] has been deprecated; use explicit texture storage types such as `RWTexture2D<RGBA8Unorm>` instead. See https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/02-conventional-features.html#texture-types" }
-)
-
 -- Enums (320xx)
 
 err(
@@ -4804,6 +4818,13 @@ warning(
 )
 
 err(
+    "entry-point-param-has-reference-mode",
+    38054,
+    "entry-point parameter cannot use a reference passing mode",
+    span { loc = "param:Decl", message = "entry-point parameter '~param' cannot use the reference passing mode '~mode:ParamPassingMode', because an entry point exchanges values with the pipeline rather than with a caller's memory location" }
+)
+
+err(
     "int-val-from-non-int-spec-const-encountered",
     38041,
     "cannot cast non-integer specialization constant to integer",
@@ -5129,6 +5150,15 @@ err(
     39032,
     "target does not support ray tracing entry point parameters",
     span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
+)
+
+err(
+    "multiple-push-constant-blocks-in-entry-point",
+    39033,
+    "entry point uses more than one push-constant block",
+    span { loc = "entryPoint:IRInst", message = "entry point `~entryPoint` uses more than one push-constant block, but Vulkan allows at most one per entry point" },
+    variadic_note { cpp_name = "Block", message = "~blockDescription is used by this entry point", span { loc = "blockLocation" } },
+    note { message = "combine the data into one `[[vk::push_constant]]` block or into the entry point's `uniform` parameters", span { loc = "entryPoint:IRInst" } }
 )
 
 warning(

@@ -1990,6 +1990,29 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // An entry point receives values from the previous pipeline stage and passes values to the
+    // next one, so there is no caller's memory location for a `__ref` parameter to bind to. We
+    // reject only the `Ref` mode: a borrow such as `__constref` has value semantics and may be
+    // implemented by copying, so it remains valid here. The checks from here on, starting with
+    // system-value semantic validation, classify each parameter as a stage input, output, or
+    // both, so we stop after reporting every such parameter rather than have them add
+    // diagnostics for a parameter that is already invalid.
+    {
+        bool hasReferenceParam = false;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            const auto mode = getParamPassingMode(param);
+            if (mode == ParamPassingMode::Ref)
+            {
+                sink->diagnose(
+                    Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
+                hasReferenceParam = true;
+            }
+        }
+        if (hasReferenceParam)
+            return;
+    }
+
     // The entry point's effective requirements, seeded from the decl's inferred set and augmented
     // at this boundary with two contributions the per-decl capability walk does not record: the
     // SV_ semantic-accessor requirements (walk just below) and the signature's generic-struct
@@ -2375,9 +2398,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.loc = param->loc;
             // Note: `InOutModifier` inherits from `OutModifier`, so it must be
             // checked first to avoid mislabeling `inout` parameters as "output".
+            // A reference parameter never reaches here; we reject it earlier
+            // in this function.
             ctx.direction = param->hasModifier<InOutModifier>() ? "input/output"
                             : param->hasModifier<OutModifier>() ? "output"
-                            : param->hasModifier<RefModifier>() ? "input/output"
                                                                 : "input";
 
             StringBuilder contextSb;

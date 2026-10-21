@@ -882,5 +882,6 @@ return {
 	["DebugLexicalBlock"] = 906,
 	["Decoration.fileOrNamespaceScopeMutableVar"] = 907,
 	["Decoration.uninitializedGlobalCheckFoundPossibleWrite"] = 908,
-	["Type.MetalConstantBufferLayout"] = 909
+	["Decoration.glslPatch"] = 909,
+	["Type.MetalConstantBufferLayout"] = 910
 }
