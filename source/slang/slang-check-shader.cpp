@@ -2014,19 +2014,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         // WAR for #13793: member typealias requirements do not propagate to the enclosing struct.
         // Include the selected primitive's requirements explicitly until that is fixed.
         CapabilitySet entryPointInferredCaps{entryPoint->getInferredCapabilityRequirements()};
-        auto& structuralInfo = entryPoint->getStructuralRayTracingInfo();
-        if (structuralInfo.primitiveType)
-        {
-            // Consider a closest-hit context with `typealias Primitive = rt::CurvePrimitive`.
-            // The primitive selects a Metal-only ABI even if invoke never reads its attributes.
-            // Use the resolved associated type's requirements instead of a separate mapping.
-            auto primitiveType = as<DeclRefType>(structuralInfo.primitiveType->resolve());
-            SLANG_RELEASE_ASSERT(primitiveType);
-            auto primitiveDecl = primitiveType->getDeclRef().getDecl();
-            SLANG_RELEASE_ASSERT(primitiveDecl->inferredCapabilityRequirements);
-            entryPointInferredCaps.nonDestructiveJoin(
-                primitiveDecl->inferredCapabilityRequirements);
-        }
+        entryPointInferredCaps.nonDestructiveJoin(
+            getStructuralRayTracingPrimitiveCapabilities(entryPoint));
 
         List<GenericStructTypeUse> signatureStructUses;
         _validateEntryPointTargetCapabilities(
@@ -2947,7 +2936,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     DeclRef<FuncDecl> entryPointFuncDeclRef =
         findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink, &notFoundSink);
     bool foundStructuralStage = false;
-    StructuralRayTracingEntryPointInfo structuralInfo;
+    SubtypeWitness* structuralStageWitness = nullptr;
     if (!entryPointFuncDeclRef &&
         linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
     {
@@ -2958,7 +2947,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
             entryPointProfile,
             sink,
             &foundStructuralStage,
-            &structuralInfo);
+            &structuralStageWitness);
     }
 
     // A recognized structural type already supplies either the entry point or its own diagnostic.
@@ -2999,7 +2988,10 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
         EntryPoint::create(linkage, entryPointFuncDeclRef, entryPointProfile);
     if (foundStructuralStage)
     {
-        initializeStructuralRayTracingEntryPoint(entryPoint, entryPointName, structuralInfo);
+        initializeStructuralRayTracingEntryPoint(
+            entryPoint,
+            entryPointName,
+            structuralStageWitness);
     }
 
     // Now that we've *found* the entry point, it is time to validate

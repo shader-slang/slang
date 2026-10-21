@@ -4379,7 +4379,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     Profile& ioProfile,
     DiagnosticSink* sink,
     bool* outFoundStruct,
-    StructuralRayTracingEntryPointInfo* outInfo);
+    SubtypeWitness** outStageWitness);
 void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink);
 
 

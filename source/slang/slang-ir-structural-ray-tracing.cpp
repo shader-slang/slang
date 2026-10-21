@@ -31,31 +31,14 @@ IROp getStructuralRayTracingStageInterfaceOp(Stage kind)
 void addStructuralRayTracingEntryPointInfo(
     IRBuilder& builder,
     IRInst* entryPointValue,
-    const StructuralRayTracingEntryPointIRInfo& info)
+    IRInst* stageWitness)
 {
-    SLANG_RELEASE_ASSERT(
-        entryPointValue && info.stageType && info.stageSourceTypeName && info.stageTypeIdentity);
-
-    // `void` is the canonical absent value for stage-specific types. Keeping a fixed operand list
-    // makes this decoration stable across stage kinds and module serialization.
-    auto voidType = builder.getVoidType();
-    IRInst* operands[] = {
-        builder.getIntValue(builder.getIntType(), IRIntegerValue(info.stageKind)),
-        info.stageType,
-        info.stageSourceTypeName,
-        info.stageTypeIdentity,
-        info.contextType ? info.contextType : voidType,
-        info.payloadType ? info.payloadType : voidType,
-        info.recordType ? info.recordType : voidType,
-        info.hitAttributesType ? info.hitAttributesType : voidType,
-        info.callableDataType ? info.callableDataType : voidType,
-        builder.getIntValue(builder.getIntType(), IRIntegerValue(info.hitAttributesKind)),
-    };
+    SLANG_RELEASE_ASSERT(entryPointValue && stageWitness);
+    SLANG_RELEASE_ASSERT(as<IRWitnessTableType>(stageWitness->getDataType()));
     builder.addDecoration(
         entryPointValue,
         kIROp_StructuralRayTracingEntryPointInfoDecoration,
-        operands,
-        SLANG_COUNT_OF(operands));
+        stageWitness);
 }
 
 void addStructuralRayTracingSourceOperation(

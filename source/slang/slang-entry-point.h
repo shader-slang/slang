@@ -239,9 +239,9 @@ public:
         m_inferredCapabilityRequirements = caps;
     }
 
-    void setStructuralRayTracingInfo(const StructuralRayTracingEntryPointInfo& info)
+    void setStructuralRayTracingWitness(SubtypeWitness* witness)
     {
-        m_structuralRayTracingInfo = info;
+        m_structuralRayTracingWitness = witness;
         // `m_funcDeclRef` already names the selected logical `invoke` implementation, including
         // any generic substitutions. Its source parameters are compiler-owned views, not native
         // ABI parameters, so structural lowering synthesizes the physical signature later.
@@ -249,12 +249,9 @@ public:
     }
     bool isStructuralRayTracingEntryPoint() const
     {
-        return m_structuralRayTracingInfo.stageKind != Stage::Unknown;
+        return m_structuralRayTracingWitness != nullptr;
     }
-    const StructuralRayTracingEntryPointInfo& getStructuralRayTracingInfo() const
-    {
-        return m_structuralRayTracingInfo;
-    }
+    SubtypeWitness* getStructuralRayTracingWitness() const { return m_structuralRayTracingWitness; }
 
     /// Get the module that contains the entry point.
     Module* getModule();
@@ -360,7 +357,9 @@ private:
     //
     DeclRef<FuncDecl> m_funcDeclRef;
 
-    StructuralRayTracingEntryPointInfo m_structuralRayTracingInfo;
+    // The selected stage conformance carries Context and its constraints, including dependent
+    // associated types. Keep that checked witness until ordinary IR specialization resolves them.
+    SubtypeWitness* m_structuralRayTracingWitness = nullptr;
 
     /// The mangled name of the entry point function
     String m_mangledName;

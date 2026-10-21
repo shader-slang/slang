@@ -974,31 +974,6 @@ IRInst* AstOrIRType::getIRType(IRGenContext* context)
     return irType;
 }
 
-/// Lowers the user-facing spelling of a structural stage type while its AST identity is present.
-///
-/// Later adapter synthesis uses this name for diagnostics and generated symbols. Recovering it
-/// from an IR name hint would be unreliable after specialization or obfuscation.
-static IRStringLit* _lowerStructuralRayTracingSourceTypeName(IRGenContext* context, Type* type)
-{
-    auto sourceTypeName = getStructuralRayTracingSourceTypeName(context->astBuilder, type);
-    SLANG_RELEASE_ASSERT(sourceTypeName.getLength() != 0);
-    return context->irBuilder->getStringValue(sourceTypeName.getUnownedSlice());
-}
-
-/// Lowers an opaque canonical identity for a structural stage type.
-///
-/// Empty nominal structs can have the same physical IR shape. The mangled canonical type keeps
-/// their source identities distinct without asking downstream consumers to reconstruct AST types.
-static IRStringLit* _lowerStructuralRayTracingCanonicalTypeIdentity(
-    IRGenContext* context,
-    Type* type)
-{
-    SLANG_RELEASE_ASSERT(type);
-    auto identity = getMangledTypeName(context->astBuilder, type->getCanonicalType());
-    SLANG_RELEASE_ASSERT(identity.getLength() != 0);
-    return context->irBuilder->getStringValue(identity.getUnownedSlice());
-}
-
 // Given a `DeclRef` for something callable, along with a bunch of
 // arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToDeclRef(
@@ -15382,8 +15357,8 @@ static void lowerFrontEndEntryPointToIR(
         return;
 
     // A raw function nested under an AST generic is the shared definition for every closed
-    // specialization. Its structural metadata contains specialization-specific context and record
-    // types, so attaching it here would let the first selected specialization contaminate the
+    // specialization. Its stage conformance carries that specialization's Context, so attaching
+    // it here would let the first selected specialization contaminate the
     // others. The program component below owns the corresponding `IRSpecialize` and attaches the
     // metadata there. A non-generic function can retain the metadata on its source-module
     // definition so IR dumps and cached-module linking preserve the same contract.
@@ -15411,11 +15386,11 @@ static void lowerFrontEndEntryPointToIR(
         CapabilitySet{inferredCaps});
 }
 
-/// Preserves the checked source contract on a selected structural stage entry point.
+/// Lowers the selected stage witness using the ordinary conformance representation.
 ///
-/// At this boundary the selected function is still the logical `invoke` method. Recording its
-/// context, payload, record, and attribute types here lets linking and adapter synthesis operate
-/// on IR without rediscovering those roles from a generic function signature.
+/// For `MyHit<ExternalContext>`, Context can name an extern type whose payload and primitive
+/// are supplied by another module. Keep the witness dependent so linking and specialization
+/// resolve those requirements before a future pass synthesizes the native adapter.
 static void _lowerStructuralRayTracingEntryPointInfo(
     IRGenContext* context,
     EntryPoint* entryPoint,
@@ -15425,38 +15400,15 @@ static void _lowerStructuralRayTracingEntryPointInfo(
         return;
     SLANG_RELEASE_ASSERT(entryPointValue);
 
-    auto& structuralInfo = entryPoint->getStructuralRayTracingInfo();
     if (entryPointValue->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
         return;
 
-    // The caller produced `entryPointValue` from the exact checked `DeclRef<FuncDecl>` selected for
-    // this program. Re-emitting the bare declaration here would either discard an outer generic
-    // substitution or create a second, unrelated `IRSpecialize`. Use that existing semantic value
-    // as both the decoration owner and the selected logical `invoke` implementation.
+    // The caller has already lowered the exact checked invoke declaration reference. Attach the
+    // conformance to that value, including its substitutions, rather than to the shared FuncDecl.
     addStructuralRayTracingEntryPointInfo(
         *context->irBuilder,
         entryPointValue,
-        {
-            .stageKind = structuralInfo.stageKind,
-            .stageType = lowerType(context, structuralInfo.stageType),
-            .stageSourceTypeName =
-                _lowerStructuralRayTracingSourceTypeName(context, structuralInfo.stageType),
-            .stageTypeIdentity =
-                _lowerStructuralRayTracingCanonicalTypeIdentity(context, structuralInfo.stageType),
-            .contextType = lowerType(context, structuralInfo.contextType),
-            .payloadType = structuralInfo.payloadType
-                               ? lowerType(context, structuralInfo.payloadType)
-                               : nullptr,
-            .recordType =
-                structuralInfo.recordType ? lowerType(context, structuralInfo.recordType) : nullptr,
-            .hitAttributesType = structuralInfo.hitAttributesType
-                                     ? lowerType(context, structuralInfo.hitAttributesType)
-                                     : nullptr,
-            .callableDataType = structuralInfo.callableDataType
-                                    ? lowerType(context, structuralInfo.callableDataType)
-                                    : nullptr,
-            .hitAttributesKind = structuralInfo.hitAttributesKind,
-        });
+        lowerSimpleVal(context, entryPoint->getStructuralRayTracingWitness()));
 }
 
 static void lowerProgramEntryPointToIR(
@@ -16683,9 +16635,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         //
         // The source module contains one generic `invoke` body, but this layout module contains
         // the selected `invoke<Payload>` specialization. Attach the checked stage contract here so
-        // linking receives the same specialization-specific context, payload, and record types as
-        // the entry-point layout. Non-generic stages also take this path; the helper avoids a
-        // duplicate when their source definition already carries the decoration.
+        // linking receives the witness for that specialization alongside the entry-point layout.
+        // Non-generic stages also take this path; the helper avoids a duplicate when their source
+        // definition already carries the decoration.
         _lowerStructuralRayTracingEntryPointInfo(context, entryPoint, irFunc);
 
         if (!irFunc->findDecoration<IRLinkageDecoration>())

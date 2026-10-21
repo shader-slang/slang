@@ -285,72 +285,72 @@ method. Selecting `SkyMiss` as an entry point or listing it in a schema does not
 or run a constructor. Generated adapters must call the static implementation with its input. The
 function's IR therefore has an input parameter and no hidden `this` parameter.
 
-### Entry-point metadata for later adapter synthesis
+### Entry-point conformance for later adapter synthesis
 
-A structural entry needs more than a function to emit. For example, an empty
-`SkyMiss.invoke(MissInput<SkyContext> input)` still needs a native adapter that supplies the
-payload and record described by `SkyContext`. Collecting those checked types during entry
-selection lets later IR lowering and adapter synthesis use them directly, without rediscovering
-the source interface requirements from the function body or signature.
+Consider a stage whose context is still a generic parameter:
 
-Both legacy and structural entries use the existing `EntryPoint` component. It references the
-selected AST `FuncDecl` through `m_funcDeclRef`; selecting `SkyMiss` makes that reference name
-`SkyMiss.invoke`. No new entry-point AST declaration is created. The PR adds two members to
-`EntryPoint`: `m_entryPointNameOverride`, for the generated shader name, and
-`m_structuralRayTracingInfo`, with this shape (initializers omitted):
-
-```cpp
-struct StructuralRayTracingEntryPointInfo
+```slang
+struct MyHit<C : rt::IHitContext> : rt::IClosestHitShader
 {
-    Stage stageKind;
-    Type* stageType;
-    InterfaceDecl* stageInterface;
-    Type* contextType;
-    Type* payloadType;
-    Type* recordType;
-    Type* primitiveType;
-    Type* hitAttributesType;
-    Type* callableDataType;
-    StructuralRayTracingHitAttributesKind hitAttributesKind;
-};
+    typealias Context = C;
+    static void invoke(in rt::ClosestHitInput<Context> input) {}
+}
 ```
 
-The declaration is in `source/slang/slang-structural-ray-tracing.h`. Its pointers reference
-existing checked AST objects owned by the linkage; the record does not create new copies of
-those types.
+Checking this declaration establishes that `MyHit<C>` conforms to `rt::IClosestHitShader`.
+Its checked conformance witness supplies `Context = C` and the proof that `C` conforms to
+`rt::IHitContext`. It does not require concrete payload, record, primitive, or attribute types.
+Those types can remain dependent on `C`, just as they would in an ordinary generic function.
+For example, selecting `MyHit<ExternalContext>` can leave these requirements unresolved when
+`ExternalContext` is an `extern` type whose definition comes from another module at link time.
+The compiler must preserve the dependencies until specialization can resolve them.
 
-| Field               | Meaning                                                                                                                                                        |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stageKind`         | The existing `Stage` enum, such as `Stage::Miss`; the entry profile retains the same stage. `Stage::Unknown` leaves this metadata inactive for legacy entries. |
-| `stageType`         | The selected user struct, including any supplied generic arguments.                                                                                            |
-| `stageInterface`    | The selected executable interface, such as `rt::IMissShader`, used for frontend stage-capability validation.                                                   |
-| `contextType`       | The type satisfying the stage's `Context` requirement.                                                                                                         |
-| `payloadType`       | The checked payload type, currently filled for closest-hit, any-hit, and miss stages.                                                                          |
-| `recordType`        | The checked shader-record type; `void` means no application record data.                                                                                       |
-| `primitiveType`     | The hit primitive, retained for the frontend capability-propagation workaround tracked in [#13793](https://github.com/shader-slang/slang/issues/13793).        |
-| `hitAttributesType` | The checked attributes type for a hit stage.                                                                                                                   |
-| `callableDataType`  | The callable-data type for a callable stage.                                                                                                                   |
-| `hitAttributesKind` | `Triangle`, `Curve`, or `Custom` for hit stages; `None` otherwise.                                                                                             |
+Both legacy and structural entries use the existing `EntryPoint` component. Its `m_funcDeclRef`
+references the selected AST `FuncDecl`, including generic substitutions; selecting
+`MyHit<ExternalContext>` selects that specialization's `invoke`. No new entry-point AST
+declaration is created. Alongside the generated name override, the structural entry stores one
+additional semantic value in `source/slang/slang-entry-point.h`:
 
-For a miss entry with `SkyContext.Payload = ColorPayload` and `SkyContext.Record = void`, the
-record contains `Miss`, `SkyMiss`, `rt::IMissShader`, `SkyContext`, `ColorPayload`, and the checked
-`void` type. Primitive, attributes, and callable-data pointers remain null. The existing function
-reference identifies `SkyMiss.invoke`; the metadata does not store a second function reference.
+```cpp
+SubtypeWitness* m_structuralRayTracingWitness = nullptr;
+```
 
-Walkthrough section 5.3 describes filling the associated-type fields in
-`_populateStructuralEntryPointInfo`, using ordinary checked conformance results. Section 5.4
-attaches the completed record through `initializeStructuralRayTracingEntryPoint`. The metadata
-setter clears `m_shaderParams`, the list used for shader-parameter layout, because the source input
-view is not a native shader parameter. This does not remove `input` from the AST function. Legacy
-entries retain the shader-parameter list collected from their source signature.
+This is the existing checked conformance witness. It replaces the separate
+`StructuralRayTracingEntryPointInfo` record and its cached associated types. A null witness
+identifies an ordinary entry point. The rest of the information has existing sources:
 
-During AST-to-IR lowering, `_lowerStructuralRayTracingEntryPointInfo` converts the relevant type
-references to IR types and attaches an `IRStructuralRayTracingEntryPointInfoDecoration` to the
-selected implementation. The IR form also stores the source type name and type identity;
-`stageInterface` and `primitiveType` remain frontend validation inputs. Missing type operands
-become IR `void`. Section 6.2 describes this handoff. Native adapter synthesis is deferred: the
-metadata preserves the types that the future pass needs to supply payload, record, and attribute
-access through a target's native shader signature and bindings.
+| Information                                                 | Source                                               |
+| ----------------------------------------------------------- | ---------------------------------------------------- |
+| Selected stage struct, including supplied generic arguments | The witness's subtype, `getSub()`                    |
+| Selected executable interface                               | The witness's supertype, `getSup()`                  |
+| Shader stage, such as `Stage::ClosestHit`                   | The existing entry-point profile                     |
+| Selected `invoke` implementation                            | The existing `m_funcDeclRef`                         |
+| Context and its associated types                            | Requirements reached through the checked conformance |
+| Public and generated shader names                           | The existing entry-point name and name override      |
+
+Keeping the witness also preserves the checked conformance path. A context can implement a
+requirement through an extension or through inherited interfaces; looking up the context type
+again could select a different path. Later synthesis should use the retained conformance and
+ordinary requirement lookups, which agree with the checked input accessors.
+
+`initializeStructuralRayTracingEntryPoint` stores the witness and sets the source and target
+names. Its setter clears `m_shaderParams`, the list used for shader-parameter layout, because
+the source input view is not a native shader parameter. This does not remove `input` from the
+AST function. Legacy entries retain the shader-parameter list collected from their signature.
+
+During AST-to-IR lowering, `_lowerStructuralRayTracingEntryPointInfo` lowers the witness through
+the ordinary conformance path. It attaches an `IRStructuralRayTracingEntryPointInfoDecoration`
+with one operand, the lowered witness, to the selected implementation. A closed generic
+implementation has an `IRSpecialize` value; linking transfers its decoration to the resulting
+function. The metadata does not duplicate the stage, associated types, source name, or type
+identity. Ordinary entry-point and linkage information retain the names.
+
+Dependent type and witness lookups remain valid IR until linking and specialization supply their
+arguments and definitions. Future native adapter synthesis must consume the checked conformance
+before transformations discard the information it needs. It can generate dependent operations
+for ordinary specialization to resolve, or wait for concrete types where the target ABI requires
+them. PR1 retains this information but does not implement native adapter synthesis or the later
+validation of primitive requirements that become known only after specialization.
 
 Entry-point lookup first tries the ordinary function name. If that fails and
 `-experimental-feature` is enabled, it tries the structural stage type. A temporary diagnostic
@@ -368,16 +368,22 @@ Generic entry selection is incomplete. A concrete name such as `-entry "M<Payloa
 but `-entry M -specialize Payload -specialize 4` currently fails during lookup. Supporting separate
 arguments through the CLI and compilation API is deferred to the front-end follow-up
 [#13800](https://github.com/shader-slang/slang/issues/13800). The fix must specialize the enclosing
-struct and retain that substitution on `invoke`, its stage/context/payload/record types, and any
-primitive-dependent target requirements. Recognizing the bare generic name alone is insufficient.
+struct and retain that substitution on both `invoke` and the selected stage witness. Any
+primitive-dependent target requirements must be checked once the primitive is known. Recognizing
+the bare generic name alone is insufficient. Retaining dependent conformance information does not
+by itself implement this separate entry-selection path.
 This is an implementation gap; generic stage structs should follow ordinary entry-point
 specialization semantics. Section 5.1 of the review walkthrough remains incomplete for this path.
 
 Ordinary conformance checking already validates the selected `invoke` signature. At the start
-of `validateEntryPoint`, structural entries collect the implementation and primitive requirements,
-call `_validateEntryPointTargetCapabilities`, and return. They skip native parameter classification
+of `validateEntryPoint`, structural entries collect the implementation requirements, call
+`_validateEntryPointTargetCapabilities`, and return. They skip native parameter classification
 and validation because the compiler supplies their RT input. For example, a correctly typed
-`invoke` that calls a Metal-only helper must still be rejected for HLSL.
+`invoke` that calls a Metal-only helper must still be rejected for HLSL. The workaround for
+[#13793](https://github.com/shader-slang/slang/issues/13793) additionally follows the stage witness
+to the primitive and includes its capabilities when its declaration is known. It computes that
+type only for this check; it does not save it in entry-point metadata. A dependent primitive
+remains unresolved and needs validation after specialization in the future backend work.
 
 An `invoke` method can be called as an ordinary static function with an existing input. For example:
 
@@ -405,8 +411,8 @@ The call uses the current invocation's input; it does not dispatch a new shader 
 SBT record. Constructing a stage object does not supply the input that `invoke` requires.
 
 The adapter implementation must preserve an ordinary callable body when generating a native
-entry wrapper. Keep `StructuralRayTracingEntryPointInfo` on the entry wrapper, not on an ordinary
-helper clone. The existing entry-point callsite pass removes native entry decorations from clones
+entry wrapper. Keep `IRStructuralRayTracingEntryPointInfoDecoration` on the entry wrapper,
+not on an ordinary helper clone. The existing entry-point callsite pass removes native entry decorations from clones
 but does not currently remove this structural metadata. PR1 still stops code generation when a
 structural entry has no adapter; the positive tests here check frontend acceptance only.
 

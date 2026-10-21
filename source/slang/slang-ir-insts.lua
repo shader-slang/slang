@@ -2194,22 +2194,11 @@ local insts = {
 				},
 			},
 			{
-				-- Records the checked source contract for a selected structural stage. This metadata is
-				-- descriptive: later lowering consumes it when it creates a native entry-point adapter.
+				-- Preserves the selected stage conformance, including dependent Context requirements.
+				-- Ordinary specialization resolves the witness before native adapter synthesis uses it.
 				structuralRayTracingEntryPointInfo = {
 					struct_name = "StructuralRayTracingEntryPointInfoDecoration",
-					operands = {
-						{ "stageKind", "IRIntLit" },
-						{ "stageType", "IRType" },
-						{ "stageSourceTypeName", "IRStringLit" },
-						{ "stageTypeIdentity", "IRStringLit" },
-						{ "contextType", "IRType" },
-						{ "payloadType", "IRType" },
-						{ "recordType", "IRType" },
-						{ "hitAttributesType", "IRType" },
-						{ "callableDataType", "IRType" },
-						{ "hitAttributesKind", "IRIntLit" },
-					},
+					operands = { { "stageWitness", "IRInst" } },
 				},
 			},
 			{

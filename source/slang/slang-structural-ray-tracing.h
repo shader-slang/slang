@@ -69,43 +69,6 @@ enum class StructuralRayTracingSourceOperationKind
     CallShader = 2,
 };
 
-/// Classifies how a selected hit stage obtains its intersection attributes.
-///
-/// Triangle and curve attributes are compiler-defined property views; custom attributes come from
-/// a procedural primitive. `None` is the invalid/non-hit-stage sentinel.
-enum class StructuralRayTracingHitAttributesKind
-{
-    None,
-    Triangle,
-    Curve,
-    Custom,
-};
-
-/// Holds the fully checked source contract for one selected structural stage entry point.
-///
-/// All pointers are AST objects owned by the entry point's linkage. AST-to-IR lowering copies the
-/// semantic roles into non-operational metadata before those AST identities become unavailable.
-struct StructuralRayTracingEntryPointInfo
-{
-    Stage stageKind = Stage::Unknown;
-    Type* stageType = nullptr;
-    /// The exact executable interface selected through the stage implementation's witness.
-    InterfaceDecl* stageInterface = nullptr;
-    Type* contextType = nullptr;
-    /// The payload is present only for hit and miss stages.
-    Type* payloadType = nullptr;
-    /// Every executable stage has a record type, including `void` when no data is required.
-    Type* recordType = nullptr;
-    /// Hit stages retain the resolved primitive for frontend target-capability validation.
-    Type* primitiveType = nullptr;
-    /// Hit stages carry attributes; miss and callable stages leave this null.
-    Type* hitAttributesType = nullptr;
-    /// Callable stages carry callable data; all other stages leave this null.
-    Type* callableDataType = nullptr;
-    StructuralRayTracingHitAttributesKind hitAttributesKind =
-        StructuralRayTracingHitAttributesKind::None;
-};
-
 /// Names the concrete entries and matching subtype witnesses encoded by a section-list type.
 ///
 /// Concrete lists keep the two packs index-aligned, including two zero-length packs for an empty
@@ -142,8 +105,8 @@ StructuralRayTracingAssociatedTypeKind getStructuralRayTracingAssociatedTypeKind
 
 /// Resolves an associated type through the exact supplied interface-conformance path.
 ///
-/// Returns null if the interface and its inherited interfaces do not declare the requested
-/// requirement, or the selected witness does not provide a type value.
+/// Returns null if the interface and its inherited interfaces do not declare the requirement.
+/// An unresolved requirement remains an ordinary dependent type lookup.
 Type* resolveStructuralRayTracingAssociatedType(
     ASTBuilder* astBuilder,
     SubtypeWitness* witness,
@@ -157,10 +120,6 @@ SubtypeWitness* resolveStructuralRayTracingAssociatedTypeConstraint(
     SubtypeWitness* witness,
     StructuralRayTracingAssociatedTypeKind kind,
     StructuralRayTracingAssociatedTypeKind requiredMember);
-
-/// Classifies built-in primitive attribute ABIs from the ordinary struct's semantic annotation.
-/// For example, TrianglePrimitive selects triangle attributes; BoundingBoxPrimitive<A> selects A.
-StructuralRayTracingHitAttributesKind getStructuralRayTracingHitAttributesKind(Type* primitiveType);
 
 /// Returns this executable interface's `invoke` requirement, or null for other interfaces.
 FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* interfaceDecl);
@@ -184,14 +143,18 @@ class EntryPoint;
 struct IRModule;
 struct IRFunc;
 
-/// Attaches the structural metadata and source/target names to a newly created entry point.
+/// Attaches the selected stage conformance and source/target names to a new entry point.
 void initializeStructuralRayTracingEntryPoint(
     EntryPoint* entryPoint,
     Name* entryPointName,
-    const StructuralRayTracingEntryPointInfo& structuralInfo);
+    SubtypeWitness* stageWitness);
 
 /// Returns the source-stage capabilities, including synthesized structural stages.
 CapabilitySet getEntryPointStageCapabilities(EntryPoint* entryPoint);
+
+/// Returns the selected primitive's known capabilities for the #13793 typealias workaround.
+/// Dependent primitive types remain unresolved until specialization supplies their definition.
+CapabilitySet getStructuralRayTracingPrimitiveCapabilities(EntryPoint* entryPoint);
 
 /// Returns the public entry-point declaration used by capability diagnostics.
 Decl* getEntryPointCapabilityDiagnosticDecl(EntryPoint* entryPoint);
