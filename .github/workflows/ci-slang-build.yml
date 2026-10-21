@@ -223,18 +223,23 @@ jobs:
 
             # CI-only: Windows debug builds use `/Ob2` (about 1.23x faster
             # tests) and a 16 MB stack, as inlining at `/Od` overflows 1 MB.
-            cmake_debug_defines=()
-            if [[ "$INPUT_OS" =~ "windows" && "$INPUT_CONFIG" == "debug" ]]; then
-              mkdir -p build
-              printf '%s\n' \
-                'foreach(lang C CXX)' \
-                '  string(REGEX REPLACE "/Ob[0-9]" "" CMAKE_${lang}_FLAGS_DEBUG "${CMAKE_${lang}_FLAGS_DEBUG}")' \
-                '  string(APPEND CMAKE_${lang}_FLAGS_DEBUG " /Ob2")' \
-                'endforeach()' \
-                >build/ci-debug-inline.cmake
-              cmake_debug_defines+=("-DCMAKE_PROJECT_INCLUDE=$(pwd)/build/ci-debug-inline.cmake")
-              cmake_debug_defines+=("-DCMAKE_EXE_LINKER_FLAGS=/STACK:16777216")
-            fi
+            # The other flags are read back from the CMake cache, so only
+            # these two change.
+            use_ci_debug_flags() {
+              [[ "$INPUT_OS" =~ "windows" && "$INPUT_CONFIG" == "debug" ]] || return 0
+              local cache lang flags args
+              cache=$(cmake -N -LA build)
+              args=("-DCMAKE_EXE_LINKER_FLAGS=$(sed -n 's/^CMAKE_EXE_LINKER_FLAGS:STRING=//p' <<<"$cache") /STACK:16777216")
+              for lang in C CXX; do
+                flags=$(sed -n "s/^CMAKE_${lang}_FLAGS_DEBUG:STRING=//p" <<<"$cache" | sed 's#/Ob[0-9]##g')
+                if [[ -z "${flags// /}" ]]; then
+                  echo "::error::CMAKE_${lang}_FLAGS_DEBUG is missing from the CMake cache"
+                  exit 1
+                fi
+                args+=("-DCMAKE_${lang}_FLAGS_DEBUG=${flags} /Ob2")
+              done
+              cmake -S . -B build "${args[@]}"
+            }
 
             if [[ "$INPUT_OS" =~ "windows" && "$INPUT_CONFIG" == "debug" && "$INPUT_BUILD_LLVM" != "false" ]]; then
               # A debug build would try to link against a release-built llvm,
@@ -249,8 +254,8 @@ jobs:
                 "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=$INPUT_WARNINGS_AS_ERRORS" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
-                "${cmake_debug_defines[@]}" \
                 "${cmake_launcher_defines[@]}"
+              use_ci_debug_flags
               cmake --workflow --preset "$INPUT_CONFIG"
             elif [[ "$INPUT_BUILD_LLVM" = "false" ]]; then
               # LLVM was explicitly not requested for this platform/config
@@ -261,8 +266,8 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=$INPUT_WARNINGS_AS_ERRORS" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
-                "${cmake_debug_defines[@]}" \
                 "${cmake_launcher_defines[@]}"
+              use_ci_debug_flags
               cmake --workflow --preset "$INPUT_CONFIG"
             else
               # Otherwise, use the "system" llvm we have just build or got from the
@@ -271,8 +276,8 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=$INPUT_WARNINGS_AS_ERRORS" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
-                "${cmake_debug_defines[@]}" \
                 "${cmake_launcher_defines[@]}"
+              use_ci_debug_flags
               cmake --workflow --preset "$INPUT_CONFIG"
             fi
           fi
