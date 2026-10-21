@@ -3304,8 +3304,11 @@ private:
 // Helper function that takes an artifact populated with the final SPIRV module
 // (natively emitted, linked or optimized) and a previously created but empty
 // strippedArtifact. The artifact's contents are unmodified, but it is renamed to
-// the module's debug build identifier, and the strippedArtifact will contain all
-// the artifact's instructions except for debug instructions.
+// the module's debug build identifier. The strippedArtifact will contain all the
+// artifact's instructions except for debug instructions, apart from the
+// `DebugBuildIdentifier` instruction, the `OpString` it refers to and the
+// `NonSemantic.Shader.DebugInfo.100` import, which are kept so the stripped
+// module can be paired with its debug module.
 static SlangResult stripDbgSpirvFromArtifact(
     ComPtr<IArtifact>& artifact,
     ComPtr<IArtifact>& strippedArtifact)
@@ -3478,7 +3481,12 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
 }
 
 // Helper function to create an artifact from IR used internally by
-// emitSPIRVForEntryPointsDirectly.
+// emitSPIRVForEntryPointsDirectly. The caller passes in an empty `artifact` of
+// the SPIR-V target type; on success it holds the final main module, which may
+// be a replacement artifact from linking, optimization or the debug split. When
+// separate debug info is requested and the function returns SLANG_OK,
+// `dbgArtifact` holds the full module, named after its debug build identifier;
+// otherwise it is left unset.
 static SlangResult createArtifactFromIR(
     CodeGenContext* codeGenContext,
     IRModule* irModule,
@@ -3518,10 +3526,11 @@ static SlangResult createArtifactFromIR(
     // downstream modules are present; or (c) validate the result when SPIR-V validation is
     // enabled. Separate debug info is not on this list: Slang splits the final module itself
     // (`stripDbgSpirvFromArtifact`). When none of these apply -- for example a single-module
-    // `-O0 -target spirv` compile -- the natively emitted SPIR-V is the final output, so we skip
-    // loading `slang-glslang` entirely and leave the artifact as-is. A build without
+    // `-O0 -target spirv` compile -- the natively emitted SPIR-V is the final output, so this
+    // function does not load `slang-glslang` and leaves the artifact as-is. A build without
     // `slang-glslang` can therefore still produce `-O0` SPIR-V, with or without separate debug
-    // info (issues #11662 and #13795).
+    // info (issues #11662 and #13795). (With separate debug info, the build-identifier hash may
+    // still open the library to read its version, but it does not require it.)
     bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::EmbedDownstreamIR);
 
@@ -3570,7 +3579,9 @@ static SlangResult createArtifactFromIR(
     // `-Xspirv-opt <flag>` selects individual optimizer passes explicitly, so it must run the
     // optimizer even at `-O0` (where the preset is empty). Detecting them here also keeps a plain
     // `-O0` compile -- with no such flags, and no link/validation -- from loading `slang-glslang`
-    // (issue #11662).
+    // (issue #11662). The same flag decides whether a compiler loaded only to link or validate is
+    // asked to optimize: without it the optimizer has no passes and returns its input unchanged
+    // (`glslang_optimizeSPIRV`), so skipping the call drops no bytes and no diagnostics.
     List<String> spirvOptArgs =
         codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt");
     const bool needsOptimization =
@@ -3706,6 +3717,11 @@ static SlangResult createArtifactFromIR(
     // is Slang's own word filter, so it needs no downstream compiler, and it runs after the
     // optimizer's diagnostics have been reported so that a failed optimization is not masked by
     // a failed split.
+    //
+    // If a required downstream compiler could not be loaded, E00100 is already in the sink and
+    // the natively emitted module is final. The split still runs, so a split compile ends the same
+    // way as a non-split one: the end-to-end compile fails on the reported error, and an API
+    // caller receives the unprocessed module alongside the diagnostic.
     if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
     {
         auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
