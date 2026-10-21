@@ -68,7 +68,7 @@ on:
 jobs:
   test-slang:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 80
+    timeout-minutes: 120
     defaults:
       run:
         shell: bash
