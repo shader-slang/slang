@@ -696,13 +696,14 @@ struct AssignValsFromLayoutContext
             ComPtr<ITextureView> textureView;
             SLANG_RETURN_ON_FAIL(texture->getDefaultView(textureView.writeRef()));
 
-            // Determine access mode from the shader parameter's resource type
-            auto handleType = dstCursor.getTypeLayout()->getType();
-            auto resourceType = handleType->getElementType();
-            auto resourceAccess =
-                resourceType ? resourceType->getResourceAccess() : SLANG_RESOURCE_ACCESS_READ_WRITE;
+            // We take the access from the same `isRWTexture` flag that chose the texture's usage
+            // above, so the descriptor type always matches what the texture supports. Reflection
+            // cannot supply it: on SPIR-V and D3D a descriptor handle is normally laid out as a
+            // plain `uint2`, which carries no resource access.
             DescriptorHandle handle;
-            DescriptorHandleAccess access = getDescriptorHandleAccess(resourceAccess);
+            DescriptorHandleAccess access = srcVal->textureDesc.isRWTexture
+                                                ? DescriptorHandleAccess::ReadWrite
+                                                : DescriptorHandleAccess::Read;
 
             // Try to get descriptor handle - will fail on backends that don't support it
             auto result = textureView->getDescriptorHandle(access, &handle);
