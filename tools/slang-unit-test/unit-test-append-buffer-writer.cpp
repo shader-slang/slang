@@ -8,6 +8,16 @@
 // handed to every request without its own writer). The tests below check that neither of these,
 // nor a `write()` that appends to its own writer, can leave a writer unusable.
 //
+// Each test protects one part of the design:
+//   * CallbackWriter: a CallbackWriter delivers append buffers to its callback.
+//   * SkippedEnd*, SkippedEndOnOtherThread: an abandoned append buffer blocks no later append,
+//     on the same thread or another one.
+//   * ReentrantWrite: a write() that appends to its own writer gets a separate buffer.
+//   * InterleavedWriters: one thread can have a buffer open on several writers at once.
+//   * SharedBetweenThreads: threads sharing one writer fill separate buffers.
+//   * EndWithoutBegin: an end with no begin on the calling thread fails without writing.
+//   * PrintFromThreadExit: a writer is still usable from a destructor run at thread exit.
+//
 // A regression in the skipped-end and re-entrant cases shows up as a deadlock, so those bodies
 // run on another thread with a timed wait. On a timeout the test fails and the thread is
 // detached, instead of hanging the run.
@@ -31,8 +41,9 @@ namespace
 {
 
 /// An `AppendBufferWriter` that records the text of every `write()` call as one string. The
-/// records are guarded by a lock that is held only inside `write()`, so one writer can be shared
-/// between threads and each record can be checked for corruption afterwards.
+/// records are guarded by a lock that is held only while they are accessed, never between
+/// `beginAppendBuffer` and `endAppendBuffer`, so one writer can be shared between threads and
+/// each record can be checked for corruption afterwards.
 class RecordingWriter : public AppendBufferWriter
 {
 public:
@@ -111,6 +122,13 @@ SlangResult appendAfterSkippedEnd(ISlangWriter* writer, const char* text)
     return writer->endAppendBuffer(buffer, length);
 }
 
+String makeSharedAppendText(int threadIndex, int appendIndex)
+{
+    char text[64];
+    ::snprintf(text, sizeof(text), "thread %d append %d", threadIndex, appendIndex);
+    return String(text);
+}
+
 void recordMessage(const char* message, void* userData)
 {
     static_cast<List<String>*>(userData)->add(String(message));
@@ -181,6 +199,29 @@ SLANG_UNIT_TEST(appendBufferWriterSkippedEndFileWriter)
     SLANG_CHECK(contents == "hello");
 }
 
+SLANG_UNIT_TEST(appendBufferWriterSkippedEndOnOtherThread)
+{
+    // The other thread abandons its append buffer and exits. A lock held from begin to end would
+    // stay locked for every thread after that.
+    List<String> records;
+    const bool finished = runWithTimeout(
+        []()
+        {
+            RefPtr<RecordingWriter> writer = new RecordingWriter();
+            std::thread([&]() { writer->beginAppendBuffer(5); }).join();
+
+            char* buffer = writer->beginAppendBuffer(5);
+            ::memcpy(buffer, "hello", 5);
+            writer->endAppendBuffer(buffer, 5);
+            return writer->getRecords();
+        },
+        records);
+
+    SLANG_CHECK_ABORT(finished);
+    SLANG_CHECK_ABORT(records.getCount() == 1);
+    SLANG_CHECK(records[0] == "hello");
+}
+
 SLANG_UNIT_TEST(appendBufferWriterReentrantWrite)
 {
     List<String> records;
@@ -209,24 +250,31 @@ SLANG_UNIT_TEST(appendBufferWriterReentrantWrite)
 
 SLANG_UNIT_TEST(appendBufferWriterInterleavedWriters)
 {
-    RefPtr<RecordingWriter> first = new RecordingWriter();
-    RefPtr<RecordingWriter> second = new RecordingWriter();
+    const char* const texts[] = {"first", "the second writer's longer text", "third"};
+    const Index kWriterCount = SLANG_COUNT_OF(texts);
 
     // Each writer allows one active append buffer, so one thread may have a buffer open on each
-    // of two writers at once. The second buffer is larger, so sharing storage would reallocate
-    // the first.
-    char* firstBuffer = first->beginAppendBuffer(5);
-    char* secondBuffer = second->beginAppendBuffer(32);
-    ::memcpy(firstBuffer, "first", 5);
-    ::memcpy(secondBuffer, "the second writer's longer text", 31);
-    second->endAppendBuffer(secondBuffer, 31);
-    first->endAppendBuffer(firstBuffer, 5);
+    // of several writers at once. Later buffers are larger, so sharing storage would reallocate
+    // an earlier one. Ending them in the order they were begun makes each removal move a live
+    // entry into the removed one's place.
+    List<RefPtr<RecordingWriter>> writers;
+    List<char*> buffers;
+    for (Index i = 0; i < kWriterCount; ++i)
+    {
+        writers.add(new RecordingWriter());
+        buffers.add(writers[i]->beginAppendBuffer(::strlen(texts[i])));
+    }
+    for (Index i = 0; i < kWriterCount; ++i)
+        ::memcpy(buffers[i], texts[i], ::strlen(texts[i]));
+    for (Index i = 0; i < kWriterCount; ++i)
+        SLANG_CHECK(SLANG_SUCCEEDED(writers[i]->endAppendBuffer(buffers[i], ::strlen(texts[i]))));
 
-    List<String> firstRecords = first->getRecords();
-    List<String> secondRecords = second->getRecords();
-    SLANG_CHECK_ABORT(firstRecords.getCount() == 1 && secondRecords.getCount() == 1);
-    SLANG_CHECK(firstRecords[0] == "first");
-    SLANG_CHECK(secondRecords[0] == "the second writer's longer text");
+    for (Index i = 0; i < kWriterCount; ++i)
+    {
+        List<String> records = writers[i]->getRecords();
+        SLANG_CHECK_ABORT(records.getCount() == 1);
+        SLANG_CHECK(records[0] == texts[i]);
+    }
 }
 
 SLANG_UNIT_TEST(appendBufferWriterSharedBetweenThreads)
@@ -247,20 +295,16 @@ SLANG_UNIT_TEST(appendBufferWriterSharedBetweenThreads)
 
                 for (int appendIndex = 0; appendIndex < kAppendsPerThread; ++appendIndex)
                 {
-                    char text[64];
-                    const size_t length = size_t(::snprintf(
-                        text,
-                        sizeof(text),
-                        "thread %d append %d",
-                        threadIndex,
-                        appendIndex));
+                    const String text = makeSharedAppendText(threadIndex, appendIndex);
+                    const char* chars = text.getBuffer();
+                    const size_t length = size_t(text.getLength());
 
                     // Filling the buffer in two halves with a yield between them gives the other
                     // threads a chance to begin and end their own appends meanwhile.
                     char* buffer = writer->beginAppendBuffer(length);
-                    ::memcpy(buffer, text, length / 2);
+                    ::memcpy(buffer, chars, length / 2);
                     std::this_thread::yield();
-                    ::memcpy(buffer + length / 2, text + length / 2, length - length / 2);
+                    ::memcpy(buffer + length / 2, chars + length / 2, length - length / 2);
                     writer->endAppendBuffer(buffer, length);
                 }
             });
@@ -277,9 +321,7 @@ SLANG_UNIT_TEST(appendBufferWriterSharedBetweenThreads)
     {
         for (int appendIndex = 0; appendIndex < kAppendsPerThread; ++appendIndex)
         {
-            char text[64];
-            ::snprintf(text, sizeof(text), "thread %d append %d", threadIndex, appendIndex);
-            expected.add(String(text));
+            expected.add(makeSharedAppendText(threadIndex, appendIndex));
         }
     }
     records.sort();
@@ -292,4 +334,58 @@ SLANG_UNIT_TEST(appendBufferWriterSharedBetweenThreads)
             ++mismatchCount;
     }
     SLANG_CHECK(mismatchCount == 0);
+}
+
+SLANG_UNIT_TEST(appendBufferWriterEndWithoutBegin)
+{
+    RefPtr<RecordingWriter> writer = new RecordingWriter();
+
+    char text[] = "abcd";
+    SLANG_CHECK(writer->endAppendBuffer(text, 4) == SLANG_E_INVALID_ARG);
+
+    // An append buffer belongs to the thread that began it, so ending it on another thread fails
+    // and leaves it open for the thread that owns it.
+    char* buffer = writer->beginAppendBuffer(4);
+    ::memcpy(buffer, "abcd", 4);
+    SlangResult otherThreadResult = SLANG_OK;
+    std::thread([&]() { otherThreadResult = writer->endAppendBuffer(buffer, 4); }).join();
+    SLANG_CHECK(otherThreadResult == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(SLANG_SUCCEEDED(writer->endAppendBuffer(buffer, 4)));
+
+    List<String> records = writer->getRecords();
+    SLANG_CHECK_ABORT(records.getCount() == 1);
+    SLANG_CHECK(records[0] == "abcd");
+}
+
+namespace
+{
+/// Prints to `writer` from its destructor. As a thread_local constructed before the thread's
+/// first append buffer, it is destroyed after the writers' per-thread state at thread exit.
+struct PrintsOnThreadExit
+{
+    RecordingWriter* writer = nullptr;
+    ~PrintsOnThreadExit()
+    {
+        if (writer)
+            WriterHelper(writer).print("thread exit %d", 1);
+    }
+};
+} // namespace
+
+SLANG_UNIT_TEST(appendBufferWriterPrintFromThreadExit)
+{
+    RefPtr<RecordingWriter> writer = new RecordingWriter();
+    std::thread thread(
+        [&]()
+        {
+            thread_local PrintsOnThreadExit printsOnExit;
+            printsOnExit.writer = writer;
+            WriterHelper(writer).print("in thread %d", 1);
+        });
+    thread.join();
+
+    List<String> records = writer->getRecords();
+    SLANG_CHECK_ABORT(records.getCount() == 2);
+    SLANG_CHECK(records[0] == "in thread 1");
+    SLANG_CHECK(records[1] == "thread exit 1");
 }
