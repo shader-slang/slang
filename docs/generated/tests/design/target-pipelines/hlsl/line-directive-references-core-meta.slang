@@ -12,7 +12,7 @@
 // Scalar `exp10` and tuple `concat` have bodies in `hlsl.meta.slang` and
 // `core.meta.slang` that HLSL emit writes out as separate functions, so
 // each function gets a `#line` naming its meta-module, and the entry
-// point gets a `#line` naming this file. The CHECK-DAGs match all three.
+// point gets a `#line` naming this file.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 
