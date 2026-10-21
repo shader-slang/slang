@@ -14973,6 +14973,21 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         }
     }
 
+    // HLSL accepts `const out` and `const inout`, so we warn rather than reject them, even
+    // though the body cannot write the parameter. The check precedes the parameter-pack
+    // handling below, which adds `const` to every pack parameter.
+    if (auto constModifier = paramDecl->findModifier<ConstModifier>())
+    {
+        const auto mode = getParamPassingMode(paramDecl);
+        if (mode == ParamPassingMode::Out || mode == ParamPassingMode::BorrowInOut)
+        {
+            getSink()->diagnose(Diagnostics::ConstOnWritableParameter{
+                .mode = mode,
+                .modifier = constModifier,
+                .param = paramDecl});
+        }
+    }
+
     if (isTypePack(paramDecl->type.type))
     {
         // For now, we only allow parameter packs to be `const`.
