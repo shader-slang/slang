@@ -32,11 +32,12 @@ namespace Slang
 {
 
 // WGSL has no NaN or infinity literal, and a const-expression that evaluates to one is a
-// shader-creation error. These helpers reinterpret the IEEE bit pattern held in a `let`, which is a
-// runtime expression rather than a const-expression; without the `let`, `bitcast` of a literal is a
-// const-expression and is rejected. We use bit patterns rather than a runtime `0.0 / 0.0` because
-// the NVIDIA Vulkan driver crashes creating a pipeline whose function-local `f32` array holds such
-// a division and is indexed at run time (issue #13658).
+// shader-creation error. These helpers reinterpret an IEEE bit pattern held in a `let` or passed as
+// a parameter, which is a runtime expression rather than a const-expression; `bitcast` of a literal
+// is a const-expression and is rejected. We use bit patterns rather than a runtime `0.0 / 0.0`
+// because the NVIDIA Vulkan driver crashes creating a pipeline whose function-local `f32` array
+// holds such a division and is indexed at run time (issue #13658). `_slang_getNan` takes the
+// literal's exact bits so that a NaN payload, e.g. from `asfloat(0x7FC00001u)`, is kept (#13635).
 static const char* kWGSLBuiltinPreludeGetInfinity = R"(
 fn _slang_getInfinity(positive: bool) -> f32
 {
@@ -46,9 +47,8 @@ fn _slang_getInfinity(positive: bool) -> f32
 )";
 
 static const char* kWGSLBuiltinPreludeGetNan = R"(
-fn _slang_getNan() -> f32
+fn _slang_getNan(bits : u32) -> f32
 {
-    let bits = 0x7fc00000u;
     return bitcast<f32>(bits);
 }
 )";
@@ -1200,8 +1200,17 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         {
                         case IRConstant::FloatKind::Nan:
                             {
+                                // An f32 literal is stored as a double, which keeps a quiet NaN's
+                                // sign and payload exactly, so narrowing it back recovers the bits.
+                                // A signaling NaN was already quieted when it was widened.
                                 ensurePrelude(kWGSLBuiltinPreludeGetNan);
-                                m_writer->emit("_slang_getNan()");
+                                uint32_t bits =
+                                    uint32_t(FloatAsInt(float(litInst->value.floatVal)));
+                                char digits[9] = {};
+                                intToAscii(digits, bits, 16, 8);
+                                m_writer->emit("_slang_getNan(0x");
+                                m_writer->emit(digits);
+                                m_writer->emit("u)");
                                 break;
                             }
                         case IRConstant::FloatKind::PositiveInfinity:

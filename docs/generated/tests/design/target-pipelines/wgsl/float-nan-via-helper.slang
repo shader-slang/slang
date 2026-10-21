@@ -26,4 +26,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // CHECK: fn _slang_getNan
-// CHECK: _slang_getNan()
+// CHECK: _slang_getNan(0x{{[0-9A-F]+}}u)
