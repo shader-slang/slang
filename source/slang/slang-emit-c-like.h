@@ -347,7 +347,26 @@ public:
 
     void emitSimpleValue(IRInst* inst) { emitSimpleValueImpl(inst); }
 
+    enum class FoldPolicy
+    {
+        Never,
+        Always,
+        WhenSafe,
+    };
+
+    /// Return whether `inst` is never folded, always folded (e.g. an address on a target without
+    /// pointers), or folded only when it is safe. The answer depends on `inst` and, for some
+    /// instructions, on the kinds of its users, but never on where those users are.
+    virtual FoldPolicy getFoldPolicy(IRInst* inst);
+
+    /// Return true if `inst` is folded into the expressions of its users instead of being
+    /// emitted as a declaration of its own. This is the final fold decision, and
+    /// `isSafeToFoldIntoUseSites` is one of the checks it makes.
     virtual bool shouldFoldInstIntoUseSites(IRInst* inst);
+
+    /// Return true if the text of `inst` can be emitted where its users are emitted without
+    /// moving it past a possible side effect, into another block, or into a branch.
+    bool isSafeToFoldIntoUseSites(IRInst* inst);
 
     void emitOperand(IRInst* inst, EmitOpInfo const& outerPrec)
     {
@@ -821,6 +840,10 @@ protected:
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
 
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
+
+    Dictionary<IRInst*, bool>* m_foldSafetyCache = nullptr;
+
+    bool isSafeToFoldIntoUseSitesUncached(IRInst* inst);
 
     // Rename entry point if target doesn't allow the name (e.g., 'main')
     virtual String maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink);
