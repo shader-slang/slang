@@ -1698,13 +1698,46 @@ QualType getTypeForDeclRef(
             // We make references immutable when the shadow must alias its parameter instead.
             isLValue = !shadowVar->shouldBeImmutableAlias;
         }
-        // A parameter's reference access comes from its effective passing mode, which
-        // `getParamPassingMode` computes from the modifiers and the parameter type.
-        auto paramDecl = as<ParamDecl>(varDeclRef.getDecl());
-        const auto paramMode = paramDecl ? getParamPassingMode(paramDecl) : ParamPassingMode::In;
-        if (varDeclRef.getDecl()->findModifier<ConstModifier>() ||
-            paramMode == ParamPassingMode::RefReadOnly)
+        bool isReadOnlyMemoryLocation = false;
+        if (auto paramDecl = as<ParamDecl>(varDeclRef.getDecl()))
+        {
+            // The effective passing mode decides how the body may access a parameter.
+            const bool isConst = paramDecl->hasModifier<ConstModifier>();
+            switch (getParamPassingMode(paramDecl))
+            {
+            case ParamPassingMode::In:
+            case ParamPassingMode::BorrowIn:
+                // A legacy (C-style) `in` or borrow parameter is mutable in the body unless it is
+                // `const`.
+                //
+                // TODO: A borrow is meant to be an immutable borrow of a value, so it should not be
+                // writable here. Making it read-only is a breaking change, which we leave to a
+                // separate change that can assess its impact.
+                isLValue = !as<ModernParamDecl>(paramDecl) && !isConst;
+                break;
+            case ParamPassingMode::Out:
+            case ParamPassingMode::BorrowInOut:
+                isLValue = !isConst;
+                break;
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefWriteOnly:
+                isLValue = true;
+                break;
+            case ParamPassingMode::RefReadOnly:
+                // A read-only reference parameter names its argument's memory location. A
+                // `__constref` parameter is a borrow, which may be a temporary holding the
+                // argument's value, so it does not name a memory location.
+                isLValue = false;
+                isReadOnlyMemoryLocation = true;
+                break;
+            default:
+                SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            }
+        }
+        else if (varDeclRef.getDecl()->hasModifier<ConstModifier>())
+        {
             isLValue = false;
+        }
 
         // Global-scope shader parameters should not be writable,
         // since they are effectively program inputs.
@@ -1722,20 +1755,6 @@ QualType getTypeForDeclRef(
         // Generic value parameters are always immutable
         if (isGenericValueParam(varDeclRef))
             isLValue = false;
-
-        // Function parameters declared in the "modern" style
-        // are immutable unless they have an `out` or `inout` modifier.
-        if (varDeclRef.is<ModernParamDecl>())
-        {
-            // Note: the `inout` modifier AST class inherits from
-            // the class for the `out` modifier so that we can
-            // make simple checks like this.
-            //
-            if (!varDeclRef.getDecl()->hasModifier<OutModifier>())
-            {
-                isLValue = false;
-            }
-        }
 
         // An explicit `readonly` or `writeonly` qualifier still restricts parameter uses in
         // compatibility mode. The parser keeps these modifiers on the underlying parameter,
@@ -1757,10 +1776,7 @@ QualType getTypeForDeclRef(
         }
 
         qualType.isLeftValue = isLValue;
-        // A read-only reference parameter names its argument's memory location. A `__constref`
-        // parameter is a borrow, which may be a temporary holding the argument's value, so it
-        // does not name a memory location.
-        qualType.isReadOnlyMemoryLocation = !isLValue && paramMode == ParamPassingMode::RefReadOnly;
+        qualType.isReadOnlyMemoryLocation = isReadOnlyMemoryLocation;
         qualType.isWriteOnly = isWriteOnly;
         return qualType;
     }
