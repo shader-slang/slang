@@ -2,6 +2,7 @@
 
 #include "slang-ast-support-types.h"
 #include "slang-compiler-fwd.h"
+#include "slang-profile.h"
 
 namespace Slang
 {
@@ -25,19 +26,6 @@ class MagicTypeModifier;
 /// Allows the ray-tracing stage-interface and descriptor AST types in imported library
 /// declarations.
 bool isRayTracingBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl);
-
-/// Identifies one logical stage contract represented by a dedicated AST type.
-///
-/// The value selects the stage profile and IR interface opcode. `Count` is the invalid value.
-enum class StructuralRayTracingStageKind
-{
-    ClosestHit,
-    AnyHit,
-    Intersection,
-    Miss,
-    Callable,
-    Count,
-};
 
 /// Gives each associated-type requirement in the structural API a stable semantic role.
 ///
@@ -99,7 +87,7 @@ enum class StructuralRayTracingHitAttributesKind
 /// semantic roles into non-operational metadata before those AST identities become unavailable.
 struct StructuralRayTracingEntryPointInfo
 {
-    StructuralRayTracingStageKind stageKind = StructuralRayTracingStageKind::Count;
+    Stage stageKind = Stage::Unknown;
     Type* stageType = nullptr;
     /// The exact executable interface selected through the stage implementation's witness.
     InterfaceDecl* stageInterface = nullptr;
@@ -136,14 +124,14 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     ASTBuilder* astBuilder,
     Type* entryListType);
 
-/// Returns the executable stage represented by the interface's AST type.
-StructuralRayTracingStageKind getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl);
+/// Returns the executable stage represented by the interface's AST type, or Stage::Unknown.
+Stage getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl);
 
 /// Returns whether the interface represents an executable stage with an `invoke` requirement.
 bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl);
 
-/// Returns the stage named by the input struct's KnownBuiltin annotation, or Count otherwise.
-StructuralRayTracingStageKind getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl);
+/// Returns the stage named by the input struct's KnownBuiltin annotation, or Stage::Unknown.
+Stage getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl);
 
 /// Returns whether the function is an annotated structural callable operation.
 bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl);

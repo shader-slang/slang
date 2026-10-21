@@ -132,45 +132,7 @@ static AssocTypeDecl* _findStructuralAssociatedRequirement(
     return nullptr;
 }
 
-static Stage _getNativeStage(StructuralRayTracingStageKind kind)
-{
-    switch (kind)
-    {
-    case StructuralRayTracingStageKind::ClosestHit:
-        return Stage::ClosestHit;
-    case StructuralRayTracingStageKind::AnyHit:
-        return Stage::AnyHit;
-    case StructuralRayTracingStageKind::Intersection:
-        return Stage::Intersection;
-    case StructuralRayTracingStageKind::Miss:
-        return Stage::Miss;
-    case StructuralRayTracingStageKind::Callable:
-        return Stage::Callable;
-    default:
-        return Stage::Unknown;
-    }
-}
-
-static StructuralRayTracingStageKind _getStructuralStage(Stage stage)
-{
-    switch (stage)
-    {
-    case Stage::ClosestHit:
-        return StructuralRayTracingStageKind::ClosestHit;
-    case Stage::AnyHit:
-        return StructuralRayTracingStageKind::AnyHit;
-    case Stage::Intersection:
-        return StructuralRayTracingStageKind::Intersection;
-    case Stage::Miss:
-        return StructuralRayTracingStageKind::Miss;
-    case Stage::Callable:
-        return StructuralRayTracingStageKind::Callable;
-    default:
-        return StructuralRayTracingStageKind::Count;
-    }
-}
-
-static StructuralRayTracingStageKind _getDirectStageInputKind(Type* type)
+static Stage _getDirectStageInputKind(Type* type)
 {
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
@@ -302,9 +264,8 @@ static bool _isLegacyRayTracingStage(Stage stage)
 // `nativeAnyHit` is not selected by a structural stage conformance. Its checked
 // `EntryPointAttribute` is nevertheless an explicit any-hit contract and must win over the fallback
 // that infers a stage from an otherwise-unannotated helper's first stage-input parameter. Preserve
-// the native `Stage` here: mapping a compute or miss entry point to
-// `StructuralRayTracingStageKind::Count` would make a known mismatched stage look the same as an
-// unconstrained helper.
+// explicitly known stages, including compute, so they cannot be mistaken for an unconstrained
+// helper.
 static Stage _getRequiredStageForStructuralInput(FunctionDeclBase* functionDecl)
 {
     if (auto entryPointAttribute = functionDecl->findModifier<EntryPointAttribute>())
@@ -343,7 +304,7 @@ static void _diagnoseStructuralStageInputParameters(
     {
         auto parameterType = function.substitute(visitor->getASTBuilder(), parameter->type.type);
         auto inputStage = _getDirectStageInputKind(parameterType);
-        if (inputStage == StructuralRayTracingStageKind::Count)
+        if (inputStage == Stage::Unknown)
             continue;
 
         _checkRayTracingAPIUse(
@@ -351,19 +312,18 @@ static void _diagnoseStructuralStageInputParameters(
             RayTracingAPIFamily::Structural,
             functionDecl,
             visitor->getSink());
-        auto requiredInputStage = _getNativeStage(inputStage);
         if (functionStage == Stage::Unknown)
         {
-            functionStage = requiredInputStage;
+            functionStage = inputStage;
             continue;
         }
-        if (requiredInputStage == functionStage)
+        if (inputStage == functionStage)
             continue;
 
         auto location = parameter->type.exp ? parameter->type.exp->loc : parameter->loc;
         visitor->diagnoseOnce(Diagnostics::StructuralRayTracingInputStageMismatch{
             .type = parameterType,
-            .stage = getStageName(requiredInputStage),
+            .stage = getStageName(inputStage),
             .function = functionDecl,
             .location = location});
     }
@@ -420,7 +380,7 @@ static void _diagnoseStructuralStageConformance(
             stageWitness);
         if (!implementation)
             continue;
-        auto stage = _getNativeStage(getStructuralRayTracingStageKind(stageInterface.getDecl()));
+        auto stage = getStructuralRayTracingStageKind(stageInterface.getDecl());
         auto functionDecl = implementation.getDecl();
         auto capabilities = functionDecl->inferredCapabilityRequirements;
         if (capabilities && capabilities->isIncompatibleWith(getAtomFromStage(stage)))
@@ -468,7 +428,7 @@ static void _diagnoseStructuralStageDeclarations(
 // different meanings on those paths, and metadata must agree with the stage input's accessor.
 static bool _populateStructuralEntryPointInfo(
     SemanticsVisitor* visitor,
-    StructuralRayTracingStageKind stageKind,
+    Stage stageKind,
     SubtypeWitness* stageWitness,
     StructuralRayTracingEntryPointInfo* outInfo)
 {
@@ -479,9 +439,9 @@ static bool _populateStructuralEntryPointInfo(
     auto astBuilder = visitor->getASTBuilder();
     auto contextRequirement = StructuralRayTracingAssociatedTypeKind::StageContext;
     auto contextMember = StructuralRayTracingAssociatedTypeKind::HitPrimitive;
-    if (stageKind == StructuralRayTracingStageKind::Miss)
+    if (stageKind == Stage::Miss)
         contextMember = StructuralRayTracingAssociatedTypeKind::PayloadContextPayload;
-    else if (stageKind == StructuralRayTracingStageKind::Callable)
+    else if (stageKind == Stage::Callable)
         contextMember = StructuralRayTracingAssociatedTypeKind::CallableData;
     outInfo->contextType =
         resolveStructuralRayTracingAssociatedType(astBuilder, stageWitness, contextRequirement);
@@ -495,15 +455,15 @@ static bool _populateStructuralEntryPointInfo(
 
     switch (stageKind)
     {
-    case StructuralRayTracingStageKind::ClosestHit:
-    case StructuralRayTracingStageKind::AnyHit:
-    case StructuralRayTracingStageKind::Intersection:
+    case Stage::ClosestHit:
+    case Stage::AnyHit:
+    case Stage::Intersection:
         {
             outInfo->recordType = resolveStructuralRayTracingAssociatedType(
                 astBuilder,
                 contextWitness,
                 StructuralRayTracingAssociatedTypeKind::StageRecord);
-            if (stageKind != StructuralRayTracingStageKind::Intersection)
+            if (stageKind != Stage::Intersection)
             {
                 outInfo->payloadType = resolveStructuralRayTracingAssociatedType(
                     astBuilder,
@@ -526,12 +486,11 @@ static bool _populateStructuralEntryPointInfo(
                 StructuralRayTracingAssociatedTypeKind::HitPrimitive);
             outInfo->hitAttributesKind =
                 getStructuralRayTracingHitAttributesKind(outInfo->primitiveType);
-            return (stageKind == StructuralRayTracingStageKind::Intersection ||
-                    outInfo->payloadType) &&
+            return (stageKind == Stage::Intersection || outInfo->payloadType) &&
                    outInfo->recordType && outInfo->primitiveType && outInfo->hitAttributesType &&
                    outInfo->hitAttributesKind != StructuralRayTracingHitAttributesKind::None;
         }
-    case StructuralRayTracingStageKind::Miss:
+    case Stage::Miss:
         {
             outInfo->payloadType = resolveStructuralRayTracingAssociatedType(
                 astBuilder,
@@ -543,7 +502,7 @@ static bool _populateStructuralEntryPointInfo(
                 StructuralRayTracingAssociatedTypeKind::StageRecord);
             return outInfo->payloadType && outInfo->recordType;
         }
-    case StructuralRayTracingStageKind::Callable:
+    case Stage::Callable:
         outInfo->callableDataType = resolveStructuralRayTracingAssociatedType(
             astBuilder,
             contextWitness,
@@ -570,7 +529,7 @@ enum class RestrictedRayTracingTypeKind
 static RestrictedRayTracingTypeKind _getDirectRestrictedRayTracingTypeKind(Type* type)
 {
     type = unwrapModifiedType(type);
-    if (_getDirectStageInputKind(type) != StructuralRayTracingStageKind::Count)
+    if (_getDirectStageInputKind(type) != Stage::Unknown)
         return RestrictedRayTracingTypeKind::StageInput;
     if (as<RayTracingStageInterfaceType>(type))
         return RestrictedRayTracingTypeKind::StageInterface;
@@ -597,8 +556,7 @@ static RestrictedRayTracingTypeKind _getRestrictedRayTracingTypeKind(Type* type)
     // as a standalone declaration; other containers still need their element types checked.
     if (auto optionalType = as<OptionalType>(type))
     {
-        if (_getDirectStageInputKind(optionalType->getValueType()) !=
-            StructuralRayTracingStageKind::Count)
+        if (_getDirectStageInputKind(optionalType->getValueType()) != Stage::Unknown)
             return RestrictedRayTracingTypeKind::None;
     }
 
@@ -851,22 +809,22 @@ String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName)
     return _encodeStructuralRayTracingSymbolName(sourceTypeName);
 }
 
-StructuralRayTracingStageKind getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl)
+Stage getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl)
 {
     switch (_getMagicTypeClass(interfaceDecl))
     {
     case ASTNodeType::ClosestHitShaderType:
-        return StructuralRayTracingStageKind::ClosestHit;
+        return Stage::ClosestHit;
     case ASTNodeType::AnyHitShaderType:
-        return StructuralRayTracingStageKind::AnyHit;
+        return Stage::AnyHit;
     case ASTNodeType::IntersectionShaderType:
-        return StructuralRayTracingStageKind::Intersection;
+        return Stage::Intersection;
     case ASTNodeType::MissShaderType:
-        return StructuralRayTracingStageKind::Miss;
+        return Stage::Miss;
     case ASTNodeType::CallableShaderType:
-        return StructuralRayTracingStageKind::Callable;
+        return Stage::Callable;
     default:
-        return StructuralRayTracingStageKind::Count;
+        return Stage::Unknown;
     }
 }
 
@@ -877,22 +835,22 @@ bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl
            modifier->magicNodeType.isSubClassOf<RayTracingStageInterfaceType>();
 }
 
-StructuralRayTracingStageKind getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl)
+Stage getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl)
 {
     switch (_getRayTracingBuiltin(typeDecl))
     {
     case KnownBuiltinDeclName::RayTracingClosestHitInput:
-        return StructuralRayTracingStageKind::ClosestHit;
+        return Stage::ClosestHit;
     case KnownBuiltinDeclName::RayTracingAnyHitInput:
-        return StructuralRayTracingStageKind::AnyHit;
+        return Stage::AnyHit;
     case KnownBuiltinDeclName::RayTracingIntersectionInput:
-        return StructuralRayTracingStageKind::Intersection;
+        return Stage::Intersection;
     case KnownBuiltinDeclName::RayTracingMissInput:
-        return StructuralRayTracingStageKind::Miss;
+        return Stage::Miss;
     case KnownBuiltinDeclName::RayTracingCallableInput:
-        return StructuralRayTracingStageKind::Callable;
+        return Stage::Callable;
     default:
-        return StructuralRayTracingStageKind::Count;
+        return Stage::Unknown;
     }
 }
 
@@ -1123,17 +1081,17 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     SemanticsVisitor visitor(&sharedContext);
     visitor.ensureDecl(stageTypeDeclRef, DeclCheckState::ReadyForConformances);
 
-    DeclRef<FuncDecl> stageImplementations[int(StructuralRayTracingStageKind::Count)] = {};
-    SubtypeWitness* stageWitnesses[int(StructuralRayTracingStageKind::Count)] = {};
-    InterfaceDecl* stageInterfaces[int(StructuralRayTracingStageKind::Count)] = {};
-    bool ambiguousImplementations[int(StructuralRayTracingStageKind::Count)] = {};
+    DeclRef<FuncDecl> stageImplementations[SLANG_STAGE_COUNT] = {};
+    SubtypeWitness* stageWitnesses[SLANG_STAGE_COUNT] = {};
+    InterfaceDecl* stageInterfaces[SLANG_STAGE_COUNT] = {};
+    bool ambiguousImplementations[SLANG_STAGE_COUNT] = {};
     auto stageType = DeclRefType::create(linkage->getASTBuilder(), stageTypeDeclRef);
     outInfo->stageType = stageType;
     for (auto facet : visitor.getShared()->getInheritanceInfo(stageType).facets)
     {
         auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>();
         auto kind = getStructuralRayTracingStageKind(interfaceDeclRef.getDecl());
-        if (kind != StructuralRayTracingStageKind::Count)
+        if (kind != Stage::Unknown)
         {
             if (auto implementation = _getStageImplementationFromSubtypeWitness(
                     visitor.getASTBuilder(),
@@ -1158,13 +1116,13 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     }
 
     Count implementedStageCount = 0;
-    StructuralRayTracingStageKind onlyImplementedStage = StructuralRayTracingStageKind::Count;
-    for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
+    Stage onlyImplementedStage = Stage::Unknown;
+    for (int i = 0; i < SLANG_STAGE_COUNT; ++i)
     {
         if (stageImplementations[i])
         {
             ++implementedStageCount;
-            onlyImplementedStage = StructuralRayTracingStageKind(i);
+            onlyImplementedStage = Stage(i);
         }
     }
 
@@ -1176,11 +1134,10 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     }
 
     auto requestedStage = ioProfile.getStage();
-    auto selectedStage = _getStructuralStage(requestedStage);
+    auto selectedStage = requestedStage;
     if (requestedStage != Stage::Unknown)
     {
-        if (selectedStage == StructuralRayTracingStageKind::Count ||
-            !stageImplementations[int(selectedStage)])
+        if (UInt(selectedStage) >= SLANG_STAGE_COUNT || !stageImplementations[int(selectedStage)])
         {
             sink->diagnose(Diagnostics::StructuralRayTracingEntryPointStageMismatch{
                 .stage = getStageName(requestedStage),
@@ -1191,7 +1148,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     else if (implementedStageCount == 1)
     {
         selectedStage = onlyImplementedStage;
-        ioProfile = Profile(_getNativeStage(selectedStage));
+        ioProfile = Profile(selectedStage);
     }
     else
     {
@@ -1203,7 +1160,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     if (ambiguousImplementations[int(selectedStage)])
     {
         sink->diagnose(Diagnostics::StructuralRayTracingEntryPointAmbiguousImplementation{
-            .stage = getStageName(_getNativeStage(selectedStage)),
+            .stage = getStageName(selectedStage),
             .stageType = stageTypeDeclRef.getDecl()});
         return DeclRef<FuncDecl>();
     }
@@ -1310,7 +1267,7 @@ void SemanticsVisitor::checkStructuralRayTracingStageRestrictions(
     SourceLoc conformanceLoc)
 {
     auto stageKind = getStructuralRayTracingStageKind(superInterfaceDeclRef.getDecl());
-    if (stageKind == StructuralRayTracingStageKind::Count || !witnessTable)
+    if (stageKind == Stage::Unknown || !witnessTable)
         return;
 
     auto witnessedType = witnessTable->witnessedType;
@@ -1394,8 +1351,8 @@ void SemanticsVisitor::checkStructuralRayTracingModule(ModuleDecl* moduleDecl)
 void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl)
 {
     auto type = varDecl->getType();
-    // Recognize the input type itself, such as MissInput<C>. Count means it is not a stage input.
-    if (_getDirectStageInputKind(type) != StructuralRayTracingStageKind::Count)
+    // Recognize the input type itself, such as MissInput<C>. Unknown means it is not a stage input.
+    if (_getDirectStageInputKind(type) != Stage::Unknown)
     {
         if (auto param = as<ParamDecl>(varDecl))
         {
@@ -1563,8 +1520,7 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericTypeApplication
     {
         if (auto argumentType = as<TypeType>(argument->type))
         {
-            if (isOptional && _getDirectStageInputKind(argumentType->getType()) !=
-                                  StructuralRayTracingStageKind::Count)
+            if (isOptional && _getDirectStageInputKind(argumentType->getType()) != Stage::Unknown)
                 continue;
             if (_diagnoseRestrictedRayTracingGenericArgument(
                     this,

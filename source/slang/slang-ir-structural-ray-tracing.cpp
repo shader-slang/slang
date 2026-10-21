@@ -9,19 +9,19 @@
 namespace Slang
 {
 
-IROp getStructuralRayTracingStageInterfaceOp(StructuralRayTracingStageKind kind)
+IROp getStructuralRayTracingStageInterfaceOp(Stage kind)
 {
     switch (kind)
     {
-    case StructuralRayTracingStageKind::ClosestHit:
+    case Stage::ClosestHit:
         return kIROp_ClosestHitStageInterface;
-    case StructuralRayTracingStageKind::AnyHit:
+    case Stage::AnyHit:
         return kIROp_AnyHitStageInterface;
-    case StructuralRayTracingStageKind::Intersection:
+    case Stage::Intersection:
         return kIROp_IntersectionStageInterface;
-    case StructuralRayTracingStageKind::Miss:
+    case Stage::Miss:
         return kIROp_MissStageInterface;
-    case StructuralRayTracingStageKind::Callable:
+    case Stage::Callable:
         return kIROp_CallableStageInterface;
     default:
         return kIROp_Invalid;

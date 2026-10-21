@@ -302,7 +302,7 @@ selected AST `FuncDecl` through `m_funcDeclRef`; selecting `SkyMiss` makes that 
 ```cpp
 struct StructuralRayTracingEntryPointInfo
 {
-    StructuralRayTracingStageKind stageKind;
+    Stage stageKind;
     Type* stageType;
     InterfaceDecl* stageInterface;
     Type* contextType;
@@ -319,18 +319,18 @@ The declaration is in `source/slang/slang-structural-ray-tracing.h`. Its pointer
 existing checked AST objects owned by the linkage; the record does not create new copies of
 those types.
 
-| Field               | Meaning                                                                                                                                                                   |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stageKind`         | The selected structural stage, such as `Miss`; the existing entry profile also retains the corresponding stage. `Count` leaves this metadata inactive for legacy entries. |
-| `stageType`         | The selected user struct, including any supplied generic arguments.                                                                                                       |
-| `stageInterface`    | The selected executable interface, such as `rt::IMissShader`, used for frontend stage-capability validation.                                                              |
-| `contextType`       | The type satisfying the stage's `Context` requirement.                                                                                                                    |
-| `payloadType`       | The checked payload type, currently filled for closest-hit, any-hit, and miss stages.                                                                                     |
-| `recordType`        | The checked shader-record type; `void` means no application record data.                                                                                                  |
-| `primitiveType`     | The hit primitive, retained for the frontend capability-propagation workaround tracked in [#13793](https://github.com/shader-slang/slang/issues/13793).                   |
-| `hitAttributesType` | The checked attributes type for a hit stage.                                                                                                                              |
-| `callableDataType`  | The callable-data type for a callable stage.                                                                                                                              |
-| `hitAttributesKind` | `Triangle`, `Curve`, or `Custom` for hit stages; `None` otherwise.                                                                                                        |
+| Field               | Meaning                                                                                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stageKind`         | The existing `Stage` enum, such as `Stage::Miss`; the entry profile retains the same stage. `Stage::Unknown` leaves this metadata inactive for legacy entries. |
+| `stageType`         | The selected user struct, including any supplied generic arguments.                                                                                            |
+| `stageInterface`    | The selected executable interface, such as `rt::IMissShader`, used for frontend stage-capability validation.                                                   |
+| `contextType`       | The type satisfying the stage's `Context` requirement.                                                                                                         |
+| `payloadType`       | The checked payload type, currently filled for closest-hit, any-hit, and miss stages.                                                                          |
+| `recordType`        | The checked shader-record type; `void` means no application record data.                                                                                       |
+| `primitiveType`     | The hit primitive, retained for the frontend capability-propagation workaround tracked in [#13793](https://github.com/shader-slang/slang/issues/13793).        |
+| `hitAttributesType` | The checked attributes type for a hit stage.                                                                                                                   |
+| `callableDataType`  | The callable-data type for a callable stage.                                                                                                                   |
+| `hitAttributesKind` | `Triangle`, `Curve`, or `Custom` for hit stages; `None` otherwise.                                                                                             |
 
 For a miss entry with `SkyContext.Payload = ColorPayload` and `SkyContext.Record = void`, the
 record contains `Miss`, `SkyMiss`, `rt::IMissShader`, `SkyContext`, `ColorPayload`, and the checked

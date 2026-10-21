@@ -15,7 +15,7 @@ namespace Slang
 /// synthesis pass will need, even after the AST entry-point object is no longer available.
 struct StructuralRayTracingEntryPointIRInfo
 {
-    StructuralRayTracingStageKind stageKind = StructuralRayTracingStageKind::Count;
+    Stage stageKind = Stage::Unknown;
     IRType* stageType = nullptr;
     IRStringLit* stageSourceTypeName = nullptr;
     IRStringLit* stageTypeIdentity = nullptr;
@@ -31,7 +31,7 @@ struct StructuralRayTracingEntryPointIRInfo
 /// Returns the compiler-owned interface-type opcode for `kind`, or `kIROp_Invalid` for an invalid
 /// kind. Distinct opcodes preserve structural stage identity after source declarations are linked
 /// or serialized and their AST pointers are no longer available.
-IROp getStructuralRayTracingStageInterfaceOp(StructuralRayTracingStageKind kind);
+IROp getStructuralRayTracingStageInterfaceOp(Stage kind);
 
 /// Attaches `info` to the selected logical `invoke` value.
 ///

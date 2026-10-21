@@ -249,7 +249,7 @@ public:
     }
     bool isStructuralRayTracingEntryPoint() const
     {
-        return m_structuralRayTracingInfo.stageKind != StructuralRayTracingStageKind::Count;
+        return m_structuralRayTracingInfo.stageKind != Stage::Unknown;
     }
     const StructuralRayTracingEntryPointInfo& getStructuralRayTracingInfo() const
     {
