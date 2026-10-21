@@ -11,10 +11,13 @@
 
 // A `#line` names the file that the emitted code's source location is in.
 // `exp10` (hlsl.meta.slang) and `concat` (core.meta.slang) keep a Slang body
-// on HLSL and are not inlined, so each is emitted as its own function under
-// a meta-module `#line`. Only these two calls matter to the meta CHECKs.
+// on HLSL and have no `[ForceInline]`, `[__unsafeForceInlineEarly]` or
+// `__intrinsic_op`, so each is emitted as its own function under a
+// meta-module `#line`. Only these two calls matter to the meta CHECKs.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=HLSLMETA):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=COREMETA):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<float> outBuf;
 
@@ -29,3 +32,10 @@ void main(uint3 tid : SV_DispatchThreadID)
 // CHECK-DAG: #line {{[0-9]+}} "{{.*}}line-directive-references-core-meta.slang"
 // CHECK-DAG: #line {{[0-9]+}} "{{.*}}core.meta.slang"
 // CHECK-DAG: #line {{[0-9]+}} "{{.*}}hlsl.meta.slang"
+
+// Each meta-module `#line` sits directly above the function it locates, so a
+// failure here means `exp10` or `concat` stopped being emitted on its own.
+// HLSLMETA: #line {{[0-9]+}} "{{.*}}hlsl.meta.slang"
+// HLSLMETA-NEXT: exp10_{{[0-9]+}}(
+// COREMETA: #line {{[0-9]+}} "{{.*}}core.meta.slang"
+// COREMETA-NEXT: concat_{{[0-9]+}}(
