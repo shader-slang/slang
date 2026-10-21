@@ -351,7 +351,8 @@ static IRInst* specializeWitnessLookup(IRLookupWitnessMethod* lookupInst)
     return satisfyingVal;
 }
 
-// Resolve any specialization and translations.
+// Resolve any specialization and translations, except that a set-specialized `Specialize` is
+// returned unchanged (see below).
 IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
 {
     if (!inst)
@@ -443,11 +444,14 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
         return translateInst;
     }
 
-    // A set-specialized generic is lowered by `specializeGenericWithSetArgs`, which prepends a tag
-    // parameter for each dynamic witness-table argument, so only a call site that passes those tags
-    // may use the lowered function. The type-flow pass adds the tags when it rewrites each call,
-    // and it needs the `Specialize` itself to do so. We therefore never resolve it here, even when
-    // the translation dictionary already maps it to the function lowered for another call site.
+    // A set-specialized generic such as `specialize(leaf, UntaggedUnion, WitnessTableSet)` is
+    // lowered by `specializeGenericWithSetArgs` into one function that takes a leading tag
+    // parameter per dynamic witness-table argument. On a later module-specialization round, the
+    // function can be memoized before type-flow rewrites other calls of the same module-scope
+    // `Specialize`. Consider `top` calling `leaf` directly and through `mid`: if the direct call is
+    // rewritten first, replacing the `Specialize` with the memoized function here would make the
+    // type-flow pass see `mid`'s call as a plain call and never pass its tag. We therefore always
+    // return a set-specialized `Specialize` unchanged; `specializeCall` adds the tag arguments.
     if (isSetSpecializedGeneric(instWithCanonicalOperands))
         return instWithCanonicalOperands;
 

@@ -6,6 +6,9 @@
 // `value` entry needs a runtime tag that the caller has no way to receive. The compiler must
 // report E33180 at the `value()` call instead of crashing, both when `use<T : ITarget>` receives
 // the value as a generic argument and when the value is stored in an `ITarget` existential.
+// E33180 here reflects a current limitation of type-flow specialization, not a language rule: if
+// witness tables over a dynamic set become supported, these cases should compile and this test
+// should check their results instead.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC):-target spirv -entry computeMain -stage compute -conformance "A:IMaterial=0" -conformance "B:IMaterial=1"
 //DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC):-target hlsl -entry computeMain -stage compute -conformance "A:IMaterial=0" -conformance "B:IMaterial=1"
