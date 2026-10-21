@@ -10,6 +10,8 @@ class DiagnosticSink;
 
 struct ByteAddressBufferLegalizationOptions
 {
+    /// Split every vector and array load/store into per-element accesses, even when the access is
+    /// known to be aligned to its whole size.
     bool scalarizeVectorLoadStore = false;
     bool useBitCastFromUInt = false;
     bool translateToStructuredBufferOps = false;

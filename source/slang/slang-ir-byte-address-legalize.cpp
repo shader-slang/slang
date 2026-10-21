@@ -500,8 +500,10 @@ struct ByteAddressBufferLegalizationContext
 
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
-                // Emit an aligned load operation on an array when using a LoadAligned inst.
-                // Else, fallback to scalarizing the loads.
+                // We load the whole array at once only when the access is known to be aligned to
+                // the array's size and the target does not set `scalarizeVectorLoadStore`, which
+                // splits arrays as well as vectors. WGSL and Metal, for example, see the buffer as
+                // an array of 32-bit words, so a whole-array leaf load there reads one word.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
@@ -509,7 +511,8 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (m_options.scalarizeVectorLoadStore ||
+                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -1461,8 +1464,6 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
-                // Emit an aligned store operation on an array when using a StoreAligned inst.
-                // Else, fallback to scalarizing the stores.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
@@ -1470,7 +1471,8 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (m_options.scalarizeVectorLoadStore ||
+                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(
                         buffer,
