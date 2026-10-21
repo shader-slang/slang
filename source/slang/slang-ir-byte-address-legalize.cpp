@@ -1594,6 +1594,38 @@ struct ByteAddressBufferLegalizationContext
         {
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
+                // A `half2` or `half4` at an offset known to be a multiple of 4 covers whole 32-bit
+                // words, so each pair of halves can be stored as one word. Storing the halves one
+                // by one would need a read-modify-write of each word, which races with another
+                // invocation that writes the other half of the same word.
+                const IRIntegerValue elementCount = elementCountInst->getValue();
+                if (m_options.storeAlignedHalfPairsAsWords &&
+                    vecType->getElementType()->getOp() == kIROp_HalfType &&
+                    (elementCount == 2 || elementCount == 4) &&
+                    isWideAccessAligned(baseOffset, immediateOffset, alignment, 4))
+                {
+                    auto pairType = m_builder.getVectorType(vecType->getElementType(), 2);
+                    for (IRIntegerValue i = 0; i < elementCount; i += 2)
+                    {
+                        IRInst* pair = value;
+                        if (elementCount != 2)
+                        {
+                            IRInst* halves[] = {
+                                m_builder.emitElementExtract(value, i),
+                                m_builder.emitElementExtract(value, i + 1)};
+                            pair = m_builder.emitMakeVector(pairType, 2, halves);
+                        }
+                        auto word = m_builder.emitBitCast(m_builder.getUIntType(), pair);
+                        SLANG_RETURN_ON_FAIL(emitSimpleStore(
+                            m_builder.getUIntType(),
+                            buffer,
+                            baseOffset,
+                            immediateOffset + i * 2,
+                            word));
+                    }
+                    return SLANG_OK;
+                }
+
                 // Emit an aligned vector store operation when using a StoreAligned inst.
                 // Else, fallback to scalarizing the stores.
 
