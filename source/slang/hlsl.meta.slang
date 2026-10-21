@@ -8713,9 +8713,17 @@ double2 asdouble(uint2 lowbits, uint2 highbits)
     }
 }
 
+// On WGSL, `asfloat` is an IR bit cast rather than an opaque intrinsic, and the overloads are
+// `[ForceInline]` so that the bit cast lands next to its argument. A constant argument then folds to
+// a float literal, which the WGSL emitter spells through a runtime helper when it is NaN or an
+// infinity; `bitcast` of such a literal is a WGSL const-expression error (issue #13635). The
+// `asint`/`asuint` overloads cannot produce a non-finite value, so they keep the intrinsic. On the
+// other targets, inlining only moves the `__target_switch` body to the call site.
+
 /// Reinterpret bits as a float.
 /// @category conversion
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 float asfloat(int x)
 {
@@ -8729,12 +8737,13 @@ float asfloat(int x)
     case spirv: return spirv_asm {
         OpBitcast $$float result $x
     };
-    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case wgsl: return bit_cast<float>(x);
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 float asfloat(uint x)
 {
@@ -8748,13 +8757,14 @@ float asfloat(uint x)
     case spirv: return spirv_asm {
         OpBitcast $$float result $x
     };
-    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case wgsl: return bit_cast<float>(x);
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<float, N> asfloat(vector< int, N> x)
 {
@@ -8766,7 +8776,7 @@ vector<float, N> asfloat(vector< int, N> x)
     case spirv: return spirv_asm {
         OpBitcast $$vector<float, N> result $x
     };
-    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case wgsl: return bit_cast<vector<float, N>>(x);
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
@@ -8775,6 +8785,7 @@ vector<float, N> asfloat(vector< int, N> x)
 
 __generic<let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
@@ -8786,7 +8797,7 @@ vector<float,N> asfloat(vector<uint,N> x)
     case spirv: return spirv_asm {
         OpBitcast $$vector<float,N> result $x
     };
-    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case wgsl: return bit_cast<vector<float, N>>(x);
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);

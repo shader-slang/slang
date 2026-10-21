@@ -23,10 +23,10 @@
 // NOCONST-NOT: const {{.*}}_slang_get
 
 // The helpers build NaN and infinity from bit patterns, not from a runtime `0.0 / 0.0`: the NVIDIA
-// Vulkan driver crashes creating a pipeline for a sunk table that holds such a division.
-// WGSL: fn _slang_getNan() -> f32
+// Vulkan driver crashes creating a pipeline for a sunk table that holds such a division. The NaN
+// below is `0.0 / 0.0` folded on the build host, whose sign differs between x86 and aarch64.
+// WGSL: fn _slang_getNan(bits : u32) -> f32
 // WGSL-NEXT: {
-// WGSL-NEXT: let bits = 0x7fc00000u;
 // WGSL-NEXT: return bitcast<f32>(bits);
 // WGSL: fn _slang_getInfinity(positive: bool) -> f32
 // WGSL-NEXT: {
@@ -47,7 +47,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 // Two functions that share `kTable` each get their own function-scope copy.
 // WGSL: fn readTable
-// WGSL: var kTable{{.*}} = array<f32, i32(3)>( _slang_getNan(), _slang_getInfinity(true), 2.0f );
+// WGSL: var kTable{{.*}} = array<f32, i32(3)>( _slang_getNan(0x{{[7F]}}FC00000u), _slang_getInfinity(true), 2.0f );
 [noinline]
 float readTable(uint i)
 {
@@ -55,7 +55,7 @@ float readTable(uint i)
 }
 
 // WGSL: fn readTableReversed
-// WGSL: var kTable{{.*}} = array<f32, i32(3)>( _slang_getNan(), _slang_getInfinity(true), 2.0f );
+// WGSL: var kTable{{.*}} = array<f32, i32(3)>( _slang_getNan(0x{{[7F]}}FC00000u), _slang_getInfinity(true), 2.0f );
 [noinline]
 float readTableReversed(uint i)
 {

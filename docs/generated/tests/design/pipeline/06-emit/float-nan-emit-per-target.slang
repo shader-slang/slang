@@ -42,6 +42,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 // as a constant, not which sign bit it carries, so match either.
 // SPIRV: OpConstant %float {{-?}}0x1.8p+128
 // METAL: (0.0 / 0.0)
-// WGSL: _slang_getNan()
+// WGSL: _slang_getNan(0x{{[7F]}}FC00000u)
 // CUDA: (0.0 / 0.0)
 // CPP: (0.0 / 0.0)
