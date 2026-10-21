@@ -81,6 +81,7 @@ protected:
     glslang_DisassembleSPIRVWithResultFunc m_disassembleWithResult = nullptr;
     glslang_FreeDisassemblyFunc m_freeDisassembly = nullptr;
     glslang_LinkSPIRVFunc m_link = nullptr;
+    glslang_FreeLinkResultFunc m_freeLinkResult = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 
@@ -101,6 +102,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_freeDisassembly =
         (glslang_FreeDisassemblyFunc)library->findFuncByName("glslang_freeDisassembly");
     m_link = (glslang_LinkSPIRVFunc)library->findFuncByName("glslang_linkSPIRV");
+    m_freeLinkResult =
+        (glslang_FreeLinkResultFunc)library->findFuncByName("glslang_freeLinkResult");
 
     if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr &&
         m_compile_1_3 == nullptr)
@@ -442,6 +445,10 @@ SlangResult GlslangDownstreamCompiler::link(
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
     artifact->addRepresentationUnknown(
         Slang::RawBlob::create(request.linkResult, request.linkResultSize * sizeof(uint32_t)));
+    if (m_freeLinkResult)
+    {
+        m_freeLinkResult(request.linkResult);
+    }
 
     *outArtifact = artifact.detach();
     return SLANG_OK;

@@ -1097,6 +1097,8 @@ extern "C"
     return glslang_compile_1_1(&request);
 }
 
+// Link the given SPIR-V modules into one. On success the caller owns request->linkResult and must
+// release it with glslang_freeLinkResult().
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
@@ -1163,4 +1165,16 @@ extern "C"
         return false;
     }
 #endif
+}
+
+// Free a link result returned by glslang_linkSPIRV.
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        void glslang_freeLinkResult(const uint32_t* linkResult)
+{
+    delete[] linkResult;
 }
