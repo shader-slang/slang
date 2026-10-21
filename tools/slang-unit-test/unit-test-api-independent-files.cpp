@@ -10,6 +10,9 @@ struct ApiFilterTestDirectory
 {
     String path;
 
+    // Match the forward-slash paths used by test discovery and positional prefixes.
+    String getPath(const char* name) const { return Path::simplify(Path::combine(path, name)); }
+
     ~ApiFilterTestDirectory()
     {
         if (path.getLength())
@@ -42,15 +45,15 @@ SLANG_UNIT_TEST(slangTestSkipApiIndependentFiles)
     directory.path = Path::getFileName(temporaryFile) + ".d";
     SLANG_CHECK_ABORT(Path::createDirectoryRecursive(directory.path));
 
-    const String source = Path::combine(directory.path, "source.slang");
+    const String source = directory.getPath("source.slang");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         source,
         "[shader(\"compute\")]\n[numthreads(1, 1, 1)]\nvoid main() {}\n")));
 
-    const String independent = Path::combine(directory.path, "independent.slang");
-    const String mixed = Path::combine(directory.path, "mixed.slang");
-    const String independentOutput = Path::combine(directory.path, "independent.hlsl");
-    const String mixedOutput = Path::combine(directory.path, "mixed.hlsl");
+    const String independent = directory.getPath("independent.slang");
+    const String mixed = directory.getPath("mixed.slang");
+    const String independentOutput = directory.getPath("independent.hlsl");
+    const String mixedOutput = directory.getPath("mixed.hlsl");
     StringBuilder independentText;
     independentText << "//TEST(smoke):COMPILE: \"" << source << "\" -target hlsl -entry main -o \""
                     << independentOutput << "\"\n";
@@ -62,11 +65,11 @@ SLANG_UNIT_TEST(slangTestSkipApiIndependentFiles)
               << "//TEST:COMPARE_COMPUTE:\n";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(mixed, mixedText)));
 
-    const String apiOnly = Path::combine(directory.path, "api-only.slang");
+    const String apiOnly = directory.getPath("api-only.slang");
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::writeAllText(apiOnly, "//TEST:COMPARE_COMPUTE: -cpu\n")));
 
-    const String skipList = Path::combine(directory.path, "skip.txt");
+    const String skipList = directory.getPath("skip.txt");
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::writeAllText(skipList, mixed + ".1\n" + mixed + ".2\n")));
 
