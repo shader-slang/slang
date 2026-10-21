@@ -326,7 +326,7 @@ requirements provided by extensions or inherited interfaces. Generic substitutio
 function reference apply through the ordinary parameter lookup.
 
 `initializeStructuralRayTracingEntryPoint` marks the entry as structural, sets the public name to
-the selected struct name, and derives a legal generated shader name. Creating an `EntryPoint`
+the selected struct name, and derives the generated shader name. Creating an `EntryPoint`
 collects specialization parameters and host-bound shader parameters through the ordinary path.
 `markAsStructuralRayTracingEntryPoint` sets the classification flag and clears the host-bound
 shader parameter list, because the compiler supplies the stage input. Generic specialization
@@ -337,12 +337,13 @@ that implements closest-hit and any-hit, the generated names are `MultiStage_clo
 `MultiStage_anyhit`; selecting `Miss` as a miss shader produces `Miss_miss`. The public entry name
 remains the selected source name. `getStructuralRayTracingSourceTypeName` supplies the declaration
 path and, for a generic specialization, a hash of its mangled type identity.
-`getStructuralRayTracingEntryPointName` makes that type name legal for the target, encoding
-qualified names, `main`, and names beginning with the reserved prefix. It then appends `_` and
-the canonical spelling from `getStageName(stage)`. Entry lookup, stage selection, and the selected
-method are unchanged by this generated name. The API regression selects both stages of
+`getStructuralRayTracingEntryPointName` replaces dots in that type name with underscores, then
+appends `_` and the canonical spelling from `getStageName(stage)`. For example, `Stages.Miss`
+becomes `Stages_Miss_miss`, and `main` becomes `main_miss`. Entry lookup, stage selection, and
+the selected method are unchanged by this generated name. The API regression selects both stages of
 `MultiStage`, combines the entries in one program, and verifies equal public names with distinct
-generated-name overrides.
+generated-name overrides. It also selects `Stages.main` as closest-hit and checks the generated
+name `Stages_main_closesthit`.
 
 AST-to-IR lowering produces an ordinary function and its input type. A generic implementation
 uses the normal generic parameters, witness parameters, and `IRSpecialize` operations. Dependent

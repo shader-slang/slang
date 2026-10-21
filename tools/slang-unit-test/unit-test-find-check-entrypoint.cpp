@@ -131,7 +131,8 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointLookupIsModuleLocal)
 }
 
 // Selecting two stages implemented by the same struct must give them distinct target names.
-// Check the overrides on the combined program, which supplies those names to IR linking.
+// Qualified names should remain readable, with dots replaced by underscores. Check the
+// overrides that supply those names to IR linking.
 SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
 {
     ComPtr<slang::IGlobalSession> globalSession;
@@ -189,6 +190,25 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
     SLANG_CHECK(internalProgram->getEntryPointCount() == 2);
     SLANG_CHECK(internalProgram->getEntryPointNameOverride(0) == "MultiStage_closesthit");
     SLANG_CHECK(internalProgram->getEntryPointNameOverride(1) == "MultiStage_anyhit");
+
+    const char* qualifiedSourcePath = "tests/ray-tracing-2/frontend/entry-point/struct-entry.slang";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(qualifiedSourcePath, source)));
+    auto qualifiedModule = session->loadModuleFromSourceString(
+        "QualifiedStageModule",
+        qualifiedSourcePath,
+        source.getBuffer(),
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(qualifiedModule != nullptr);
+    ComPtr<slang::IEntryPoint> qualifiedEntry;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(qualifiedModule->findAndCheckEntryPoint(
+        "Stages.main",
+        SLANG_STAGE_CLOSEST_HIT,
+        qualifiedEntry.writeRef(),
+        diagnostics.writeRef())));
+    auto internalEntry = static_cast<EntryPoint*>(qualifiedEntry.get());
+    SLANG_CHECK(internalEntry->getName()->text == "Stages.main");
+    ComponentType* qualifiedComponent = internalEntry;
+    SLANG_CHECK(qualifiedComponent->getEntryPointNameOverride(0) == "Stages_main_closesthit");
 }
 
 // This test reproduces issue #6507, where it was noticed that compilation of
