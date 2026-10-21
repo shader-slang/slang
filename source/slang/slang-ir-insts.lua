@@ -1887,6 +1887,20 @@ local insts = {
 			-- to it.
 			{ vulkanHitObjectAttributes = { struct_name = "VulkanHitObjectAttributesDecoration" } },
 			{ GlobalVariableShadowingGlobalParameterDecoration = { min_operands = 2 } },
+			-- Lowering adds this marker when the AST declaration is either a file- or namespace-scope
+			-- mutable `static` variable or a mutable uniform-parameter shadow. The marker records
+			-- membership in that combined category, not which kind the declaration has or what storage
+			-- rate it uses. Static data members also use `IRGlobalVar`, but are outside the category.
+			{ fileOrNamespaceScopeMutableVar = { struct_name = "FileOrNamespaceScopeMutableVarDecoration" } },
+			-- The pre-link module-wide uninitialized-global check found a possible write and
+			-- therefore could not prove that every read is uninitialized. We preserve that result
+			-- because entry-point linking may remove the writer before a later analysis revisits the
+			-- global.
+			{
+				uninitializedGlobalCheckFoundPossibleWrite = {
+					struct_name = "UninitializedGlobalCheckFoundPossibleWriteDecoration",
+				},
+			},
 			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",
@@ -1952,6 +1966,7 @@ local insts = {
 			{
 				patchConstantFunc = { struct_name = "PatchConstantFuncDecoration", operands = { { "func", "IRInst" } } },
 			},
+			{ glslPatch = { struct_name = "GLSLPatchDecoration" } },
 			{
 				maxTessFactor = {
 					struct_name = "MaxTessFactorDecoration",
@@ -2372,11 +2387,11 @@ local insts = {
 			},
 			{ noRefInline = { struct_name = "NoRefInlineDecoration" } },
 			{
-				DerivativeGroupQuad = {
-					struct_name = "DerivativeGroupQuadDecoration",
+				DerivativeGroupDecoration = {
+					{ DerivativeGroupQuad = { struct_name = "DerivativeGroupQuadDecoration" } },
+					{ DerivativeGroupLinear = { struct_name = "DerivativeGroupLinearDecoration" } },
 				},
 			},
-			{ DerivativeGroupLinear = { struct_name = "DerivativeGroupLinearDecoration" } },
 			{
 				MaximallyReconverges = {
 					struct_name = "MaximallyReconvergesDecoration",
