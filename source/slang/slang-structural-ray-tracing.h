@@ -93,12 +93,12 @@ FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* i
 /// cannot silently claim the same structural entry-point name.
 String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type);
 
-/// Returns the deterministic target symbol used for a portable structural ray-tracing stage type.
+/// Returns the deterministic target symbol for a structural ray-tracing type and selected stage.
 ///
-/// Ordinary source identifiers other than target-reserved names are preserved. Qualified,
-/// reserved, or otherwise target-unsafe names are encoded injectively so reflection and
-/// synthesized entry points agree on one physical name.
-String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName);
+/// Qualified, reserved, or otherwise target-unsafe type names are encoded injectively. The
+/// canonical stage name is appended so a struct implementing multiple stages gets distinct
+/// target symbols while retaining its source-level lookup name.
+String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName, Stage stage);
 
 class EntryPoint;
 struct IRModule;

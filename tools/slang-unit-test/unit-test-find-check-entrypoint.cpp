@@ -4,6 +4,7 @@
 #include "core/slang-process.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include "slang/slang-entry-point.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
@@ -127,6 +128,67 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointLookupIsModuleLocal)
         diagnosticText.indexOf(toSlice("no function found matching entry point name 'Plain'")) !=
         -1);
     SLANG_CHECK(diagnosticText.indexOf(toSlice("structural ray-tracing")) == -1);
+}
+
+// Selecting two stages implemented by the same struct must give them distinct target names.
+// Check the overrides on the combined program, which supplies those names to IR linking.
+SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalFeature = {};
+    experimentalFeature.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalFeature.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalFeature.value.intValue0 = 1;
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalFeature;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    const char* sourcePath =
+        "tests/ray-tracing-2/frontend/entry-point/struct-entry-ambiguous.slang";
+    String source;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(sourcePath, source)));
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "MultiStageModule",
+        sourcePath,
+        source.getBuffer(),
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> closestHit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+        "MultiStage",
+        SLANG_STAGE_CLOSEST_HIT,
+        closestHit.writeRef(),
+        diagnostics.writeRef())));
+    ComPtr<slang::IEntryPoint> anyHit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+        "MultiStage",
+        SLANG_STAGE_ANY_HIT,
+        anyHit.writeRef(),
+        diagnostics.writeRef())));
+
+    // The public selection name stays the same; only the target names distinguish the stages.
+    SLANG_CHECK(static_cast<EntryPoint*>(closestHit.get())->getName()->text == "MultiStage");
+    SLANG_CHECK(static_cast<EntryPoint*>(anyHit.get())->getName()->text == "MultiStage");
+
+    slang::IComponentType* components[] = {module, closestHit.get(), anyHit.get()};
+    ComPtr<slang::IComponentType> program;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+        components,
+        SLANG_COUNT_OF(components),
+        program.writeRef(),
+        diagnostics.writeRef())));
+    auto internalProgram = static_cast<ComponentType*>(program.get());
+    SLANG_CHECK(internalProgram->getEntryPointCount() == 2);
+    SLANG_CHECK(internalProgram->getEntryPointNameOverride(0) == "MultiStage_closesthit");
+    SLANG_CHECK(internalProgram->getEntryPointNameOverride(1) == "MultiStage_anyhit");
 }
 
 // This test reproduces issue #6507, where it was noticed that compilation of

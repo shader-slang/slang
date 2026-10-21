@@ -664,14 +664,13 @@ String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type)
     return result.produceString();
 }
 
-String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName)
+String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName, Stage stage)
 {
-    // Consider `Miss` and `Stages.Miss`. Keeping `Miss` unchanged preserves the public names used
-    // by existing structural programs. `Stages.Miss` cannot be emitted as a CUDA or C-like symbol,
-    // while C-like targets reserve the entry-point name `main`, so encode every UTF-8 byte of those
-    // names after a compiler-reserved prefix. We also encode source names that start with the
-    // prefix; consequently a user-written identifier cannot collide with an encoded qualified
-    // name.
+    SLANG_RELEASE_ASSERT(isRaytracingStage(stage));
+
+    // Consider `Miss` and `Stages.Miss`. Use the simple identifier directly, but encode every
+    // UTF-8 byte of qualified or target-reserved names after a compiler-reserved prefix. We also
+    // encode source names that start with the prefix so they cannot collide with encoded names.
     static const UnownedStringSlice kEncodedPrefix = toSlice("__slang_structural_rt_");
     bool isSimpleIdentifier =
         sourceTypeName.getLength() != 0 && !sourceTypeName.startsWith(kEncodedPrefix) &&
@@ -684,10 +683,16 @@ String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName)
         isSimpleIdentifier =
             (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
     }
-    if (isSimpleIdentifier)
-        return String(sourceTypeName);
-
-    return _encodeStructuralRayTracingSymbolName(sourceTypeName);
+    // A struct can implement both closest-hit and any-hit. Include the selected stage so its
+    // two entry points get distinct target names, such as `MultiStage_closesthit` and
+    // `MultiStage_anyhit`. Canonical stage names contain no underscores, so the final underscore
+    // separates the stage from the type name unambiguously.
+    StringBuilder result;
+    result
+        << (isSimpleIdentifier ? String(sourceTypeName)
+                               : _encodeStructuralRayTracingSymbolName(sourceTypeName));
+    result << "_" << getStageName(stage);
+    return result.produceString();
 }
 
 Stage getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl)
@@ -961,8 +966,9 @@ void initializeStructuralRayTracingEntryPoint(
     entryPoint->setNameOverride(entryPointName);
     auto sourceTypeName =
         getStructuralRayTracingSourceTypeName(entryPoint->getLinkage()->getASTBuilder(), stageType);
-    entryPoint->setEntryPointNameOverride(
-        getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice()));
+    entryPoint->setEntryPointNameOverride(getStructuralRayTracingEntryPointName(
+        sourceTypeName.getUnownedSlice(),
+        entryPoint->getStage()));
 }
 
 // Checks the structural representations that must be consumed before native ABI legalization.
