@@ -26,14 +26,17 @@ using SlangUnitTest::ScopedEnvVar;
 // - When the optimizer is required but missing (`-O1`), separate debug info must not change the
 //   outcome of the compile: E00100 is reported, and the debug module is never left missing.
 //
-// A missing shared library cannot be expressed in a `.slang` test that shares slang-test's global
-// session, so these tests install a fake loader with `setSharedLibraryLoader`.
+// These tests install a fake `slang-glslang` with `setSharedLibraryLoader` and compile through
+// the API. Unlike the CLI test `tests/spirv/separate-debug-without-spirv-opt.slang`, the fake
+// records which entry points ran (optimizer, validator, linker), the API returns both modules for
+// inspection, and a crash fails the test rather than producing the same result code as a clean
+// failure.
 
 namespace
 {
 
-// Set by the fake library, so each test can tell "was not needed" from "was never
-// reached" and cannot pass vacuously.
+// Set by the fake library's entry points, so a test that serves the fake library can tell "this
+// step ran" from "this step was skipped". They are never set in tests that refuse the library.
 bool gFakeOptimizerWasCalled = false;
 bool gFakeValidatorWasCalled = false;
 bool gFakeLinkerWasCalled = false;
@@ -60,19 +63,38 @@ bool fakeValidateReturningTrue(const uint32_t* contents, int contentsSize)
     return true;
 }
 
-// Return the first input module as the link result. The caller reads only
-// `linkResult`/`linkResultSize`, and the buffer is owned by the caller's module list, which
-// outlives the `link` call. The importer's module is first and, with debug info on, carries the
-// build identifier, so the split of the "linked" module is still meaningful.
-int fakeLinkReturningFirstModule(glslang_LinkRequest* request)
+// The link result: the first input module (the importer's, which carries the build identifier)
+// followed by an `OpSourceExtension "<kFakeLinkMarker>"` instruction. `OpSourceExtension` is a
+// debug instruction, so a split of the link result keeps the marker only in the debug module,
+// and a split of the native module never contains it. That is how the linked-split test tells
+// which module was split. The buffer must outlive the `link` call, because the caller copies it
+// only after `link` returns.
+const char kFakeLinkMarker[] = "fake-link-output";
+List<uint32_t> gFakeLinkResult;
+
+int fakeLinkAppendingMarker(glslang_LinkRequest* request)
 {
     gFakeLinkerWasCalled = true;
     if (!request || !request->modules || request->moduleCount < 1)
     {
         return false;
     }
-    request->linkResult = request->modules[0];
-    request->linkResultSize = request->moduleSizes[0];
+    gFakeLinkResult.clear();
+    gFakeLinkResult.addRange(request->modules[0], Index(request->moduleSizes[0]));
+
+    // A SPIR-V literal string is NUL-terminated and padded with zeros to a word boundary.
+    const uint32_t markerWordCount = uint32_t((sizeof(kFakeLinkMarker) + 3) / 4);
+    const uint32_t kSpvOpSourceExtension = 4;
+    gFakeLinkResult.add(((1 + markerWordCount) << 16) | kSpvOpSourceExtension);
+    const Index markerStart = gFakeLinkResult.getCount();
+    for (uint32_t i = 0; i < markerWordCount; ++i)
+    {
+        gFakeLinkResult.add(0);
+    }
+    memcpy(gFakeLinkResult.getBuffer() + markerStart, kFakeLinkMarker, sizeof(kFakeLinkMarker));
+
+    request->linkResult = gFakeLinkResult.getBuffer();
+    request->linkResultSize = size_t(gFakeLinkResult.getCount());
     return true;
 }
 
@@ -102,7 +124,7 @@ public:
         }
         if (symbol == "glslang_linkSPIRV")
         {
-            return (void*)fakeLinkReturningFirstModule;
+            return (void*)fakeLinkAppendingMarker;
         }
         return nullptr;
     }
@@ -117,11 +139,12 @@ protected:
     }
 };
 
-// Whether the fake loader answers a `slang-glslang` request with the fake library or refuses it.
-enum class GlslangAvailability
+// Whether the fake loader refuses every `slang-glslang` request, which leaves Slang with no
+// optimizer, validator or linker, or answers it with the fake library.
+enum class GlslangLibrary
 {
     Missing,
-    Fake,
+    Faked,
 };
 
 class FakeLoader : public RefObject, public ISlangSharedLibraryLoader
@@ -129,8 +152,8 @@ class FakeLoader : public RefObject, public ISlangSharedLibraryLoader
 public:
     SLANG_REF_OBJECT_IUNKNOWN_ALL
 
-    explicit FakeLoader(GlslangAvailability availability)
-        : m_availability(availability)
+    explicit FakeLoader(GlslangLibrary library)
+        : m_library(library)
     {
     }
 
@@ -145,13 +168,13 @@ public:
             return SLANG_E_NOT_FOUND;
         }
 
-        if (m_availability == GlslangAvailability::Missing)
+        if (m_library == GlslangLibrary::Missing)
         {
             return SLANG_E_NOT_FOUND;
         }
 
-        ComPtr<ISlangSharedLibrary> library(new FakeGlslangLibrary());
-        *outLibrary = library.detach();
+        ComPtr<ISlangSharedLibrary> fakeLibrary(new FakeGlslangLibrary());
+        *outLibrary = fakeLibrary.detach();
         return SLANG_OK;
     }
 
@@ -164,7 +187,7 @@ protected:
                    : nullptr;
     }
 
-    GlslangAvailability m_availability;
+    GlslangLibrary m_library;
 };
 
 // The variable name appears in the debug module (as `OpName` and in the embedded source) but not
@@ -205,12 +228,13 @@ const char kImportingShaderSource[] = R"SLANG(
 
 struct CompileOptions
 {
-    GlslangAvailability availability;
-    SlangOptimizationLevel optimizationLevel;
-    bool separateDebugInfo;
-    bool skipValidation;
+    GlslangLibrary library = GlslangLibrary::Missing;
+    SlangOptimizationLevel optimizationLevel = SLANG_OPTIMIZATION_LEVEL_NONE;
+    bool separateDebugInfo = true;
+    // Skipping validation keeps CI's `SLANG_RUN_SPIRV_VALIDATION=1` from loading the library.
+    bool skipValidation = true;
     // Compile `kImportingShaderSource` against a precompiled `kLibrarySource`, so that a link runs.
-    bool linkPrecompiledLibrary;
+    bool linkPrecompiledLibrary = false;
 };
 
 // What a compile produced. `code` is item 0 (the stripped module when separate debug info is on)
@@ -237,6 +261,11 @@ void addIntOption(
     ioEntries.add(entry);
 }
 
+// Compile the test shader to SPIR-V in a fresh global session that has the fake loader installed,
+// and return what `getEntryPointCompileResult` produced. Front-end, precompile and link failures
+// abort the test, because only code generation is under test. `outcome.diagnostics` holds only the
+// code-generation diagnostics. The `gFake*WasCalled` flags cover the whole call, precompilation
+// included.
 CompileOutcome compileToSpirv(const CompileOptions& options)
 {
     gFakeOptimizerWasCalled = false;
@@ -247,7 +276,7 @@ CompileOutcome compileToSpirv(const CompileOptions& options)
     SLANG_CHECK_ABORT(
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
-    ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(options.availability));
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(options.library));
     globalSession->setSharedLibraryLoader(loader);
 
     slang::TargetDesc targetDesc = {};
@@ -406,8 +435,7 @@ void checkSplitModules(const CompileOutcome& outcome)
 // on a best-effort basis that cannot fail the compile.
 SLANG_UNIT_TEST(separateDebugAtO0SucceedsWithoutSpirvOpt)
 {
-    const CompileOutcome outcome = compileToSpirv(
-        {GlslangAvailability::Missing, SLANG_OPTIMIZATION_LEVEL_NONE, true, true, false});
+    const CompileOutcome outcome = compileToSpirv({.library = GlslangLibrary::Missing});
 
     SLANG_CHECK(!diagnosticsContain(outcome, "E00100"));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(outcome.result));
@@ -419,8 +447,8 @@ SLANG_UNIT_TEST(separateDebugAtO0SucceedsWithoutSpirvOpt)
 SLANG_UNIT_TEST(separateDebugAtO0WithValidationDoesNotCallOptimizer)
 {
     ScopedEnvVar validateSpirv("SLANG_RUN_SPIRV_VALIDATION", "1");
-    const CompileOutcome outcome = compileToSpirv(
-        {GlslangAvailability::Fake, SLANG_OPTIMIZATION_LEVEL_NONE, true, false, false});
+    const CompileOutcome outcome =
+        compileToSpirv({.library = GlslangLibrary::Faked, .skipValidation = false});
 
     SLANG_CHECK(gFakeValidatorWasCalled);
     SLANG_CHECK(!gFakeOptimizerWasCalled);
@@ -429,36 +457,39 @@ SLANG_UNIT_TEST(separateDebugAtO0WithValidationDoesNotCallOptimizer)
 }
 
 // Linking a precompiled module loads `slang-glslang`, but at `-O0` the optimizer has nothing to
-// do, so a split compile must split the linked module without calling the optimizer.
+// do, so a split compile must split the linked module without calling the optimizer. The fake
+// link result carries a debug-only marker, which must end up in the debug module only.
 SLANG_UNIT_TEST(separateDebugAtO0SplitsLinkedModule)
 {
-    const CompileOutcome outcome = compileToSpirv(
-        {GlslangAvailability::Fake, SLANG_OPTIMIZATION_LEVEL_NONE, true, true, true});
+    const CompileOutcome outcome =
+        compileToSpirv({.library = GlslangLibrary::Faked, .linkPrecompiledLibrary = true});
 
     SLANG_CHECK(gFakeLinkerWasCalled);
     SLANG_CHECK(!gFakeOptimizerWasCalled);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(outcome.result));
     checkSplitModules(outcome);
+    SLANG_CHECK(blobContains(outcome.debugCode, kFakeLinkMarker));
+    SLANG_CHECK(!blobContains(outcome.code, kFakeLinkMarker));
 }
 
-// At `-O1` the optimizer is required. With `slang-glslang` missing, the compile reports E00100, and
-// separate debug info must not change its outcome: the split compile returns the same result as
-// the non-split one, and whenever it returns code it returns both modules.
+// At `-O1` the optimizer is required. With `slang-glslang` missing, the API compile reports E00100
+// and still returns the natively emitted module, as it does without separate debug info; with
+// separate debug info it returns both modules instead of crashing on a missing debug module.
 SLANG_UNIT_TEST(separateDebugWithMissingSpirvOptMatchesNonSplitCompile)
 {
     const CompileOutcome plain = compileToSpirv(
-        {GlslangAvailability::Missing, SLANG_OPTIMIZATION_LEVEL_DEFAULT, false, true, false});
+        {.library = GlslangLibrary::Missing,
+         .optimizationLevel = SLANG_OPTIMIZATION_LEVEL_DEFAULT,
+         .separateDebugInfo = false});
     SLANG_CHECK(diagnosticsContain(plain, "E00100"));
+    SLANG_CHECK(SLANG_SUCCEEDED(plain.result));
+    SLANG_CHECK(plain.itemCount == 1);
 
     const CompileOutcome split = compileToSpirv(
-        {GlslangAvailability::Missing, SLANG_OPTIMIZATION_LEVEL_DEFAULT, true, true, false});
+        {.library = GlslangLibrary::Missing,
+         .optimizationLevel = SLANG_OPTIMIZATION_LEVEL_DEFAULT});
     SLANG_CHECK(diagnosticsContain(split, "E00100"));
     SLANG_CHECK(!diagnosticsContain(split, "E99997"));
-
-    SLANG_CHECK(split.result == plain.result);
-    SLANG_CHECK((split.code != nullptr) == (plain.code != nullptr));
-    if (SLANG_SUCCEEDED(split.result))
-    {
-        checkSplitModules(split);
-    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(split.result));
+    checkSplitModules(split);
 }

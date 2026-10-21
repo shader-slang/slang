@@ -1,8 +1,9 @@
 // Regression test for issue #11662.
 //
 // A single-module `-O0 -target spirv` compile needs no downstream (slang-glslang /
-// SPIRV-Tools) work: there is nothing to optimize, no second module to link, validation is
-// off, and no separate debug info is requested. The SPIR-V backend now skips loading the
+// SPIRV-Tools) work: there is nothing to optimize, no second module to link, and validation is
+// off. (Separate debug info does not change this; see
+// tests/spirv/separate-debug-without-spirv-opt.slang.) The SPIR-V backend now skips loading the
 // `slang-glslang` module in that case and emits the natively generated module directly.
 //
 // This test guards that the `-O0 -target spirv` code path still produces a complete, valid
