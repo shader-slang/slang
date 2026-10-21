@@ -52,8 +52,11 @@ Slang::Result GlslangModule::init()
     // Load functions
 #if SLANG_WINDOWS_FAMILY
     m_linkSPIRVFunc = (glslang_LinkSPIRVFunc)GetProcAddress((HMODULE)m_module, "glslang_linkSPIRV");
+    m_freeLinkResultFunc =
+        (glslang_FreeLinkResultFunc)GetProcAddress((HMODULE)m_module, "glslang_freeLinkResult");
 #else
     m_linkSPIRVFunc = (glslang_LinkSPIRVFunc)dlsym(m_module, "glslang_linkSPIRV");
+    m_freeLinkResultFunc = (glslang_FreeLinkResultFunc)dlsym(m_module, "glslang_freeLinkResult");
 #endif
     if (!m_linkSPIRVFunc)
     {
@@ -105,6 +108,10 @@ ComPtr<ISlangBlob> GlslangModule::linkSPIRV(List<ComPtr<ISlangBlob>> spirvModule
 
     ComPtr<ISlangBlob> linkedSPIRV;
     linkedSPIRV = RawBlob::create(request.linkResult, request.linkResultSize * sizeof(uint32_t));
+    if (m_freeLinkResultFunc)
+    {
+        m_freeLinkResultFunc(request.linkResult);
+    }
     return linkedSPIRV;
 }
 
