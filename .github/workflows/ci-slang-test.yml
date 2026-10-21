@@ -26,6 +26,10 @@ on:
         required: false
         type: number
         default: 8
+      timeout-minutes:
+        required: false
+        type: number
+        default: 80
       enable-debug-layers:
         required: false
         type: boolean
@@ -58,7 +62,7 @@ on:
       run-via-glsl:
         required: true
         type: boolean
-        description: "Run the via-glsl pass on pull requests. API-split jobs run the same pass, so only one of them needs it."
+        description: "Run one Vulkan via-glsl pass on pull requests, including Debug when enabled."
       api:
         required: false
         type: string
@@ -68,7 +72,7 @@ on:
 jobs:
   test-slang:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 80
+    timeout-minutes: ${{ inputs.timeout-minutes }}
     defaults:
       run:
         shell: bash

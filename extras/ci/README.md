@@ -2,8 +2,8 @@
 
 Tools for analyzing GitHub Actions CI performance and queue status.
 
-See the [Windows GPU API consolidation plan](../../docs/design/windows-ci-api-consolidation.md)
-for the proposed workflow changes, related analytics prerequisites, and rollout criteria.
+See the [Windows and Linux API consolidation design](../../docs/design/windows-ci-api-consolidation.md)
+for the workflow changes, related analytics coordination, and rollout criteria.
 
 ## Scripts
 

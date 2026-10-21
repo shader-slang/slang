@@ -468,8 +468,8 @@ jobs:
   # long before a PR sitting in the Falcor approval queue gets looked at.
   # Building again here, only once approved, means the artifact this job
   # produces is always fresh when test-falcor actually needs it. The
-  # other six consumers of build-windows-release-cl-x86_64-gpu's artifact
-  # (dx/vk/cuda/rhi tests, MaterialX, compile-regression, benchmark) are
+  # other consumers of build-windows-release-cl-x86_64-gpu's artifact
+  # (combined API and RHI tests, MaterialX, compile-regression, benchmark) are
   # unaffected -- they keep using the eagerly-built, ungated artifact.
   #
   # If test-falcor fails on a stale/inaccessible artifact from this job
@@ -510,7 +510,7 @@ jobs:
       runs-on: '["Windows", "self-hosted", "build"]'
       artifact-name-suffix: "-falcor"
 
-  # Linux tests (self-hosted GPU runner, containerized)
+  # Linux tests: GPU, CPU, and LLVM coverage share each containerized T4 job.
   test-linux-debug-gcc-x86_64:
     needs: [filter, build-linux-debug-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
@@ -533,6 +533,7 @@ jobs:
     with:
       config: release
       server-count: 8
+      slang-user-skills: true
 
   test-linux-release-gcc-x86_64-rhi:
     needs: [filter, build-linux-release-gcc-x86_64]
@@ -542,8 +543,8 @@ jobs:
       config: release
 
   # Linux x86_64 SM80+ capability tests (self-hosted L4/Blackwell runner).
-  # Runs only cooperative-matrix / neural coverage that T4 cannot safely
-  # execute after CUDA coopmat moves to Ampere-only mma.sync PTX.
+  # Runs cooperative-matrix / neural coverage excluded by the T4 skip list,
+  # including its CPU/LLVM variants. Keep this hardware-capability tier separate.
   test-linux-release-gcc-x86_64-sm80:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
@@ -553,27 +554,6 @@ jobs:
       runs-on: '["Linux", "self-hosted", "SM80Plus"]'
       gpu-tier: sm80plus
       server-count: 8
-
-  # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
-  # Runs the test suite filtered to CPU and LLVM backends via
-  # -api cpu+llvm, so GPU-targeted test variants are ignored rather than run.
-  # Catches frontend / IR / diagnostic regressions on cheap hardware and
-  # complements the GPU-runner jobs.
-  test-linux-release-gcc-x86_64-cpu:
-    needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
-      config: release
-      runs-on: '["ubuntu-24.04"]'
-      full-gpu-tests: false
-      cpu-only: true
-      slang-user-skills: true
-      server-count: 4
-      run-via-glsl: false
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -692,12 +672,9 @@ jobs:
       run-via-glsl: false
 
   # Windows GPU tests (self-hosted).
-  # Each config is split into three parallel jobs to reduce wall-clock time:
-  #   -gpu-dx:   dx11+dx12+wgpu
-  #   -gpu-vk:   vk+cpu+llvm + no-API tests
-  #   -gpu-cuda: cuda
-  # The three jobs run concurrently on separate runners.
-  test-windows-debug-cl-x86_64-gpu-dx:
+  # Run all APIs once per configuration to avoid repeating setup, independent
+  # file tests, and unit tests on three separately booted VMs.
+  test-windows-debug-cl-x86_64-gpu:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -708,42 +685,11 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
-      api: dx11+dx12+wgpu
-      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
-      run-via-glsl: false
-      gpu-tier: t4
-
-  test-windows-debug-cl-x86_64-gpu-vk:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: vk+cpu+llvm
-      gpu-tier: t4
-      # Only this job runs the via-glsl pass (-api vk); the dx and cuda jobs would repeat it.
+      api: dx11+dx12+wgpu+vk+cuda+cpu+llvm
       run-via-glsl: true
-
-  test-windows-debug-cl-x86_64-gpu-cuda:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: cuda
       gpu-tier: t4
-      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
-      run-via-glsl: false
+      # The combined main suite plus via-GLSL can exceed the old 80-minute limit.
+      timeout-minutes: 120
 
   test-windows-debug-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
@@ -756,7 +702,7 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  test-windows-release-cl-x86_64-gpu-dx:
+  test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -767,41 +713,8 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
-      api: dx11+dx12+wgpu
-      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
-      run-via-glsl: false
-      gpu-tier: t4
-
-  test-windows-release-cl-x86_64-gpu-vk:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: vk+cpu+llvm
-      gpu-tier: t4
-      # Only this job runs the via-glsl pass (-api vk); the dx and cuda jobs would repeat it.
+      api: dx11+dx12+wgpu+vk+cuda+cpu+llvm
       run-via-glsl: true
-
-  test-windows-release-cl-x86_64-gpu-cuda:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: cuda
-      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
-      run-via-glsl: false
       gpu-tier: t4
 
   test-windows-release-cl-x86_64-gpu-rhi:
@@ -995,13 +908,9 @@ jobs:
         static-unit-test-linux-debug-gcc-aarch64,
         static-unit-test-macos-debug-clang-aarch64,
         static-unit-test-windows-debug-cl-x86_64,
-        test-windows-release-cl-x86_64-gpu-dx,
-        test-windows-release-cl-x86_64-gpu-vk,
-        test-windows-release-cl-x86_64-gpu-cuda,
+        test-windows-release-cl-x86_64-gpu,
         test-windows-release-cl-x86_64-gpu-rhi,
-        test-windows-debug-cl-x86_64-gpu-dx,
-        test-windows-debug-cl-x86_64-gpu-vk,
-        test-windows-debug-cl-x86_64-gpu-cuda,
+        test-windows-debug-cl-x86_64-gpu,
         test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
         test-macos-release-clang-aarch64-rhi,
@@ -1010,7 +919,6 @@ jobs:
         test-linux-release-gcc-x86_64,
         test-linux-release-gcc-x86_64-rhi,
         test-linux-release-gcc-x86_64-sm80,
-        test-linux-release-gcc-x86_64-cpu,
         test-linux-debug-gcc-x86_64,
         test-linux-debug-gcc-x86_64-rhi,
         test-linux-release-gcc-aarch64,

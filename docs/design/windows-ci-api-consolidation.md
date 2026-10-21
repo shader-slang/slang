@@ -1,15 +1,17 @@
-# Plan: recombine Windows GPU API test jobs
+# Recombine Windows and Linux API test jobs
 
-Status: proposed, 2026-10-21. This document plans a measured consolidation; it does not
-change the CI workflow or its required checks.
+Status: implementation proposal, 2026-10-21. The accompanying workflow change
+recombines Windows API partitions and Linux CPU/GPU testing. Native CI validation
+and the rollout measurements below remain required before merge.
 
 ## Motivation and evidence
 
 [PR #12422](https://github.com/shader-slang/slang/pull/12422) merged on
 2026-08-07 at 22:08 UTC. It increased Linux test-server concurrency and split each
 Windows GPU configuration into DX, Vulkan/CPU/LLVM, and CUDA jobs. Recombining the
-Windows jobs should reduce repeated discovery, compilation, unit tests, setup, and
-runner demand. It can also lengthen the longest individual job, so reduced job count
+Windows jobs and the separate Linux CPU tier reduces runner requests and repeated
+discovery, compilation, unit tests, and setup. VM startup and provisioning delays
+make extra runner requests material even when individual test jobs are shorter. It can also lengthen the longest individual job, so reduced job count
 alone is not a rollout criterion.
 
 The October investigation used the monthly archives at
@@ -44,7 +46,7 @@ Falcor was the last completed build/test before `check-ci` in 127 of the 181
 successful full runs in the August post-change window. Capacity, approvals, test
 growth, retries, and other workflow changes must remain visible in comparisons.
 
-## Proposed workflow shape
+## Workflow shape
 
 Use one combined main `slang-test` invocation per Windows x86_64 GPU configuration.
 Keep Debug and Release separate and retain their existing build dependencies.
@@ -77,19 +79,36 @@ The actual reusable-workflow condition includes Debug despite the input descript
 saying "release pull requests"; the implementation must reconcile that description
 without silently dropping Debug coverage.
 
-Initially evaluate the main and via-GLSL invocations in the combined caller. The
-reusable workflow currently has an 80-minute timeout. A roughly 48-minute historical
-combined main job plus Debug via-GLSL can exceed that budget: do not infer safety by
-adding medians, and do not raise the timeout without measuring the actual stages.
-Require combined-job p95 below 64 minutes, leaving 20% of the current limit as
-headroom. If that fails, keep one combined main job and move via-GLSL to a dedicated
-required caller per configuration. That caller must invoke only via-GLSL, reuse the
-same build, preserve its PR-only condition, and have its own cleanliness check.
-It must not call the full reusable workflow and repeat the main suite.
-Add any dedicated via-GLSL caller to the aggregate gate. Either keep its caller
-successful with skipped test steps on non-PR events, or teach `check-ci` to accept
-that specific event-dependent skip; a failed or unexpectedly skipped PR invocation
-must still fail the gate.
+The main and via-GLSL invocations share one VM per configuration. A successful
+Debug Vulkan job in [run 39567827367](https://github.com/shader-slang/slang/actions/runs/39567827367)
+spent 40 minutes in its main invocation and another 32.5 minutes via GLSL.
+Recombining all APIs increases the main workload further. The reusable workflow
+therefore accepts a timeout input, retaining the 80-minute default while the combined
+Windows Debug caller requests 120 minutes. Release retains 80 minutes. This is
+headroom for the combined job, not a prediction or an acceptance of slower turnaround.
+Keep the existing test-server concurrency; use actual CI durations and the rollout
+criteria below to decide whether consolidation is worthwhile. A separate via-GLSL VM
+would reintroduce startup and setup cost and is outside this implementation.
+
+### Linux CPU/GPU coverage
+
+Keep the existing containerized T4 Debug and Release callers and add `cpu+llvm` to
+their API mask. Remove the GitHub-hosted Release CPU-only caller and its required-gate
+dependency. The Release T4 job also takes over the user-skills checkout, package
+verifier, and example validation. Preserve `SLANG_DISABLE_AVX512=1` from the removed
+CPU job because LLVM JIT host detection on VMs is still affected by #11062.
+
+The T4 skip list excludes entire cooperative-matrix and neural directories. Merely
+adding CPU APIs to T4 would lose CPU/LLVM variants in those directories. Keep the
+existing SM80Plus caller, runner labels, and restricted test roots separate; add
+CPU/LLVM to that subset's API mask to preserve the displaced variants there.
+SM80Plus continues to cover hardware capabilities unavailable on T4 and does not
+become a second full Linux suite. RHI, ARM64, and other distinct configurations remain.
+
+Windows moves from six API callers to two; Linux removes one CPU-only caller.
+A full run requests five fewer test-runner jobs: four fewer Windows GPU runners
+and one fewer hosted Linux runner, with no additional via-GLSL runners. This is a
+reduction in runner requests, not a measured VM startup or billing saving.
 
 ### Relationship to API-independent-file filtering
 
@@ -106,12 +125,15 @@ and regression coverage unless a separate audit proves they have no other use.
 If #13803 is still open, consolidate from master without copying its four opt-ins.
 Rebase whichever change lands second and recheck the resolved commands.
 
-## Analytics prerequisites and coordinated changes
+## Analytics coordination and measurement follow-up
 
 [PR #13204](https://github.com/shader-slang/slang/pull/13204), "Track required CI gate
 metrics", remains open at `b0ac054d7`. It changes the collector, visualization,
 runner classification, and regression tests. Coordinate with that PR rather than
-copying a second required-gate implementation into this consolidation.
+copying a second required-gate implementation into this consolidation. The runtime
+consolidation does not depend on new analytics code, but its performance assessment
+must use the corrected gate semantics. The following analytics work remains in
+#13204 or a focused follow-up rather than being represented as shipped by this PR.
 
 1. Land or rebase #13204 independently before using the published dashboard to
    judge rollout. Until deployed, compute the same required-gate metrics directly
@@ -168,8 +190,9 @@ change. Keep the current JSON/static-dashboard collection and publication pipeli
    actionlint, Bash syntax checks under Bash 3.2, and ShellCheck on changed shell
    code. Exercise `check-ci` success, failure, and expected-skipped paths; a failed
    combined job must fail the aggregate gate. Run the focused analytics regressions.
-5. Trial Release first, then Debug after checking timeout headroom. Keep temporary
-   comparison jobs explicitly experimental and outside the required gate; remove
+5. Validate both configurations on this PR before merge. If a temporary staged
+   experiment is needed, trial Release first, then Debug after checking timeout
+   headroom. Keep temporary comparison jobs explicitly experimental and outside the required gate; remove
    them before the final production switch. Do not claim capacity savings while
    both layouts run side by side.
 6. Evaluate at least 30 successful full PR runs and 20 successful merge-queue runs
@@ -181,18 +204,22 @@ change. Keep the current JSON/static-dashboard collection and publication pipeli
    observation when uncertainty or workload differences prevent a conclusion.
 
 Rollback if coverage, reliability, timeout headroom, or turnaround criteria fail.
+Restore the Linux CPU caller, its skills checks and gate dependency, and the original
+T4/SM80Plus API masks together to avoid losing the excluded directories' CPU coverage.
 Restore the six callers and their aggregate dependencies together, including
 Vulkan-only via-GLSL ownership and the four independent-file-filter opt-ins if
 #13803 is already present. Preserve the analytics corrections and both layout
 classifications so the rollback remains measurable. Do not merge automatically.
 
-## Implementation slices
+## Delivery and follow-up
 
 1. Required-gate, optional-tail, retry identity, and runner classification: #13204.
 2. Layout-aware Windows analytics, invocation timing, and regression fixtures.
-3. Matched Release consolidation trial, coverage evidence, and timeout decision.
-4. Debug consolidation trial, required-gate update, and final measured rollout.
+3. Combined Windows and Linux callers, preserved SM80Plus subset, and required-gate update
+   (implemented in this PR with rendered-command and gate regression tests).
+4. Native CI coverage validation and measured rollout; do not merge automatically.
 
-At the time of writing, #13204 and #13803 are open. This plan does not close
-[issue #13791](https://github.com/shader-slang/slang/issues/13791) or establish that
-either runtime change has shipped. Update these dependency states before implementation.
+At the time of writing, #13204 and #13803 are open. The redundancy concern is
+tracked in [issue #13791](https://github.com/shader-slang/slang/issues/13791).
+The consolidation is proposed by this PR; native CI validation and merge are still
+pending. Recheck the related PR states before merge.
