@@ -4735,6 +4735,24 @@ struct TypeFlowSpecializationContext
                 WorkItem(InterproceduralEdge::Direction::CallToFunc, context, inst, callee));
         };
 
+        // A set-specialized generic takes one runtime tag per dynamic witness-table argument, and
+        // `specializeCall` reads those tags from the arguments of the local `Specialize` that the
+        // call names as its callee. A call that reaches such a generic any other way has no tag in
+        // scope, so we cannot dispatch it. Consider `use(make_target(b))` where `b` is a dynamic
+        // `IBSDF` and `use<T : ITarget>` calls `target.value()`: `T` is `Target<UntaggedUnion>`,
+        // its `ITarget` witness table is specialized over the set of `IBSDF` witness tables, and
+        // the table's `value` entry is a set-specialized generic that `use` has no tag for.
+        //
+        auto diagnoseIfSetSpecializedCalleeLacksTags = [&](IRInst* resolvedCallee)
+        {
+            if (!isSetSpecializedGeneric(resolvedCallee))
+                return false;
+            if (as<IRSpecialize>(callee) && !isGlobalInst(callee))
+                return false;
+            emitExistentialSpecializationDiagnostic(resolvedCallee, inst->sourceLoc, inst);
+            return true;
+        };
+
         auto convertArgInfosToParamInfos = [&](IRFuncType* calleeFuncType) -> List<IRInst*>
         {
             List<IRInst*> paramInfos;
@@ -4813,6 +4831,8 @@ struct TypeFlowSpecializationContext
                     module->getContainerPool().free(&funcs);
                     return none();
                 }
+                if (diagnoseIfSetSpecializedCalleeLacksTags(resolvedFunc))
+                    continue;
                 auto paramInfos =
                     convertArgInfosToParamInfos(cast<IRFuncType>(resolvedFunc->getDataType()));
                 if (auto boundCallee = maybeGetBoundFunc(resolvedFunc, paramInfos, workQueue))
@@ -4824,7 +4844,7 @@ struct TypeFlowSpecializationContext
         else if (isGlobalInst(callee))
         {
             auto resolvedCallee = translationContext.resolveInst(callee);
-            if (!resolvedCallee)
+            if (!resolvedCallee || diagnoseIfSetSpecializedCalleeLacksTags(resolvedCallee))
                 return none();
 
             auto paramInfos =
