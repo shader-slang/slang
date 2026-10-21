@@ -74,8 +74,9 @@ ISlangUnknown* BaseWriter::getInterface(const Guid& guid)
 namespace
 {
 /// An append buffer that the current thread has begun on `writer` and not yet ended. `writer`
-/// is only compared, never dereferenced. If a writer is destroyed with an abandoned buffer, a
-/// later writer at the same address takes that entry over, and its next begin resizes it anyway.
+/// is only compared, never dereferenced. A writer's destructor removes the destroying thread's
+/// entry for it. An entry abandoned on another thread stays until that thread exits, and a later
+/// writer at the same address takes it over harmlessly, because its next begin resizes it.
 struct ActiveAppendBuffer
 {
     const AppendBufferWriter* writer = nullptr;
@@ -92,8 +93,8 @@ struct ThreadAppendBuffers
     /// has already been returned to a caller.
     List<ActiveAppendBuffer> active;
 
-    /// The storage of the most recently ended append buffer, which the next begin reuses so that
-    /// repeated begin/end pairs do not allocate.
+    /// The storage of the most recently ended append buffer, if it is small, which the next begin
+    /// reuses so that repeated begin/end pairs do not allocate.
     List<char> spare;
 
     /// Returns the index in `active` of the entry for `writer`, or -1 if there is none.
@@ -104,39 +105,71 @@ struct ThreadAppendBuffers
     }
 };
 
-/// Set when this thread's `ThreadAppendBuffers` has been destroyed at thread exit. A destructor
-/// that runs later on the same thread (a static object's at process exit, or another
-/// thread_local's) can still print to a writer, so it gets a separate instance instead.
-thread_local bool t_isThreadAppendBuffersDestroyed = false;
-thread_local ThreadAppendBuffers* t_lateThreadAppendBuffers = nullptr;
+// A thread's append buffers live in a thread_local holder from its first use until thread exit.
+// A destructor that runs after that on the same thread (a static object's at process exit, or
+// another thread_local's) can still print to a writer, so it gets a separate heap instance
+// instead. These variables are trivially destructible, so they stay usable that late.
+
+/// Set when this thread's holder has been constructed, so a writer's destructor can find the
+/// buffers without creating them during teardown.
+thread_local bool gIsThreadAppendBuffersCreated = false;
+thread_local bool gIsThreadAppendBuffersDestroyed = false;
+/// The heap instance used after the holder has been destroyed, or null.
+thread_local ThreadAppendBuffers* gLateThreadAppendBuffers = nullptr;
 
 struct ThreadAppendBuffersHolder
 {
     ThreadAppendBuffers buffers;
-    ~ThreadAppendBuffersHolder() { t_isThreadAppendBuffersDestroyed = true; }
+    ThreadAppendBuffersHolder() { gIsThreadAppendBuffersCreated = true; }
+    ~ThreadAppendBuffersHolder() { gIsThreadAppendBuffersDestroyed = true; }
 };
 } // namespace
 
 static ThreadAppendBuffers& _getThreadAppendBuffers()
 {
-    if (!t_isThreadAppendBuffersDestroyed)
+    if (!gIsThreadAppendBuffersDestroyed)
     {
         thread_local ThreadAppendBuffersHolder holder;
         return holder.buffers;
     }
-    // A plain pointer has no destructor to run, so it stays usable this late. The instance is
-    // freed by the end that closes its last append buffer.
-    if (!t_lateThreadAppendBuffers)
-        t_lateThreadAppendBuffers = new ThreadAppendBuffers();
-    return *t_lateThreadAppendBuffers;
+    // The instance is freed once it holds no append buffer: by the end of its last buffer, by an
+    // end without a begin, or by a writer's destructor. A late begin that is never ended leaves
+    // it allocated, because no later point on this thread could free it.
+    if (!gLateThreadAppendBuffers)
+        gLateThreadAppendBuffers = new ThreadAppendBuffers();
+    return *gLateThreadAppendBuffers;
+}
+
+/// Returns the calling thread's buffers if it has any, without creating them.
+static ThreadAppendBuffers* _findThreadAppendBuffers()
+{
+    if (gIsThreadAppendBuffersDestroyed)
+        return gLateThreadAppendBuffers;
+    return gIsThreadAppendBuffersCreated ? &_getThreadAppendBuffers() : nullptr;
 }
 
 static void _releaseLateThreadAppendBuffersIfIdle()
 {
-    if (t_lateThreadAppendBuffers && t_lateThreadAppendBuffers->active.getCount() == 0)
+    if (gLateThreadAppendBuffers && gLateThreadAppendBuffers->active.getCount() == 0)
     {
-        delete t_lateThreadAppendBuffers;
-        t_lateThreadAppendBuffers = nullptr;
+        delete gLateThreadAppendBuffers;
+        gLateThreadAppendBuffers = nullptr;
+    }
+}
+
+AppendBufferWriter::~AppendBufferWriter()
+{
+    // A buffer this thread began and abandoned on this writer is freed with the writer. Buffers
+    // abandoned on other threads stay until those threads exit.
+    if (auto appendBuffers = _findThreadAppendBuffers())
+    {
+        const Index index = appendBuffers->find(this);
+        if (index >= 0)
+        {
+            appendBuffers->active[index].buffer.clearAndDeallocate();
+            appendBuffers->active.fastRemoveAt(index);
+        }
+        _releaseLateThreadAppendBuffersIfIdle();
     }
 }
 
@@ -154,9 +187,9 @@ SLANG_NO_THROW char* SLANG_MCALL AppendBufferWriter::beginAppendBuffer(size_t ma
         appendBuffers.active[index].buffer.swapWith(appendBuffers.spare);
     }
 
-    List<char>& buffer = appendBuffers.active[index].buffer;
-    buffer.setCount(maxNumChars);
-    return buffer.getBuffer();
+    List<char>& appendBuffer = appendBuffers.active[index].buffer;
+    appendBuffer.setCount(maxNumChars);
+    return appendBuffer.getBuffer();
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -164,10 +197,14 @@ AppendBufferWriter::endAppendBuffer(char* buffer, size_t numChars)
 {
     auto& appendBuffers = _getThreadAppendBuffers();
     const Index index = appendBuffers.find(this);
-    if (index < 0)
+
+    // The append buffer belongs to the thread that began it. An end on another thread, with a
+    // pointer other than the one begin returned, or with more characters than were reserved, is
+    // reported rather than writing from memory this thread does not own. The other thread may
+    // have an abandoned buffer of its own on this writer, so finding an entry is not enough.
+    if (index < 0 || appendBuffers.active[index].buffer.getBuffer() != buffer ||
+        numChars > size_t(appendBuffers.active[index].buffer.getCount()))
     {
-        // The append buffer belongs to the thread that began it, so an end without a begin on
-        // this thread is reported rather than writing from memory this thread does not own.
         _releaseLateThreadAppendBuffersIfIdle();
         return SLANG_E_INVALID_ARG;
     }
@@ -178,16 +215,18 @@ AppendBufferWriter::endAppendBuffer(char* buffer, size_t numChars)
     appendBuffer.swapWith(appendBuffers.active[index].buffer);
     appendBuffers.active.fastRemoveAt(index);
 
-    // A missing begin can come from a caller that followed the contract on another thread, so it
-    // fails in every build. A mismatched buffer can only come from a caller that broke the
-    // contract, so it is only asserted.
-    SLANG_ASSERT(appendBuffer.getBuffer() == buffer && buffer + numChars <= appendBuffer.end());
     const SlangResult res = write(buffer, numChars);
 
-    // A write that appends to this writer again can end with the late instance freed, so this
-    // thread's buffers are looked up again instead of reusing `appendBuffers`.
-    appendBuffer.clear();
-    _getThreadAppendBuffers().spare.swapWith(appendBuffer);
+    // Only a small buffer is kept for reuse, so one large append does not hold its memory for
+    // the rest of the thread's life.
+    const Index kMaxSpareCapacity = 4096;
+    if (appendBuffer.getCapacity() <= kMaxSpareCapacity)
+    {
+        appendBuffer.clear();
+        // During teardown, an append to any writer from inside `write` can end with the late
+        // instance freed, so the buffers are looked up again instead of reusing `appendBuffers`.
+        _getThreadAppendBuffers().spare.swapWith(appendBuffer);
+    }
     _releaseLateThreadAppendBuffersIfIdle();
     return res;
 }

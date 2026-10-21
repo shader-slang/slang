@@ -92,11 +92,13 @@ protected:
  *
  * - Each thread has at most one append buffer per writer. A second beginAppendBuffer on the same
  *   writer and thread, without an endAppendBuffer in between, abandons the first buffer and
- *   reuses its storage.
- * - endAppendBuffer must run on the thread that began the buffer. Otherwise it returns
+ *   reuses its storage, so the pointer the first call returned is no longer valid.
+ * - endAppendBuffer must run on the thread that began the buffer, with the pointer
+ *   beginAppendBuffer returned and at most that many characters. Otherwise it returns
  *   SLANG_E_INVALID_ARG and writes nothing.
- * - write may itself append to the same writer, because endAppendBuffer detaches the buffer
- *   before calling write. */
+ *
+ * A write override may itself append to the same writer, because endAppendBuffer detaches the
+ * buffer before calling write. */
 class AppendBufferWriter : public BaseWriter
 {
 public:
@@ -111,11 +113,12 @@ public:
         : Parent(flags)
     {
     }
+    ~AppendBufferWriter();
 };
 
-/* Passes text to a diagnostic callback. It keeps its append buffer in the writer itself, so,
- * unlike an AppendBufferWriter, one CallbackWriter must not be used from several threads at
- * once. */
+/* Passes text to a diagnostic callback. Its write 0-terminates text in place when the text comes
+ * from its append buffer, so it keeps that buffer in the writer itself. Unlike an
+ * AppendBufferWriter, one CallbackWriter must not be used from several threads at once. */
 class CallbackWriter : public BaseWriter
 {
 public:
