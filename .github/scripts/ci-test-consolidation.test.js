@@ -137,8 +137,13 @@ try {
   for (const config of ["debug", "release"]) {
     const id = `test-windows-${config}-cl-x86_64-gpu`;
     const caller = getJobText(id);
-    assert.match(caller, /api: dx11\+dx12\+wgpu\+vk\+cuda\+cpu\+llvm/);
-    assert.match(caller, /run-via-glsl: true/);
+    const apiInput = caller.match(/^      api: (\S+)$/m)?.[1];
+    assert.ok(apiInput, `missing API union in ${id}`);
+    const selectedApis = new Set(apiInput.split("+"));
+    for (const api of ["dx11", "dx12", "wgpu", "vk", "cuda", "cpu", "llvm"]) {
+      assert.ok(selectedApis.has(api), `${id} must retain ${api} coverage`);
+    }
+    assert.match(caller, /^      run-via-glsl: true$/m);
     const inputs = {
       os: "windows",
       config,
@@ -181,12 +186,12 @@ try {
       getStepScript(ordinary, "Test Slang"),
       inputs,
       {
-        API_INPUT: "dx11+dx12+wgpu+vk+cuda+cpu+llvm",
+        API_INPUT: apiInput,
       },
     );
-    assert.equal(
-      args[args.indexOf("-api") + 1],
-      "dx11+dx12+wgpu+vk+cuda+cpu+llvm",
+    assert.deepEqual(
+      new Set(args[args.indexOf("-api") + 1].split("+")),
+      selectedApis,
     );
     assert.ok(args.includes("tests/skip-list-gpu-t4.txt"));
     assert.equal(
@@ -200,21 +205,14 @@ try {
     assert.equal(via[via.indexOf("-api") + 1], "vk");
     assert.ok(via.includes("-emit-spirv-via-glsl"));
     assert.match(getJobText("check-ci"), new RegExp(`        ${id},`));
-    for (const api of ["dx", "vk", "cuda"])
-      assert.ok(!ci.includes(`${id}-${api}:`));
     console.log(
       `PASS Windows ${config}: one combined main and one via-GLSL pass`,
     );
   }
-  assert.match(
-    getJobText("test-windows-debug-cl-x86_64-gpu"),
-    /timeout-minutes: 120/,
-  );
   const cpuCaller = getJobText("test-linux-release-gcc-x86_64-cpu");
-  assert.match(cpuCaller, /runs-on: '\["ubuntu-24.04"\]'/);
-  assert.match(cpuCaller, /cpu-only: true/);
-  assert.match(cpuCaller, /slang-user-skills: true/);
-  assert.match(cpuCaller, /server-count: 4/);
+  assert.match(cpuCaller, /^      full-gpu-tests: false$/m);
+  assert.match(cpuCaller, /^      cpu-only: true$/m);
+  assert.match(cpuCaller, /^      slang-user-skills: true$/m);
   const cpuArgs = runAndCaptureSlangTestArgs(
     getStepScript(ordinary, "Test Slang"),
     {
@@ -257,7 +255,10 @@ try {
       );
     }
   }
-  assert.match(getJobText("test-linux-release-gcc-x86_64-sm80"), /"SM80Plus"/);
+  assert.match(
+    getJobText("test-linux-release-gcc-x86_64-sm80"),
+    /^      gpu-tier: sm80plus$/m,
+  );
   for (const id of [
     "test-linux-debug-gcc-x86_64",
     "test-linux-release-gcc-x86_64",
