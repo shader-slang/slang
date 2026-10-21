@@ -1,9 +1,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -stage compute -entry main
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main
 
-// Taking the address of an operand that has no address is an error. The asm
-// block sits in an entry point so that the IR passes and emitters after
-// lowering would see the operand; bad-addr.slang only reaches lowering.
+// Taking the address of an operand that has no address is error E29103:
+// `&buf` is a global resource, `&v.xy` is a multi-element swizzle, and `&c`
+// is a `const` parameter of a helper that `main` calls. These asm blocks are
+// reachable from `main`, so before E29103 was an error they reached the back
+// end: SPIR-V emission crashed and HLSL reported an internal error.
 
 RWStructuredBuffer<float> buf;
 
