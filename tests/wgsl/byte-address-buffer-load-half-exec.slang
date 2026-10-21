@@ -4,21 +4,29 @@
 
 // Runs the WGSL lowering of byte-address-buffer `half` loads (see
 // byte-address-buffer-load-half.slang), which loads the containing 32-bit word, shifts it and
-// bit-casts it to `vec2<f16>`. The words hold known half bit patterns:
-// - 0x40003C00 0x44004200: 1.0, 2.0, 3.0, 4.0, read at dynamic offsets (thread i reads byte 2*i);
-// - a `Record` at byte 8: a = 5.0, b = 6.0 (0x46004500), c = 7.0f (0x40E00000), and
-//   d = (8.0, 0.5) (0x38004800).
-// Each value is written as uint(2 * value), so a swapped half or a wrong shift shows up.
-// The Vulkan run is a reference for the same expected values.
+// bit-casts it to `vec2<f16>`. It loads `half`, `half2`, `half4` and a struct with `half` fields,
+// at 4-byte aligned offsets and at offsets that are only 2-byte aligned, so both half-words of
+// a word are read, and a `half2` or `half4` can start in the middle of a word.
+//
+// Every loaded `half` is widened to `float`, which is exact, and written as its `float` bits, so a
+// swapped half-word or a wrong shift shows up as a different value. The vector loads use an offset
+// read from the buffer (word 6 is 0), so they take the dynamic-offset path. The Vulkan run is a
+// reference for the same expected values.
+//
+// Words, as (half at the lower byte offset, half at the higher one):
+//   byte  0: 0x40003C00 = (1.0, 2.0)          byte  4: 0xC2003800 = (0.5, -3.0)
+//   byte  8: 0x00017BFF = (65504.0, 2^-24)    byte 12: 0x80003555 = (0.333251953125, -0.0)
+//   byte 16: 0x40E00000 = 7.0f                byte 20: 0x38004800 = (8.0, 0.5)
+//   byte 24: 0
 
-//TEST_INPUT:ubuffer(data=[1073757184 1140867584 1174422784 1088421888 939542528], stride=4):name pool
+//TEST_INPUT:ubuffer(data=[0x40003C00 0xC2003800 0x00017BFF 0x80003555 0x40E00000 0x38004800 0], stride=4):name=pool
 #if defined(RWBAB)
 RWByteAddressBuffer pool;
 #else
 ByteAddressBuffer pool;
 #endif
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 struct Record
@@ -29,27 +37,68 @@ struct Record
     half2 d;
 };
 
-// BUF: 2
-// BUF-NEXT: 4
-// BUF-NEXT: 6
-// BUF-NEXT: 8
-// BUF-NEXT: A
-// BUF-NEXT: C
-// BUF-NEXT: E
-// BUF-NEXT: 10
-// BUF-NEXT: 1
-[numthreads(4, 1, 1)]
+void writeHalf(uint index, half h)
+{
+    outputBuffer[index] = asuint(float(h));
+}
+
+void writeHalf2(uint index, half2 h)
+{
+    writeHalf(index, h.x);
+    writeHalf(index + 1, h.y);
+}
+
+void writeHalf4(uint index, half4 h)
+{
+    writeHalf2(index, h.xy);
+    writeHalf2(index + 2, h.zw);
+}
+
+// `half` at bytes 0, 2, ..., 14 (thread i reads byte 2 * i).
+// BUF: 3F800000
+// BUF-NEXT: 40000000
+// BUF-NEXT: 3F000000
+// BUF-NEXT: C0400000
+// BUF-NEXT: 477FE000
+// BUF-NEXT: 33800000
+// BUF-NEXT: 3EAAA000
+// BUF-NEXT: 80000000
+// `half2` at byte 4 (aligned), then at byte 2 (across two words).
+// BUF-NEXT: 3F000000
+// BUF-NEXT: C0400000
+// BUF-NEXT: 40000000
+// BUF-NEXT: 3F000000
+// `half4` at byte 8 (aligned), then at byte 6 (across three words).
+// BUF-NEXT: 477FE000
+// BUF-NEXT: 33800000
+// BUF-NEXT: 3EAAA000
+// BUF-NEXT: 80000000
+// BUF-NEXT: C0400000
+// BUF-NEXT: 477FE000
+// BUF-NEXT: 33800000
+// BUF-NEXT: 3EAAA000
+// `Record` at byte 12: a, b, c (the `float` bits as loaded), d.x, d.y.
+// BUF-NEXT: 3EAAA000
+// BUF-NEXT: 80000000
+// BUF-NEXT: 40E00000
+// BUF-NEXT: 41000000
+// BUF-NEXT: 3F000000
+[numthreads(8, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     const uint i = dispatchThreadID.x;
-    outputBuffer[i] = uint(2.0 * float(pool.Load<half>(i * 2)));
+    writeHalf(i, pool.Load<half>(i * 2));
     if (i == 0)
     {
-        const Record r = pool.Load<Record>(8 + i);
-        outputBuffer[4] = uint(2.0 * float(r.a));
-        outputBuffer[5] = uint(2.0 * float(r.b));
-        outputBuffer[6] = uint(2.0 * r.c);
-        outputBuffer[7] = uint(2.0 * float(r.d.x));
-        outputBuffer[8] = uint(2.0 * float(r.d.y));
+        const uint zero = pool.Load(24);
+        writeHalf2(8, pool.Load<half2>(zero + 4));
+        writeHalf2(10, pool.Load<half2>(zero + 2));
+        writeHalf4(12, pool.Load<half4>(zero + 8));
+        writeHalf4(16, pool.Load<half4>(zero + 6));
+
+        const Record r = pool.Load<Record>(12);
+        writeHalf2(20, half2(r.a, r.b));
+        outputBuffer[22] = asuint(r.c);
+        writeHalf2(23, r.d);
     }
 }

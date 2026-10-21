@@ -9,6 +9,9 @@
 // `half` data (scalars, vectors, and struct fields) must be lowered through
 // the containing 32-bit word, bit-cast to `vec2<f16>`, instead of through a
 // 16-bit integer.
+//
+// byte-address-buffer-load-half-exec.slang runs these loads on WebGPU and Vulkan and checks the
+// loaded bits; this file checks the shape of the WGSL output.
 
 // The WGSL emitter writes nothing for a 16-bit integer type and reports E56103, so a regression
 // shows up as an error, not as `u16` in the output. NOERR searches the whole output for it, and

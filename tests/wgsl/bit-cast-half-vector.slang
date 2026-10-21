@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry computeMain -stage compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -render-feature half
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -render-feature half
 
 // WGSL's `bitcast` converts directly between `vec2<f16>` and a 32-bit scalar (`u32`, `i32`,
 // `f32`), and between `vec4<f16>` and a `vec2` of 32-bit values. `bit_cast` of those shapes is
@@ -16,27 +18,67 @@
 // CHECK-NOT: {{error\[E[0-9]+\]}}
 // TINT: OpEntryPoint
 
+// The runs check exact bits. Each `half` that comes out of a bitcast is widened to `float`, which
+// is exact, and written as its `float` bits, so a swapped element or a wrong half-word shows up
+// as a different value. The other direction writes the bitcast's 32-bit result as it is. The
+// Vulkan run is a reference for the same expected values.
+//
+// Input words, as (element 0 = low 16 bits, element 1 = high 16 bits):
+//   0x40003C00 = (1.0, 2.0)          0xC2003800 = (0.5, -3.0)
+//   0x00017BFF = (65504.0, 2^-24)    0x80003555 = (0.333251953125, -0.0)
+
+//TEST_INPUT:ubuffer(data=[0x40003C00 0xC2003800 0x00017BFF 0x80003555], stride=16):name=words
 RWStructuredBuffer<uint4> words;
-RWStructuredBuffer<half4> halves;
+
+//TEST_INPUT:ubuffer(data=[0x3F800000 0x40000000 0x3F000000 0xC0400000 0x477FE000 0x33800000 0x3EAAA000 0x80000000], stride=4):name=floats
+RWStructuredBuffer<float> floats;
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<uint> outputBuffer;
+
+// 32-bit -> half2 (from u32, i32 and f32) and uint2 -> half4.
+// BUF: 3F800000
+// BUF-NEXT: 40000000
+// BUF-NEXT: 3F000000
+// BUF-NEXT: C0400000
+// BUF-NEXT: 477FE000
+// BUF-NEXT: 33800000
+// BUF-NEXT: 477FE000
+// BUF-NEXT: 33800000
+// BUF-NEXT: 3EAAA000
+// BUF-NEXT: 80000000
+// half2 -> u32, i32 and f32, and half4 -> uint2.
+// BUF-NEXT: 40003C00
+// BUF-NEXT: C2003800
+// BUF-NEXT: C2003C00
+// BUF-NEXT: 17BFF
+// BUF-NEXT: 80003555
+
+void writeHalf2(uint index, half2 h)
+{
+    outputBuffer[index] = asuint(float(h.x));
+    outputBuffer[index + 1] = asuint(float(h.y));
+}
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    const uint i = dispatchThreadID.x;
-    const uint4 w = words[i];
-    const half4 h = halves[i];
+    const uint4 w = words[dispatchThreadID.x];
 
-    // 32-bit scalar -> half2 and uint2 -> half4.
-    const half2 fromUInt = bit_cast<half2>(w.x);
-    const half2 fromInt = bit_cast<half2>(int(w.y));
-    const half2 fromFloat = bit_cast<half2>(asfloat(w.z));
+    writeHalf2(0, bit_cast<half2>(w.x));
+    writeHalf2(2, bit_cast<half2>(int(w.y)));
+    writeHalf2(4, bit_cast<half2>(asfloat(w.z)));
     const half4 fromUInt2 = bit_cast<half4>(w.zw);
-    halves[i] = half4(fromUInt + fromInt, fromFloat) + fromUInt2;
+    writeHalf2(6, fromUInt2.xy);
+    writeHalf2(8, fromUInt2.zw);
 
-    // half2 -> 32-bit scalar and half4 -> uint2.
-    words[i] = uint4(
-        bit_cast<uint>(h.xy),
-        uint(bit_cast<int>(h.zw)),
-        asuint(bit_cast<float>(h.xw)),
-        bit_cast<uint2>(h).x);
+    // Halves converted from `float`, so these bitcasts cannot fold with the ones above.
+    const half4 h = half4(half(floats[0]), half(floats[1]), half(floats[2]), half(floats[3]));
+    const half4 g = half4(half(floats[4]), half(floats[5]), half(floats[6]), half(floats[7]));
+    outputBuffer[10] = bit_cast<uint>(h.xy);
+    outputBuffer[11] = uint(bit_cast<int>(h.zw));
+    outputBuffer[12] = asuint(bit_cast<float>(h.xw));
+    const uint2 fromHalf4 = bit_cast<uint2>(g);
+    outputBuffer[13] = fromHalf4.x;
+    outputBuffer[14] = fromHalf4.y;
 }

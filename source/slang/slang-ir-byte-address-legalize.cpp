@@ -719,7 +719,20 @@ struct ByteAddressBufferLegalizationContext
             {
                 if (m_options.loadHalfFrom32BitWords && basicType->getOp() == kIROp_HalfType)
                 {
-                    return emitHalfLoadFrom32BitWord(buffer, baseOffset, immediateOffset);
+                    // Load a `half` on a target without 16-bit integer types: the containing
+                    // word is shifted as for any value smaller than 4 bytes
+                    // (`emitLoadContainingWordShifted`), but the last step is a bitcast of the
+                    // whole word to `vector<half, 2>` rather than a mask and a cast to a 16-bit
+                    // integer. This relies on WGSL's `bitcast<vec2<f16>>(u32)` placing bits 0..15
+                    // in element 0, and on `lowerBitCast` leaving that bitcast intact on WGPU
+                    // targets (see `isWGSLHalfVectorBitCast`); otherwise it would be split back
+                    // into 16-bit integers.
+                    auto offset = emitOffsetAddIfNeeded(baseOffset, immediateOffset);
+                    auto shifted = emitLoadContainingWordShifted(buffer, offset);
+                    auto halfPair = m_builder.emitBitCast(
+                        m_builder.getVectorType(m_builder.getBasicType(BaseType::Half), 2),
+                        shifted);
+                    return m_builder.emitElementExtract(halfPair, (IRIntegerValue)0);
                 }
                 if (auto unsignedType = getSameSizeUIntType(basicType))
                 {
@@ -1005,25 +1018,6 @@ struct ByteAddressBufferLegalizationContext
             m_builder.emitSub(offsetType, offset, alignedOffset),
             m_builder.getIntValue(offsetType, 8));
         return m_builder.emitShr(m_builder.getUIntType(), word, shiftAmount);
-    }
-
-    // Load a `half` on a target without 16-bit integer types: the containing word is shifted as
-    // for any value smaller than 4 bytes (`emitLoadContainingWordShifted`), but the last step is a
-    // bitcast of the whole word to `vector<half, 2>` rather than a mask and a cast to a 16-bit
-    // integer. This relies on WGSL's `bitcast<vec2<f16>>(u32)` placing bits 0..15 in element 0,
-    // and on `lowerBitCast` leaving that bitcast intact on WGPU targets (see
-    // `isWGSLHalfVectorBitCast`); otherwise it would be split back into 16-bit integers.
-    IRInst* emitHalfLoadFrom32BitWord(
-        IRInst* buffer,
-        IRInst* baseOffset,
-        IRIntegerValue immediateOffset)
-    {
-        auto offset = emitOffsetAddIfNeeded(baseOffset, immediateOffset);
-        auto shifted = emitLoadContainingWordShifted(buffer, offset);
-        auto halfPair = m_builder.emitBitCast(
-            m_builder.getVectorType(m_builder.getBasicType(BaseType::Half), 2),
-            shifted);
-        return m_builder.emitElementExtract(halfPair, (IRIntegerValue)0);
     }
 
     IRInst* emitOffsetAddIfNeeded(IRInst* baseOffset, IRIntegerValue immediateOffset)
