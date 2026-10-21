@@ -313,6 +313,7 @@ parameter type is the source of structural type information:
 | Information                                            | Source                                           |
 | ------------------------------------------------------ | ------------------------------------------------ |
 | Selected `invoke` implementation and generic arguments | `EntryPoint::m_funcDeclRef`                      |
+| Selection through a checked structural conformance     | `EntryPoint::m_isStructuralRayTracingEntryPoint` |
 | Context and its associated requirements                | The checked stage-input parameter type           |
 | Shader stage and profile                               | `EntryPoint::m_profile`                          |
 | Public and generated shader names                      | The entry-point name and generated-name override |
@@ -323,16 +324,19 @@ has already selected the conformance paths used by the input type and its access
 requirements provided by extensions or inherited interfaces. Later consumers use that checked
 signature and ordinary substitution.
 
-`initializeStructuralRayTracingEntryPoint` sets the public name to the selected struct name and
-derives a legal generated shader name. `_collectShaderParams` collects generic specialization
-parameters, then omits the compiler-supplied stage input from host-bound shader parameter layout.
-The input remains in the AST function signature.
+`initializeStructuralRayTracingEntryPoint` marks the entry as structural, sets the public name to
+the selected struct name, and derives a legal generated shader name. Creating an `EntryPoint`
+collects specialization parameters and host-bound shader parameters through the ordinary path.
+`markAsStructuralRayTracingEntryPoint` sets the classification flag and clears the host-bound
+shader parameter list, because the compiler supplies the stage input. Generic specialization
+parameters remain available, and the input remains in the AST function signature.
 
 AST-to-IR lowering produces an ordinary function and its input type. A generic implementation
 uses the normal generic parameters, witness parameters, and `IRSpecialize` operations. Dependent
 type and witness lookups remain valid IR until linking and specialization supply their arguments
-and definitions. The stage-input declaration's `KnownBuiltin` annotation is preserved by ordinary
-lowering and specialization.
+and definitions. `lowerFrontEndEntryPointToIR` uses the classification flag to avoid adding a
+native `[shader]` attribute to the shared structural method. The stage-input declaration's
+`KnownBuiltin` annotation is preserved by ordinary lowering and specialization.
 
 At the native ABI boundary, `hasStructuralRayTracingStageInput` examines the IR function's
 parameter types. A parameter whose declaration is annotated as a stage input keeps native
@@ -349,10 +353,10 @@ recognized the type or failed, so selecting `SkyMiss` does not report a missing 
 lookup diagnostics, including generic-argument conversion warnings, go directly to the real sink.
 
 Both lookup paths return a `DeclRef<FuncDecl>`. `findAndValidateEntryPoint` creates the entry
-once and calls `initializeStructuralRayTracingEntryPoint` in the RT checker to set the public
-and generated shader names when needed, then calls `validateEntryPoint`. The structural finder
-also supplies the stage selected by conformance; native entries resolve their stage through the
-usual function attributes.
+once and calls `initializeStructuralRayTracingEntryPoint` in the RT checker to mark a structural
+entry and set its public and generated shader names when needed, then calls `validateEntryPoint`.
+The structural finder also supplies the stage selected by conformance; native entries resolve
+their stage through the usual function attributes.
 
 Generic entry selection is incomplete. A concrete name such as `-entry "M<Payload,4>"` works,
 but `-entry M -specialize Payload -specialize 4` currently fails during lookup. Supporting separate
@@ -365,12 +369,11 @@ the same checked function specialization as inline selection.
 This is an implementation gap; generic stage structs should follow ordinary entry-point
 specialization semantics. Section 5.1 of the review walkthrough remains incomplete for this path.
 
-Ordinary conformance checking already validates the selected `invoke` signature. The structural
-lookup passes
-`hasCheckedStageConformance` to `validateEntryPoint` for that call. This transient flag permits
-the selected implementation to skip native parameter classification because conformance has
-already checked its compiler-supplied input. Ordinary function entries still receive native
-validation even if their signature includes an RT input. The structural branch passes the
+Ordinary conformance checking already validates the selected `invoke` signature.
+`validateEntryPoint(entryPoint, sink)` reads the entry's structural classification flag to skip
+native parameter classification because conformance has already checked its compiler-supplied
+input. Ordinary function entries keep the flag unset and still receive native validation even if
+their signature includes an RT input. The structural branch passes the
 annotated input declaration's source-stage requirements to `_validateEntryPointTargetCapabilities`,
 including synthesized stages on Metal; the native branch passes its ordinary stage profile.
 For example, a correctly typed `invoke` that calls a Metal-only helper must still be rejected for

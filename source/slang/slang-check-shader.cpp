@@ -889,11 +889,6 @@ void EntryPoint::_collectShaderParams()
     //
     _collectGenericSpecializationParamsRec(getFuncDecl());
 
-    // A stage input such as MissInput<C> is supplied by the compiler. Keep it in the checked
-    // function signature, but do not expose it as a host-bound shader parameter.
-    if (getStructuralRayTracingEntryPointInputType(this))
-        return;
-
     // After geneic specialization parameters have been collected,
     // we look through the value parameters of the entry point
     // function and see if any of them introduce existential/interface
@@ -2018,15 +2013,12 @@ static void _validateEntryPointTargetCapabilities(
 
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
-void validateEntryPoint(
-    EntryPoint* entryPoint,
-    DiagnosticSink* sink,
-    bool hasCheckedStageConformance)
+void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 {
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
     auto linkage = entryPoint->getLinkage();
 
-    if (hasCheckedStageConformance)
+    if (entryPoint->isStructuralRayTracingEntryPoint())
     {
         // Conformance already checks invoke's signature. Its RT input is supplied by the
         // compiler, so native uniform/varying parameter rules do not apply. The selected
@@ -3021,7 +3013,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     // Now that we've *found* the entry point, it is time to validate
     // that it actually meets the constraints for the chosen stage/profile.
     //
-    validateEntryPoint(entryPoint, sink, foundStructuralStage);
+    validateEntryPoint(entryPoint, sink);
 
     // We should return nullptr if entry point fails to validate
     if (sink->getErrorCount())

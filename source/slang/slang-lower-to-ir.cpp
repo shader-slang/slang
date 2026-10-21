@@ -15320,7 +15320,7 @@ static void lowerFrontEndEntryPointToIR(
 
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
 
-    if (!getStructuralRayTracingEntryPointInputType(entryPoint) &&
+    if (!entryPoint->isStructuralRayTracingEntryPoint() &&
         !entryPointFuncDecl->findModifier<EntryPointAttribute>())
     {
         // If the entry point doesn't have an explicit `[shader("...")]` attribute,

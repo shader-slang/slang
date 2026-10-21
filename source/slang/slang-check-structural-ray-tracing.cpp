@@ -973,6 +973,7 @@ void initializeStructuralRayTracingEntryPoint(
     Name* entryPointName,
     Type* stageType)
 {
+    entryPoint->markAsStructuralRayTracingEntryPoint();
     entryPoint->setNameOverride(entryPointName);
     auto sourceTypeName =
         getStructuralRayTracingSourceTypeName(entryPoint->getLinkage()->getASTBuilder(), stageType);

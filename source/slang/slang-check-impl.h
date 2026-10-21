@@ -4781,10 +4781,7 @@ bool getExtensionTargetDeclList(
     ExtensionDecl* extDeclRef,
     ShortList<AggTypeDecl*>& targetDecls);
 
-void validateEntryPoint(
-    EntryPoint* entryPoint,
-    DiagnosticSink* sink,
-    bool hasCheckedStageConformance = false);
+void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
 
 // Collect the requirements of a checked declaration reference, including its generic arguments.
 // Append contributing declarations to `outReferencedDecls` for use-site diagnostics without
