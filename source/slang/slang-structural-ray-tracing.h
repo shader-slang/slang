@@ -100,7 +100,6 @@ String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type)
 /// synthesized entry points agree on one physical name.
 String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName);
 
-struct CapabilitySet;
 class EntryPoint;
 struct IRModule;
 struct IRFunc;
@@ -110,10 +109,6 @@ void initializeStructuralRayTracingEntryPoint(
     EntryPoint* entryPoint,
     Name* entryPointName,
     Type* stageType);
-
-/// Returns the selected primitive's known capabilities for the #13793 typealias workaround.
-/// Dependent primitive types remain unresolved until specialization supplies their definition.
-CapabilitySet getStructuralRayTracingPrimitiveCapabilities(EntryPoint* entryPoint);
 
 /// Rejects structural source representations that remain before native ABI legalization.
 SlangResult diagnoseUnloweredStructuralRayTracing(

@@ -344,8 +344,7 @@ parameter types. A parameter whose declaration is annotated as a stage input kee
 parameter layout from being applied prematurely and identifies an entry that needs an adapter.
 Future adapter synthesis must consume the checked input contract before transformations discard
 information it needs. It can generate dependent operations for ordinary specialization to resolve,
-or wait for concrete types where the target ABI requires them. PR1 does not implement that adapter
-or later validation of primitive requirements that become known only after specialization.
+or wait for concrete types where the target ABI requires them. PR1 does not implement that adapter.
 
 Entry-point lookup first tries the ordinary function name. If that fails and
 `-experimental-feature` is enabled, it tries the structural stage type. A temporary diagnostic
@@ -363,8 +362,7 @@ Generic entry selection is incomplete. A concrete name such as `-entry "M<Payloa
 but `-entry M -specialize Payload -specialize 4` currently fails during lookup. Supporting separate
 arguments through the CLI and compilation API is deferred to the front-end follow-up
 [#13800](https://github.com/shader-slang/slang/issues/13800). The fix must specialize the enclosing
-struct and retain that substitution on `invoke` and its checked input signature. Any
-primitive-dependent target requirements must be checked once the primitive is known. Recognizing
+struct and retain that substitution on `invoke` and its checked input signature. Recognizing
 the bare generic name alone is insufficient; the separate entry-selection path must provide
 the same checked function specialization as inline selection.
 This is an implementation gap; generic stage structs should follow ordinary entry-point
@@ -381,13 +379,10 @@ For example, a correctly typed `invoke` that calls a Metal-only helper must stil
 HLSL. Capability diagnostics use the ordinary function location at `invoke`; the public entry
 name remains the selected struct name.
 
-The workaround for [#13793](https://github.com/shader-slang/slang/issues/13793) obtains the
-primitive through the input type's checked generic constraint. For `ClosestHitInput<Context>`,
-ordinary substitution applies its `Context : IHitContext` argument to the declared constraint;
-a requirement lookup then reads `Primitive` from that exact conformance. The check includes a
-known primitive's capabilities even when the body never reads its attributes. A dependent
-primitive remains unresolved and needs validation after specialization in the future backend
-work.
+Target validation uses the requirements that ordinary capability checking infers from the
+selected method's uses. The curve-data and curve-attribute tests exercise the restrictions where
+curve features are used. Whether an otherwise unused `typealias` should contribute requirements
+to its enclosing struct remains an open capability-system question.
 
 An `invoke` method can be called as an ordinary static function with an existing input. For example:
 

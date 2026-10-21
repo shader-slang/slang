@@ -965,67 +965,6 @@ void initializeStructuralRayTracingEntryPoint(
         getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice()));
 }
 
-// Includes a known primitive's requirements even when invoke does not read its attributes.
-// Consider a hit context with `typealias Primitive = rt::CurvePrimitive`: it requires Metal even
-// for an empty invoke body. This is a WAR for #13793, where typealias requirements do not reach
-// the enclosing type. The checked input type already supplies the Context : IHitContext witness;
-// substituting its declared constraint reads that exact argument through ordinary substitution.
-// An extern context can leave Primitive dependent. Its concrete requirements must be checked
-// after specialization when adapter synthesis is added.
-CapabilitySet getStructuralRayTracingPrimitiveCapabilities(EntryPoint* entryPoint)
-{
-    auto stage = entryPoint->getStage();
-    if (stage != Stage::ClosestHit && stage != Stage::AnyHit && stage != Stage::Intersection)
-        return CapabilitySet();
-
-    auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
-    auto parameters = getParameters(astBuilder, entryPoint->getFuncDeclRef());
-    SLANG_RELEASE_ASSERT(parameters.getCount() == 1);
-    auto inputType = as<DeclRefType>(unwrapModifiedType(getType(astBuilder, parameters[0])));
-    SLANG_RELEASE_ASSERT(inputType);
-    auto inputDeclRef = inputType->getDeclRef();
-    auto genericDecl = as<GenericDecl>(inputDeclRef.getDecl()->parentDecl);
-    SLANG_RELEASE_ASSERT(genericDecl);
-
-    // ClosestHitInput, AnyHitInput, and IntersectionInput all declare Context : IHitContext.
-    // The interface directly owns Primitive, so this lookup needs no projection through the
-    // stage struct's conformance or knowledge of the input's generic argument positions.
-    Type* primitiveType = nullptr;
-    for (auto constraint : genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
-    {
-        auto constraintDeclRef = makeDeclRef(constraint);
-        auto interfaceDeclRef =
-            isDeclRefTypeOf<InterfaceDecl>(getSup(astBuilder, constraintDeclRef));
-        if (!interfaceDeclRef)
-            continue;
-        for (auto requirement :
-             interfaceDeclRef.getDecl()->getDirectMemberDeclsOfType<AssocTypeDecl>())
-        {
-            if (_getRayTracingBuiltin(requirement) != KnownBuiltinDeclName::RayTracingHitPrimitive)
-                continue;
-            SLANG_RELEASE_ASSERT(!primitiveType);
-            auto declaredWitness = astBuilder->getDeclaredSubtypeWitness(
-                getSub(astBuilder, constraintDeclRef),
-                getSup(astBuilder, constraintDeclRef),
-                constraintDeclRef);
-            auto contextWitness = as<SubtypeWitness>(
-                declaredWitness->substitute(astBuilder, SubstitutionSet(inputDeclRef))->resolve());
-            SLANG_RELEASE_ASSERT(contextWitness);
-            auto primitiveLookup = DeclRefType::create(
-                astBuilder,
-                astBuilder->getLookupDeclRef(contextWitness, requirement));
-            primitiveType = as<Type>(primitiveLookup->resolve());
-        }
-    }
-    SLANG_RELEASE_ASSERT(primitiveType);
-    auto primitiveDecl = isDeclRefTypeOf<AggTypeDecl>(primitiveType);
-    if (!primitiveDecl)
-        return CapabilitySet();
-
-    SLANG_RELEASE_ASSERT(primitiveDecl.getDecl()->inferredCapabilityRequirements);
-    return CapabilitySet{primitiveDecl.getDecl()->inferredCapabilityRequirements};
-}
-
 // Checks the structural representations that must be consumed before native ABI legalization.
 //
 // For example, compiling `-entry MyMiss` must not send its logical `MissInput<C>` parameter to

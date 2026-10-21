@@ -2022,12 +2022,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         // Conformance already checks invoke's signature. Its RT input is supplied by the
         // compiler, so native uniform/varying parameter rules do not apply. The selected
-        // implementation and primitive must still support the requested target/profile.
-        // WAR for #13793: member typealias requirements do not propagate to the enclosing struct.
-        // Include the selected primitive's requirements explicitly until that is fixed.
-        CapabilitySet entryPointInferredCaps{entryPoint->getInferredCapabilityRequirements()};
-        entryPointInferredCaps.nonDestructiveJoin(
-            getStructuralRayTracingPrimitiveCapabilities(entryPoint));
+        // implementation must still support the requested target/profile.
 
         // Conformance guarantees one input; read its type with the selected generic arguments.
         auto astBuilder = linkage->getASTBuilder();
@@ -2042,7 +2037,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         List<GenericStructTypeUse> signatureStructUses;
         _validateEntryPointTargetCapabilities(
             entryPoint,
-            entryPointInferredCaps,
+            CapabilitySet{entryPoint->getInferredCapabilityRequirements()},
             CapabilitySet{inputDecl->inferredCapabilityRequirements},
             signatureStructUses,
             sink);
