@@ -214,14 +214,35 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
 
             {
                 Int sizeAlongAxis[kThreadGroupAxisCount];
-                getComputeThreadGroupSize(irFunc, sizeAlongAxis);
+                Int specializationConstantIds[kThreadGroupAxisCount];
+                auto numThreadsDecor =
+                    getComputeThreadGroupSize(irFunc, sizeAlongAxis, specializationConstantIds);
 
+                // A specialization-constant axis names its `override`, so the pipeline can set
+                // the workgroup size. WGSL requires every `@workgroup_size` argument to have the
+                // same type, so we keep literal axes as bare abstract-int literals (which convert
+                // to either i32 or u32) and convert any override that is not `i32` to `i32`.
                 m_writer->emit("@workgroup_size(");
                 for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
                 {
                     if (ii != 0)
                         m_writer->emit(", ");
-                    m_writer->emit(sizeAlongAxis[ii]);
+                    if (specializationConstantIds[ii] < 0)
+                    {
+                        m_writer->emit(sizeAlongAxis[ii]);
+                        continue;
+                    }
+                    auto specConst = numThreadsDecor->getOperand(ii);
+                    if (specConst->getDataType()->getOp() == kIROp_IntType)
+                    {
+                        m_writer->emit(getName(specConst));
+                    }
+                    else
+                    {
+                        m_writer->emit("i32(");
+                        m_writer->emit(getName(specConst));
+                        m_writer->emit(")");
+                    }
                 }
                 m_writer->emit(")\n");
             }
