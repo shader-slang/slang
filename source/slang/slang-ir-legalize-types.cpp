@@ -3462,6 +3462,139 @@ static IRTypeLayout* _wrapFieldTypeLayoutInParentArrays(
     return _createArrayTypeLayoutLike(irBuilder, parentArrayTypeLayout, elementFieldTypeLayout);
 }
 
+/// Create the type layout for the ordinary part of a value that legalization has split into an
+/// ordinary part and a special (resource) part. `typeLayout` is the layout of the whole value,
+/// and `pairInfo` records which of its fields went to which part.
+///
+/// Consider:
+///
+///     struct P { float4 tint; StructuredBuffer<float4> a; StructuredBuffer<float4> b; };
+///     ConstantBuffer<P> gP;
+///
+/// When targeting Vulkan, `gP` uses three `binding`s: one for the constant buffer, plus those of
+/// `a` and `b`, which bleed through it. Resource legalization turns `gP` into a constant buffer
+/// that holds only `tint`, plus stand-alone parameters for `a` and `b` with their own layouts.
+/// The leftover buffer must then claim only its own binding. Otherwise the parameter usage
+/// metadata reports the bindings of `a` and `b` as used, even after one of them has been
+/// removed as dead code.
+///
+/// We add up the usage of the parts that stay ordinary instead of subtracting the parts that
+/// moved, because a moved part does not always count its usage the way the group did. For
+/// example, an unbounded array of textures takes a whole register space in the group, but its
+/// own layout counts registers.
+///
+/// A parameter group keeps its container, element and offset element layouts. The offsets of
+/// the variable that holds the ordinary part are derived from the kinds its layout uses, so an
+/// offset for a kind that moved out is dropped too. Emitters read those offsets, but only for
+/// kinds the variable itself binds.
+///
+static IRTypeLayout* _createOrdinaryPartTypeLayout(
+    IRBuilder* irBuilder,
+    IRTypeLayout* typeLayout,
+    PairInfo* pairInfo)
+{
+    if (auto arrayTypeLayout = as<IRArrayTypeLayout>(typeLayout))
+    {
+        auto elementTypeLayout = _createOrdinaryPartTypeLayout(
+            irBuilder,
+            arrayTypeLayout->getElementTypeLayout(),
+            pairInfo);
+        return _createArrayTypeLayoutLike(irBuilder, arrayTypeLayout, elementTypeLayout);
+    }
+
+    if (auto paramGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+    {
+        auto containerVarLayout = paramGroupTypeLayout->getContainerVarLayout();
+        auto elementVarLayout = paramGroupTypeLayout->getElementVarLayout();
+        auto containerTypeLayout = containerVarLayout->getTypeLayout();
+        auto ordinaryElementTypeLayout =
+            _createOrdinaryPartTypeLayout(irBuilder, elementVarLayout->getTypeLayout(), pairInfo);
+
+        // The original group already leaves out every kind that it masks, so we only consider
+        // the kinds it uses. The ordinary bytes of the element are always masked, because they
+        // live in the group's own buffer.
+        //
+        // A group always passes up the whole register spaces and existential slots of its
+        // element, and those stay with the group: the parameters split out of it report their
+        // spaces through their own offsets, not through a range of this kind. For example,
+        // `ConstantBuffer<O>` with a field `ParameterBlock<P> pb` still claims the space of
+        // `pb` after `pb` becomes a parameter of its own.
+        IRParameterGroupTypeLayout::Builder newTypeLayoutBuilder(irBuilder);
+        for (auto sizeAttr : paramGroupTypeLayout->getSizeAttrs())
+        {
+            auto kind = sizeAttr->getResourceKind();
+            if (kind == LayoutResourceKind::SubElementRegisterSpace ||
+                kind == LayoutResourceKind::ExistentialTypeParam)
+            {
+                newTypeLayoutBuilder.addResourceUsage(sizeAttr);
+                continue;
+            }
+
+            auto containerSizeAttr = containerTypeLayout->findSizeAttr(kind);
+            auto elementSizeAttr = kind == LayoutResourceKind::Uniform
+                                       ? nullptr
+                                       : ordinaryElementTypeLayout->findSizeAttr(kind);
+            if (!containerSizeAttr && !elementSizeAttr)
+                continue;
+
+            if (containerSizeAttr)
+                newTypeLayoutBuilder.addResourceUsage(containerSizeAttr);
+            if (elementSizeAttr)
+                newTypeLayoutBuilder.addResourceUsage(elementSizeAttr);
+            if (auto alignmentAttr = paramGroupTypeLayout->findAlignmentAttr(kind))
+                newTypeLayoutBuilder.addAlignment(alignmentAttr);
+        }
+
+        newTypeLayoutBuilder.setContainerVarLayout(containerVarLayout);
+        newTypeLayoutBuilder.setElementVarLayout(elementVarLayout);
+        newTypeLayoutBuilder.setOffsetElementTypeLayout(
+            paramGroupTypeLayout->getOffsetElementTypeLayout());
+        return newTypeLayoutBuilder.build();
+    }
+
+    if (auto structTypeLayout = as<IRStructTypeLayout>(typeLayout))
+    {
+        // A struct is only split into a pair by struct legalization, which always records
+        // where each field went.
+        SLANG_RELEASE_ASSERT(pairInfo);
+
+        // Only the usage outside an enclosing parameter group matters, and that group masks the
+        // ordinary bytes, so we add up the resource usage of the fields that stay ordinary.
+        IRTypeLayout::Builder newTypeLayoutBuilder(irBuilder);
+        for (auto const& element : pairInfo->elements)
+        {
+            if (!(element.flags & PairInfo::kFlag_hasOrdinary))
+                continue;
+
+            // Legalization can produce a field key that the original layout does not know (the
+            // tuple case in `declareVars` meets the same keys). We then keep the usage of the
+            // whole struct, which can over-report but never drops a binding.
+            auto fieldLayout = getFieldLayout(structTypeLayout, element.key);
+            if (!fieldLayout)
+                return typeLayout;
+
+            auto fieldTypeLayout = fieldLayout->getTypeLayout();
+            if (element.flags & PairInfo::kFlag_hasSpecial)
+            {
+                fieldTypeLayout = _createOrdinaryPartTypeLayout(
+                    irBuilder,
+                    fieldTypeLayout,
+                    element.fieldPairInfo);
+            }
+            for (auto fieldSizeAttr : fieldTypeLayout->getSizeAttrs())
+            {
+                if (fieldSizeAttr->getResourceKind() != LayoutResourceKind::Uniform)
+                    newTypeLayoutBuilder.addResourceUsage(fieldSizeAttr);
+            }
+        }
+        return newTypeLayoutBuilder.build();
+    }
+
+    // For any other layout we keep the usage of the whole value. That can report a binding of
+    // the special part as used, but it never drops a binding that the ordinary part uses.
+    return typeLayout;
+}
+
 static LegalVal declareVars(
     IRTypeLegalizationContext* context,
     IROp op,
@@ -3556,11 +3689,23 @@ static LegalVal declareVars(
     case LegalType::Flavor::pair:
         {
             auto pairType = type.getPair();
+
+            // The special side keeps the original layout, because its fields find their own
+            // layouts through it. When the value is a parameter group, or an array of them,
+            // the ordinary side no longer holds those fields, so it gets a layout without
+            // their resource usage.
+            IRTypeLayout* ordinaryTypeLayout = typeLayout;
+            if (typeLayout && as<IRParameterGroupTypeLayout>(typeLayout->unwrapArray()))
+            {
+                ordinaryTypeLayout =
+                    _createOrdinaryPartTypeLayout(context->builder, typeLayout, pairType->pairInfo);
+            }
+
             auto ordinaryVal = declareVars(
                 context,
                 op,
                 pairType->ordinaryType,
-                typeLayout,
+                ordinaryTypeLayout,
                 varChain,
                 nameHint,
                 leafVar,

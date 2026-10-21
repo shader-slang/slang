@@ -404,6 +404,199 @@ SLANG_UNIT_TEST(isParameterLocationUsedMixedConstantBuffer)
             expectations,
             SLANG_COUNT_OF(expectations));
     }
+
+    // An array of mixed constant buffers is split into an array of data-only buffers plus one
+    // array per resource field. On SPIR-V each array takes a single binding: `gP` 1, `usedBuf` 2
+    // and `unusedBuf` 3.
+    const char* arraySource = R"(
+        struct P
+        {
+            float4 tint;
+            StructuredBuffer<float4> usedBuf;
+            StructuredBuffer<float4> unusedBuf;
+        };
+
+        RWStructuredBuffer<float4> Output;
+        ConstantBuffer<P> gP[2];
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = gP[1].usedBuf[tid.x] * gP[0].tint;
+        }
+    )";
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 2, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 3, false},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            arraySource,
+            SLANG_SPIRV,
+            "spirv_1_5",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+
+    // When the element of a constant buffer is itself a constant buffer, the inner buffer stays
+    // on the data-only side of the split, so its binding must still be reported as used. On
+    // SPIR-V the inner buffer `gP` is at binding 1, and `usedBuf` and `unusedBuf` are at 2 and 3.
+    const char* nestedSource = R"(
+        struct P
+        {
+            float4 tint;
+            StructuredBuffer<float4> usedBuf;
+            StructuredBuffer<float4> unusedBuf;
+        };
+
+        RWStructuredBuffer<float4> Output;
+        ConstantBuffer<ConstantBuffer<P>> gP;
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = gP.usedBuf[tid.x] * gP.tint;
+        }
+    )";
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 2, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 3, false},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            nestedSource,
+            SLANG_SPIRV,
+            "spirv_1_5",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+
+    // A `ParameterBlock<P>` is split the same way. With `sm_5_0` there are no register spaces,
+    // so the block's buffer is at b0, and `usedBuf` and `unusedBuf` are at t0 and t1.
+    const char* parameterBlockSource = R"(
+        struct P
+        {
+            float4 tint;
+            StructuredBuffer<float4> usedBuf;
+            StructuredBuffer<float4> unusedBuf;
+        };
+
+        RWStructuredBuffer<float4> Output;
+        ParameterBlock<P> gP;
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = gP.usedBuf[tid.x] * gP.tint;
+        }
+    )";
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 0, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 1, false},
+            {SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER, 0, 0, true},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            parameterBlockSource,
+            SLANG_HLSL,
+            "sm_5_0",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+
+    // A `ParameterBlock` field of a mixed constant buffer is split out with its own register
+    // space, and the outer buffer still reports that space: `gO.pb` is at sub-element register
+    // space 1 in space 0. SPIR-V emits `pb` at set 1 binding 0 and `usedBuf` at set 1 binding 2;
+    // binding 1 is reserved for the unread `unusedBuf`.
+    const char* nestedParameterBlockSource = R"(
+        struct P
+        {
+            float4 tint;
+            StructuredBuffer<float4> usedBuf;
+            StructuredBuffer<float4> unusedBuf;
+        };
+        struct O
+        {
+            float4 x;
+            ParameterBlock<P> pb;
+        };
+
+        RWStructuredBuffer<float4> Output;
+        ConstantBuffer<O> gO;
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = gO.pb.usedBuf[tid.x] * gO.pb.tint * gO.x;
+        }
+    )";
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, 0, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, 1, false},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, 2, true},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            nestedParameterBlockSource,
+            SLANG_SPIRV,
+            "spirv_1_5",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+
+    // An array of structs with resources inside a mixed constant buffer is split into one array
+    // per resource field. On HLSL `gP.arr.t` takes t0..t1, so both must be reported as used,
+    // while the unread `gP.unusedBuf` at t2 must not.
+    const char* arrayOfStructsSource = R"(
+        struct Inner
+        {
+            Texture2D t;
+            float x;
+        };
+        struct P
+        {
+            float4 c;
+            Inner arr[2];
+            StructuredBuffer<float4> unusedBuf;
+        };
+
+        RWStructuredBuffer<float4> Output;
+        ConstantBuffer<P> gP;
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = gP.arr[1].t.Load(int3(0)) * gP.c + gP.arr[0].x;
+        }
+    )";
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 0, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 2, false},
+            {SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER, 0, 0, true},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            arrayOfStructsSource,
+            SLANG_HLSL,
+            "sm_5_0",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
 }
 
 // An array of structs that holds resources is split into one array per resource field. On D3D
