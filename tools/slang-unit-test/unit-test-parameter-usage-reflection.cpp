@@ -779,3 +779,101 @@ SLANG_UNIT_TEST(isParameterLocationUsedArrayOfStructsWithResources)
             SLANG_COUNT_OF(expectations));
     }
 }
+
+// An interface-typed entry-point parameter specialized to a type that mixes ordinary data with a
+// resource is split like a struct field, but its layout is an existential layout with no field
+// layouts. Compiling it must succeed. Debug builds stop earlier, at the tuple case's assertion
+// that every field has a layout, so the test only runs in release builds.
+SLANG_UNIT_TEST(isParameterLocationUsedSplitExistential)
+{
+#ifdef _DEBUG
+    SLANG_IGNORE_TEST;
+#else
+    const char* source = R"(
+        interface IFoo
+        {
+            float4 get();
+        }
+        struct Impl : IFoo
+        {
+            float4 v;
+            Texture2D t;
+            float4 get() { return v * t.Load(int3(0)); }
+        }
+
+        RWStructuredBuffer<float4> Output;
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uniform IFoo f, uniform float4 tint, uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = f.get() * tint;
+        }
+    )";
+
+    auto globalSession = unitTestContext->slangGlobalSession;
+    SlangCompileTarget formats[] = {SLANG_HLSL, SLANG_SPIRV};
+    for (auto format : formats)
+    {
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = format;
+        targetDesc.profile =
+            globalSession->findProfile(format == SLANG_HLSL ? "sm_5_1" : "spirv_1_5");
+
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> diagnosticBlob;
+        auto module = session->loadModuleFromSourceString(
+            "isParameterLocationUsedSplitExistential",
+            "split-existential.slang",
+            source,
+            diagnosticBlob.writeRef());
+        SLANG_CHECK_ABORT(module != nullptr);
+
+        ComPtr<slang::IEntryPoint> entryPoint;
+        SLANG_CHECK_ABORT(
+            module->findAndCheckEntryPoint(
+                "main",
+                SLANG_STAGE_COMPUTE,
+                entryPoint.writeRef(),
+                diagnosticBlob.writeRef()) == SLANG_OK);
+
+        slang::SpecializationArg arg =
+            slang::SpecializationArg::fromType(module->getLayout()->findTypeByName("Impl"));
+        ComPtr<slang::IComponentType> specializedEntryPoint;
+        SLANG_CHECK_ABORT(
+            entryPoint->specialize(
+                &arg,
+                1,
+                specializedEntryPoint.writeRef(),
+                diagnosticBlob.writeRef()) == SLANG_OK);
+
+        slang::IComponentType* components[] = {module, specializedEntryPoint.get()};
+        ComPtr<slang::IComponentType> compositeProgram;
+        SLANG_CHECK_ABORT(
+            session->createCompositeComponentType(
+                components,
+                2,
+                compositeProgram.writeRef(),
+                diagnosticBlob.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IComponentType> linkedProgram;
+        SLANG_CHECK_ABORT(
+            compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef()) ==
+            SLANG_OK);
+
+        ComPtr<slang::IBlob> code;
+        auto codeResult =
+            linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnosticBlob.writeRef());
+        if (SLANG_FAILED(codeResult) && diagnosticBlob)
+            fprintf(stderr, "%s\n", (const char*)diagnosticBlob->getBufferPointer());
+        SLANG_CHECK(SLANG_SUCCEEDED(codeResult));
+    }
+#endif
+}
