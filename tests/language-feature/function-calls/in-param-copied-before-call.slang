@@ -6,13 +6,7 @@
 
 // An `in` parameter receives a copy of its argument taken before the call, so it keeps the old
 // value when the same variable is also passed to a parameter that the call writes. The struct
-// cases cover targets where `transformParamsToConstRef` turns a struct `in` parameter into a
-// borrow; the call site still passes a copy.
-
-struct Big
-{
-    int v[4];
-}
+// cases are in `in-param-struct-copied-before-call.slang`.
 
 [noinline]
 int inThenInout(int a, inout int b)
@@ -35,28 +29,7 @@ int inThenRef(int a, __ref int b)
     return a;
 }
 
-[noinline]
-int bigInThenInout(Big a, inout Big b)
-{
-    b.v[0] = 5;
-    return a.v[0];
-}
-
-[noinline]
-int bigInThenOut(Big a, out Big b)
-{
-    b.v = { 5, 5, 5, 5 };
-    return a.v[0];
-}
-
-[noinline]
-int bigInThenRef(Big a, __ref Big b)
-{
-    b.v[0] = 5;
-    return a.v[0];
-}
-
-//TEST_INPUT:ubuffer(data=[1 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[1 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -79,23 +52,4 @@ void computeMain()
     outputBuffer[4] = inThenRef(x, x);
     // CHECK-NEXT: 5
     outputBuffer[5] = x;
-
-    Big big;
-    big.v = { 1, 1, 1, 1 };
-    // CHECK-NEXT: 1
-    outputBuffer[6] = bigInThenInout(big, big);
-    // CHECK-NEXT: 5
-    outputBuffer[7] = big.v[0];
-
-    big.v = { 1, 1, 1, 1 };
-    // CHECK-NEXT: 1
-    outputBuffer[8] = bigInThenOut(big, big);
-    // CHECK-NEXT: 5
-    outputBuffer[9] = big.v[0];
-
-    big.v = { 1, 1, 1, 1 };
-    // CHECK-NEXT: 1
-    outputBuffer[10] = bigInThenRef(big, big);
-    // CHECK-NEXT: 5
-    outputBuffer[11] = big.v[0];
 }
