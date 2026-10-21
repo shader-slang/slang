@@ -5,8 +5,8 @@
 
 // A specialization constant is emitted as a WGSL `override`, and an expression that reads one is an
 // override-expression, which a WGSL `const` initializer cannot hold. A function-scope value computed
-// from a specialization constant is therefore bound with `var`. Issue #13635 makes WGSL's `asfloat`
-// an IR bit cast, so `asfloat(kBits)` is such a value too.
+// from a specialization constant is therefore bound with `var`. WGSL's `asfloat` is an IR bit cast,
+// so `asfloat(kBits)` is such a value too.
 
 // NOCONST: result code = 0
 // NOCONST-NOT: const {{.*}}kBits

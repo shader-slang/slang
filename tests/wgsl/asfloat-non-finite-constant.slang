@@ -9,8 +9,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -output-using-type
 //TEST(compute,vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
 
-// Regression test for issue #13635.
-//
 // WGSL's `bitcast` of a literal is a const-expression, and a const-expression that evaluates to NaN
 // or infinity is a shader-creation error. `asfloat` of constant NaN/infinity bits must therefore
 // produce the value at run time while keeping the exact bit pattern, including a NaN payload.
