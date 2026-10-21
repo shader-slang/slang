@@ -1,4 +1,5 @@
-// Aligned `(RW)ByteAddressBuffer` loads and stores of arrays on WGSL and Metal (issue #13805).
+// Aligned `(RW)ByteAddressBuffer` loads and stores of arrays on the targets that set
+// `scalarizeVectorLoadStore`: WGSL, Metal and CPU-via-LLVM (issue #13805).
 //
 // WGSL and Metal see a byte-address buffer as an array of 32-bit words, so an array access must be
 // split into per-element accesses even when its offset is known to be aligned to the whole array.
@@ -14,6 +15,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-llvm -compute -output-using-type
+//TEST:SIMPLE(filecheck=LLVM):-target llvm-shader-ir -entry computeMain -stage compute -O1
 
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 11.0 12.0 13.0 14.0 15.0 16.0 17.0 18.0 19.0 20.0 21.0 22.0 23.0 24.0 25.0 26.0 27.0 28.0 29.0 30.0 31.0 32.0 33.0 34.0], stride=4):name=src
 ByteAddressBuffer src;
@@ -70,7 +72,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // METAL: dst_{{[0-9]+}}[(92U)>>2] = as_type<uint32_t>
     dst.Store<WithArrayField>(48, src.Load<WithArrayField>(48));
 
-    // Run-time offsets whose alignment is promised by the caller.
+    // Run-time offsets whose alignment is promised by the caller. `LoadAligned<T>(location)` and
+    // `StoreAligned` promise `T`'s natural alignment (4 for `uint[1]`, which is also its size); the
+    // other two statements promise 32 and 8 explicitly, which are the sizes of `float4[2]` and
+    // `float[2]`.
     uint t = tid.x * 128;
 
     // WGSL: [[T44:[A-Za-z0-9_]+]] : u32 = {{.*}} + u32(44);
@@ -110,11 +115,20 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     dst.Store<float[2]>(t + 128, src.LoadAligned<float[2]>(t + 128, 8), 8);
 }
 
-// Neither target may load or store a whole array as one 32-bit word, or go through 64-bit integers.
+// The `*_BAD` runs are separate so that their `-NOT` checks scan the whole output. Neither target
+// may load a whole array from one 32-bit word, and neither may round-trip an 8-byte array such as
+// `float[2]` through a 64-bit integer (`u64` in WGSL, which has no 64-bit integers; `ulong` in
+// Metal). The positive `dst` checks above cover the store side.
 // WGSL_BAD-NOT: u64
 // WGSL_BAD-NOT: : array<{{.*}}> = src_{{[0-9]+}}[
 // METAL_BAD-NOT: as_type<array<
 // METAL_BAD-NOT: ulong
+
+// On CPU-via-LLVM at `-O1`, an `llvm.memcpy` here means an array was accessed whole instead of per
+// element. The run uses `-O1` because at `-O0` unrelated local copies also use `llvm.memcpy.inline`.
+// LLVM: define {{.*}}computeMain
+// LLVM-NOT: llvm.memcpy
+
 // `dst` holds the bits of the floats 1.0 to 34.0, copied from `src`.
 // BUF: 3F800000
 // BUF-NEXT: 40000000
