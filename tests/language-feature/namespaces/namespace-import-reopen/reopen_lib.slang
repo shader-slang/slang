@@ -12,4 +12,14 @@ public struct ImportedType
 }
 
 public static const int importedValue = 7;
+
+public int over(int x)
+{
+    return 1;
+}
+
+public int over(float x)
+{
+    return 2;
+}
 }
