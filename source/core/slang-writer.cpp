@@ -71,22 +71,83 @@ ISlangUnknown* BaseWriter::getInterface(const Guid& guid)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! AppendBufferWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
+namespace
+{
+/// An append buffer that the current thread has begun on `writer` and not yet ended.
+struct ActiveAppendBuffer
+{
+    const AppendBufferWriter* writer = nullptr;
+    List<char> buffer;
+};
+
+struct ThreadAppendBuffers
+{
+    /// The append buffers this thread has begun and not yet ended. Each writer allows one active
+    /// append buffer, so there is at most one entry per writer. Each entry's characters live in
+    /// their own allocation, so adding an entry for another writer does not move a buffer that
+    /// has already been returned to a caller.
+    List<ActiveAppendBuffer> active;
+
+    /// The storage of the most recently ended append buffer, which the next begin reuses so that
+    /// repeated begin/end pairs do not allocate.
+    List<char> spare;
+
+    Index find(const AppendBufferWriter* writer) const
+    {
+        return active.findFirstIndex([&](const ActiveAppendBuffer& activeAppendBuffer)
+                                     { return activeAppendBuffer.writer == writer; });
+    }
+};
+} // namespace
+
+static ThreadAppendBuffers& _getThreadAppendBuffers()
+{
+    thread_local ThreadAppendBuffers threadAppendBuffers;
+    return threadAppendBuffers;
+}
+
 SLANG_NO_THROW char* SLANG_MCALL AppendBufferWriter::beginAppendBuffer(size_t maxNumChars)
 {
-    mutex.lock();
-    m_appendBuffer.setCount(maxNumChars);
-    return m_appendBuffer.getBuffer();
+    auto& appendBuffers = _getThreadAppendBuffers();
+
+    // If an earlier append buffer on this writer was never ended, which `ISlangWriter` allows when
+    // there are no characters to write, its entry is reused.
+    Index index = appendBuffers.find(this);
+    if (index < 0)
+    {
+        index = appendBuffers.active.getCount();
+        appendBuffers.active.add(ActiveAppendBuffer{this, List<char>()});
+        appendBuffers.active[index].buffer.swapWith(appendBuffers.spare);
+    }
+
+    List<char>& buffer = appendBuffers.active[index].buffer;
+    buffer.setCount(maxNumChars);
+    return buffer.getBuffer();
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
 AppendBufferWriter::endAppendBuffer(char* buffer, size_t numChars)
 {
-    SLANG_ASSERT(m_appendBuffer.getBuffer() == buffer && buffer + numChars <= m_appendBuffer.end());
-    // Do the actual write
-    SlangResult res = write(buffer, numChars);
-    // Clear so that buffer can't be written from again without assert
-    m_appendBuffer.clear();
-    mutex.unlock();
+    auto& appendBuffers = _getThreadAppendBuffers();
+    const Index index = appendBuffers.find(this);
+    if (index < 0)
+    {
+        // The append buffer belongs to the thread that began it, so an end without a begin on
+        // this thread is reported rather than writing from memory this thread does not own.
+        return SLANG_E_INVALID_ARG;
+    }
+
+    // The buffer is detached before calling write, so that a write that appends to this same
+    // writer begins a new buffer instead of overwriting the one being written.
+    List<char> appendBuffer;
+    appendBuffer.swapWith(appendBuffers.active[index].buffer);
+    appendBuffers.active.fastRemoveAt(index);
+
+    SLANG_ASSERT(appendBuffer.getBuffer() == buffer && buffer + numChars <= appendBuffer.end());
+    const SlangResult res = write(buffer, numChars);
+
+    appendBuffer.clear();
+    appendBuffers.spare.swapWith(appendBuffer);
     return res;
 }
 
@@ -97,6 +158,16 @@ SLANG_NO_THROW char* SLANG_MCALL CallbackWriter::beginAppendBuffer(size_t maxNum
     // Add one so there is always space for end termination, we need for the callback.
     m_appendBuffer.setCount(maxNumChars + 1);
     return m_appendBuffer.getBuffer();
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL
+CallbackWriter::endAppendBuffer(char* buffer, size_t numChars)
+{
+    SLANG_ASSERT(m_appendBuffer.getBuffer() == buffer && buffer + numChars <= m_appendBuffer.end());
+    SlangResult res = write(buffer, numChars);
+    // Clear so that buffer can't be written from again without assert
+    m_appendBuffer.clear();
+    return res;
 }
 
 SlangResult CallbackWriter::write(const char* chars, size_t numChars)

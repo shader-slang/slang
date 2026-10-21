@@ -6,8 +6,6 @@
 #include "slang-list.h"
 #include "slang-string.h"
 
-#include <mutex>
-
 namespace Slang
 {
 
@@ -84,8 +82,13 @@ protected:
     WriterFlags m_flags;
 };
 
-/* Implemented the append buffer part of the writer, such that calls to begin/endAppendBuffer are
- * transformed into appropriate calls to write method */
+/* Implements the append buffer part of the writer, such that calls to begin/endAppendBuffer are
+ * transformed into a call to the write method.
+ *
+ * A writer can be shared between threads (for example the process-wide stdout writer), so the
+ * append buffer is owned by the calling thread rather than by the writer, and no lock is held
+ * between beginAppendBuffer and endAppendBuffer. Sharing a writer between threads is then safe
+ * if its write method is, as FileWriter's is. */
 class AppendBufferWriter : public BaseWriter
 {
 public:
@@ -100,18 +103,16 @@ public:
         : Parent(flags)
     {
     }
-
-protected:
-    List<char> m_appendBuffer;
-    std::mutex mutex;
 };
 
-class CallbackWriter : public AppendBufferWriter
+class CallbackWriter : public BaseWriter
 {
 public:
-    typedef AppendBufferWriter Parent;
+    typedef BaseWriter Parent;
     // ISlangWriter
     SLANG_NO_THROW char* SLANG_MCALL beginAppendBuffer(size_t maxNumChars) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL endAppendBuffer(char* buffer, size_t numChars)
+        SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars)
         SLANG_OVERRIDE;
 
@@ -121,6 +122,9 @@ public:
     }
 
 protected:
+    // Holds the append buffer, and the 0-terminated copy of text passed to write, because the
+    // callback takes a 0-terminated string.
+    List<char> m_appendBuffer;
     SlangDiagnosticCallback m_callback;
     const void* m_data;
 };
