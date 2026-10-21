@@ -433,9 +433,10 @@ struct GlobalVarTranslationContext
     //
     // A specialization-constant operand keeps its declared type (for example `uint`), so we
     // convert it to `int`. We convert only spec-const-rate operands. On a target without
-    // specialization constants, `collectGlobalUniformParameters` has already removed the global
-    // parameter that such an operand names, and left the `[numthreads]` use in place so that
-    // emit can report E55205; the operand's type is cleared, so `emitCast` must not read it, and
+    // specialization constants, the operand has a known shape left by
+    // `collectGlobalUniformParameters` (slang-ir-collect-global-uniforms.cpp): that pass removes
+    // the global parameter but keeps the `[numthreads]` use so that emit can report E55205. The
+    // removed operand's type is cleared, so `emitCast` must not read it, and
     // `isSpecConstRateType` is false for it. Literal operands are left unchanged: semantic
     // checking canonicalizes `[numthreads]` literals to `int`, although a GLSL
     // `layout(local_size_x = 4u)` literal currently keeps its `uint` type.

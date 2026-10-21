@@ -8,8 +8,8 @@
 // See shader-slang/slang#13767.
 
 // WGSL requires every `@workgroup_size` argument to have the same type (i32 or u32). Literal
-// axes stay as bare abstract-int literals, which convert to either type, and every override
-// that is not `i32` is converted to `i32`, even when it is the only override.
+// axes stay as bare abstract-int literals, which convert to either type, and a `u32` override
+// is converted to `i32`, even when it is the only override.
 
 // SINGLE: @id(0) override kGroupSize_0 : i32
 // SINGLE: @workgroup_size(kGroupSize_0, 1, 1)
