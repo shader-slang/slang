@@ -1209,11 +1209,14 @@ struct PeepholeContext : InstPassBase
             break;
         case kIROp_BitCast:
             {
+                // On WGSL, a `bitcast` of a literal that yields NaN or infinity is a
+                // shader-creation error, so such a bit cast must reach the emitter folded.
                 // `lowerBitCast` splits a vector bit cast into per-element scalar ones after the
                 // function-level SCCP has run, and at minimal optimization no later SCCP runs, so
-                // a bit cast of a literal is folded here. WGSL depends on this: a `bitcast` of a
-                // literal that yields NaN or infinity is a shader-creation error there.
-                if (as<IRConstant>(inst->getOperand(0)))
+                // we fold it here. Other targets keep their reinterpret intrinsic, which preserves
+                // a NaN payload that their float-literal spelling (`0.0 / 0.0`) would lose.
+                if (targetProgram && isWGPUTarget(targetProgram->getTargetReq()) &&
+                    as<IRConstant>(inst->getOperand(0)))
                 {
                     auto folded = tryConstantFoldInst(module, targetProgram, inst);
                     if (folded != inst)
