@@ -30,6 +30,7 @@ on:
         required: false
         type: number
         default: 80
+        description: "Limit the whole test-slang job, including setup, main tests, examples, slangc tests, and via-GLSL."
       enable-debug-layers:
         required: false
         type: boolean
@@ -62,7 +63,7 @@ on:
       run-via-glsl:
         required: true
         type: boolean
-        description: "Run one Vulkan via-glsl pass on pull requests, including Debug when enabled."
+        description: "When true, on pull_request events only, for non-macOS full-GPU callers, run one -api vk -emit-spirv-via-glsl pass in this job."
       api:
         required: false
         type: string
