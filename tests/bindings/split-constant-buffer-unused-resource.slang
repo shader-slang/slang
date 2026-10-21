@@ -1,7 +1,9 @@
 // Entry-point `uniform` parameters that mix ordinary data with resources are collected into one
 // constant buffer, which resource legalization splits into a data-only buffer plus one parameter
-// per resource (shader-slang/slang#13789). The split must keep the registers of the buffer and
-// of the used resource, and must not declare the unread resource.
+// per resource (shader-slang/slang#13789). The data-only buffer must not shift any emitted
+// register or binding. The HLSL run checks the buffer's own `b0` and the used resource; the SPIR-V
+// run checks the resource bindings, since the buffer there is a push-constant block with no
+// binding. The metadata itself is checked by `isParameterLocationUsedMixedConstantBuffer`.
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile cs_5_0 -entry main -stage compute
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry main -stage compute

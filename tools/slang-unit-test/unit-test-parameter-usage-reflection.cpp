@@ -252,21 +252,23 @@ void checkEntryPointParameterLocationUsage(
     SLANG_CHECK_ABORT(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
-    SLANG_CHECK_ABORT(
-        module->findAndCheckEntryPoint(
-            "main",
-            SLANG_STAGE_COMPUTE,
-            entryPoint.writeRef(),
-            diagnosticBlob.writeRef()) == SLANG_OK);
+    auto entryPointResult = module->findAndCheckEntryPoint(
+        "main",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef());
+    printDiagnostics();
+    SLANG_CHECK_ABORT(entryPointResult == SLANG_OK);
 
     ComPtr<slang::IComponentType> compositeProgram;
     slang::IComponentType* components[] = {module, entryPoint.get()};
-    SLANG_CHECK_ABORT(
-        session->createCompositeComponentType(
-            components,
-            2,
-            compositeProgram.writeRef(),
-            diagnosticBlob.writeRef()) == SLANG_OK);
+    auto compositeResult = session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    printDiagnostics();
+    SLANG_CHECK_ABORT(compositeResult == SLANG_OK);
 
     ComPtr<slang::IComponentType> linkedProgram;
     auto linkResult = compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
@@ -289,6 +291,17 @@ void checkEntryPointParameterLocationUsage(
                 expectation.spaceIndex,
                 expectation.registerIndex,
                 isUsed) == SLANG_OK);
+        if (isUsed != expectation.expectedUsed)
+        {
+            fprintf(
+                stderr,
+                "target %d: category %d, space %d, index %d: expected used=%d\n",
+                int(format),
+                int(expectation.category),
+                int(expectation.spaceIndex),
+                int(expectation.registerIndex),
+                int(expectation.expectedUsed));
+        }
         SLANG_CHECK(isUsed == expectation.expectedUsed);
     }
 }
@@ -441,8 +454,9 @@ SLANG_UNIT_TEST(isParameterLocationUsedMixedConstantBuffer)
             SLANG_COUNT_OF(expectations));
     }
 
-    // When the element of a constant buffer is itself a constant buffer, the inner buffer stays
-    // on the data-only side of the split, so its binding must still be reported as used. On
+    // When the element of a constant buffer is itself a constant buffer, the inner buffer is not
+    // moved out by the split: it stays in the outer buffer's element, so its binding must still
+    // be reported as used. On
     // SPIR-V the inner buffer `gP` is at binding 1, and `usedBuf` and `unusedBuf` are at 2 and 3.
     const char* nestedSource = R"(
         struct P
@@ -513,9 +527,11 @@ SLANG_UNIT_TEST(isParameterLocationUsedMixedConstantBuffer)
     }
 
     // A `ParameterBlock` field of a mixed constant buffer is split out with its own register
-    // space, and the outer buffer still reports that space: `gO.pb` is at sub-element register
-    // space 1 in space 0. SPIR-V emits `pb` at set 1 binding 0 and `usedBuf` at set 1 binding 2;
-    // binding 1 is reserved for the unread `unusedBuf`.
+    // space, and the outer buffer still reports that space. `Output` is at binding 0 and `gO` at
+    // binding 1 of set 0, and `gO.pb` takes sub-element register space 1, which becomes set 1.
+    // In set 1 the emitted code puts `pb`'s own buffer at binding 0, `usedBuf` at 2 and
+    // `unusedBuf` at 3. Reflection reports the two buffers one binding lower, at 1 and 2; that
+    // offset is a separate, pre-existing mismatch, so the checks here follow the emitted code.
     const char* nestedParameterBlockSource = R"(
         struct P
         {
@@ -544,8 +560,8 @@ SLANG_UNIT_TEST(isParameterLocationUsedMixedConstantBuffer)
             {SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE, 0, 1, true},
             {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, true},
             {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, 0, true},
-            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, 1, false},
             {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, 2, true},
+            {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, 3, false},
         };
         checkEntryPointParameterLocationUsage(
             globalSession,
@@ -557,8 +573,10 @@ SLANG_UNIT_TEST(isParameterLocationUsedMixedConstantBuffer)
     }
 
     // An array of structs with resources inside a mixed constant buffer is split into one array
-    // per resource field. On HLSL `gP.arr.t` takes t0..t1, so both must be reported as used,
-    // while the unread `gP.unusedBuf` at t2 must not.
+    // per resource field. On HLSL `gP.arr.t` becomes one `Texture2D[2]` parameter at t0..t1. The
+    // whole range is recorded while that parameter is live, so this checks the array scaling of
+    // its layout, not which elements the shader reads. The unread `gP.unusedBuf` at t2 must not be
+    // reported.
     const char* arrayOfStructsSource = R"(
         struct Inner
         {
@@ -682,8 +700,9 @@ SLANG_UNIT_TEST(isParameterLocationUsedArrayOfStructsWithResources)
             SLANG_COUNT_OF(expectations));
     }
 
-    // An unbounded array of structs gives each resource field its own register space, so the
-    // texture array `gS.arr.t` fills space 1 the way a plain `Texture2D textures[]` does.
+    // An unbounded array of structs gives each resource field its own register space (space 1
+    // here, after `Output` in space 0), so the texture array `gS.arr.t` fills that space the way a
+    // plain `Texture2D textures[]` does. t5 stands for any register past the first.
     const char* unboundedSource = R"(
         struct Inner
         {
@@ -714,6 +733,48 @@ SLANG_UNIT_TEST(isParameterLocationUsedArrayOfStructsWithResources)
             unboundedSource,
             SLANG_HLSL,
             "sm_5_1",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+
+    // A struct that mixes data and resources nested inside an array of structs keeps its
+    // ordinary bytes in the enclosing buffer. HLSL does not pad the last element of a constant
+    // buffer array, so the array's byte size is not a multiple of the element's, and the array
+    // scaling must leave those bytes out. `gS.inner.t` becomes `Texture2D[2]` at t0..t1.
+    const char* nestedMixedStructSource = R"(
+        struct Inner
+        {
+            Texture2D t;
+            float x;
+        };
+        struct S
+        {
+            Inner inner;
+            float y;
+            float z;
+        };
+
+        RWStructuredBuffer<float4> Output;
+        S gS[2];
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = gS[1].inner.t.Load(int3(0)) * gS[0].y * gS[1].inner.x;
+        }
+    )";
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 0, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 2, false},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            nestedMixedStructSource,
+            SLANG_HLSL,
+            "sm_5_0",
             expectations,
             SLANG_COUNT_OF(expectations));
     }
