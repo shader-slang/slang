@@ -281,6 +281,11 @@ These are in addition to `_common.md` and `pipeline-06-emit.md`.
 - **`#line N "<file>"` directives appear in HLSL emit by default**
   and may reference `core.meta.slang` / `hlsl.meta.slang` for
   core-module-sourced items. Use a wildcard for the file name.
+  A meta-module function that is emitted as its own HLSL function
+  (scalar `exp10` from `hlsl.meta.slang`, tuple `concat` from
+  `core.meta.slang`) gets a meta-module `#line`. The split
+  `Sampler2D` globals do not: since #13724 they carry the user
+  declaration's location.
 - **Enum lowering eats the enumerator name.** `Color.Green` becomes
   `int(1)` in HLSL emit; there is no surviving `Green` identifier.
 - **HLSL output always emits `void main(...)`** for an entry point

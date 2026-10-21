@@ -9,21 +9,23 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Using a built-in that draws from `hlsl.meta.slang` /
-// `core.meta.slang` causes the `SourceWriter` to emit `#line`
-// directives that point at the meta-module sources.
+// Scalar `exp10` and tuple `concat` have bodies in `hlsl.meta.slang` and
+// `core.meta.slang` that HLSL emit writes out as separate functions, so
+// each function gets a `#line` naming its meta-module, and the entry
+// point gets a `#line` naming this file. The CHECK-DAGs match all three.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 
-Sampler2D combined;
-RWStructuredBuffer<float4> outBuf;
+RWStructuredBuffer<float> outBuf;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
-    outBuf[tid.x] = combined.SampleLevel(float2(0.5, 0.5), 0);
+    let pair = concat(makeTuple(float(tid.x)), makeTuple(2.0f));
+    outBuf[tid.x] = exp10(pair._0) + pair._1;
 }
 
+// CHECK-DAG: #line {{[0-9]+}} "{{.*}}line-directive-references-core-meta.slang"
 // CHECK-DAG: #line {{[0-9]+}} "{{.*}}core.meta.slang"
 // CHECK-DAG: #line {{[0-9]+}} "{{.*}}hlsl.meta.slang"
