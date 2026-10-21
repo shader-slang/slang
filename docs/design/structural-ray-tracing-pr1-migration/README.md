@@ -285,6 +285,73 @@ method. Selecting `SkyMiss` as an entry point or listing it in a schema does not
 or run a constructor. Generated adapters must call the static implementation with its input. The
 function's IR therefore has an input parameter and no hidden `this` parameter.
 
+### Entry-point metadata for later adapter synthesis
+
+A structural entry needs more than a function to emit. For example, an empty
+`SkyMiss.invoke(MissInput<SkyContext> input)` still needs a native adapter that supplies the
+payload and record described by `SkyContext`. Collecting those checked types during entry
+selection lets later IR lowering and adapter synthesis use them directly, without rediscovering
+the source interface requirements from the function body or signature.
+
+Both legacy and structural entries use the existing `EntryPoint` component. It references the
+selected AST `FuncDecl` through `m_funcDeclRef`; selecting `SkyMiss` makes that reference name
+`SkyMiss.invoke`. No new entry-point AST declaration is created. The PR adds two members to
+`EntryPoint`: `m_entryPointNameOverride`, for the generated shader name, and
+`m_structuralRayTracingInfo`, with this shape (initializers omitted):
+
+```cpp
+struct StructuralRayTracingEntryPointInfo
+{
+    StructuralRayTracingStageKind stageKind;
+    Type* stageType;
+    InterfaceDecl* stageInterface;
+    Type* contextType;
+    Type* payloadType;
+    Type* recordType;
+    Type* primitiveType;
+    Type* hitAttributesType;
+    Type* callableDataType;
+    StructuralRayTracingHitAttributesKind hitAttributesKind;
+};
+```
+
+The declaration is in `source/slang/slang-structural-ray-tracing.h`. Its pointers reference
+existing checked AST objects owned by the linkage; the record does not create new copies of
+those types.
+
+| Field               | Meaning                                                                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stageKind`         | The selected structural stage, such as `Miss`; the existing entry profile also retains the corresponding stage. `Count` leaves this metadata inactive for legacy entries. |
+| `stageType`         | The selected user struct, including any supplied generic arguments.                                                                                                       |
+| `stageInterface`    | The selected executable interface, such as `rt::IMissShader`, used for frontend stage-capability validation.                                                              |
+| `contextType`       | The type satisfying the stage's `Context` requirement.                                                                                                                    |
+| `payloadType`       | The checked payload type, currently filled for closest-hit, any-hit, and miss stages.                                                                                     |
+| `recordType`        | The checked shader-record type; `void` means no application record data.                                                                                                  |
+| `primitiveType`     | The hit primitive, retained for the frontend capability-propagation workaround tracked in [#13793](https://github.com/shader-slang/slang/issues/13793).                   |
+| `hitAttributesType` | The checked attributes type for a hit stage.                                                                                                                              |
+| `callableDataType`  | The callable-data type for a callable stage.                                                                                                                              |
+| `hitAttributesKind` | `Triangle`, `Curve`, or `Custom` for hit stages; `None` otherwise.                                                                                                        |
+
+For a miss entry with `SkyContext.Payload = ColorPayload` and `SkyContext.Record = void`, the
+record contains `Miss`, `SkyMiss`, `rt::IMissShader`, `SkyContext`, `ColorPayload`, and the checked
+`void` type. Primitive, attributes, and callable-data pointers remain null. The existing function
+reference identifies `SkyMiss.invoke`; the metadata does not store a second function reference.
+
+Walkthrough section 5.3 describes filling the associated-type fields in
+`_populateStructuralEntryPointInfo`, using ordinary checked conformance results. Section 5.4
+attaches the completed record through `initializeStructuralRayTracingEntryPoint`. The metadata
+setter clears `m_shaderParams`, the list used for shader-parameter layout, because the source input
+view is not a native shader parameter. This does not remove `input` from the AST function. Legacy
+entries retain the shader-parameter list collected from their source signature.
+
+During AST-to-IR lowering, `_lowerStructuralRayTracingEntryPointInfo` converts the relevant type
+references to IR types and attaches an `IRStructuralRayTracingEntryPointInfoDecoration` to the
+selected implementation. The IR form also stores the source type name and type identity;
+`stageInterface` and `primitiveType` remain frontend validation inputs. Missing type operands
+become IR `void`. Section 6.2 describes this handoff. Native adapter synthesis is deferred: the
+metadata preserves the types that the future pass needs to supply payload, record, and attribute
+access through a target's native shader signature and bindings.
+
 Entry-point lookup first tries the ordinary function name. If that fails and
 `-experimental-feature` is enabled, it tries the structural stage type. A temporary diagnostic
 sink holds only the function-not-found diagnostic until the structural fallback has either
