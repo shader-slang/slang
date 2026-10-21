@@ -3420,13 +3420,13 @@ static IRTypeLayout* _createArrayTypeLayoutWithElement(
         auto oldArraySizeAttr = oldArrayTypeLayout->findSizeAttr(kind);
         if (!oldArraySizeAttr)
         {
-            // The array has no usage for a kind its element uses only when it holds no elements,
-            // or when it is an unbounded array of structs. The latter moves this kind into a
-            // whole register space per field (`SubElementRegisterSpace`), so the new array fills
-            // its space the way a plain `Texture2D textures[]` does.
-            newSize = oldArrayTypeLayout->findSizeAttr(LayoutResourceKind::SubElementRegisterSpace)
-                          ? LayoutSize::infinite()
-                          : LayoutSize(0);
+            // Only an unbounded array of structs drops a kind its element uses: it moves the kind
+            // into a whole register space per field (`SubElementRegisterSpace`), so the new array
+            // fills its space the way a plain `Texture2D textures[]` does. Zero-length arrays are
+            // removed by `legalizeEmptyArray` before this pass.
+            SLANG_RELEASE_ASSERT(
+                oldArrayTypeLayout->findSizeAttr(LayoutResourceKind::SubElementRegisterSpace));
+            newSize = LayoutSize::infinite();
         }
         else if (!oldArraySizeAttr->getSize().isFinite() || !oldElementSize.isFinite())
         {
@@ -3500,8 +3500,7 @@ static IRTypeLayout* _wrapFieldTypeLayoutInParentArrays(
 ///
 /// The struct case is only reached through an enclosing parameter group, which masks the
 /// struct's ordinary bytes, so it returns only the resource usage of the fields that stay. Those
-/// can still hold resources: a nested `ConstantBuffer<Q>` field stays in the group's element
-/// when `Q` is itself split.
+/// can still use other kinds: an interface-typed field `IFoo f` keeps its existential slots.
 ///
 static IRTypeLayout* _createOrdinaryPartTypeLayout(
     IRBuilder* irBuilder,
@@ -3608,8 +3607,12 @@ static IRTypeLayout* _createOrdinaryPartTypeLayout(
     }
 
     // A pointer field such as `Inner* p` is also split when `Inner` holds resources, but the
-    // pointer is laid out as an address and has no resource usage to remove.
-    SLANG_RELEASE_ASSERT(as<IRPointerTypeLayout>(typeLayout));
+    // pointer is laid out as an address and has no resource usage to remove. An existential
+    // field specialized to a type with resources, such as `IFoo f` bound to
+    // `struct Impl : IFoo { float4 v; Texture2D t; }`, is split the same way; its layout
+    // records the existential slots, which stay with the ordinary part.
+    SLANG_RELEASE_ASSERT(
+        as<IRPointerTypeLayout>(typeLayout) || as<IRExistentialTypeLayout>(typeLayout));
     return typeLayout;
 }
 
