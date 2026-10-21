@@ -228,7 +228,8 @@ jobs:
               mkdir -p build
               printf '%s\n' \
                 'foreach(lang C CXX)' \
-                '  string(REPLACE "/Ob0" "/Ob2" CMAKE_${lang}_FLAGS_DEBUG "${CMAKE_${lang}_FLAGS_DEBUG}")' \
+                '  string(REGEX REPLACE "/Ob[0-9]" "" CMAKE_${lang}_FLAGS_DEBUG "${CMAKE_${lang}_FLAGS_DEBUG}")' \
+                '  string(APPEND CMAKE_${lang}_FLAGS_DEBUG " /Ob2")' \
                 'endforeach()' \
                 >build/ci-debug-inline.cmake
               cmake_debug_defines+=("-DCMAKE_PROJECT_INCLUDE=$(pwd)/build/ci-debug-inline.cmake")
