@@ -12,8 +12,9 @@
 namespace Slang
 {
 
-// Is `bitcast<halfType>(otherType)` one of WGSL's direct f16 vector bitcasts:
-// `vec2<f16>` <-> 32-bit scalar, or `vec4<f16>` <-> `vec2` of 32-bit values?
+// Is `halfType` a `vec2<f16>` and `otherType` a 32-bit scalar, or `halfType` a `vec4<f16>` and
+// `otherType` a `vec2` of 32-bit values? WGSL's `bitcast` converts directly between those shapes
+// in both directions, so the caller checks the bitcast's types in both orders.
 static bool isWGSLHalfVectorBitCast(IRType* halfType, IRType* otherType)
 {
     auto halfVectorType = as<IRVectorType>(halfType);
@@ -397,7 +398,7 @@ struct BitCastLoweringContext
         // WGSL's `bitcast` converts directly between `vec2<f16>` and a 32-bit scalar, and
         // between `vec4<f16>` and a two-element vector of 32-bit values. Keep those as they are:
         // lowering them would go through 16-bit integers, which WGSL does not have.
-        if (fromTypeSize.size == toTypeSize.size && isWGPUTarget(targetProgram->getTargetReq()) &&
+        if (isWGPUTarget(targetProgram->getTargetReq()) &&
             (isWGSLHalfVectorBitCast(fromType, toType) ||
              isWGSLHalfVectorBitCast(toType, fromType)))
             return;

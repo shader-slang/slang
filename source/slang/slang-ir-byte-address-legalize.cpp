@@ -727,11 +727,12 @@ struct ByteAddressBufferLegalizationContext
                     // in element 0, and on `lowerBitCast` leaving that bitcast intact on WGPU
                     // targets (see `isWGSLHalfVectorBitCast`); otherwise it would be split back
                     // into 16-bit integers.
+                    SLANG_ASSERT(
+                        m_options.lowerBasicTypeOps && !m_options.translateToStructuredBufferOps);
                     auto offset = emitOffsetAddIfNeeded(baseOffset, immediateOffset);
                     auto shifted = emitLoadContainingWordShifted(buffer, offset);
-                    auto halfPair = m_builder.emitBitCast(
-                        m_builder.getVectorType(m_builder.getBasicType(BaseType::Half), 2),
-                        shifted);
+                    auto halfPair =
+                        m_builder.emitBitCast(m_builder.getVectorType(basicType, 2), shifted);
                     return m_builder.emitElementExtract(halfPair, (IRIntegerValue)0);
                 }
                 if (auto unsignedType = getSameSizeUIntType(basicType))
@@ -999,7 +1000,11 @@ struct ByteAddressBufferLegalizationContext
     }
 
     // Loads the 32-bit word that contains the byte at `offset` and shifts it right so that this
-    // byte is the lowest byte of the result. Loads of values smaller than 4 bytes start here.
+    // byte is the lowest byte of the result; the bits above hold the following bytes of the same
+    // word, then zeros. Loads of values smaller than 4 bytes start here. The value at `offset` must
+    // fit inside the containing word, i.e. a 2-byte value must be at a 2-byte aligned offset.
+    // Callers that mask the result read only the low bytes; the `half` load reads element 0 of
+    // the result bit-cast to `vector<half, 2>`, which is the low 16 bits.
     IRInst* emitLoadContainingWordShifted(IRInst* buffer, IRInst* offset)
     {
         auto offsetType = offset->getDataType();

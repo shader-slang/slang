@@ -11,9 +11,9 @@
 // CHECK-NOT: {{error\[E[0-9]+\]}}
 // CHECK-DAG: bitcast<vec2<f16>>(
 // CHECK-DAG: bitcast<vec4<f16>>(
-// CHECK-DAG: bitcast<u32>(
-// CHECK-DAG: bitcast<i32>(
-// CHECK-DAG: bitcast<f32>(
+// CHECK-DAG: bitcast<u32>(vec2<f16>(
+// CHECK-DAG: bitcast<i32>(vec2<f16>(
+// CHECK-DAG: bitcast<f32>(vec2<f16>(
 // CHECK-DAG: bitcast<vec2<u32>>(
 // CHECK-NOT: {{error\[E[0-9]+\]}}
 // TINT: OpEntryPoint
