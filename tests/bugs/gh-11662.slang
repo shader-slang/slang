@@ -2,9 +2,10 @@
 //
 // A single-module `-O0 -target spirv` compile needs no downstream (slang-glslang /
 // SPIRV-Tools) work: there is nothing to optimize, no second module to link, and validation is
-// off. (Separate debug info does not change this; see
-// tests/spirv/separate-debug-without-spirv-opt.slang.) The SPIR-V backend now skips loading the
-// `slang-glslang` module in that case and emits the natively generated module directly.
+// off. The SPIR-V backend does not require the `slang-glslang` module in that case and emits the
+// natively generated module directly. Separate debug info needs no downstream pass either (see
+// tests/spirv/separate-debug-without-spirv-opt.slang), although its build-identifier hash may
+// still probe `slang-glslang` for a version.
 //
 // This test guards that the `-O0 -target spirv` code path still produces a complete, valid
 // compute module after that gating change. (It cannot exercise the "module physically

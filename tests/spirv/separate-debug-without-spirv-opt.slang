@@ -36,7 +36,7 @@
 
 // BAD_PASS: result code = {{-?[1-9][0-9]*}}
 // BAD_PASS-NOT: E00113
-// BAD_PASS: separate-debug-without-spirv-opt-bogus-pass
+// BAD_PASS: spirv-opt{{.*}}error{{.*}}separate-debug-without-spirv-opt-bogus-pass
 // BAD_PASS-NOT: E00113
 
 RWStructuredBuffer<uint> output;
