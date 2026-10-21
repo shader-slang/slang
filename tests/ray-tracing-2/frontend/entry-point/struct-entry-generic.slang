@@ -21,6 +21,7 @@ struct MissContext<PayloadType> : rt::IPayloadContext
 }
 
 // `M<P>` chooses `P` for `PayloadType`. The `-no-codegen` test checks that this succeeds.
+// Selecting `M` and then supplying `-specialize P` is deferred to #13800.
 struct M<PayloadType> : rt::IMissShader
 {
     typealias Context = MissContext<PayloadType>;

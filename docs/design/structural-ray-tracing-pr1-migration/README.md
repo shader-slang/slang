@@ -4,7 +4,7 @@ This report describes the changes the full implementation and demos need to adop
 [PR1](https://github.com/kaizhangNV/slang/pull/24).
 
 Reference: the current PR1 source and the shared-table design documented in this report and
-the accompanying source comments. Updated on 2026-10-14. The full implementation comparison point
+the accompanying source comments. Updated on 2026-10-20. The full implementation comparison point
 is `f96ab27c0` from [PR #12691](https://github.com/shader-slang/slang/pull/12691). The shared Metal
 layout is agreed design; its backend implementation is deferred.
 
@@ -296,6 +296,15 @@ once and calls `initializeStructuralRayTracingEntryPoint` in the RT checker to a
 metadata and name overrides when needed, then calls `validateEntryPoint`. The structural finder
 also supplies the stage selected by conformance; native entries resolve their stage through the
 usual function attributes.
+
+Generic entry selection is incomplete. A concrete name such as `-entry "M<Payload,4>"` works,
+but `-entry M -specialize Payload -specialize 4` currently fails during lookup. Supporting separate
+arguments through the CLI and compilation API is deferred to the front-end follow-up
+[#13800](https://github.com/shader-slang/slang/issues/13800). The fix must specialize the enclosing
+struct and retain that substitution on `invoke`, its stage/context/payload/record types, and any
+primitive-dependent target requirements. Recognizing the bare generic name alone is insufficient.
+This is an implementation gap; generic stage structs should follow ordinary entry-point
+specialization semantics. Section 5.1 of the review walkthrough remains incomplete for this path.
 
 Ordinary conformance checking already validates the selected `invoke` signature. At the start
 of `validateEntryPoint`, structural entries collect the implementation and primitive requirements,

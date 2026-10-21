@@ -1086,6 +1086,9 @@ void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink)
 // For example, a struct implementing both IMissShader and ICallableShader needs `-stage miss`
 // or `-stage callable`; a struct implementing only IMissShader can omit the explicit stage.
 // The selected witness supplies the exact generic invoke implementation and all ABI types.
+// Generic stages currently need arguments in the entry name, for example `-entry "M<P>"`.
+// TODO(#13800): Support separate CLI/API specialization while keeping invoke, its stage contract,
+// and target validation consistent with the concrete arguments.
 DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     Linkage* linkage,
     Module* module,
