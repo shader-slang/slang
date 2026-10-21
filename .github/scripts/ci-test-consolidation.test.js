@@ -1,4 +1,12 @@
-// Exercise the actual workflow commands without a GPU or downloaded build.
+// Protect one invocation with one -api option, enabled independent compile steps,
+// the Windows API union and PR-only via-GLSL pass, separate Linux CPU/GPU masks,
+// capability-specific roots/skip lists, and aggregate-gate failure handling.
+// Execute the actual workflow commands without a GPU or downloaded build.
+//
+// This is an indentation-based extractor, not a general YAML parser: job keys
+// have two spaces, named steps six, and run: | scripts ten. Conditions occupy
+// one line and use the boolean expressions supported by stepRuns below. Shell
+// rendering supports only inputs.* expressions; others fail before Bash runs.
 // Run with: node .github/scripts/ci-test-consolidation.test.js
 "use strict";
 
@@ -13,7 +21,8 @@ const workflow = (name) =>
   fs.readFileSync(path.join(root, ".github/workflows", name), "utf8");
 const ci = workflow("ci.yml");
 
-function job(id) {
+// Return the raw caller block from ci.yml, excluding the following job.
+function getJobText(id) {
   const start = ci.indexOf(`  ${id}:\n`);
   assert.notEqual(start, -1, `missing job ${id}`);
   const rest = ci.slice(start + 1);
@@ -21,7 +30,8 @@ function job(id) {
   return end < 0 ? rest : rest.slice(0, end);
 }
 
-function step(text, name) {
+// Return the named step's raw metadata and body from a reusable workflow.
+function getStepText(text, name) {
   const start = text.indexOf(`      - name: ${name}\n`);
   assert.notEqual(start, -1, `missing step ${name}`);
   const rest = text.slice(start);
@@ -29,8 +39,9 @@ function step(text, name) {
   return end < 0 ? rest : rest.slice(0, end);
 }
 
-function script(text, name) {
-  const source = step(text, name);
+// Extract and dedent a literal run: | body; folded run: > blocks are unsupported.
+function getStepScript(text, name) {
+  const source = getStepText(text, name);
   const run = source.indexOf("        run: |\n");
   assert.notEqual(run, -1, `missing literal script for ${name}`);
   return source
@@ -44,7 +55,7 @@ function script(text, name) {
 // Evaluate the actual expression with successful preceding steps; bracket input
 // lookups accommodate Actions input names containing hyphens.
 function stepRuns(text, name, inputs, event) {
-  const condition = step(text, name).match(/^        if: (.+)$/m);
+  const condition = getStepText(text, name).match(/^        if: (.+)$/m);
   assert.ok(condition, `missing condition for ${name}`);
   const expression = condition[1].replace(
     /inputs\.([\w-]+)/g,
@@ -61,11 +72,20 @@ function stepRuns(text, name, inputs, event) {
   );
 }
 
-function render(source, inputs) {
-  return source.replace(/\$\{\{ inputs\.([\w-]+) \}\}/g, (_, key) => {
-    assert.ok(key in inputs, `unprovided workflow input ${key}`);
-    return String(inputs[key]);
-  });
+// Substitute supplied inputs and reject expressions this harness cannot render.
+function renderWorkflowInputs(source, inputs) {
+  const rendered = source.replace(
+    /\$\{\{\s*inputs\.([\w-]+)\s*\}\}/g,
+    (_, key) => {
+      assert.ok(key in inputs, `unprovided workflow input ${key}`);
+      return String(inputs[key]);
+    },
+  );
+  assert.ok(
+    !rendered.includes("${{"),
+    "Unsupported workflow expression in step script",
+  );
+  return rendered;
 }
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ci-consolidation-"));
@@ -76,8 +96,9 @@ try {
     '#!/usr/bin/env node\nrequire("fs").appendFileSync(process.env.CAPTURE, JSON.stringify(process.argv.slice(2)) + "\\n");\n',
     { mode: 0o755 },
   );
-  function run(source, inputs, extraEnv = {}) {
-    const shell = render(source, inputs);
+  // Check Bash syntax, execute the rendered body, and return its process result.
+  function runStepScript(source, inputs, extraEnv = {}) {
+    const shell = renderWorkflowInputs(source, inputs);
     const syntax = spawnSync("/bin/bash", ["-n"], {
       input: shell,
       encoding: "utf8",
@@ -90,9 +111,10 @@ try {
     });
     return result;
   }
-  function command(source, inputs, extraEnv) {
+  // Execute a step and return its single captured argv after checking API policy.
+  function runAndCaptureSlangTestArgs(source, inputs, extraEnv) {
     fs.writeFileSync(capture, "");
-    const result = run(source, inputs, extraEnv);
+    const result = runStepScript(source, inputs, extraEnv);
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const records = fs
       .readFileSync(capture, "utf8")
@@ -114,7 +136,7 @@ try {
   const container = workflow("ci-slang-test-container.yml");
   for (const config of ["debug", "release"]) {
     const id = `test-windows-${config}-cl-x86_64-gpu`;
-    const caller = job(id);
+    const caller = getJobText(id);
     assert.match(caller, /api: dx11\+dx12\+wgpu\+vk\+cuda\+cpu\+llvm/);
     assert.match(caller, /run-via-glsl: true/);
     const inputs = {
@@ -155,9 +177,13 @@ try {
         );
       }
     }
-    const args = command(script(ordinary, "Test Slang"), inputs, {
-      API_INPUT: "dx11+dx12+wgpu+vk+cuda+cpu+llvm",
-    });
+    const args = runAndCaptureSlangTestArgs(
+      getStepScript(ordinary, "Test Slang"),
+      inputs,
+      {
+        API_INPUT: "dx11+dx12+wgpu+vk+cuda+cpu+llvm",
+      },
+    );
     assert.equal(
       args[args.indexOf("-api") + 1],
       "dx11+dx12+wgpu+vk+cuda+cpu+llvm",
@@ -167,24 +193,30 @@ try {
       args.includes("tests/skip-list-debug.txt"),
       config === "debug",
     );
-    const via = command(script(ordinary, "Test Slang via glsl"), inputs);
+    const via = runAndCaptureSlangTestArgs(
+      getStepScript(ordinary, "Test Slang via glsl"),
+      inputs,
+    );
     assert.equal(via[via.indexOf("-api") + 1], "vk");
     assert.ok(via.includes("-emit-spirv-via-glsl"));
-    assert.match(job("check-ci"), new RegExp(`        ${id},`));
+    assert.match(getJobText("check-ci"), new RegExp(`        ${id},`));
     for (const api of ["dx", "vk", "cuda"])
       assert.ok(!ci.includes(`${id}-${api}:`));
     console.log(
       `PASS Windows ${config}: one combined main and one via-GLSL pass`,
     );
   }
-  assert.match(job("test-windows-debug-cl-x86_64-gpu"), /timeout-minutes: 120/);
-  const cpuCaller = job("test-linux-release-gcc-x86_64-cpu");
+  assert.match(
+    getJobText("test-windows-debug-cl-x86_64-gpu"),
+    /timeout-minutes: 120/,
+  );
+  const cpuCaller = getJobText("test-linux-release-gcc-x86_64-cpu");
   assert.match(cpuCaller, /runs-on: '\["ubuntu-24.04"\]'/);
   assert.match(cpuCaller, /cpu-only: true/);
   assert.match(cpuCaller, /slang-user-skills: true/);
   assert.match(cpuCaller, /server-count: 4/);
-  const cpuArgs = command(
-    script(ordinary, "Test Slang"),
+  const cpuArgs = runAndCaptureSlangTestArgs(
+    getStepScript(ordinary, "Test Slang"),
     {
       os: "linux",
       config: "release",
@@ -203,11 +235,14 @@ try {
   );
   for (const config of ["debug", "release"]) {
     for (const tier of ["t4", "sm80plus"]) {
-      const args = command(script(container, "Test Slang"), {
-        config,
-        "server-count": 8,
-        "gpu-tier": tier,
-      });
+      const args = runAndCaptureSlangTestArgs(
+        getStepScript(container, "Test Slang"),
+        {
+          config,
+          "server-count": 8,
+          "gpu-tier": tier,
+        },
+      );
       const apis = args[args.indexOf("-api") + 1].split("+");
       for (const api of ["vk", "cuda"]) assert.ok(apis.includes(api));
       for (const api of ["cpu", "llvm"]) assert.ok(!apis.includes(api));
@@ -222,16 +257,16 @@ try {
       );
     }
   }
-  assert.match(job("test-linux-release-gcc-x86_64-sm80"), /"SM80Plus"/);
+  assert.match(getJobText("test-linux-release-gcc-x86_64-sm80"), /"SM80Plus"/);
   for (const id of [
     "test-linux-debug-gcc-x86_64",
     "test-linux-release-gcc-x86_64",
     "test-linux-release-gcc-x86_64-sm80",
     "test-linux-release-gcc-x86_64-cpu",
   ])
-    assert.match(job("check-ci"), new RegExp(`        ${id},`));
+    assert.match(getJobText("check-ci"), new RegExp(`        ${id},`));
 
-  const gate = script(ci, "Check CI Results");
+  const gate = getStepScript(ci, "Check CI Results");
   const required = [
     "test-windows-debug-cl-x86_64-gpu",
     "test-windows-release-cl-x86_64-gpu",
@@ -247,7 +282,7 @@ try {
         { result: name === failing ? "failure" : "success" },
       ]),
     );
-    const result = run(
+    const result = runStepScript(
       gate,
       {},
       {
@@ -262,7 +297,7 @@ try {
     required.map((name) => [name, { result: "skipped" }]),
   );
   assert.equal(
-    run(
+    runStepScript(
       gate,
       {},
       {
@@ -274,7 +309,7 @@ try {
     0,
   );
   assert.equal(
-    run(
+    runStepScript(
       gate,
       {},
       {
