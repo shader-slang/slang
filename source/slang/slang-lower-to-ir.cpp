@@ -5665,9 +5665,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                             i = addr.val;
                         else
                         {
+                            // We diagnose an error, which stops compilation after IR
+                            // generation; until then we use a poison pointer operand so
+                            // the IR has no null operands.
                             context->getSink()->diagnose(
                                 Diagnostics::NoSuchAddress{.location = operand.expr->loc});
-                            return nullptr;
+                            i = builder->getPoison(
+                                builder->getPtrType(lowerType(context, operand.expr->type)));
                         }
                     }
                     return builder->emitSPIRVAsmOperandInst(i);
