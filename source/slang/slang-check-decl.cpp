@@ -22121,8 +22121,13 @@ struct CapabilityDeclReferenceVisitor
         // must retain MetalOnly's requirements without repeatedly visiting Self.
         if (auto structDecl = as<StructDecl>(decl); includeTypeAliasDependencies && structDecl)
         {
-            for (auto typeAlias : structDecl->getMembersOfType<TypeDefDecl>())
+            // A generic alias such as `typealias Element<U> = MetalElement<U>` is
+            // wrapped in GenericDecl, so its inner declaration identifies the alias.
+            for (auto member : structDecl->getDirectMemberDecls())
             {
+                auto typeAlias = as<TypeDefDecl>(maybeGetInner(member));
+                if (!typeAlias)
+                    continue;
                 typename Base::PushSourceLocRAII sourceLocRAII(
                     Base::sourceLocStack,
                     typeAlias->loc);
