@@ -4776,6 +4776,7 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
                 if (result)
                 {
                     auto parentNamespace = as<NamespaceDecl>(parentDecl);
+                    SLANG_ASSERT(parentNamespace);
                     parser->PushScope(parentNamespace);
                     nestedNamespaceDecls.add(parentNamespace);
                 }
