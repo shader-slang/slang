@@ -1619,8 +1619,8 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
-// Return whether `inst` writes only the texel data of a texture.
-static bool doesInstOnlyWriteTexelMemory(IRInst* inst)
+// Return whether `inst` can reach no memory other than the texel data of a texture.
+static bool doesInstOnlyTouchTexelMemory(IRInst* inst)
 {
     switch (inst->getOp())
     {
@@ -1639,9 +1639,12 @@ bool canInstHaveSideEffectAtAddress(
     IRInst* addr,
     Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
-    // A texel holds scalar or vector data, never a resource handle, so a write that only reaches
-    // texel memory cannot change a location that holds resources.
-    if (doesInstOnlyWriteTexelMemory(inst))
+    // A texel holds scalar or vector data, never a resource handle, on every target, so an
+    // instruction that touches only texel memory cannot change a location that holds resources.
+    // `simplifyForEmit` relies on this to re-load a texture-array element next to each of its
+    // uses: on Metal, the `ImageStore` and the fences around it all name `getElement(load(arr),
+    // i)`, and without this rule the emitter would copy the whole array of handles into a local.
+    if (doesInstOnlyTouchTexelMemory(inst))
     {
         auto ptrType = as<IRPtrTypeBase>(addr->getDataType());
         if (ptrType && isResourceType(ptrType->getValueType()))
