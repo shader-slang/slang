@@ -4259,6 +4259,13 @@ static bool _mayAliasedArgumentsInterfere(ParamPassingMode first, ParamPassingMo
         !_mayParamBeReferenceToArgumentStorage(second))
         return false;
 
+    // A function that declares two reference parameters has opted into reference semantics for
+    // both, so we assume it handles their aliasing. A borrow, `out`, or `inout` parameter has value
+    // semantics that the target may implement by reference, so pairing one with any parameter that
+    // may write the storage still warns.
+    if (isByReferenceParamPassingMode(first) && isByReferenceParamPassingMode(second))
+        return false;
+
     // Both parameters may be references to the same storage. Two read-only references
     // (`ref_readonly`, `borrow`, `constref`) cannot change it, but a write through either one
     // makes the result depend on how the target passed them. Consider this example:

@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
-// Test that passing the same variable to multiple out/inout/ref parameters
+// Test that passing the same variable to multiple out/inout parameters
 // produces a warning about potential aliasing (issue #10699).
 
 void addConsumeTwoValues(
@@ -118,10 +118,9 @@ void computeMain()
     // because the `in` parameter is a copy taken before the call.
     inAndInout(a, a);
 
-    // Positive: same variable to two ref params.
+    // Negative: same variable to two ref params — no warning expected, because a
+    // function with two reference parameters has opted into reference semantics.
     twoRef(a, a);
-//CHECK:   ^ potentially aliased argument to a parameter that may be written
-//CHECK:   ^ argument for 'ref' parameter 'a' may alias argument for 'ref' parameter 'b'; passing the same value to both may produce unexpected results
 
     // Positive: identical struct field to two inout params.
     S s;

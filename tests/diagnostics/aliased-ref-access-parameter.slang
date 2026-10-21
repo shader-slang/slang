@@ -4,7 +4,8 @@
 // parameter is named by the keyword of its passing mode, so a read-only or write-only reference
 // is not reported as a plain `ref`. Every mode except `in` may refer to the argument's storage,
 // because the compiler may pass `out`, `inout`, and borrow parameters by reference. Two such
-// parameters warn if at least one may write the storage; an `in` parameter never warns.
+// parameters warn if at least one may write the storage, unless both are reference parameters,
+// whose function has opted into reference semantics. An `in` parameter never warns.
 
 void readOnlyAndRef(__ref_readonly int a, __ref int b)
 {
@@ -20,6 +21,11 @@ void writeOnlyAndWriteOnly(__ref_writeonly int a, __ref_writeonly int b)
 {
     a = 1;
     b = 2;
+}
+
+void refAndRef(__ref int a, __ref int b)
+{
+    a = b;
 }
 
 void borrowAndRef(__borrow int a, __ref int b)
@@ -107,18 +113,6 @@ void test()
 {
     int x = 0;
 
-    readOnlyAndRef(x, x);
-//CHECK:              ^ potentially aliased argument to a parameter that may be written
-//CHECK:              ^ argument for 'ref' parameter 'b' may alias argument for 'ref_readonly' parameter 'a'
-
-    writeOnlyAndReadOnly(x, x);
-//CHECK:                 ^ potentially aliased argument to a parameter that may be written
-//CHECK:                 ^ argument for 'ref_writeonly' parameter 'a' may alias argument for 'ref_readonly' parameter 'b'
-
-    writeOnlyAndWriteOnly(x, x);
-//CHECK:                  ^ potentially aliased argument to a parameter that may be written
-//CHECK:                  ^ argument for 'ref_writeonly' parameter 'a' may alias argument for 'ref_writeonly' parameter 'b'
-
     borrowAndRef(x, x);
 //CHECK:            ^ potentially aliased argument to a parameter that may be written
 //CHECK:            ^ argument for 'ref' parameter 'b' may alias argument for 'borrow' parameter 'a'
@@ -147,6 +141,10 @@ void test()
 //CHECK:            ^ potentially aliased argument to a parameter that may be written
 //CHECK:            ^ argument for 'out' parameter 'b' may alias argument for 'borrow' parameter 'a'
 
+    readOnlyAndRef(x, x);
+    writeOnlyAndReadOnly(x, x);
+    writeOnlyAndWriteOnly(x, x);
+    refAndRef(x, x);
     readOnlyAndReadOnly(x, x);
     borrowAndReadOnly(x, x);
     readOnlyAndIn(x, x);
