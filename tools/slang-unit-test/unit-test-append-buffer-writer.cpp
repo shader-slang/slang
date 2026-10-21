@@ -15,8 +15,10 @@
 //   * ReentrantWrite: a write() that appends to its own writer gets a separate buffer.
 //   * InterleavedWriters: one thread can have a buffer open on several writers at once.
 //   * SharedBetweenThreads: threads sharing one writer fill separate buffers.
-//   * EndWithoutBegin: an end with no begin on the calling thread fails without writing.
-//   * PrintFromThreadExit: a writer is still usable from a destructor run at thread exit.
+//   * EndWithoutBegin: an end without a matching begin on the calling thread fails without
+//     writing.
+//   * PrintFromThreadExit, ReentrantWriteFromThreadExit: a writer is still usable, including
+//     from a re-entrant write, in a destructor run at thread exit.
 //
 // A regression in the skipped-end and re-entrant cases shows up as a deadlock, so those bodies
 // run on another thread with a timed wait. On a timeout the test fails and the thread is
@@ -254,9 +256,9 @@ SLANG_UNIT_TEST(appendBufferWriterInterleavedWriters)
     const Index kWriterCount = SLANG_COUNT_OF(texts);
 
     // Each writer allows one active append buffer, so one thread may have a buffer open on each
-    // of several writers at once. Later buffers are larger, so sharing storage would reallocate
-    // an earlier one. Ending them in the order they were begun makes each removal move a live
-    // entry into the removed one's place.
+    // of several writers at once. The second buffer is larger than the first, so sharing storage
+    // would reallocate the first. Ending them in the order they were begun makes the first
+    // removal move a live entry into the removed one's place.
     List<RefPtr<RecordingWriter>> writers;
     List<char*> buffers;
     for (Index i = 0; i < kWriterCount; ++i)
@@ -326,14 +328,7 @@ SLANG_UNIT_TEST(appendBufferWriterSharedBetweenThreads)
     }
     records.sort();
     expected.sort();
-
-    Index mismatchCount = 0;
-    for (Index i = 0; i < records.getCount(); ++i)
-    {
-        if (!(records[i] == expected[i]))
-            ++mismatchCount;
-    }
-    SLANG_CHECK(mismatchCount == 0);
+    SLANG_CHECK(records == expected);
 }
 
 SLANG_UNIT_TEST(appendBufferWriterEndWithoutBegin)
@@ -350,6 +345,18 @@ SLANG_UNIT_TEST(appendBufferWriterEndWithoutBegin)
     SlangResult otherThreadResult = SLANG_OK;
     std::thread([&]() { otherThreadResult = writer->endAppendBuffer(buffer, 4); }).join();
     SLANG_CHECK(otherThreadResult == SLANG_E_INVALID_ARG);
+
+    // The other thread fails the same way when it has an abandoned buffer of its own on the
+    // writer.
+    otherThreadResult = SLANG_OK;
+    std::thread(
+        [&]()
+        {
+            writer->beginAppendBuffer(2);
+            otherThreadResult = writer->endAppendBuffer(buffer, 4);
+        })
+        .join();
+    SLANG_CHECK(otherThreadResult == SLANG_E_INVALID_ARG);
     SLANG_CHECK(SLANG_SUCCEEDED(writer->endAppendBuffer(buffer, 4)));
 
     List<String> records = writer->getRecords();
@@ -359,8 +366,9 @@ SLANG_UNIT_TEST(appendBufferWriterEndWithoutBegin)
 
 namespace
 {
-/// Prints to `writer` from its destructor. As a thread_local constructed before the thread's
-/// first append buffer, it is destroyed after the writers' per-thread state at thread exit.
+/// Prints to `writer` from its destructor. Thread_locals are destroyed in the reverse order of
+/// their construction, so one constructed before the thread's first append buffer is destroyed
+/// after the writers' per-thread state at thread exit.
 struct PrintsOnThreadExit
 {
     RecordingWriter* writer = nullptr;
@@ -387,5 +395,46 @@ SLANG_UNIT_TEST(appendBufferWriterPrintFromThreadExit)
     List<String> records = writer->getRecords();
     SLANG_CHECK_ABORT(records.getCount() == 2);
     SLANG_CHECK(records[0] == "in thread 1");
+    SLANG_CHECK(records[1] == "thread exit 1");
+}
+
+namespace
+{
+/// Prints to a `ReentrantWriter` from its destructor at thread exit, so the nested print inside
+/// `write` runs after the thread's per-thread state has been destroyed.
+struct ReentrantPrintOnThreadExit
+{
+    ReentrantWriter* writer = nullptr;
+    ~ReentrantPrintOnThreadExit()
+    {
+        if (writer)
+            WriterHelper(writer).print("thread exit %d", 1);
+    }
+};
+} // namespace
+
+SLANG_UNIT_TEST(appendBufferWriterReentrantWriteFromThreadExit)
+{
+    List<String> records;
+    const bool finished = runWithTimeout(
+        []()
+        {
+            RefPtr<ReentrantWriter> writer = new ReentrantWriter();
+            std::thread(
+                [&]()
+                {
+                    thread_local ReentrantPrintOnThreadExit printsOnExit;
+                    printsOnExit.writer = writer;
+                    RefPtr<RecordingWriter> other = new RecordingWriter();
+                    WriterHelper(other).print("in thread %d", 1);
+                })
+                .join();
+            return writer->getRecords();
+        },
+        records);
+
+    SLANG_CHECK_ABORT(finished);
+    SLANG_CHECK_ABORT(records.getCount() == 2);
+    SLANG_CHECK(records[0] == "inner note 1");
     SLANG_CHECK(records[1] == "thread exit 1");
 }
