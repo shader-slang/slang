@@ -221,6 +221,20 @@ jobs:
               exit 1
             fi
 
+            # CI-only: Windows debug builds use `/Ob2` (about 1.23x faster
+            # tests) and a 16 MB stack, as inlining at `/Od` overflows 1 MB.
+            cmake_debug_defines=()
+            if [[ "$INPUT_OS" =~ "windows" && "$INPUT_CONFIG" == "debug" ]]; then
+              mkdir -p build
+              printf '%s\n' \
+                'foreach(lang C CXX)' \
+                '  string(REPLACE "/Ob0" "/Ob2" CMAKE_${lang}_FLAGS_DEBUG "${CMAKE_${lang}_FLAGS_DEBUG}")' \
+                'endforeach()' \
+                >build/ci-debug-inline.cmake
+              cmake_debug_defines+=("-DCMAKE_PROJECT_INCLUDE=$(pwd)/build/ci-debug-inline.cmake")
+              cmake_debug_defines+=("-DCMAKE_EXE_LINKER_FLAGS=/STACK:16777216")
+            fi
+
             if [[ "$INPUT_OS" =~ "windows" && "$INPUT_CONFIG" == "debug" && "$INPUT_BUILD_LLVM" != "false" ]]; then
               # A debug build would try to link against a release-built llvm,
               # which is a problem on Windows, so when llvm is wanted, build
@@ -234,6 +248,7 @@ jobs:
                 "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=$INPUT_WARNINGS_AS_ERRORS" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
+                "${cmake_debug_defines[@]}" \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "$INPUT_CONFIG"
             elif [[ "$INPUT_BUILD_LLVM" = "false" ]]; then
@@ -245,6 +260,7 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=$INPUT_WARNINGS_AS_ERRORS" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
+                "${cmake_debug_defines[@]}" \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "$INPUT_CONFIG"
             else
@@ -254,6 +270,7 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=$INPUT_WARNINGS_AS_ERRORS" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
+                "${cmake_debug_defines[@]}" \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "$INPUT_CONFIG"
             fi
