@@ -888,7 +888,6 @@ return {
 	["Type.RaytracingStageInterface.intersection_stage_interface"] = 912,
 	["Type.RaytracingStageInterface.miss_stage_interface"] = 913,
 	["Type.RaytracingStageInterface.callable_stage_interface"] = 914,
-	["Decoration.structuralRayTracingEntryPointInfo"] = 915,
 	["Decoration.structuralRayTracingSourceOperation"] = 916,
 	["Type.TraceProgramDescriptor"] = 917,
 	["metalTraceRay"] = 918

@@ -27,25 +27,6 @@ class MagicTypeModifier;
 /// declarations.
 bool isRayTracingBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl);
 
-/// Gives each associated-type requirement in the structural API a stable semantic role.
-///
-/// A KnownBuiltin annotation identifies each requirement on an ordinary interface. For example,
-/// the Record requirement is found through the selected context conformance even when another
-/// interface also declares a member named Record. Neither interface needs a special AST type.
-enum class StructuralRayTracingAssociatedTypeKind
-{
-    StageContext,
-    StageRecord,
-    PayloadContextPayload,
-    HitPrimitive,
-    PrimitiveAttributes,
-    CallableData,
-    ProgramHitGroups,
-    ProgramMissShaders,
-    ProgramCallableShaders,
-    Count,
-};
-
 /// Distinguishes structural shader declarations from legacy shader entry points.
 ///
 /// The frontend records the first shader declaration or stage-input use of each family per module
@@ -96,30 +77,11 @@ bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl
 /// Returns the stage named by the input struct's KnownBuiltin annotation, or Stage::Unknown.
 Stage getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl);
 
+/// Returns the stage identified by a KnownBuiltin role, or Stage::Unknown for other roles.
+Stage getStructuralRayTracingStageInputKind(KnownBuiltinDeclName builtin);
+
 /// Returns whether the function is an annotated structural callable operation.
 bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl);
-
-/// Returns the semantic role attached to an ordinary associated-type requirement.
-StructuralRayTracingAssociatedTypeKind getStructuralRayTracingAssociatedTypeKind(
-    AssocTypeDecl* requirement);
-
-/// Resolves an associated type through the exact supplied interface-conformance path.
-///
-/// Returns null if the interface and its inherited interfaces do not declare the requirement.
-/// An unresolved requirement remains an ordinary dependent type lookup.
-Type* resolveStructuralRayTracingAssociatedType(
-    ASTBuilder* astBuilder,
-    SubtypeWitness* witness,
-    StructuralRayTracingAssociatedTypeKind kind);
-
-/// Resolves the constraint on an associated type that supplies the required next member.
-/// For example, Context may have several bounds; resolving its Payload selects the bound
-/// whose checked interface facets declare the annotated Payload requirement.
-SubtypeWitness* resolveStructuralRayTracingAssociatedTypeConstraint(
-    ASTBuilder* astBuilder,
-    SubtypeWitness* witness,
-    StructuralRayTracingAssociatedTypeKind kind,
-    StructuralRayTracingAssociatedTypeKind requiredMember);
 
 /// Returns this executable interface's `invoke` requirement, or null for other interfaces.
 FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* interfaceDecl);
@@ -143,21 +105,18 @@ class EntryPoint;
 struct IRModule;
 struct IRFunc;
 
-/// Attaches the selected stage conformance and source/target names to a new entry point.
+/// Returns the checked compiler-supplied input type, or null when the signature has no such input.
+Type* getStructuralRayTracingEntryPointInputType(EntryPoint* entryPoint);
+
+/// Sets the public and target names for an entry point selected by its source stage type.
 void initializeStructuralRayTracingEntryPoint(
     EntryPoint* entryPoint,
     Name* entryPointName,
-    SubtypeWitness* stageWitness);
-
-/// Returns the source-stage capabilities, including synthesized structural stages.
-CapabilitySet getEntryPointStageCapabilities(EntryPoint* entryPoint);
+    Type* stageType);
 
 /// Returns the selected primitive's known capabilities for the #13793 typealias workaround.
 /// Dependent primitive types remain unresolved until specialization supplies their definition.
 CapabilitySet getStructuralRayTracingPrimitiveCapabilities(EntryPoint* entryPoint);
-
-/// Returns the public entry-point declaration used by capability diagnostics.
-Decl* getEntryPointCapabilityDiagnosticDecl(EntryPoint* entryPoint);
 
 /// Rejects structural source representations that remain before native ABI legalization.
 SlangResult diagnoseUnloweredStructuralRayTracing(

@@ -10,6 +10,7 @@
 #include "slang-ir-specialize-target-switch.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-translate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
@@ -538,11 +539,7 @@ IRGlobalVar* cloneGlobalVarImpl(
 /// that selected requirement, so preserve its capability and execution-mode decorations when
 /// choosing the source module's function body or specializing a generic body.
 ///
-/// Structural stage selection has the same shape. A cached source module can own the preferred
-/// definition of `MyMiss.invoke`, while the selected program owns its checked
-/// `structuralRayTracingEntryPointInfo`. Linking must merge that decoration onto the selected body
-/// so later adapter synthesis receives the semantic stage contract regardless of request order.
-/// Structural callable functions similarly retain their source-operation marker
+/// Structural callable functions retain their source-operation marker
 /// when a different module contributes the selected definition.
 ///
 /// This function scans through all the `originalValues` that were considered for `clonedInst`,
@@ -589,7 +586,6 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_NonCopyableTypeDecoration:
         case kIROp_DynamicDispatchWitnessDecoration:
         case kIROp_Shader64BitIndexingDecoration:
-        case kIROp_StructuralRayTracingEntryPointInfoDecoration:
         case kIROp_StructuralRayTracingSourceOperationDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {
@@ -1129,7 +1125,7 @@ static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* buil
     // A structural `invoke` parameter is a logical, compiler-owned stage-input view. Its native
     // parameters do not exist until a later pass synthesizes the target adapter, so copying an
     // entry-point layout onto this source signature would assign physical meaning too early.
-    if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+    if (hasStructuralRayTracingStageInput(func))
         return;
 
     auto layoutDecor = func->findDecoration<IRLayoutDecoration>();

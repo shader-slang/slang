@@ -57,18 +57,18 @@ rt::AccelerationStructure scene;
 rt::TraceProgramDescriptor<Schema> program;
 
 struct TestMiss : rt::IMissShader
-/*CHECK:
-       ^^^^^^^^ unavailable features in entry point
-       ^^^^^^^^ entrypoint 'TestMiss' uses features that are not available
-*/
-/*VERSION:
-       ^^^^^^^^ entry point uses capabilities not in specified profile
-       ^^^^^^^^ Missing capabilities are: 'metallib_2_4'
-*/
 {
     typealias Context = MissContext;
 
     static void invoke(rt::MissInput<Context> input)
+/*CHECK:
+                ^^^^^^ unavailable features in entry point
+                ^^^^^^ entrypoint 'invoke' uses features that are not available
+*/
+/*VERSION:
+                ^^^^^^ entry point uses capabilities not in specified profile
+                ^^^^^^ Missing capabilities are: 'metallib_2_4'
+*/
     {
         traceEnabled<Schema, Payload>(scene, program, input.payload);
 /*CHECK:

@@ -1,6 +1,7 @@
 #include "slang-ir-structural-ray-tracing.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 // Source annotations produce special AST types and operation metadata during ordinary checking.
 // AST-to-IR lowering preserves those identities with distinct interface opcodes and decorations;
@@ -28,17 +29,16 @@ IROp getStructuralRayTracingStageInterfaceOp(Stage kind)
     }
 }
 
-void addStructuralRayTracingEntryPointInfo(
-    IRBuilder& builder,
-    IRInst* entryPointValue,
-    IRInst* stageWitness)
+bool hasStructuralRayTracingStageInput(IRFunc* func)
 {
-    SLANG_RELEASE_ASSERT(entryPointValue && stageWitness);
-    SLANG_RELEASE_ASSERT(as<IRWitnessTableType>(stageWitness->getDataType()));
-    builder.addDecoration(
-        entryPointValue,
-        kIROp_StructuralRayTracingEntryPointInfoDecoration,
-        stageWitness);
+    for (auto paramType : func->getDataType()->getParamTypes())
+    {
+        auto inputType = getResolvedInstForDecorations(unwrapAttributedType(paramType));
+        auto builtin = inputType->findDecoration<IRKnownBuiltinDecoration>();
+        if (builtin && getStructuralRayTracingStageInputKind(builtin->getName()) != Stage::Unknown)
+            return true;
+    }
+    return false;
 }
 
 void addStructuralRayTracingSourceOperation(

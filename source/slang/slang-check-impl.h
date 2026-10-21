@@ -1208,18 +1208,6 @@ public:
         InheritanceCircularityInfo* circularityInfo = nullptr,
         HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
-    /// Project a checked `Self : Base` witness through `Base`'s interface inheritance.
-    ///
-    /// Consider a generic function that knows `T : IDerived`, where `IDerived : IBase`, while
-    /// the concrete `T` also has another direct `IBase` conformance. A fresh subtype query for
-    /// `T : IBase` is allowed to select that direct conformance. This operation instead preserves
-    /// the caller's supplied `T : IDerived` path and returns its corresponding `T : IBase`
-    /// witness. It returns null when the supplied witness is not rooted in an interface or the
-    /// target is not one of that interface's bases.
-    SubtypeWitness* tryProjectInterfaceSubtypeWitness(
-        SubtypeWitness* selfIsSubtypeOfBase,
-        Type* targetInterfaceType);
-
     /// Prevent an unsupported case of
     /// ```
     ///     extension<T:IFoo> : IBar{};
@@ -4379,7 +4367,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     Profile& ioProfile,
     DiagnosticSink* sink,
     bool* outFoundStruct,
-    SubtypeWitness** outStageWitness);
+    Type** outStageType);
 void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink);
 
 
@@ -4793,7 +4781,10 @@ bool getExtensionTargetDeclList(
     ExtensionDecl* extDeclRef,
     ShortList<AggTypeDecl*>& targetDecls);
 
-void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
+void validateEntryPoint(
+    EntryPoint* entryPoint,
+    DiagnosticSink* sink,
+    bool hasCheckedStageConformance = false);
 
 // Collect the requirements of a checked declaration reference, including its generic arguments.
 // Append contributing declarations to `outReferencedDecls` for use-site diagnostics without

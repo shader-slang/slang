@@ -1,6 +1,7 @@
 #include "slang-check-impl.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-util.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
@@ -96,46 +97,9 @@ static KnownBuiltinDeclName _getRayTracingBuiltin(Decl* declaration)
     return value ? KnownBuiltinDeclName(value->getValue()) : KnownBuiltinDeclName::COUNT;
 }
 
-// Finds a requirement in the interface supplied by the caller's witness and projects that same
-// witness to its owner. Consider `HitContext : IHitContext`, with `IHitContext : IPayloadContext`
-// and `IPayloadContext : IStageContext`. Resolving `Record` needs the inherited IStageContext
-// requirement. The checked interface facets identify that declaration; projecting the original
-// witness preserves this path even when HitContext has another IStageContext conformance.
-static AssocTypeDecl* _findStructuralAssociatedRequirement(
-    SubtypeWitness*& witness,
-    StructuralRayTracingAssociatedTypeKind kind)
-{
-    witness = witness ? as<SubtypeWitness>(witness->resolve()) : nullptr;
-    if (!witness)
-        return nullptr;
-    auto interfaceType = as<DeclRefType>(witness->getSup()->resolve());
-    auto interfaceDecl =
-        interfaceType ? interfaceType->getDeclRef().as<InterfaceDecl>() : DeclRef<InterfaceDecl>();
-    if (!interfaceDecl)
-        return nullptr;
-    auto module = getModule(interfaceDecl.getDecl());
-    SLANG_RELEASE_ASSERT(module);
-    auto sharedSemantics = module->getLinkage()->getSemanticsForReflection();
-    for (auto facet : sharedSemantics->getInheritanceInfo(interfaceType).facets)
-    {
-        auto owner = facet->origin.declRef.as<InterfaceDecl>();
-        if (!owner)
-            continue;
-        for (auto requirement : owner.getDecl()->getDirectMemberDeclsOfType<AssocTypeDecl>())
-        {
-            if (getStructuralRayTracingAssociatedTypeKind(requirement) != kind)
-                continue;
-            witness = sharedSemantics->tryProjectInterfaceSubtypeWitness(witness, facet->getType());
-            return witness ? requirement : nullptr;
-        }
-    }
-    return nullptr;
-}
-
 static Stage _getDirectStageInputKind(Type* type)
 {
-    while (auto modifiedType = as<ModifiedType>(type))
-        type = modifiedType->getBase();
+    type = unwrapModifiedType(type);
     auto declRefType = as<DeclRefType>(type);
     auto typeDecl = declRefType ? declRefType->getDeclRef().as<AggTypeDecl>().getDecl() : nullptr;
     return getStructuralRayTracingStageInputKind(typeDecl);
@@ -225,13 +189,13 @@ static void _checkRayTracingAPIUse(
 // or null for other associated-type requirements.
 static const char* _getStructuralRayTracingSchemaSectionName(AssocTypeDecl* requirement)
 {
-    switch (getStructuralRayTracingAssociatedTypeKind(requirement))
+    switch (_getRayTracingBuiltin(requirement))
     {
-    case StructuralRayTracingAssociatedTypeKind::ProgramHitGroups:
+    case KnownBuiltinDeclName::RayTracingProgramHitGroups:
         return "hit-group";
-    case StructuralRayTracingAssociatedTypeKind::ProgramMissShaders:
+    case KnownBuiltinDeclName::RayTracingProgramMissShaders:
         return "miss-shader";
-    case StructuralRayTracingAssociatedTypeKind::ProgramCallableShaders:
+    case KnownBuiltinDeclName::RayTracingProgramCallableShaders:
         return "callable-shader";
     default:
         break;
@@ -358,7 +322,9 @@ static void _diagnoseStructuralStageConformance(
 {
     auto witnessTable = inheritanceDecl->witnessTable;
     auto interfaceType = as<DeclRefType>(inheritanceDecl->base.type);
-    if (!witnessTable || !interfaceType || !interfaceType->getDeclRef().as<InterfaceDecl>())
+    auto interfaceDeclRef =
+        interfaceType ? interfaceType->getDeclRef().as<InterfaceDecl>() : DeclRef<InterfaceDecl>();
+    if (!witnessTable || !interfaceDeclRef)
         return;
     auto astBuilder = visitor->getASTBuilder();
     auto inheritanceDeclRef =
@@ -367,13 +333,23 @@ static void _diagnoseStructuralStageConformance(
         witnessTable->witnessedType,
         interfaceType,
         inheritanceDeclRef);
+    // Consider `MyMiss : IRefinedMiss`, where `IRefinedMiss : rt::IMissShader`. The checked
+    // interface facets express their witnesses using IRefinedMiss.This. Substitute this exact
+    // MyMiss conformance for This before reading invoke, as ordinary inheritance merging does.
+    // Looking up MyMiss's conformances again could select a different path to IMissShader.
+    auto substitutions = SubstitutionSet(
+        astBuilder->getLookupDeclRef(witness, interfaceDeclRef.getDecl()->getThisTypeDecl()));
     for (auto facet : visitor->getShared()->getInheritanceInfo(interfaceType).facets)
     {
         auto stageInterface = facet->origin.declRef.as<InterfaceDecl>();
         if (!isExecutableStructuralRayTracingStageInterface(stageInterface.getDecl()))
             continue;
         auto stageWitness =
-            visitor->getShared()->tryProjectInterfaceSubtypeWitness(witness, facet->getType());
+            as<SubtypeWitness>(facet->subtypeWitness->substitute(astBuilder, substitutions));
+        SLANG_RELEASE_ASSERT(stageWitness);
+        stageWitness = as<SubtypeWitness>(stageWitness->resolve());
+        SLANG_RELEASE_ASSERT(
+            stageWitness && stageWitness->getSub()->equals(witnessTable->witnessedType));
         auto implementation = _getStageImplementationFromSubtypeWitness(
             astBuilder,
             stageInterface.getDecl(),
@@ -542,9 +518,9 @@ static bool _diagnoseRestrictedRayTracingGenericArgument(
 // Prevents a logical structural stage signature from reaching native entry-point ABI passes.
 //
 // Consider `-entry MyMiss` selecting a struct whose `invoke` takes `rt::MissInput<C>`.
-// Linking preserves that logical signature and its structural metadata. Adapter synthesis must
+// Linking preserves that checked signature. Adapter synthesis must
 // replace it with a native entry point before normal ABI legalization can interpret its inputs.
-// This check reports any unconsumed marker at that boundary, including while adapter synthesis
+// This check reports any remaining stage-input parameter at that boundary, while adapter synthesis
 // remains unimplemented in this frontend slice.
 static bool _diagnoseUnloweredStructuralRayTracingEntryPoints(
     const List<IRFunc*>& entryPoints,
@@ -553,7 +529,7 @@ static bool _diagnoseUnloweredStructuralRayTracingEntryPoints(
     bool found = false;
     for (auto entryPoint : entryPoints)
     {
-        if (!entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+        if (!hasStructuralRayTracingStageInput(entryPoint))
             continue;
         sink->diagnose(
             Diagnostics::UnloweredStructuralRayTracingEntryPoint{.entryPoint = entryPoint});
@@ -742,7 +718,12 @@ bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl
 
 Stage getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl)
 {
-    switch (_getRayTracingBuiltin(typeDecl))
+    return getStructuralRayTracingStageInputKind(_getRayTracingBuiltin(typeDecl));
+}
+
+Stage getStructuralRayTracingStageInputKind(KnownBuiltinDeclName builtin)
+{
+    switch (builtin)
     {
     case KnownBuiltinDeclName::RayTracingClosestHitInput:
         return Stage::ClosestHit;
@@ -757,94 +738,6 @@ Stage getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl)
     default:
         return Stage::Unknown;
     }
-}
-
-// Identifies requirements whose concrete types are recorded for later backend code generation.
-// Consider `SkyMiss.Context = SkyContext`, with `SkyContext.Payload = ColorPayload`: generating
-// the native miss function will need ColorPayload, so checking must find these requirements and
-// read their ordinary Slang conformance results. Looking them up by name would also work. We use
-// KnownBuiltin roles so renaming Context to ShaderContext while keeping StageContext requires no
-// compiler lookup change; it is a maintenance choice, not a shortcut for resolving the types.
-StructuralRayTracingAssociatedTypeKind getStructuralRayTracingAssociatedTypeKind(
-    AssocTypeDecl* requirement)
-{
-    switch (_getRayTracingBuiltin(requirement))
-    {
-    case KnownBuiltinDeclName::RayTracingStageContext:
-        return StructuralRayTracingAssociatedTypeKind::StageContext;
-    case KnownBuiltinDeclName::RayTracingStageRecord:
-        return StructuralRayTracingAssociatedTypeKind::StageRecord;
-    case KnownBuiltinDeclName::RayTracingPayloadContextPayload:
-        return StructuralRayTracingAssociatedTypeKind::PayloadContextPayload;
-    case KnownBuiltinDeclName::RayTracingHitPrimitive:
-        return StructuralRayTracingAssociatedTypeKind::HitPrimitive;
-    case KnownBuiltinDeclName::RayTracingPrimitiveAttributes:
-        return StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes;
-    case KnownBuiltinDeclName::RayTracingCallableData:
-        return StructuralRayTracingAssociatedTypeKind::CallableData;
-    case KnownBuiltinDeclName::RayTracingProgramHitGroups:
-        return StructuralRayTracingAssociatedTypeKind::ProgramHitGroups;
-    case KnownBuiltinDeclName::RayTracingProgramMissShaders:
-        return StructuralRayTracingAssociatedTypeKind::ProgramMissShaders;
-    case KnownBuiltinDeclName::RayTracingProgramCallableShaders:
-        return StructuralRayTracingAssociatedTypeKind::ProgramCallableShaders;
-    default:
-        return StructuralRayTracingAssociatedTypeKind::Count;
-    }
-}
-
-Type* resolveStructuralRayTracingAssociatedType(
-    ASTBuilder* astBuilder,
-    SubtypeWitness* witness,
-    StructuralRayTracingAssociatedTypeKind kind)
-{
-    auto requirement = _findStructuralAssociatedRequirement(witness, kind);
-    if (!requirement)
-        return nullptr;
-    // Keep an extern context's associated type as an ordinary dependent lookup. Resolving the
-    // same declaration reference also gives the concrete type when the witness already defines it.
-    auto type = DeclRefType::create(astBuilder, astBuilder->getLookupDeclRef(witness, requirement));
-    return as<Type>(type->resolve());
-}
-
-// Selects the associated-type constraint that supplies the next ABI requirement.
-// For example, a miss contract can constrain Context by both IExtra and IPayloadContext.
-// Only the latter supplies the annotated Payload requirement. Selecting that checked constraint
-// by its requirement role keeps additional bounds and refined context interfaces ordinary Slang.
-SubtypeWitness* resolveStructuralRayTracingAssociatedTypeConstraint(
-    ASTBuilder* astBuilder,
-    SubtypeWitness* witness,
-    StructuralRayTracingAssociatedTypeKind kind,
-    StructuralRayTracingAssociatedTypeKind requiredMember)
-{
-    SLANG_RELEASE_ASSERT(requiredMember != StructuralRayTracingAssociatedTypeKind::Count);
-    auto associatedType = _findStructuralAssociatedRequirement(witness, kind);
-    if (!associatedType)
-        return nullptr;
-    auto owner = as<InterfaceDecl>(associatedType->parentDecl);
-    SLANG_RELEASE_ASSERT(owner);
-    for (auto constraint : owner->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
-    {
-        if (constraint->isEqualityConstraint)
-            continue;
-        auto subType = isDeclRefTypeOf<AssocTypeDecl>(constraint->sub.type);
-        if (!subType || subType.getDecl() != associatedType)
-            continue;
-        auto requirementWitness = tryLookUpRequirementWitness(astBuilder, witness, constraint);
-        if (requirementWitness.getFlavor() != RequirementWitness::Flavor::val)
-            continue;
-        auto constraintWitness = as<SubtypeWitness>(requirementWitness.getVal()->resolve());
-        if (!constraintWitness)
-            continue;
-
-        // A refined context may inherit the requirement rather than declare it directly.
-        // Reuse normal requirement projection to recognize that bound, but return its original
-        // witness so resolving Record later starts from the same context conformance.
-        auto projectedWitness = constraintWitness;
-        if (_findStructuralAssociatedRequirement(projectedWitness, requiredMember))
-            return constraintWitness;
-    }
-    return nullptr;
 }
 
 bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl)
@@ -918,9 +811,11 @@ void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink)
         return;
 
     auto entryPointDecl = entryPoint->getFuncDecl();
-    auto family = entryPoint->isStructuralRayTracingEntryPoint() ? RayTracingAPIFamily::Structural
-                                                                 : RayTracingAPIFamily::Legacy;
-    _checkRayTracingAPIUse(getModule(entryPointDecl), family, entryPointDecl, sink);
+    _checkRayTracingAPIUse(
+        getModule(entryPointDecl),
+        RayTracingAPIFamily::Legacy,
+        entryPointDecl,
+        sink);
 }
 
 // Selects one executable conformance for a source struct named by -entry.
@@ -937,7 +832,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     Profile& ioProfile,
     DiagnosticSink* sink,
     bool* outFoundStruct,
-    SubtypeWitness** outStageWitness)
+    Type** outStageType)
 {
     // A structural entry request names a stage struct rather than its `invoke` method. Resolve the
     // struct in the requested module, select exactly one structural stage conformance (or the
@@ -945,7 +840,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     // compile. The public entry name remains the struct name and is stored separately on
     // `EntryPoint`.
     *outFoundStruct = false;
-    *outStageWitness = nullptr;
+    *outStageType = nullptr;
     auto expr = module->findDeclFromString(getText(name), sink);
     auto declRefExpr = as<DeclRefExpr>(expr);
     auto stageTypeDeclRef =
@@ -965,7 +860,6 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     visitor.ensureDecl(stageTypeDeclRef, DeclCheckState::ReadyForConformances);
 
     DeclRef<FuncDecl> stageImplementations[SLANG_STAGE_COUNT] = {};
-    SubtypeWitness* stageWitnesses[SLANG_STAGE_COUNT] = {};
     bool ambiguousImplementations[SLANG_STAGE_COUNT] = {};
     auto stageType = DeclRefType::create(linkage->getASTBuilder(), stageTypeDeclRef);
     for (auto facet : visitor.getShared()->getInheritanceInfo(stageType).facets)
@@ -990,7 +884,6 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
                     continue;
                 }
                 stageImplementations[int(kind)] = implementation;
-                stageWitnesses[int(kind)] = facet->subtypeWitness;
             }
         }
     }
@@ -1052,52 +945,48 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
         return DeclRef<FuncDecl>();
     }
 
-    auto stageWitness = stageWitnesses[int(selectedStage)];
-    SLANG_RELEASE_ASSERT(stageWitness && stageWitness->getSub()->equals(stageType));
-    *outStageWitness = stageWitness;
+    *outStageType = stageType;
     return invokeMethod;
 }
 
-// Attaches the checked stage conformance and names to a newly created entry point.
+Type* getStructuralRayTracingEntryPointInputType(EntryPoint* entryPoint)
+{
+    auto function = entryPoint->getFuncDeclRef();
+    if (!function)
+        return nullptr;
+
+    auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
+    for (auto parameter : getParameters(astBuilder, function))
+    {
+        auto type = unwrapModifiedType(getType(astBuilder, parameter));
+        if (_getDirectStageInputKind(type) != Stage::Unknown)
+            return type;
+    }
+    return nullptr;
+}
+
+// Sets the names of an entry point selected through a checked stage conformance.
 // For `-entry Stages.Miss`, retain the selected type as the public name and derive a legal target
 // symbol. The function reference still names the checked invoke method selected by conformance.
 void initializeStructuralRayTracingEntryPoint(
     EntryPoint* entryPoint,
     Name* entryPointName,
-    SubtypeWitness* stageWitness)
+    Type* stageType)
 {
     entryPoint->setNameOverride(entryPointName);
-    auto sourceTypeName = getStructuralRayTracingSourceTypeName(
-        entryPoint->getLinkage()->getASTBuilder(),
-        stageWitness->getSub());
+    auto sourceTypeName =
+        getStructuralRayTracingSourceTypeName(entryPoint->getLinkage()->getASTBuilder(), stageType);
     entryPoint->setEntryPointNameOverride(
         getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice()));
-    entryPoint->setStructuralRayTracingWitness(stageWitness);
-}
-
-// Uses the source stage's capabilities when its native entry point will be synthesized.
-//
-// Consider `struct MyMiss : rt::IMissShader { ... }` compiled for Metal. The source role is
-// `miss`, but Metal has no native miss entry point. The selected interface's declared
-// capabilities describe the supported source role, including Metal's synthesized path. Native
-// function entry points continue to use the capabilities of their ordinary stage profile.
-CapabilitySet getEntryPointStageCapabilities(EntryPoint* entryPoint)
-{
-    if (!entryPoint->isStructuralRayTracingEntryPoint())
-        return entryPoint->getProfile().getCapabilityName();
-
-    auto stageWitness = entryPoint->getStructuralRayTracingWitness();
-    auto stageInterface =
-        isDeclRefTypeOf<InterfaceDecl>(stageWitness->getSup()->resolve()).getDecl();
-    SLANG_RELEASE_ASSERT(stageInterface && stageInterface->inferredCapabilityRequirements);
-    return CapabilitySet{stageInterface->inferredCapabilityRequirements};
 }
 
 // Includes a known primitive's requirements even when invoke does not read its attributes.
 // Consider a hit context with `typealias Primitive = rt::CurvePrimitive`: it requires Metal even
 // for an empty invoke body. This is a WAR for #13793, where typealias requirements do not reach
-// the enclosing type. An extern context can leave Primitive as a dependent associated type;
-// its concrete requirements must be checked after specialization when adapter synthesis is added.
+// the enclosing type. The checked input type already supplies the Context : IHitContext witness;
+// substituting its declared constraint reads that exact argument through ordinary substitution.
+// An extern context can leave Primitive dependent. Its concrete requirements must be checked
+// after specialization when adapter synthesis is added.
 CapabilitySet getStructuralRayTracingPrimitiveCapabilities(EntryPoint* entryPoint)
 {
     auto stage = entryPoint->getStage();
@@ -1105,16 +994,42 @@ CapabilitySet getStructuralRayTracingPrimitiveCapabilities(EntryPoint* entryPoin
         return CapabilitySet();
 
     auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
-    auto contextWitness = resolveStructuralRayTracingAssociatedTypeConstraint(
-        astBuilder,
-        entryPoint->getStructuralRayTracingWitness(),
-        StructuralRayTracingAssociatedTypeKind::StageContext,
-        StructuralRayTracingAssociatedTypeKind::HitPrimitive);
-    SLANG_RELEASE_ASSERT(contextWitness);
-    auto primitiveType = resolveStructuralRayTracingAssociatedType(
-        astBuilder,
-        contextWitness,
-        StructuralRayTracingAssociatedTypeKind::HitPrimitive);
+    auto inputType = as<DeclRefType>(getStructuralRayTracingEntryPointInputType(entryPoint));
+    SLANG_RELEASE_ASSERT(inputType);
+    auto inputDeclRef = inputType->getDeclRef();
+    auto genericDecl = as<GenericDecl>(inputDeclRef.getDecl()->parentDecl);
+    SLANG_RELEASE_ASSERT(genericDecl);
+
+    // ClosestHitInput, AnyHitInput, and IntersectionInput all declare Context : IHitContext.
+    // The interface directly owns Primitive, so this lookup needs no projection through the
+    // stage struct's conformance or knowledge of the input's generic argument positions.
+    Type* primitiveType = nullptr;
+    for (auto constraint : genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+    {
+        auto constraintDeclRef = makeDeclRef(constraint);
+        auto interfaceDeclRef =
+            isDeclRefTypeOf<InterfaceDecl>(getSup(astBuilder, constraintDeclRef));
+        if (!interfaceDeclRef)
+            continue;
+        for (auto requirement :
+             interfaceDeclRef.getDecl()->getDirectMemberDeclsOfType<AssocTypeDecl>())
+        {
+            if (_getRayTracingBuiltin(requirement) != KnownBuiltinDeclName::RayTracingHitPrimitive)
+                continue;
+            SLANG_RELEASE_ASSERT(!primitiveType);
+            auto declaredWitness = astBuilder->getDeclaredSubtypeWitness(
+                getSub(astBuilder, constraintDeclRef),
+                getSup(astBuilder, constraintDeclRef),
+                constraintDeclRef);
+            auto contextWitness = as<SubtypeWitness>(
+                declaredWitness->substitute(astBuilder, SubstitutionSet(inputDeclRef))->resolve());
+            SLANG_RELEASE_ASSERT(contextWitness);
+            auto primitiveLookup = DeclRefType::create(
+                astBuilder,
+                astBuilder->getLookupDeclRef(contextWitness, requirement));
+            primitiveType = as<Type>(primitiveLookup->resolve());
+        }
+    }
     SLANG_RELEASE_ASSERT(primitiveType);
     auto primitiveDecl = isDeclRefTypeOf<AggTypeDecl>(primitiveType);
     if (!primitiveDecl)
@@ -1122,23 +1037,6 @@ CapabilitySet getStructuralRayTracingPrimitiveCapabilities(EntryPoint* entryPoin
 
     SLANG_RELEASE_ASSERT(primitiveDecl.getDecl()->inferredCapabilityRequirements);
     return CapabilitySet{primitiveDecl.getDecl()->inferredCapabilityRequirements};
-}
-
-// Anchors capability diagnostics on the public entry-point declaration.
-//
-// Consider `-entry MyMiss` selecting `struct MyMiss : rt::IMissShader { ... }`. A capability
-// error should name `MyMiss`, even though the selected function is its `invoke` witness. The
-// capability provenance walk still starts at that function; this helper only chooses the
-// declaration shown by the primary diagnostic. Native entry points already use their function.
-Decl* getEntryPointCapabilityDiagnosticDecl(EntryPoint* entryPoint)
-{
-    if (!entryPoint->isStructuralRayTracingEntryPoint())
-        return entryPoint->getFuncDecl();
-
-    auto stageType =
-        as<DeclRefType>(entryPoint->getStructuralRayTracingWitness()->getSub()->resolve());
-    SLANG_RELEASE_ASSERT(stageType);
-    return stageType->getDeclRef().getDecl();
 }
 
 // Checks the structural representations that must be consumed before native ABI legalization.

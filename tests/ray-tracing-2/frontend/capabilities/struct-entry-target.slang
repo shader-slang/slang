@@ -2,6 +2,8 @@
 //TEST:SIMPLE: -experimental-feature -entry MetalOnlyMiss -stage miss -target metal -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=CURVE_HLSL,non-exhaustive): -experimental-feature -entry CurveClosestHit -stage closesthit -target hlsl -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry CurveClosestHit -stage closesthit -target metal -capability metallib_3_1 -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry GenericClosestHit<TriangleHitContext> -stage closesthit -target hlsl -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC_CURVE_HLSL,non-exhaustive): -experimental-feature -entry GenericClosestHit<CurveHitContext> -stage closesthit -target hlsl -no-codegen
 
 import slang.raytracing;
 
@@ -25,14 +27,14 @@ struct MissContext : rt::IPayloadContext
 void useMetalOnlyFeature() {}
 
 struct MetalOnlyMiss : rt::IMissShader
-/*HLSL:
-       ^^^^^^^^^^^^^ unavailable features in entry point
-       ^^^^^^^^^^^^^ entrypoint 'MetalOnlyMiss' uses features that are not available in '_miss' stage for 'hlsl' compilation target.
-*/
 {
     typealias Context = MissContext;
 
     static void invoke(in rt::MissInput<Context> input)
+/*HLSL:
+                ^^^^^^ unavailable features in entry point
+                ^^^^^^ entrypoint 'invoke' uses features that are not available in '_miss' stage for 'hlsl' compilation target.
+*/
     {
         useMetalOnlyFeature();
 //HLSL: ^^^^^^^^^^^^^^^^^^^ see using of 'useMetalOnlyFeature'
@@ -51,12 +53,33 @@ struct CurveHitContext : rt::IHitContext
 // Curve selection is part of the checked structural contract even when `invoke` does not read a
 // CurveData property, so entry-point target validation must retain its Metal-only requirement.
 struct CurveClosestHit : rt::IClosestHitShader
-/*CURVE_HLSL:
-       ^^^^^^^^^^^^^^^ unavailable features in entry point
-       ^^^^^^^^^^^^^^^ entrypoint 'CurveClosestHit' uses features that are not available in '_closesthit' stage for 'hlsl' compilation target.
-*/
 {
     typealias Context = CurveHitContext;
 
     static void invoke(in rt::ClosestHitInput<Context> input) {}
+/*CURVE_HLSL:
+                ^^^^^^ unavailable features in entry point
+                ^^^^^^ entrypoint 'invoke' uses features that are not available in '_closesthit' stage for 'hlsl' compilation target.
+*/
+}
+
+struct TriangleHitContext : rt::IHitContext
+{
+    typealias TraceContext = ::TraceContext;
+    typealias Payload = ::Payload;
+    typealias Primitive = rt::TrianglePrimitive;
+    typealias Record = ::Record;
+}
+
+// These entries use the same generic implementation. Its selected context determines whether
+// HLSL is supported, even though the empty body never accesses the primitive.
+struct GenericClosestHit<C : rt::IHitContext> : rt::IClosestHitShader
+{
+    typealias Context = C;
+
+    static void invoke(in rt::ClosestHitInput<Context> input) {}
+/*GENERIC_CURVE_HLSL:
+                ^^^^^^ unavailable features in entry point
+                ^^^^^^ entrypoint 'invoke' uses features that are not available in '_closesthit' stage for 'hlsl' compilation target.
+*/
 }

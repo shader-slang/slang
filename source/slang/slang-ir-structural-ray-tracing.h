@@ -14,17 +14,12 @@ namespace Slang
 /// or serialized and their AST pointers are no longer available.
 IROp getStructuralRayTracingStageInterfaceOp(Stage kind);
 
-/// Preserves the selected stage conformance on the logical `invoke` value.
+/// Returns whether `func` accepts a structural stage-input type.
 ///
-/// Consider `MyHit<C>` with `typealias Context = C`. The witness carries that dependent Context
-/// and its checked constraints without fixing payload or attribute types before C is supplied.
-/// Lower it like any other witness so ordinary linking and specialization resolve its types.
-/// A closed generic invoke is an IRSpecialize; entry-point linking transfers this decoration
-/// to its resulting IRFunc. Keep the witness off the shared generic body.
-void addStructuralRayTracingEntryPointInfo(
-    IRBuilder& builder,
-    IRInst* entryPointValue,
-    IRInst* stageWitness);
+/// For example, `invoke(ClosestHitInput<C>)` keeps the input's KnownBuiltin annotation whether
+/// its type is still a generic specialization or has become a concrete struct. Entry-point
+/// consumers use this checked signature to recognize that native adapter synthesis is required.
+bool hasStructuralRayTracingStageInput(IRFunc* func);
 
 /// Marks `func` as one annotated source operation that structural lowering must consume.
 ///

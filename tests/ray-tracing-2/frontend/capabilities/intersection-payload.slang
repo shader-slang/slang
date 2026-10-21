@@ -51,13 +51,13 @@ void accessPayload<C : rt::IHitContext>(in rt::IntersectionInput<C> input)
 }
 
 struct AccessPayload : rt::IIntersectionShader
-/*UNSUPPORTED:
-       ^^^^^^^^^^^^^ unavailable features in entry point
-*/
 {
     typealias Context = HitContext;
 
     static void invoke(in rt::IntersectionInput<Context> input)
+/*UNSUPPORTED:
+                ^^^^^^ unavailable features in entry point
+*/
     {
         accessPayload(input);
         input.payload.value += 1;

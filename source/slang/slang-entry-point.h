@@ -13,7 +13,6 @@
 //
 
 #include "slang-linkable.h"
-#include "slang-structural-ray-tracing.h"
 
 namespace Slang
 {
@@ -239,20 +238,6 @@ public:
         m_inferredCapabilityRequirements = caps;
     }
 
-    void setStructuralRayTracingWitness(SubtypeWitness* witness)
-    {
-        m_structuralRayTracingWitness = witness;
-        // `m_funcDeclRef` already names the selected logical `invoke` implementation, including
-        // any generic substitutions. Its source parameters are compiler-owned views, not native
-        // ABI parameters, so structural lowering synthesizes the physical signature later.
-        m_shaderParams.clear();
-    }
-    bool isStructuralRayTracingEntryPoint() const
-    {
-        return m_structuralRayTracingWitness != nullptr;
-    }
-    SubtypeWitness* getStructuralRayTracingWitness() const { return m_structuralRayTracingWitness; }
-
     /// Get the module that contains the entry point.
     Module* getModule();
 
@@ -356,10 +341,6 @@ private:
     // The declaration of the entry-point function itself.
     //
     DeclRef<FuncDecl> m_funcDeclRef;
-
-    // The selected stage conformance carries Context and its constraints, including dependent
-    // associated types. Keep that checked witness until ordinary IR specialization resolves them.
-    SubtypeWitness* m_structuralRayTracingWitness = nullptr;
 
     /// The mangled name of the entry point function
     String m_mangledName;

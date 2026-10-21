@@ -28,17 +28,17 @@ struct CurveContext : rt::IHitContext
 
 // The unified accessor retains the view's type and Metal version requirement in both hit stages.
 struct CurveClosestHit : rt::IClosestHitShader
-/*CLOSEST_HLSL:
-       ^^^^^^^^^^^^^^^ unavailable features in entry point
-*/
-/*CLOSEST_METAL:
-       ^^^^^^^^^^^^^^^ entry point uses capabilities not in specified profile
-       ^^^^^^^^^^^^^^^ Missing capabilities are: 'metallib_3_1'
-*/
 {
     typealias Context = CurveContext;
 
     static void invoke(rt::ClosestHitInput<Context> input)
+/*CLOSEST_HLSL:
+                ^^^^^^ unavailable features in entry point
+*/
+/*CLOSEST_METAL:
+                ^^^^^^ entry point uses capabilities not in specified profile
+                ^^^^^^ Missing capabilities are: 'metallib_3_1'
+*/
     {
         rt::CurveData attributes = input.attributes;
         input.payload.value = attributes.parameter;
@@ -46,17 +46,17 @@ struct CurveClosestHit : rt::IClosestHitShader
 }
 
 struct CurveAnyHit : rt::IAnyHitShader
-/*ANY_HLSL:
-       ^^^^^^^^^^^ unavailable features in entry point
-*/
-/*ANY_METAL:
-       ^^^^^^^^^^^ entry point uses capabilities not in specified profile
-       ^^^^^^^^^^^ Missing capabilities are: 'metallib_3_1'
-*/
 {
     typealias Context = CurveContext;
 
     static void invoke(rt::AnyHitInput<Context> input)
+/*ANY_HLSL:
+                ^^^^^^ unavailable features in entry point
+*/
+/*ANY_METAL:
+                ^^^^^^ entry point uses capabilities not in specified profile
+                ^^^^^^ Missing capabilities are: 'metallib_3_1'
+*/
     {
         let attributes = input.attributes;
         input.payload.value = attributes.parameter;

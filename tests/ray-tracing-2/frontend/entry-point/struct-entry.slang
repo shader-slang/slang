@@ -2,11 +2,9 @@
 //TEST:SIMPLE: -experimental-feature -entry Stages.main -no-codegen
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -entry Stages.main -stage closesthit -dump-ir -no-codegen
 
-// A selected struct remains the logical entry point in this frontend-only slice. The compiler
-// retains its checked conformance on `invoke`; the ordinary entry-point decoration retains its
-// qualified source name.
+// A selected struct uses its ordinary checked `invoke` function as the entry point. The
+// entry-point decoration retains the struct's qualified source name.
 // IR: [entryPoint({{.*}}"Stages.main"
-// IR-NEXT: [structuralRayTracingEntryPointInfo({{%[A-Za-z0-9_]+}})]
 // The selected static method has exactly one parameter, input. No stage object is passed as this.
 // IR: [nameHint("Stages.main.invoke")]
 // IR-NEXT: func {{.*}} : Func(Void, specialize({{.*}}))

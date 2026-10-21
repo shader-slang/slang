@@ -2194,14 +2194,6 @@ local insts = {
 				},
 			},
 			{
-				-- Preserves the selected stage conformance, including dependent Context requirements.
-				-- Ordinary specialization resolves the witness before native adapter synthesis uses it.
-				structuralRayTracingEntryPointInfo = {
-					struct_name = "StructuralRayTracingEntryPointInfoDecoration",
-					operands = { { "stageWitness", "IRInst" } },
-				},
-			},
-			{
 				-- Marks an annotated structural operation whose source semantics must be lowered before
 				-- ordinary entry-point ABI legalization. This decoration is deliberately non-operational.
 				structuralRayTracingSourceOperation = {

@@ -2,6 +2,7 @@
 #include "core/slang-char-util.h"
 #include "slang-check-impl.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-structural-ray-tracing.h"
 
 // This file implements semantic checking behavior for
 // modifiers.
