@@ -468,6 +468,15 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             {
                 // On bindless targets, DescriptorHandle<T> has the layout of T
                 auto descriptorHandleType = cast<IRDescriptorHandleType>(type);
+
+                // Except a combined texture-sampler handle on Metal: `lowerCombinedTextureSamplers`
+                // turns it into a struct of a texture and a sampler, two 8-byte resource IDs.
+                if (isMetalTarget(targetReq) &&
+                    getCombinedTextureSamplerHandleResourceType(descriptorHandleType))
+                {
+                    *outSizeAndAlignment = IRSizeAndAlignment(16, 8);
+                    return SLANG_OK;
+                }
                 return calcSizeAndAlignment(
                     targetReq,
                     descriptorHandleType->getResourceType(),

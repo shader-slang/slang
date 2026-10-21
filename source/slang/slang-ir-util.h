@@ -313,6 +313,11 @@ bool isBindlessTextureNVEncodableResourceType(IRType* type);
 // not a descriptor handle.
 bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool hasBindlessTextureNV);
 
+// If `descriptorHandleType` is a `DescriptorHandle<T>` whose `T` (after unwrapping attributed
+// types) is a combined texture-sampler such as `Sampler2D`, return that texture type; otherwise
+// return null.
+IRTextureTypeBase* getCombinedTextureSamplerHandleResourceType(IRInst* descriptorHandleType);
+
 // True if type is a pointer to a resource
 bool isPointerToResourceType(IRType* type);
 

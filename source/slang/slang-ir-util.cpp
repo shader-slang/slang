@@ -3985,4 +3985,15 @@ bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool ha
     return isBindlessTextureNVEncodableResourceType(handleType->getResourceType());
 }
 
+IRTextureTypeBase* getCombinedTextureSamplerHandleResourceType(IRInst* descriptorHandleType)
+{
+    auto handleType = as<IRDescriptorHandleType>(descriptorHandleType);
+    if (!handleType)
+        return nullptr;
+    auto textureType = as<IRTextureTypeBase>(unwrapAttributedType(handleType->getResourceType()));
+    if (!textureType || !textureType->isCombined())
+        return nullptr;
+    return textureType;
+}
+
 } // namespace Slang

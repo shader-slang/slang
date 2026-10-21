@@ -38,6 +38,16 @@ struct LowerCombinedSamplerContext
         }
     }
 
+    // Like `getLoweredTypeInfo`, but returns nothing for a texture type that is not combined.
+    std::optional<LoweredCombinedSamplerStructInfo> getCombinedLoweredTypeInfo(
+        IRType* textureTypeOrLoweredType)
+    {
+        auto textureType = as<IRTextureTypeBase>(textureTypeOrLoweredType);
+        if (textureType && !textureType->isCombined())
+            return std::nullopt;
+        return getLoweredTypeInfo(textureTypeOrLoweredType);
+    }
+
     LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerType(IRTextureTypeBase* textureType)
     {
         if (auto loweredInfo = mapTypeToLoweredInfo.tryGetValue(textureType))
@@ -261,7 +271,8 @@ void lowerCombinedTextureSamplers(
                             // where native resource handles are already bindless, e.g. metal.
                             // On these platforms, the handle is a struct containing texture
                             // and sampler fields, so we just need to insert the extract operations.
-                            auto loweredInfo = context.getLoweredTypeInfo(inst->getDataType());
+                            auto loweredInfo =
+                                context.getCombinedLoweredTypeInfo(inst->getDataType());
                             if (!loweredInfo)
                                 continue;
                             builder.setInsertBefore(inst);
@@ -279,6 +290,49 @@ void lowerCombinedTextureSamplers(
                             inst->replaceUsesWith(combinedSampler);
                             inst->removeAndDeallocate();
                         }
+                    }
+                    break;
+
+                case kIROp_CastResourceToDescriptorHandle:
+                    {
+                        // The reverse of the case above: on a target where the handle stays a
+                        // DescriptorHandle, a combined handle is the same struct, so build it from
+                        // the texture and sampler fields of the combined value.
+                        if (!as<IRDescriptorHandleType>(inst->getDataType()))
+                            continue;
+                        auto loweredInfo =
+                            context.getCombinedLoweredTypeInfo(inst->getOperand(0)->getDataType());
+                        if (!loweredInfo)
+                            continue;
+                        auto combinedSampler = inst->getOperand(0);
+                        builder.setInsertBefore(inst);
+                        auto textureVal = builder.emitFieldExtract(
+                            loweredInfo->textureType,
+                            combinedSampler,
+                            loweredInfo->texture);
+                        auto samplerVal = builder.emitFieldExtract(
+                            loweredInfo->samplerType,
+                            combinedSampler,
+                            loweredInfo->sampler);
+                        IRInst* args[] = {textureVal, samplerVal};
+                        auto handle = builder.emitMakeStruct(inst->getFullType(), 2, args);
+                        inst->replaceUsesWith(handle);
+                        inst->removeAndDeallocate();
+                    }
+                    break;
+
+                case kIROp_MakeCombinedTextureSampler:
+                    {
+                        // A combined texture-sampler built from a texture and a sampler. On
+                        // Metal, AnyValue unmarshalling of a combined handle emits this.
+                        auto loweredInfo = context.getLoweredTypeInfo(inst->getDataType());
+                        if (!loweredInfo)
+                            continue;
+                        builder.setInsertBefore(inst);
+                        IRInst* args[] = {inst->getOperand(0), inst->getOperand(1)};
+                        auto combinedSampler = builder.emitMakeStruct(loweredInfo->type, 2, args);
+                        inst->replaceUsesWith(combinedSampler);
+                        inst->removeAndDeallocate();
                     }
                     break;
 

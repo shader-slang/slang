@@ -614,6 +614,35 @@ struct AnyValueMarshallingContext
             }
         }
 
+        // Metal: store the 8-byte handle `handleVal` in the two uints at `fieldIndex`. A buffer
+        // handle is a pointer, and as_type<> can't cast between pointer and non-pointer types, so
+        // the handle is converted through uint64 with CastDescriptorHandleToUInt64.
+        void emitMetalHandleBitsStore(IRBuilder* builder, IRInst* handleVal, uint32_t fieldIndex)
+        {
+            auto uint64Val = builder->emitIntrinsicInst(
+                builder->getUInt64Type(),
+                kIROp_CastDescriptorHandleToUInt64,
+                1,
+                &handleVal);
+            auto lowBits = builder->emitCast(builder->getUIntType(), uint64Val);
+            auto highBits = builder->emitShr(
+                builder->getUInt64Type(),
+                uint64Val,
+                builder->getIntValue(builder->getIntType(), 32));
+            highBits = builder->emitCast(builder->getUIntType(), highBits);
+
+            auto dstAddr0 = builder->emitFieldAddress(
+                uintPtrType,
+                anyValueVar,
+                anyValInfo->fieldKeys[fieldIndex]);
+            builder->emitStore(dstAddr0, lowBits);
+            auto dstAddr1 = builder->emitFieldAddress(
+                uintPtrType,
+                anyValueVar,
+                anyValInfo->fieldKeys[fieldIndex + 1]);
+            builder->emitStore(dstAddr1, highBits);
+        }
+
         // pack: DescriptorHandle -> AnyValue
         virtual void marshalDescriptorHandle(
             IRBuilder* builder,
@@ -672,33 +701,49 @@ struct AnyValueMarshallingContext
                 if (fieldOffset + numFieldsNeeded <=
                     static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
-                    if (isMetalTarget(targetRequest) && sizeInBytes == 8)
+                    auto combinedType = isMetalTarget(targetRequest)
+                                            ? getCombinedTextureSamplerHandleResourceType(dataType)
+                                            : nullptr;
+                    if (combinedType)
                     {
-                        // Metal: DescriptorHandle is a pointer; as_type<> can't cast
-                        // between pointer and non-pointer types. Convert through uint64
-                        // using CastDescriptorHandleToUInt64 which emits a C-style cast.
-                        auto uint64Val = builder->emitIntrinsicInst(
-                            builder->getUInt64Type(),
-                            kIROp_CastDescriptorHandleToUInt64,
+                        // Metal: a combined texture-sampler handle is a struct of a texture and a
+                        // sampler (see `lowerCombinedTextureSamplers`), 16 bytes. Split it into a
+                        // texture handle and a sampler handle and store each as an 8-byte handle:
+                        // the texture in the first two uints, the sampler in the next two.
+                        SLANG_ASSERT(sizeInBytes == 16);
+                        auto combined = builder->emitIntrinsicInst(
+                            combinedType,
+                            kIROp_CastDescriptorHandleToResource,
                             1,
                             &srcVal);
-                        auto lowBits = builder->emitCast(builder->getUIntType(), uint64Val);
-                        auto highBits = builder->emitShr(
-                            builder->getUInt64Type(),
-                            uint64Val,
-                            builder->getIntValue(builder->getIntType(), 32));
-                        highBits = builder->emitCast(builder->getUIntType(), highBits);
-
-                        auto dstAddr0 = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        builder->emitStore(dstAddr0, lowBits);
-                        auto dstAddr1 = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset + 1]);
-                        builder->emitStore(dstAddr1, highBits);
+                        auto textureType = getTextureTypeFromCombinedTextureSampler(combinedType);
+                        auto samplerType = getSamplerTypeFromCombinedTextureSampler(combinedType);
+                        auto texture = builder->emitIntrinsicInst(
+                            textureType,
+                            kIROp_CombinedTextureSamplerGetTexture,
+                            1,
+                            &combined);
+                        auto sampler = builder->emitIntrinsicInst(
+                            samplerType,
+                            kIROp_CombinedTextureSamplerGetSampler,
+                            1,
+                            &combined);
+                        auto textureHandle = builder->emitIntrinsicInst(
+                            builder->getType(kIROp_DescriptorHandleType, textureType),
+                            kIROp_CastResourceToDescriptorHandle,
+                            1,
+                            &texture);
+                        auto samplerHandle = builder->emitIntrinsicInst(
+                            builder->getType(kIROp_DescriptorHandleType, samplerType),
+                            kIROp_CastResourceToDescriptorHandle,
+                            1,
+                            &sampler);
+                        emitMetalHandleBitsStore(builder, textureHandle, fieldOffset);
+                        emitMetalHandleBitsStore(builder, samplerHandle, fieldOffset + 2);
+                    }
+                    else if (isMetalTarget(targetRequest) && sizeInBytes == 8)
+                    {
+                        emitMetalHandleBitsStore(builder, srcVal, fieldOffset);
                     }
                     else
                     {
@@ -1159,6 +1204,34 @@ struct AnyValueMarshallingContext
             }
         }
 
+        // Metal: load an 8-byte handle of type `handleType` from the two uints at `fieldIndex`.
+        // A buffer handle is a pointer, and as_type<> can't cast between pointer and non-pointer
+        // types, so the handle is rebuilt from uint64 with CastUInt64ToDescriptorHandle.
+        IRInst* emitMetalHandleBitsLoad(IRBuilder* builder, IRType* handleType, uint32_t fieldIndex)
+        {
+            auto srcAddr0 = builder->emitFieldAddress(
+                uintPtrType,
+                anyValueVar,
+                anyValInfo->fieldKeys[fieldIndex]);
+            auto lowBits = builder->emitLoad(srcAddr0);
+            auto srcAddr1 = builder->emitFieldAddress(
+                uintPtrType,
+                anyValueVar,
+                anyValInfo->fieldKeys[fieldIndex + 1]);
+            auto highBits = builder->emitLoad(srcAddr1);
+
+            auto lowBits64 = builder->emitCast(builder->getUInt64Type(), lowBits);
+            auto highBits64 = builder->emitCast(builder->getUInt64Type(), highBits);
+            auto shiftedHigh = builder->emitShl(
+                builder->getUInt64Type(),
+                highBits64,
+                builder->getIntValue(builder->getIntType(), 32));
+            auto bits = builder->emitBitOr(builder->getUInt64Type(), lowBits64, shiftedHigh);
+
+            return builder
+                ->emitIntrinsicInst(handleType, kIROp_CastUInt64ToDescriptorHandle, 1, &bits);
+        }
+
         // unpack: AnyValue -> DescriptorHandle
         virtual void marshalDescriptorHandle(
             IRBuilder* builder,
@@ -1214,38 +1287,53 @@ struct AnyValueMarshallingContext
                 if (fieldOffset + numFieldsNeeded <=
                     static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
-                    if (isMetalTarget(targetRequest) && sizeInBytes == 8)
+                    auto combinedType = isMetalTarget(targetRequest)
+                                            ? getCombinedTextureSamplerHandleResourceType(dataType)
+                                            : nullptr;
+                    if (combinedType)
                     {
-                        // Metal: DescriptorHandle is a pointer; as_type<> can't cast
-                        // between pointer and non-pointer types. Reconstruct through
-                        // uint64 using CastUInt64ToDescriptorHandle.
-                        auto srcAddr0 = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        auto lowBits = builder->emitLoad(srcAddr0);
-
-                        auto srcAddr1 = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset + 1]);
-                        auto highBits = builder->emitLoad(srcAddr1);
-
-                        auto lowBits64 = builder->emitCast(builder->getUInt64Type(), lowBits);
-                        auto highBits64 = builder->emitCast(builder->getUInt64Type(), highBits);
-                        auto shiftedHigh = builder->emitShl(
-                            builder->getUInt64Type(),
-                            highBits64,
-                            builder->getIntValue(builder->getIntType(), 32));
-                        auto combined =
-                            builder->emitBitOr(builder->getUInt64Type(), lowBits64, shiftedHigh);
-
+                        // Metal: a combined texture-sampler handle, stored by the packing side as
+                        // a texture handle in the first two uints and a sampler handle in the
+                        // next two. Load each as an 8-byte handle and recombine them.
+                        SLANG_ASSERT(sizeInBytes == 16);
+                        auto textureType = getTextureTypeFromCombinedTextureSampler(combinedType);
+                        auto samplerType = getSamplerTypeFromCombinedTextureSampler(combinedType);
+                        auto textureHandle = emitMetalHandleBitsLoad(
+                            builder,
+                            builder->getType(kIROp_DescriptorHandleType, textureType),
+                            fieldOffset);
+                        auto samplerHandle = emitMetalHandleBitsLoad(
+                            builder,
+                            builder->getType(kIROp_DescriptorHandleType, samplerType),
+                            fieldOffset + 2);
+                        IRInst* parts[2] = {
+                            builder->emitIntrinsicInst(
+                                textureType,
+                                kIROp_CastDescriptorHandleToResource,
+                                1,
+                                &textureHandle),
+                            builder->emitIntrinsicInst(
+                                samplerType,
+                                kIROp_CastDescriptorHandleToResource,
+                                1,
+                                &samplerHandle)};
+                        auto combined = builder->emitIntrinsicInst(
+                            combinedType,
+                            kIROp_MakeCombinedTextureSampler,
+                            2,
+                            parts);
                         auto result = builder->emitIntrinsicInst(
                             dataType,
-                            kIROp_CastUInt64ToDescriptorHandle,
+                            kIROp_CastResourceToDescriptorHandle,
                             1,
                             &combined);
                         builder->emitStore(concreteVar, result);
+                    }
+                    else if (isMetalTarget(targetRequest) && sizeInBytes == 8)
+                    {
+                        builder->emitStore(
+                            concreteVar,
+                            emitMetalHandleBitsLoad(builder, dataType, fieldOffset));
                     }
                     else
                     {
