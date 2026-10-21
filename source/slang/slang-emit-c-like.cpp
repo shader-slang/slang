@@ -3395,21 +3395,6 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         emitInstStmt(inst);
         break;
 
-    case kIROp_CastUInt64ToDescriptorHandle:
-    case kIROp_CastDescriptorHandleToUInt64:
-        // Usually an expression. A target may emit some of these casts as statements instead
-        // (Metal, for opaque handles; see `isOpaqueDescriptorHandleBitsCast`). Such a target must
-        // handle them in `tryEmitInstStmtImpl` and also return `FoldPolicy::Never` for them,
-        // because a folded use only reaches `tryEmitInstExprImpl`. They are not in the list above
-        // because the other targets have no statement form for them.
-        if (!tryEmitInstStmtImpl(inst))
-        {
-            emitInstResultDecl(inst);
-            emitInstExpr(inst, getInfo(EmitOp::General));
-            m_writer->emit(";\n");
-        }
-        break;
-
     case kIROp_LiveRangeStart:
     case kIROp_LiveRangeEnd:
         emitLiveness(inst);
