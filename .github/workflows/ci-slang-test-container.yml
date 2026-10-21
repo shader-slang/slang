@@ -25,10 +25,6 @@ on:
         required: false
         type: boolean
         default: true
-      slang-user-skills:
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
@@ -97,16 +93,6 @@ jobs:
       - name: Setup Vulkan ICD
         uses: ./.github/actions/setup-vulkan-icd
 
-      - name: Checkout Slang user skills
-        if: inputs.slang-user-skills
-        run: |
-          git submodule sync -- external/slang-user-skills
-          git submodule update --init --depth=1 external/slang-user-skills
-
-      - name: Test user-skills package verifier
-        if: inputs.slang-user-skills
-        run: python3 extras/tests/test_verify_user_skills_package.py
-
       - name: Download artifacts
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
@@ -136,12 +122,6 @@ jobs:
       # /var/cores is bind-mounted in via container.options. gdb is baked
       # into the container image so the post-test step can extract backtraces.
 
-      - name: Validate Slang user-skill examples
-        if: inputs.slang-user-skills
-        run: >-
-          python3 external/slang-user-skills/scripts/validate-examples.py
-          --slangc "$bin_dir/slangc"
-
       - name: Test Slang
         run: |
           # ulimit is per-step in GitHub Actions, so each step that runs a
@@ -149,8 +129,6 @@ jobs:
           ulimit -c unlimited
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          # Preserve the CPU tier's JIT workaround when CPU/LLVM tests move here.
-          export SLANG_DISABLE_AVX512=1
 
           test_roots=()
           slang_test_args=(
@@ -162,9 +140,12 @@ jobs:
 
           case "${{ inputs.gpu-tier }}" in
             t4)
-              # Run CPU/LLVM and GPU variants together. Keep independent compile
-              # steps enabled for mixed-file compile/dispatch sequences.
-              slang_test_args+=("-api" "vk+cuda+dx11+dx12+mtl+wgpu+cpu+llvm")
+              # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped — the
+              # CPU-only tier covers those. Intentionally NOT using -api-only:
+              # no-API tests (COMPILE directives in multi-step compile→dispatch
+              # sequences, SIMPLE/DIAGNOSTIC tests that validate SPIR-V emission)
+              # still need to run on the GPU tier for correctness.
+              slang_test_args+=("-api" "vk+cuda+dx11+dx12+mtl+wgpu")
               # T4 cannot execute SM 8.0+ cooperative matrix PTX safely.
               slang_test_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
               slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
@@ -173,9 +154,7 @@ jobs:
               # Keep L4/Blackwell cost bounded: run only the capability subset
               # that T4 cannot safely cover, not a second full Linux GPU suite.
               test_roots=("tests/cooperative-matrix/" "tests/neural/" "slang-unit-test-tool/cooperativeMatrixSubgroupTypeMetadata.internal")
-              # The removed CPU-only job also covered these excluded paths.
-              # Preserve their CPU/LLVM variants on the existing capable runner.
-              slang_test_args+=("-api" "vk+cuda+cpu+llvm")
+              slang_test_args+=("-api" "vk+cuda")
               ;;
             *)
               echo "::error::unknown gpu-tier '${{ inputs.gpu-tier }}' (expected t4 or sm80plus)"

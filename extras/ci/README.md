@@ -2,9 +2,6 @@
 
 Tools for analyzing GitHub Actions CI performance and queue status.
 
-See the [Windows and Linux API consolidation design](../../docs/design/windows-ci-api-consolidation.md)
-for the workflow changes, related analytics coordination, and rollout criteria.
-
 ## Scripts
 
 | Script                          | Purpose                                                                   |

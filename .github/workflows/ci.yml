@@ -510,7 +510,7 @@ jobs:
       runs-on: '["Windows", "self-hosted", "build"]'
       artifact-name-suffix: "-falcor"
 
-  # Linux tests: GPU, CPU, and LLVM coverage share each containerized T4 job.
+  # Linux tests (self-hosted GPU runner, containerized)
   test-linux-debug-gcc-x86_64:
     needs: [filter, build-linux-debug-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
@@ -533,7 +533,6 @@ jobs:
     with:
       config: release
       server-count: 8
-      slang-user-skills: true
 
   test-linux-release-gcc-x86_64-rhi:
     needs: [filter, build-linux-release-gcc-x86_64]
@@ -543,8 +542,8 @@ jobs:
       config: release
 
   # Linux x86_64 SM80+ capability tests (self-hosted L4/Blackwell runner).
-  # Runs cooperative-matrix / neural coverage excluded by the T4 skip list,
-  # including its CPU/LLVM variants. Keep this hardware-capability tier separate.
+  # Runs only cooperative-matrix / neural coverage that T4 cannot safely
+  # execute after CUDA coopmat moves to Ampere-only mma.sync PTX.
   test-linux-release-gcc-x86_64-sm80:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
@@ -554,6 +553,27 @@ jobs:
       runs-on: '["Linux", "self-hosted", "SM80Plus"]'
       gpu-tier: sm80plus
       server-count: 8
+
+  # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
+  # Runs the test suite filtered to CPU and LLVM backends via
+  # -api cpu+llvm, so GPU-targeted test variants are ignored rather than run.
+  # Catches frontend / IR / diagnostic regressions on cheap hardware and
+  # complements the GPU-runner jobs.
+  test-linux-release-gcc-x86_64-cpu:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: x86_64
+      config: release
+      runs-on: '["ubuntu-24.04"]'
+      full-gpu-tests: false
+      cpu-only: true
+      slang-user-skills: true
+      server-count: 4
+      run-via-glsl: false
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -919,6 +939,7 @@ jobs:
         test-linux-release-gcc-x86_64,
         test-linux-release-gcc-x86_64-rhi,
         test-linux-release-gcc-x86_64-sm80,
+        test-linux-release-gcc-x86_64-cpu,
         test-linux-debug-gcc-x86_64,
         test-linux-debug-gcc-x86_64-rhi,
         test-linux-release-gcc-aarch64,

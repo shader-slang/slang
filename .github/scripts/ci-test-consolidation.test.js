@@ -113,10 +113,29 @@ try {
     );
   }
   assert.match(job("test-windows-debug-cl-x86_64-gpu"), /timeout-minutes: 120/);
-  assert.ok(!ci.includes("test-linux-release-gcc-x86_64-cpu"));
-  assert.match(job("test-linux-release-gcc-x86_64"), /slang-user-skills: true/);
-  assert.match(container, /export SLANG_DISABLE_AVX512=1/);
-  assert.match(container, /Validate Slang user-skill examples/);
+  const cpuCaller = job("test-linux-release-gcc-x86_64-cpu");
+  assert.match(cpuCaller, /runs-on: '\["ubuntu-24.04"\]'/);
+  assert.match(cpuCaller, /cpu-only: true/);
+  assert.match(cpuCaller, /slang-user-skills: true/);
+  assert.match(cpuCaller, /server-count: 4/);
+  const cpuArgs = command(
+    script(ordinary, "Test Slang"),
+    {
+      os: "linux",
+      config: "release",
+      "cpu-only": true,
+      "gpu-api-only": false,
+      "enable-debug-layers": true,
+      "server-count": 4,
+      "gpu-tier": "",
+      "full-gpu-tests": false,
+    },
+    { API_INPUT: "" },
+  );
+  assert.equal(cpuArgs[cpuArgs.indexOf("-api") + 1], "cpu+llvm");
+  console.log(
+    "PASS Linux CPU/LLVM: separate non-GPU hosted job and skills checks",
+  );
   for (const config of ["debug", "release"]) {
     for (const tier of ["t4", "sm80plus"]) {
       const args = command(script(container, "Test Slang"), {
@@ -125,8 +144,8 @@ try {
         "gpu-tier": tier,
       });
       const apis = args[args.indexOf("-api") + 1].split("+");
-      for (const api of ["vk", "cuda", "cpu", "llvm"])
-        assert.ok(apis.includes(api));
+      for (const api of ["vk", "cuda"]) assert.ok(apis.includes(api));
+      for (const api of ["cpu", "llvm"]) assert.ok(!apis.includes(api));
       assert.equal(args.includes("tests/skip-list-gpu-t4.txt"), tier === "t4");
       assert.equal(args.includes("tests/neural/"), tier === "sm80plus");
       assert.equal(
@@ -134,7 +153,7 @@ try {
         tier === "sm80plus",
       );
       console.log(
-        `PASS Linux ${config} ${tier}: CPU/LLVM coverage and capability selection`,
+        `PASS Linux ${config} ${tier}: GPU-only mask and capability selection`,
       );
     }
   }
@@ -143,6 +162,7 @@ try {
     "test-linux-debug-gcc-x86_64",
     "test-linux-release-gcc-x86_64",
     "test-linux-release-gcc-x86_64-sm80",
+    "test-linux-release-gcc-x86_64-cpu",
   ])
     assert.match(job("check-ci"), new RegExp(`        ${id},`));
 
@@ -153,6 +173,7 @@ try {
     "test-linux-debug-gcc-x86_64",
     "test-linux-release-gcc-x86_64",
     "test-linux-release-gcc-x86_64-sm80",
+    "test-linux-release-gcc-x86_64-cpu",
   ];
   for (const failing of [null, ...required]) {
     const needs = Object.fromEntries(
