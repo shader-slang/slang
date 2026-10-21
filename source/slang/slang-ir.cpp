@@ -2570,7 +2570,8 @@ IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
     switch (type->getOp())
     {
     case kIROp_FloatType:
-        keyInst.value.floatVal = static_cast<float>(inValue);
+        // Narrow through the bit pattern so that a signaling NaN is not quieted.
+        keyInst.value.floatVal = FloatBitsToDouble(DoubleToFloatBits(inValue));
         break;
     case kIROp_HalfType:
         keyInst.value.floatVal = HalfToFloat(FloatToHalf((float)inValue));

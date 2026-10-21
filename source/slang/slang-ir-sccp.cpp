@@ -879,8 +879,8 @@ struct SCCPContext
         {
         case kIROp_FloatType:
             {
-                float fval = (float)c0->value.floatVal;
-                memcpy(&sourceValueBits, &fval, sizeof(fval));
+                // Not `(float)floatVal`, which would quiet a signaling NaN.
+                sourceValueBits = DoubleToFloatBits(c0->value.floatVal);
                 break;
             }
         case kIROp_DoubleType:
@@ -932,9 +932,9 @@ struct SCCPContext
             break;
         case kIROp_FloatType:
             {
-                uint32_t val = (uint32_t)sourceValueBits;
-                float floatVal = IntAsFloat((int)val);
-                resultVal = getBuilder()->getFloatValue(type, floatVal);
+                // Widening the bits through a `float` would quiet a signaling NaN.
+                resultVal =
+                    getBuilder()->getFloatValue(type, FloatBitsToDouble((uint32_t)sourceValueBits));
             }
             break;
         case kIROp_DoubleType:
