@@ -71,6 +71,7 @@
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
+#include "slang-ir-legalize-resource-globals.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-legalize-vector-types.h"
@@ -84,6 +85,7 @@
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-conditional-type.h"
 #include "slang-ir-lower-coopvec.h"
+#include "slang-ir-lower-copy-logical.h"
 #include "slang-ir-lower-cpu-resource-types.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
@@ -2066,6 +2068,37 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
+    // Global varying translation materializes input parameters and their assignments before
+    // cloning an entry point. The ordinary clone must contain that same input setup.
+    if (requiredLoweringPassSet.globalVaryingVar)
+        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
+
+    // We separate launch functions from ordinary callees before injecting initialization. The
+    // ordinary clone must use its caller's globals rather than reinitialize them at each call.
+    // This ordering applies independently of the globals' types and also lets later CUDA active-
+    // mask synthesis distinguish a launch from a call inside divergent control flow.
+    SLANG_PASS(fixEntryPointCallsites);
+
+    // Resource- and empty-type legalization selected for the target has completed. We move all
+    // initializers required by the target or by resource-global replacement in one module-order
+    // traversal, before any pass replaces their storage. HLSL globals whose initializers can stay
+    // at module scope remain there; the initializer mover owns that target policy.
+    SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    // Selected resource globals still represent one IR value and now have no initializer bodies.
+    // We replace their storage with locals and generated parameters before resource specialization
+    // attempts to eliminate forms that the target cannot emit. The generated-local uninitialized-
+    // value check uses the same validation option as the pre-link module-wide check.
+    SLANG_PASS(
+        legalizeResourceGlobalVars,
+        targetRequest->getTargetCaps(),
+        targetProgram->getOptionSet().shouldRunNonEssentialValidation(),
+        sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     if (isCPUTargetViaLLVM(targetRequest))
     {
         // The LLVM targets are special in that we always lower all matrices
@@ -2083,13 +2116,14 @@ Result linkAndOptimizeIR(
             bufferElementTypeLoweringOptions);
     }
 
-    SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
-
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
     // to see if we can clean up any temporaries created by legalization.
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
+    //
+    // Matrix types are the exception: `legalizeMatrixTypes` runs later, after
+    // `lowerBufferElementTypeToStorageType`, so int/uint/bool matrices are still matrices here.
     if (fastIRSimplificationOptions.minimalOptimization)
         SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     else
@@ -2109,15 +2143,13 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // After type legalization and subsequent SSA cleanup we expect
-    // that any resource types passed to functions are exposed
-    // as their own top-level parameters (which might have
-    // resource or array-of-...-resource types).
-    //
-    // Many of our targets place restrictions on how certain
-    // resource types can be used, so that having them as
-    // function parameters, reults, etc. is invalid.
-    // We clean up the usages of resource values here.
+    // On targets that require resource-type legalization, that pass has separated resources from
+    // the aggregates that contained them. Each remaining resource parameter on those paths
+    // represents one resource value or one resource array. CPU and CUDA paths retain aggregates
+    // because their target representations can contain resource values.
+    // Some targets cannot pass those values through ordinary function parameters or results.
+    // `specializeResourceUsage` specializes calls that it can rewrite into a supported form; later
+    // target validation diagnoses any addressable resource storage that still cannot be emitted.
     SLANG_PASS(specializeResourceUsage, codeGenContext);
 
     // Specialize calls to functions with values loaded from an immutable location,
@@ -2335,17 +2367,13 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // Specialization can expose references to global varying builtins that were
-    // previously hidden behind generic/interface dispatch. Translate all global
-    // varying inputs/outputs now, after specialization, but before target
-    // entry-point legalization.
-    if (requiredLoweringPassSet.globalVaryingVar)
-        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
-
+    // Resource specialization can inline a helper containing interpolation operations into an
+    // entry point. We resolve varying-input references after those calls have been inlined, while
+    // varying parameters still have their original address representation. Ordinary entry-point
+    // clones can contain the same operations, so the resolver visits them as well as launch
+    // functions.
     if (requiredLoweringPassSet.resolveVaryingInputRef)
         SLANG_PASS(resolveVaryingInputRef);
-
-    SLANG_PASS(fixEntryPointCallsites);
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
@@ -2471,15 +2499,9 @@ Result linkAndOptimizeIR(
     {
     default:
         break;
-    case CodeGenTarget::HLSL:
-    case CodeGenTarget::GLSL:
-    case CodeGenTarget::WGSL:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
-        break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             SLANG_PASS(introduceExplicitGlobalContext, target);
@@ -2493,18 +2515,11 @@ Result linkAndOptimizeIR(
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with
         // direct pointers
         SLANG_PASS(undoParameterCopy);
-        // Transform struct parameters to use ConstRef for better performance
-        if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
-            isMetalTarget(targetRequest))
-        {
-            SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
-        }
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         SLANG_PASS(introduceExplicitGlobalContext, target);
         if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
         {
@@ -2601,11 +2616,6 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.bitcast)
         SLANG_PASS(lowerBitCast, targetProgram, sink);
 
-    // Rewrite functions that return arrays to return them via `out` parameter,
-    // since our target languages doesn't allow returning arrays.
-    if (!isMetalTarget(targetRequest) && !isSPIRV(target))
-        SLANG_PASS(legalizeArrayReturnType);
-
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {
         SLANG_PASS(legalizeUniformBufferLoad);
@@ -2632,6 +2642,46 @@ Result linkAndOptimizeIR(
         lowerBufferElementTypeToStorageType,
         targetProgram,
         bufferElementTypeLoweringOptions);
+
+    // Loading a whole struct that has an int/uint/bool matrix member copies the buffer storage
+    // type into the logical type with a `CopyLogical` inst. SPIR-V has `OpCopyLogical` for it,
+    // but GLSL has no such operation, so we lower it into element-wise copies here.
+    if (target == CodeGenTarget::GLSL)
+        SLANG_PASS(lowerCopyLogical);
+
+    // On SPIR-V, GLSL, WGSL and Metal, `legalizeMatrixTypes` rewrites an int/uint/bool matrix into
+    // an array of row vectors, because the int/uint/bool types are not allowed as the matrix
+    // element type on those targets. The vector types no longer keep the information of
+    // matrix-major-ness. `lowerBufferElementTypeToStorageType()` needs the information of the
+    // matrix-major-ness and it must run before `legalizeMatrixTypes()` removes the information.
+    //
+    // Consider this example:
+    //
+    //     struct S { column_major int2x3 m; int tail; }
+    //     RWStructuredBuffer<S> b;
+    //
+    // `lowerBufferElementTypeToStorageType` sees `m` as a matrix and stores it as three column
+    // vectors, which is the layout that reflection reports. If this pass ran first, it would
+    // change `m` into two row vectors, and `tail` would be at a different offset than reflection
+    // says.
+    SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
+
+    // Transform struct and array parameters to use ConstRef for better performance on Metal, C++
+    // and CUDA. This runs after `legalizeMatrixTypes`, because the pass transforms struct and
+    // array parameters but not matrix parameters. A parameter of an int/uint/bool matrix type is
+    // an array only after `legalizeMatrixTypes`, and Metal requires an array parameter to be
+    // passed by reference. SPIR-V does the same transformation earlier, because the pass changes
+    // how `lowerBufferElementTypeToStorageType` sees array parameters.
+    if ((isCPUTarget(targetRequest) && !isCPUTargetViaLLVM(targetRequest)) ||
+        isCUDATarget(targetRequest) || isMetalTarget(targetRequest))
+        SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+
+    // Rewrite functions that return arrays to return them via `out` parameter,
+    // since our target languages doesn't allow returning arrays. This runs after
+    // `legalizeMatrixTypes`, because a function that returns an int/uint/bool matrix returns an
+    // array once the matrix is lowered.
+    if (!isMetalTarget(targetRequest) && !isSPIRV(target))
+        SLANG_PASS(legalizeArrayReturnType);
 
     // If we are generating code for glsl or metal, perform address space propagation now.
     // For SPIRV, we will do that during spirv legalization that happens after
@@ -2897,6 +2947,9 @@ Result linkAndOptimizeIR(
     }
     SLANG_PASS(collectMetadata, targetProgram, *metadata);
 
+    // We check D3D and Metal resource locals after all passes that can create mutable storage.
+    // Minimum-optimization mode must still reject storage that its target cannot represent.
+    SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
@@ -3062,7 +3115,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         // passes have been performed, we can emit target code from
         // the IR module.
         //
+        const Index errorCountBeforeEmit = sink->getErrorCount();
         sourceEmitter->emitModule(irModule, sink);
+        if (sink->getErrorCount() > errorCountBeforeEmit)
+            return SLANG_FAIL;
     }
 
     String code = sourceWriter.getContent();

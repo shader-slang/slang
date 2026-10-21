@@ -1186,6 +1186,20 @@ err(
 )
 
 err(
+    "spirv-snippet-undefined-id",
+    29001,
+    "undefined id in SPIR-V snippet",
+    span { loc = "location", message = "undefined SPIR-V id '%~id' in target intrinsic snippet: ~snippet" }
+)
+
+err(
+    "spirv-snippet-unknown-operand",
+    29002,
+    "unknown operand in SPIR-V snippet",
+    span { loc = "location", message = "unknown operand '~operand' in target intrinsic snippet: ~snippet" }
+)
+
+err(
     "unrecognized-spirv-opcode",
     29100,
     "unrecognized SPIR-V opcode",
@@ -1590,17 +1604,24 @@ err(
 )
 
 err(
-    "this-param-mode-attribute-without-effective-this-param",
+    "receiver-param-mode-specifier-without-receiver-param",
     30428,
-    "attribute requires an effective `this` parameter",
-    span { loc = "attribute:Modifier", message = "attribute '~attribute' is only allowed on a declaration with an effective `this` parameter." }
+    "receiver-mode specifier requires an instance receiver",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is only allowed on an instance member that has a `this` parameter." }
 )
 
 err(
-    "this-param-mode-attribute-on-class-member",
+    "receiver-param-mode-specifier-on-class-member",
     30429,
-    "attribute cannot change a source-declared class member's effective `this` parameter",
-    span { loc = "attribute:Modifier", message = "attribute '~attribute' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value." }
+    "receiver-mode specifier is not allowed on a class member",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is not allowed on a class member; a class receiver always uses the `in` parameter-passing mode." }
+)
+
+err(
+    "cpp-style-trailing-receiver-param-const-requires-hlsl",
+    30443,
+    "trailing `const` is only allowed in the HLSL dialect",
+    span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`)." }
 )
 
 err(
@@ -1695,10 +1716,10 @@ err(
 )
 
 err(
-    "global-var-cannot-have-opaque-type",
+    "opaque-type-not-supported-for-mutable-static",
     30076,
-    "global variable cannot have opaque type",
-    span { loc = "decl:Decl", message = "global variable cannot have opaque type." }
+    "opaque type is not supported for mutable static storage",
+    span { loc = "decl:Decl", message = "mutable file- or namespace-scope `static` variable '~decl' has the opaque type '~type:Type', which cannot be represented by mutable storage" }
 )
 
 err(
@@ -1709,17 +1730,17 @@ err(
 )
 
 err(
-    "opaque-type-in-mutable-global",
+    "opaque-type-not-supported-for-mutable-global-storage",
     30089,
-    "mutable global variable has an opaque type after linking",
-    span { loc = "location", message = "a mutable static global variable cannot contain an opaque value of type '~type:IRInst'." }
+    "opaque type is not supported for mutable global storage",
+    span { loc = "location", message = "mutable global storage cannot contain an opaque value of type '~type:IRInst'" }
 )
 
 err(
-    "unsized-type-in-mutable-global",
+    "unsized-type-in-mutable-global-storage",
     30074,
-    "mutable global variable has an unsized type after linking",
-    span { loc = "location", message = "a mutable static global variable cannot have unsized type '~type:IRInst'." }
+    "mutable global variable has an unsized type",
+    span { loc = "location", message = "a mutable global variable cannot have the unsized type '~type:IRInst'" }
 )
 
 err(
@@ -4797,6 +4818,13 @@ warning(
 )
 
 err(
+    "entry-point-param-has-reference-mode",
+    38054,
+    "entry-point parameter cannot use a reference passing mode",
+    span { loc = "param:Decl", message = "entry-point parameter '~param' cannot use the reference passing mode '~mode:ParamPassingMode', because an entry point exchanges values with the pipeline rather than with a caller's memory location" }
+)
+
+err(
     "int-val-from-non-int-spec-const-encountered",
     38041,
     "cannot cast non-integer specialization constant to integer",
@@ -5122,6 +5150,15 @@ err(
     39032,
     "target does not support ray tracing entry point parameters",
     span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
+)
+
+err(
+    "multiple-push-constant-blocks-in-entry-point",
+    39033,
+    "entry point uses more than one push-constant block",
+    span { loc = "entryPoint:IRInst", message = "entry point `~entryPoint` uses more than one push-constant block, but Vulkan allows at most one per entry point" },
+    variadic_note { cpp_name = "Block", message = "~blockDescription is used by this entry point", span { loc = "blockLocation" } },
+    note { message = "combine the data into one `[[vk::push_constant]]` block or into the entry point's `uniform` parameters", span { loc = "entryPoint:IRInst" } }
 )
 
 warning(
@@ -6089,6 +6126,104 @@ warning(
     56005,
     "'precise' qualifier is not supported on target '~target' and will be ignored; Slang does not currently preserve it in generated code, so the value may be optimized with fused/contracted arithmetic",
     span { loc = "location" }
+)
+
+err(
+    "mutable-resource-used-by-function-without-rewritable-call",
+    56006,
+    "mutable resource state is unavailable to a function whose invocations cannot all be rewritten",
+    span { loc = "location", message = "function '~function:IRInst' may be invoked without a direct call that Slang can rewrite, so Slang cannot automatically pass the resource that it accesses; pass the resource explicitly instead" }
+)
+
+err(
+    "mutable-resource-has-conflicting-call-aliases",
+    56007,
+    "mutable resource state cannot be passed by reference and accessed by name when either path may modify it",
+    span { loc = "location", message = "mutable resource variable '~variable:IRInst' is passed by reference to function '~function:IRInst', which also accesses the resource by name, and at least one of those paths may modify it; pass the resource through only one path" }
+)
+
+err(
+    "mutable-resource-requires-module-scope-storage",
+    56008,
+    "mutable resource variable must remain in module-scope storage",
+    span { loc = "location", message = "mutable resource variable '~variable:IRInst' must remain in module-scope storage because it is externally accessible or explicitly retained; Slang cannot replace it with function-local storage" }
+)
+
+err(
+    "mutable-resource-address-has-unsupported-use",
+    56009,
+    "address use may observe the identity of mutable resource storage",
+    span { loc = "location", message = "the program may retain the address of mutable resource variable '~variable:IRInst' or observe its storage identity; replacing the variable with function-local storage might change that behavior" }
+)
+
+err(
+    "mutable-resource-used-by-entry-point-with-unrewritable-invocation",
+    56010,
+    "entry point may be invoked through a path that cannot receive mutable resource state",
+    span { loc = "location", message = "entry point '~function:IRInst' accesses mutable resource state and may be invoked through another path for which Slang cannot add generated resource arguments; move the shared implementation to an ordinary function and pass the resource explicitly" }
+)
+
+err(
+    "mutable-resource-used-outside-function",
+    56011,
+    "mutable resource variable is used by executable code outside a function",
+    span { loc = "location", message = "mutable resource variable '~variable:IRInst' is referenced by an operation outside a function body; perform that operation inside an entry point or another function" }
+)
+
+err(
+    "mutable-resource-array-complete-initialization-not-proven",
+    56012,
+    "cannot prove complete initialization of a mutable resource array",
+    span { loc = "location", message = "mutable resource array '~variable:IRInst' may be written one element at a time and may be read before a whole-array assignment; assign the whole array before reading it" }
+)
+
+err(
+    "cannot-prove-mutable-resource-initializer-safe-to-move",
+    56013,
+    "cannot prove that a mutable resource initializer can be moved safely",
+    span { loc = "location", message = "Slang cannot prove that moving the initializer for the mutable resource variable '~variable:IRInst' to each entry point preserves observable behavior. The initializer may fail to return normally, may have externally observable side effects, or may read preexisting mutable storage, resource contents, or non-resource data from an explicit parameter group; initialize the resource explicitly in an entry point instead" }
+)
+
+err(
+    "mutable-resource-used-by-generic-assembly-function",
+    56014,
+    "mutable resource state is unavailable to a generic-assembly function",
+    span { loc = "location", message = "function '~function:IRInst' uses generic assembly as its emitted implementation, so Slang cannot preserve the function body's access to mutable resource state; pass the resource explicitly as an assembly operand instead" }
+)
+
+err(
+    "mutable-resource-used-by-target-intrinsic-function",
+    56015,
+    "mutable resource state is unavailable to a target-intrinsic function",
+    span { loc = "location", message = "function '~function:IRInst' has a target-intrinsic implementation for this compilation target, so Slang emits that implementation instead of the function body and cannot preserve the body's access to mutable resource state; pass the resource as an explicit function argument and reference it from the target intrinsic instead" }
+)
+
+err(
+    "mutable-resource-has-reference-outside-function-body",
+    56016,
+    "mutable resource variable has an unsupported reference outside a function body",
+    span { loc = "location", message = "mutable resource variable '~variable:IRInst' is referenced by an instruction that is not inside a function body; Slang cannot preserve that reference after replacing the variable with function-local storage" }
+)
+
+err(
+    "mutable-static-resource-cannot-use-shared-or-qualified-storage",
+    56017,
+    "mutable static resource cannot use shared or memory-qualified storage",
+    span { loc = "decl:Decl", message = "a resource-valued `static` variable declared at file or namespace scope cannot use `groupshared` or a memory-access qualifier; per-invocation resource replacement uses function-local storage and cannot preserve group sharing or the qualified memory-access behavior" }
+)
+
+err(
+    "mutable-resource-attached-metadata-has-external-reference",
+    56018,
+    "metadata attached to a mutable resource variable has an external reference",
+    span { loc = "location", message = "metadata attached to mutable resource variable '~variable:IRInst' is referenced from outside the variable's metadata subtree; Slang cannot remove the variable without leaving that reference dangling" }
+)
+
+err(
+    "opaque-local-storage-not-supported-for-target",
+    56019,
+    "target cannot represent an opaque value in mutable local storage",
+    span { loc = "location", message = "mutable local storage contains an opaque value of type '~type:IRInst', which target '~target:CodeGenTarget' cannot represent; use or pass the resource value directly instead of assigning it to a mutable local or `static` variable" }
 )
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics

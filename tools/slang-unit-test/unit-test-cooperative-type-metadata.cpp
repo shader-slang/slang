@@ -338,6 +338,13 @@ static const CooperativeMetadataTargetDesc kCooperativeVectorTargets[] = {
     {"cuda_optix", SLANG_CUDA_SOURCE, nullptr, kCudaOptixCoopVecCaps, 1},
 };
 
+// OptiX rejects a transposed matrix with an int8 interpretation and `coopVecMatMulPacked` (E55204),
+// so the test that uses both runs only on the targets that support them.
+static const CooperativeMetadataTargetDesc kCooperativeVectorInt8TransposeAndPackedTargets[] = {
+    {"spirv", SLANG_SPIRV, "spirv_1_6", kSpirvCoopVecCaps, 1},
+    {"hlsl", SLANG_HLSL, "sm_6_9", nullptr, 0},
+};
+
 static const CooperativeMetadataTargetDesc kCooperativeVectorTrainingTargets[] = {
     {"spirv", SLANG_SPIRV, "spirv_1_6", kSpirvCoopVecTrainingCaps, 2},
     {"hlsl", SLANG_HLSL, "sm_6_9", nullptr, 0},
@@ -701,7 +708,7 @@ void computeMain()
          .transpose = false},
     };
 
-    for (const auto& target : kCooperativeVectorTargets)
+    for (const auto& target : kCooperativeVectorInt8TransposeAndPackedTargets)
     {
         auto metadata = _compileAndGetCooperativeMetadata(source, "coopVectorTypeModule", target);
         SLANG_CHECK(metadata != nullptr);
