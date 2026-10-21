@@ -812,10 +812,11 @@ static bool isStaticConst(IRInst* inst)
     // functions that use it.
     if (isNonFiniteFloatLit(inst))
         return false;
-    // A specialization constant is emitted as an `override`, and an expression that reads one is
-    // an override-expression, which a WGSL `const` initializer cannot hold.
-    if (auto layout = findVarLayout(inst);
-        layout && layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
+    // A specialization constant is emitted as an `override`, and an expression that reads one is an
+    // override-expression, which a WGSL `const` initializer cannot hold. Both the constant and the
+    // module-scope values computed from it (e.g. `kBits | 1u`) carry the spec-const rate, so this
+    // check also comes before the module-scope test below.
+    if (isSpecConstRateType(inst->getFullType()))
         return false;
     if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
