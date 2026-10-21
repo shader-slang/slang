@@ -47,7 +47,7 @@ try {
   const capture = path.join(tmp, "args.json");
   fs.writeFileSync(
     path.join(tmp, "slang-test"),
-    '#!/usr/bin/env node\nrequire("fs").writeFileSync(process.env.CAPTURE, JSON.stringify(process.argv.slice(2)));\n',
+    '#!/usr/bin/env node\nrequire("fs").appendFileSync(process.env.CAPTURE, JSON.stringify(process.argv.slice(2)) + "\\n");\n',
     { mode: 0o755 },
   );
   function run(source, inputs, extraEnv = {}) {
@@ -65,9 +65,20 @@ try {
     return result;
   }
   function command(source, inputs, extraEnv) {
+    fs.writeFileSync(capture, "");
     const result = run(source, inputs, extraEnv);
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    const args = JSON.parse(fs.readFileSync(capture, "utf8"));
+    const records = fs
+      .readFileSync(capture, "utf8")
+      .trim()
+      .split("\n")
+      .filter(Boolean);
+    assert.equal(
+      records.length,
+      1,
+      "Expected exactly one slang-test invocation",
+    );
+    const args = JSON.parse(records[0]);
     assert.equal(args.filter((arg) => arg === "-api").length, 1);
     assert.ok(!args.includes("-api-only"));
     assert.ok(!args.includes("-skip-api-independent-tests"));
