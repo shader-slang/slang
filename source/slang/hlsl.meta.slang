@@ -8716,6 +8716,7 @@ double2 asdouble(uint2 lowbits, uint2 highbits)
 /// Reinterpret bits as a float.
 /// @category conversion
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 float asfloat(int x)
 {
@@ -8729,12 +8730,13 @@ float asfloat(int x)
     case spirv: return spirv_asm {
         OpBitcast $$float result $x
     };
-    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case wgsl: return bit_cast<float>(x);
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 float asfloat(uint x)
 {
@@ -8748,13 +8750,14 @@ float asfloat(uint x)
     case spirv: return spirv_asm {
         OpBitcast $$float result $x
     };
-    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case wgsl: return bit_cast<float>(x);
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<float, N> asfloat(vector< int, N> x)
 {
@@ -8766,7 +8769,7 @@ vector<float, N> asfloat(vector< int, N> x)
     case spirv: return spirv_asm {
         OpBitcast $$vector<float, N> result $x
     };
-    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case wgsl: return bit_cast<vector<float, N>>(x);
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
@@ -8775,6 +8778,7 @@ vector<float, N> asfloat(vector< int, N> x)
 
 __generic<let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
@@ -8786,7 +8790,7 @@ vector<float,N> asfloat(vector<uint,N> x)
     case spirv: return spirv_asm {
         OpBitcast $$vector<float,N> result $x
     };
-    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case wgsl: return bit_cast<vector<float, N>>(x);
     case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
