@@ -383,6 +383,83 @@ void validateCodeBody(IRValidateContext* context, IRGlobalValueWithCode* code)
     }
 }
 
+// Check declaration-scope contracts, guarding operand counts before reading fixed positions.
+static void validateDebugScopeOperands(IRValidateContext* context, IRInst* inst)
+{
+    IRInst* scope = nullptr;
+    switch (inst->getOp())
+    {
+    case kIROp_DebugLexicalBlock:
+        {
+            bool validCount = inst->getOperandCount() == 4;
+            validate(context, validCount, inst, "invalid debug declaration operand count");
+            if (!validCount)
+                return;
+            scope = inst->getOperand(3);
+            break;
+        }
+    case kIROp_DebugVar:
+    case kIROp_DebugInlinedAt:
+        {
+            auto count = inst->getOperandCount();
+            bool validCount = count == 4 || count == 5;
+            validate(context, validCount, inst, "invalid debug declaration operand count");
+            if (!validCount)
+                return;
+            scope = inst->getOperand(3);
+            break;
+        }
+    case kIROp_DebugScope:
+        validate(
+            context,
+            inst->getOperandCount() == 1 || inst->getOperandCount() == 2,
+            inst,
+            "invalid DebugScope operand count");
+        if (!inst->getOperandCount())
+            return;
+        scope = inst->getOperand(0);
+        break;
+    case kIROp_DebugLocationDecoration:
+        if (inst->getOperandCount() == 4)
+            scope = inst->getOperand(3);
+        else
+            return;
+        break;
+    default:
+        return;
+    }
+    validate(
+        context,
+        as<IRDebugFunction>(scope) || as<IRDebugLexicalBlock>(scope),
+        inst,
+        "debug scope must be a function or lexical block");
+    if (as<IRDebugLexicalBlock>(inst))
+    {
+        validate(
+            context,
+            as<IRDebugSource>(inst->getOperand(0)) && as<IRIntLit>(inst->getOperand(1)) &&
+                as<IRIntLit>(inst->getOperand(2)),
+            inst,
+            "lexical block requires source, line and column");
+        HashSet<IRInst*> parents;
+        parents.add(inst);
+        while (auto block = as<IRDebugLexicalBlock>(scope))
+        {
+            if (!parents.add(block) || block->getOperandCount() != 4)
+            {
+                validate(context, false, inst, "invalid lexical parent chain");
+                return;
+            }
+            scope = block->getParentScope();
+        }
+        validate(
+            context,
+            as<IRDebugFunction>(scope),
+            inst,
+            "lexical parent chain must end at a function");
+    }
+}
+
 void validateIRInst(IRValidateContext* context, IRInst* inst)
 {
     // Validate that any operands of the instruction are used appropriately
@@ -401,6 +478,8 @@ void validateIRInst(IRValidateContext* context, IRInst* inst)
 
     if (as<IRGlobalValueWithCode>(inst))
         context->domTree = nullptr;
+
+    validateDebugScopeOperands(context, inst);
 }
 
 void validateIRInst(IRInst* inst)
@@ -685,6 +764,77 @@ void validateVectorsAndMatrices(
             validateVectorElementCount(sink, vectorType);
         }
     }
+}
+
+bool validateMutableGlobalVariableTypes(IRModule* module, DiagnosticSink* sink)
+{
+    // Consider a module that declares `extern struct Thing {}` and uses `Thing` as the type of a
+    // file- or namespace-scope mutable `static` variable. Semantic checking cannot know whether a
+    // definition from another module contains a resource or an unsized array. Lowering marks that
+    // declaration category, so this validation can check its type once the definition is
+    // available.
+    bool hasErrors = false;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        // Only `IRGlobalVar` instructions represent mutable module-scope storage. Shader
+        // parameters and constants do not require that storage and are checked elsewhere.
+        auto globalVar = as<IRGlobalVar>(globalInst);
+        if (!globalVar)
+            continue;
+
+        // An `IRGlobalVar` may also represent a static data member. The decoration instead
+        // identifies a file- or namespace-scope mutable `static` variable, or a shadow synthesized
+        // for a uniform parameter under `-Gec`. The candidate predicate below separately checks
+        // that the global has no explicit storage rate before treating it as per-invocation state.
+        if (!globalVar->findDecoration<IRFileOrNamespaceScopeMutableVarDecoration>())
+            continue;
+
+        // We record whether the marked global has the rate and stored type accepted as a resource-
+        // replacement candidate before diagnosing other opaque types. The legalization pass later
+        // validates the candidate's uses and call graph before committing to replacement.
+        bool isPerInvocationResourceReplacementCandidate =
+            isResourceGlobalCandidateForPerInvocationReplacement(globalVar);
+
+        // The shared accessor asserts the concrete pointer and pointee representation established
+        // by linking. We remove wrappers from the stored value before inspecting its storage
+        // requirements.
+        auto valueType = as<IRType>(unwrapAttributedType(getGlobalVarValueType(globalVar)));
+        SLANG_RELEASE_ASSERT(valueType);
+
+        // The linker can select a definition with a trailing unsized array. Such a type may be
+        // valid as a buffer element, but we cannot independently allocate a mutable variable of
+        // that type. We check this before the resource exception below because an unbounded array
+        // of otherwise supported resources still cannot become function-local storage.
+        if (isUnsizedType(valueType))
+        {
+            sink->diagnose(Diagnostics::UnsizedTypeInMutableGlobalStorage{
+                .type = valueType,
+                .location = globalVar->sourceLoc});
+            hasErrors = true;
+            continue;
+        }
+
+        // `isOpaqueType` examines fields and array elements recursively. A later pass can attempt
+        // to replace one resource value or a fixed-size homogeneous resource array selected by the
+        // shared predicate. Every other opaque value would require unsupported mutable global
+        // storage.
+        IRType* opaqueType = nullptr;
+        if (isOpaqueType(valueType, &opaqueType))
+        {
+            if (isPerInvocationResourceReplacementCandidate)
+                continue;
+
+            // The diagnostic belongs at the variable declaration. Reporting it before resource
+            // legalization prevents an unsupported global initializer from being split as if it
+            // were a function returning its resource fields through generated `out` parameters.
+            sink->diagnose(Diagnostics::OpaqueTypeNotSupportedForMutableGlobalStorage{
+                .type = opaqueType,
+                .location = globalVar->sourceLoc});
+            hasErrors = true;
+            continue;
+        }
+    }
+    return !hasErrors;
 }
 
 //

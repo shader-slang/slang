@@ -54,9 +54,10 @@ jobs:
         run: |
           {
             echo "matrix<<MATRIX_EOF"
-            cat .github/cmake-options-matrix.json
+            jq '{include: [.include[] | select(.macos_only != "true")]}' \
+              .github/cmake-options-matrix.json
             echo "MATRIX_EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
 
   build:
     needs: setup

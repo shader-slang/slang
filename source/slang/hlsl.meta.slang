@@ -2284,7 +2284,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -2299,6 +2299,87 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
             case glsl:
                 __intrinsic_asm "$ctextureGrad($0, $1, $2, $3)$z";
+            case cuda:
+                // The 'tex*Grad<T>' CUDA runtime built-ins have no half or 3-component texel
+                // overloads. A half texel is rejected here because NVRTC would reject the
+                // CUDA; a float3/int3/uint3 texel fetches four components and reshapes back
+                // to three (other 3-component texel types stay unsupported, as for
+                // SampleLevel). The 3D and cube forms take float4 gradients, so we pad the
+                // float3 gradients with a zero w component.
+                static_assert(!__isHalf<T>(),
+                    "'SampleGrad' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
+                if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayeredGrad<float4>($0, ($1).x, int(($1).y), ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayeredGrad<int4>($0, ($1).x, int(($1).y), ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayeredGrad<uint4>($0, ($1).x, int(($1).y), ($2), ($3)))";
+                        __intrinsic_asm "tex1DLayeredGrad<$T0>($0, ($1).x, int(($1).y), ($2), ($3))";
+                    case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayeredGrad<float4>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayeredGrad<int4>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayeredGrad<uint4>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3)))";
+                        __intrinsic_asm "tex2DLayeredGrad<$T0>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredGrad<float4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayeredGrad<int4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayeredGrad<uint4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        __intrinsic_asm "texCubemapLayeredGrad<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DGrad<float4>($0, ($1), ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DGrad<int4>($0, ($1), ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DGrad<uint4>($0, ($1), ($2), ($3)))";
+                        __intrinsic_asm "tex1DGrad<$T0>($0, ($1), ($2), ($3))";
+                    case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DGrad<float4>($0, ($1).x, ($1).y, ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DGrad<int4>($0, ($1).x, ($1).y, ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DGrad<uint4>($0, ($1).x, ($1).y, ($2), ($3)))";
+                        __intrinsic_asm "tex2DGrad<$T0>($0, ($1).x, ($1).y, ($2), ($3))";
+                    case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3DGrad<float4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3DGrad<int4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3DGrad<uint4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        __intrinsic_asm "tex3DGrad<$T0>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapGrad<float4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapGrad<int4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapGrad<uint4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        __intrinsic_asm "texCubemapGrad<$T0>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
             case spirv:
                 return spirv_asm
                 {
@@ -13354,6 +13435,22 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
     }
 }
 
+//@ hidden:
+// Tests a value for NaN on the LLVM path without requiring the caller's generic constraint to
+// expose `__BuiltinFloatingPointType`. Explicit classification detects NaNs without relying on
+// floating-point comparison optimizations. Calls are guarded by `__isFloat<T>()`.
+// That query folds to a compile-time constant during specialization, so this helper is eliminated
+// for integer and application-defined `IComparable` specializations.
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+[__readNone]
+[require(llvm)]
+bool __llvmExtremaIsNaN(T value)
+{
+    // LLVM's fpclass mask 3 combines signaling NaN (0x1) and quiet NaN (0x2).
+    __intrinsic_asm "%result = call i1 @llvm.is.fpclass($0, i32 3)";
+}
+
 // Internal helper for max - contains the intrinsic implementations.
 // Caller must ensure T is a builtin scalar type (float, int, etc.).
 //@ hidden:
@@ -13373,7 +13470,8 @@ T __max_impl(T x, T y)
     case cpp: __intrinsic_asm "$P_max($0, $1)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm { result:$$T = OpExtInst glsl450 FMax $x $y };
+            // `NMax` matches HLSL/DXIL: one NaN returns the other operand; two return a NaN.
+            return spirv_asm { result:$$T = OpExtInst glsl450 NMax $x $y };
         else if (__isSignedInt<T>())
                 return spirv_asm { result:$$T = OpExtInst glsl450 SMax $x $y };
             else
@@ -13381,10 +13479,8 @@ T __max_impl(T x, T y)
     case llvm:
         if (__isFloat<T>())
         {
-            // We can only handle NaN for __BuiltinFloatingPointType,
-            // but not types conforming to IFloat for now
-            // if (isnan(x)) return y;
-            // if (isnan(y)) return x;
+            if (__llvmExtremaIsNaN(x)) return y;
+            if (__llvmExtremaIsNaN(y)) return x;
             return x > y ? x : y;
         }
         else if (__isSignedInt<T>())
@@ -13409,6 +13505,34 @@ T max(T x, T y)
     return __max_impl(x, y);
 }
 
+//@hidden:
+// These overloads rank below the numerics module's (-9 and -10) and above the `IComparable` one
+// (-13). Overload resolution compares conversion cost before rank, and satisfying `__IMinMax`
+// through `IFloat` costs more than a constraint the caller names directly, such as `IComparable`.
+// The overloads are therefore constrained by `IFloat` and `IInteger` themselves, and their ranks
+// differ so that a type conforming to both is not ambiguous; both call the same `__IMinMax`
+// witness, so either choice gives the type's own `min`/`max`.
+__generic<T : IFloat>
+[__readNone]
+[ForceInline]
+[OverloadRank(-11)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T max(T x, T y)
+{
+    return x.__max(y);
+}
+
+__generic<T : IInteger>
+[__readNone]
+[ForceInline]
+[OverloadRank(-12)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T max(T x, T y)
+{
+    return x.__max(y);
+}
+//@public:
+
 /// Maximum.
 /// @param x The first value.
 /// @param y The second value.
@@ -13418,11 +13542,15 @@ T max(T x, T y)
 /// @category math
 __generic<T : IComparable>
 [__readNone]
-[OverloadRank(-10)]
+[OverloadRank(-13)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
 {
-    // For builtin scalar types, use optimized intrinsics
+    // `__isFloat`/`__isInt` also hold for builtin vectors and matrices, which `__max_impl` cannot
+    // expand on cpp/cuda. Generic code constrained by `IFloat` or `IInteger` reaches the
+    // shape-specific overloads through `__IMinMax` instead. Generic code constrained only by
+    // `IComparable` or `IArithmetic` still sends builtin vectors and matrices here, a known
+    // limitation (#12720).
     if (__isFloat<T>() || __isInt<T>())
         return __max_impl(x, y);
 
@@ -13432,11 +13560,17 @@ T max(T x, T y)
     return x;
 }
 
-/// @category math
-__generic<T : __BuiltinIntegerType, let N : int>
+// Computes component-wise maxima using the target's vector operation when one is available.
+// Consider a generic function taking `vector<T, N>` with `T : __BuiltinArithmeticType`: semantic
+// checking cannot choose the integer or floating-point overload while `T` is abstract. Both that
+// broad overload and the concrete family overloads call this worker, whose type queries resolve
+// after specialization. We therefore retain native vector operations for either call path.
+//@ hidden:
+__generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-vector<T, N> max(vector<T, N> x, vector<T, N> y)
+vector<T, N> __vectorMaxImpl(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
     {
@@ -13445,7 +13579,13 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     case metal: __intrinsic_asm "max";
     case spirv:
     {
-        if (__isSignedInt<T>())
+        if (__isFloat<T>())
+        {
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 NMax $x $y
+            };
+        }
+        else if (__isSignedInt<T>())
         {
             return spirv_asm {
                 result:$$vector<T,N> = OpExtInst glsl450 SMax $x $y
@@ -13461,30 +13601,81 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     case wgsl: __intrinsic_asm "max";
     case llvm:
     {
-        if (__isSignedInt<T>())
+        if (__isFloat<T>())
+        {
+            // LLVM 21.1.1's `maximumnum` intrinsic miscompiles on x86. Use the scalar worker to
+            // preserve the established floating-point NaN behavior on every LLVM architecture.
+            VECTOR_MAP_BINARY(T, N, __max_impl, x, y);
+        }
+        else if (__isSignedInt<T>())
             __intrinsic_asm "%result = call $T0 @llvm.smax($0, $1)";
         else
             __intrinsic_asm "%result = call $T0 @llvm.umax($0, $1)";
     }
     default:
-        VECTOR_MAP_BINARY(T, N, max, x, y);
+        // C++ and CUDA use the scalar builtin worker directly. Calling public `max` while `T`
+        // is abstract would bind the whole-type `IComparable` overload and retain an extra wrapper.
+        VECTOR_MAP_BINARY(T, N, __max_impl, x, y);
     }
 }
 
-/// @category math
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+// Computes component-wise maxima while preserving the operands' matrix layout.
+// HLSL supports a native matrix operation; other targets use the vector worker on logical rows.
+//@ hidden:
+__generic<
+    T : __BuiltinArithmeticType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
+matrix<T, N, M, L> __matrixMaxImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "max";
     default:
-        MATRIX_MAP_BINARY(T, N, M, max, x, y);
+        // HLSL has a native matrix operation. Other targets decompose the logical rows so each row
+        // reaches the intrinsic-aware vector worker. `matrix<T, N, M, L>` implements
+        // `IRWArray<vector<T, M>>`, so indexing addresses a logical row independently of storage
+        // layout `L`. We retain the rolled loop so target compilers can choose whether to unroll it.
+        matrix<T, N, M, L> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = __vectorMaxImpl(x[i], y[i]);
+        return result;
     }
 }
 
+//@public:
+// We retain the integer and floating-point overloads so overload resolution remains
+// stable. The floating-point declarations also retain the identities referenced by derivative
+// registrations.
+/// @category math
+__generic<T : __BuiltinIntegerType, let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T, N> max(vector<T, N> x, vector<T, N> y)
+{
+    return __vectorMaxImpl(x, y);
+}
+
+/// @category math
+__generic<
+    T : __BuiltinIntegerType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
+{
+    return __matrixMaxImpl(x, y);
+}
+
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -13506,37 +13697,60 @@ T max(T x, T y)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "max";
-    case metal: __intrinsic_asm "max";
-    case glsl: __intrinsic_asm "max";
-    case spirv: return spirv_asm {
-        result:$$vector<T, N> = OpExtInst glsl450 FMax $x $y
-    };
-    case wgsl: __intrinsic_asm "max";
-    //case llvm: __intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
-    default:
-        VECTOR_MAP_BINARY(T, N, max, x, y);
-    }
+    return __vectorMaxImpl(x, y);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+/// @category math
+__generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
+// Concrete integer and floating-point calls should retain their established overloads; this
+// lower-ranked overload exists for generic code that knows only the common arithmetic domain.
+// It is primal-only because that domain includes integers and cannot share the floating-point
+// derivative registration. Differentiable generic code must constrain `T` to
+// `__BuiltinFloatingPointType` so overload resolution selects the overload above.
+[OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
+vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "max";
-    default:
-        MATRIX_MAP_BINARY(T, N, M, max, x, y);
-    }
+    return __vectorMaxImpl(x, y);
+}
+
+/// @category math
+__generic<
+    T : __BuiltinFloatingPointType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
+{
+    return __matrixMaxImpl(x, y);
+}
+
+/// @category math
+__generic<
+    T : __BuiltinArithmeticType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
+[__readNone]
+[ForceInline]
+// See the vector overload above for the common-arithmetic rank and primal-only contract.
+[OverloadRank(-1)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
+{
+    return __matrixMaxImpl(x, y);
 }
 
 /// Maximum of 3 inputs.
@@ -13575,7 +13789,10 @@ vector<T,N> max3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 /// @param x The first value to compare.
 /// @param y The second value to compare.
 /// @return The larger of the two values, element-wise if vector typed.
-/// @remarks Result is `y` if `x` < `y`, either `x` or `y` if both `x` and `y` are zeros, otherwise `x`. Which operand is the result is undefined if one of the operands is a NaN.
+/// @remarks HLSL/DXIL returns the numeric operand for one NaN, and a NaN for two NaNs.
+/// SPIR-V uses the corresponding `NMin`/`NMax` operations; target floating-point modes may relax
+/// special-value behavior. GLSL uses native `min`/`max`, which need not follow those NaN rules.
+/// Zero-sign selection also follows the target operation.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -13657,7 +13874,8 @@ T __min_impl(T x, T y)
     case cpp: __intrinsic_asm "$P_min($0, $1)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm { result:$$T = OpExtInst glsl450 FMin $x $y };
+            // `NMin` matches HLSL/DXIL: one NaN returns the other operand; two return a NaN.
+            return spirv_asm { result:$$T = OpExtInst glsl450 NMin $x $y };
         else if (__isSignedInt<T>())
             return spirv_asm { result:$$T = OpExtInst glsl450 SMin $x $y };
         else
@@ -13665,10 +13883,8 @@ T __min_impl(T x, T y)
     case llvm:
         if (__isFloat<T>())
         {
-            // We can only handle NaN for __BuiltinFloatingPointType,
-            // but not types conforming to IFloat for now
-            // if (isnan(x)) return y;
-            // if (isnan(y)) return x;
+            if (__llvmExtremaIsNaN(x)) return y;
+            if (__llvmExtremaIsNaN(y)) return x;
             return x < y ? x : y;
         }
         else if (__isSignedInt<T>())
@@ -13695,10 +13911,15 @@ T min(T x, T y)
     return __min_impl(x, y);
 }
 
-__generic<T : __BuiltinIntegerType, let N : int>
+// Computes component-wise minima using the target's vector operation when one is available.
+// Like `__vectorMaxImpl`, this worker is shared by the broad arithmetic overload and the concrete
+// integer and floating-point overloads so their specialized target behavior stays consistent.
+//@ hidden:
+__generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-vector<T,N> min(vector<T,N> x, vector<T,N> y)
+vector<T, N> __vectorMinImpl(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
     {
@@ -13708,40 +13929,102 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     case wgsl: __intrinsic_asm "min";
     case spirv:
     {
-        if (__isSignedInt<T>())
+        if (__isFloat<T>())
+        {
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 NMin $x $y
+            };
+        }
+        else if (__isSignedInt<T>())
+        {
             return spirv_asm {
                 result:$$vector<T,N> = OpExtInst glsl450 SMin $x $y
             };
+        }
         else
+        {
             return spirv_asm {
                 result:$$vector<T,N> = OpExtInst glsl450 UMin $x $y
             };
+        }
     }
     case llvm:
     {
-        if (__isSignedInt<T>())
+        if (__isFloat<T>())
+        {
+            // LLVM 21.1.1's `minimumnum` intrinsic miscompiles on x86. Use the scalar worker to
+            // preserve the established floating-point NaN behavior on every LLVM architecture.
+            VECTOR_MAP_BINARY(T, N, __min_impl, x, y);
+        }
+        else if (__isSignedInt<T>())
             __intrinsic_asm "%result = call $T0 @llvm.smin($0, $1)";
         else
             __intrinsic_asm "%result = call $T0 @llvm.umin($0, $1)";
     }
     default:
-        VECTOR_MAP_BINARY(T, N, min, x, y);
+        // As in `__vectorMaxImpl`, the builtin worker preserves direct scalar helper calls on
+        // C++ and CUDA even when the element type is abstract during semantic checking.
+        VECTOR_MAP_BINARY(T, N, __min_impl, x, y);
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+// Computes component-wise minima while preserving the operands' matrix layout.
+// HLSL supports a native matrix operation; other targets use the vector worker on logical rows.
+//@ hidden:
+__generic<
+    T : __BuiltinArithmeticType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
+matrix<T, N, M, L> __matrixMinImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "min";
     default:
-        MATRIX_MAP_BINARY(T, N, M, min, x, y);
+        // HLSL has a native matrix operation. Other targets decompose the logical rows so each row
+        // reaches the intrinsic-aware vector worker. `matrix<T, N, M, L>` implements
+        // `IRWArray<vector<T, M>>`, so indexing addresses a logical row independently of storage
+        // layout `L`. We retain the rolled loop so target compilers can choose whether to unroll it.
+        matrix<T, N, M, L> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = __vectorMinImpl(x[i], y[i]);
+        return result;
     }
 }
 
+//@public:
+// We retain the integer and floating-point overloads so overload resolution remains
+// stable. The floating-point declarations also retain the identities referenced by derivative
+// registrations.
+/// @category math
+__generic<T : __BuiltinIntegerType, let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T,N> min(vector<T,N> x, vector<T,N> y)
+{
+    return __vectorMinImpl(x, y);
+}
+
+/// @category math
+__generic<
+    T : __BuiltinIntegerType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T,N,M,L> min(matrix<T,N,M,L> x, matrix<T,N,M,L> y)
+{
+    return __matrixMinImpl(x, y);
+}
+
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -13763,38 +14046,89 @@ T min(T x, T y)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "min";
-    case metal: __intrinsic_asm "min";
-    case glsl: __intrinsic_asm "min";
-    case wgsl: __intrinsic_asm "min";
-    case spirv: return spirv_asm {
-        result:$$vector<T,N> = OpExtInst glsl450 FMin $x $y
-    };
-    //case llvm: __intrinsic_asm "%result = call $T0 @llvm.minimumnum($0, $1)";
-    default:
-        VECTOR_MAP_BINARY(T, N, min, x, y);
-    }
+    return __vectorMinImpl(x, y);
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+/// @category math
+__generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
+// Concrete integer and floating-point calls should retain their established overloads; this
+// lower-ranked overload exists for generic code that knows only the common arithmetic domain.
+// It is primal-only because that domain includes integers and cannot share the floating-point
+// derivative registration. Differentiable generic code must constrain `T` to
+// `__BuiltinFloatingPointType` so overload resolution selects the overload above.
+[OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
-matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
+vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "min";
-    default:
-        MATRIX_MAP_BINARY(T, N, M, min, x, y);
-    }
+    return __vectorMinImpl(x, y);
 }
+
+/// @category math
+__generic<
+    T : __BuiltinFloatingPointType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T,N,M,L> min(matrix<T,N,M,L> x, matrix<T,N,M,L> y)
+{
+    return __matrixMinImpl(x, y);
+}
+
+/// @category math
+__generic<
+    T : __BuiltinArithmeticType,
+    let N : int,
+    let M : int,
+    let L : MatrixLayoutMode>
+[__readNone]
+[ForceInline]
+// See the vector overload above for the common-arithmetic rank and primal-only contract.
+[OverloadRank(-1)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T, N, M, L> min(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
+{
+    return __matrixMinImpl(x, y);
+}
+
+//@hidden:
+// These overloads rank below the numerics module's (-9 and -10) and above the `IComparable` one
+// (-13). Overload resolution compares conversion cost before rank, and satisfying `__IMinMax`
+// through `IFloat` costs more than a constraint the caller names directly, such as `IComparable`.
+// The overloads are therefore constrained by `IFloat` and `IInteger` themselves, and their ranks
+// differ so that a type conforming to both is not ambiguous; both call the same `__IMinMax`
+// witness, so either choice gives the type's own `min`/`max`.
+__generic<T : IFloat>
+[__readNone]
+[ForceInline]
+[OverloadRank(-11)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T min(T x, T y)
+{
+    return x.__min(y);
+}
+
+__generic<T : IInteger>
+[__readNone]
+[ForceInline]
+[OverloadRank(-12)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T min(T x, T y)
+{
+    return x.__min(y);
+}
+//@public:
 
 /// Minimum.
 /// @param x The first value.
@@ -13805,11 +14139,15 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 /// @category math
 __generic<T : IComparable>
 [__readNone]
-[OverloadRank(-10)]
+[OverloadRank(-13)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
 {
-    // For builtin scalar types, use optimized intrinsics
+    // `__isFloat`/`__isInt` also hold for builtin vectors and matrices, which `__min_impl` cannot
+    // expand on cpp/cuda. Generic code constrained by `IFloat` or `IInteger` reaches the
+    // shape-specific overloads through `__IMinMax` instead. Generic code constrained only by
+    // `IComparable` or `IArithmetic` still sends builtin vectors and matrices here, a known
+    // limitation (#12720).
     if (__isFloat<T>() || __isInt<T>())
         return __min_impl(x, y);
 
@@ -13856,7 +14194,10 @@ vector<T,N> min3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 /// @param x The first value to compare.
 /// @param y The second value to compare.
 /// @return The smaller of the two values, element-wise if vector typed.
-/// @remarks Result is `x` if `x` < `y`, either `x` or `y` if both `x` and `y` are zeros, otherwise `y`. Which operand is the result is undefined if one of the operands is a NaN.
+/// @remarks HLSL/DXIL returns the numeric operand for one NaN, and a NaN for two NaNs.
+/// SPIR-V uses the corresponding `NMin`/`NMax` operations; target floating-point modes may relax
+/// special-value behavior. GLSL uses native `min`/`max`, which need not follow those NaN rules.
+/// Zero-sign selection also follows the target operation.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -19840,6 +20181,303 @@ ${
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
 $}
 
+//@public:
+
+//
+// Wave Clustered intrinsics.
+// These are Slang specific intrinsics corresponding to GL_KHR_shader_subgroup_clustered.
+
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredSum(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredAdd($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredSum(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredAdd($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;
+            OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredProduct(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMul($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredProduct(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMul($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredMin(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMin($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMin $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredMin(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMin($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredMax(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMax($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMax $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredMax(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMax($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredBitAnd(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredAnd($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredBitAnd(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredAnd($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredBitOr(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredOr($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$T result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredBitOr(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredOr($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredBitXor(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredXor($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$T result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredBitXor(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredXor($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
 
 //
 // Quad Control intrinsics
@@ -20567,6 +21205,9 @@ bool __reportOptiXIntersection(float tHit, uint hitKind, A attributes);
 __generic<A>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_intersection)]
+// A target-agnostic identity so IR passes recognize a `ReportHit` call regardless of the
+// `__target_switch` arm selected, without depending on the intrinsic's emitted spelling.
+[KnownBuiltin($( (int)KnownBuiltinDeclName::ReportHit))]
 bool ReportHit(float tHit, uint hitKind, A attributes)
 {
     __target_switch
@@ -21710,18 +22351,22 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
 //
 
 /// Returns the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader.
-/// @return Zero-based index of the geometry in the current instance
+/// @return Zero-based index of the geometry in the current instance. On CUDA/OptiX, the SBT GAS index
+/// of the hit primitive, which equals the geometry index when every build input of the geometry
+/// acceleration structure has one shader binding table record (see "Geometry index" in the CUDA target
+/// documentation).
 /// @remarks Available in intersection, any-hit, and closest-hit shaders
 /// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint GeometryIndex()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "GeometryIndex";
     case glsl: __intrinsic_asm "(gl_GeometryIndexEXT)";
+    case cuda: __intrinsic_asm "optixGetSbtGASIndex";
     case spirv: return spirv_asm {
             result:$$uint = OpLoad builtin(RayGeometryIndexKHR:uint);
         };
@@ -23844,6 +24489,8 @@ struct HitObject
         /// TraceRay. The computed index must reference a valid hit group record in the shader table. The
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
+        /// On CUDA/OptiX, GeometryIndex is an SBT GAS index (see `GeometryIndex()`), and with OptiX 9.0 and
+        /// later the hit-identifying arguments are not used (see "Geometry index" in the CUDA target documentation).
     [ForceInline]
     [require(cuda, ser_raygen_closesthit_miss)]
     [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
@@ -24030,6 +24677,8 @@ struct HitObject
         /// reference a valid hit group record in the shader table. The Attributes parameter must either be an
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
+        /// On CUDA/OptiX, GeometryIndex is an SBT GAS index (see `GeometryIndex()`), and with OptiX 9.0 and
+        /// later the hit-identifying arguments are not used (see "Geometry index" in the CUDA target documentation).
     [ForceInline]
     [require(cuda_hlsl, ser_raygen_closesthit_miss)]
     [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
@@ -24791,6 +25440,7 @@ struct HitObject
     }
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
+        /// On CUDA/OptiX, returns the SBT GAS index of the hit primitive; see `GeometryIndex()`.
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -29407,6 +30057,38 @@ struct CoopMat
             __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::ColMajor)";
     }
 
+    // The groupshared overloads of `dx::linalg::Matrix::Load` and `Store` take the array
+    // directly, plus an element index and an element stride (both in units of the array's
+    // element type), unlike the byte-addressed `(RW)ByteAddressBuffer` overloads above.
+    [ForceInline]
+    [require(sm_6_10)]
+    [__NoSideEffect]
+    internal static This __hlslLoadGroupshared<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int
+    >(__constref groupshared U[V] data, uint element, uint stride)
+    {
+        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::RowMajor)";
+        else
+            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::ColMajor)";
+    }
+
+    [ForceInline]
+    [require(sm_6_10)]
+    internal void __hlslStoreGroupshared<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int
+    >(__ref groupshared U[V] data, uint element, uint stride)
+    {
+        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::RowMajor)";
+        else
+            __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::ColMajor)";
+    }
+
 
     /// Copies the contents from another cooperative matrix into this matrix.
     /// @param U The element type of the source cooperative matrix.
@@ -29847,7 +30529,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cuda_metal_spirv, cooperative_matrix)]
+    [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -29855,6 +30537,8 @@ struct CoopMat
     {
         __target_switch
         {
+        case hlsl:
+            __hlslStoreGroupshared<matrixLayout>(data, element, stride);
         case spirv:
             let pointer = __getAddress(data[element]);
             let alignment = 16U;
@@ -29910,7 +30594,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cuda_metal_spirv, cooperative_matrix)]
+    [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -29919,6 +30603,8 @@ struct CoopMat
     {
         __target_switch
         {
+        case hlsl:
+            __hlslStoreGroupshared<matrixLayout>(data, element, stride);
         case spirv:
             let pointer = __getAddress(data[element]);
             let alignment = 16U;
@@ -30132,7 +30818,7 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cuda_metal_spirv, cooperative_matrix)]
+    [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -30140,6 +30826,8 @@ $}
     {
         __target_switch
         {
+        case hlsl:
+            return __hlslLoadGroupshared<matrixLayout>(data, element, stride);
         case spirv:
             let pointer = __getAddress(data[element]);
             let alignment = 16U;
@@ -30196,7 +30884,7 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cuda_metal_spirv, cooperative_matrix)]
+    [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -30205,6 +30893,8 @@ $}
     {
         __target_switch
         {
+        case hlsl:
+            return __hlslLoadGroupshared<matrixLayout>(data, element, stride);
         case spirv:
             let pointer = __getAddress(data[element]);
             let alignment = 16U;
@@ -31621,6 +32311,19 @@ linalg.CoopMat<T, S, M, N, R> operator *<
     return rhs * lhs;
 }
 
+${
+// On HLSL a CoopVec is a per-lane vector, and DXC implements a dynamic index into a vector by
+// spilling it to an indexable local. Every loop over the elements of a CoopVec therefore has to
+// be unrolled so that each index is a constant. `emitUnrollableLoop` emits `loop` (the source of
+// one `for` statement over `i < N`) twice: as a plain loop for vectors longer than
+// `__kMaxUnrolledElements`, and under `[ForceUnroll]` otherwise. The `N` test folds to a constant,
+// so only one of the two copies survives in the IR.
+auto emitUnrollableLoop = [&](char const* loop)
+{
+    sb << "if (N > __kMaxUnrolledElements)\n{\n" << loop << "\n}\nelse\n{\n[ForceUnroll]\n" << loop << "\n}\n";
+};
+$}
+
 //
 // Cooperative Vector
 //
@@ -31634,6 +32337,10 @@ __intrinsic_type($(kIROp_CoopVectorType))
 [require(cooperative_vector)]
 struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmetic
 {
+    // Shader Model 6.9 limits a vector to 1024 elements, so every CoopVec that DXC accepts is
+    // unrolled; a longer vector falls back to a plain loop instead of failing the unroll.
+    static const int __kMaxUnrolledElements = 1024;
+
     //
     // Initialization
     //
@@ -31722,8 +32429,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case hlsl:
              __intrinsic_asm "$0 = $1";
         default:
-            for(int i = 0; i < N; ++i)
-                this[i] = t;
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    this[i] = t;
+            )SLANG");
+$}
             return;
         }
     }
@@ -31746,8 +32457,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case hlsl:
             __intrinsic_asm "$1.Store< vector<$[0], $[1]> >($2, $0)", T, N;
         default:
-            for(int i = 0; i < N; ++i)
-                buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
+            )SLANG");
+$}
             return;
         }
     }
@@ -31765,8 +32480,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
             return;
         default:
-            for(int i = 0; i < N; ++i)
-                buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+            )SLANG");
+$}
         }
     }
 
@@ -31809,8 +32528,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
             return;
         default:
-            for(int i = 0; i < N; ++i)
-                data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+            )SLANG");
+$}
             return;
         }
     }
@@ -31867,8 +32590,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+            )SLANG");
+$}
             return vec;
         }
         return CoopVec<T, N>();
@@ -31891,8 +32618,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+            )SLANG");
+$}
             return vec;
         }
         return CoopVec<T, N>();
@@ -31912,8 +32643,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+            )SLANG");
+$}
             return vec;
         }
         return CoopVec<T, N>();
@@ -31933,8 +32668,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+            )SLANG");
+$}
             return vec;
         }
     }
@@ -31988,8 +32727,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             CoopVec<T,N> result;
-            for(int i = 0; i < N; ++i)
-                result[i] = data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    result[i] = data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)];
+            )SLANG");
+$}
             return result;
         }
     }
@@ -32102,13 +32845,17 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @return True if all corresponding elements are equal, false otherwise.
     bool equals(This other)
     {
-        for (int i = 0; i < N; i++)
-        {
-            if (this[i] != other[i])
+${
+        emitUnrollableLoop(R"SLANG(
+            for (int i = 0; i < N; i++)
             {
-                return false;
+                if (this[i] != other[i])
+                {
+                    return false;
+                }
             }
-        }
+        )SLANG");
+$}
         return true;
     }
 
@@ -32120,17 +32867,21 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// parallel computation rather than ordering.
     bool lessThan(This other)
     {
-        for (int i = 0; i < N; i++)
-        {
-            if (this[i] < other[i])
+${
+        emitUnrollableLoop(R"SLANG(
+            for (int i = 0; i < N; i++)
             {
-                return true;
+                if (this[i] < other[i])
+                {
+                    return true;
+                }
+                else if (this[i] > other[i])
+                {
+                    return false;
+                }
             }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
+        )SLANG");
+$}
         return false;
     }
 
@@ -32142,17 +32893,21 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// parallel computation rather than ordering.
     bool lessThanOrEquals(This other)
     {
-        for (int i = 0; i < N; i++)
-        {
-            if (this[i] < other[i])
+${
+        emitUnrollableLoop(R"SLANG(
+            for (int i = 0; i < N; i++)
             {
-                return true;
+                if (this[i] < other[i])
+                {
+                    return true;
+                }
+                else if (this[i] > other[i])
+                {
+                    return false;
+                }
             }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
+        )SLANG");
+$}
         return true;
     }
 
@@ -32307,8 +33062,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "$0 % $1";
         default:
             This ret;
-            for(int i = 0; i < N; ++i)
-                ret[i] = this[i] % other[i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    ret[i] = this[i] % other[i];
+            )SLANG");
+$}
             return ret;
         }
     }
@@ -32409,9 +33168,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         __target_switch
         {
         case hlsl:
-            [ForceUnroll]
-            for(int i = 0; i < N; ++i)
-                this[i] = buffer[i + elemOffset];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    this[i] = buffer[i + elemOffset];
+            )SLANG");
+$}
             return;
         }
     }
@@ -32744,83 +33506,12 @@ extension<T : __BuiltinFloatingPointType, let N : int> CoopVec<T, N>
     }
 }
 
-// These arithmetic witnesses copy the normal CoopVec target-switch implementations.
-// The specialization is only here to satisfy differentiable arithmetic requirements.
+// Reuse the existing arithmetic methods so `x * x` and `x.mul(x)` select the same custom
+// derivative. Redeclaring [Differentiable] methods here would instead ask autodiff to
+// differentiate their target-specific intrinsic bodies.
 __generic<T : __BuiltinFloatingPointType, let N : int>
 extension CoopVec<T, N> : IDifferentiableArithmetic
 {
-    [Differentiable]
-    [ForceInline]
-    [require(cooperative_vector)]
-    [require(optix_coopvec)]
-    This add(This other)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 + $1";
-        case optix_coopvec:
-            __intrinsic_asm "optixCoopVecAdd($0, $1)";
-        default: return __pureAdd(other);
-        }
-    }
-
-    [Differentiable]
-    [ForceInline]
-    [require(cooperative_vector)]
-    [require(optix_coopvec)]
-    This sub(This other)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 - $1";
-        case optix_coopvec:
-            __intrinsic_asm "optixCoopVecSub($0, $1)";
-        default: return __pureSub(other);
-        }
-    }
-
-    [Differentiable]
-    [ForceInline]
-    [require(cooperative_vector)]
-    [require(optix_coopvec)]
-    This mul(This other)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 * $1";
-        case optix_coopvec:
-            __intrinsic_asm "optixCoopVecMul($0, $1)";
-        default: return __pureMul(other);
-        }
-    }
-
-    [Differentiable]
-    [ForceInline]
-    [require(cooperative_vector)]
-    This div(This other)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 / $1";
-        default: return __pureDiv(other);
-        }
-    }
-
-    [Differentiable]
-    [require(cooperative_vector)]
-    This neg()
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "-$0";
-        default: return __pureNeg(this);
-        }
-    }
 }
 
 // Conditional custom derivatives for floating-point CoopVec arithmetic. Keeping these
@@ -33024,7 +33715,7 @@ CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
     case spirv:
         return spirv_asm
         {
-            result:$$CoopVec<T, N> = OpExtInst glsl450 FMin $x $y;
+            result:$$CoopVec<T, N> = OpExtInst glsl450 NMin $x $y;
         };
     case hlsl:
         __intrinsic_asm "min($0, $1)";
@@ -33049,7 +33740,7 @@ CoopVec<T, N> max<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
     case spirv:
         return spirv_asm
         {
-            result:$$CoopVec<T, N> = OpExtInst glsl450 FMax $x $y;
+            result:$$CoopVec<T, N> = OpExtInst glsl450 NMax $x $y;
         };
     case hlsl:
         __intrinsic_asm "max($0, $1)";

@@ -3,6 +3,7 @@
 
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
+#include "slang-ir-check-push-constant-blocks.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
@@ -3519,6 +3520,14 @@ static void widenNarrowAccessChainIndices(IRModule* module, TargetRequest* targe
     }
 }
 
+/// Return true if `globalParam` was legalized into a `PushConstant` variable, which is how the
+/// SPIR-V emitter decides its storage class.
+static bool isPushConstantGlobalForSPIRV(IRInst* globalParam)
+{
+    auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType());
+    return ptrType && ptrType->getAddressSpace() == AddressSpace::PushConstant;
+}
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
@@ -3545,6 +3554,16 @@ void legalizeIRForSPIRV(
     eliminateDeadCode(module);
 
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
+
+    // `m_referencingEntryPoints` records which globals each entry point's call tree uses, which is
+    // the static use that Vulkan limits to one push-constant block per entry point. We count blocks
+    // here, after the last dead-code elimination that can remove a block's only use.
+    checkForMultiplePushConstantBlocksPerEntryPoint(
+        module,
+        context->m_referencingEntryPoints,
+        isPushConstantGlobalForSPIRV,
+        codeGenContext->getSink());
+
     insertFragmentShaderInterlock(context, module);
 }
 
