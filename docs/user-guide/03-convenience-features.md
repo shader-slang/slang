@@ -878,7 +878,9 @@ A handle to any other kind of resource (a storage texture, a buffer or a combine
 compile-time error under this capability. The extension is experimental: Dawn exposes it behind the
 `chromium-experimental-sampling-resource-table` feature, which needs unsafe APIs to be allowed. A pipeline
 created with `layout: 'auto'` enables the table itself; an explicit pipeline layout needs
-`usesResourceTable: true`.
+`usesResourceTable: true`. Neither one creates or binds a table. The host creates a `GPUResourceTable`
+with `device.createResourceTable`, puts each texture and sampler at the index its handle holds, and sets
+the table on the pass before dispatch (`GPUComputePassEncoder.setResourceTable`).
 
 Slang emits each `getResource<T>(index)` call inside the expression that uses it, never as a `let`, and
 inlines a function that receives a looked-up texture or sampler. Tint crashes on the other two forms,
