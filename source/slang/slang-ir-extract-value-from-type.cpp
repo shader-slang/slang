@@ -185,13 +185,13 @@ FindLeafValueResult findLeafValueAtOffset(
             auto matrixType = as<IRMatrixType>(dataType);
             auto elementType = matrixType->getElementType();
             SLANG_RELEASE_ASSERT(matrixType->getColumnCount()->getOp() == kIROp_IntLit);
-            auto columnCount = as<IRIntLit>(matrixType->getColumnCount())->value.intVal;
             auto rowType = builder.getVectorType(elementType, matrixType->getColumnCount());
             IRSizeAndAlignment rowLayout;
             CHECK(getNaturalSizeAndAlignment(targetProgram->getTargetReq(), rowType, &rowLayout));
-            uint32_t rowIndex = rowLayout.getStride() == 0
-                                    ? 0
-                                    : (uint32_t)(offset / (columnCount * rowLayout.getStride()));
+            // `rowLayout` is the layout of one whole row, so its stride already covers all of the
+            // columns, and the row that holds `offset` is `offset / stride`.
+            uint32_t rowIndex =
+                rowLayout.getStride() == 0 ? 0 : (uint32_t)(offset / rowLayout.getStride());
             auto rowValue = builder.emitElementExtract(
                 rowType,
                 src,
