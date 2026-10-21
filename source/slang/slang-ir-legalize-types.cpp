@@ -3373,6 +3373,95 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
     return newTypeLayoutBuilder.build();
 }
 
+/// Create an array type layout that holds `newElementTypeLayout` and scales each of its resource
+/// kinds the same way `oldArrayTypeLayout` scales its own element.
+///
+/// An array does not scale every kind by its element count. Consider:
+///
+///     struct Material { Texture2D tex; };
+///     Material gMaterials[4];
+///
+/// For D3D, `gMaterials` uses four `t` registers, but for Vulkan it uses a single `binding`
+/// that holds an array of four descriptors. When legalization replaces the array of structs
+/// with `Texture2D gMaterials_tex[4]`, the new array must use the same amounts, so we read the
+/// factor for each kind from the original array instead of recomputing it.
+///
+/// An unbounded array of structs gives each resource field a whole register space, and the
+/// original array then has no usage for that field's kind. The new array is then unbounded in
+/// its own space, like a plain `Texture2D textures[]`.
+///
+/// Only resource kinds reach this function, so every finite factor is a whole number. The
+/// ordinary bytes of an array include padding between elements and are not a multiple of the
+/// element size, but they never appear here.
+///
+static IRTypeLayout* _createArrayTypeLayoutLike(
+    IRBuilder* irBuilder,
+    IRArrayTypeLayout* oldArrayTypeLayout,
+    IRTypeLayout* newElementTypeLayout)
+{
+    auto oldElementTypeLayout = oldArrayTypeLayout->getElementTypeLayout();
+
+    IRArrayTypeLayout::Builder newArrayTypeLayoutBuilder(irBuilder, newElementTypeLayout);
+    for (auto sizeAttr : newElementTypeLayout->getSizeAttrs())
+    {
+        auto kind = sizeAttr->getResourceKind();
+        auto newSize = sizeAttr->getSize();
+
+        auto oldArraySizeAttr = oldArrayTypeLayout->findSizeAttr(kind);
+        auto oldElementSizeAttr = oldElementTypeLayout->findSizeAttr(kind);
+        if (oldElementSizeAttr && !oldArraySizeAttr)
+        {
+            // The original array is unbounded and moved this kind into whole register spaces,
+            // so the new array fills its space the way a plain unbounded resource array does.
+            newSize = LayoutSize::infinite();
+        }
+        else if (oldArraySizeAttr && oldElementSizeAttr)
+        {
+            auto oldArraySize = oldArraySizeAttr->getSize();
+            auto oldElementSize = oldElementSizeAttr->getSize();
+            if (!oldArraySize.isFinite())
+            {
+                newSize = oldArraySize;
+            }
+            else if (oldElementSize.isFinite() && oldElementSize.getFiniteValueOr(0) != 0)
+            {
+                auto oldArrayCount = oldArraySize.getFiniteValueOr(0);
+                auto oldElementCount = oldElementSize.getFiniteValueOr(0);
+                SLANG_ASSERT(oldArrayCount % oldElementCount == 0);
+                newSize *= LayoutSize(oldArrayCount / oldElementCount);
+            }
+        }
+        newArrayTypeLayoutBuilder.addResourceUsage(kind, newSize);
+        if (auto alignmentAttr = oldArrayTypeLayout->findAlignmentAttr(kind))
+            newArrayTypeLayoutBuilder.addAlignment(alignmentAttr);
+    }
+    return newArrayTypeLayoutBuilder.build();
+}
+
+/// Wrap `fieldTypeLayout` in one array type layout for each array layer of
+/// `parentTypeLayout`, innermost first.
+///
+/// Legalization turns an array of structs with resource fields into one array per field
+/// (`Material gMaterials[4]` becomes `Texture2D gMaterials_tex[4]`), and `getFieldLayout`
+/// looks through the array layers to find the field, so the field's own layout only
+/// describes one element.
+///
+static IRTypeLayout* _wrapFieldTypeLayoutInParentArrays(
+    IRBuilder* irBuilder,
+    IRTypeLayout* parentTypeLayout,
+    IRTypeLayout* fieldTypeLayout)
+{
+    auto parentArrayTypeLayout = as<IRArrayTypeLayout>(parentTypeLayout);
+    if (!parentArrayTypeLayout)
+        return fieldTypeLayout;
+
+    auto elementFieldTypeLayout = _wrapFieldTypeLayoutInParentArrays(
+        irBuilder,
+        parentArrayTypeLayout->getElementTypeLayout(),
+        fieldTypeLayout);
+    return _createArrayTypeLayoutLike(irBuilder, parentArrayTypeLayout, elementFieldTypeLayout);
+}
+
 static LegalVal declareVars(
     IRTypeLegalizationContext* context,
     IROp op,
@@ -3506,6 +3595,21 @@ static LegalVal declareVars(
                 // If we have a type layout coming in, we really expect to have a layout for each
                 // field.
                 SLANG_ASSERT(fieldLayout || !typeLayout);
+
+                // A simple, tuple or implicit-deref element under an array has had the array
+                // wrapped around its own type, so its layout needs the same array layers. An
+                // implicit-deref element then sees the same layout as a top-level array of
+                // constant buffers. A pair element reads its layout as a parameter group, so it
+                // keeps the layout of the field itself.
+                if (fieldTypeLayout && (ee.type.flavor == LegalType::Flavor::simple ||
+                                        ee.type.flavor == LegalType::Flavor::tuple ||
+                                        ee.type.flavor == LegalType::Flavor::implicitDeref))
+                {
+                    fieldTypeLayout = _wrapFieldTypeLayoutInParentArrays(
+                        context->builder,
+                        typeLayout,
+                        fieldTypeLayout);
+                }
 
                 // If we are processing layout information, then
                 // we need to create a new link in the chain

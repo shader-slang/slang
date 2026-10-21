@@ -235,12 +235,20 @@ void checkEntryPointParameterLocationUsage(
     ComPtr<slang::ISession> session;
     SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
+    // Each step prints the compiler's diagnostics before checking it, so a failing case says why.
     ComPtr<slang::IBlob> diagnosticBlob;
+    auto printDiagnostics = [&]()
+    {
+        if (diagnosticBlob && diagnosticBlob->getBufferSize())
+            fprintf(stderr, "%s\n", (const char*)diagnosticBlob->getBufferPointer());
+    };
+
     auto module = session->loadModuleFromSourceString(
-        "isParameterLocationUsedMixedConstantBuffer",
-        "mixed-cb.slang",
+        "isParameterLocationUsedSplitResources",
+        "split-resources.slang",
         source,
         diagnosticBlob.writeRef());
+    printDiagnostics();
     SLANG_CHECK_ABORT(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
@@ -261,13 +269,15 @@ void checkEntryPointParameterLocationUsage(
             diagnosticBlob.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IComponentType> linkedProgram;
-    SLANG_CHECK_ABORT(compositeProgram->link(linkedProgram.writeRef(), nullptr) == SLANG_OK);
+    auto linkResult = compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    printDiagnostics();
+    SLANG_CHECK_ABORT(linkResult == SLANG_OK);
 
     ComPtr<slang::IMetadata> metadata;
-    SLANG_CHECK_ABORT(
-        linkedProgram
-            ->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnosticBlob.writeRef()) ==
-        SLANG_OK);
+    auto metadataResult =
+        linkedProgram->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnosticBlob.writeRef());
+    printDiagnostics();
+    SLANG_CHECK_ABORT(metadataResult == SLANG_OK);
 
     for (Index i = 0; i < expectationCount; ++i)
     {
@@ -289,9 +299,7 @@ void checkEntryPointParameterLocationUsage(
 // reads must be reported as unused, even though the data-only buffer is still live.
 SLANG_UNIT_TEST(isParameterLocationUsedMixedConstantBuffer)
 {
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    auto globalSession = unitTestContext->slangGlobalSession;
 
     // The entry-point `uniform` parameters are collected into one implicit constant buffer.
     const char* entryPointSource = R"(
@@ -393,6 +401,126 @@ SLANG_UNIT_TEST(isParameterLocationUsedMixedConstantBuffer)
             globalSource,
             SLANG_SPIRV,
             "spirv_1_5",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+}
+
+// An array of structs that holds resources is split into one array per resource field. On D3D
+// each such array uses one register per element, so every register of the array must be
+// reported as used.
+SLANG_UNIT_TEST(isParameterLocationUsedArrayOfStructsWithResources)
+{
+    auto globalSession = unitTestContext->slangGlobalSession;
+
+    // `gS.arr.t` becomes `Texture2D[2]` at t0..t1, and `gS.arr.u` becomes `Texture2D[2]` at
+    // t2..t3.
+    const char* globalSource = R"(
+        struct Inner
+        {
+            Texture2D t;
+            Texture2D u;
+        };
+        struct S
+        {
+            Inner arr[2];
+        };
+
+        RWStructuredBuffer<float4> Output;
+        S gS;
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = gS.arr[1].t.Load(int3(0)) + gS.arr[1].u.Load(int3(0));
+        }
+    )";
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 0, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 2, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 3, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 4, false},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            globalSource,
+            SLANG_HLSL,
+            "sm_5_0",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+
+    // A `ConstantBuffer<Texture2D>` field in an array of structs becomes a plain texture array,
+    // `gS.cb` at t0..t1, and `gS.u` is at t2..t3.
+    const char* constantBufferFieldSource = R"(
+        struct S
+        {
+            ConstantBuffer<Texture2D> cb;
+            Texture2D u;
+        };
+
+        RWStructuredBuffer<float4> Output;
+        S gS[2];
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = gS[1].cb.Load(int3(0)) + gS[1].u.Load(int3(0));
+        }
+    )";
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 0, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 1, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 2, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 3, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, 4, false},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            constantBufferFieldSource,
+            SLANG_HLSL,
+            "sm_5_0",
+            expectations,
+            SLANG_COUNT_OF(expectations));
+    }
+
+    // An unbounded array of structs gives each resource field its own register space, so the
+    // texture array `gS.arr.t` fills space 1 the way a plain `Texture2D textures[]` does.
+    const char* unboundedSource = R"(
+        struct Inner
+        {
+            Texture2D t;
+        };
+        struct S
+        {
+            Inner arr[];
+        };
+
+        RWStructuredBuffer<float4> Output;
+        S gS;
+
+        [shader("compute")]
+        [numthreads(64, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            Output[tid.x] = gS.arr[tid.x].t.Load(int3(0));
+        }
+    )";
+    {
+        ParameterLocationExpectation expectations[] = {
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 1, 0, true},
+            {SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 1, 5, true},
+        };
+        checkEntryPointParameterLocationUsage(
+            globalSession,
+            unboundedSource,
+            SLANG_HLSL,
+            "sm_5_1",
             expectations,
             SLANG_COUNT_OF(expectations));
     }
