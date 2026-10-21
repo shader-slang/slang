@@ -876,12 +876,16 @@ textureSample(getResource<texture_2d<f32>>(m.albedo.x), getResource<sampler>(m.s
 The resource table holds sampled textures (including depth and multisampled textures) and samplers.
 A handle to any other kind of resource (a storage texture, a buffer or a combined texture-sampler) is a
 compile-time error under this capability. The extension is experimental: Dawn exposes it behind the
-`chromium-experimental-sampling-resource-table` feature, which needs unsafe APIs to be allowed.
+`chromium-experimental-sampling-resource-table` feature, which needs unsafe APIs to be allowed. A pipeline
+created with `layout: 'auto'` enables the table itself; an explicit pipeline layout needs
+`usesResourceTable: true`.
 
-> **Known issue:** until [Chromium issue 574322344](https://issues.chromium.org/issues/574322344) is
-> fixed, passing a texture or sampler returned by the resource table to a helper function crashes
-> Tint's SPIR-V and HLSL backends (and with them Chrome's GPU process). Keep the lookup in the function
-> that uses the resource, for example by passing the handle, not the resource, to the helper.
+Slang emits each `getResource<T>(index)` call inside the expression that uses it, never as a `let`, and
+inlines a function that receives a looked-up texture or sampler. Tint crashes on the other two forms,
+and the crash takes down Chrome's GPU process: a `let` that holds a texture from the table, sampled with
+a sampler looked up inline, and a texture from the table passed to a function parameter
+([Chromium issue 574322344](https://issues.chromium.org/issues/574322344)). Textures and samplers from
+ordinary global bindings are still passed to functions as parameters.
 
 ### Custom Descriptor Fetch
 

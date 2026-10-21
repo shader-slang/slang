@@ -828,28 +828,6 @@ static bool isStaticConst(IRInst* inst)
     return false;
 }
 
-// A texture or sampler value cannot live in a function-scope `var` (its type is not
-// constructible), but WGSL lets a `let` hold one. A temporary of such a type appears when a
-// handle value is used more than once, e.g. a `Texture2D` local initialized from a
-// `DescriptorHandle` lookup.
-static bool isFunctionScopeHandleValue(IRType* type, IRInst* inst)
-{
-    if (!as<IRTextureTypeBase>(type) && !as<IRSamplerStateTypeBase>(type))
-        return false;
-    if (as<IRModuleInst>(inst->getParent()))
-        return false;
-    switch (inst->getOp())
-    {
-    case kIROp_LoadFromUninitializedMemory:
-    case kIROp_Poison:
-    case kIROp_DefaultConstruct:
-        // Declared without an initializer, which a `let` requires.
-        return false;
-    default:
-        return true;
-    }
-}
-
 void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
 {
     // A module-scope `static const` array is emitted as `var<private>`, not `const`: a WGSL
@@ -889,8 +867,6 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
             m_writer->emit("var");
         else if (isStaticConst(varDecl))
             m_writer->emit("const");
-        else if (isFunctionScopeHandleValue(type, varDecl))
-            m_writer->emit("let");
         else
             m_writer->emit("var");
         break;

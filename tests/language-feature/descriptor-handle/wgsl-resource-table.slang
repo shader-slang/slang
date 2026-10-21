@@ -1,7 +1,7 @@
 // With `wgsl_chromium_experimental_resource_table`, a `DescriptorHandle<T>` lookup on WGSL becomes a
 // `getResource<T>(index)` call into Chromium's experimental resource table: the handle stays a
-// `vec2<u32>`, its `.x` is the table index, and no descriptor-heap binding is declared. A texture or
-// sampler local that is used more than once is held in a `let`, since a WGSL `var` cannot hold one.
+// `vec2<u32>`, its `.x` is the table index, and no descriptor-heap binding is declared. A looked-up
+// texture that is used more than once is looked up again at each use, and `shade` is inlined.
 // Without the capability, the output keeps the global descriptor array. See shader-slang/slang#13641.
 //
 // The resource-table output was checked with Tint from Dawn c943ea32 (`tint file.wgsl`); the Tint
@@ -15,10 +15,10 @@
 // TABLE-DAG: tex_0 : vec2<u32>
 // TABLE-DAG: smp_0 : vec2<u32>
 // TABLE-DAG: gTex_0 : vec2<u32>
-// TABLE: fn shade_0
-// TABLE: textureSampleLevel(
-// TABLE: let [[TEX:[A-Za-z0-9_]+]] : texture_2d<f32> = {{.*}}getResource<texture_2d<f32>>({{.*}}.x
-// TABLE: shade_0([[TEX]], {{.*}}getResource<sampler>({{.*}}smp_0.x{{.*}}textureLoad({{.*}}[[TEX]]
+// TABLE-NOT: fn shade_0
+// TABLE: fn main(
+// TABLE-NOT: {{^ +(let|var) [A-Za-z0-9_]+ : (texture|sampler)}}
+// TABLE: textureSampleLevel({{.*}}getResource<texture_2d<f32>>({{.*}}.x{{.*}}getResource<sampler>({{.*}}smp_0.x{{.*}}textureLoad({{.*}}getResource<texture_2d<f32>>(
 // TABLE: textureDimensions({{.*}}getResource<texture_2d<f32>>({{.*}}gTex_0.x
 // TABLE: getResource<texture_2d<f32>>({{.*}}heapIndex
 
