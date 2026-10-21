@@ -1818,7 +1818,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(expandAutodiffParameterContexts);
     }
 
-    SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
+    SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
