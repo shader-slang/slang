@@ -33,8 +33,8 @@ void main(uint3 tid : SV_DispatchThreadID)
 // CHECK-DAG: #line {{[0-9]+}} "{{.*}}core.meta.slang"
 // CHECK-DAG: #line {{[0-9]+}} "{{.*}}hlsl.meta.slang"
 
-// Each meta-module `#line` sits directly above the function it locates, so a
-// failure here means `exp10` or `concat` stopped being emitted on its own.
+// A type declaration can also emit a meta-module `#line`, so each of these
+// checks binds the directive to the function it should precede.
 // HLSLMETA: #line {{[0-9]+}} "{{.*}}hlsl.meta.slang"
 // HLSLMETA-NEXT: exp10_{{[0-9]+}}(
 // COREMETA: #line {{[0-9]+}} "{{.*}}core.meta.slang"
