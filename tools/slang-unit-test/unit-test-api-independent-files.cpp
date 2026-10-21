@@ -10,8 +10,7 @@ struct ApiFilterTestDirectory
 {
     String path;
 
-    // Match the forward-slash paths used by test discovery and positional prefixes.
-    String getPath(const char* name) const { return Path::simplify(Path::combine(path, name)); }
+    String getPath(const char* name) const { return Path::combine(path, name); }
 
     ~ApiFilterTestDirectory()
     {
@@ -33,7 +32,10 @@ SLANG_UNIT_TEST(slangTestSkipApiIndependentFiles)
     File::remove(temporaryFile);
     // Positional test prefixes are normalized without their root, so keep the fixture paths
     // relative to the working directory too. The temporary filename supplies a unique name.
-    directory.path = Path::getFileName(temporaryFile) + ".d";
+    // Directory discovery also uses Path::combine, which preserves an existing separator.
+    // Seed the directory with a forward slash so discovered paths match normalized subtest
+    // prefixes on Windows as well as the fixture paths built below.
+    directory.path = Path::getFileName(temporaryFile) + ".d/";
     SLANG_CHECK_ABORT(Path::createDirectoryRecursive(directory.path));
 
     const String source = directory.getPath("source.slang");
@@ -189,14 +191,13 @@ SLANG_UNIT_TEST(slangTestSkipApiIndependentFiles)
             if (SLANG_FAILED(executeResult) || result.resultCode != 0 || !independentMatches ||
                 !mixedMatches || !reportMatches)
             {
-                printf(
-                    "Scenario '%s' (%s): launch=0x%08x, exit=%d\n%s\n%s\n",
-                    scenario.name,
-                    useServer ? "test-server" : "direct",
-                    unsigned(executeResult),
-                    result.resultCode,
-                    result.standardOutput.getBuffer(),
-                    result.standardError.getBuffer());
+                StringBuilder message;
+                message << "Scenario '" << scenario.name << "' ("
+                        << (useServer ? "test-server" : "direct") << "): launch=" << executeResult
+                        << ", exit=" << result.resultCode << "\n"
+                        << result.standardOutput << "\n"
+                        << result.standardError;
+                getTestReporter()->message(TestMessageType::TestFailure, message.getBuffer());
             }
             SLANG_CHECK(SLANG_SUCCEEDED(executeResult));
             SLANG_CHECK(result.resultCode == 0);
