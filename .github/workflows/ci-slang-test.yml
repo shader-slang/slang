@@ -64,6 +64,11 @@ on:
         type: string
         default: ""
         description: "Override the -api expression passed to slang-test (e.g. 'dx11+dx12' or 'vk+cuda+cpu+llvm'). Overrides cpu-only and gpu-api-only when set."
+      skip-api-independent-tests:
+        required: false
+        type: boolean
+        default: false
+        description: "Skip files with no API-dependent subtests; retain no-API preparation steps in mixed files."
 
 jobs:
   test-slang:
@@ -204,6 +209,10 @@ jobs:
           fi
 
           slang_test_args+=("-api" "$api_expr")
+
+          if [[ "${{ inputs.skip-api-independent-tests }}" == "true" ]]; then
+            slang_test_args+=("-skip-api-independent-tests")
+          fi
 
           # Add test server arguments only if server count > 1
           if [ "${{ inputs.server-count }}" -gt 1 ]; then

@@ -76,6 +76,9 @@ struct Options
     // When true only tests that use an api that matches the enabledApis flags will run
     bool apiOnly = false;
 
+    // Skip file tests only when none of the file's original or synthesized subtests uses an API.
+    bool skipApiIndependentTests = false;
+
     // Use verbose paths
     bool verbosePaths = false;
 

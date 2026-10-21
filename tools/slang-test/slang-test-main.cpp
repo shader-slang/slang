@@ -6433,6 +6433,29 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         testList.tests.addRange(compileTargetTests);
     }
 
+    // Classify the whole file after synthesis, before selecting individual subtests. Consider
+    // the compile-then-dispatch pattern in tests/serialization/serialized-module-test.slang:
+    //
+    //   //TEST:COMPILE: module.slang -o module.slang-module
+    //   //TEST:COMPARE_COMPUTE_EX: -slang -compute -xslang -r -xslang module.slang-module
+    //
+    // The COMPILE step has no API requirement, but produces the module used by the dispatch.
+    // Keep both steps eligible in files like this, even if a category or prefix selects only
+    // the COMPILE step. Only files with no API requirement in any variant can be skipped.
+    bool skipApiIndependentFile = false;
+    if (context->options.skipApiIndependentTests)
+    {
+        skipApiIndependentFile = true;
+        for (const auto& testDetails : testList.tests)
+        {
+            if (testDetails.requirements.usedRenderApiFlags != 0)
+            {
+                skipApiIndependentFile = false;
+                break;
+            }
+        }
+    }
+
     // If explicit test order is requested, reorder subtests by prefix order
     List<Index> testOrder;
     for (Index i = 0; i < testList.tests.getCount(); i++)
@@ -6615,7 +6638,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             TestResult testResult = TestResult::Fail;
 
             // If this test can be ignored
-            if (_canIgnore(context, testDetails))
+            if (skipApiIndependentFile || _canIgnore(context, testDetails))
             {
                 testResult = TestResult::Ignored;
                 context->getTestReporter()->addResult(testResult);

@@ -694,9 +694,10 @@ jobs:
   # Windows GPU tests (self-hosted).
   # Each config is split into three parallel jobs to reduce wall-clock time:
   #   -gpu-dx:   dx11+dx12+wgpu
-  #   -gpu-vk:   vk+cpu+llvm + no-API tests
+  #   -gpu-vk:   vk+cpu+llvm + all API-independent files
   #   -gpu-cuda: cuda
   # The three jobs run concurrently on separate runners.
+  # Mixed files retain their no-API preparation steps in all three jobs.
   test-windows-debug-cl-x86_64-gpu-dx:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
@@ -709,6 +710,7 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
       api: dx11+dx12+wgpu
+      skip-api-independent-tests: true
       # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
       run-via-glsl: false
       gpu-tier: t4
@@ -741,6 +743,7 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
       api: cuda
+      skip-api-independent-tests: true
       gpu-tier: t4
       # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
       run-via-glsl: false
@@ -768,6 +771,7 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
       api: dx11+dx12+wgpu
+      skip-api-independent-tests: true
       # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
       run-via-glsl: false
       gpu-tier: t4
@@ -800,6 +804,7 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
       api: cuda
+      skip-api-independent-tests: true
       # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
       run-via-glsl: false
       gpu-tier: t4

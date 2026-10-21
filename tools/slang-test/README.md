@@ -48,6 +48,10 @@ A test may be in one or more categories. The categories are specified on top of 
 
 - `-api <expr>`: Enable specific APIs (e.g., 'vk+dx12' or '+dx11')
 - `-api-only`: Only run tests that use specified APIs
+- `-skip-api-independent-tests`: Skip file tests only when every original and synthesized subtest
+  in the file has no API requirement. Mixed files keep their no-API steps, which may prepare
+  artifacts for API-dependent steps. Classification happens before category, prefix, and skip-list
+  selection and does not depend on which APIs are enabled or available. Unit tests are unaffected.
 - `-synthesizedTestApi <expr>`: Set APIs for synthesized tests
 - `-skip-api-detection`: Skip API availability detection
 

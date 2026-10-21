@@ -74,6 +74,7 @@ static bool _isSubCommand(const char* arg)
         "                                 Default: verbose when -v used, info otherwise\n"
         "  -hide-ignored                  Hide results from ignored tests\n"
         "  -api-only                      Only run tests that use specified APIs\n"
+        "  -skip-api-independent-tests     Skip files whose subtests all have no API requirement\n"
         "  -verbose-paths                 Use verbose paths in output\n"
         "  -category <name>               Only run tests in specified category\n"
         "  -exclude <name>                Exclude tests in specified category\n"
@@ -284,6 +285,10 @@ static bool _isSubCommand(const char* arg)
         else if (strcmp(arg, "-api-only") == 0)
         {
             optionsOut->apiOnly = true;
+        }
+        else if (strcmp(arg, "-skip-api-independent-tests") == 0)
+        {
+            optionsOut->skipApiIndependentTests = true;
         }
         else if (strcmp(arg, "-verbose-paths") == 0)
         {
