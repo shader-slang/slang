@@ -477,11 +477,16 @@ static IRInst* getWrittenTexture(IRInst* inst)
 
 // MSL makes a thread's write to an `access::read_write` texture visible to that thread's
 // later reads of the texture only after a `fence()` on it (MSL 4.1 section 6.13.17); HLSL,
-// SPIR-V and WGSL order these accesses implicitly. Every texture write reaches this pass as an
-// `ImageStore` or a texture atomic, including the read-then-write that `legalizeImageSubscript`
-// creates for a partial texel store such as `tex[p].x = 1`, so we fence after each write.
-// A write-only texture is emitted as `access::write`, which has no `fence()` and cannot be
-// read back.
+// SPIR-V and WGSL order these accesses implicitly. We fence after each write so that later
+// reads see it, and before each write so that it cannot move ahead of an earlier read of the
+// same texel. Dawn needed the fence before writes for a write-after-read failure on Apple M1
+// (crbug.com/417296309).
+//
+// The pass sees every texture write because Metal texture stores in the core module lower to
+// `ImageStore` or to a texture atomic, never to an `__intrinsic_asm` string, and because it runs
+// after `legalizeImageSubscript` has turned a partial texel store such as `tex[p].x = 1` into a
+// read followed by an `ImageStore`. A write-only texture is emitted as `access::write`, which has
+// no `fence()` and cannot be read back.
 void insertMetalTextureFences(IRModule* module)
 {
     IRBuilder builder(module);
@@ -501,6 +506,16 @@ void insertMetalTextureFences(IRModule* module)
                 SLANG_RELEASE_ASSERT(textureType);
                 if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_WRITE)
                     continue;
+
+                // A texture atomic is emitted together with its `ImageSubscript` address, so its
+                // leading fence goes before that address rather than between the two.
+                if (as<IRImageStore>(inst))
+                    builder.setInsertBefore(inst);
+                else
+                    builder.setInsertBefore(getRootAddr(inst->getOperand(0)));
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
+
                 builder.setInsertAfter(inst);
                 builder
                     .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
