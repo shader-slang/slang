@@ -1985,13 +1985,32 @@ int SemanticsVisitor::CompareLookupResultItems(
     // If both left and right are extern, then they are equal.
     // If only one of them is extern, then the other one is preferred.
     // If neither is extern, then we continue with the rest of the checks.
-    if (leftIsExtern)
+    //
+    // The preference only applies when the two candidates are one function (an `extern`
+    // declaration and its definition). Two functions with different signatures are distinct
+    // overloads, and `extern` must not make one of them win.
+    bool isSameFunction = true;
+    if (leftIsExtern != rigthIsExtern)
     {
-        return (rigthIsExtern ? 0 : 1);
+        auto leftFunc = as<FuncDecl>(left.declRef.getDecl());
+        auto rightFunc = as<FuncDecl>(right.declRef.getDecl());
+        if (leftFunc && rightFunc)
+        {
+            isSameFunction = doFunctionSignaturesMatch(
+                left.declRef.as<FuncDecl>(),
+                right.declRef.as<FuncDecl>());
+        }
     }
-    if (rigthIsExtern)
+    if (isSameFunction)
     {
-        return (leftIsExtern ? -1 : 0);
+        if (leftIsExtern)
+        {
+            return (rigthIsExtern ? 0 : 1);
+        }
+        if (rigthIsExtern)
+        {
+            return -1;
+        }
     }
 
     // If one of the candidates is a free-form extension, it is always worse than
