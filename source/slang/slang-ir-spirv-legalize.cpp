@@ -1752,6 +1752,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // This is important to make sure
         // that vectors made of constant components end up being emitted as
         // constant vectors (using OpConstantComposite).
+        // OpConstantComposite cannot take a specialization constant, so a constructor
+        // with a spec-const-rate operand (such as `intCast(kX)`) stays local.
         UIndex opIndex = 0;
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount();
              operand++, opIndex++)
@@ -1760,6 +1762,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 return;
 
             if (as<IRGlobalParam>(operand->get()))
+                return;
+
+            if (isSpecConstRateType(operand->get()->getFullType()))
                 return;
         }
         inst->insertAtEnd(m_module->getModuleInst());
