@@ -8713,6 +8713,13 @@ double2 asdouble(uint2 lowbits, uint2 highbits)
     }
 }
 
+// On WGSL, `asfloat` is an IR bit cast rather than an opaque intrinsic, and the overloads are
+// `[ForceInline]` so that the bit cast lands next to its argument. A constant argument then folds to
+// a float literal, which the WGSL emitter spells through a runtime helper when it is NaN or an
+// infinity; `bitcast` of such a literal is a WGSL const-expression error (issue #13635). The
+// `asint`/`asuint` overloads cannot produce a non-finite value, so they keep the intrinsic. On the
+// other targets, inlining only moves the `__target_switch` body to the call site.
+
 /// Reinterpret bits as a float.
 /// @category conversion
 [__readNone]
