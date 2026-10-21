@@ -2029,11 +2029,15 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         entryPointInferredCaps.nonDestructiveJoin(
             getStructuralRayTracingPrimitiveCapabilities(entryPoint));
 
+        // Conformance guarantees one input; read its type with the selected generic arguments.
+        auto astBuilder = linkage->getASTBuilder();
+        auto parameters = getParameters(astBuilder, entryPoint->getFuncDeclRef());
+        SLANG_RELEASE_ASSERT(parameters.getCount() == 1);
+        auto inputType = unwrapModifiedType(getType(astBuilder, parameters[0]));
+
         // MissInput<C>, for example, declares the source miss-stage capabilities, including
         // Metal's synthesized miss path. The native miss profile alone does not include Metal.
-        auto inputDecl =
-            isDeclRefTypeOf<AggTypeDecl>(getStructuralRayTracingEntryPointInputType(entryPoint))
-                .getDecl();
+        auto inputDecl = isDeclRefTypeOf<AggTypeDecl>(inputType).getDecl();
         SLANG_RELEASE_ASSERT(inputDecl && inputDecl->inferredCapabilityRequirements);
         List<GenericStructTypeUse> signatureStructUses;
         _validateEntryPointTargetCapabilities(

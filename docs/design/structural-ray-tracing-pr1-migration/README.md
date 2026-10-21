@@ -318,11 +318,12 @@ parameter type is the source of structural type information:
 | Shader stage and profile                               | `EntryPoint::m_profile`                          |
 | Public and generated shader names                      | The entry-point name and generated-name override |
 
-`getStructuralRayTracingEntryPointInputType` reads the selected function's substituted parameter
-types and recognizes a stage input through its `KnownBuiltin` annotation. Ordinary type checking
+Consumers use ordinary `getParameters` and `getType` with the selected `DeclRef<FuncDecl>` to
+read the input type. Conformance checking guarantees exactly one parameter; the callers assert
+that invariant and use `unwrapModifiedType` to obtain its checked type. Ordinary type checking
 has already selected the conformance paths used by the input type and its accessors, including
-requirements provided by extensions or inherited interfaces. Later consumers use that checked
-signature and ordinary substitution.
+requirements provided by extensions or inherited interfaces. Generic substitutions on the
+function reference apply through the ordinary parameter lookup.
 
 `initializeStructuralRayTracingEntryPoint` marks the entry as structural, sets the public name to
 the selected struct name, and derives a legal generated shader name. Creating an `EntryPoint`

@@ -105,9 +105,6 @@ class EntryPoint;
 struct IRModule;
 struct IRFunc;
 
-/// Returns the checked compiler-supplied input type, or null when the signature has no such input.
-Type* getStructuralRayTracingEntryPointInputType(EntryPoint* entryPoint);
-
 /// Sets the public and target names for an entry point selected by its source stage type.
 void initializeStructuralRayTracingEntryPoint(
     EntryPoint* entryPoint,

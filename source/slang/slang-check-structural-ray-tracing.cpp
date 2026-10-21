@@ -949,22 +949,6 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     return invokeMethod;
 }
 
-Type* getStructuralRayTracingEntryPointInputType(EntryPoint* entryPoint)
-{
-    auto function = entryPoint->getFuncDeclRef();
-    if (!function)
-        return nullptr;
-
-    auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
-    for (auto parameter : getParameters(astBuilder, function))
-    {
-        auto type = unwrapModifiedType(getType(astBuilder, parameter));
-        if (_getDirectStageInputKind(type) != Stage::Unknown)
-            return type;
-    }
-    return nullptr;
-}
-
 // Sets the names of an entry point selected through a checked stage conformance.
 // For `-entry Stages.Miss`, retain the selected type as the public name and derive a legal target
 // symbol. The function reference still names the checked invoke method selected by conformance.
@@ -995,7 +979,9 @@ CapabilitySet getStructuralRayTracingPrimitiveCapabilities(EntryPoint* entryPoin
         return CapabilitySet();
 
     auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
-    auto inputType = as<DeclRefType>(getStructuralRayTracingEntryPointInputType(entryPoint));
+    auto parameters = getParameters(astBuilder, entryPoint->getFuncDeclRef());
+    SLANG_RELEASE_ASSERT(parameters.getCount() == 1);
+    auto inputType = as<DeclRefType>(unwrapModifiedType(getType(astBuilder, parameters[0])));
     SLANG_RELEASE_ASSERT(inputType);
     auto inputDeclRef = inputType->getDeclRef();
     auto genericDecl = as<GenericDecl>(inputDeclRef.getDecl()->parentDecl);
