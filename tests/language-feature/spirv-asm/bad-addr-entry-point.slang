@@ -4,8 +4,8 @@
 // Taking the address of an operand that has no address is error E29103:
 // `&buf` is a global resource, `&v.xy` is a multi-element swizzle, and `&c`
 // is a `const` parameter of a helper that `main` calls. These asm blocks are
-// reachable from `main`, so before E29103 was an error they reached the back
-// end: SPIR-V emission crashed and HLSL reported an internal error.
+// reachable from `main`, so they cover paths that would otherwise reach SPIR-V
+// and HLSL code generation.
 
 RWStructuredBuffer<float> buf;
 
