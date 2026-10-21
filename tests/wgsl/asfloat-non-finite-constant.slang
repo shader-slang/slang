@@ -30,8 +30,12 @@
 // WGSL-DAG: _slang_getNan(0x7FC00001u)
 // WGSL-DAG: _slang_getInfinity(true)
 // WGSL-DAG: _slang_getInfinity(false)
+// A vector bit cast is split into one scalar bit cast per element, so a fully run-time vector
+// `asfloat` is a `vec2<f32>` built from per-element `bitcast<f32>` calls. The first lane may reuse
+// an earlier `bitcast<f32>` of the same value, so only the second lane is matched.
+// WGSL-DAG: vec2<f32>({{.*}}, bitcast<f32>({{.*}} + u32(1065353216)))
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 static const float kTable[4] = {
@@ -75,6 +79,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[14] = asuint(m[i]);
     outputBuffer[15] = asuint(m[i + 1]);
     outputBuffer[16] = asuint(m[i + 2]);
+
+    // Slots 17-18: a fully run-time vector, the shape the per-element WGSL check above pins.
+    float2 r = asfloat(uint2(tid.x, tid.x + 0x3F800000u));
+    outputBuffer[17] = asuint(r[i]);
+    outputBuffer[18] = asuint(r[i + 1]);
 }
 
 // BUF: {{^}}4294967295{{$}}
@@ -98,3 +107,5 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // BUF-NEXT: {{^}}4294967295{{$}}
 // BUF-NEXT: {{^}}0{{$}}
 // BUF-NEXT: {{^}}4286578688{{$}}
+// BUF-NEXT: {{^}}0{{$}}
+// BUF-NEXT: {{^}}1065353216{{$}}
