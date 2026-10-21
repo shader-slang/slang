@@ -61,34 +61,34 @@ void writeHalf4(uint index, half4 h)
 }
 
 // `half` at bytes 0, 2, ..., 14 (thread i reads byte 2 * i).
-// BUF: 3F800000
-// BUF-NEXT: 40000000
-// BUF-NEXT: 3F000000
-// BUF-NEXT: C0400000
-// BUF-NEXT: 477FE000
-// BUF-NEXT: 38802000
-// BUF-NEXT: 3EAAA000
-// BUF-NEXT: BE000000
+// BUF: {{^}}3F800000{{$}}
+// BUF-NEXT: {{^}}40000000{{$}}
+// BUF-NEXT: {{^}}3F000000{{$}}
+// BUF-NEXT: {{^}}C0400000{{$}}
+// BUF-NEXT: {{^}}477FE000{{$}}
+// BUF-NEXT: {{^}}38802000{{$}}
+// BUF-NEXT: {{^}}3EAAA000{{$}}
+// BUF-NEXT: {{^}}BE000000{{$}}
 // `half2` at byte 4 (aligned), then at byte 2 (across two words).
-// BUF-NEXT: 3F000000
-// BUF-NEXT: C0400000
-// BUF-NEXT: 40000000
-// BUF-NEXT: 3F000000
+// BUF-NEXT: {{^}}3F000000{{$}}
+// BUF-NEXT: {{^}}C0400000{{$}}
+// BUF-NEXT: {{^}}40000000{{$}}
+// BUF-NEXT: {{^}}3F000000{{$}}
 // `half4` at byte 8 (aligned), then at byte 6 (across three words).
-// BUF-NEXT: 477FE000
-// BUF-NEXT: 38802000
-// BUF-NEXT: 3EAAA000
-// BUF-NEXT: BE000000
-// BUF-NEXT: C0400000
-// BUF-NEXT: 477FE000
-// BUF-NEXT: 38802000
-// BUF-NEXT: 3EAAA000
+// BUF-NEXT: {{^}}477FE000{{$}}
+// BUF-NEXT: {{^}}38802000{{$}}
+// BUF-NEXT: {{^}}3EAAA000{{$}}
+// BUF-NEXT: {{^}}BE000000{{$}}
+// BUF-NEXT: {{^}}C0400000{{$}}
+// BUF-NEXT: {{^}}477FE000{{$}}
+// BUF-NEXT: {{^}}38802000{{$}}
+// BUF-NEXT: {{^}}3EAAA000{{$}}
 // `Record` at byte 12: a, b, c (the `float` bits as loaded), d.x, d.y.
-// BUF-NEXT: 3EAAA000
-// BUF-NEXT: BE000000
-// BUF-NEXT: 40E00000
-// BUF-NEXT: 41000000
-// BUF-NEXT: 3F000000
+// BUF-NEXT: {{^}}3EAAA000{{$}}
+// BUF-NEXT: {{^}}BE000000{{$}}
+// BUF-NEXT: {{^}}40E00000{{$}}
+// BUF-NEXT: {{^}}41000000{{$}}
+// BUF-NEXT: {{^}}3F000000{{$}}
 [numthreads(8, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {

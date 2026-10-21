@@ -40,22 +40,22 @@ RWStructuredBuffer<float> floats;
 RWStructuredBuffer<uint> outputBuffer;
 
 // 32-bit -> half2 (from u32, i32 and f32) and uint2 -> half4.
-// BUF: 3F800000
-// BUF-NEXT: 40000000
-// BUF-NEXT: 3F000000
-// BUF-NEXT: C0400000
-// BUF-NEXT: 477FE000
-// BUF-NEXT: 38802000
-// BUF-NEXT: 477FE000
-// BUF-NEXT: 38802000
-// BUF-NEXT: 3EAAA000
-// BUF-NEXT: BE000000
+// BUF: {{^}}3F800000{{$}}
+// BUF-NEXT: {{^}}40000000{{$}}
+// BUF-NEXT: {{^}}3F000000{{$}}
+// BUF-NEXT: {{^}}C0400000{{$}}
+// BUF-NEXT: {{^}}477FE000{{$}}
+// BUF-NEXT: {{^}}38802000{{$}}
+// BUF-NEXT: {{^}}477FE000{{$}}
+// BUF-NEXT: {{^}}38802000{{$}}
+// BUF-NEXT: {{^}}3EAAA000{{$}}
+// BUF-NEXT: {{^}}BE000000{{$}}
 // half2 -> u32, i32 and f32, and half4 -> uint2.
-// BUF-NEXT: 40003C00
-// BUF-NEXT: C2003800
-// BUF-NEXT: C2003C00
-// BUF-NEXT: 4017BFF
-// BUF-NEXT: B0003555
+// BUF-NEXT: {{^}}40003C00{{$}}
+// BUF-NEXT: {{^}}C2003800{{$}}
+// BUF-NEXT: {{^}}C2003C00{{$}}
+// BUF-NEXT: {{^}}4017BFF{{$}}
+// BUF-NEXT: {{^}}B0003555{{$}}
 
 void writeHalf2(uint index, half2 h)
 {
