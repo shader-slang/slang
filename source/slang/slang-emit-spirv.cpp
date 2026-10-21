@@ -3749,6 +3749,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     UnownedStringSlice("SPV_EXT_descriptor_indexing"));
                 requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
                 break;
+            case kIROp_GLSLPatchDecoration:
+                // User patch I/O only; gl_TessLevel* get Patch from getBuiltinGlobalVar.
+                emitOpDecorate(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decor,
+                    varInst,
+                    SpvDecorationPatch);
+                break;
             }
         }
     }
@@ -5377,15 +5385,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     getReferencingEntryPoints(m_referencingEntryPoints, parentFunc);
                 for (IRFunc* entryPoint : *entryPointsUsingInst)
                 {
-                    bool isQuad = true;
-                    IREntryPointDecoration* entryPointDecor = nullptr;
-                    for (auto dec : entryPoint->getDecorations())
-                    {
-                        if (auto maybeEntryPointDecor = as<IREntryPointDecoration>(dec))
-                            entryPointDecor = maybeEntryPointDecor;
-                        if (as<IRDerivativeGroupLinearDecoration>(dec))
-                            isQuad = false;
-                    }
+                    auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
                     if (!entryPointDecor ||
                         entryPointDecor->getProfile().getStage() != Stage::Compute)
                         continue;
@@ -5393,8 +5393,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_compute_shader_derivatives"));
                     auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
-                    if (isQuad)
+                    switch (inferDerivativeGroupMode(entryPoint))
                     {
+                    case DerivativeGroupMode::Quad:
                         verifyComputeDerivativeGroupModifiers(
                             this->m_sink,
                             inst->sourceLoc,
@@ -5406,9 +5407,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             getIRInstSpvID(entryPoint),
                             SpvExecutionModeDerivativeGroupQuadsKHR);
                         requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupQuadsKHR);
-                    }
-                    else
-                    {
+                        break;
+                    case DerivativeGroupMode::Linear:
                         verifyComputeDerivativeGroupModifiers(
                             this->m_sink,
                             inst->sourceLoc,
@@ -5420,6 +5420,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             getIRInstSpvID(entryPoint),
                             SpvExecutionModeDerivativeGroupLinearKHR);
                         requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupLinearKHR);
+                        break;
+                    default:
+                        SLANG_UNEXPECTED("unexpected derivative-group mode");
                     }
                 }
 
@@ -12488,7 +12491,10 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
+    const auto errorCountBeforeLegalize = sink->getErrorCount();
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
+    if (sink->getErrorCount() > errorCountBeforeLegalize)
+        return SLANG_FAIL;
 
 #if 0
     {

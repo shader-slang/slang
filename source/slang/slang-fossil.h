@@ -218,6 +218,14 @@ static_assert(sizeof(Fossilized<uint64_t>) == 8);
 static_assert(sizeof(Fossilized<float>) == 4);
 static_assert(sizeof(Fossilized<double>) == 8);
 
+// The fossil writer aligns each simple value to its size, so the reader-side
+// wrapper must do the same. On targets such as 32-bit x86 the natural
+// alignment of a 64-bit type is only 4, which would make records with 64-bit
+// fields have a different layout when read than when written.
+static_assert(alignof(Fossilized<int64_t>) == 8);
+static_assert(alignof(Fossilized<uint64_t>) == 8);
+static_assert(alignof(Fossilized<double>) == 8);
+
 //
 // The `bool` type shouldn't be fossilized as itself, because
 // its layout is not guaranteed to be consistent across targets.

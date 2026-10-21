@@ -11,14 +11,14 @@
 namespace Slang
 {
 
-bool HLSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
+CLikeSourceEmitter::FoldPolicy HLSLSourceEmitter::getFoldPolicy(IRInst* inst)
 {
     // Barrier flag conversion ops do not have a standalone HLSL temporary form. The
     // use-site emitter expands their folded integer operand to DXC barrier flag tokens.
     if (isBarrierFlagGetterOp(inst->getOp()))
-        return true;
+        return FoldPolicy::Always;
 
-    return Super::shouldFoldInstIntoUseSites(inst);
+    return Super::getFoldPolicy(inst);
 }
 
 
