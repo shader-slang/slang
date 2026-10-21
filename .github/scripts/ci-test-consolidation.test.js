@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { runInNewContext } = require("node:vm");
 const root = path.resolve(__dirname, "../..");
 const workflow = (name) =>
   fs.readFileSync(path.join(root, ".github/workflows", name), "utf8");
@@ -20,19 +21,44 @@ function job(id) {
   return end < 0 ? rest : rest.slice(0, end);
 }
 
-function script(text, name) {
+function step(text, name) {
   const start = text.indexOf(`      - name: ${name}\n`);
   assert.notEqual(start, -1, `missing step ${name}`);
   const rest = text.slice(start);
   const end = rest.indexOf("\n      - ");
-  const step = end < 0 ? rest : rest.slice(0, end);
-  const run = step.indexOf("        run: |\n");
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+function script(text, name) {
+  const source = step(text, name);
+  const run = source.indexOf("        run: |\n");
   assert.notEqual(run, -1, `missing literal script for ${name}`);
-  return step
+  return source
     .slice(run + "        run: |\n".length)
     .split("\n")
     .map((line) => (line.startsWith("          ") ? line.slice(10) : line))
     .join("\n");
+}
+
+// These explicit conditions use boolean operators shared with JavaScript.
+// Evaluate the actual expression with successful preceding steps; bracket input
+// lookups accommodate Actions input names containing hyphens.
+function stepRuns(text, name, inputs, event) {
+  const condition = step(text, name).match(/^        if: (.+)$/m);
+  assert.ok(condition, `missing condition for ${name}`);
+  const expression = condition[1].replace(
+    /inputs\.([\w-]+)/g,
+    (_, key) => `inputs[${JSON.stringify(key)}]`,
+  );
+  return runInNewContext(
+    expression,
+    {
+      inputs,
+      github: { event_name: event },
+      always: () => true,
+    },
+    { timeout: 1000 },
+  );
 }
 
 function render(source, inputs) {
@@ -100,7 +126,35 @@ try {
       "server-count": 8,
       "gpu-tier": "t4",
       "full-gpu-tests": true,
+      "run-via-glsl": true,
     };
+    for (const name of [
+      "Test Slang via glsl",
+      "Check via-glsl slang-test worktree cleanliness",
+    ]) {
+      for (const [event, expected] of [
+        ["pull_request", true],
+        ["merge_group", false],
+        ["push", false],
+      ]) {
+        assert.equal(
+          stepRuns(ordinary, name, inputs, event),
+          expected,
+          `${config}/${event}: ${name} condition`,
+        );
+      }
+      for (const disabled of [
+        { "run-via-glsl": false },
+        { "full-gpu-tests": false },
+        { os: "macos" },
+      ]) {
+        assert.equal(
+          stepRuns(ordinary, name, { ...inputs, ...disabled }, "pull_request"),
+          false,
+          `${config}: ${name} disabled by ${JSON.stringify(disabled)}`,
+        );
+      }
+    }
     const args = command(script(ordinary, "Test Slang"), inputs, {
       API_INPUT: "dx11+dx12+wgpu+vk+cuda+cpu+llvm",
     });
