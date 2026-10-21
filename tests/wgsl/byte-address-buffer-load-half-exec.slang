@@ -13,13 +13,19 @@
 // read from the buffer (word 6 is 0), so they take the dynamic-offset path. The Vulkan run is a
 // reference for the same expected values.
 //
+// All loaded values are normal and nonzero, because WGSL lets an implementation flush subnormals
+// to zero and ignore the sign of zero.
+//
 // Words, as (half at the lower byte offset, half at the higher one):
-//   byte  0: 0x40003C00 = (1.0, 2.0)          byte  4: 0xC2003800 = (0.5, -3.0)
-//   byte  8: 0x00017BFF = (65504.0, 2^-24)    byte 12: 0x80003555 = (0.333251953125, -0.0)
-//   byte 16: 0x40E00000 = 7.0f                byte 20: 0x38004800 = (8.0, 0.5)
+//   byte  0: 0x40003C00 = (1.0, 2.0)
+//   byte  4: 0xC2003800 = (0.5, -3.0)
+//   byte  8: 0x04017BFF = (65504.0, 2^-14 * (1 + 2^-10))
+//   byte 12: 0xB0003555 = (0.333251953125, -0.125)
+//   byte 16: 0x40E00000 = 7.0f
+//   byte 20: 0x38004800 = (8.0, 0.5)
 //   byte 24: 0
 
-//TEST_INPUT:ubuffer(data=[0x40003C00 0xC2003800 0x00017BFF 0x80003555 0x40E00000 0x38004800 0], stride=4):name=pool
+//TEST_INPUT:ubuffer(data=[0x40003C00 0xC2003800 0x04017BFF 0xB0003555 0x40E00000 0x38004800 0], stride=4):name=pool
 #if defined(RWBAB)
 RWByteAddressBuffer pool;
 #else
@@ -60,9 +66,9 @@ void writeHalf4(uint index, half4 h)
 // BUF-NEXT: 3F000000
 // BUF-NEXT: C0400000
 // BUF-NEXT: 477FE000
-// BUF-NEXT: 33800000
+// BUF-NEXT: 38802000
 // BUF-NEXT: 3EAAA000
-// BUF-NEXT: 80000000
+// BUF-NEXT: BE000000
 // `half2` at byte 4 (aligned), then at byte 2 (across two words).
 // BUF-NEXT: 3F000000
 // BUF-NEXT: C0400000
@@ -70,16 +76,16 @@ void writeHalf4(uint index, half4 h)
 // BUF-NEXT: 3F000000
 // `half4` at byte 8 (aligned), then at byte 6 (across three words).
 // BUF-NEXT: 477FE000
-// BUF-NEXT: 33800000
+// BUF-NEXT: 38802000
 // BUF-NEXT: 3EAAA000
-// BUF-NEXT: 80000000
+// BUF-NEXT: BE000000
 // BUF-NEXT: C0400000
 // BUF-NEXT: 477FE000
-// BUF-NEXT: 33800000
+// BUF-NEXT: 38802000
 // BUF-NEXT: 3EAAA000
 // `Record` at byte 12: a, b, c (the `float` bits as loaded), d.x, d.y.
 // BUF-NEXT: 3EAAA000
-// BUF-NEXT: 80000000
+// BUF-NEXT: BE000000
 // BUF-NEXT: 40E00000
 // BUF-NEXT: 41000000
 // BUF-NEXT: 3F000000
