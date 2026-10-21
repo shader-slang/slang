@@ -838,6 +838,12 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
+    // A specialization constant is emitted as an `override`, and an expression that reads one is an
+    // override-expression, which a WGSL `const` initializer cannot hold. Both the constant and the
+    // module-scope values computed from it (e.g. `i32(kX)` in a `WorkgroupSize()` vector) carry the
+    // spec-const rate, so this check also comes before the module-scope test below.
+    if (isSpecConstRateType(inst->getFullType()))
+        return false;
     if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
