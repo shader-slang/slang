@@ -2,6 +2,9 @@
 
 Tools for analyzing GitHub Actions CI performance and queue status.
 
+The [L0 CPU shadow pilot](l0-shadow.md) documents the advisory PR test selection
+and its observation artifacts.
+
 ## Scripts
 
 | Script                          | Purpose                                                                   |
