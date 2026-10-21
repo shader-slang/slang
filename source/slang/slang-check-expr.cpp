@@ -314,14 +314,6 @@ static SourceLoc _getMemberOpLoc(Expr* expr)
     return SourceLoc();
 }
 
-void addSiblingScopeForContainerDecl(
-    ASTBuilder* builder,
-    ContainerDecl* dest,
-    ContainerDecl* source)
-{
-    addSiblingScopeForContainerDecl(builder, dest->ownedScope, source);
-}
-
 void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source)
 {
     auto subScope = builder->create<Scope>();

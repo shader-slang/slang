@@ -18807,6 +18807,11 @@ void SemanticsDeclScopeWiringVisitor::visitUsingDecl(UsingDecl* decl)
 
 void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
 {
+    // Every scope that the parser creates for a namespace is in `lexicalScopes`, so wiring
+    // all of them covers `ownedScope` too. A namespace with no body, such as one that a
+    // `syntax` declaration creates, has no scopes and nothing to wire.
+    SLANG_ASSERT(!decl->ownedScope || decl->lexicalScopes.contains(decl->ownedScope));
+
     // We need to wire up the scope of namespaces with other namespace decls of the same name
     // that is accessible from the current context.
     auto parent = as<ContainerDecl>(getParentDecl(decl));
@@ -18832,7 +18837,11 @@ void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
                 {
                     ensureDecl(ns, DeclCheckState::ScopesWired);
                 }
-                addSiblingScopeForContainerDecl(getASTBuilder(), decl, otherNamespace);
+                // We attach the other namespace to every scope of `decl`, not only to
+                // `ownedScope`, because code in each body of a reopened namespace looks up
+                // names through the scope of that body.
+                for (auto lexicalScope : decl->lexicalScopes)
+                    addSiblingScopeForContainerDecl(getASTBuilder(), lexicalScope, otherNamespace);
             }
         }
         // For file decls, we need to continue searching up in the parent module scope.
