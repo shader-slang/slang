@@ -29461,11 +29461,15 @@ T getDescriptorFromExplicitHeapIndex<T:IOpaqueDescriptor>(uint2 handle)
 /// The resource table holds sampled textures (including depth and multisampled textures) and
 /// samplers. Storage textures, buffers and combined texture-samplers cannot be looked up in it,
 /// so they are rejected at compile time instead of producing WGSL that Tint refuses.
-/// `[__readNone]` keeps the call at its use site: WGSL cannot store a texture or a sampler in a
-/// function-scope `var`.
+/// `[__AlwaysFoldIntoUseSiteAttribute]` emits the call inside each expression that uses it, so
+/// the result is never bound to a `var` or `let`. WGSL cannot store a texture or a sampler in a
+/// function-scope `var`, and Tint crashes on a `let` that holds a texture from the table when the
+/// sampler it is sampled with is looked up inline. `[__readNone]` makes re-emitting the call at
+/// each use equivalent to one lookup.
 __wgsl_extension(chromium_experimental_resource_table)
 [ForceInline]
 [__readNone]
+[__AlwaysFoldIntoUseSiteAttribute]
 [require(wgsl, wgsl_chromium_experimental_resource_table)]
 T __wgslGetResourceFromTable<T:IOpaqueDescriptor>(uint index)
 {
