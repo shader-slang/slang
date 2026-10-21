@@ -39,6 +39,20 @@ namespace slang
 namespace wgsl
 {
 
+// JavaScript objects that mirror the C++ descriptor structs. Each is an emscripten::val, read
+// field by field at run time; the types exist so that interface.d.ts names them (see
+// register_type in slang-wasm-bindings.cpp) instead of declaring `any`.
+namespace js
+{
+EMSCRIPTEN_DECLARE_VAL_TYPE(CompilerOptionValue);
+EMSCRIPTEN_DECLARE_VAL_TYPE(CompilerOptionEntry);
+EMSCRIPTEN_DECLARE_VAL_TYPE(PreprocessorMacroDesc);
+EMSCRIPTEN_DECLARE_VAL_TYPE(TargetDesc);
+EMSCRIPTEN_DECLARE_VAL_TYPE(SessionDesc);
+// The argument of GlobalSession.createSession: a SessionDesc, or a compile target number.
+EMSCRIPTEN_DECLARE_VAL_TYPE(SessionDescOrTarget);
+} // namespace js
+
 std::string getVersionString();
 
 class TypeLayoutReflection;
@@ -330,25 +344,27 @@ public:
     {
     }
 
-    // `desc` is either a compile target (a number, as returned by getCompileTargets()), or an
-    // object mirroring slang::SessionDesc:
-    //   {
-    //     target: number,                       // required
-    //     profile?: string,                     // e.g. "sm_6_6"; HLSL defaults to sm_6_6
-    //     preprocessorMacros?: [{name: string, value?: string}],  // value defaults to ""
-    //     searchPaths?: [string],               // paths in the Emscripten file system
-    //     defaultMatrixLayoutMode?: number,     // SlangMatrixLayoutMode; row-major by default
-    //     compilerOptions?: [{name: number,     // slang::CompilerOptionName
-    //                         intValue0?: number, intValue1?: number,
-    //                         stringValue0?: string, stringValue1?: string}],
-    //   }
-    // The enums are not exported to JavaScript; their integer values are those in
-    // include/slang.h. An option is passed as a string option when it has a stringValue0 or
-    // stringValue1, and as an int option otherwise.
+    // `desc` is either a compile target (a number, as returned by getCompileTargets()), or a
+    // js::SessionDesc object, which mirrors slang::SessionDesc (see the TypeScript definitions
+    // registered in slang-wasm-bindings.cpp). Only some of the C++ fields are bound so far:
+    //   SessionDesc: targets, defaultMatrixLayoutMode, searchPaths, preprocessorMacros,
+    //                compilerOptionEntries.
+    //   TargetDesc:  format (required), profile, flags, floatingPointMode, lineDirectiveMode,
+    //                forceGLSLScalarBufferLayout, compilerOptionEntries.
+    // Fields that are left out keep the C++ defaults, except that an HLSL target without a
+    // profile gets sm_6_6, as a session created from a number does. A profile is a
+    // SlangProfileID from findProfile(). The enums are not exported to JavaScript; their
+    // integer values are those in include/slang.h.
     // Returns null and sets getLastError() (type "USER", SLANG_E_INVALID_ARG) when `desc` is
-    // neither a number nor an object with a `target`, or names an unknown profile. A field of
-    // the wrong type (for example a macro without a name) throws a JavaScript exception.
-    Session* createSession(emscripten::val desc);
+    // neither a number nor an object, an array field is not an array, a target has no
+    // `format`, a macro has no `name`, or a compiler option entry has no `name` or
+    // `value.kind`. A field of the wrong type (for example a macro name that is not a string)
+    // throws a JavaScript exception.
+    Session* createSession(js::SessionDescOrTarget desc);
+
+    // Returns the SlangProfileID for a profile name such as "sm_6_6" or "glsl_460", or 0
+    // (SLANG_PROFILE_UNKNOWN) if the name is not a known profile.
+    int findProfile(const std::string& name);
 
     // Returns the source of the builtin module "core" or "glsl". The name is matched by prefix,
     // so "core-extra" also selects core. Any other name returns an empty string and does not

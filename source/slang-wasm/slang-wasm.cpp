@@ -4,6 +4,7 @@
 #include "core/slang-exception.h"
 #include "slang/slang-language-server.h"
 
+#include <deque>
 #include <slang.h>
 #include <vector>
 
@@ -79,133 +80,223 @@ static bool hasProperty(const emscripten::val& object, const char* name)
     return object.hasOwnProperty(name) && !object[name].isUndefined() && !object[name].isNull();
 }
 
-Session* GlobalSession::createSession(emscripten::val desc)
+static bool isObject(const emscripten::val& value)
 {
-    // A plain number is the compile target (the original signature).
-    const bool isTargetOnly = desc.isNumber();
-    const bool isObject =
-        !desc.isNull() && !desc.isUndefined() && desc.typeOf().as<std::string>() == "object";
-    if (!isTargetOnly && (!isObject || !hasProperty(desc, "target")))
+    return !value.isNull() && !value.isUndefined() && value.typeOf().as<std::string>() == "object";
+}
+
+static bool isArray(const emscripten::val& value)
+{
+    return emscripten::val::global("Array").call<bool>("isArray", value);
+}
+
+static void setInvalidArgError(const std::string& message)
+{
+    g_error.type = std::string("USER");
+    g_error.result = SLANG_E_INVALID_ARG;
+    g_error.message = "createSession: " + message;
+}
+
+namespace
+{
+// Converts a js::SessionDesc into a slang::SessionDesc. The C++ descriptors point into this
+// object, so it must outlive the IGlobalSession::createSession call.
+struct SessionDescReader
+{
+    IGlobalSession* globalSession;
+
+    // A deque, so the c_str() pointers stay valid while more strings are added.
+    std::deque<std::string> strings;
+    std::vector<const char*> searchPaths;
+    std::vector<PreprocessorMacroDesc> macros;
+    std::vector<CompilerOptionEntry> options;
+    std::vector<TargetDesc> targets;
+    // One list per target. It is sized before it is filled, so the inner vectors don't move.
+    std::vector<std::vector<CompilerOptionEntry>> targetOptions;
+
+    const char* keep(std::string string)
     {
-        g_error.type = std::string("USER");
-        g_error.result = SLANG_E_INVALID_ARG;
-        g_error.message = std::string("createSession: expected a compile target or an object "
-                                      "with a 'target' property");
+        strings.push_back(std::move(string));
+        return strings.back().c_str();
+    }
+
+    const char* readString(const emscripten::val& object, const char* name)
+    {
+        return keep(hasProperty(object, name) ? object[name].as<std::string>() : "");
+    }
+
+    // Reads `object[name]` as an array, if present. Returns false (and sets the error) if it is
+    // present but not an array.
+    bool readArray(
+        const emscripten::val& object,
+        const char* name,
+        std::vector<emscripten::val>& out)
+    {
+        out.clear();
+        if (!hasProperty(object, name))
+            return true;
+        if (!isArray(object[name]))
+        {
+            setInvalidArgError(std::string("'") + name + "' must be an array");
+            return false;
+        }
+        out = emscripten::vecFromJSArray<emscripten::val>(object[name]);
+        return true;
+    }
+
+    // Reads `object.compilerOptionEntries`: [{name, value: {kind, intValue0?, intValue1?,
+    // stringValue0?, stringValue1?}}], as slang::CompilerOptionEntry.
+    bool readCompilerOptionEntries(
+        const emscripten::val& object,
+        std::vector<CompilerOptionEntry>& out)
+    {
+        std::vector<emscripten::val> entries;
+        if (!readArray(object, "compilerOptionEntries", entries))
+            return false;
+        for (auto& entry : entries)
+        {
+            if (!isObject(entry) || !hasProperty(entry, "name") || !hasProperty(entry, "value") ||
+                !isObject(entry["value"]) || !hasProperty(entry["value"], "kind"))
+            {
+                setInvalidArgError("each compilerOptionEntries item needs a 'name' and a "
+                                   "'value' with a 'kind'");
+                return false;
+            }
+            const emscripten::val value = entry["value"];
+            CompilerOptionEntry option = {};
+            option.name = (CompilerOptionName)entry["name"].as<int>();
+            option.value.kind = (CompilerOptionValueKind)value["kind"].as<int>();
+            if (hasProperty(value, "intValue0"))
+                option.value.intValue0 = value["intValue0"].as<int>();
+            if (hasProperty(value, "intValue1"))
+                option.value.intValue1 = value["intValue1"].as<int>();
+            option.value.stringValue0 = readString(value, "stringValue0");
+            option.value.stringValue1 = readString(value, "stringValue1");
+            out.push_back(option);
+        }
+        return true;
+    }
+
+    bool readTarget(const emscripten::val& object, size_t index)
+    {
+        if (!isObject(object) || !hasProperty(object, "format"))
+        {
+            setInvalidArgError("each targets item needs a 'format'");
+            return false;
+        }
+        TargetDesc& target = targets[index];
+        target.format = (SlangCompileTarget)object["format"].as<int>();
+        if (hasProperty(object, "profile"))
+            target.profile = (SlangProfileID)object["profile"].as<int>();
+        else if (target.format == SLANG_HLSL)
+            target.profile = globalSession->findProfile("sm_6_6");
+        if (hasProperty(object, "flags"))
+            target.flags = (SlangTargetFlags)object["flags"].as<unsigned int>();
+        if (hasProperty(object, "floatingPointMode"))
+            target.floatingPointMode =
+                (SlangFloatingPointMode)object["floatingPointMode"].as<int>();
+        if (hasProperty(object, "lineDirectiveMode"))
+            target.lineDirectiveMode =
+                (SlangLineDirectiveMode)object["lineDirectiveMode"].as<int>();
+        if (hasProperty(object, "forceGLSLScalarBufferLayout"))
+            target.forceGLSLScalarBufferLayout = object["forceGLSLScalarBufferLayout"].as<bool>();
+        if (!readCompilerOptionEntries(object, targetOptions[index]))
+            return false;
+        target.compilerOptionEntries = targetOptions[index].data();
+        target.compilerOptionEntryCount = (uint32_t)targetOptions[index].size();
+        return true;
+    }
+
+    bool read(const emscripten::val& desc, SessionDesc& sessionDesc)
+    {
+        std::vector<emscripten::val> items;
+
+        if (!readArray(desc, "targets", items))
+            return false;
+        targets.resize(items.size());
+        targetOptions.resize(items.size());
+        for (size_t i = 0; i < items.size(); i++)
+        {
+            if (!readTarget(items[i], i))
+                return false;
+        }
+
+        if (!readArray(desc, "searchPaths", items))
+            return false;
+        for (auto& path : items)
+            searchPaths.push_back(keep(path.as<std::string>()));
+
+        if (!readArray(desc, "preprocessorMacros", items))
+            return false;
+        for (auto& macro : items)
+        {
+            if (!isObject(macro) || !hasProperty(macro, "name"))
+            {
+                setInvalidArgError("each preprocessorMacros item needs a 'name'");
+                return false;
+            }
+            macros.push_back({readString(macro, "name"), readString(macro, "value")});
+        }
+
+        if (!readCompilerOptionEntries(desc, options))
+            return false;
+
+        sessionDesc.targets = targets.data();
+        sessionDesc.targetCount = (SlangInt)targets.size();
+        if (hasProperty(desc, "defaultMatrixLayoutMode"))
+            sessionDesc.defaultMatrixLayoutMode =
+                (SlangMatrixLayoutMode)desc["defaultMatrixLayoutMode"].as<int>();
+        sessionDesc.searchPaths = searchPaths.data();
+        sessionDesc.searchPathCount = (SlangInt)searchPaths.size();
+        sessionDesc.preprocessorMacros = macros.data();
+        sessionDesc.preprocessorMacroCount = (SlangInt)macros.size();
+        sessionDesc.compilerOptionEntries = options.data();
+        sessionDesc.compilerOptionEntryCount = (uint32_t)options.size();
+        return true;
+    }
+};
+} // namespace
+
+Session* GlobalSession::createSession(js::SessionDescOrTarget desc)
+{
+    SessionDesc sessionDesc = {};
+    SessionDescReader reader = {m_interface};
+
+    // A plain number is the compile target (the original signature): one target, with the
+    // sm_6_6 profile for HLSL.
+    TargetDesc numberTarget = {};
+    if (desc.isNumber())
+    {
+        numberTarget.format = (SlangCompileTarget)desc.as<int>();
+        if (numberTarget.format == SLANG_HLSL)
+            numberTarget.profile = m_interface->findProfile("sm_6_6");
+        sessionDesc.targets = &numberTarget;
+        sessionDesc.targetCount = 1;
+    }
+    else if (!isObject(desc))
+    {
+        setInvalidArgError("expected a compile target or a SessionDesc object");
         return nullptr;
     }
-    const int compileTarget = isTargetOnly ? desc.as<int>() : desc["target"].as<int>();
-
-    std::string profile;
-    std::vector<std::string> macroNames, macroValues, searchPaths;
-    std::vector<std::string> optionStrings0, optionStrings1;
-    std::vector<CompilerOptionEntry> options;
-    // The default of slang::SessionDesc, which every session used before descriptors.
-    SlangMatrixLayoutMode matrixLayoutMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
-
-    if (!isTargetOnly)
+    else if (!reader.read(desc, sessionDesc))
     {
-        if (hasProperty(desc, "profile"))
-            profile = desc["profile"].as<std::string>();
-        if (hasProperty(desc, "preprocessorMacros"))
-        {
-            for (auto& macro :
-                 emscripten::vecFromJSArray<emscripten::val>(desc["preprocessorMacros"]))
-            {
-                macroNames.push_back(macro["name"].as<std::string>());
-                macroValues.push_back(
-                    hasProperty(macro, "value") ? macro["value"].as<std::string>() : "");
-            }
-        }
-        if (hasProperty(desc, "searchPaths"))
-            searchPaths = emscripten::vecFromJSArray<std::string>(desc["searchPaths"]);
-        if (hasProperty(desc, "defaultMatrixLayoutMode"))
-            matrixLayoutMode = (SlangMatrixLayoutMode)desc["defaultMatrixLayoutMode"].as<int>();
-        if (hasProperty(desc, "compilerOptions"))
-        {
-            for (auto& option :
-                 emscripten::vecFromJSArray<emscripten::val>(desc["compilerOptions"]))
-            {
-                CompilerOptionEntry entry = {};
-                entry.name = (CompilerOptionName)option["name"].as<int>();
-                // The kind follows from the fields that are set: each option reads either
-                // strings or ints (see slang::CompilerOptionName), so an option given its
-                // documented fields gets the kind it reads.
-                const bool isString =
-                    hasProperty(option, "stringValue0") || hasProperty(option, "stringValue1");
-                entry.value.kind =
-                    isString ? CompilerOptionValueKind::String : CompilerOptionValueKind::Int;
-                if (hasProperty(option, "intValue0"))
-                    entry.value.intValue0 = option["intValue0"].as<int>();
-                if (hasProperty(option, "intValue1"))
-                    entry.value.intValue1 = option["intValue1"].as<int>();
-                optionStrings0.push_back(
-                    hasProperty(option, "stringValue0") ? option["stringValue0"].as<std::string>()
-                                                        : "");
-                optionStrings1.push_back(
-                    hasProperty(option, "stringValue1") ? option["stringValue1"].as<std::string>()
-                                                        : "");
-                options.push_back(entry);
-            }
-        }
-    }
-
-    // Point the descriptors at the strings only now that the vectors no longer grow.
-    std::vector<PreprocessorMacroDesc> macros;
-    for (size_t i = 0; i < macroNames.size(); i++)
-        macros.push_back({macroNames[i].c_str(), macroValues[i].c_str()});
-    std::vector<const char*> searchPathPointers;
-    for (auto& path : searchPaths)
-        searchPathPointers.push_back(path.c_str());
-    for (size_t i = 0; i < options.size(); i++)
-    {
-        if (options[i].value.kind == CompilerOptionValueKind::String)
-        {
-            options[i].value.stringValue0 = optionStrings0[i].c_str();
-            options[i].value.stringValue1 = optionStrings1[i].c_str();
-        }
+        return nullptr;
     }
 
     Slang::ComPtr<ISession> session;
+    SlangResult result = m_interface->createSession(sessionDesc, session.writeRef());
+    if (result != SLANG_OK)
     {
-        SessionDesc sessionDesc = {};
-        sessionDesc.structureSize = sizeof(sessionDesc);
-        constexpr SlangInt targetCount = 1;
-        TargetDesc target = {};
-        target.format = (SlangCompileTarget)compileTarget;
-        if (!profile.empty())
-        {
-            target.profile = spFindProfile(m_interface, profile.c_str());
-            if (target.profile == SLANG_PROFILE_UNKNOWN)
-            {
-                g_error.type = std::string("USER");
-                g_error.result = SLANG_E_INVALID_ARG;
-                g_error.message = "createSession: unknown profile '" + profile + "'";
-                return nullptr;
-            }
-        }
-        else if (compileTarget == SLANG_HLSL)
-        {
-            target.profile = spFindProfile(m_interface, "sm_6_6");
-        }
-        sessionDesc.targets = &target;
-        sessionDesc.targetCount = targetCount;
-        sessionDesc.preprocessorMacros = macros.data();
-        sessionDesc.preprocessorMacroCount = (SlangInt)macros.size();
-        sessionDesc.searchPaths = searchPathPointers.data();
-        sessionDesc.searchPathCount = (SlangInt)searchPathPointers.size();
-        sessionDesc.compilerOptionEntries = options.data();
-        sessionDesc.compilerOptionEntryCount = (uint32_t)options.size();
-        sessionDesc.defaultMatrixLayoutMode = matrixLayoutMode;
-        SlangResult result = m_interface->createSession(sessionDesc, session.writeRef());
-        if (result != SLANG_OK)
-        {
-            g_error.type = std::string("USER");
-            g_error.result = result;
-            return nullptr;
-        }
+        g_error.type = std::string("USER");
+        g_error.result = result;
+        return nullptr;
     }
-
     return new Session(session);
+}
+
+int GlobalSession::findProfile(const std::string& name)
+{
+    return (int)m_interface->findProfile(name.c_str());
 }
 
 std::string GlobalSession::getBuiltinModuleSource(const std::string& moduleName)

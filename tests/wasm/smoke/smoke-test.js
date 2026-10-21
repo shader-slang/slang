@@ -161,27 +161,37 @@ async function runSmokeTest() {
         }
         console.log('Builtin module source smoke test passed');
 
-        // Session options: macros, search paths and compiler options apply to every module of
-        // the session, including one imported from a search path.
+        // Session options: a SessionDesc that mirrors slang::SessionDesc. Macros, search paths
+        // and compiler option entries apply to every module of the session, including one
+        // imported from a search path. Enum values are those in include/slang.h.
+        const CompilerOptionValueKind = { Int: 0, String: 1 };
+        const CompilerOptionName = { MacroDefine: 0, IgnoreCapabilities: 11, LineDirectiveMode: 45 };
         module.FS.mkdirTree('/session-options/lib');
         module.FS.writeFile('/session-options/lib/helper.slang',
             'module helper;\n' +
             '#if HELPER_VALUE != 7\n#error "HELPER_VALUE did not reach the imported module"\n#endif\n' +
             'public uint helperValue() { return HELPER_VALUE; }\n');
         const wgslTarget = targets.find(target => target.name === 'WGSL').value;
+        const glslTarget = targets.find(target => target.name === 'GLSL').value;
         const optionsSession = globalSession.createSession({
-            target: wgslTarget,
+            targets: [{ format: wgslTarget }],
             preprocessorMacros: [{ name: 'HELPER_VALUE', value: '7' }, { name: 'MAIN_VALUE', value: '5' }],
             searchPaths: ['/session-options/lib'],
-            compilerOptions: [
-                // slang::CompilerOptionName::MacroDefine (0): stringValue0 = name, stringValue1 = value.
-                { name: 0, stringValue0: 'OPTION_VALUE', stringValue1: '3' },
-                // slang::CompilerOptionName::IgnoreCapabilities (11).
-                { name: 11, intValue0: 1 },
+            compilerOptionEntries: [
+                // MacroDefine: stringValue0 = name, stringValue1 = value.
+                {
+                    name: CompilerOptionName.MacroDefine,
+                    value: { kind: CompilerOptionValueKind.String, stringValue0: 'OPTION_VALUE', stringValue1: '3' },
+                },
+                {
+                    name: CompilerOptionName.IgnoreCapabilities,
+                    value: { kind: CompilerOptionValueKind.Int, intValue0: 1 },
+                },
             ],
         });
         if (!optionsSession) {
-            throw new Error('Failed to create a session from a descriptor');
+            const error = module.getLastError();
+            throw new Error(`Failed to create a session from a SessionDesc: ${error ? error.message : ''}`);
         }
         const optionsModule = optionsSession.loadModuleFromSource(
             'import helper;\n' +
@@ -206,58 +216,95 @@ async function runSmokeTest() {
             const error = module.getLastError();
             throw new Error(`Session options: no WGSL generated: ${error ? error.message : ''}`);
         }
-        // A valid profile and the matrix layout reach the target code. GLSL shows both: the
-        // profile as `#version`, and the layout as a default qualifier (Slang's column-major
-        // layout, 2, is GLSL's `row_major`; the default, row-major, is `column_major`).
-        const glslTarget = targets.find(target => target.name === 'GLSL').value;
-        const glslShaderSource = 'RWStructuredBuffer<uint> outputBuffer;\n' +
+
+        // Several targets, each with its own TargetDesc fields or compiler option entries, and
+        // the session's matrix layout. GLSL shows the profile as `#version`, the line directive
+        // mode as the presence of `#line`, and the layout as a default qualifier (Slang's
+        // column-major layout, 2, is GLSL's `row_major`; the default, row-major, is
+        // `column_major`).
+        const shaderSource = 'RWStructuredBuffer<uint> outputBuffer;\n' +
             '[shader("compute")] [numthreads(1, 1, 1)]\n' +
             'void computeMain() { outputBuffer[0] = 1; }\n';
-        const glslCode = (desc) => {
-            const glslSession = globalSession.createSession(desc);
-            if (!glslSession) {
-                throw new Error(`Failed to create a GLSL session from ${JSON.stringify(desc)}`);
+        const targetCodes = (desc, targetCount) => {
+            const codeSession = globalSession.createSession(desc);
+            if (!codeSession) {
+                const error = module.getLastError();
+                throw new Error(`Failed to create a session from ${JSON.stringify(desc)}: ${error ? error.message : ''}`);
             }
-            const glslModule = glslSession.loadModuleFromSource(
-                glslShaderSource, 'glsl-options', '/glsl-options.slang');
-            const glslProgram = glslModule ?
-                glslSession.createCompositeComponentType([glslModule]).link() : null;
-            const code = glslProgram ? glslProgram.getTargetCode(0) : '';
-            if (glslProgram) glslProgram.delete();
-            if (glslModule) glslModule.delete();
-            glslSession.delete();
-            return code;
+            const codeModule = codeSession.loadModuleFromSource(
+                shaderSource, 'target-options', '/target-options.slang');
+            const codeProgram = codeModule ?
+                codeSession.createCompositeComponentType([codeModule]).link() : null;
+            const codes = [];
+            for (let i = 0; i < targetCount; i++) {
+                codes.push(codeProgram ? codeProgram.getTargetCode(i) : '');
+            }
+            if (codeProgram) codeProgram.delete();
+            if (codeModule) codeModule.delete();
+            codeSession.delete();
+            return codes;
         };
-        const defaultGlsl = glslCode(glslTarget);
+        const [defaultGlsl] = targetCodes(glslTarget, 1);
         if (!defaultGlsl.includes('#version 450') ||
-            !defaultGlsl.includes('layout(column_major) uniform;')) {
-            throw new Error(`Unexpected default GLSL header:\n${defaultGlsl.slice(0, 200)}`);
+            !defaultGlsl.includes('layout(column_major) uniform;') ||
+            !defaultGlsl.includes('#line')) {
+            throw new Error(`Unexpected default GLSL:\n${defaultGlsl.slice(0, 300)}`);
         }
-        const configuredGlsl =
-            glslCode({ target: glslTarget, profile: 'glsl_460', defaultMatrixLayoutMode: 2 });
+        const glsl460 = globalSession.findProfile('glsl_460');
+        if (!glsl460) {
+            throw new Error('findProfile("glsl_460") should return a profile');
+        }
+        if (globalSession.findProfile('not_a_profile') !== 0) {
+            throw new Error('findProfile should return 0 (SLANG_PROFILE_UNKNOWN) for an unknown name');
+        }
+        const SLANG_LINE_DIRECTIVE_MODE_NONE = 1;
+        const [multiTargetWgsl, configuredGlsl, optionGlsl] = targetCodes({
+            targets: [
+                { format: wgslTarget },
+                { format: glslTarget, profile: glsl460, lineDirectiveMode: SLANG_LINE_DIRECTIVE_MODE_NONE },
+                {
+                    format: glslTarget,
+                    compilerOptionEntries: [{
+                        name: CompilerOptionName.LineDirectiveMode,
+                        value: { kind: CompilerOptionValueKind.Int, intValue0: SLANG_LINE_DIRECTIVE_MODE_NONE },
+                    }],
+                },
+            ],
+            defaultMatrixLayoutMode: 2,
+        }, 3);
+        if (!multiTargetWgsl.includes('@compute')) {
+            throw new Error(`Target 0 should be WGSL:\n${multiTargetWgsl.slice(0, 300)}`);
+        }
         if (!configuredGlsl.includes('#version 460') ||
-            !configuredGlsl.includes('layout(row_major) uniform;')) {
-            throw new Error(`profile or defaultMatrixLayoutMode did not apply:\n${configuredGlsl.slice(0, 200)}`);
+            !configuredGlsl.includes('layout(row_major) uniform;') ||
+            configuredGlsl.includes('#line')) {
+            throw new Error(`profile, lineDirectiveMode or defaultMatrixLayoutMode did not apply:\n${configuredGlsl.slice(0, 300)}`);
         }
-        const badSession = globalSession.createSession({ profile: 'sm_6_6' });
-        if (badSession) {
-            throw new Error('A descriptor without a target should not create a session');
+        if (!optionGlsl.includes('#version 450') || optionGlsl.includes('#line')) {
+            throw new Error(`A target's compilerOptionEntries did not apply to that target:\n${optionGlsl.slice(0, 300)}`);
         }
-        const badError = module.getLastError();
-        if (!badError || badError.type !== 'USER' || badError.result === module.SLANG_OK) {
-            throw new Error('A descriptor without a target should set a USER invalid-argument error');
-        }
-        const badProfileSession =
-            globalSession.createSession({ target: wgslTarget, profile: 'not_a_profile' });
-        if (badProfileSession) {
-            throw new Error('An unknown profile should not create a session');
-        }
-        const badProfileError = module.getLastError();
-        if (!badProfileError || badProfileError.type !== 'USER' ||
-            badProfileError.result === module.SLANG_OK ||
-            !badProfileError.message.includes('not_a_profile')) {
-            throw new Error('An unknown profile should set a USER error naming the profile');
-        }
+
+        // A malformed descriptor returns null and sets a USER error naming the problem.
+        const expectInvalid = (desc, messagePart) => {
+            const badSession = globalSession.createSession(desc);
+            if (badSession) {
+                badSession.delete();
+                throw new Error(`createSession(${JSON.stringify(desc)}) should fail`);
+            }
+            const error = module.getLastError();
+            if (!error || error.type !== 'USER' || error.result === module.SLANG_OK ||
+                !error.message.includes(messagePart)) {
+                throw new Error(`createSession(${JSON.stringify(desc)}) should set a USER error about ${messagePart}`);
+            }
+        };
+        expectInvalid('WGSL', 'SessionDesc');
+        expectInvalid({ targets: wgslTarget }, "'targets' must be an array");
+        expectInvalid({ targets: [{ profile: glsl460 }] }, "'format'");
+        expectInvalid({ preprocessorMacros: [{ value: '1' }] }, "'name'");
+        expectInvalid({
+            targets: [{ format: wgslTarget }],
+            compilerOptionEntries: [{ name: CompilerOptionName.IgnoreCapabilities, value: { intValue0: 1 } }],
+        }, "'kind'");
         optionsProgram.delete();
         optionsModule.delete();
         optionsSession.delete();
