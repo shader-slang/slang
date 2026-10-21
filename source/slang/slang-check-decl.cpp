@@ -14983,8 +14983,8 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         {
             getSink()->diagnose(Diagnostics::ConstOnWritableParameter{
                 .mode = mode,
-                .modifier = constModifier,
-                .param = paramDecl});
+                .param = paramDecl,
+                .modifier = constModifier});
         }
     }
 
