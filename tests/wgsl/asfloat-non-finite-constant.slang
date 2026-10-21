@@ -1,6 +1,9 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -O0
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -O2
 //TEST:SIMPLE(filecheck=NOCONSTEXPR): -target wgsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=NOCONSTEXPR): -target wgsl -stage compute -entry computeMain -O0
+//TEST:SIMPLE(filecheck=NOCONSTEXPR): -target wgsl -stage compute -entry computeMain -O2
 // Validate the emitted WGSL through Tint on CI (ignored where the downstream compiler is absent).
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm -stage compute -entry computeMain
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -output-using-type
