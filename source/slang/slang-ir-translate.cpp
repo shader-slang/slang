@@ -443,6 +443,14 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
         return translateInst;
     }
 
+    // A set-specialized generic is lowered by `specializeGenericWithSetArgs`, which prepends a tag
+    // parameter for each dynamic witness-table argument, so only a call site that passes those tags
+    // may use the lowered function. The type-flow pass adds the tags when it rewrites each call,
+    // and it needs the `Specialize` itself to do so. We therefore never resolve it here, even when
+    // the translation dictionary already maps it to the function lowered for another call site.
+    if (isSetSpecializedGeneric(instWithCanonicalOperands))
+        return instWithCanonicalOperands;
+
     // Assume at this point that we have a specializable inst with resolved operands.
     auto entry = builder.fetchCompilerDictionaryEntry(
         ctx->getModule()->getTranslationDict(),
@@ -464,47 +472,42 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
     {
     case kIROp_Specialize:
         {
-            if (!isSetSpecializedGeneric(instWithCanonicalOperands))
+            auto specInst = cast<IRSpecialize>(instWithCanonicalOperands);
+            auto specResult = specializeGeneric(ctx->getSpecializationContext(), specInst, false);
+
+            if (specResult && as<IRGlobalValueWithCode>(specResult))
             {
-                auto specInst = cast<IRSpecialize>(instWithCanonicalOperands);
-                auto specResult =
-                    specializeGeneric(ctx->getSpecializationContext(), specInst, false);
+                // If we ended up with something that has code,
+                // specialization may have opened up simplification opportunities.
+                //
 
-                if (specResult && as<IRGlobalValueWithCode>(specResult))
-                {
-                    // If we ended up with something that has code,
-                    // specialization may have opened up simplification opportunities.
-                    //
+                // Specialize any child instructions. This handles any non-hoistable
+                // instructions and peephole-style opportunities.
+                // TODO: Should this just run both specialization and peephole in a loop until
+                // we reach a fixed point?
+                specializeChildInsts(ctx->getSpecializationContext(), specResult);
 
-                    // Specialize any child instructions. This handles any non-hoistable
-                    // instructions and peephole-style opportunities.
-                    // TODO: Should this just run both specialization and peephole in a loop until
-                    // we reach a fixed point?
-                    specializeChildInsts(ctx->getSpecializationContext(), specResult);
+                // Fold any constants within the specialized code.
+                applySparseConditionalConstantPropagation(
+                    specResult,
+                    ctx->getTargetProgram(),
+                    ctx->getSink(),
+                    ctx);
 
-                    // Fold any constants within the specialized code.
-                    applySparseConditionalConstantPropagation(
-                        specResult,
+                if (!unrollLoopsInFunc(
                         ctx->getTargetProgram(),
-                        ctx->getSink(),
-                        ctx);
-
-                    if (!unrollLoopsInFunc(
-                            ctx->getTargetProgram(),
-                            ctx->getModule(),
-                            as<IRGlobalValueWithCode>(specResult),
-                            ctx->getSink()))
-                        return nullptr;
-                }
-
-                auto currentSpecInst = as<IRSpecialize>(instRef->getOperand(0));
-                if (specResult && currentSpecInst && specResult != currentSpecInst)
-                    currentSpecInst->replaceUsesWith(specResult);
-
-                // No need to memoize since specializeGeneric will already have memoized this.
-                return specResult;
+                        ctx->getModule(),
+                        as<IRGlobalValueWithCode>(specResult),
+                        ctx->getSink()))
+                    return nullptr;
             }
-            break;
+
+            auto currentSpecInst = as<IRSpecialize>(instRef->getOperand(0));
+            if (specResult && currentSpecInst && specResult != currentSpecInst)
+                currentSpecInst->replaceUsesWith(specResult);
+
+            // No need to memoize since specializeGeneric will already have memoized this.
+            return specResult;
         }
     case kIROp_LookupWitnessMethod:
         return memoize(
