@@ -33,7 +33,8 @@ void computeMain()
     outputBuffer[4] = uint(v.w);
 }
 
-// BUF: 2
+// BUF: type: uint32_t
+// BUF-NEXT: 2
 // BUF-NEXT: 1
 // BUF-NEXT: 2
 // BUF-NEXT: 7
