@@ -573,6 +573,7 @@ jobs:
       cpu-only: true
       slang-user-skills: true
       server-count: 4
+      run-via-glsl: false
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -587,6 +588,8 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+      # Vulkan is not available on macOS, so the via-glsl pass (-api vk) cannot run here.
+      run-via-glsl: false
 
   test-macos-debug-clang-aarch64-rhi:
     needs: [filter, build-macos-debug-clang-aarch64]
@@ -611,6 +614,8 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+      # Vulkan is not available on macOS, so the via-glsl pass (-api vk) cannot run here.
+      run-via-glsl: false
 
   test-macos-release-clang-aarch64-rhi:
     needs: [filter, build-macos-release-clang-aarch64]
@@ -635,6 +640,7 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+      run-via-glsl: false
 
   test-linux-release-gcc-aarch64:
     needs: [filter, build-linux-release-gcc-aarch64]
@@ -647,6 +653,7 @@ jobs:
       config: release
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+      run-via-glsl: false
 
   # Windows ARM64 test (GitHub-hosted, native, CPU only — no GPU on this
   # hosted image).
@@ -668,6 +675,7 @@ jobs:
       # platform, so restrict directly to cpu+llvm via cpu-only instead of
       # relying on it.
       cpu-only: true
+      run-via-glsl: false
 
   test-windows-release-cl-aarch64:
     needs: [filter, build-windows-release-cl-aarch64]
@@ -681,6 +689,7 @@ jobs:
       runs-on: '["windows-11-vs2026-arm"]'
       full-gpu-tests: false
       cpu-only: true
+      run-via-glsl: false
 
   # Windows GPU tests (self-hosted).
   # Each config is split into three parallel jobs to reduce wall-clock time:
@@ -700,6 +709,8 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
       api: dx11+dx12+wgpu
+      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
+      run-via-glsl: false
       gpu-tier: t4
 
   test-windows-debug-cl-x86_64-gpu-vk:
@@ -715,6 +726,8 @@ jobs:
       full-gpu-tests: true
       api: vk+cpu+llvm
       gpu-tier: t4
+      # Only this job runs the via-glsl pass (-api vk); the dx and cuda jobs would repeat it.
+      run-via-glsl: true
 
   test-windows-debug-cl-x86_64-gpu-cuda:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
@@ -729,6 +742,8 @@ jobs:
       full-gpu-tests: true
       api: cuda
       gpu-tier: t4
+      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
+      run-via-glsl: false
 
   test-windows-debug-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
@@ -753,6 +768,8 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
       api: dx11+dx12+wgpu
+      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
+      run-via-glsl: false
       gpu-tier: t4
 
   test-windows-release-cl-x86_64-gpu-vk:
@@ -768,6 +785,8 @@ jobs:
       full-gpu-tests: true
       api: vk+cpu+llvm
       gpu-tier: t4
+      # Only this job runs the via-glsl pass (-api vk); the dx and cuda jobs would repeat it.
+      run-via-glsl: true
 
   test-windows-release-cl-x86_64-gpu-cuda:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -781,6 +800,8 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
       api: cuda
+      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
+      run-via-glsl: false
       gpu-tier: t4
 
   test-windows-release-cl-x86_64-gpu-rhi:

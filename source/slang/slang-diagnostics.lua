@@ -1186,6 +1186,20 @@ err(
 )
 
 err(
+    "spirv-snippet-undefined-id",
+    29001,
+    "undefined id in SPIR-V snippet",
+    span { loc = "location", message = "undefined SPIR-V id '%~id' in target intrinsic snippet: ~snippet" }
+)
+
+err(
+    "spirv-snippet-unknown-operand",
+    29002,
+    "unknown operand in SPIR-V snippet",
+    span { loc = "location", message = "unknown operand '~operand' in target intrinsic snippet: ~snippet" }
+)
+
+err(
     "unrecognized-spirv-opcode",
     29100,
     "unrecognized SPIR-V opcode",
@@ -5136,6 +5150,15 @@ err(
     39032,
     "target does not support ray tracing entry point parameters",
     span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
+)
+
+err(
+    "multiple-push-constant-blocks-in-entry-point",
+    39033,
+    "entry point uses more than one push-constant block",
+    span { loc = "entryPoint:IRInst", message = "entry point `~entryPoint` uses more than one push-constant block, but Vulkan allows at most one per entry point" },
+    variadic_note { cpp_name = "Block", message = "~blockDescription is used by this entry point", span { loc = "blockLocation" } },
+    note { message = "combine the data into one `[[vk::push_constant]]` block or into the entry point's `uniform` parameters", span { loc = "entryPoint:IRInst" } }
 )
 
 warning(
