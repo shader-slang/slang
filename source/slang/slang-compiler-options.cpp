@@ -370,6 +370,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::NoHLSLBinding:
         case CompilerOptionName::NoHLSLPackConstantBufferElements:
         case CompilerOptionName::EnableExperimentalPasses:
+        case CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility:
         case CompilerOptionName::TrackLiveness:
         case CompilerOptionName::LoopInversion:
         case CompilerOptionName::AllowGLSL:
@@ -458,10 +459,10 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::WarningsAsErrors:
     case CompilerOptionName::DisableWarning:
     case CompilerOptionName::DisableWarnings:
+    case CompilerOptionName::DisableNotes:
     case CompilerOptionName::EnableWarning:
     case CompilerOptionName::WarningLevel:
     case CompilerOptionName::Capability:
-    case CompilerOptionName::DownstreamArgs:
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
     case CompilerOptionName::TypeConformance:
@@ -472,6 +473,43 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     }
     return false;
 }
+bool CompilerOptionSet::isLevelLocal(CompilerOptionName name)
+{
+    return name == CompilerOptionName::DownstreamArgs;
+}
+
+CompilerOptionSet CompilerOptionSet::copyWithoutLevelLocalOptions() const
+{
+    CompilerOptionSet result = *this;
+    for (auto& kv : options)
+    {
+        if (isLevelLocal(kv.key))
+            result.options.remove(kv.key);
+    }
+    return result;
+}
+
+void CompilerOptionSet::appendLevelLocal(
+    CompilerOptionName name,
+    const List<CompilerOptionValue>& values)
+{
+    SLANG_ASSERT(isLevelLocal(name));
+    auto existing = options.tryGetValue(name);
+    if (!existing)
+    {
+        options[name] = values;
+        return;
+    }
+    if (existing == &values)
+    {
+        // Growing the list would free the buffer we are copying from.
+        List<CompilerOptionValue> copy = values;
+        existing->addRange(copy);
+        return;
+    }
+    existing->addRange(values);
+}
+
 CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name)
 {
     switch (name)
@@ -655,6 +693,16 @@ void applySettingsToDiagnosticSink(
             Severity::Warning,
             Severity::Disable);
     }
+    disableArray = options.getArray(CompilerOptionName::DisableNotes);
+    for (auto& element : disableArray)
+    {
+        overrideDiagnostics(
+            targetSink,
+            outputSink,
+            element.stringValue.getUnownedSlice(),
+            Severity::Note,
+            Severity::Disable);
+    }
     auto enableArray = options.getArray(CompilerOptionName::EnableWarning);
     for (auto& element : enableArray)
     {
@@ -703,6 +751,13 @@ void applySettingsToDiagnosticSink(
     if (options.shouldEmitMachineReadableDiagnostics())
     {
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
+    }
+
+    // Preserve a previously applied format when this option set does not specify one.
+    if (options.hasOption(CompilerOptionName::DiagnosticFormat))
+    {
+        targetSink->setDiagnosticFormat(
+            (SlangDiagnosticFormat)options.getIntOption(CompilerOptionName::DiagnosticFormat));
     }
 
     // Handle diagnostic color setting.

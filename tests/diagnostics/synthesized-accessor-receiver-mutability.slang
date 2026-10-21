@@ -43,3 +43,25 @@ struct InvalidSubscript : INonmutatingSubscript
         set { data[index] = newValue; }
     }
 }
+
+// A static accessor has no effective `this` parameter. An exact static witness can be installed
+// directly, but adapting a mismatched signature would require a type-based forwarding expression;
+// it must fail as an ordinary conformance mismatch instead of synthesizing an instance wrapper.
+interface IStaticSubscript
+{
+    static __subscript(int index) -> int
+//CHECK:              ^ see interface requirement declaration of 'operator[]'
+    {
+        get;
+    }
+}
+
+struct InvalidStaticSubscript : IStaticSubscript
+{
+    static __subscript(uint index) -> int
+//CHECK:              ^ interface requirement mismatch
+//CHECK:              ^ member 'operator[]' does not match interface requirement.
+    {
+        get { return 0; }
+    }
+}

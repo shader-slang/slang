@@ -261,6 +261,14 @@ all - Treat all warnings as errors.
 Disable specific warnings, given by numeric id or name. A numeric id that this compiler version does not recognize is silently ignored, so one option value can be shared across compiler versions that do not all define the warning; an unrecognized warning name is still reported as an error. 
 
 
+<a id="notes-disable"></a>
+### -notes-disable
+
+**-notes-disable &lt;id&gt;\[,&lt;id&gt;...\]**
+
+Disable specific notes, given by numeric id or name. 
+
+
 <a id="wall"></a>
 ### -Wall, -Wextra, -Wpedantic
 
@@ -999,6 +1007,11 @@ Deprecated. Treat every input translation unit as GLSL. Use a GLSL file-name ext
 Enable experimental compiler passes 
 
 
+<a id="gec"></a>
+### -Gec
+Enable additional backwards-compatibility features for legacy HLSL inputs. See the user guide's HLSL backwards compatibility section for the supported behavior. 
+
+
 <a id="enable-experimental-dynamic-dispatch"></a>
 ### -enable-experimental-dynamic-dispatch
 Enable experimental dynamic dispatch features 
@@ -1022,6 +1035,14 @@ Enable experimental rich diagnostics with enhanced formatting and details
 <a id="enable-machine-readable-diagnostics"></a>
 ### -enable-machine-readable-diagnostics
 Enable machine-readable diagnostic output in tab-separated format 
+
+
+<a id="diagnostic-format"></a>
+### -diagnostic-format
+
+**-diagnostic-format &lt;default|vs&gt;**
+
+Select diagnostic formatting. 'default' preserves normal output; 'vs' uses Visual Studio headers and uncolored, indented source details. Machine-readable diagnostics take precedence. 
 
 
 <a id="diagnostic-color"></a>
