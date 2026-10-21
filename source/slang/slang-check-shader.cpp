@@ -2575,6 +2575,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     for (auto target : linkage->targets)
     {
+        // Capability diagnostics for this target follow its options, so an option such as
+        // IgnoreCapabilities set in the target's own compiler option entries applies here.
+        auto& targetOptionSet = target->getOptionSet();
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
         targetCaps.join(stageCapabilitySet);
@@ -2587,7 +2590,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             auto stageTarget = stageCapabilitySet.getTargetStage();
             maybeDiagnose(
                 sink,
-                linkage->m_optionSet,
+                targetOptionSet,
                 DiagnosticCategory::Capability,
                 Diagnostics::EntryPointUsesUnavailableCapability{
                     .stage = capabilityNameToString((CapabilityName)stageTarget),
@@ -2597,7 +2600,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // Find out what is incompatible (ancestor missing a super set of 'target+stage')
             CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
             diagnoseMissingCapabilityProvenance(
-                linkage->m_optionSet,
+                targetOptionSet,
                 sink,
                 entryPointFuncDecl,
                 failedSet);
@@ -2613,25 +2616,24 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     continue;
                 maybeDiagnose(
                     sink,
-                    linkage->m_optionSet,
+                    targetOptionSet,
                     DiagnosticCategory::Capability,
                     Diagnostics::SeeUsingOf{.decl = use.structDecl, .location = use.useLoc});
                 maybeDiagnose(
                     sink,
-                    linkage->m_optionSet,
+                    targetOptionSet,
                     DiagnosticCategory::Capability,
                     Diagnostics::SeeDefinitionOf{.decl = use.structDecl});
                 if (auto requireAttr = use.structDecl->findModifier<RequireCapabilityAttribute>())
                     maybeDiagnose(
                         sink,
-                        linkage->m_optionSet,
+                        targetOptionSet,
                         DiagnosticCategory::Capability,
                         Diagnostics::SeeDeclarationOfModifier{.modifier = requireAttr});
             }
         }
         else
         {
-            auto& targetOptionSet = target->getOptionSet();
             bool specificProfileRequested =
                 targetOptionSet.hasOption(CompilerOptionName::Profile) &&
                 (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
