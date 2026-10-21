@@ -336,14 +336,16 @@ The generated name includes both the selected type and shader stage. For a struc
 that implements closest-hit and any-hit, the generated names are `MultiStage_closesthit` and
 `MultiStage_anyhit`; selecting `Miss` as a miss shader produces `Miss_miss`. The public entry name
 remains the selected source name. `getStructuralRayTracingSourceTypeName` supplies the declaration
-path and, for a generic specialization, a hash of its mangled type identity.
+path for a non-generic type. For a generic specialization, it uses the canonical type's existing
+mangled name, which includes the selected type arguments.
 `getStructuralRayTracingEntryPointName` replaces dots in that type name with underscores, then
 appends `_` and the canonical spelling from `getStageName(stage)`. For example, `Stages.Miss`
 becomes `Stages_Miss_miss`, and `main` becomes `main_miss`. Entry lookup, stage selection, and
 the selected method are unchanged by this generated name. The API regression selects both stages of
 `MultiStage`, combines the entries in one program, and verifies equal public names with distinct
 generated-name overrides. It also selects `Stages.main` as closest-hit and checks the generated
-name `Stages_main_closesthit`.
+name `Stages_main_closesthit`. For `M<P>` and `M<R>`, it checks that each generated name is the
+selected type's ordinary mangled name followed by `_miss`.
 
 AST-to-IR lowering produces an ordinary function and its input type. A generic implementation
 uses the normal generic parameters, witness parameters, and `IRSpecialize` operations. Dependent

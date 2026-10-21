@@ -86,11 +86,11 @@ bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl);
 /// Returns this executable interface's `invoke` requirement, or null for other interfaces.
 FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* interfaceDecl);
 
-/// Returns the source declaration path used as the name hint for a structural ray-tracing type.
+/// Returns the type name used to form a structural ray-tracing entry-point symbol.
 ///
-/// The path includes namespaces and enclosing types, but excludes module names. A closed generic
-/// specialization gains a suffix derived from its canonical semantic type, so two specializations
-/// cannot silently claim the same structural entry-point name.
+/// Nongeneric types use the source declaration path, including namespaces and enclosing types
+/// but excluding module names. Generic specializations use ordinary type mangling to preserve
+/// the selected arguments.
 String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type);
 
 /// Returns the deterministic target symbol for a structural ray-tracing type and selected stage.

@@ -640,15 +640,9 @@ String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type)
         return sourceName;
     }
 
-    // `GenericMiss<uint>` and `GenericMiss<float>` share one declaration path, but their
-    // canonical semantic types have distinct mangled identities. Hash that existing identity only
-    // to keep the public target symbol compact; the compiler never parses a mangled spelling to
-    // rediscover either the declaration or its substitutions.
-    auto canonicalType = type->getCanonicalType();
-    auto mangledTypeName = getMangledTypeName(astBuilder, canonicalType);
-    StringBuilder result;
-    result << sourceName << getHashedName(mangledTypeName.getUnownedSlice());
-    return result.produceString();
+    // `GenericMiss<uint>` and `GenericMiss<float>` share one declaration path. Ordinary type
+    // mangling preserves the selected arguments and provides a distinct name for each type.
+    return getMangledTypeName(astBuilder, type->getCanonicalType());
 }
 
 String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName, Stage stage)

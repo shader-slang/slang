@@ -131,8 +131,8 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointLookupIsModuleLocal)
 }
 
 // Selecting two stages implemented by the same struct must give them distinct target names.
-// Qualified names should remain readable, with dots replaced by underscores. Check the
-// overrides that supply those names to IR linking.
+// Qualified names should remain readable, with dots replaced by underscores. Generic types use
+// ordinary mangling to retain their arguments. Check the overrides supplied to IR linking.
 SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
 {
     ComPtr<slang::IGlobalSession> globalSession;
@@ -209,6 +209,35 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
     SLANG_CHECK(internalEntry->getName()->text == "Stages.main");
     ComponentType* qualifiedComponent = internalEntry;
     SLANG_CHECK(qualifiedComponent->getEntryPointNameOverride(0) == "Stages_main_closesthit");
+
+    const char* genericSourcePath =
+        "tests/ray-tracing-2/frontend/entry-point/struct-entry-generic.slang";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(genericSourcePath, source)));
+    auto genericModule = session->loadModuleFromSourceString(
+        "GenericStageModule",
+        genericSourcePath,
+        source.getBuffer(),
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(genericModule != nullptr);
+
+    // The two specializations share M's declaration but retain P or R in its mangled name.
+    const char* genericEntryNames[] = {"M<P>", "M<R>"};
+    const char* genericTargetNames[] = {
+        "_ST18GenericStageModule1MG118GenericStageModule1P_miss",
+        "_ST18GenericStageModule1MG118GenericStageModule1R_miss"};
+    for (Index i = 0; i < SLANG_COUNT_OF(genericEntryNames); ++i)
+    {
+        ComPtr<slang::IEntryPoint> genericEntry;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(genericModule->findAndCheckEntryPoint(
+            genericEntryNames[i],
+            SLANG_STAGE_MISS,
+            genericEntry.writeRef(),
+            diagnostics.writeRef())));
+        auto internalGenericEntry = static_cast<EntryPoint*>(genericEntry.get());
+        SLANG_CHECK(internalGenericEntry->getName()->text == genericEntryNames[i]);
+        ComponentType* genericComponent = internalGenericEntry;
+        SLANG_CHECK(genericComponent->getEntryPointNameOverride(0) == genericTargetNames[i]);
+    }
 }
 
 // This test reproduces issue #6507, where it was noticed that compilation of
