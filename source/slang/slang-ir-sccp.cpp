@@ -380,11 +380,12 @@ struct SCCPContext
             case kIROp_FloatLit:
                 {
                     IRFloatingPointValue value = irConstant->value.floatVal;
-                    // Converting a `double` or `half` to `float` at run time quiets a signaling
-                    // NaN, so the folded conversion does too. `getFloatValue` keeps NaN bits.
-                    if (type->getOp() == kIROp_FloatType &&
-                        irConstant->getDataType()->getOp() != kIROp_FloatType)
-                        value = IRFloatingPointValue(float(value));
+                    // A conversion between floating-point types quiets a signaling NaN at run
+                    // time, so the folded conversion does too. `getFloatValue` keeps the bits of
+                    // a `float` or `double` NaN, so set the quiet bit here. Bit 51 is the quiet
+                    // bit of a double, and of a `float` NaN held as one.
+                    if (type->getOp() != irConstant->getDataType()->getOp() && Math::IsNaN(value))
+                        value = Int64AsDouble(DoubleAsInt64(value) | (int64_t(1) << 51));
                     resultVal = getBuilder()->getFloatValue(type, value);
                 }
                 break;

@@ -11,6 +11,7 @@
 //TEST:SIMPLE(filecheck=O0): -target spirv-asm -stage compute -entry computeMain -O0
 
 //TEST:SIMPLE(filecheck=CAST): -target spirv -stage compute -entry castMain -O1
+//TEST:SIMPLE(filecheck=WIDEN): -target spirv -stage compute -entry widenMain -O1
 
 // Signaling NaNs folded through `float` and back to `uint` keep their bits:
 // 0x7F800001, 0xFF800001 and 0x7FBFFFFF.
@@ -34,6 +35,11 @@
 // the double 0x7FF0000040000000 becomes 0x7FC00002, not 0x7F800002.
 // CAST: OpConstant %uint 2143289346
 // CAST-NOT: OpConstant %uint 2139095042
+
+// A value conversion from `float` to `double` quiets it too: the float 0x7F800001 becomes the
+// double 0x7FF8000020000000, whose high word is 0x7FF80000, not 0x7FF00000.
+// WIDEN: OpConstant %uint 2146959360
+// WIDEN-NOT: OpConstant %uint 2146435072
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -Xslang -O1
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -Xslang -O0
@@ -88,4 +94,11 @@ void computeMain()
 void castMain()
 {
     outputBuffer[0] = asuint(float(bit_cast<double>(0x7FF0000040000000ull)));
+}
+
+[numthreads(1, 1, 1)]
+void widenMain()
+{
+    uint64_t bits = bit_cast<uint64_t>(double(bit_cast<float>(0x7F800001u)));
+    outputBuffer[0] = uint(bits >> 32);
 }
