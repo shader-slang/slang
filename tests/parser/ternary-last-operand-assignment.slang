@@ -3,7 +3,8 @@
 // The last operand of `?:` is parsed at the `?:` precedence level, so this is
 // `(c ? 0.0 : b) /= 2.0` and fails because a `?:` is not an l-value. This test records the current
 // behavior pending a maintainer decision on the last operand (shader-slang/slang#13870); it does not
-// state the intended grammar.
+// state the intended grammar. If Slang adopts the C++/GLSL rule, this line parses as
+// `c ? 0.0 : (b /= 2.0)` and the test should be inverted.
 
 RWStructuredBuffer<float> outputBuffer;
 
