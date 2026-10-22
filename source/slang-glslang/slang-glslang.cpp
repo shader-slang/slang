@@ -12,7 +12,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-#if defined(_WIN32) && defined(SLANG_GLSLANG_USES_MIMALLOC)
+#if defined(_MSC_VER) && defined(SLANG_GLSLANG_USES_MIMALLOC)
 #include <mimalloc.h>
 #endif
 
@@ -945,16 +945,14 @@ static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_3& request)
     return 0;
 }
 
-#if defined(_WIN32) && defined(SLANG_GLSLANG_USES_MIMALLOC)
-// SPIRV-Tools-opt links its own mimalloc into this DLL, which keeps its OS memory reserved after
-// `FreeLibrary` unless `mi_option_destroy_on_exit` is set when it shuts down, so every load and
-// unload of slang-glslang would leave an arena reservation behind (#13828). The MSVC CRT calls
-// this `DllMain` before it runs the DLL's static destructors (including `ProcessInitializer`
-// below) and `atexit` functions, and mimalloc registers its shutdown as the first of those
-// `atexit` functions, so it releases the memory only after every static has freed its allocations.
-//
-// `reserved` is null when the DLL is unloaded by `FreeLibrary` (or its load failed) and non-null
-// when the whole process is exiting, which we leave alone because the OS reclaims the memory.
+#if defined(_MSC_VER) && defined(SLANG_GLSLANG_USES_MIMALLOC)
+// SPIRV-Tools-opt links its own copy of mimalloc into this DLL
+// (external/spirv-tools/source/opt/CMakeLists.txt). This hook releases that copy's memory on
+// `FreeLibrary` exactly as the one in source/slang/slang-mimalloc.cpp does for slang-compiler, and
+// the explanation and host contract there apply unchanged. The function-local static
+// `g_processInitializer` in `glslang_compile_1_3`, whose destructor calls
+// `glslang::FinalizeProcess()`, is registered with `atexit` after mimalloc, so it is destroyed
+// before `mi_process_done` runs.
 extern "C" BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID reserved)
 {
     if (reason == DLL_PROCESS_DETACH && reserved == nullptr)
