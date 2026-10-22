@@ -219,22 +219,20 @@ void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, Dia
     }
 }
 
-/// Return true if every use of `inst` is debug information, directly or through instructions
-/// without side effects whose own uses are all debug information.
+/// Return true if `inst` has no side effects, has at least one use, and every use is a debug
+/// instruction.
 //
-// The source emitters do not emit debug instructions, and fold a pure value into its uses, so
-// such a value does not appear in the output. For example, with `-g` the unused local in
-// `float* q = (float*)addr; bool b = q != nullptr;` is kept alive only by `DebugValue`.
+// The source emitters drop debug instructions and, on targets without pointers, fold every
+// pointer value into its uses, so such a value does not appear in the output. For example, with
+// `-g` the unused local in `float* q = (float*)addr;` is kept alive only by `DebugValue`. A value
+// with any other user is reported, because that user may be emitted and print the pointer type.
 static bool isUsedOnlyByDebugInfo(IRInst* inst)
 {
-    if (!inst->hasUses())
+    if (!inst->hasUses() || inst->mightHaveSideEffects())
         return false;
     for (auto use = inst->firstUse; use; use = use->nextUse)
     {
-        auto user = use->getUser();
-        if (isDebugInfoInst(user))
-            continue;
-        if (user->mightHaveSideEffects() || !isUsedOnlyByDebugInfo(user))
+        if (!isDebugInfoInst(use->getUser()))
             return false;
     }
     return true;
@@ -242,15 +240,16 @@ static bool isUsedOnlyByDebugInfo(IRInst* inst)
 
 void checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink)
 {
-    // We report every `T*` value that shader code makes from an integer or from `nullptr`, because
-    // the HLSL and WGSL emitters have no type for it. IR types are deduplicated at module scope, so
-    // we walk the uses of each `T*` type instead of every function. For example, `(float*)addr` is
-    // a `CastIntToPtr` reported at the cast. `p != nullptr` and `static float* g = nullptr;` use a
+    // A physical pointer is a `T*`: a `Ptr` in the `UserPointer` address space. After
+    // specialization, a `T*` value in code comes from an integer (`CastIntToPtr`, or `BitCast` from
+    // a non-pointer), from `nullptr` (`PtrLit`), or from memory (#13399, not checked here). We
+    // report the first two. IR types are deduplicated, so we walk the values whose type is a `T*`
+    // type: a field, parameter or variable type that mentions `T*` is not a value and is skipped.
+    // `(float*)addr` is reported at the cast. `p != nullptr` and `static float* g = nullptr;` use a
     // `PtrLit` that has no location, so we report each of its users.
     //
-    // A value that only debug information uses is not emitted, so it is not reported.
-    // Compiler-made copies of a value, such as phi-elimination stores, can have no location. We
-    // report one of those only if nothing else is reported, so that the compilation still fails.
+    // Compiler-made copies of a value can have no location. We report one of those only if
+    // nothing else is reported, so that the compilation still fails.
     HashSet<SourceLoc::RawValue> diagnosedLocations;
     bool hasValueWithoutLocation = false;
     auto diagnose = [&](IRInst* inst)
@@ -265,7 +264,7 @@ void checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink)
     };
 
     // A compile-time constant such as `(float*)16ULL` has a `@ConstExpr` rate-qualified type that
-    // wraps the pointer type, so we also follow the uses of those wrappers.
+    // wraps the `T*` type, so we also walk those wrappers.
     for (auto globalInst : module->getGlobalInsts())
     {
         auto rateType = as<IRRateQualifiedType>(globalInst);
