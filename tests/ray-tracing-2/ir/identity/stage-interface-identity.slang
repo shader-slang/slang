@@ -1,13 +1,13 @@
-//TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry main -stage compute -dump-ir -no-codegen
+//TEST:SIMPLE(filecheck=CHECK): -experimental-feature -dump-ir -no-codegen
 
 import slang.raytracing;
 
-// CHECK-DAG: closest_hit_stage_interface(
-// CHECK-DAG: any_hit_stage_interface(
-// CHECK-DAG: intersection_stage_interface(
-// CHECK-DAG: miss_stage_interface(
-// CHECK-DAG: callable_stage_interface(
-// CHECK-DAG: let %localx5FIClosestHitShader{{.*}}= interface(
+// Stage identity is checked in the AST. All five contracts lower to ordinary IR interfaces.
+// CHECK-DAG: let %rtx5FIClosestHitShader{{.*}}= interface(
+// CHECK-DAG: let %rtx5FIAnyHitShader{{.*}}= interface(
+// CHECK-DAG: let %rtx5FIIntersectionShader{{.*}}= interface(
+// CHECK-DAG: let %rtx5FIMissShader{{.*}}= interface(
+// CHECK-DAG: let %rtx5FICallableShader{{.*}}= interface(
 
 struct TestPayload {}
 struct TestRecord {}
@@ -69,30 +69,4 @@ struct Callable : rt::ICallableShader
 {
     typealias Context = CallableContext;
     static void invoke(rt::CallableInput<CallableContext> input) {}
-}
-
-namespace local
-{
-interface IClosestHitShader<T>
-{
-    void invoke();
-}
-}
-
-struct OrdinaryInterfaceImplementation : local::IClosestHitShader<int>
-{
-    void invoke() {}
-}
-
-void invokeOrdinaryInterface(local::IClosestHitShader<int> stage)
-{
-    stage.invoke();
-}
-
-[numthreads(1, 1, 1)]
-void main()
-{
-    // Keep the user-defined interface reachable so this test observes its ordinary IR identity
-    // even when dead-code elimination removes unused interface declarations.
-    invokeOrdinaryInterface(OrdinaryInterfaceImplementation());
 }

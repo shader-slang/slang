@@ -176,7 +176,9 @@ public interface IMissShader
 ```
 
 The checked type is a `MissShaderType`; the declaration remains an ordinary interface with normal
-conformance witnesses. Ordinary interface lowering emits its stage-specific IR interface opcode.
+conformance witnesses. All five stage contracts lower to ordinary `IRInterfaceType` instructions
+with their associated-type and function requirements. Generic conformances and inheritance witnesses
+use ordinary interface lowering and module serialization.
 The five executable stage interfaces and the descriptor handle have dedicated AST classes.
 The descriptor uses `TraceProgramDescriptorType`; it is not a stage interface. Context, primitive,
 input, list, schema, and tracer declarations remain ordinary Slang types. `KnownBuiltin` annotations mark
@@ -200,10 +202,9 @@ Build `raytracing-builtins.meta.slang` into the ordinary `raytracing-builtins.sl
 shared C++ header; do not copy numeric IDs into the module. Ship this generated include with the
 other RT source files so source compilation and serialized imports use the same declarations.
 
-Remove the old RT-specific declaration discovery and IR opcode replacement. Stage checking reads
-the declaration annotations preserved through source imports and serialized modules; an
-unannotated interface named `IMissShader` remains an ordinary interface. Metal trace calls lower
-to an explicit IR instruction, as described in section 11. Callable dispatch still uses its
+Stage checking reads the declaration annotations preserved through source imports and serialized
+modules; an unannotated interface named `IMissShader` remains an ordinary interface. Metal trace
+calls lower to an explicit IR instruction, as described in section 11. Callable dispatch still uses its
 source-operation IR decoration. Builtin loading and ownership are separate responsibilities,
 described in section 9.
 

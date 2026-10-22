@@ -343,16 +343,6 @@ IRType* cloneType(IRSpecContextBase* context, IRType* originalType);
 
 IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
 {
-    // Structural stage-interface instructions are concrete subclasses of `IRInterfaceType`, not
-    // aliases for `kIROp_InterfaceType`. Route the whole family through nominal global cloning so
-    // specialization neither treats them as structural types nor drops their compiler-owned op.
-    if (as<IRInterfaceType>(originalValue))
-    {
-        auto clonedInst = cloneGlobalValue(this, originalValue);
-        cloneAnnotations(this, clonedInst, originalValue);
-        return clonedInst;
-    }
-
     switch (originalValue->getOp())
     {
     case kIROp_StructType:
@@ -366,6 +356,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_InterfaceRequirementEntry:
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
+    case kIROp_InterfaceType:
     case kIROp_EnumType:
     case kIROp_SymbolAlias:
         {
@@ -939,12 +930,8 @@ IRInterfaceType* cloneInterfaceTypeImpl(
     IRInterfaceType* originalInterface,
     IROriginalValuesForClone const& originalValues)
 {
-    // Preserve the concrete opcode. Recreating every interface as `kIROp_InterfaceType` would erase
-    // the trusted structural-stage identity during specialization or linking.
-    auto clonedInterface = builder->createInterfaceType(
-        originalInterface->getOp(),
-        originalInterface->getOperandCount(),
-        nullptr);
+    auto clonedInterface =
+        builder->createInterfaceType(originalInterface->getOperandCount(), nullptr);
     registerClonedValue(context, clonedInterface, originalValues);
 
     for (UInt i = 0; i < originalInterface->getOperandCount(); i++)
@@ -1469,13 +1456,6 @@ IRInst* cloneInst(
     SLANG_DEFER(_debugResetInstBeingCloned());
 #endif
 
-    // The opcode switch below only names the ordinary interface opcode. Use the shared IR base so
-    // compiler-owned stage-interface subclasses receive the same operand-aware cloning behavior.
-    if (auto originalInterface = as<IRInterfaceType>(originalInst))
-    {
-        return cloneInterfaceTypeImpl(context, builder, originalInterface, originalValues);
-    }
-
     switch (originalInst->getOp())
     {
         // We need to special-case any instruction that is not
@@ -1529,6 +1509,13 @@ IRInst* cloneInst(
 
     case kIROp_EnumType:
         return cloneEnumTypeImpl(context, builder, cast<IREnumType>(originalInst), originalValues);
+
+    case kIROp_InterfaceType:
+        return cloneInterfaceTypeImpl(
+            context,
+            builder,
+            cast<IRInterfaceType>(originalInst),
+            originalValues);
 
     case kIROp_Generic:
         return cloneGenericImpl(context, builder, cast<IRGeneric>(originalInst), originalValues);
@@ -2620,15 +2607,6 @@ struct IRPrelinkContext : IRSpecContext
             builderForClone = &shared->builderStorage;
         }
         IRInst* clonedInst = nullptr;
-        // Prelinking must preserve structural interface opcodes for the same reason as ordinary
-        // specialization: later consumers recognize the trusted stage contract from the IR type,
-        // without consulting source names or decorations.
-        if (as<IRInterfaceType>(originalVal))
-        {
-            return completeClonedInst(
-                cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
-        }
-
         switch (originalVal->getOp())
         {
         case kIROp_Generic:
@@ -2638,6 +2616,7 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_StructKey:
         case kIROp_InterfaceRequirementEntry:
         case kIROp_GlobalGenericParam:
+        case kIROp_InterfaceType:
             return completeClonedInst(
                 cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
         case kIROp_WitnessTable:

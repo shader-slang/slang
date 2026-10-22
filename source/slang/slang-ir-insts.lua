@@ -765,40 +765,6 @@ local insts = {
 				class = { struct_name = "ClassType", parent = true },
 			},
 			{ interface = { struct_name = "InterfaceType", global = true } },
-			-- Structural ray-tracing stage interfaces retain ordinary interface requirements and
-			-- witness-table behavior. Their magic AST types select these opcodes during normal
-			-- interface lowering, preserving stage identity through serialization and linking.
-			-- An ordinary interface with the same source name still lowers to `interface`.
-			{
-				RaytracingStageInterface = {
-					global = true,
-					{
-						closest_hit_stage_interface = {
-							struct_name = "ClosestHitStageInterface",
-						},
-					},
-					{
-						any_hit_stage_interface = {
-							struct_name = "AnyHitStageInterface",
-						},
-					},
-					{
-						intersection_stage_interface = {
-							struct_name = "IntersectionStageInterface",
-						},
-					},
-					{
-						miss_stage_interface = {
-							struct_name = "MissStageInterface",
-						},
-					},
-					{
-						callable_stage_interface = {
-							struct_name = "CallableStageInterface",
-						},
-					},
-				},
-			},
 			{
 				associated_type = {
 					struct_name = "AssociatedType",

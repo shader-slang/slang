@@ -3,16 +3,10 @@
 #include "slang-ir.h"
 #include "slang-structural-ray-tracing.h"
 
-// Defines the IR identities emitted from checked structural ray-tracing declarations. Consumers
-// recognize stage contracts and source operations without retaining AST declaration pointers.
+// Queries structural stage inputs and preserves source-operation markers in IR.
 
 namespace Slang
 {
-
-/// Returns the compiler-owned interface-type opcode for `kind`, or `kIROp_Invalid` for an invalid
-/// kind. Distinct opcodes preserve structural stage identity after source declarations are linked
-/// or serialized and their AST pointers are no longer available.
-IROp getStructuralRayTracingStageInterfaceOp(Stage kind);
 
 /// Returns whether `func` accepts a structural stage-input type.
 ///

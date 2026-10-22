@@ -13,9 +13,11 @@ import magic_stage_secondary_library;
 // The serialized filenames deliberately differ from the import names, so the first two runs
 // always use source. Both application interfaces inherit the standard rt::IMissShader contract;
 // their ordinary inheritance witnesses must preserve its stage identity after serialization.
-// IR-DAG: [nameHint("first.IBackgroundStage")]
-// IR-DAG: [nameHint("second.IBackgroundStage")]
-// IR-DAG: miss_stage_interface(
+// IR-DAG: let %firstx5FIBackgroundStage{{.*}}= interface(
+// IR-DAG: let %secondx5FIBackgroundStage{{.*}}= interface(
+// IR-DAG: let %rtx5FIMissShader{{.*}}= interface(
+// IR-DAG: witness_table_entry(%firstx5FIBackgroundStagex5Fx24inheritance,
+// IR-DAG: witness_table_entry(%rtx5FIMissShaderx5Finvoke,specialize(
 
 struct Payload
 {

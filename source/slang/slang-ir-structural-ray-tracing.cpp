@@ -3,31 +3,11 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 
-// Source annotations produce special AST types and operation metadata during ordinary checking.
-// AST-to-IR lowering preserves those identities with distinct interface opcodes and decorations;
-// module serialization, linking, and specialization then carry them without import-time fixups.
+// Ordinary type annotations and source-operation decorations retain the information needed by
+// structural ray-tracing lowering through module serialization, linking, and specialization.
 
 namespace Slang
 {
-
-IROp getStructuralRayTracingStageInterfaceOp(Stage kind)
-{
-    switch (kind)
-    {
-    case Stage::ClosestHit:
-        return kIROp_ClosestHitStageInterface;
-    case Stage::AnyHit:
-        return kIROp_AnyHitStageInterface;
-    case Stage::Intersection:
-        return kIROp_IntersectionStageInterface;
-    case Stage::Miss:
-        return kIROp_MissStageInterface;
-    case Stage::Callable:
-        return kIROp_CallableStageInterface;
-    default:
-        return kIROp_Invalid;
-    }
-}
 
 bool hasStructuralRayTracingStageInput(IRFunc* func)
 {

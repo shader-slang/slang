@@ -12186,17 +12186,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             operandCount++;
         }
 
-        // A special AST type identifies an executable stage interface. Emit its corresponding IR
-        // class here so ordinary module serialization preserves that identity. Requirements and
-        // witness tables retain ordinary interface lowering; the non-executable intersection
-        // placeholder contract remains an ordinary interface.
-        auto interfaceOp = kIROp_InterfaceType;
-        if (isExecutableStructuralRayTracingStageInterface(decl))
-            interfaceOp =
-                getStructuralRayTracingStageInterfaceOp(getStructuralRayTracingStageKind(decl));
-
-        IRInterfaceType* irInterface =
-            subBuilder->createInterfaceType(interfaceOp, operandCount, nullptr);
+        IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
         auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
 
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.

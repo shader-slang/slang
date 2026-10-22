@@ -1747,32 +1747,9 @@ struct IRInterfaceRequirementEntry : IRInst
 FIDDLE()
 struct IRInterfaceType : IRType
 {
-    FIDDLE(leafInst{noIsaImpl = true})
-
-    // Structural ray-tracing stage interfaces use distinct opcodes so their trusted identity
-    // survives serialization and linking. They retain the ordinary interface representation;
-    // shared classifiers and cloning paths use this `isaImpl` instead of exact-op checks. Keep the
-    // generated stage-interface opcode range contiguous when adding another stage.
-    static bool isaImpl(IROp opIn)
-    {
-        const int op = kIROpMask_OpMask & opIn;
-        return op == kIROp_InterfaceType || (op >= kIROp_FirstRaytracingStageInterface &&
-                                             op <= kIROp_LastRaytracingStageInterface);
-    }
-    enum
-    {
-        kOp = kIROp_InterfaceType
-    };
+    FIDDLE(leafInst())
 
     UInt getRequirementCount() { return getOperandCount(); }
-};
-
-FIDDLE()
-struct IRRaytracingStageInterface : IRInterfaceType
-{
-    // This base class lets compiler code classify every structural stage interface without knowing
-    // its individual stage opcode. It adds no operands or runtime representation.
-    FIDDLE(baseInst())
 };
 
 FIDDLE()
