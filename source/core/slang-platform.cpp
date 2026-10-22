@@ -78,6 +78,9 @@ namespace Slang
 ///   `slang-llvm.dll` would leave process exit calling into unmapped code. Issue #12292 shows that
 ///   kind of crash, although it did not identify which callback was involved. The destructor has
 ///   to stay callable until the very end of process shutdown, so there is no safe point to unload.
+///   `slang-llvm` also links Slang's mimalloc, but mimalloc detects thread exit through TLS
+///   callbacks in the module image rather than `FlsAlloc` unless it is built with `MI_WIN_USE_FLS`,
+///   which Slang does not set.
 /// * `libdxcompiler` invokes undefined behaviour on `dlclose`, see
 ///   https://github.com/microsoft/DirectXShaderCompiler/issues/5119.
 /// * `libdxvk_d3d11` and `libdxvk_dxgi` break GDB when closed, see

@@ -10,7 +10,9 @@ using namespace Slang;
 /// process shutdown, long after any module has been unloaded. Unmapping the library would leave
 /// that callback dangling. Issue #12292 shows the resulting kind of crash, although it did not
 /// identify which callback was involved: `tests/cpu-program/gfx-smoke.slang` produced all of its
-/// expected output and then died with `0xC0000005` inside `ntdll!RtlpFlsDataCleanup`.
+/// expected output and then died with `0xC0000005` inside `ntdll!RtlpFlsDataCleanup`. Slang's
+/// mimalloc, also linked into `slang-llvm`, detects thread exit through TLS callbacks in the module
+/// image rather than FLS, so it does not add to this.
 ///
 /// `SharedLibrary::loadWithPlatformPath` keeps every library that `SharedLibrary::isUnclosable`
 /// reports resident, so this checks that predicate. The teardown crash itself only reproduces in
