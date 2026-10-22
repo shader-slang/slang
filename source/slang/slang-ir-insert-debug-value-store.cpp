@@ -177,7 +177,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         // a value, not storage; when the function modifies it, the in-param proxy var below
         // holds it instead. Entry-point parameters are shader inputs and outputs rather than
         // pointers to a caller's storage, so linking removes the decoration from them (see
-        // `specializeAndCloneEntryPoint`).
+        // `specializeIRForEntryPoint`).
         if (isRefParam)
             builder.addDecoration(param, kIROp_DebugVarStorageDecoration, debugVar);
 
