@@ -624,8 +624,9 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     case kIROp_ArrayType:
         {
-            m_writer->emit(
-                isBindingArrayElementType(type->getOperand(0)) ? "binding_array<" : "array<");
+            if (isBindingArrayElementType(type->getOperand(0)))
+                m_writer->emit("binding_");
+            m_writer->emit("array<");
             emitType((IRType*)type->getOperand(0));
             m_writer->emit(", ");
             emitVal(type->getOperand(1), getInfo(EmitOp::General));
@@ -634,8 +635,9 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_UnsizedArrayType:
         {
-            m_writer->emit(
-                isBindingArrayElementType(type->getOperand(0)) ? "binding_array<" : "array<");
+            if (isBindingArrayElementType(type->getOperand(0)))
+                m_writer->emit("binding_");
+            m_writer->emit("array<");
             emitType((IRType*)type->getOperand(0));
             m_writer->emit(">");
             return;
