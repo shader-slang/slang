@@ -3136,6 +3136,13 @@ public:
     void checkForRedeclaration(Decl* decl, RedeclarationSeverity severity);
     void checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl);
 
+    /// Diagnose `decl` if it shadows a generic parameter of an enclosing generic.
+    ///
+    /// `decl` is a generic parameter, a function parameter, or a variable or type declared in a
+    /// function body. Shadowing is a warning before Slang 202c and an error in Slang 202c and
+    /// later.
+    void checkForShadowedGenericParam(Decl* decl);
+
     Expr* checkPredicateExpr(Expr* expr);
 
     Expr* checkExpressionAndExpectIntegerConstant(

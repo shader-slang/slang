@@ -111,6 +111,23 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
                 ensureAllDeclsRec(genericDecl, DeclCheckState::DefinitionChecked);
         }
 
+        // A local type alias is checked only when it is used, but shadowing a generic parameter
+        // depends only on names, so we check every alias in the block and the generic
+        // parameters of every generic alias.
+        for (auto typeDefDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<TypeDefDecl>())
+            checkForShadowedGenericParam(typeDefDecl);
+        for (auto genericDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<GenericDecl>())
+        {
+            if (!as<TypeDefDecl>(genericDecl->inner))
+                continue;
+            checkForShadowedGenericParam(genericDecl->inner);
+            for (auto member : genericDecl->getDirectMemberDecls())
+            {
+                if (isGenericParam(member))
+                    checkForShadowedGenericParam(member);
+            }
+        }
+
         // Consider this code:
         // ```
         // {
