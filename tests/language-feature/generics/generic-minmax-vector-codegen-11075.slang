@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry computeMain -stage compute
 
 // Regression test for shader-slang/slang#11075: on cpp/cuda a generic `IFloat` `min`/`max` on a
 // vector lowers to per-element scalar calls, the same code the concrete vector overload emits.
@@ -23,10 +23,12 @@ void computeMain()
     outputBuffer[3] = genMax(a, b);
 }
 
-// The concrete vector overload applies the scalar helper to each element, so we match the
-// element accessor inside the call rather than the helper name alone (the helpers themselves are
-// declared in the prelude).
-// CPP-DAG: F32_min((_slang_vector_get_element(
-// CPP-DAG: F32_max((_slang_vector_get_element(
-// CUDA-DAG: F32_min((_slang_vector_get_element(
-// CUDA-DAG: F32_max((_slang_vector_get_element(
+// The vector map macros are fully unrolled, so the scalar helper is called once per element with
+// direct component access (`a.x`, `a.y`, `a.z`). We match the component accessors inside the call
+// rather than the helper name alone, because the helpers themselves are declared in the prelude.
+// CHECK-DAG: F32_min(({{.*}}.x), ({{.*}}.x))
+// CHECK-DAG: F32_min(({{.*}}.y), ({{.*}}.y))
+// CHECK-DAG: F32_min(({{.*}}.z), ({{.*}}.z))
+// CHECK-DAG: F32_max(({{.*}}.x), ({{.*}}.x))
+// CHECK-DAG: F32_max(({{.*}}.y), ({{.*}}.y))
+// CHECK-DAG: F32_max(({{.*}}.z), ({{.*}}.z))
