@@ -2,8 +2,9 @@
 //
 // HLSL, DXIL and WGSL have no pointers to memory addresses, so a `T*` value that shader code
 // makes from an integer, with `bit_cast`, or from `nullptr` is an error on those targets. Each
-// such value is reported once, where it is made or where `nullptr` is used, at every optimization
-// level. A value that only debug information uses is not emitted and is not reported. SPIR-V
+// such value is reported once per source location, at every optimization level: at the cast or
+// the `nullptr` use when it has a location, otherwise at a use, and without a location as a last
+// resort. A value that only debug information uses is not emitted and is not reported. SPIR-V
 // compiles the same shader.
 //
 // `computeMain` runs on every target and optimization level. Each other entry point tests one
@@ -34,8 +35,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEBUG_CALL): -target hlsl -entry debugCallMain -stage compute -g
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEBUG_CALL): -target wgsl -entry debugCallMain -stage compute -g -O0
 //DIAGNOSTIC_TEST:SIMPLE(diag=NOLOC): -target wgsl -entry reinterpretMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=DEBUG_TWICE): -target hlsl -entry debugTwiceMain -stage compute -g
+//DIAGNOSTIC_TEST:SIMPLE(diag=DEBUG_TWICE): -target wgsl -entry debugTwiceMain -stage compute -g -O0
 //DIAGNOSTIC_TEST:SIMPLE(diag=NOLOC): -target hlsl -entry reinterpretMain -stage compute -O0
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute -minimum-slang-optimization
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target wgsl -entry computeMain -stage compute -minimum-slang-optimization
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute
 
 // SPV: OpConvertUToPtr
@@ -48,14 +52,14 @@ T* pointerAt<T>(uint2 a)
 {
     return (T*)(uint64_t(a.x) | (uint64_t(a.y) << 32));
 //CHECK:   ^ pointers to memory addresses are not supported on this target
-//CHECK:   ^ the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//CHECK:   ^ the current code generation target has no pointers to memory addresses
 }
 
 bool isSet(float* p)
 {
     return p != nullptr;
 //CHECK:     ^^ pointers to memory addresses are not supported on this target
-//CHECK:     ^^ the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//CHECK:     ^^ the current code generation target has no pointers to memory addresses
 }
 
 [shader("compute")]
@@ -69,21 +73,21 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     int* q = pointerAt<int>(a);
     if (q)
 //CHECK:^ pointers to memory addresses are not supported on this target
-//CHECK:^ the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//CHECK:^ the current code generation target has no pointers to memory addresses
         outBuf[tid.x] = 2.0;
-    // `bit_cast` is inlined without a location, so its pointer is reported at the location of a
-    // use. Here the load `*r` takes the location of the `?:` expression.
+    // The `bitCast` that `bit_cast` lowers to has no location, so its pointer is reported at the
+    // location of a use. Here the load `*r` takes the location of the `?:` expression.
     float* r = bit_cast<float*>(uint64_t(a.x));
     outBuf[tid.x] = isSet(p) ? *r : 0.0;
 //CHECK:                     ^ pointers to memory addresses are not supported on this target
-//CHECK:                     ^ the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//CHECK:                     ^ the current code generation target has no pointers to memory addresses
 }
 
 // HLSL keeps this initializer at module scope, so it is reported at the declaration. WGSL moves
 // it into the entry point, so it is reported where `gPointer` is read.
 static float* gPointer = nullptr;
 //D3D_STATIC: ^^^^^^^^ pointers to memory addresses are not supported on this target
-//D3D_STATIC: ^^^^^^^^ the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//D3D_STATIC: ^^^^^^^^ the current code generation target has no pointers to memory addresses
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -91,7 +95,7 @@ void staticMain(uint3 tid: SV_DispatchThreadID)
 {
     outBuf[tid.x] = (uint64_t(gPointer) != 0) ? 1.0 : 0.0;
 //WGSL_STATIC:               ^ pointers to memory addresses are not supported on this target
-//WGSL_STATIC:               ^ the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//WGSL_STATIC:               ^ the current code generation target has no pointers to memory addresses
 }
 
 struct PointerAndCount
@@ -100,9 +104,11 @@ struct PointerAndCount
     int n;
 };
 
+// The WGSL `CONST` runs also check that `legalizeCall` passes this `nullptr` argument by value,
+// which keeps its location.
 static const PointerAndCount kPointerAndCount = { nullptr, 3 };
 //CONST:                                        ^ pointers to memory addresses are not supported on this target
-//CONST:                                        ^ the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//CONST:                                        ^ the current code generation target has no pointers to memory addresses
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -122,7 +128,7 @@ void constexprMain(uint3 tid: SV_DispatchThreadID)
 {
     float* p = (float*)16ULL;
 //CONSTEXPR:   ^ pointers to memory addresses are not supported on this target
-//CONSTEXPR:   ^ the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//CONSTEXPR:   ^ the current code generation target has no pointers to memory addresses
     colors[tid.x] = tex.SampleLevel(samp, float2(0.5), 0, int2(int(uint64_t(p) >> 3), 0));
 }
 
@@ -134,7 +140,7 @@ void debugCopyMain(uint3 tid: SV_DispatchThreadID)
 {
     uint64_t x = uint64_t((float*)uint64_t(addrs[tid.x].x));
 //DEBUG_COPY:             ^ pointers to memory addresses are not supported on this target
-//DEBUG_COPY:             ^ the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//DEBUG_COPY:             ^ the current code generation target has no pointers to memory addresses
     x = x * x;
     outBuf[tid.x] = 1.0;
 }
@@ -154,7 +160,7 @@ void debugCallMain(uint3 tid: SV_DispatchThreadID)
 {
     bool b = storeAndTest(nullptr);
 //DEBUG_CALL:            ^ pointers to memory addresses are not supported on this target
-//DEBUG_CALL:            ^ the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//DEBUG_CALL:            ^ the current code generation target has no pointers to memory addresses
     outBuf[tid.x] = 1.0;
 }
 
@@ -168,4 +174,18 @@ void reinterpretMain(uint3 tid: SV_DispatchThreadID)
     outBuf[tid.x] = *p;
 }
 //NOLOC: pointers to memory addresses are not supported on this target
-//NOLOC: the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets
+//NOLOC: the current code generation target has no pointers to memory addresses
+
+uniform float* gUniformPointer;
+
+// With `-g`, two debug uses keep `isNull` declared, so its `nullptr` is emitted and reported.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void debugTwiceMain(uint3 tid: SV_DispatchThreadID)
+{
+    bool isNull = gUniformPointer == nullptr;
+//DEBUG_TWICE:                    ^^ pointers to memory addresses are not supported on this target
+//DEBUG_TWICE:                    ^^ the current code generation target has no pointers to memory addresses
+    bool copy = isNull;
+    outBuf[tid.x] = 1.0;
+}

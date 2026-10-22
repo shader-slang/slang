@@ -6097,7 +6097,7 @@ err(
     "physical-pointer-not-supported-on-target",
     55219,
     "pointers to memory addresses are not supported on this target",
-    span { loc = "location", message = "the current code generation target has no pointers to memory addresses; pointers are supported on SPIR-V, C++ and CUDA targets" }
+    span { loc = "location", message = "the current code generation target has no pointers to memory addresses" }
 )
 
 err(

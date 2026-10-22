@@ -230,6 +230,11 @@ static bool isUsedOnlyByDebugInfo(IRInst* inst)
 {
     if (!inst->hasUses() || inst->mightHaveSideEffects())
         return false;
+    // A value that is not a pointer is folded only into a single use in the same block; otherwise
+    // the emitter declares it, as `bool c = b;` does for `bool b = p != nullptr;`.
+    if (!as<IRPtrTypeBase>(inst->getDataType()) &&
+        (inst->hasMoreThanOneUse() || inst->firstUse->getUser()->getParent() != inst->getParent()))
+        return false;
     for (auto use = inst->firstUse; use; use = use->nextUse)
     {
         if (!isDebugInfoInst(use->getUser()))
