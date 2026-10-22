@@ -2,12 +2,12 @@
 #include "slang-check-impl.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-util.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-module.h"
 #include "slang-session.h"
+#include "slang-structural-ray-tracing.h"
 #include "slang-syntax.h"
 
 namespace Slang
@@ -464,6 +464,21 @@ static bool _diagnoseRestrictedRayTracingGenericArgument(
     }
 }
 
+// Returns whether func accepts a structural stage-input type. For example,
+// invoke(ClosestHitInput<C>) keeps the input's KnownBuiltin annotation through ordinary
+// specialization. The post-link adapter check uses that annotation to recognize a logical input.
+static bool _hasStructuralRayTracingStageInput(IRFunc* func)
+{
+    for (auto paramType : func->getDataType()->getParamTypes())
+    {
+        auto inputType = getResolvedInstForDecorations(unwrapAttributedType(paramType));
+        auto builtin = inputType->findDecoration<IRKnownBuiltinDecoration>();
+        if (builtin && getStructuralRayTracingStageInputKind(builtin->getName()) != Stage::Unknown)
+            return true;
+    }
+    return false;
+}
+
 // Prevents a logical structural stage signature from reaching native entry-point ABI passes.
 //
 // Consider `-entry MyMiss` selecting a struct whose `invoke` takes `rt::MissInput<C>`.
@@ -478,7 +493,7 @@ static bool _diagnoseUnloweredStructuralRayTracingEntryPoints(
     bool found = false;
     for (auto entryPoint : entryPoints)
     {
-        if (!hasStructuralRayTracingStageInput(entryPoint))
+        if (!_hasStructuralRayTracingStageInput(entryPoint))
             continue;
         sink->diagnose(
             Diagnostics::UnloweredStructuralRayTracingEntryPoint{.entryPoint = entryPoint});

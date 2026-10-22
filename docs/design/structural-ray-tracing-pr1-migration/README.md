@@ -359,7 +359,8 @@ specialization.
 During linking, `specializeIRForEntryPoint` uses the selected `EntryPoint`'s structural flag to
 skip copying parameter layout onto the logical `invoke` input. Its current entry-point parameter
 layout is empty; the native adapter and its layout have not been generated yet. At the native
-ABI boundary, `hasStructuralRayTracingStageInput` examines the IR function's parameter types.
+ABI boundary, the file-local `_hasStructuralRayTracingStageInput` helper in
+`slang-check-structural-ray-tracing.cpp` examines the IR function's parameter types.
 A parameter whose declaration is annotated as a stage input identifies an entry that needs an
 adapter.
 Future adapter synthesis must consume the checked input contract before transformations discard
