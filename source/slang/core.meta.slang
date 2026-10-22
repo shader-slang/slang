@@ -2249,10 +2249,11 @@ extension<Access access> Ptr<void, access>
     [__unsafeForceInlineEarly]
     __init(NativeString nativeStr) { this = Ptr<void, access>(nativeStr.getBuffer()); }
 
-    __generic<$(ptrTypeParameterList)>
+    // The source pointer's access is a separate parameter from the extension's `access`.
+    __generic<T, Access fromAccess, AddressSpace addrSpace, L:IBufferDataLayout>
     __intrinsic_op($(kIROp_BitCast))
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
-    __init($(fullPtrType) ptr);
+    __init(Ptr<T, fromAccess, addrSpace, L> ptr);
 
     __generic<T>
     __intrinsic_op($(kIROp_BitCast))
