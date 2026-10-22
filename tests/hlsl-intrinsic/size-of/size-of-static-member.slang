@@ -1,9 +1,9 @@
 // Static struct members are lowered outside the struct (as a global variable
 // or a constant), so they must not contribute to the size or alignment of an
-// instance. A concrete `sizeof(S)`/`alignof(S)`
-// is folded by the front end, while `sizeof(T)` inside a generic is folded
-// later from the lowered IR struct, which never contains static members. Both
-// paths must agree. See shader-slang/slang#13858.
+// instance. A concrete `sizeof(S)`/`alignof(S)` is folded by the front end,
+// while `sizeof(T)` inside a generic is folded later from the lowered IR
+// struct, which never contains static members. Both paths must agree. See
+// shader-slang/slang#13858.
 
 #pragma warning(disable:30816)
 
@@ -13,7 +13,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-slang -compute -dx12 -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[10 11 12 13 14 15 16 17], stride=4):name records
@@ -92,12 +92,21 @@ struct OnlyStatic
 }
 
 // A static member of the struct's own type is legal because it does not live
-// in an instance. Its size must still fold in the front end, so that it can
-// serve as a generic value argument (see `SizeTag` below).
+// in an instance. Sizing `shared` as a field would re-enter `SelfStatic` while
+// its cache entry is still marked invalid and force a fallback to IR layout, so
+// the front end can fold this size only by skipping the static member. The
+// `SizeTag` check below needs that front-end constant.
 struct SelfStatic
 {
     static SelfStatic shared;
     float x;
+}
+
+// A field whose type depends on `T` is sized by IR layout, not the front end.
+struct H<T>
+{
+    static const uint K = 1;
+    T x;
 }
 
 // Controls: none of these declare a static data member.
@@ -117,7 +126,6 @@ struct InstanceConst
 // type-checks when the front end folds `sizeof(SelfStatic)` to a constant.
 struct SizeTag<let N : int>
 {
-    int get() { return N; }
 }
 
 void takesSizeTag4(SizeTag<4> t) {}
@@ -243,4 +251,9 @@ void computeMain()
     {
         outputBuffer[31 + i] = roundTripRecords.Load(i * 4);
     }
+
+    // CHECK-NEXT: 4
+    // CHECK-NEXT: 4
+    outputBuffer[37] = sizeof(H<float>);
+    outputBuffer[38] = genericSize<H<float>>();
 }

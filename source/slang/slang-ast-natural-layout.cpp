@@ -274,12 +274,12 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
                 }
             }
 
-            // We count exactly the fields that `visitAggTypeDecl` puts in the
-            // `IRStructType`, so a concrete `sizeof(S)` folded here agrees with a
-            // generic `sizeof(T)` folded later by IR layout. A `static` member is
-            // lowered outside the struct (as a global variable or a constant), so we
-            // skip it. We read the declared field type without substitution; a field
-            // whose type is a generic parameter is therefore left to IR layout.
+            // We count the same set of fields that `visitAggTypeDecl` puts in the
+            // `IRStructType`. A `static` member is lowered outside the struct (as a
+            // global variable or a constant), so we skip it. Per-field natural sizes
+            // can still differ from IR layout: `bool` is 1 byte here and 4 bytes there.
+            // We read the declared field type without substitution, so a field whose
+            // type depends on a generic parameter is left to IR layout.
             for (auto field : getFields(m_astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
                 const auto fieldSize = calcSize(field.getDecl()->getType());
