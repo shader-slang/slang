@@ -198,6 +198,7 @@ jobs:
           # (daily labels share the swept commit's DATE, so several points can
           # share a date and series order alone cannot identify this run's).
           echo "PERF_LABEL=$LABEL" >> "$GITHUB_ENV"
+          echo "PERF_OBSERVED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
           # Also a job OUTPUT, not only job-scoped env: the analyze job runs on
           # a different machine and cannot see this job's $GITHUB_ENV.
           echo "perf_label=$LABEL" >> "$GITHUB_OUTPUT"
@@ -260,13 +261,40 @@ jobs:
           path: bench-results/
           if-no-files-found: ignore
 
+      - name: Check BenchView tooling support
+        id: benchview_tools
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "daily=false" >> "$GITHUB_OUTPUT"
+          echo "releases=false" >> "$GITHUB_OUTPUT"
+          if [[ ! -f "$SUITE/benchview.py" ]]; then
+            echo "::warning::Selected suite has no BenchView exporter; release discovery is deferred."
+            exit 0
+          fi
+          help=$(python3 "$SUITE/benchview.py" --help)
+          if [[ "$help" != *"--output"* || "$help" != *"--branch"* ]]; then
+            echo "::warning::Selected suite lacks host-collector export support; release discovery is deferred."
+            exit 0
+          fi
+          echo "daily=true" >> "$GITHUB_OUTPUT"
+          release_help=$(python3 "$SUITE/new_release_check.py" --help)
+          if [[ "$help" == *"--completed-releases"* && "$release_help" == *"--completed"* ]]; then
+            echo "releases=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Selected suite supports daily export only; release discovery is deferred."
+          fi
+
       # New releases (majors + patch releases from v2026.13 on) are swept into
-      # the tracked history the night they ship, riding the same results push
-      # below. continue-on-error: a failing new-release sweep must not cost the
+      # the tracked history on non-sweep runs with release-export support.
+      # Deferring keeps tags new until a capable nightly can measure and export them.
+      # continue-on-error: a failing new-release sweep must not cost the
       # night's own point — the script removes partial baselines and the next
       # nightly retries.
       - name: Sweep newly published releases
-        if: env.PUBLISH == 'true'
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview_tools.outputs.releases == 'true'
         continue-on-error: true
         shell: bash
         env:
@@ -276,7 +304,8 @@ jobs:
           set -euo pipefail
           cd "$SUITE"
           python3 new_release_check.py --results "$GITHUB_WORKSPACE/perf-results" \
-            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES"
+            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES" \
+            --completed "$GITHUB_WORKSPACE/benchview-completed-releases.json"
 
       - name: Push results
         if: env.PUBLISH == 'true'
@@ -290,6 +319,48 @@ jobs:
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -m "nightly ToT $(date -u +%Y-%m-%d) ($(cd "$GITHUB_WORKSPACE" && git rev-parse --short HEAD))"
           git push
+
+      # The benchmark host owns collection, credentials and delivery.
+      # Complexity sweeps stay in the existing reports, not BenchView.
+      - name: Export nightly results for BenchView
+        id: benchview
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview_tools.outputs.daily == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          EXPORT_RELEASES: ${{ steps.benchview_tools.outputs.releases }}
+        run: |
+          set -euo pipefail
+          # Use the measured checkout's branch, not the workflow or suite ref.
+          # Detached commits and tags have no unambiguous branch.
+          branch=$(git -C "$GITHUB_WORKSPACE" symbolic-ref --quiet --short HEAD || true)
+          args=()
+          if [[ -n "$branch" ]]; then args+=(--branch "$branch"); fi
+          if [[ "$EXPORT_RELEASES" == "true" ]]; then
+            args+=(--completed-releases "$GITHUB_WORKSPACE/benchview-completed-releases.json"
+                   --release-results "$GITHUB_WORKSPACE/perf-results/releases")
+          fi
+          python3 "$SUITE/benchview.py" \
+            --results "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/results.json" \
+            --meta "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/meta.json" \
+            --os Windows --observed-at "$PERF_OBSERVED_AT" \
+            --execution-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            "${args[@]}" \
+            --output "$GITHUB_WORKSPACE/benchview-export"
+
+      - name: Archive BenchView submission payloads
+        if: always() && env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: benchview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/benchview-export/
+          if-no-files-found: warn
+
+      - name: Report BenchView export failure
+        if: always() && steps.benchview.outcome == 'failure'
+        shell: bash
+        run: echo "::warning::BenchView export failed; see the BenchView step and payload artifact"
 
       # Remove the PAT credential that actions/checkout baked into perf-results'
       # .git/config — on a persistent self-hosted runner this would otherwise

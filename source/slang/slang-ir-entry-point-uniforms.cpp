@@ -582,6 +582,13 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         builder.addNameHintDecoration(
             collectedParam,
             UnownedTerminatedStringSlice("entryPointParams"));
+
+        // The collected parameter has no declaration of its own; it stands for the entry
+        // point's `uniform` parameters, so it takes the entry point's location. A diagnostic
+        // about it then points at the entry point, and
+        // `checkForMultiplePushConstantBlocksPerEntryPoint` recognizes an entry point's own
+        // block by that shared location.
+        collectedParam->sourceLoc = m_entryPoint.func->sourceLoc;
     }
 };
 
@@ -631,6 +638,7 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
 
             builder->setInsertBefore(entryPointFunc);
             auto globalParam = builder->createGlobalParam(paramType);
+            globalParam->sourceLoc = param->sourceLoc;
 
             param->transferDecorationsTo(globalParam);
 
