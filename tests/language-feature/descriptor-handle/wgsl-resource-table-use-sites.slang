@@ -31,9 +31,9 @@
 // CHECK: textureSampleLevel({{.*}}getResource<texture_2d<f32>>({{.*}}getResource<sampler>(
 
 // A lookup used in a branch and in a loop.
-// CHECK: if
+// CHECK: {{^ *}}if(
 // CHECK: textureLoad({{.*}}getResource<texture_2d<f32>>(
-// CHECK: loop
+// CHECK: {{^ *}}loop
 // CHECK: textureSampleLevel({{.*}}getResource<texture_2d<f32>>({{.*}}getResource<sampler>(
 
 // The global texture is still passed to its helper.
