@@ -10,7 +10,6 @@
 #include "slang-ir-specialize-target-switch.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-string-hash.h"
-#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-translate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
@@ -1109,12 +1108,6 @@ void cloneFunctionCommon(
 ///
 static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* builder)
 {
-    // A structural `invoke` parameter is a logical, compiler-owned stage-input view. Its native
-    // parameters do not exist until a later pass synthesizes the target adapter, so copying an
-    // entry-point layout onto this source signature would assign physical meaning too early.
-    if (hasStructuralRayTracingStageInput(func))
-        return;
-
     auto layoutDecor = func->findDecoration<IRLayoutDecoration>();
     if (!layoutDecor)
         return;
@@ -1284,11 +1277,13 @@ IRFunc* specializeIRForEntryPoint(
         context->builder->addDecoration(clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
     }
 
-    // We will also go on and attach layout information
-    // to the function parameters, so that we have it
-    // available directly on the parameters, rather
-    // than having to look it up on the original entry-point layout.
-    maybeCopyLayoutInformationToParameters(clonedFunc, context->builder);
+    // Make layout directly available on native entry-point parameters. A structural `invoke`
+    // still takes its logical Input<Context> parameter, while its parameter layout is empty.
+    // Its native adapter and corresponding layout have not been generated yet.
+    if (!entryPoint->isStructuralRayTracingEntryPoint())
+    {
+        maybeCopyLayoutInformationToParameters(clonedFunc, context->builder);
+    }
 
     return clonedFunc;
 }

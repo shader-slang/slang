@@ -242,7 +242,7 @@ public:
     void markAsStructuralRayTracingEntryPoint()
     {
         m_isStructuralRayTracingEntryPoint = true;
-        // The compiler supplies the input view; it is not a host-bound shader parameter.
+        // Defer native parameter layout for the logical input until an adapter is generated.
         m_shaderParams.clear();
     }
 

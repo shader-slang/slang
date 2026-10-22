@@ -328,10 +328,12 @@ function reference apply through the ordinary parameter lookup.
 
 `initializeStructuralRayTracingEntryPoint` marks the entry as structural, sets the public name to
 the selected struct name, and derives the generated shader name. Creating an `EntryPoint`
-collects specialization parameters and host-bound shader parameters through the ordinary path.
-`markAsStructuralRayTracingEntryPoint` sets the classification flag and clears the host-bound
-shader parameter list, because the compiler supplies the stage input. Generic specialization
-parameters remain available, and the input remains in the AST function signature.
+collects specialization parameters and function parameters through the ordinary path.
+`markAsStructuralRayTracingEntryPoint` sets the classification flag and currently clears the
+shader parameter list to keep the logical stage input out of native parameter layout. As a
+result, entry-point layout reflection has an empty parameter scope; it does not yet describe the
+adapter's native parameters. Generic specialization parameters remain available, and function
+reflection can still inspect the input in the AST function signature.
 
 The generated name includes both the selected type and shader stage. For a struct `MultiStage`
 that implements closest-hit and any-hit, the generated names are `MultiStage_closesthit` and
@@ -352,13 +354,16 @@ selected type's ordinary mangled name followed by `_miss`.
 AST-to-IR lowering produces an ordinary function and its input type. A generic implementation
 uses the normal generic parameters, witness parameters, and `IRSpecialize` operations. Dependent
 type and witness lookups remain valid IR until linking and specialization supply their arguments
-and definitions. `lowerFrontEndEntryPointToIR` uses the classification flag to avoid adding a
-native `[shader]` attribute to the shared structural method. The stage-input declaration's
-`KnownBuiltin` annotation is preserved by ordinary lowering and specialization.
+and definitions. `lowerFrontEndEntryPointToIR` applies ordinary entry-point attribute handling.
+The stage-input declaration's `KnownBuiltin` annotation is preserved by ordinary lowering and
+specialization.
 
-At the native ABI boundary, `hasStructuralRayTracingStageInput` examines the IR function's
-parameter types. A parameter whose declaration is annotated as a stage input keeps native
-parameter layout from being applied prematurely and identifies an entry that needs an adapter.
+During linking, `specializeIRForEntryPoint` uses the selected `EntryPoint`'s structural flag to
+skip copying parameter layout onto the logical `invoke` input. Its current entry-point parameter
+layout is empty; the native adapter and its layout have not been generated yet. At the native
+ABI boundary, `hasStructuralRayTracingStageInput` examines the IR function's parameter types.
+A parameter whose declaration is annotated as a stage input identifies an entry that needs an
+adapter.
 Future adapter synthesis must consume the checked input contract before transformations discard
 information it needs. It can generate dependent operations for ordinary specialization to resolve,
 or wait for concrete types where the target ABI requires them. PR1 does not implement that adapter.
