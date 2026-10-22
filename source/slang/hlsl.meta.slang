@@ -35921,7 +35921,10 @@ uint packUint4x8Clamp(int32_t4 unpackedValue)
     __target_switch
     {
     case hlsl: __intrinsic_asm "pack_clamp_u8";
-    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>($0))";
+    // pack4xU8Clamp takes vec4<u32>, so the i32 -> u32 conversion happens before it clamps, and a
+    // negative lane would wrap and clamp to 255. Clamp the low end in i32 first; the builtin still
+    // clamps the high end.
+    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>(max($0, vec4<i32>(0))))";
     default:
         return packInt4x8(clamp(unpackedValue, 0, 255));
     }

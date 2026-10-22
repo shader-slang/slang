@@ -39,10 +39,173 @@ class BenchViewTests(unittest.TestCase):
         self.assertNotEqual(daily["run"]["key"], release["run"]["key"])
         self.assertEqual(self.convert()[0], daily)
 
+    def test_primary_metric_and_total_labels(self):
+        """Select each workload's total without discarding diagnostic measurements."""
+        for mode, timer, label in (("target", "compileInner", "Total compile time"),
+                                   ("api", "apiTotal", "Total API time")):
+            with self.subTest(mode=mode):
+                record = copy.deepcopy(self.record)
+                record["mode"] = mode
+                record["timers"][timer] = {"samples": [10, 20]}
+                observation = self.convert([record])[0]["observations"][0]
+                primary = "compile.timer." + timer.lower()
+                self.assertEqual(observation["test"]["metadata"]["primaryMetric"], primary)
+                metric = next(m for m in observation["metrics"] if m["id"] == primary)
+                self.assertEqual(metric["name"], label)
+                self.assertEqual(metric["distribution"]["samples"], [10, 20])
+                self.assertIn("compile.timer.linkandoptimizeir",
+                              [m["id"] for m in observation["metrics"]])
+                self.assertEqual(json.loads(observation["artifacts"][0]["content"]["text"]), record)
+                record["ok"] = False
+                failed = self.convert([record])[0]["observations"][0]
+                self.assertEqual(failed["test"], observation["test"])
+                self.assertEqual(failed["metrics"], [])
+
+    def test_branch_preserves_run_identity(self):
+        """Branch display metadata must not create a different logical run."""
+        detached = self.convert()[0]
+        self.assertNotIn("branch", detached["run"]["vcs"])
+        for branch in ("master", "test/perf"):
+            tagged = self.convert(branch=branch)[0]
+            self.assertEqual(tagged["run"]["vcs"]["branch"], branch)
+            self.assertEqual(tagged["run"]["key"], detached["run"]["key"])
+
+    def test_missing_primary_does_not_abort_export(self):
+        """Partial passed records keep measurements without declaring a missing total."""
+        for mode, primary in (("target", "compileInner"), ("api", "apiTotal")):
+            with self.subTest(mode=mode):
+                partial = dict(self.record, workload="partial", mode=mode,
+                               timers={"linkAndOptimizeIR": {"samples": [12, 25]}})
+                with patch("sys.stderr", new=io.StringIO()) as warnings:
+                    observations = self.convert([self.record, partial])[0]["observations"]
+                self.assertIn(primary, warnings.getvalue())
+                self.assertIn("metadata", observations[0]["test"])
+                self.assertNotIn("metadata", observations[1]["test"])
+                self.assertEqual(observations[1]["status"], "passed")
+                self.assertEqual(observations[1]["metrics"][0]["distribution"]["samples"],
+                                 [12, 25])
+                self.assertEqual(json.loads(observations[1]["artifacts"][0]["content"]["text"]),
+                                 partial)
+
+    def test_primary_omitted_by_metric_limit(self):
+        """A total excluded by the metric cap cannot be advertised as exported."""
+        self.record["memory"] = {f"memory{i}": {"samples": [1, 2]} for i in range(64)}
+        with patch("sys.stderr", new=io.StringIO()) as warnings:
+            observation = self.convert()[0]["observations"][0]
+        self.assertEqual(len(observation["metrics"]), 64)
+        self.assertNotIn("metadata", observation["test"])
+        self.assertIn("compileInner", warnings.getvalue())
+
+    def test_daily_and_new_releases_export_together(self):
+        """New releases carry their own revisions, tags and only current default cases."""
+        size = benchview.BY_NAME["mdl_dxr"].default_size
+        default = dict(self.record, size=size)
+        records = [default, dict(default, size=size + 1),
+                   dict(default, size=False), dict(default, size=float(size)),
+                   dict(default, workload="retired_workload")]
+        completed = [
+            {"tag": tag, "commit": revision * 40, "commit_time": "2026-10-17T00:00:00Z",
+             "released_at": "2026-10-17T04:00:00Z", "observed_at": "2026-10-20T06:00:00Z"}
+            for tag, revision in (("v2026.20", "b"), ("v2026.20.1", "c"))]
+        completed[1]["branch"] = "release/2026.20"
+        self.meta.update(corpus_sha="corpus", label="daily-label", slangc="daily/compiler")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "daily.json").write_text(json.dumps([default]))
+            (root / "meta.json").write_text(json.dumps(self.meta))
+            for info in completed:
+                folder = root / info["tag"]
+                folder.mkdir()
+                (folder / "results.json").write_text(json.dumps(records))
+            for releases in (completed, []):
+                (root / "completed.json").write_text(json.dumps(releases))
+                argv = ["benchview.py", "--results", str(root / "daily.json"),
+                        "--meta", str(root / "meta.json"), "--os", "Windows",
+                        "--observed-at", "2026-10-20T05:00:00Z", "--execution-id", "job-1",
+                        "--branch", "master", "--completed-releases", str(root / "completed.json"),
+                        "--release-results", str(root), "--output", str(root / "export")]
+                with patch.object(sys, "argv", argv), patch("sys.stdout", new=io.StringIO()):
+                    benchview.main()
+                payloads = json.loads((root / "export/submissions.json").read_text())["submissions"]
+                self.assertEqual(len(payloads), 1 + len(releases))
+                self.assertNotIn("metadata", payloads[0]["run"])
+                for payload, info in zip(payloads[1:], releases):
+                    self.assertEqual(payload["execution"]["metadata"], {
+                        "runner": self.meta["runner"], "corpus_sha": "corpus",
+                        "commit": info["commit"], "commit_time": info["commit_time"]})
+                    self.assertEqual(payload["run"]["vcs"]["revision"], info["commit"])
+                    self.assertEqual(payload["run"]["vcs"].get("branch"), info.get("branch"))
+                    self.assertEqual(payload["run"]["metadata"]["release"],
+                                     {"label": info["tag"], "releasedAt": info["released_at"]})
+                    self.assertEqual(len(payload["observations"]), 1)
+                    observation = payload["observations"][0]
+                    self.assertEqual(observation["case"]["dimensions"]["size"], size)
+                    self.assertEqual(observation["observedAt"], info["observed_at"])
+                    self.assertEqual(json.loads(observation["artifacts"][0]["content"]["text"]),
+                                     default)
+                self.assertTrue((root / "export/submissions.ready").exists())
+        self.assertEqual(self.meta["commit"], "a" * 40)
+
+    def test_release_paths_reject_non_tags(self):
+        """Completed metadata cannot address paths outside the release result directory."""
+        with patch("sys.stderr", new=io.StringIO()) as warnings:
+            self.assertEqual(benchview.release_submissions(
+                [{"tag": "../daily"}], Path("."), self.meta, "Windows", "job-1"), [])
+        self.assertIn("Invalid completed release tag", warnings.getvalue())
+
+    def test_release_failures_preserve_daily_export(self):
+        """Missing, malformed and oversized releases must not block the daily handoff."""
+        default = dict(self.record, size=benchview.BY_NAME["mdl_dxr"].default_size)
+        info = {"tag": "v2026.20", "commit": "b" * 40,
+                "commit_time": "2026-10-17T00:00:00Z",
+                "released_at": "2026-10-17T04:00:00Z",
+                "observed_at": "2026-10-20T06:00:00Z"}
+        oversized = dict(default, extra="x" * 262144)
+        for failure in ("missing", "empty", "date", "artifact", "manifest", "count", "bytes"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                (root / "daily.json").write_text(json.dumps([default]))
+                (root / "meta.json").write_text(json.dumps(self.meta))
+                folder = root / info["tag"]
+                folder.mkdir()
+                records = ([dict(default, size=999)] if failure == "empty" else
+                           [oversized] if failure == "artifact" else [default])
+                if failure != "missing":
+                    (folder / "results.json").write_text(json.dumps(records))
+                release = dict(info, released_at="invalid") if failure == "date" else info
+                (root / "completed.json").write_text(
+                    "{" if failure == "manifest" else json.dumps([release]))
+                argv = ["benchview.py", "--results", str(root / "daily.json"),
+                        "--meta", str(root / "meta.json"), "--os", "Windows",
+                        "--observed-at", "2026-10-20T05:00:00Z", "--execution-id", "job-1",
+                        "--completed-releases", str(root / "completed.json"),
+                        "--release-results", str(root), "--output", str(root / "export")]
+                convert = benchview.submissions
+
+                def oversized_release(*args, **kwargs):
+                    """Exercise real collector validation without thousands of fixture records."""
+                    payloads = convert(*args, **kwargs)
+                    if payloads[0]["run"]["dimensions"]["kind"] == "release":
+                        if failure == "count":
+                            return payloads * 64
+                        if failure == "bytes":
+                            payloads[0]["execution"]["metadata"]["extra"] = "x" * (8 * 1024 * 1024)
+                    return payloads
+
+                with patch.object(sys, "argv", argv), patch("sys.stdout", new=io.StringIO()), \
+                     patch("sys.stderr", new=io.StringIO()) as warnings, \
+                     patch.object(benchview, "submissions", side_effect=oversized_release):
+                    benchview.main()
+                self.assertIn("Warning: skipped BenchView release", warnings.getvalue())
+                payloads = json.loads((root / "export/submissions.json").read_text())["submissions"]
+                self.assertEqual(len(payloads), 1)
+                self.assertEqual(payloads[0]["run"]["dimensions"]["kind"], "daily")
+                self.assertTrue((root / "export/submissions.ready").exists())
+
     def test_samples_and_breakdown(self):
         """Allocated phases conserve each root sample despite overlapping timers."""
         metrics = self.convert()[0]["observations"][0]["metrics"]
-        root = next(m for m in metrics if m["name"] == "compileInner")
+        root = next(m for m in metrics if m["id"] == "compile.timer.compileinner")
         self.assertEqual(root["distribution"], {"samples": [10, 20]})
         components = root["breakdown"]["components"]
         for i, total in enumerate([10, 20]):
@@ -54,7 +217,7 @@ class BenchViewTests(unittest.TestCase):
         with patch('sys.stderr', new_callable=io.StringIO) as stderr:
             observation = self.convert()[0]["observations"][0]
         self.assertEqual(observation["status"], "passed")
-        root = next(m for m in observation["metrics"] if m["name"] == "compileInner")
+        root = next(m for m in observation["metrics"] if m["id"] == "compile.timer.compileinner")
         self.assertNotIn("breakdown", root)
         self.assertEqual(root["distribution"]["samples"], [10, 20])
         self.assertIn("breakdownOmitted", root["metadata"])
@@ -69,7 +232,7 @@ class BenchViewTests(unittest.TestCase):
         self.record["timers"].update({f"aaa{i}": {"samples": [1, 2]} for i in range(80)})
         metrics = self.convert()[0]["observations"][0]["metrics"]
         self.assertIn("emitEntryPointsSourceFromIR", [m["name"] for m in metrics])
-        root = next(m for m in metrics if m["name"] == "compileInner")
+        root = next(m for m in metrics if m["id"] == "compile.timer.compileinner")
         actual = {c["name"]: c["distribution"]["samples"]
                   for c in root["breakdown"]["components"]}
         for i in range(2):
