@@ -173,28 +173,45 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getResultAsFileSystem(
     ComPtr<ISlangBlob> code;
 
     SLANG_RETURN_ON_FAIL(
-        getEntryPointCode(entryPointIndex, targetIndex, diagnostics.writeRef(), code.writeRef()));
+        getEntryPointCode(entryPointIndex, targetIndex, code.writeRef(), diagnostics.writeRef()));
 
     auto linkage = getLinkage();
-
     auto target = linkage->targets[targetIndex];
 
     auto targetProgram = getTargetProgram(target);
 
+    // The entry point result artifact is cached in the `TargetProgram` and shared by every caller
+    // that asks for the same entry point and target, possibly from different threads. We treat it
+    // as read-only here: the diagnostics and the obfuscated source maps that belong in the file
+    // system are added to a private copy, not to the cached artifact. This keeps concurrent
+    // callers from racing on the artifact's association list, and keeps the items reported by
+    // `getEntryPointCompileResult()` independent of whether `getResultAsFileSystem()` was called.
     IArtifact* artifact = targetProgram->getExistingEntryPointResult(entryPointIndex);
 
-    // Add diagnostics id needs be...
+    // Filter the cached artifact into a copy containing the things that can be written.
+    ComPtr<IArtifact> writeArtifact;
+    SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::filter(artifact, writeArtifact));
+    SLANG_ASSERT(writeArtifact);
+
+    // The additions below are filtered in the same way, so that every artifact in the copy holds a
+    // blob and can be written.
+    auto addFilteredAssociated = [&](IArtifact* associated) -> SlangResult
+    {
+        ComPtr<IArtifact> filteredAssociated;
+        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::filter(associated, filteredAssociated));
+        if (filteredAssociated)
+            writeArtifact->addAssociated(filteredAssociated);
+        return SLANG_OK;
+    };
+
+    // Add diagnostics if needed...
     if (diagnostics && !_findDiagnosticRepresentation(artifact))
     {
-        // Add as an associated
-
         auto diagnosticsArtifact = Artifact::create(
             ArtifactDesc::make(Artifact::Kind::HumanText, ArtifactPayload::Diagnostics));
         diagnosticsArtifact->addRepresentationUnknown(diagnostics);
 
-        artifact->addAssociated(diagnosticsArtifact);
-
-        SLANG_ASSERT(diagnosticsArtifact == _findDiagnosticRepresentation(artifact));
+        SLANG_RETURN_ON_FAIL(addFilteredAssociated(diagnosticsArtifact));
     }
 
     // Add obfuscated source maps
@@ -219,8 +236,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getResultAsFileSystem(
 
                 sourceMapArtifact->addRepresentation(obfuscatedSourceMap);
 
-                // associate with the artifact
-                artifact->addAssociated(sourceMapArtifact);
+                // associate with the copy
+                SLANG_RETURN_ON_FAIL(addFilteredAssociated(sourceMapArtifact));
             }
         }
     }
@@ -228,9 +245,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getResultAsFileSystem(
     // Turn into a file system and return
     ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
 
-    // Filter the containerArtifact into things that can be written
-    ComPtr<IArtifact> writeArtifact;
-    SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::filter(artifact, writeArtifact));
     SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(writeArtifact, "", fileSystem));
 
     *outFileSystem = fileSystem.detach();

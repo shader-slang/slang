@@ -646,6 +646,12 @@ public:
     // Construct the type `RefParam<valueType>`
     RefParamType* getRefParamType(Type* valueType);
 
+    // Construct the type `RefReadOnlyParam<valueType>`
+    RefReadOnlyParamType* getRefReadOnlyParamType(Type* valueType);
+
+    // Construct the type `RefWriteOnlyParam<valueType>`
+    RefWriteOnlyParamType* getRefWriteOnlyParamType(Type* valueType);
+
     // Construct the type `ImmutableBorrowParam<valueType>`
     BorrowInParamType* getConstRefParamType(Type* valueType);
 
