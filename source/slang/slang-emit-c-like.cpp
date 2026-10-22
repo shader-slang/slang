@@ -4091,8 +4091,8 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     }
     else if (auto refType = as<IRRefParamType>(type))
     {
-        // Note: There is no HLSL/GLSL equivalent for by-reference parameters,
-        // so we don't actually expect to encounter these in user code.
+        // HLSL cannot express a by-reference parameter; `inout` is the closest form, though it
+        // copies the value in and out and so loses any aliasing.
         m_writer->emit("inout ");
         type = refType->getValueType();
     }
