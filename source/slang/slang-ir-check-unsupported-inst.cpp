@@ -219,6 +219,83 @@ void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, Dia
     }
 }
 
+/// Return true if every use of `inst` is debug information, directly or through instructions
+/// without side effects whose own uses are all debug information.
+//
+// The source emitters do not emit debug instructions, and fold a pure value into its uses, so
+// such a value does not appear in the output. For example, with `-g` the unused local in
+// `float* q = (float*)addr; bool b = q != nullptr;` is kept alive only by `DebugValue`.
+static bool isUsedOnlyByDebugInfo(IRInst* inst)
+{
+    if (!inst->hasUses())
+        return false;
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (isDebugInfoInst(user))
+            continue;
+        if (user->mightHaveSideEffects() || !isUsedOnlyByDebugInfo(user))
+            return false;
+    }
+    return true;
+}
+
+void checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink)
+{
+    // We report every `T*` value that shader code makes from an integer or from `nullptr`, because
+    // the HLSL and WGSL emitters have no type for it. IR types are deduplicated at module scope, so
+    // we walk the uses of each `T*` type instead of every function. For example, `(float*)addr` is
+    // a `CastIntToPtr` reported at the cast. `p != nullptr` and `static float* g = nullptr;` use a
+    // `PtrLit` that has no location, so we report each of its users.
+    //
+    // A value that only debug information uses is not emitted, so it is not reported.
+    // Compiler-made copies of a value, such as phi-elimination stores, can have no location. We
+    // report one of those only if nothing else is reported, so that the compilation still fails.
+    HashSet<SourceLoc::RawValue> diagnosedLocations;
+    bool hasValueWithoutLocation = false;
+    auto diagnose = [&](IRInst* inst)
+    {
+        if (isDebugInfoInst(inst) || isUsedOnlyByDebugInfo(inst))
+            return;
+        auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+        if (!loc.isValid())
+            hasValueWithoutLocation = true;
+        else if (diagnosedLocations.add(loc.getRaw()))
+            sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = loc});
+    };
+
+    // A compile-time constant such as `(float*)16ULL` has a `@ConstExpr` rate-qualified type that
+    // wraps the pointer type, so we also follow the uses of those wrappers.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto rateType = as<IRRateQualifiedType>(globalInst);
+        if (!isUserPointerType(rateType ? rateType->getValueType() : globalInst))
+            continue;
+        for (auto use = globalInst->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (use != &user->typeUse)
+                continue;
+            switch (user->getOp())
+            {
+            case kIROp_CastIntToPtr:
+                diagnose(user);
+                break;
+            case kIROp_BitCast:
+                if (!isUserPointerType(user->getOperand(0)->getDataType()))
+                    diagnose(user);
+                break;
+            case kIROp_PtrLit:
+                for (auto litUse = user->firstUse; litUse; litUse = litUse->nextUse)
+                    diagnose(litUse->getUser());
+                break;
+            }
+        }
+    }
+    if (hasValueWithoutLocation && diagnosedLocations.getCount() == 0)
+        sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = SourceLoc()});
+}
+
 // True if `target` is a C++/CUDA *kernel* output target. The `String` type is
 // implemented in terms of the Slang core runtime (`Slang::String`), which is
 // available for host C++ output and for the LLVM-backed CPU path, but not in the

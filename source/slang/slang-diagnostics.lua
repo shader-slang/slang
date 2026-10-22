@@ -6094,6 +6094,13 @@ err(
 )
 
 err(
+    "physical-pointer-not-supported-on-target",
+    55219,
+    "pointers to memory addresses are not supported on this target",
+    span { loc = "location", message = "this creates or uses a pointer to a memory address, which the current code generation target cannot represent" }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",

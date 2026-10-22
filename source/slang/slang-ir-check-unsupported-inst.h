@@ -15,4 +15,11 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
 /// This validation is required regardless of the selected optimization mode. Other targets,
 /// including HLSL source output, are not checked by this operation.
 void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
+
+/// Diagnose `T*` values made from an integer or from `nullptr`, for targets without pointers to
+/// memory addresses (the D3D and WebGPU targets).
+///
+/// Call after specialization and inlining, so that each remaining value is reported once at the
+/// code that makes it. Pointers read from memory are not checked.
+void checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang

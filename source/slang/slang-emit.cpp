@@ -664,6 +664,10 @@ void calcRequiredLoweringPassSet(
                 result.unresolvedMatrixLayout = true;
         }
         break;
+    case kIROp_PtrType:
+        if (isUserPointerType(inst))
+            result.usePhysicalPointers = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -2951,6 +2955,12 @@ Result linkAndOptimizeIR(
     // We check D3D and Metal resource locals after all passes that can create mutable storage.
     // Minimum-optimization mode must still reject storage that its target cannot represent.
     SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
+    // Without this check the HLSL and WGSL emitters abort on `nullptr` or print an invalid pointer
+    // type, so it also runs in minimum-optimization mode.
+    if (requiredLoweringPassSet.usePhysicalPointers &&
+        (isWGPUTarget(targetRequest) || isD3DTarget(targetRequest)) &&
+        !codeGenContext->shouldSkipSPIRVValidation())
+        SLANG_PASS(checkUnsupportedPhysicalPointers, sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
