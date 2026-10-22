@@ -15970,6 +15970,22 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
     // extension __func_as_type(decl) : IBackwardDifferentiable<__func_as_type(decl)>
     // { /* ..empty.. */ }
     //
+    // For each mode, `__func_as_type(decl)` must have exactly one conformance to the derivative
+    // interface: either the synthesized extension here, or the one that
+    // `translateFwdDerivativeAttributeToAD2` / `translateBwdDerivativeAttributeToAD2` creates later
+    // (at `ReadyForLookup`) from a `[ForwardDerivative]` / `[BackwardDerivative]` on the decl.
+    // Two conformances of the same function type to the same interface get the same witness-table
+    // linkage name in `visitInheritanceDecl`, and the linker keeps only one of them, so calls
+    // through an interface requirement could silently use the synthesized derivative instead of the
+    // user's. We therefore skip the synthesized extension for a mode whose attribute is present.
+    // For the forward mode, that also skips the synthesized higher-order conformances of
+    // `fwd_diff`; a differentiable user derivative provides them instead.
+    //
+    // The guard only sees attributes on the decl itself. A derivative attached from the other side
+    // with `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]`, or one a `[Differentiable]` decl
+    // gets through `[PrimalSubstitute]`, is not visible here, so those spellings can still produce
+    // both conformances.
+    //
 
     if (decl->findModifier<DifferentiableAttribute>())
     {
@@ -16002,8 +16018,9 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
         };
         if (!isInterfaceRequirement(decl))
         {
-            if (decl->findModifier<ForwardDifferentiableAttribute>() ||
-                decl->findModifier<BackwardDifferentiableAttribute>())
+            if ((decl->findModifier<ForwardDifferentiableAttribute>() ||
+                 decl->findModifier<BackwardDifferentiableAttribute>()) &&
+                !decl->findModifier<ForwardDerivativeAttribute>())
             {
                 auto declsToExtend = ShortList<FunctionDeclBase*, 4>{as<FunctionDeclBase>(decl)};
                 for (auto _decl : getCurrentASTBuilder()->m_substituteMap[decl])
@@ -16079,7 +16096,8 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
                 }
             }
 
-            if (decl->findModifier<BackwardDifferentiableAttribute>())
+            if (decl->findModifier<BackwardDifferentiableAttribute>() &&
+                !decl->findModifier<BackwardDerivativeAttribute>())
             {
                 auto declsToExtend = ShortList<FunctionDeclBase*, 4>{as<FunctionDeclBase>(decl)};
                 for (auto _decl : getCurrentASTBuilder()->m_substituteMap[decl])
