@@ -826,11 +826,11 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
         if (decl->hasModifier<TransparentModifier>() &&
             decl->parentDecl->getTransparentDirectMemberDecls().getFirst() == decl)
         {
-            checkForRedeclarationOfTransparentMembers(decl->parentDecl);
+            checkForRedeclarationOfBufferBlockMembers(decl->parentDecl);
         }
     }
 
-    void checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl);
+    void checkForRedeclarationOfBufferBlockMembers(ContainerDecl* containerDecl);
 };
 
 
@@ -14960,8 +14960,21 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
     }
 }
 
-/// Check the members of the transparent `cbuffer`, `tbuffer` and GLSL interface blocks in
-/// `containerDecl` against the other declarations that lookup finds in that scope.
+/// Return whether `decl` is the transparent variable of a buffer block without an instance
+/// name, such as `cbuffer CB { ... }`, or the `-Gec` shadow that carries its `__transparent`
+/// modifier (see `ParseBufferBlockDecl` and `createUniformParameterShadowVarIfNeeded`).
+///
+static bool isTransparentBufferBlockVariable(Decl* decl)
+{
+    if (!decl->hasModifier<TransparentModifier>())
+        return false;
+    if (auto shadowVarDecl = as<UniformParameterShadowVarDecl>(decl))
+        decl = shadowVarDecl->uniformParameter;
+    return decl->hasModifier<ImplicitParameterGroupVariableModifier>();
+}
+
+/// Check the members of the `cbuffer`, `tbuffer` and GLSL interface blocks without an instance
+/// name in `containerDecl` against the other declarations that lookup finds in that scope.
 ///
 /// Consider this example:
 ///
@@ -14975,42 +14988,51 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
 /// enclosing scope, so `checkForRedeclaration` never compares it with the `static const`.
 ///
 /// We walk the direct members in order and treat the members of each struct as declared at the
-/// transparent variable that follows it. A struct that no transparent variable follows (the
-/// parser drops the variable of a GLSL `gl_PerVertex` redeclaration) exposes nothing. As in
-/// `checkForRedeclaration`, the later declaration gets the diagnostic. A declaration that has an
-/// earlier same-name sibling in its own container is left to `checkForRedeclaration`, so each
-/// declaration gets at most one conflict diagnostic.
+/// buffer block's transparent variable. `ParseBufferBlockDecl` adds the struct to the scope just
+/// before the variable, and with `-Gec` the transparent shadow follows the renamed variable, so
+/// the most recent marked struct is the element type of the next transparent buffer block
+/// variable. A struct that no such variable follows (the parser drops the variable of a GLSL
+/// `gl_PerVertex` redeclaration) exposes nothing. Other transparent variables are treated as
+/// ordinary direct members.
 ///
-void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfTransparentMembers(
+/// As in `checkForRedeclaration`, the later declaration gets the diagnostic, and a declaration
+/// that has an earlier same-name sibling in its own container is left to
+/// `checkForRedeclaration`, so each declaration gets at most one conflict diagnostic. Every other
+/// declaration is compared with the nearest earlier declaration of its name only, so we do not
+/// need the result of `checkRedeclaration`, which tells a caller when to stop comparing.
+/// Buffer members are variables, which ordinary lookup always finds, so only direct members go
+/// through the lookup-mask filter, which skips declarations such as attributes.
+///
+void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMembers(
     ContainerDecl* containerDecl)
 {
     // For each name, the most recent declaration so far that lookup in `containerDecl` finds,
-    // either a direct member or a member of a transparent parameter group.
+    // either a direct member or a member of a buffer block.
     Dictionary<Name*, Decl*> visibleDecls;
-    AggTypeDecl* groupDecl = nullptr;
+    AggTypeDecl* elementTypeDecl = nullptr;
     for (auto memberDecl : containerDecl->getDirectMemberDecls())
     {
         if (memberDecl->hasModifier<ImplicitParameterGroupElementTypeModifier>())
         {
-            groupDecl = as<AggTypeDecl>(memberDecl);
+            elementTypeDecl = as<AggTypeDecl>(memberDecl);
             continue;
         }
 
-        if (memberDecl->hasModifier<TransparentModifier>())
+        if (isTransparentBufferBlockVariable(memberDecl))
         {
-            SLANG_RELEASE_ASSERT(groupDecl);
-            for (auto groupMemberDecl : groupDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+            SLANG_RELEASE_ASSERT(elementTypeDecl);
+            for (auto bufferMemberDecl : elementTypeDecl->getDirectMemberDeclsOfType<VarDeclBase>())
             {
-                auto name = groupMemberDecl->getName();
+                auto name = bufferMemberDecl->getName();
                 Decl* prevDecl = nullptr;
-                if (!groupDecl->getPrevDirectMemberDeclWithSameName(groupMemberDecl) &&
+                if (!elementTypeDecl->getPrevDirectMemberDeclWithSameName(bufferMemberDecl) &&
                     visibleDecls.tryGetValue(name, prevDecl))
                 {
-                    checkRedeclaration(groupMemberDecl, prevDecl);
+                    checkRedeclaration(bufferMemberDecl, prevDecl);
                 }
-                visibleDecls[name] = groupMemberDecl;
+                visibleDecls[name] = bufferMemberDecl;
             }
-            groupDecl = nullptr;
+            elementTypeDecl = nullptr;
             continue;
         }
 
