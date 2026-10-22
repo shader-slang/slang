@@ -8,6 +8,9 @@ namespace Slang
 
 struct SemanticsVisitor;
 
+// Return whether lookup with `mask` can find `decl`. The mask selects declarations by kind
+// (types, functions, values, attributes, syntax and semantics declarations), and `extern`
+// members of extensions never pass.
 bool DeclPassesLookupMask(Decl* decl, LookupMask mask);
 
 // Take an existing lookup result and refine it to only include

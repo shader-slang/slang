@@ -2000,7 +2000,8 @@ bool SemanticsVisitor::isUsableAsStaticMember(LookupResultItem const& item)
 
 /// Dispatch an appropriate visitor to check `decl` up to state `state`
 ///
-/// The current state of `decl` must be `state-1`.
+/// The current state of `decl` must be `state-1`. The one exception is that `ensureDecl`
+/// also dispatches `ReadyForReference` for a declaration that a visitor moved past it.
 /// This call does *not* handle updating the state of `decl`; the
 /// caller takes responsibility for doing so.
 ///
@@ -2107,9 +2108,11 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
 
         // A visitor can advance `decl` past several states at once. Consider `let x = 1;`:
         // the header visitor checks the initializer to infer the type of `x`, and then marks
-        // `x` as `DefinitionChecked`. The `ReadyForReference` step compares `decl` with the
-        // other declarations in its scope, so we still run that step when a visitor skips it.
-        // Without it, `int x; let x = 1;` would be accepted while `let x = 1; int x;` is not.
+        // `x` as `DefinitionChecked`. Such a visitor has checked `decl` itself, but the
+        // `ReadyForReference` step also compares `decl` with the other declarations in its
+        // scope, so we still run that step. Without it, `int x; let x = 1;` would be accepted
+        // while `let x = 1; int x;` is not. We run the step here, rather than at each place
+        // that advances a declaration, so that a new such place cannot skip the comparison.
         //
         if (nextState < DeclCheckState::ReadyForReference &&
             decl->checkState.getState() >= DeclCheckState::ReadyForReference)
