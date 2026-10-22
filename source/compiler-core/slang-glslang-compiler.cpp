@@ -445,6 +445,8 @@ SlangResult GlslangDownstreamCompiler::link(
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
     artifact->addRepresentationUnknown(
         Slang::RawBlob::create(request.linkResult, request.linkResultSize * sizeof(uint32_t)));
+    // A library that predates the export keeps the buffer: it was allocated in that module, so we
+    // cannot free it here.
     if (m_freeLinkResult)
     {
         m_freeLinkResult(request.linkResult);

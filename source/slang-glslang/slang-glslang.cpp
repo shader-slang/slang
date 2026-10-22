@@ -1167,7 +1167,7 @@ extern "C"
 #endif
 }
 
-// Free a link result returned by glslang_linkSPIRV.
+// Free a link result returned by glslang_linkSPIRV. A null pointer is accepted and ignored.
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)

@@ -33,7 +33,9 @@ using namespace Slang;
 namespace
 {
 
-// Which linker the fake library exports, covering the states the caller must tell apart.
+// Which linker the fake library exports, covering the states the caller must tell apart. Every
+// state except `PresentAcceptingWithoutFree` also exports `glslang_freeLinkResult`, so the failure
+// tests can check that a link that returned no buffer frees nothing.
 enum class FakeLinkerState
 {
     Absent,
@@ -79,11 +81,13 @@ int fakeLinkReturningFirstModule(glslang_LinkRequest* request)
     return true;
 }
 
-// Record which buffer the caller handed back, and overwrite it so a caller that reads the result
-// after handing it back sees different bytes.
 int gFakeFreeLinkResultCallCount = 0;
 const uint32_t* gFakeFreedLinkResult = nullptr;
 
+// Record which buffer the caller handed back. Overwriting it stands in for the real `delete[]`: a
+// caller that copies the result only after handing it back then reads `0xCDCDCDCD` instead of the
+// linked words. Only the buffer `fakeLinkReturningFirstModule` handed out is overwritten, so a
+// wrong pointer shows up in the pointer check rather than by corrupting unrelated memory.
 void fakeFreeLinkResult(const uint32_t* linkResult)
 {
     ++gFakeFreeLinkResultCallCount;
@@ -334,7 +338,8 @@ SLANG_UNIT_TEST(downstreamLinkSucceedsWhenLinkerAccepts)
     SLANG_CHECK(gFakeFreeLinkResultCallCount == 1);
     SLANG_CHECK(gFakeFreedLinkResult == gFakeLinkResult.getBuffer());
 
-    // The artifact holds the linked bytes, so it copied them before handing the buffer back.
+    // `fakeFreeLinkResult` overwrote the linked buffer with `0xCDCDCDCD`, so the artifact still
+    // holding module A's bytes means it copied them before handing the buffer back.
     ComPtr<ISlangBlob> blob;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(artifact->loadBlob(ArtifactKeep::No, blob.writeRef())));
     SLANG_CHECK(blob->getBufferSize() == sizeof(kSpirvModuleA));
