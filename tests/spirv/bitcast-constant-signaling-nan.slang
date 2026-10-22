@@ -2,26 +2,40 @@
 // Widening or narrowing a signaling NaN with a hardware conversion quiets it, so the fold must
 // move the bits instead: `bit_cast<float>(0x7F800001u)` must keep 0x7F800001, not 0x7FC00001.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -O1
+//TEST:SIMPLE(filecheck=FOLD): -target spirv -stage compute -entry computeMain -O1
+
+//TEST:SIMPLE(filecheck=NOQ): -target spirv -stage compute -entry computeMain -O1
+//TEST:SIMPLE(filecheck=NOQ): -target spirv -stage compute -entry computeMain -O0
 
 //TEST:SIMPLE(filecheck=O0): -target spirv-asm -stage compute -entry computeMain -O0
+
+//TEST:SIMPLE(filecheck=CAST): -target spirv -stage compute -entry castMain -O1
 
 // Signaling NaNs folded through `float` and back to `uint` keep their bits:
 // 0x7F800001, 0xFF800001 and 0x7FBFFFFF.
 // CHECK-DAG: OpConstant %uint 2139095041
 // CHECK-DAG: OpConstant %uint 4286578689
 // CHECK-DAG: OpConstant %uint 2143289343
-// The quieted patterns 0x7FC00001, 0xFFC00001 and 0x7FFFFFFF must not appear.
-// CHECK-NOT: OpConstant %uint 2143289345
-// CHECK-NOT: OpConstant %uint 4290772993
-// CHECK-NOT: OpConstant %uint 2147483647
+
+// At -O1 every bit cast is folded, so the constants above are folded results, not the inputs.
+// FOLD-NOT: OpBitcast
+
+// The quieted patterns 0x7FC00001, 0xFFC00001 and 0x7FFFFFFF appear nowhere in the module.
+// NOQ-NOT: OpConstant %uint 2143289345
+// NOQ-NOT: OpConstant %uint 4290772993
+// NOQ-NOT: OpConstant %uint 2147483647
 
 // At -O0, `storedNan` stays a float constant, and its bits are 0x7F800001 rather than 0x7FC00001.
 // O0: OpConstant %float 0x1.000002p+128
 // O0-NOT: OpConstant %float 0x1.800002p+128
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj
+// A value conversion from `double` to `float` quiets a signaling NaN, as it does at run time:
+// the double 0x7FF0000040000000 becomes 0x7FC00002, not 0x7F800002.
+// CAST: OpConstant %uint 2143289346
+// CAST-NOT: OpConstant %uint 2139095042
+
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -Xslang -O1
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -Xslang -O0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
@@ -69,3 +83,9 @@ void computeMain()
 // BUF-NEXT: 80000000
 // BUF-NEXT: FF800001
 // BUF-NEXT: 7FA00000
+
+[numthreads(1, 1, 1)]
+void castMain()
+{
+    outputBuffer[0] = asuint(float(bit_cast<double>(0x7FF0000040000000ull)));
+}

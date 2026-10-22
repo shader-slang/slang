@@ -223,8 +223,10 @@ SLANG_FORCE_INLINE double FloatBitsToDouble(uint32_t bits)
     return double(IntAsFloat(int(bits)));
 }
 
-// Narrow `value` to Float32 and return its bit pattern. A NaN keeps its sign and the top 23
-// fraction bits, signaling or not, where a hardware double-to-float conversion would quiet it.
+// Narrow `value` to Float32 and return its bit pattern. If `value` is a NaN whose top 23 fraction
+// bits are not all zero, return its sign and those bits unchanged, signaling or not, where a
+// hardware double-to-float conversion would quiet it. Any other NaN would truncate to an
+// infinity, so it goes through the hardware conversion.
 SLANG_FORCE_INLINE uint32_t DoubleToFloatBits(double value)
 {
     const uint64_t bits = uint64_t(DoubleAsInt64(value));
