@@ -345,13 +345,27 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             )
         endif()
 
-        # SPIRV-Tools-opt (linked by slang-glslang) and SPIRV-Tools-diff override allocation in
-        # mimalloc.cpp through mimalloc-new-delete.h. That file needs /Zc:__cplusplus on MSVC for
-        # the same reason as source/slang/slang-mimalloc.cpp.
+        # SPIRV-Tools' source/mimalloc.cpp includes mimalloc-new-delete.h, so on MSVC it needs
+        # /Zc:__cplusplus for the same reason as source/slang/slang-mimalloc.cpp. With SPIRV-Tools
+        # built static, these are the targets that compile the file. A source property on a target
+        # that does not compile it is silently ignored, so we check the list.
         if(SLANG_MIMALLOC_AVAILABLE AND SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
-            set_source_files_properties(
+            set(_spvtools_mimalloc_cpp
                 "${spirv-tools_SOURCE_DIR}/source/mimalloc.cpp"
-                TARGET_DIRECTORY SPIRV-Tools-opt SPIRV-Tools-diff
+            )
+            set(_spvtools_mimalloc_targets SPIRV-Tools-opt SPIRV-Tools-diff)
+            foreach(_target IN LISTS _spvtools_mimalloc_targets)
+                get_target_property(_sources ${_target} SOURCES)
+                if(NOT _spvtools_mimalloc_cpp IN_LIST _sources)
+                    message(
+                        FATAL_ERROR
+                        "${_target} no longer compiles ${_spvtools_mimalloc_cpp}; update the /Zc:__cplusplus setting in external/CMakeLists.txt"
+                    )
+                endif()
+            endforeach()
+            set_source_files_properties(
+                "${_spvtools_mimalloc_cpp}"
+                TARGET_DIRECTORY ${_spvtools_mimalloc_targets}
                 PROPERTIES
                     COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>"
             )
