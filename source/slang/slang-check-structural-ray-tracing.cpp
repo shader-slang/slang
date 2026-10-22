@@ -29,10 +29,10 @@ namespace Slang
 
 static bool _hasStructuralRayTracingGenericSubstitution(DeclRefBase* declRef)
 {
-    // Consider `GenericMiss<uint>` and an ordinary `Miss`. The first decl-ref contains a
-    // `GenericAppDeclRef` carrying `uint`, while the second has no generic substitution at all.
-    // Check that semantic representation directly instead of trying to recognize generic syntax
-    // in a printed or mangled name.
+    // A reference to `GenericMiss<uint>` carries a mapping from its generic parameter to `uint`;
+    // an ordinary `Miss` has no such mapping. This only asks whether a mapping exists. Its
+    // arguments can still be generic parameters, so this does not test whether the type is fully
+    // specialized or whether specialization is possible.
     bool result = false;
     SubstitutionSet(declRef).forEachGenericSubstitution([&](GenericDecl*, Val::OperandView<Val>)
                                                         { result = true; });
@@ -601,9 +601,9 @@ bool isRayTracingBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl)
             modifier->magicNodeType.isSubClassOf<TraceProgramDescriptorType>());
 }
 
-String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type)
+String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* stageType)
 {
-    auto declRefType = as<DeclRefType>(type ? type->resolve() : nullptr);
+    auto declRefType = as<DeclRefType>(stageType ? stageType->resolve() : nullptr);
     if (!declRefType)
         return String();
 
@@ -611,7 +611,7 @@ String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type)
     {
         // `GenericMiss<uint>` and `GenericMiss<float>` share one declaration path. Ordinary type
         // mangling preserves the selected arguments and provides a distinct name for each type.
-        return getMangledTypeName(astBuilder, type->getCanonicalType());
+        return getMangledTypeName(astBuilder, stageType->getCanonicalType());
     }
 
     // Ordinary declaration-reference printing gives names such as `Stages.Miss`, omitting modules.

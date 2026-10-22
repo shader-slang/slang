@@ -91,7 +91,7 @@ FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* i
 /// Nongeneric types use the source declaration path, including namespaces and enclosing types
 /// but excluding module names. Generic specializations use ordinary type mangling to preserve
 /// the selected arguments.
-String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type);
+String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* stageType);
 
 /// Returns the deterministic target symbol for a structural ray-tracing type and selected stage.
 ///
