@@ -812,11 +812,25 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
 
     CASE(EnumCaseDecl)
     CASE(FuncDecl)
-    CASE(VarDeclBase)
     CASE(SimpleTypeDecl)
     CASE(AggTypeDecl)
 
 #undef CASE
+
+    void visitVarDeclBase(VarDeclBase* decl)
+    {
+        checkForRedeclaration(decl);
+
+        // The members of transparent parameter groups are compared in one pass over the
+        // whole scope, which we run when checking the first transparent variable.
+        if (decl->hasModifier<TransparentModifier>() &&
+            decl->parentDecl->getTransparentDirectMemberDecls().getFirst() == decl)
+        {
+            checkForRedeclarationOfTransparentMembers(decl->parentDecl);
+        }
+    }
+
+    void checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl);
 };
 
 
@@ -14943,6 +14957,73 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         //
         if (SLANG_FAILED(checkResult))
             break;
+    }
+}
+
+/// Check the members of the transparent `cbuffer`, `tbuffer` and GLSL interface blocks in
+/// `containerDecl` against the other declarations that lookup finds in that scope.
+///
+/// Consider this example:
+///
+///     static const int x = 1;
+///     cbuffer CB { int x; }
+///
+/// The parser desugars the `cbuffer` into a struct that holds `x` and is marked with
+/// `ImplicitParameterGroupElementTypeModifier`, followed by a `__transparent` variable of type
+/// `ConstantBuffer<...>`. Lookup in the enclosing scope sees through the transparent variable,
+/// so a use of `x` finds both declarations. The member `x` is not a direct member of the
+/// enclosing scope, so `checkForRedeclaration` never compares it with the `static const`.
+///
+/// We walk the direct members in order and treat the members of each struct as declared at the
+/// transparent variable that follows it. A struct that no transparent variable follows (the
+/// parser drops the variable of a GLSL `gl_PerVertex` redeclaration) exposes nothing. As in
+/// `checkForRedeclaration`, the later declaration gets the diagnostic. A declaration that has an
+/// earlier same-name sibling in its own container is left to `checkForRedeclaration`, so each
+/// declaration gets at most one conflict diagnostic.
+///
+void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfTransparentMembers(
+    ContainerDecl* containerDecl)
+{
+    // For each name, the most recent declaration so far that lookup in `containerDecl` finds,
+    // either a direct member or a member of a transparent parameter group.
+    Dictionary<Name*, Decl*> visibleDecls;
+    AggTypeDecl* groupDecl = nullptr;
+    for (auto memberDecl : containerDecl->getDirectMemberDecls())
+    {
+        if (memberDecl->hasModifier<ImplicitParameterGroupElementTypeModifier>())
+        {
+            groupDecl = as<AggTypeDecl>(memberDecl);
+            continue;
+        }
+
+        if (memberDecl->hasModifier<TransparentModifier>())
+        {
+            SLANG_RELEASE_ASSERT(groupDecl);
+            for (auto groupMemberDecl : groupDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+            {
+                auto name = groupMemberDecl->getName();
+                Decl* prevDecl = nullptr;
+                if (!groupDecl->getPrevDirectMemberDeclWithSameName(groupMemberDecl) &&
+                    visibleDecls.tryGetValue(name, prevDecl))
+                {
+                    checkRedeclaration(groupMemberDecl, prevDecl);
+                }
+                visibleDecls[name] = groupMemberDecl;
+            }
+            groupDecl = nullptr;
+            continue;
+        }
+
+        auto name = memberDecl->getName();
+        if (!name || !DeclPassesLookupMask(memberDecl, LookupMask::Default))
+            continue;
+        Decl* prevDecl = nullptr;
+        if (!containerDecl->getPrevDirectMemberDeclWithSameName(memberDecl) &&
+            visibleDecls.tryGetValue(name, prevDecl))
+        {
+            checkRedeclaration(memberDecl, prevDecl);
+        }
+        visibleDecls[name] = memberDecl;
     }
 }
 
