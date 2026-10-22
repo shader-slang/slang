@@ -12,6 +12,9 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
+#if defined(_WIN32) && defined(SLANG_GLSLANG_USES_MIMALLOC)
+#include <mimalloc.h>
+#endif
 
 #include <cassert>
 #include <iostream>
@@ -941,6 +944,24 @@ static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_3& request)
     dump(result.c_str(), result.length(), request.outputFunc, request.outputUserData, stdout);
     return 0;
 }
+
+#if defined(_WIN32) && defined(SLANG_GLSLANG_USES_MIMALLOC)
+// SPIRV-Tools-opt links its own mimalloc into this DLL, which keeps its OS memory reserved after
+// `FreeLibrary` unless `mi_option_destroy_on_exit` is set when it shuts down, so every load and
+// unload of slang-glslang would leave at least one 1 GiB arena behind (#13828). The MSVC CRT calls
+// this `DllMain` before it runs the DLL's static destructors (including `ProcessInitializer`
+// below) and `atexit` functions, and mimalloc registers its shutdown as the first of those
+// `atexit` functions, so it releases the memory only after every static has freed its allocations.
+//
+// `reserved` is null when the DLL is unloaded by `FreeLibrary` (or its load failed) and non-null
+// when the whole process is exiting, which we leave alone because the OS reclaims the memory.
+extern "C" BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID reserved)
+{
+    if (reason == DLL_PROCESS_DETACH && reserved == nullptr)
+        mi_option_enable(mi_option_destroy_on_exit);
+    return TRUE;
+}
+#endif
 
 // We need a per process initialization
 class ProcessInitializer
