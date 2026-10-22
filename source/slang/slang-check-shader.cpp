@@ -2730,7 +2730,7 @@ bool resolveStageOfProfileWithEntryPoint(
             if (profileStage != Stage::Unknown && profileStage != entryPointStage)
                 maybeDiagnose(
                     sink,
-                    optionSet,
+                    target->getOptionSet(),
                     DiagnosticCategory::Capability,
                     Diagnostics::EntryPointAndProfileAreIncompatible{
                         .decl = entryPointFuncDecl,
