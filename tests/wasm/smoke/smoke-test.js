@@ -165,7 +165,9 @@ async function runSmokeTest() {
         // and compiler option entries apply to every module of the session, including one
         // imported from a search path. Enum values are those in include/slang.h.
         const CompilerOptionValueKind = { Int: 0, String: 1 };
-        const CompilerOptionName = { MacroDefine: 0, IgnoreCapabilities: 11, LineDirectiveMode: 45 };
+        const CompilerOptionName = {
+            MacroDefine: 0, IgnoreCapabilities: 11, RestrictiveCapabilityCheck: 12, LineDirectiveMode: 45,
+        };
         module.FS.mkdirTree('/session-options/lib');
         module.FS.writeFile('/session-options/lib/helper.slang',
             'module helper;\n' +
@@ -225,23 +227,47 @@ async function runSmokeTest() {
         const shaderSource = 'RWStructuredBuffer<uint> outputBuffer;\n' +
             '[shader("compute")] [numthreads(1, 1, 1)]\n' +
             'void computeMain() { outputBuffer[0] = 1; }\n';
-        const targetCodes = (desc, targetCount) => {
+        // Returns the code for each target, or throws with getLastError()'s message when the
+        // session, the module, the link or a target's code fails.
+        let codeModuleCount = 0;
+        const targetCodes = (desc, targetCount, source = shaderSource) => {
+            const lastErrorMessage = () => {
+                const error = module.getLastError();
+                return error ? error.message : '';
+            };
             const codeSession = globalSession.createSession(desc);
             if (!codeSession) {
-                const error = module.getLastError();
-                throw new Error(`Failed to create a session from ${JSON.stringify(desc)}: ${error ? error.message : ''}`);
+                throw new Error(`Failed to create a session from ${JSON.stringify(desc)}: ${lastErrorMessage()}`);
             }
-            const codeModule = codeSession.loadModuleFromSource(
-                shaderSource, 'target-options', '/target-options.slang');
-            const codeProgram = codeModule ?
-                codeSession.createCompositeComponentType([codeModule]).link() : null;
             const codes = [];
-            for (let i = 0; i < targetCount; i++) {
-                codes.push(codeProgram ? codeProgram.getTargetCode(i) : '');
+            const codeModule = codeSession.loadModuleFromSource(
+                source, `target-options-${codeModuleCount}`, `/target-options-${codeModuleCount}.slang`);
+            codeModuleCount++;
+            let codeComposite = null;
+            try {
+                if (!codeModule) {
+                    throw new Error(`Failed to load the module for ${JSON.stringify(desc)}: ${lastErrorMessage()}`);
+                }
+                codeComposite = codeSession.createCompositeComponentType([codeModule]);
+                const codeProgram = codeComposite.link();
+                if (!codeProgram) {
+                    throw new Error(`Failed to link for ${JSON.stringify(desc)}: ${lastErrorMessage()}`);
+                }
+                for (let i = 0; i < targetCount; i++) {
+                    const code = codeProgram.getTargetCode(i);
+                    if (!code) {
+                        const message = lastErrorMessage();
+                        codeProgram.delete();
+                        throw new Error(`No code for target ${i} of ${JSON.stringify(desc)}: ${message}`);
+                    }
+                    codes.push(code);
+                }
+                codeProgram.delete();
+            } finally {
+                if (codeComposite) codeComposite.delete();
+                if (codeModule) codeModule.delete();
+                codeSession.delete();
             }
-            if (codeProgram) codeProgram.delete();
-            if (codeModule) codeModule.delete();
-            codeSession.delete();
             return codes;
         };
         const [defaultGlsl] = targetCodes(glslTarget, 1);
@@ -284,6 +310,59 @@ async function runSmokeTest() {
             throw new Error(`A target's compilerOptionEntries did not apply to that target:\n${optionGlsl.slice(0, 300)}`);
         }
 
+        // An HLSL target without a profile gets sm_6_6, and an explicit profile replaces it.
+        // RestrictiveCapabilityCheck makes code above the target's profile an error instead of
+        // an implicit upgrade: ResourceDescriptorHeap needs SM 6.6 and QuadAny needs SM 6.7.
+        const hlslTarget = targets.find(target => target.name === 'HLSL').value;
+        const restrictive = [{
+            name: CompilerOptionName.RestrictiveCapabilityCheck,
+            value: { kind: CompilerOptionValueKind.Int, intValue0: 1 },
+        }];
+        const heapSource = 'RWStructuredBuffer<uint> outputBuffer;\n' +
+            '[shader("compute")] [numthreads(1, 1, 1)]\n' +
+            'void computeMain() { RWStructuredBuffer<uint> b = ResourceDescriptorHeap[0]; outputBuffer[0] = b[0]; }\n';
+        const quadAnySource = 'RWStructuredBuffer<uint> outputBuffer;\n' +
+            '[shader("compute")] [numthreads(4, 1, 1)]\n' +
+            'void computeMain(uint i : SV_GroupIndex) { outputBuffer[0] = QuadAny(i == 0) ? 1 : 0; }\n';
+        // Returns null if `source` compiles for `target`, or else the error message.
+        const hlslError = (target, source) => {
+            try {
+                targetCodes({ targets: [target], compilerOptionEntries: restrictive }, 1, source);
+                return null;
+            } catch (error) {
+                return error.message;
+            }
+        };
+        const defaultHeapError = hlslError({ format: hlslTarget }, heapSource);
+        if (defaultHeapError) {
+            throw new Error(`An HLSL target without a profile should compile SM 6.6 code: ${defaultHeapError}`);
+        }
+        const defaultQuadAnyError = hlslError({ format: hlslTarget }, quadAnySource);
+        if (!defaultQuadAnyError || !defaultQuadAnyError.includes("Missing capabilities are: 'sm_6_7'")) {
+            throw new Error(`An HLSL target without a profile should be sm_6_6, so SM 6.7 code should fail: ${defaultQuadAnyError}`);
+        }
+        const sm50HeapError = hlslError({ format: hlslTarget, profile: globalSession.findProfile('sm_5_0') }, heapSource);
+        if (!sm50HeapError || !sm50HeapError.includes('E41013')) {
+            throw new Error(`An explicit sm_5_0 profile should replace the HLSL default: ${sm50HeapError}`);
+        }
+
+        // forceGLSLScalarBufferLayout gives a float3 structured buffer the scalar layout.
+        const float3Source = 'RWStructuredBuffer<float3> outputBuffer;\n' +
+            '[shader("compute")] [numthreads(1, 1, 1)]\n' +
+            'void computeMain() { outputBuffer[0] = float3(1, 2, 3); }\n';
+        const [scalarGlsl, defaultLayoutGlsl] = targetCodes({
+            targets: [
+                { format: glslTarget, forceGLSLScalarBufferLayout: true },
+                { format: glslTarget },
+            ],
+        }, 2, float3Source);
+        if (!scalarGlsl.includes('GL_EXT_scalar_block_layout') || !scalarGlsl.includes('layout(scalar')) {
+            throw new Error(`forceGLSLScalarBufferLayout did not apply:\n${scalarGlsl.slice(0, 400)}`);
+        }
+        if (defaultLayoutGlsl.includes('layout(scalar')) {
+            throw new Error(`A target without forceGLSLScalarBufferLayout should not use the scalar layout:\n${defaultLayoutGlsl.slice(0, 400)}`);
+        }
+
         // A malformed descriptor returns null and sets a USER error naming the problem.
         const expectInvalid = (desc, messagePart) => {
             const badSession = globalSession.createSession(desc);
@@ -297,14 +376,41 @@ async function runSmokeTest() {
                 throw new Error(`createSession(${JSON.stringify(desc)}) should set a USER error about ${messagePart}`);
             }
         };
-        expectInvalid('WGSL', 'SessionDesc');
+        const ignoreCapabilities = { kind: CompilerOptionValueKind.Int, intValue0: 1 };
+        expectInvalid('WGSL', 'expected a compile target number or a SessionDesc object');
+        expectInvalid(null, 'expected a compile target number or a SessionDesc object');
+        expectInvalid(undefined, 'expected a compile target number or a SessionDesc object');
+        expectInvalid([{ format: wgslTarget }], 'expected a compile target number or a SessionDesc object');
         expectInvalid({ targets: wgslTarget }, "'targets' must be an array");
-        expectInvalid({ targets: [{ profile: glsl460 }] }, "'format'");
-        expectInvalid({ preprocessorMacros: [{ value: '1' }] }, "'name'");
+        expectInvalid({ targets: [wgslTarget] }, "'targets[0]' must be an object");
+        expectInvalid({ targets: [{ profile: glsl460 }] }, "'targets[0].format' is required");
+        expectInvalid({ targets: [{ format: 'WGSL' }] }, "'targets[0].format' must be a number");
+        expectInvalid({ targets: [{ format: 100000 }] }, "'targets[0].format' is not a SlangCompileTarget");
+        expectInvalid({ targets: [{ format: glslTarget, forceGLSLScalarBufferLayout: 1 }] },
+            "'targets[0].forceGLSLScalarBufferLayout' must be a boolean");
+        expectInvalid({ searchPaths: '/session-options/lib' }, "'searchPaths' must be an array");
+        expectInvalid({ searchPaths: [7] }, "'searchPaths[0]' must be a string");
+        expectInvalid({ preprocessorMacros: { name: 'A' } }, "'preprocessorMacros' must be an array");
+        expectInvalid({ preprocessorMacros: [{ value: '1' }] }, "'preprocessorMacros[0].name' is required");
+        expectInvalid({ preprocessorMacros: [{ name: 'A', value: 1 }] }, "'preprocessorMacros[0].value' must be a string");
+        expectInvalid({ compilerOptionEntries: {} }, "'compilerOptionEntries' must be an array");
+        expectInvalid({ compilerOptionEntries: [{ value: ignoreCapabilities }] },
+            "'compilerOptionEntries[0].name' is required");
+        expectInvalid({ compilerOptionEntries: [{ name: CompilerOptionName.IgnoreCapabilities }] },
+            "'compilerOptionEntries[0].value' is required");
+        expectInvalid({ compilerOptionEntries: [{ name: CompilerOptionName.IgnoreCapabilities, value: { intValue0: 1 } }] },
+            "'compilerOptionEntries[0].value.kind' is required");
+        expectInvalid({ compilerOptionEntries: [{ name: 100000, value: ignoreCapabilities }] },
+            "'compilerOptionEntries[0].name' is not a CompilerOptionName");
+        expectInvalid({ compilerOptionEntries: [{ name: -1, value: ignoreCapabilities }] },
+            "'compilerOptionEntries[0].name' is not a CompilerOptionName");
+        expectInvalid({ compilerOptionEntries: [{ name: CompilerOptionName.IgnoreCapabilities, value: { kind: 2 } }] },
+            "'compilerOptionEntries[0].value.kind' must be 0 (Int) or 1 (String)");
+        expectInvalid({ compilerOptionEntries: [{ name: CompilerOptionName.IgnoreCapabilities, value: { kind: 0, intValue0: '1' } }] },
+            "'compilerOptionEntries[0].value.intValue0' must be a number");
         expectInvalid({
-            targets: [{ format: wgslTarget }],
-            compilerOptionEntries: [{ name: CompilerOptionName.IgnoreCapabilities, value: { intValue0: 1 } }],
-        }, "'kind'");
+            targets: [{ format: wgslTarget }, { format: glslTarget, compilerOptionEntries: [{ value: { kind: 0 } }] }],
+        }, "'targets[1].compilerOptionEntries[0].name' is required");
         optionsProgram.delete();
         optionsModule.delete();
         optionsSession.delete();

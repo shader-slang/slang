@@ -345,21 +345,31 @@ public:
     }
 
     // `desc` is either a compile target (a number, as returned by getCompileTargets()), or a
-    // js::SessionDesc object, which mirrors slang::SessionDesc (see the TypeScript definitions
-    // registered in slang-wasm-bindings.cpp). Only some of the C++ fields are bound so far:
+    // js::SessionDesc object, which mirrors slang::SessionDesc. A number gives a session with
+    // that one target.
+    //
+    // This list is the reference for the fields that are read; SessionDescReader in
+    // slang-wasm.cpp reads them, and the TypeScript types registered in slang-wasm-bindings.cpp
+    // declare them. Other C++ fields are not read.
     //   SessionDesc: targets, defaultMatrixLayoutMode, searchPaths, preprocessorMacros,
     //                compilerOptionEntries.
     //   TargetDesc:  format (required), profile, flags, floatingPointMode, lineDirectiveMode,
     //                forceGLSLScalarBufferLayout, compilerOptionEntries.
-    // Fields that are left out keep the C++ defaults, except that an HLSL target without a
-    // profile gets sm_6_6, as a session created from a number does. A profile is a
-    // SlangProfileID from findProfile(). The enums are not exported to JavaScript; their
-    // integer values are those in include/slang.h.
-    // Returns null and sets getLastError() (type "USER", SLANG_E_INVALID_ARG) when `desc` is
-    // neither a number nor an object, an array field is not an array, a target has no
-    // `format`, a macro has no `name`, or a compiler option entry has no `name` or
-    // `value.kind`. A field of the wrong type (for example a macro name that is not a string)
-    // throws a JavaScript exception.
+    //   PreprocessorMacroDesc: name (required), value.
+    //   CompilerOptionEntry: name (required), value: {kind (required), intValue0, intValue1,
+    //                stringValue0, stringValue1}.
+    // Fields that are left out keep the C++ defaults, so a SessionDesc without `targets` gives
+    // a session with no targets, as in C++. The exception: an HLSL target without a profile
+    // gets sm_6_6, in both forms. A profile is a SlangProfileID from findProfile().
+    //
+    // Enum fields take the integer values from include/slang.h (for example
+    // CompilerOptionName::MacroDefine is 0), as `format` always has; that is the contract of
+    // this function. Exporting the enums by name (with embind's enum_ or constant()) would be a
+    // separate addition, which these fields could then accept as well.
+    //
+    // A malformed descriptor returns null and sets getLastError() (type "USER",
+    // SLANG_E_INVALID_ARG) with a message that names the field; SessionDescReader lists the
+    // cases.
     Session* createSession(js::SessionDescOrTarget desc);
 
     // Returns the SlangProfileID for a profile name such as "sm_6_6" or "glsl_460", or 0
