@@ -823,8 +823,11 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
 
         // One ordered pass over the scope covers all of its transparent variables, so we run
         // it only for the first one; running it for each would report every conflict again.
-        if (decl->hasModifier<TransparentModifier>() &&
-            decl->parentDecl->getTransparentDirectMemberDecls().getFirst() == decl)
+        // The inner declaration of a `__generic` (a parse error that the language server still
+        // checks) is not in its parent's member list, so the list can be empty.
+        auto& transparentDecls = decl->parentDecl->getTransparentDirectMemberDecls();
+        if (decl->hasModifier<TransparentModifier>() && transparentDecls.getCount() != 0 &&
+            transparentDecls.getFirst() == decl)
         {
             checkForRedeclarationOfBufferBlockMembers(decl->parentDecl);
         }
