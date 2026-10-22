@@ -4250,8 +4250,8 @@ static bool _mayParamBeReferenceToArgumentStorage(ParamPassingMode mode)
     return true;
 }
 
-/// Return whether passing the same argument storage to parameters of modes `first` and `second`
-/// may give unexpected results, so that the potential-aliasing warning applies.
+/// Return whether passing overlapping argument storage to parameters of modes `first` and `second`
+/// may be undefined behavior, so that the potential-aliasing warning applies.
 static bool _mayAliasedArgumentsInterfere(ParamPassingMode first, ParamPassingMode second)
 {
     // A copy is taken before the call, so nothing done through the other parameter can affect it.

@@ -56,7 +56,7 @@ struct WithMethods
         // Implicit this.x passed to both inout params: expect the aliasing warning.
         twoInoutInt(x, x);
 //CHECK:            ^ potentially aliased argument to a parameter that may be written
-//CHECK:            ^ passing the same value to both may produce unexpected results
+//CHECK:            ^ passing the same value to both may produce undefined behavior
     }
 
     [mutating]
@@ -95,7 +95,7 @@ void staticMemberAlias()
 {
     twoInoutInt(WithStatic.counter, WithStatic.counter);
 //CHECK:                   ^^^^^^^ potentially aliased argument to a parameter that may be written
-//CHECK:                   ^^^^^^^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce unexpected results
+//CHECK:                   ^^^^^^^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
 }
 
 [numthreads(1,1,1)]
@@ -107,12 +107,12 @@ void computeMain()
     // Positive: same variable to two inout params.
     addConsumeTwoValues(a, b, a);
 //CHECK:                ^ potentially aliased argument to a parameter that may be written
-//CHECK:                ^ argument for 'inout' parameter 'i1' may alias argument for 'inout' parameter 'o'; passing the same value to both may produce unexpected results
+//CHECK:                ^ argument for 'inout' parameter 'i1' may alias argument for 'inout' parameter 'o'; passing the same value to both may produce undefined behavior
 
     // Positive: same variable to two out params.
     twoOut(a, a);
 //CHECK:   ^ potentially aliased argument to a parameter that may be written
-//CHECK:   ^ argument for 'out' parameter 'a' may alias argument for 'out' parameter 'b'; passing the same value to both may produce unexpected results
+//CHECK:   ^ argument for 'out' parameter 'a' may alias argument for 'out' parameter 'b'; passing the same value to both may produce undefined behavior
 
     // Negative: same variable to in and inout params — no warning expected,
     // because the `in` parameter is a copy taken before the call.
@@ -126,18 +126,18 @@ void computeMain()
     S s;
     twoInoutInt(s.x, s.x);
 //CHECK:          ^ potentially aliased argument to a parameter that may be written
-//CHECK:          ^ passing the same value to both may produce unexpected results
+//CHECK:          ^ passing the same value to both may produce undefined behavior
 
     // Positive: identical array element to two inout params.
     int arr[4];
     twoInoutInt(arr[0], arr[0]);
 //CHECK:           ^ potentially aliased argument to a parameter that may be written
-//CHECK:           ^ passing the same value to both may produce unexpected results
+//CHECK:           ^ passing the same value to both may produce undefined behavior
 
     // Positive: coerced inout argument (exercises TypeCastExpr peeling).
     twoInoutUint(a, a);
 //CHECK:         ^ potentially aliased argument to a parameter that may be written
-//CHECK:         ^ passing the same value to both may produce unexpected results
+//CHECK:         ^ passing the same value to both may produce undefined behavior
 
     // Negative: distinct variables — no warning expected.
     twoOut(a, b);
