@@ -14,7 +14,15 @@
 #include <mutex>
 #include <thread>
 
-#if SLANG_WINDOWS_FAMILY
+// The unload hooks under test exist only in shared MSVC builds (see
+// source/slang/slang-mimalloc.cpp), and the memory thresholds below assume 64-bit arenas. Every
+// target that links `core` sees `SLANG_STATIC`, so `SLANG_DYNAMIC` is what says that slang-compiler
+// itself is a DLL.
+#if defined(_MSC_VER) && SLANG_PTR_IS_64 && defined(SLANG_DYNAMIC)
+#define SLANG_UNLOAD_TEST_ENABLED 1
+#endif
+
+#if SLANG_UNLOAD_TEST_ENABLED
 // clang-format off
 // psapi.h uses windows.h types without including it, so the order matters.
 #include <windows.h>
@@ -24,19 +32,17 @@
 
 using namespace Slang;
 
-// In Windows builds with mimalloc, slang-compiler.dll and slang-glslang.dll each statically link
-// their own copy of it, which on 64-bit reserves address space in 1 GiB arenas. Unless the DLL
-// turns on mimalloc's `destroy_on_exit` option before it is unloaded, those arenas stay reserved
-// after `FreeLibrary`, together with the pages that other, still-running threads allocated through
-// the DLL, so a host that repeatedly loads, uses and unloads Slang grows by at least 1 GiB per
-// cycle (issue #13828).
+// slang-compiler.dll and slang-glslang.dll each release their mimalloc memory when they are
+// unloaded (see the `DllMain` in source/slang/slang-mimalloc.cpp). Without that, every unload left
+// at least one 1 GiB arena reservation behind on 64-bit, plus the pages of threads that were still
+// running (issue #13828).
 //
 // We check this by repeatedly loading a private copy of each DLL, compiling something on a worker
 // thread and on this thread, and unloading the copy while the worker is still alive. The copy is
 // needed because the test harness already has the original DLL loaded, so `FreeLibrary` on the
 // original would only drop a reference instead of unmapping the module.
 
-#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
+#if SLANG_UNLOAD_TEST_ENABLED
 
 static const int kCycleCount = 10;
 static const uint64_t kMiB = 1024 * 1024;
@@ -99,7 +105,7 @@ public:
             });
     }
 
-    void waitForWork()
+    void waitUntilWorkDone()
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_condition.wait(lock, [this]() { return m_workDone; });
@@ -171,16 +177,19 @@ static bool compileWithSlang(SharedLibrary::Handle library)
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = globalSession->findProfile("spirv_1_5");
 
-    // Without optimization the copy does not load slang-glslang, which is checked on its own.
-    slang::CompilerOptionEntry optimization = {};
-    optimization.name = slang::CompilerOptionName::Optimization;
-    optimization.value.intValue0 = SLANG_OPTIMIZATION_LEVEL_NONE;
+    // Without optimization or validation the copy does not load slang-glslang, which is checked on
+    // its own. Validation is turned off explicitly because CI exports SLANG_RUN_SPIRV_VALIDATION=1.
+    slang::CompilerOptionEntry options[2] = {};
+    options[0].name = slang::CompilerOptionName::Optimization;
+    options[0].value.intValue0 = SLANG_OPTIMIZATION_LEVEL_NONE;
+    options[1].name = slang::CompilerOptionName::SkipSPIRVValidation;
+    options[1].value.intValue0 = 1;
 
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targets = &targetDesc;
     sessionDesc.targetCount = 1;
-    sessionDesc.compilerOptionEntries = &optimization;
-    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = options;
+    sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(options);
 
     ComPtr<slang::ISession> session;
     if (SLANG_FAILED(globalSession->createSession(sessionDesc, session.writeRef())))
@@ -230,8 +239,8 @@ static void appendOutput(void const* data, size_t size, void* userData)
 }
 
 /// Compile a small GLSL compute shader to optimized SPIR-V through the `glslang_compile_1_3`
-/// exported by the copied slang-glslang DLL. Optimization runs SPIRV-Tools-opt, which is what
-/// links mimalloc into slang-glslang.
+/// exported by the copied slang-glslang DLL. Optimization makes the compile run SPIRV-Tools-opt as
+/// well as glslang, so it reaches the code that brings mimalloc into slang-glslang.
 static bool compileWithGlslang(SharedLibrary::Handle library)
 {
     auto compile = (glslang_CompileFunc_1_3)SharedLibrary::findSymbolAddressByName(
@@ -294,9 +303,11 @@ static void checkUnloadReleasesMemory(
         SLANG_CHECK_ABORT(
             SLANG_SUCCEEDED(SharedLibrary::loadWithPlatformPath(copyPath.getBuffer(), library)));
 
+        // `worker` lives until the end of this iteration, so its thread is still alive when the DLL
+        // is unloaded below, which is the case where mimalloc used to keep that thread's pages.
         bool workerResult = false;
         IdleWorker worker([&]() { workerResult = compileFunc(library); });
-        worker.waitForWork();
+        worker.waitUntilWorkDone();
         SLANG_CHECK(workerResult);
         SLANG_CHECK(compileFunc(library));
 
@@ -319,7 +330,7 @@ static void checkUnloadReleasesMemory(
     const uint64_t privateGrowth =
         growth(firstAfterUnload.privateBytes, lastAfterUnload.privateBytes);
 
-    const bool sawArena = !expectArena || smallestArenaGrowth >= kMinArenaGrowth;
+    const bool arenaExpectationMet = !expectArena || smallestArenaGrowth >= kMinArenaGrowth;
     const bool releasedVirtual = virtualGrowth < kMaxResidualGrowth;
     const bool releasedPrivate = privateGrowth < kMaxResidualGrowth;
 
@@ -328,12 +339,12 @@ static void checkUnloadReleasesMemory(
             << smallestArenaGrowth / kMiB << " MiB; over " << (kCycleCount - 1)
             << " further cycles virtual +" << virtualGrowth / 1024 << " KiB, private +"
             << privateGrowth / 1024 << " KiB\n";
-    const bool passed = sawArena && releasedVirtual && releasedPrivate;
+    const bool passed = arenaExpectationMet && releasedVirtual && releasedPrivate;
     getTestReporter()->message(
         passed ? TestMessageType::Info : TestMessageType::TestFailure,
         message.getBuffer());
 
-    SLANG_CHECK(sawArena);
+    SLANG_CHECK(arenaExpectationMet);
     SLANG_CHECK(releasedVirtual);
     SLANG_CHECK(releasedPrivate);
 }
@@ -342,9 +353,7 @@ static void checkUnloadReleasesMemory(
 
 SLANG_UNIT_TEST(libraryUnloadReleasesMemory)
 {
-// Every target that links `core` sees `SLANG_STATIC`, so `SLANG_DYNAMIC` is what says that
-// slang-compiler itself is a DLL that can be unloaded.
-#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64 && defined(SLANG_DYNAMIC)
+#if SLANG_UNLOAD_TEST_ENABLED
     // Without an embedded core module every cycle would compile the core module from source.
     if (slang_getEmbeddedCoreModule() == nullptr)
     {
