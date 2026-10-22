@@ -9258,9 +9258,10 @@ static Expr* parseAtomicExpr(Parser* parser)
                 }
                 else
                 {
-                    // When language version is 2026 or later, we no longer parse comma as a
-                    // C/C++-style comma operator when it is inside a paranthesis,
-                    // but rather as a tuple element separator.
+                    // When language version is 2026 or later, we no longer parse a top-level
+                    // comma inside a paranthesis as a C/C++-style comma operator, but rather as
+                    // a tuple element separator. A comma inside the middle operand of `?:` is
+                    // not top-level: the `?` and `:` delimit it, so it stays a comma operator.
                     //
                     Precedence exprLevel = Precedence::Comma;
                     if (parser->getSourceLanguage() == SourceLanguage::Slang &&
