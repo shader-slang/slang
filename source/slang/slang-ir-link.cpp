@@ -1251,10 +1251,11 @@ IRFunc* specializeIRForEntryPoint(
     }
 
     // An entry point's parameters are shader inputs and outputs, not pointers to a caller's
-    // storage, and entry-point legalization replaces them with global variables that take over
-    // their decorations. A `DebugVarStorage` decoration moved that way would name a debug
-    // variable of a function it is no longer part of, so we remove it here, where every entry
-    // point (including one found only by `findAndCheckEntryPoint`) is known to be one.
+    // storage, and entry-point legalization moves their decorations elsewhere (for example onto
+    // the struct keys of a packed stage input). A `DebugVarStorage` decoration moved that way would
+    // name a debug variable of a function it is no longer part of. We remove it here rather than
+    // when the decoration is created, because lowering does not yet know every entry point: one
+    // selected through `findAndCheckEntryPoint` without `[shader]` becomes an entry point only here.
     for (auto param : clonedFunc->getParams())
     {
         if (auto decor = param->findDecoration<IRDebugVarStorageDecoration>())

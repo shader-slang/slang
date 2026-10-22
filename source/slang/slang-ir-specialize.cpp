@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
@@ -3956,6 +3957,7 @@ IRInst* specializeGenericWithSetArgs(
                         specializationDepth);
                 }
             }
+            rebindDebugVarStorageDecorations(loweredFunc, &cloneEnv);
 
             // Add extra indices to the func-type parameters
             List<IRType*> funcTypeParams;

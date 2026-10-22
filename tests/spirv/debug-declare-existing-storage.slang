@@ -9,6 +9,8 @@
 // Each variable has its own name, so that its OpString identifies it.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -g2 -O0
+// NOCOPY repeats the CHECK compile with a prefix that has only -NOT lines after one anchor, so that
+// it scans the whole module rather than the gaps between CHECK matches.
 //TEST:SIMPLE(filecheck=NOCOPY): -target spirv-asm -entry computeMain -stage compute -g2 -O0
 //TEST:SIMPLE(filecheck=OPT): -target spirv-asm -entry computeMain -stage compute -g2 -O1
 //TEST:SIMPLE(filecheck=NODEBUG): -target spirv-asm -entry computeMain -stage compute -g0 -O0
@@ -65,6 +67,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 }
 
 // acc[0] + (st.a + 1) + f * 2 + r + (7 + acc[1]) + st.b = 1 + 6 + 12 + 2 + 9 + 2.
+// The single thread writes only outputBuffer[0]; outputBuffer[1] keeps its input.
 // BUF: 32.0
 // BUF-NEXT: 2.0
 
@@ -126,7 +129,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 
 // No variable with program storage has a `_dbgvar_` copy anywhere in the module.
 // NOCOPY: OpEntryPoint
-// NOCOPY-NOT: %_dbgvar_{{(acc|st|f|r|s|scale|result|vals|held)[^A-Za-z_0-9]}}
+// NOCOPY-NOT: %_dbgvar_{{(acc|st|f|r|s|scale|result|vals|held)(_[0-9]+)?[^A-Za-z_0-9]}}
 
 // spirv-opt deletes a store-only `_dbgvar_` copy together with its DebugDeclare, but keeps a
 // DebugDeclare on storage that the program reads.

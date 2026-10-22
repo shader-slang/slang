@@ -8,6 +8,7 @@
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-init-local-var.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-propagate-func-properties.h"
 #include "slang-ir-single-return.h"
@@ -216,31 +217,6 @@ struct ForwardDiffTranslationContext
         }
     }
 
-    // Points the `DebugVarStorage` decorations that `diffFunc` copied from the function it
-    // differentiates at the debug variables transcribed into `diffFunc`. A parameter is copied
-    // before the debug variable it holds is transcribed, so its decoration still names the
-    // original one. A decoration whose debug variable was not transcribed into `diffFunc` is
-    // removed; this is the case in a trivial derivative, which only calls the original function.
-    void rebindDebugVarStorageDecorations(IRFunc* diffFunc)
-    {
-        for (auto block : diffFunc->getBlocks())
-        {
-            for (auto inst : block->getChildren())
-            {
-                auto decor = inst->findDecoration<IRDebugVarStorageDecoration>();
-                if (!decor)
-                    continue;
-                IRInst* debugVar = decor->getDebugVar();
-                if (getParentFunc(debugVar) != diffFunc)
-                    cloneEnv.mapOldValToNew.tryGetValue(decor->getDebugVar(), debugVar);
-                if (as<IRDebugVar>(debugVar) && getParentFunc(debugVar) == diffFunc)
-                    decor->setOperand(0, debugVar);
-                else
-                    decor->removeAndDeallocate();
-            }
-        }
-    }
-
     void generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFunc* diffFunc)
     {
         IRBuilder builder(diffFunc);
@@ -279,7 +255,7 @@ struct ForwardDiffTranslationContext
         {
             builder.markInstAsPrimal(builder.emitReturn(primalCall));
         }
-        rebindDebugVarStorageDecorations(diffFunc);
+        rebindDebugVarStorageDecorations(diffFunc, &cloneEnv);
     }
 
     // Returns "d<var-name>" to use as a name hint for variables and parameters.
@@ -2374,8 +2350,8 @@ struct ForwardDiffTranslationContext
             auto ptrType = asRelevantPtrType(param->getDataType());
             auto tempVar = builder.emitVar(ptrType->getValueType());
             param->replaceUsesWith(tempVar);
-            // The parameter is written only when the function returns, so it no longer holds
-            // the parameter's value.
+            // The function now reads and writes the temporary and writes the IR parameter only
+            // on return, so the IR parameter no longer holds the source parameter's value.
             if (auto decor = param->findDecoration<IRDebugVarStorageDecoration>())
                 decor->removeAndDeallocate();
             mapParamToTempVar[param] = tempVar;
@@ -2588,7 +2564,7 @@ struct ForwardDiffTranslationContext
             }
         }
 
-        rebindDebugVarStorageDecorations(diffFunc);
+        rebindDebugVarStorageDecorations(diffFunc, &cloneEnv);
 
 #if _DEBUG
         checkAutodiffInstDecorations(diffFunc);

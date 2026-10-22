@@ -181,27 +181,27 @@ struct CleanUpVoidContext
                 // update it and the DebugVarStorage decorations of the storage that holds it.
                 if (removeDebugVar)
                 {
-                    List<IRInst*> debugUsersToRemove;
-                    bool hasOnlyDebugUsers =
+                    List<IRInst*> debugInfoUsersToRemove;
+                    bool hasOnlyDebugInfoUsers =
                         true; // Keep the DebugVar if there are other users
                     for (auto use = debugVar->firstUse; use; use = use->nextUse)
                     {
                         auto user = use->getUser();
                         if (as<IRDebugValue>(user) || as<IRDebugVarStorageDecoration>(user))
                         {
-                            debugUsersToRemove.add(user);
+                            debugInfoUsersToRemove.add(user);
                         }
                         else
                         {
-                            hasOnlyDebugUsers = false;
+                            hasOnlyDebugInfoUsers = false;
                         }
                     }
 
-                    for (auto debugUser : debugUsersToRemove)
+                    for (auto debugInfoUser : debugInfoUsersToRemove)
                     {
-                        m_instsToRemove.add(debugUser);
+                        m_instsToRemove.add(debugInfoUser);
                     }
-                    if (hasOnlyDebugUsers)
+                    if (hasOnlyDebugInfoUsers)
                     {
                         m_instsToRemove.add(debugVar);
                     }

@@ -1139,6 +1139,9 @@ struct ResourceOutputSpecializationPass
             //
             IRInst* newParam = paramsBuilder.createParam(valueType);
             newParam->insertBefore(param);
+            // `newVar`, not the by-value parameter, now holds the source parameter's value.
+            if (auto decor = param->findDecoration<IRDebugVarStorageDecoration>())
+                decor->removeAndDeallocate();
             param->transferDecorationsTo(newParam);
 
             // The start of the function body should assign

@@ -2158,9 +2158,10 @@ static LegalVal legalizeInst(
         result = legalizeDebugValue(context, args[0], args[1], (IRDebugValue*)inst);
         break;
     case kIROp_DebugVarStorageDecoration:
-        // `legalizeDebugVar` keeps either the ordinary part of a debug variable or nothing, so
-        // this decoration needs legalizing only when its debug variable was legalized away
-        // (for example, a zero-length array). The storage then describes no debug variable.
+        // `legalizeDebugVar` keeps either the ordinary part of a debug variable, which the
+        // generic path has already substituted into this operand, or nothing. So we get here
+        // only when the debug variable was legalized away (for example, a local array of an
+        // empty struct), and the storage then describes no debug variable.
         SLANG_ASSERT(args[0].flavor == LegalVal::Flavor::none);
         return LegalVal();
 

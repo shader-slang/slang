@@ -383,19 +383,25 @@ void validateCodeBody(IRValidateContext* context, IRGlobalValueWithCode* code)
     }
 }
 
-// Check that a `DebugVarStorage` decoration names a debug variable of its storage's own
-// function. The SPIR-V emitter declares the debug variable on that storage, so a decoration that
-// a pass moved to another function or a global, or whose debug variable a pass removed without
-// it, would bind a debug variable to storage it cannot reach.
+// Check the contract of a `DebugVarStorage` decoration (see `slang-ir-insts.lua`): it sits on a
+// var or pointer parameter of a function and names a debug variable of that same function.
 static void validateDebugVarStorageDecoration(IRValidateContext* context, IRInst* inst)
 {
     auto decor = as<IRDebugVarStorageDecoration>(inst);
     if (!decor)
         return;
+    auto storage = decor->getParent();
+    auto func = getParentFunc(storage);
+    validate(
+        context,
+        func && (as<IRVar>(storage) ||
+                 (as<IRParam>(storage) && as<IRPtrTypeBase>(storage->getDataType()))),
+        inst,
+        "debug variable storage must be a var or pointer parameter of a function");
     auto debugVar = as<IRDebugVar>(decor->getDebugVar());
     validate(
         context,
-        debugVar && getParentFunc(debugVar) == getParentFunc(decor->getParent()),
+        debugVar && getParentFunc(debugVar) == func,
         inst,
         "debug variable storage must name a debug variable of its own function");
 }

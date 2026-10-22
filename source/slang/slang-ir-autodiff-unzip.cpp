@@ -1,6 +1,7 @@
 #include "slang-ir-autodiff-unzip.h"
 
 #include "slang-ir-autodiff-rev.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
 #include "slang-target-program.h"
@@ -1066,6 +1067,7 @@ struct ExtractPrimalFuncContext
         IRCloneEnv primalToRematFuncMapping;
         primalToRematFuncMapping.squashChildrenMapping = true;
         cloneInst(&primalToRematFuncMapping, &rematFuncBuilder, paramBlock);
+        rebindDebugVarStorageDecorations(rematFunc, &primalToRematFuncMapping);
         rematFuncBuilder.setInsertInto(rematFunc->getFirstBlock());
         rematFunc->getFirstBlock()->getTerminator()->removeAndDeallocate();
         auto rematFuncMinimalContextParam = rematFuncBuilder.emitParam((IRType*)minimalContextType);
@@ -1323,6 +1325,7 @@ IRFunc* splitApplyAndPropFuncs(
     subEnv.squashChildrenMapping = true;
     // subEnv.parent = &cloneEnv;
     auto clonedFunc = as<IRFunc>(cloneInst(&subEnv, &builder, func));
+    rebindDebugVarStorageDecorations(clonedFunc, &subEnv);
     auto clonedPrimalsInfo = primalsInfo->applyMap(&subEnv);
 
     // Remove [KeepAlive] decorations in clonedFunc.
