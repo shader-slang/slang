@@ -334,6 +334,18 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
                 EXCLUDE_FROM_ALL
             )
         endif()
+
+        # SPIRV-Tools-opt (linked by slang-glslang) and SPIRV-Tools-diff override allocation in
+        # mimalloc.cpp through mimalloc-new-delete.h. That file needs /Zc:__cplusplus on MSVC for
+        # the same reason as source/slang/slang-mimalloc.cpp.
+        if(SLANG_MIMALLOC_AVAILABLE AND SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
+            set_source_files_properties(
+                "${spirv-tools_SOURCE_DIR}/source/mimalloc.cpp"
+                TARGET_DIRECTORY SPIRV-Tools-opt SPIRV-Tools-diff
+                PROPERTIES
+                    COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>"
+            )
+        endif()
     endif()
 
     if(NOT ${SLANG_USE_SYSTEM_GLSLANG})
