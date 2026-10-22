@@ -383,6 +383,23 @@ void validateCodeBody(IRValidateContext* context, IRGlobalValueWithCode* code)
     }
 }
 
+// Check that a `DebugVarStorage` decoration names a debug variable of its storage's own
+// function. The SPIR-V emitter declares the debug variable on that storage, so a decoration that
+// a pass moved to another function or a global, or whose debug variable a pass removed without
+// it, would bind a debug variable to storage it cannot reach.
+static void validateDebugVarStorageDecoration(IRValidateContext* context, IRInst* inst)
+{
+    auto decor = as<IRDebugVarStorageDecoration>(inst);
+    if (!decor)
+        return;
+    auto debugVar = as<IRDebugVar>(decor->getDebugVar());
+    validate(
+        context,
+        debugVar && getParentFunc(debugVar) == getParentFunc(decor->getParent()),
+        inst,
+        "debug variable storage must name a debug variable of its own function");
+}
+
 // Check declaration-scope contracts, guarding operand counts before reading fixed positions.
 static void validateDebugScopeOperands(IRValidateContext* context, IRInst* inst)
 {
@@ -480,6 +497,7 @@ void validateIRInst(IRValidateContext* context, IRInst* inst)
         context->domTree = nullptr;
 
     validateDebugScopeOperands(context, inst);
+    validateDebugVarStorageDecoration(context, inst);
 }
 
 void validateIRInst(IRInst* inst)

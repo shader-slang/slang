@@ -1,8 +1,10 @@
 // Regression test for https://github.com/shader-slang/slang/issues/13841
-// An entry point's `inout` parameter is a shader varying, not a pointer to the caller's storage,
-// so its debug variable keeps a `_dbgvar_` copy on every target, as does a by-value parameter.
-// Entry-point legalization moves parameter decorations onto the global inputs and outputs that
-// replace the parameters, and Metal/WGSL must still compile.
+// An entry point's `inout` parameter is a shader input and output, not a pointer to a caller's
+// storage, so linking removes its `DebugVarStorage` decoration. The SPIR-V run checks that its
+// debug variable keeps a `_dbgvar_` copy, as a by-value parameter does. On Metal and WGSL,
+// entry-point legalization replaces the parameter with globals that take over its decorations,
+// and the WGSL run's `-validate-ir` rejects a `DebugVarStorage` decoration that ends up outside
+// the function of its debug variable.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry fsMain -stage fragment -g2 -O0
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry fsMain -stage fragment -g2 -O0 -validate-ir

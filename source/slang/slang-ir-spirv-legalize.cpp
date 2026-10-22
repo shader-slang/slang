@@ -2499,6 +2499,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_DebugVar:
                 if (!isSimpleDataType(as<IRDebugVar>(inst)->getDataType()))
                 {
+                    // The storage of a removed debug variable no longer describes it.
+                    for (auto use = inst->firstUse; use; use = use->nextUse)
+                    {
+                        if (as<IRDebugVarStorageDecoration>(use->getUser()))
+                            m_instsToRemove.add(use->getUser());
+                    }
                     inst->removeFromParent();
                     m_instsToRemove.add(inst);
                 }

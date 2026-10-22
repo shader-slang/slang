@@ -137,7 +137,6 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
     auto funcDebugDecor = func->findDecoration<IRDebugFuncDecoration>();
     SLANG_RELEASE_ASSERT(funcDebugDecor && "function has DebugLocation but no DebugFunc");
     auto debugFunc = funcDebugDecor->getDebugFunc();
-    bool isEntryPoint = func->findDecoration<IREntryPointDecoration>() != nullptr;
     List<IRInst*> params;
     for (auto param : firstBlock->getParams())
     {
@@ -175,10 +174,10 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         // An `out`/`inout` parameter is a pointer to the caller's storage, and every write the
         // function makes to the source parameter goes through it, so a backend can declare the
         // debug variable on the parameter itself. A `borrow in` pointer is excluded because the
-        // function never writes through it. An entry point's `out`/`inout` parameters are
-        // excluded too: they are shader varyings, which entry-point legalization replaces
-        // with global inputs and outputs rather than keeping as pointer parameters.
-        if (as<IROutParamTypeBase>(param->getDataType()) && !isEntryPoint)
+        // function never writes through it. Entry-point parameters are shader inputs and
+        // outputs rather than pointers to a caller's storage, so linking removes the decoration
+        // from them (see `specializeAndCloneEntryPoint`).
+        if (as<IROutParamTypeBase>(param->getDataType()))
             builder.addDecoration(param, kIROp_DebugVarStorageDecoration, debugVar);
 
         // Map any in-param proxy vars to the debug var.
@@ -234,6 +233,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                         debugLoc->getScope());
                     copyNameHintAndDebugDecorations(debugVar, varInst);
                     mapVarToDebugVar[varInst] = debugVar;
+                    // Every read and write of the local goes through its var.
                     builder.addDecoration(varInst, kIROp_DebugVarStorageDecoration, debugVar);
                 }
             }

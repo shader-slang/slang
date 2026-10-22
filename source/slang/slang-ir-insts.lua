@@ -2408,10 +2408,14 @@ local insts = {
 			{ InParamProxyVar = { struct_name = "InParamProxyVarDecoration", min_operands = 1 } },
 			{
 				DebugVarStorage = {
-					-- Placed on a `var` or pointer `param` that holds the value of the source variable
-					-- described by the `DebugVar` operand, so that a backend can declare the debug
-					-- variable on this storage instead of creating a separate debug-only copy.
-					-- A decoration rather than a `DebugVar` operand, so the storage stays promotable to SSA.
+					-- Placed on the program storage of a source variable: a `var` or pointer `param`
+					-- through which the program reads and writes the variable described by the
+					-- `DebugVar` operand, so that the storage holds its value at every `DebugValue`.
+					-- A backend can then declare the debug variable on this storage instead of on a
+					-- separate copy. The `DebugVar` belongs to the storage's own function and has its
+					-- value type; a pass that removes the `DebugVar` removes this decoration too.
+					-- The link is a decoration on the storage, not an operand of an instruction that
+					-- uses the storage, because such a use would stop the storage being promoted to SSA.
 					struct_name = "DebugVarStorageDecoration",
 					operands = { { "debugVar" } },
 				},
