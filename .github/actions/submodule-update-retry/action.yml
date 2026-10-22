@@ -38,6 +38,13 @@ inputs:
 runs:
   using: composite
   steps:
+    # The self-hosted Windows runners have no `bash` on PATH until a later
+    # setup step adds it, but this action runs right after the checkout.
+    - name: Add bash to PATH (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+
     - name: Update submodules
       shell: bash
       env:
