@@ -254,6 +254,16 @@ if(SLANG_BUILD_MIMALLOC)
     # mimalloc otherwise compiles itself for armv8.1 on arm64, which would raise the minimum CPU
     # that Slang's arm64 binaries run on.
     set(MI_NO_OPT_ARCH ON)
+
+    # In a single-config Debug build mimalloc defines MI_DEBUG=2 itself, which overrides the
+    # MI_DEBUG=1 that we add to mimalloc-static below. Requesting level 1 makes the two agree.
+    if(
+        SLANG_ENABLE_MIMALLOC
+        AND CMAKE_BUILD_TYPE MATCHES "Debug"
+        AND NOT MI_DEBUG_FULL
+    )
+        set(MI_DEBUG ON)
+    endif()
 endif()
 
 # SPIRV-Headers
