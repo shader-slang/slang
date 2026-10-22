@@ -244,6 +244,12 @@ if(SLANG_BUILD_MIMALLOC)
 
     set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
     set(SLANG_MIMALLOC_AVAILABLE ON)
+
+    # The global operator new/delete replacement lives in slang-mimalloc.cpp and in SPIRV-Tools'
+    # source/mimalloc.cpp, so mimalloc-static itself must not override allocation. SPIRV-Tools
+    # disables MI_OVERRIDE only off Windows, and mimalloc v2.3.0+ with MI_OVERRIDE ON defines the
+    # same operators in a /MT static library, which then collide at link time.
+    set(MI_OVERRIDE OFF)
 endif()
 
 # SPIRV-Headers
@@ -349,7 +355,6 @@ endif()
 # SPIRV-Tools did not, while keeping the global allocation override in Slang-owned source code.
 if(SLANG_ENABLE_MIMALLOC AND NOT TARGET mimalloc-static)
     function(_slang_add_mimalloc_target)
-        set(MI_OVERRIDE OFF)
         set(MI_BUILD_SHARED OFF)
         set(MI_BUILD_STATIC ON)
         set(MI_BUILD_OBJECT OFF)
