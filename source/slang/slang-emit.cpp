@@ -2951,11 +2951,6 @@ Result linkAndOptimizeIR(
                 return SLANG_FAIL;
         }
     }
-    SLANG_PASS(collectMetadata, targetProgram, *metadata);
-
-    // We check D3D and Metal resource locals after all passes that can create mutable storage.
-    // Minimum-optimization mode must still reject storage that its target cannot represent.
-    SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
     // Without this check the HLSL and WGSL emitters abort on `nullptr` or print an invalid pointer
     // type, so it also runs in minimum-optimization mode. `usePhysicalPointers` is set for every
     // `T*` type, so it cannot be a false negative: a pass that runs after the last scan and makes a
@@ -2966,10 +2961,16 @@ Result linkAndOptimizeIR(
         !codeGenContext->shouldSkipSPIRVValidation())
     {
         // With `-g`, the check removes pointer values that only debug information observes; the
-        // globals they read, such as an unused `uniform float*`, are dead after that.
+        // globals they read, such as an unused `uniform float*`, are dead after that. It runs
+        // before `collectMetadata` so that reflection does not count those globals as used.
         if (SLANG_PASS(checkUnsupportedPhysicalPointers, sink))
             SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     }
+    SLANG_PASS(collectMetadata, targetProgram, *metadata);
+
+    // We check D3D and Metal resource locals after all passes that can create mutable storage.
+    // Minimum-optimization mode must still reject storage that its target cannot represent.
+    SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 

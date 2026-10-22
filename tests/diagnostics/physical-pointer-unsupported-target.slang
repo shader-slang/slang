@@ -46,6 +46,8 @@
 // DEBUG_ONLY-NOT: Ptr<
 // DEBUG_ONLY-NOT: ptr<,
 // DEBUG_ONLY: debugOnlyMain
+// DEBUG_ONLY-NOT: Ptr<
+// DEBUG_ONLY-NOT: ptr<,
 
 RWStructuredBuffer<uint2> addrs;
 RWStructuredBuffer<float> outBuf;
