@@ -274,9 +274,12 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
                 }
             }
 
-            // We accumulate only instance fields. A `static` field is lowered to a
-            // global variable rather than a struct field, so it occupies no space in
-            // an instance, matching struct lowering and reflection layout.
+            // We count exactly the fields that `visitAggTypeDecl` puts in the
+            // `IRStructType`, so a concrete `sizeof(S)` folded here agrees with a
+            // generic `sizeof(T)` folded later by IR layout. A `static` member is
+            // lowered outside the struct (as a global variable or a constant), so we
+            // skip it. We read the declared field type without substitution; a field
+            // whose type is a generic parameter is therefore left to IR layout.
             for (auto field : getFields(m_astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
                 const auto fieldSize = calcSize(field.getDecl()->getType());

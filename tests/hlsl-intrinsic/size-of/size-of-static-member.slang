@@ -1,5 +1,6 @@
-// Static struct members have their own storage, so they must not contribute
-// to the size or alignment of an instance. A concrete `sizeof(S)`/`alignof(S)`
+// Static struct members are lowered outside the struct (as a global variable
+// or a constant), so they must not contribute to the size or alignment of an
+// instance. A concrete `sizeof(S)`/`alignof(S)`
 // is folded by the front end, while `sizeof(T)` inside a generic is folded
 // later from the lowered IR struct, which never contains static members. Both
 // paths must agree. See shader-slang/slang#13858.
@@ -10,6 +11,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-slang -compute -dx12 -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -20,6 +22,8 @@ ByteAddressBuffer records;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):name roundTripRecords
 RWByteAddressBuffer roundTripRecords;
 
+// `Record` holds `uint`s so that the round trip below can compare raw input
+// words without float conversion.
 struct Record
 {
     static const uint VERSION = 2;
@@ -80,13 +84,17 @@ struct G<T>
     float data[2];
 }
 
+// With no instance fields the natural layout is the empty size (0 bytes,
+// alignment 1), which is also what IR layout gives the lowered empty struct.
 struct OnlyStatic
 {
     static const uint X = 1;
 }
 
 // A static member of the struct's own type is legal because it does not live
-// in an instance.
+// in an instance. Before the fix the front end gave up on this type and the
+// IR fallback produced 4, so only the `SizeTag` check below, which needs a
+// front-end constant, detects the change.
 struct SelfStatic
 {
     static SelfStatic shared;
@@ -105,6 +113,15 @@ struct InstanceConst
     const uint c = 1;
     float data[2];
 }
+
+// A generic value argument is compared as a folded AST value, so this only
+// type-checks when the front end folds `sizeof(SelfStatic)` to a constant.
+struct SizeTag<let N : int>
+{
+    int get() { return N; }
+}
+
+void takesSizeTag4(SizeTag<4> t) {}
 
 uint genericSize<T>()
 {
@@ -132,7 +149,13 @@ void computeMain()
     static_assert(sizeof(StaticMethod) == 8, "static method control");
     static_assert(sizeof(InstanceConst) == 12, "non-static const control");
     static_assert(sizeof(OnlyStatic) == 0, "static-only struct is not empty");
-    static_assert(sizeof(SelfStatic) == 4, "self-typed static member counted in sizeof");
+    static_assert(sizeof(Leading, Std430DataLayout) == 8, "std430 control");
+    static_assert(alignof(OnlyStatic) == 1, "static-only alignof");
+    static_assert(sizeof(Leading[3]) == 24, "array of affected struct");
+    static_assert(sizeof(SelfStatic) == 4, "self-typed static member agrees with IR layout");
+
+    SizeTag<sizeof(SelfStatic)> selfTag;
+    takesSizeTag4(selfTag);
 
     int arr[sizeof(Leading)];
     static_assert(countof(arr) == 8, "static member counted in array size");
@@ -174,6 +197,8 @@ void computeMain()
     // CHECK-NEXT: 8
     outputBuffer[16] = sizeof(G<int>);
     outputBuffer[17] = genericSize<G<int>>();
+    // Explicit layouts: only `ScalarDataLayout` is folded by the front end;
+    // `Std430DataLayout` is an IR-layout control.
     // CHECK-NEXT: 8
     // CHECK-NEXT: 8
     outputBuffer[18] = sizeof(Leading, ScalarDataLayout);
@@ -202,7 +227,8 @@ void computeMain()
     outputBuffer[30] = genericSize<SelfStatic>();
 
     // Byte-offset arithmetic with a concrete `sizeof` must address the same
-    // records as the buffer layout does, for both loads and stores.
+    // records as the buffer layout does. The stores are read back at fixed
+    // offsets so that a wrong store stride cannot cancel out.
     // CHECK-NEXT: 10
     // CHECK-NEXT: 11
     // CHECK-NEXT: 12
@@ -214,10 +240,8 @@ void computeMain()
         let record = records.Load<Record>(i * sizeof(Record));
         roundTripRecords.Store<Record>(i * sizeof(Record), record);
     }
-    for (uint i = 0; i < 3; i++)
+    for (uint i = 0; i < 6; i++)
     {
-        let echoed = roundTripRecords.Load<Record>(i * sizeof(Record));
-        outputBuffer[31 + 2 * i] = echoed.data[0];
-        outputBuffer[32 + 2 * i] = echoed.data[1];
+        outputBuffer[31 + i] = roundTripRecords.Load(i * 4);
     }
 }
