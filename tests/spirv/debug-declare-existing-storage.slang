@@ -107,7 +107,6 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // OPT-DAG: DebugDeclare [[S_PARAM_DBG]] %s {{%[0-9]+}}{{$}}
 // OPT-DAG: DebugDeclare [[F_PARAM_DBG]] %f_1 {{%[0-9]+}}{{$}}
 
-// Without debug info there are no debug variables, and so no declarations or copies.
 // NODEBUG-NOT: DebugDeclare
 // NODEBUG-NOT: _dbgvar_
 // NODEBUG: OpFunctionCall %void %bump
