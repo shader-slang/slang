@@ -665,6 +665,8 @@ declaring pointers to read-only and immutable values, and pointers to address sp
 
 - Slang currently does not support `const` pointers.
 
+- On HLSL, DXIL and WGSL targets, creating a pointer from an integer or from `nullptr` is an error (E55219).
+
 ## `DescriptorHandle` for Bindless Descriptor Access
 
 Slang supports the `DescriptorHandle<T>` type that represents a bindless handle to a resource. This feature provides a portable way of implementing
