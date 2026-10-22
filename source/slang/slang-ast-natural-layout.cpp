@@ -274,10 +274,12 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
                 }
             }
 
-            // Accumulate over all of the fields
-            for (auto field : structDeclRef.getDecl()->getFields())
+            // We accumulate only instance fields. A `static` field is lowered to a
+            // global variable rather than a struct field, so it occupies no space in
+            // an instance, matching struct lowering and reflection layout.
+            for (auto field : getFields(m_astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
-                const auto fieldSize = calcSize(field->getType());
+                const auto fieldSize = calcSize(field.getDecl()->getType());
                 if (!fieldSize)
                 {
                     return NaturalSize::makeInvalid();
