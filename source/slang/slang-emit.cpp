@@ -2276,6 +2276,7 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             byteAddressBufferOptions.useBitCastFromUInt = true;
             byteAddressBufferOptions.loadHalfFrom32BitWords = true;
+            byteAddressBufferOptions.storeAlignedHalfPairsAsWords = true;
             break;
         }
 
