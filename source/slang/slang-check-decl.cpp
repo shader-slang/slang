@@ -7134,6 +7134,11 @@ static Type* _moveNoDiffFromTypeToParamDecl(
     return type;
 }
 
+    // The parameter is made by the compiler, so source-level checks such as generic-parameter
+    // shadowing skip it; when it copies the name of a user-written parameter, that parameter is
+    // checked in its own right.
+    addModifier(paramDecl, astBuilder->create<SynthesizedModifier>());
+
 static void _configureSynthesizedParamDecl(
     ASTBuilder* astBuilder,
     ParamDecl* paramDecl,
@@ -7242,6 +7247,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             getSession()->getNameObj("$__syn_" + synGenericDecl->nameAndLoc.name->text);
     }
 
+            addModifier(synTypeParamDeclBase, m_astBuilder->create<SynthesizedModifier>());
     // Dictionary to map from the original type parameters to the synthesized ones.
     Dictionary<Decl*, Decl*> mapOrigToSynTypeParams;
 
@@ -7267,6 +7273,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             // initType anyways, so we'll just save ourselves from the trouble.
             //
 
+            addModifier(synValParamDecl, m_astBuilder->create<SynthesizedModifier>());
             mapOrigToSynTypeParams.add(typeParamDeclBase, synTypeParamDeclBase);
 
             // Construct a DeclRefExpr from the type parameter.
@@ -7290,6 +7297,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             // Constraint cloning below uses this map for both the target pack
             // and the count expression in `where countof(I) == N`. Value
             // parameters therefore map to their synthesized value declarations,
+            addModifier(synValPackParamDecl, m_astBuilder->create<SynthesizedModifier>());
             // so a cloned count expression references synthetic `N` rather than
             // the original requirement's `N`.
             mapOrigToSynTypeParams.add(valParamDecl, synValParamDecl);
