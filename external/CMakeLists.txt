@@ -250,6 +250,10 @@ if(SLANG_BUILD_MIMALLOC)
     # add_subdirectory(spirv-tools), so that it applies whether SPIRV-Tools or the fallback below
     # creates mimalloc-static.
     set(MI_OVERRIDE OFF)
+
+    # mimalloc otherwise compiles itself for armv8.1 on arm64, which would raise the minimum CPU
+    # that Slang's arm64 binaries run on.
+    set(MI_NO_OPT_ARCH ON)
 endif()
 
 # SPIRV-Headers
