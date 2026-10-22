@@ -8,6 +8,8 @@ namespace Slang
 
 struct SemanticsVisitor;
 
+bool DeclPassesLookupMask(Decl* decl, LookupMask mask);
+
 // Take an existing lookup result and refine it to only include
 // results that pass the given `LookupMask`.
 LookupResult refineLookup(LookupResult const& inResult, LookupMask mask);
