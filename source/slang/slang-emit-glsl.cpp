@@ -4,6 +4,7 @@
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-call-graph.h"
+#include "slang-ir-check-push-constant-blocks.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
@@ -90,6 +91,24 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
 void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
 {
     buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
+
+    // glslang rejects a stage that declares more than one `layout(push_constant)` block. We report
+    // the case where an entry point's own call tree uses more than one block. A block read only by
+    // an exported function that the entry point does not call is still declared, and this check
+    // does not count it.
+    checkForMultiplePushConstantBlocksPerEntryPoint(
+        module,
+        m_referencingEntryPoints,
+        isPushConstantBlockByLayout,
+        getSink());
+
+    Index pushConstantBlockCount = 0;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (as<IRGlobalParam>(globalInst) && isPushConstantBlockByLayout(globalInst))
+            pushConstantBlockCount++;
+    }
+    m_hasMultiplePushConstantBlocks = pushConstantBlockCount > 1;
 
     IRBuilder builder(module);
     for (auto globalInst : module->getGlobalInsts())
@@ -1480,6 +1499,13 @@ void GLSLSourceEmitter::emitParameterGroupImpl(
     IRGlobalParam* varDecl,
     IRUniformParameterGroupType* type)
 {
+    // glslang allows one `layout(push_constant)` block per stage and counts every block we
+    // declare, including one that nothing reads. `-preserve-params` keeps such unused blocks, so
+    // a module with one used block and one unused block would be rejected. We therefore omit a
+    // push-constant block with no uses when the module has more than one push-constant block.
+    if (m_hasMultiplePushConstantBlocks && isPushConstantBlockByLayout(varDecl) &&
+        !varDecl->hasUses())
+        return;
     _emitGLSLParameterGroup(varDecl, type);
 }
 
@@ -3997,6 +4023,15 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         {
             _requireGLSLExtension(toSlice("GL_EXT_fragment_shader_barycentric"));
             prefix = toSlice("pervertex");
+        }
+        else if (as<IRGLSLPatchDecoration>(decoration))
+        {
+            prefix = toSlice("patch");
+            // `patch` is a core GLSL keyword, no need for suffix like EXT
+            postfix = toSlice("");
+            // Unlike the payload branches below, no `layout(location = ...)` here: a patch
+            // variable is an ordinary varying, so its location comes from the normal varying
+            // layout path (`emitLayoutQualifiersImpl`), and emitting one here would duplicate it.
         }
         else
         {
