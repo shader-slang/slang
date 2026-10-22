@@ -59,7 +59,9 @@ static void legalizeCall(IRCall* call)
         if (!ptrType)
             continue;
 
-        // A `T*` argument is a pointer value passed by value, not the address of a sub-part.
+        // A `T*` argument is a pointer to a memory address, which the callee can use directly, so
+        // it needs no copy. For example, `PointerAndCount(nullptr, 3)` passes `nullptr` by value,
+        // and copying it would load from and store to address zero.
         if (isUserPointerType(ptrType))
             continue;
 

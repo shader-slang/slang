@@ -93,6 +93,7 @@ struct RequiredLoweringPassSet
     bool sumVectorMatrix;
     bool lateRequireCapability;
     bool unresolvedMatrixLayout;
+    /// Whether the module has a `T*` type: a `Ptr` in the `UserPointer` address space.
     bool usePhysicalPointers;
 };
 

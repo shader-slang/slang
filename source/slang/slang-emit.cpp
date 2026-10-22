@@ -665,6 +665,7 @@ void calcRequiredLoweringPassSet(
         }
         break;
     case kIROp_PtrType:
+        // `checkUnsupportedPhysicalPointers` walks the values of these types.
         if (isUserPointerType(inst))
             result.usePhysicalPointers = true;
         break;
@@ -2956,7 +2957,10 @@ Result linkAndOptimizeIR(
     // Minimum-optimization mode must still reject storage that its target cannot represent.
     SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
     // Without this check the HLSL and WGSL emitters abort on `nullptr` or print an invalid pointer
-    // type, so it also runs in minimum-optimization mode.
+    // type, so it also runs in minimum-optimization mode. `usePhysicalPointers` is set for every
+    // `T*` type, so it cannot be a false negative: a pass that runs after the last scan and makes a
+    // value this check reports, such as the `p != nullptr` peephole, reuses a `T*` type that the
+    // scan already saw.
     if (requiredLoweringPassSet.usePhysicalPointers &&
         (isWGPUTarget(targetRequest) || isD3DTarget(targetRequest)) &&
         !codeGenContext->shouldSkipSPIRVValidation())
