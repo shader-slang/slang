@@ -118,7 +118,6 @@ struct ResultTypeLoweringContext
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(inst);
-        IRBuilderSourceLocRAII sourceLocScope(builder, inst->sourceLoc);
 
         auto info = getLoweredResultType(builder, inst->getDataType());
 
@@ -139,7 +138,6 @@ struct ResultTypeLoweringContext
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(inst);
-        IRBuilderSourceLocRAII sourceLocScope(builder, inst->sourceLoc);
 
         auto info = getLoweredResultType(builder, inst->getDataType());
 
@@ -178,7 +176,6 @@ struct ResultTypeLoweringContext
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(inst);
-        IRBuilderSourceLocRAII sourceLocScope(builder, inst->sourceLoc);
 
         auto resultValue = inst->getResultOperand();
         auto errValue = getResultError(builder, resultValue);
@@ -191,7 +188,6 @@ struct ResultTypeLoweringContext
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(inst);
-        IRBuilderSourceLocRAII sourceLocScope(builder, inst->sourceLoc);
 
         auto base = inst->getResultOperand();
         auto loweredResultTypeInfo = getLoweredResultType(builder, base->getDataType());
