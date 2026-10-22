@@ -2,10 +2,12 @@
 
 #include "core/slang-blob.h"
 #include "core/slang-exception.h"
+#include "slang/slang-capability.h"
 #include "slang/slang-language-server.h"
 
 #include <deque>
 #include <slang.h>
+#include <stdint.h>
 #include <vector>
 
 using namespace slang;
@@ -101,13 +103,32 @@ static void setCreateSessionError(const std::string& message)
     g_error.message = "createSession: " + message;
 }
 
-// An HLSL target with no profile gets sm_6_6, whichever form of createSession made it. That is
-// the profile a session created from a number has always had. Other targets keep
-// SLANG_PROFILE_UNKNOWN, the C++ default.
-static void applyDefaultProfile(IGlobalSession* globalSession, TargetDesc& target)
+// An HLSL target with no profile gets sm_6_6. This is the one departure from the C++ defaults.
+// A session created from a number has always had it, and existing callers (slang-playground)
+// rely on it; the SessionDesc form applies it too, so the two forms give the same target. An
+// explicit `profile: 0` (SLANG_PROFILE_UNKNOWN) counts as no profile.
+static void applyLegacyHlslDefaultProfile(IGlobalSession* globalSession, TargetDesc& target)
 {
     if (target.format == SLANG_HLSL && target.profile == SLANG_PROFILE_UNKNOWN)
         target.profile = globalSession->findProfile("sm_6_6");
+}
+
+static bool isCompileTarget(int format)
+{
+    return format > SLANG_TARGET_UNKNOWN && format < SLANG_TARGET_COUNT_OF;
+}
+
+// Reads `value` as an int if it is a JavaScript number that is an integer in the int32 range.
+// Converting anything else (NaN, 1.5, 2**40) to int would be undefined behaviour.
+static bool readInt32(const emscripten::val& value, int& out)
+{
+    if (!value.isNumber() || !emscripten::val::global("Number").call<bool>("isInteger", value))
+        return false;
+    const double number = value.as<double>();
+    if (number < double(INT32_MIN) || number > double(INT32_MAX))
+        return false;
+    out = int(number);
+    return true;
 }
 
 namespace
@@ -122,12 +143,18 @@ namespace
 // - Every malformed field it reads gives the same result: createSession returns null and
 //   getLastError() is a USER error with SLANG_E_INVALID_ARG and a message that names the field
 //   by its path (for example `targets[1].format`). That covers a missing required field, a
-//   field of the wrong JavaScript type, an item that is not an object, a list that is not an
-//   array, a compiler option `name` that is not a CompilerOptionName, a `value.kind` that is
-//   not Int or String, and a target `format` that is not a SlangCompileTarget.
+//   field of the wrong JavaScript type, a number field that is not an int32 integer, an item
+//   that is not an object, and a list that is not an array.
+// - Some values are also range-checked. The rule: a value is checked when it decides how the
+//   rest of the descriptor is read, or when the compiler uses it as a table index without a
+//   check of its own. So `format` must be a SlangCompileTarget, an option `name` must be inside
+//   the CompilerOptionName range, `value.kind` must be Int or String, and the Int value of a
+//   Capability entry must be a capability atom (the compiler indexes its capability table with
+//   it). The range check on `name` does not reject the retired and sentinel values inside the
+//   range, which the C++ API also accepts.
 // - Other enum values (profile, flags, floatingPointMode, lineDirectiveMode,
-//   defaultMatrixLayoutMode) and the values inside compiler option entries are passed on
-//   without checks, as the C++ API does.
+//   defaultMatrixLayoutMode) and the other option values are passed on without checks, as the
+//   C++ API passes them.
 //
 // Every `read...` function returns false after setting g_error; the caller then returns null
 // without touching g_error again.
@@ -173,9 +200,11 @@ struct SessionDescReader
     {
         if (!hasOwnValue(object, name))
             return true;
-        if (!object[name].isNumber())
+        const emscripten::val value = object[name];
+        if (!value.isNumber())
             return fail(fieldPath(path, name), "must be a number");
-        out = object[name].as<int>();
+        if (!readInt32(value, out))
+            return fail(fieldPath(path, name), "must be an integer in the int32 range");
         return true;
     }
 
@@ -256,10 +285,12 @@ struct SessionDescReader
             if (!readInt(entry, entryPath, "name", name) ||
                 !readInt(value, valuePath, "kind", kind))
                 return false;
-            // The compiler uses some option values as array indices, so a name outside the enum
-            // must not reach it.
+            // A name outside the enum can't be an option; reject it instead of storing an entry
+            // that nothing reads.
             if (name < 0 || name >= int(CompilerOptionName::CountOf))
-                return fail(fieldPath(entryPath, "name"), "is not a CompilerOptionName");
+                return fail(
+                    fieldPath(entryPath, "name"),
+                    "is outside the CompilerOptionName range");
             if (kind != int(CompilerOptionValueKind::Int) &&
                 kind != int(CompilerOptionValueKind::String))
                 return fail(fieldPath(valuePath, "kind"), "must be 0 (Int) or 1 (String)");
@@ -272,6 +303,13 @@ struct SessionDescReader
                 !readString(value, valuePath, "stringValue0", option.value.stringValue0) ||
                 !readString(value, valuePath, "stringValue1", option.value.stringValue1))
                 return false;
+            // getTargetCaps indexes the capability table with this value, with only a debug
+            // assert on its range.
+            if (option.name == CompilerOptionName::Capability &&
+                option.value.kind == CompilerOptionValueKind::Int &&
+                (option.value.intValue0 < 0 ||
+                 option.value.intValue0 >= int(Slang::CapabilityName::Count)))
+                return fail(fieldPath(valuePath, "intValue0"), "is not a capability atom");
             out.push_back(option);
         }
         return true;
@@ -302,14 +340,14 @@ struct SessionDescReader
                 "forceGLSLScalarBufferLayout",
                 target.forceGLSLScalarBufferLayout))
             return false;
-        if (format <= SLANG_TARGET_UNKNOWN || format >= SLANG_TARGET_COUNT_OF)
+        if (!isCompileTarget(format))
             return fail(fieldPath(path, "format"), "is not a SlangCompileTarget");
         target.format = SlangCompileTarget(format);
         target.profile = SlangProfileID(profile);
         target.flags = SlangTargetFlags(flags);
         target.floatingPointMode = SlangFloatingPointMode(floatingPointMode);
         target.lineDirectiveMode = SlangLineDirectiveMode(lineDirectiveMode);
-        applyDefaultProfile(globalSession, target);
+        applyLegacyHlslDefaultProfile(globalSession, target);
         if (!readCompilerOptionEntries(object, path, targetOptions[index]))
             return false;
         target.compilerOptionEntries = targetOptions[index].data();
@@ -383,13 +421,19 @@ Session* GlobalSession::createSession(js::SessionDescOrTarget desc)
     SessionDescReader reader = {m_interface};
 
     // A number is a compile target: the session has that one target, with the C++ defaults and
-    // applyDefaultProfile. `numberTarget` is declared here, outside the `if`, because
+    // applyLegacyHlslDefaultProfile. `numberTarget` is declared here, outside the `if`, because
     // `sessionDesc.targets` points at it until createSession returns.
     TargetDesc numberTarget = {};
     if (desc.isNumber())
     {
-        numberTarget.format = (SlangCompileTarget)desc.as<int>();
-        applyDefaultProfile(m_interface, numberTarget);
+        int format = 0;
+        if (!readInt32(desc, format) || !isCompileTarget(format))
+        {
+            setCreateSessionError("the compile target number is not a SlangCompileTarget");
+            return nullptr;
+        }
+        numberTarget.format = SlangCompileTarget(format);
+        applyLegacyHlslDefaultProfile(m_interface, numberTarget);
         sessionDesc.targets = &numberTarget;
         sessionDesc.targetCount = 1;
     }

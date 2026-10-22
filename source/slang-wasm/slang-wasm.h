@@ -348,9 +348,9 @@ public:
     // js::SessionDesc object, which mirrors slang::SessionDesc. A number gives a session with
     // that one target.
     //
-    // This list is the reference for the fields that are read; SessionDescReader in
-    // slang-wasm.cpp reads them, and the TypeScript types registered in slang-wasm-bindings.cpp
-    // declare them. Other C++ fields are not read.
+    // These are the fields that are read; other C++ fields and other properties are ignored.
+    // (This list is the reference: the reader in slang-wasm.cpp and the TypeScript types in
+    // slang-wasm-bindings.cpp follow it.)
     //   SessionDesc: targets, defaultMatrixLayoutMode, searchPaths, preprocessorMacros,
     //                compilerOptionEntries.
     //   TargetDesc:  format (required), profile, flags, floatingPointMode, lineDirectiveMode,
@@ -363,13 +363,19 @@ public:
     // gets sm_6_6, in both forms. A profile is a SlangProfileID from findProfile().
     //
     // Enum fields take the integer values from include/slang.h (for example
-    // CompilerOptionName::MacroDefine is 0), as `format` always has; that is the contract of
-    // this function. Exporting the enums by name (with embind's enum_ or constant()) would be a
-    // separate addition, which these fields could then accept as well.
+    // CompilerOptionName::MacroDefine is 0), as `format` always has.
     //
-    // A malformed descriptor returns null and sets getLastError() (type "USER",
-    // SLANG_E_INVALID_ARG) with a message that names the field; SessionDescReader lists the
-    // cases.
+    // Returns null and sets getLastError() (type "USER", SLANG_E_INVALID_ARG, with a message
+    // that names the field by its path, such as `targets[1].format`) when:
+    //   - `desc` is neither a number nor an object (an array is not accepted);
+    //   - `desc` is a number that is not a SlangCompileTarget;
+    //   - a required field is missing, a field has the wrong JavaScript type, a number field is
+    //     not an integer in the int32 range, a list is not an array, or a list item is not an
+    //     object;
+    //   - a `format` is not a SlangCompileTarget, an option `name` is outside the
+    //     CompilerOptionName range, a `value.kind` is not 0 (Int) or 1 (String), or the Int value
+    //     of a Capability entry is not a capability atom.
+    // Other enum and option values are passed on without checks, as in C++.
     Session* createSession(js::SessionDescOrTarget desc);
 
     // Returns the SlangProfileID for a profile name such as "sm_6_6" or "glsl_460", or 0

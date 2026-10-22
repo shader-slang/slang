@@ -166,7 +166,8 @@ async function runSmokeTest() {
         // imported from a search path. Enum values are those in include/slang.h.
         const CompilerOptionValueKind = { Int: 0, String: 1 };
         const CompilerOptionName = {
-            MacroDefine: 0, IgnoreCapabilities: 11, RestrictiveCapabilityCheck: 12, LineDirectiveMode: 45,
+            MacroDefine: 0, IgnoreCapabilities: 11, RestrictiveCapabilityCheck: 12, Capability: 39,
+            LineDirectiveMode: 45,
         };
         module.FS.mkdirTree('/session-options/lib');
         module.FS.writeFile('/session-options/lib/helper.slang',
@@ -341,10 +342,19 @@ async function runSmokeTest() {
         if (!defaultQuadAnyError || !defaultQuadAnyError.includes("Missing capabilities are: 'sm_6_7'")) {
             throw new Error(`An HLSL target without a profile should be sm_6_6, so SM 6.7 code should fail: ${defaultQuadAnyError}`);
         }
+        // `profile: null` counts as leaving the profile out, so the target is sm_6_6 too.
+        const nullProfileQuadAnyError = hlslError({ format: hlslTarget, profile: null }, quadAnySource);
+        if (!nullProfileQuadAnyError || !nullProfileQuadAnyError.includes("Missing capabilities are: 'sm_6_7'")) {
+            throw new Error(`An HLSL target with profile: null should be sm_6_6: ${nullProfileQuadAnyError}`);
+        }
         const sm50HeapError = hlslError({ format: hlslTarget, profile: globalSession.findProfile('sm_5_0') }, heapSource);
         if (!sm50HeapError || !sm50HeapError.includes('E41013')) {
             throw new Error(`An explicit sm_5_0 profile should replace the HLSL default: ${sm50HeapError}`);
         }
+
+        // A macro without a `value` is defined (as empty), as with `-D NAME`.
+        targetCodes({ targets: [{ format: wgslTarget }], preprocessorMacros: [{ name: 'FLAG' }] }, 1,
+            '#ifndef FLAG\n#error "FLAG is not defined"\n#endif\n' + shaderSource);
 
         // forceGLSLScalarBufferLayout gives a float3 structured buffer the scalar layout.
         const float3Source = 'RWStructuredBuffer<float3> outputBuffer;\n' +
@@ -381,7 +391,18 @@ async function runSmokeTest() {
         expectInvalid(null, 'expected a compile target number or a SessionDesc object');
         expectInvalid(undefined, 'expected a compile target number or a SessionDesc object');
         expectInvalid([{ format: wgslTarget }], 'expected a compile target number or a SessionDesc object');
+        expectInvalid(100000, 'the compile target number is not a SlangCompileTarget');
+        expectInvalid(1.5, 'the compile target number is not a SlangCompileTarget');
+        expectInvalid(NaN, 'the compile target number is not a SlangCompileTarget');
         expectInvalid({ targets: wgslTarget }, "'targets' must be an array");
+        expectInvalid({ targets: [{ format: NaN }] }, "'targets[0].format' must be an integer in the int32 range");
+        expectInvalid({ targets: [{ format: 5.9 }] }, "'targets[0].format' must be an integer in the int32 range");
+        expectInvalid({ compilerOptionEntries: [{ name: 2 ** 40, value: ignoreCapabilities }] },
+            "'compilerOptionEntries[0].name' must be an integer in the int32 range");
+        for (const atom of [-1, 0x7fffffff]) {
+            expectInvalid({ compilerOptionEntries: [{ name: CompilerOptionName.Capability, value: { kind: 0, intValue0: atom } }] },
+                "'compilerOptionEntries[0].value.intValue0' is not a capability atom");
+        }
         expectInvalid({ targets: [wgslTarget] }, "'targets[0]' must be an object");
         expectInvalid({ targets: [{ profile: glsl460 }] }, "'targets[0].format' is required");
         expectInvalid({ targets: [{ format: 'WGSL' }] }, "'targets[0].format' must be a number");
@@ -401,9 +422,9 @@ async function runSmokeTest() {
         expectInvalid({ compilerOptionEntries: [{ name: CompilerOptionName.IgnoreCapabilities, value: { intValue0: 1 } }] },
             "'compilerOptionEntries[0].value.kind' is required");
         expectInvalid({ compilerOptionEntries: [{ name: 100000, value: ignoreCapabilities }] },
-            "'compilerOptionEntries[0].name' is not a CompilerOptionName");
+            "'compilerOptionEntries[0].name' is outside the CompilerOptionName range");
         expectInvalid({ compilerOptionEntries: [{ name: -1, value: ignoreCapabilities }] },
-            "'compilerOptionEntries[0].name' is not a CompilerOptionName");
+            "'compilerOptionEntries[0].name' is outside the CompilerOptionName range");
         expectInvalid({ compilerOptionEntries: [{ name: CompilerOptionName.IgnoreCapabilities, value: { kind: 2 } }] },
             "'compilerOptionEntries[0].value.kind' must be 0 (Int) or 1 (String)");
         expectInvalid({ compilerOptionEntries: [{ name: CompilerOptionName.IgnoreCapabilities, value: { kind: 0, intValue0: '1' } }] },
