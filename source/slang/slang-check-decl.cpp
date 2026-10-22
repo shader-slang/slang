@@ -14998,7 +14998,8 @@ static bool isTransparentBufferBlockVariable(Decl* decl)
 /// before the variable, and with `-Gec` the transparent shadow follows the renamed variable, so
 /// the most recent marked struct is the element type of the next transparent buffer block
 /// variable. A struct that no such variable follows (the parser drops the variable of a GLSL
-/// `gl_PerVertex` redeclaration) exposes nothing. Other transparent variables are treated as
+/// `gl_PerVertex` redeclaration) exposes nothing. Other transparent variables, such as the one
+/// that the `synthesizedDeclarationRegistryDrainsNewRoots` unit test builds, are treated as
 /// ordinary direct members.
 ///
 /// As in `checkForRedeclaration`, the later declaration gets the diagnostic, and a declaration

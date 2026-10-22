@@ -6126,8 +6126,9 @@ static void CompleteDecl(
             {
                 for (auto enumCase : enumDecl->getMembersOfType<EnumCaseDecl>())
                 {
-                    // A repeated case is already diagnosed against its earlier sibling, and an
-                    // alias for it would be reported again at the same location.
+                    // We add one alias per distinct case name. The redeclaration check of the
+                    // `EnumCaseDecl` reports a repeated case, and an alias for it would be
+                    // reported again at the same location.
                     if (enumDecl->getPrevDirectMemberDeclWithSameName(enumCase))
                         continue;
                     auto staticConstDecl = parser->astBuilder->create<LetDecl>();
