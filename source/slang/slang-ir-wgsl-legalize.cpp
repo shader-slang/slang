@@ -59,6 +59,10 @@ static void legalizeCall(IRCall* call)
         if (!ptrType)
             continue;
 
+        // A `T*` argument is a pointer value passed by value, not the address of a sub-part.
+        if (isUserPointerType(ptrType))
+            continue;
+
         auto argOp = arg->getOp();
 
         // A by-ref `Param` and a block-local `Var` are already in the `function` address
