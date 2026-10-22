@@ -461,4 +461,68 @@ void specializeAddressSpaceForMetal(IRModule* module)
     specializeAddressSpace(module, &metalAddressSpaceAssigner);
 }
 
+// Return the texture that `inst` writes, or null if it writes none. Texture atomics other than
+// loads also store to their texel, so they count as writes along with `ImageStore`.
+static IRInst* getWrittenTexture(IRInst* inst)
+{
+    if (auto imageStore = as<IRImageStore>(inst))
+        return imageStore->getImage();
+    if (as<IRAtomicOperation>(inst) && !as<IRAtomicLoad>(inst))
+    {
+        if (auto imageSubscript = as<IRImageSubscript>(getRootAddr(inst->getOperand(0))))
+            return imageSubscript->getImage();
+    }
+    return nullptr;
+}
+
+// MSL makes a thread's write to an `access::read_write` texture visible to that thread's
+// later reads of the texture only after a `fence()` on it (MSL 4.1 section 6.13.17); HLSL,
+// SPIR-V and WGSL order these accesses implicitly. The fence after each write is that
+// specified requirement. The fence before each write is not in section 6.13.17: it keeps the
+// write from moving ahead of an earlier read of the same texel, a write-after-read failure that
+// Dawn observed on Apple M1 hardware while it already fenced after every write
+// (crbug.com/417296309).
+//
+// The pass sees every texture write because Metal texture stores in the core module lower to
+// `ImageStore` or to a texture atomic, never to an `__intrinsic_asm` string, and because it runs
+// after `legalizeImageSubscript` has turned a partial texel store such as `tex[p].x = 1` into a
+// read followed by an `ImageStore`. A write-only texture is emitted as `access::write`, which has
+// no `fence()` and cannot be read back.
+void insertMetalTextureFences(IRModule* module)
+{
+    IRBuilder builder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getModifiableChildren())
+            {
+                auto texture = getWrittenTexture(inst);
+                if (!texture)
+                    continue;
+                auto textureType = as<IRTextureTypeBase>(texture->getDataType());
+                SLANG_RELEASE_ASSERT(textureType);
+                if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_WRITE)
+                    continue;
+
+                // A texture atomic is emitted together with its `ImageSubscript` address, so its
+                // leading fence goes before that address rather than between the two.
+                if (as<IRImageStore>(inst))
+                    builder.setInsertBefore(inst);
+                else
+                    builder.setInsertBefore(getRootAddr(inst->getOperand(0)));
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
+
+                builder.setInsertAfter(inst);
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
+            }
+        }
+    }
+}
+
 } // namespace Slang

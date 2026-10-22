@@ -5800,6 +5800,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         __intrinsic_asm "imageStore($0, $1, $V2)";
     }
 
+    // Metal texture writes lower to `kIROp_ImageStore` (or to a texture atomic) rather than to an
+    // `__intrinsic_asm` string, because `insertMetalTextureFences` finds the writes it fences by
+    // that instruction.
     [require(metal, texture_sm_4_1)]
     __intrinsic_op($(kIROp_ImageStore))
     static void __metalImageStoreArray(This val, vector<uint, Shape.dimensions> location, T value, uint arrayIndex);
@@ -20669,7 +20672,7 @@ $}
                 {
                 case hlsl: __intrinsic_asm "($0)[$1] = $2";
                 case glsl: __intrinsic_asm "imageStore($0, int($1), $V2)";
-                case metal: __intrinsic_asm "$0.write($2, $1)";
+                case metal: __metalImageStore(this, index, newValue);
                 case spirv: spirv_asm {
                         OpImageWrite $this $index __convertTexel(newValue);
                     };

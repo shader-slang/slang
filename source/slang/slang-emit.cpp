@@ -2464,7 +2464,8 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         SLANG_PASS(legalizeDynamicResourcesForGLSL, codeGenContext);
 
-    // Legalize `ImageSubscript` loads.
+    // Legalize `ImageSubscript` loads and stores. On Metal, the texture fences go in afterwards,
+    // since the read-modify-writes that `legalizeImageSubscript` creates need them too.
     switch (target)
     {
     case CodeGenTarget::MetalLibAssembly:
@@ -2475,6 +2476,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRVAssembly:
         {
             SLANG_PASS(legalizeImageSubscript, targetRequest, sink);
+            if (isMetalTarget(targetRequest))
+                SLANG_PASS(insertMetalTextureFences);
         }
         break;
     default:
