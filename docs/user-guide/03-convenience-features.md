@@ -861,16 +861,17 @@ the lookup becomes `getResource<T>(index)`. The output starts with
 `enable chromium_experimental_resource_table;` and declares no heap bindings.
 
 ```slang
-struct Material { Texture2D.Handle albedo; SamplerState.Handle sampler; };
+struct Material { Texture2D.Handle albedo; SamplerState.Handle smp; };
 StructuredBuffer<Material> materials;
 // ...
-float4 c = materials[i].albedo.Sample(materials[i].sampler, uv);
+Material m = materials[i];
+float4 c = m.albedo.Sample(m.smp, uv);
 ```
 
-becomes
+becomes (with Slang's generated names shortened)
 
 ```wgsl
-textureSample(getResource<texture_2d<f32>>(m.albedo.x), getResource<sampler>(m.sampler.x), uv)
+textureSample(getResource<texture_2d<f32>>(m.albedo.x), getResource<sampler>(m.smp.x), uv)
 ```
 
 The resource table holds sampled textures (including depth and multisampled textures) and samplers.
@@ -882,12 +883,12 @@ created with `layout: 'auto'` enables the table itself; an explicit pipeline lay
 with `device.createResourceTable`, puts each texture and sampler at the index its handle holds, and sets
 the table on the pass before dispatch (`GPUComputePassEncoder.setResourceTable`).
 
-Slang emits each `getResource<T>(index)` call inside the expression that uses it, never as a `let`, and
-inlines a function that receives a looked-up texture or sampler. Tint crashes on the other two forms,
-and the crash takes down Chrome's GPU process: a `let` that holds a texture from the table, sampled with
-a sampler looked up inline, and a texture from the table passed to a function parameter
-([Chromium issue 574322344](https://issues.chromium.org/issues/574322344)). Textures and samplers from
-ordinary global bindings are still passed to functions as parameters.
+Tint crashes on two shapes of code that use the table, and the crash takes down Chrome's GPU process
+([Chromium issue 574322344](https://issues.chromium.org/issues/574322344)): (1) a `let` that holds a
+texture from the table and is sampled with a sampler looked up inline, and (2) a texture from the table
+passed to a function parameter. Slang avoids both: it emits each `getResource<T>(index)` call inside the
+expression that uses it, and it inlines a function that receives a looked-up texture or sampler.
+Textures and samplers from ordinary global bindings are still passed to functions as parameters.
 
 ### Custom Descriptor Fetch
 
