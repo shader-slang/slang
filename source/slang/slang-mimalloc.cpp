@@ -11,11 +11,11 @@
 #pragma warning(pop)
 #endif
 
-// mimalloc-new-delete.h omits the aligned overloads unless this condition holds, and over-aligned
-// allocations would then silently bypass mimalloc. On MSVC the condition depends on the
-// /Zc:__cplusplus option that source/slang/CMakeLists.txt sets for this file.
-#if defined(_MSC_VER) && !(__cplusplus > 201402L && defined(__cpp_aligned_new))
-#error "mimalloc-new-delete.h did not define the aligned operator new/delete overloads"
+// We repeat the condition that mimalloc-new-delete.h places around its aligned overloads, so that a
+// build in which over-aligned allocations would silently bypass mimalloc fails instead. A change to
+// that condition in a later mimalloc has to be mirrored here.
+#if !(__cplusplus > 201402L && defined(__cpp_aligned_new))
+#error "mimalloc aligned new/delete overloads are missing; MSVC needs /Zc:__cplusplus for this file"
 #endif
 
 #endif

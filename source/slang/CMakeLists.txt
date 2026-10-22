@@ -89,8 +89,10 @@ set_source_files_properties(
 )
 
 # mimalloc-new-delete.h defines the aligned operator new/delete overloads only when __cplusplus
-# reports C++17 or later, which MSVC does only with /Zc:__cplusplus. The precompiled header is
-# built without that option, so this file does not use it.
+# reports C++17 or later, which MSVC does only with /Zc:__cplusplus. We set the option on this file
+# alone because it changes the __cplusplus checks in every header a file includes, such as
+# slang-common.h. The file also skips the precompiled header, which is built without the option,
+# because MSVC expects a file that uses a precompiled header to be compiled with consistent options.
 set_source_files_properties(
     slang-mimalloc.cpp
     PROPERTIES
