@@ -590,6 +590,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Map a Slang IR instruction to the corresponding SPIR-V debug instruction.
     Dictionary<IRInst*, SpvInst*> m_mapIRInstToSpvDebugInst;
 
+    // Map an `IRDebugVar` to the program storage (an `IRVar` or pointer `IRParam`) that holds its
+    // value, for debug variables declared on that storage instead of on a `_dbgvar_` copy.
+    Dictionary<IRInst*, IRInst*> m_mapDebugVarToStorage;
+
     // DebugFunction records for which a DebugFunctionDefinition has already been emitted. A record
     // binds to at most one definition (the NonSemantic invariant), so we dedup by record; see
     // maybeEmitDebugFunctionDefinition.
@@ -4330,6 +4334,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto spvBlock = emitOpLabel(spvFunc, irBlock);
             if (irBlock == irFunc->getFirstBlock())
             {
+                // Debug variables declared on the program's own storage are found before the
+                // `_dbgvar_` copies below are created, so that those debug variables get no copy.
+                if (m_targetProgram->getOptionSet().getDebugInfoLevel() > DebugInfoLevel::Minimal)
+                {
+                    for (auto irParam : irFunc->getParams())
+                        recordDebugVarStorage(irFunc, irParam);
+                    for (auto block : irFunc->getBlocks())
+                    {
+                        for (auto inst : block->getChildren())
+                        {
+                            if (as<IRVar>(inst))
+                                recordDebugVarStorage(irFunc, inst);
+                        }
+                    }
+                }
+
                 // OpVariable and OpDebugVariable
                 // All variables used in the function must be declared before anything else.
                 for (auto block : irFunc->getBlocks())
@@ -4461,6 +4481,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 //
                 // Skip vars because they are already emitted.
                 if (as<IRVar>(irInst))
+                    continue;
+                if (isAddressIntoDebugVarWithoutCopy(irInst))
                     continue;
                 emitLocalInst(spvBlock, irInst);
                 if (irInst->getOp() == kIROp_Loop)
@@ -4702,16 +4724,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugVarDeclaration(SpvInstParent* parent, IRDebugVar* debugVar)
     {
-        // For every DebugVar, we will declare:
-        // - An OpDebugLocalVariable `spvDebugLocalVar`
-        // - An OpVariable `actualHelperVar`
-        // - An OpDebugDeclare to associate `spvDebugLocalVar` with `actualHelperVar`
-        // The `actualHelperVar` is used to update the actual value of the variable
-        // at each kIROp_DebugValue instruction.
+        // For every DebugVar, we declare an OpDebugLocalVariable and, when the variable has
+        // storage, an OpDebugDeclare that binds it to that storage. The storage is the
+        // program's own variable or pointer parameter when one holds the value (see
+        // `recordDebugVarStorage`); otherwise it is a `_dbgvar_` helper OpVariable that each
+        // kIROp_DebugValue updates.
         //
         auto scope = ensureInst(debugVar->getScope());
         SLANG_RELEASE_ASSERT(scope);
 
+        IRInst* storage = findDebugVarStorage(debugVar);
         bool hasBackingVar = m_mapIRInstToSpvInst.containsKey(debugVar);
 
         IRBuilder builder(debugVar);
@@ -4737,7 +4759,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         registerDebugInst(debugVar, spvDebugLocalVar);
 
-        if (hasBackingVar)
+        if (storage || hasBackingVar)
         {
             emitOpDebugDeclare(
                 parent,
@@ -4745,7 +4767,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
                 spvDebugLocalVar,
-                debugVar,
+                storage ? storage : debugVar,
                 getDwarfExpr(),
                 List<SpvInst*>());
         }
@@ -4778,8 +4800,77 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    // Records `storage` as the storage of the debug variable named by its
+    // `IRDebugVarStorageDecoration`, when the debug variable can be declared on it.
+    //
+    // Consider this example:
+    //
+    //     float acc[4];
+    //     for (int i = 0; i < 4; i++) acc[i] = input[i];
+    //
+    // `acc` keeps its own `OpVariable` because it is indexed dynamically, so `DebugDeclare`
+    // names that `OpVariable` directly. `i` is promoted to SSA, which removes its `IRVar` and the
+    // decoration with it, so `i` falls back to a `_dbgvar_` copy. A link also falls back to the
+    // copy when the storage no longer matches the debug variable: type legalization can split a
+    // `var` into several narrower ones or change its pointee type, and the storage must be
+    // ordinary Function memory in the same function as the debug variable. The storage replaces
+    // the copy only for types that would get a copy, and a debug variable claimed by two storages
+    // (for example after one of them is cloned) is ambiguous and keeps its copy.
+    void recordDebugVarStorage(IRFunc* irFunc, IRInst* storage)
+    {
+        auto decor = storage->findDecoration<IRDebugVarStorageDecoration>();
+        if (!decor)
+            return;
+        auto debugVar = as<IRDebugVar>(decor->getDebugVar());
+        if (!debugVar || getParentFunc(debugVar) != irFunc)
+            return;
+        auto storagePtrType = as<IRPtrTypeBase>(storage->getDataType());
+        if (!storagePtrType || getSpvStorageClass(storagePtrType) != SpvStorageClassFunction)
+            return;
+        IRBuilder builder(debugVar);
+        auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
+        if (storagePtrType->getValueType() != varType || !isAllowedDebugVarType(varType))
+            return;
+        if (!m_mapDebugVarToStorage.addIfNotExists(debugVar, storage))
+            m_mapDebugVarToStorage[debugVar] = nullptr;
+    }
+
+    // Returns the program storage that `debugVar` is declared on, or null if it uses a copy.
+    IRInst* findDebugVarStorage(IRInst* debugVar)
+    {
+        IRInst* storage = nullptr;
+        m_mapDebugVarToStorage.tryGetValue(debugVar, storage);
+        return storage;
+    }
+
+    // Returns true if `inst` is an address into a debug variable that has no `_dbgvar_` copy,
+    // for example one declared on program storage. Such an address only names the element that
+    // a `DebugValue` updates; there is no memory for it to point into, so we do not emit it, and
+    // `emitDebugValue` reads the access chain from the IR instead. The copies are all created
+    // before the function body is emitted, so the answer does not depend on emission order.
+    bool isAddressIntoDebugVarWithoutCopy(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_GetElementPtr:
+        case kIROp_FieldAddress:
+            break;
+        default:
+            return false;
+        }
+        auto debugVar = as<IRDebugVar>(getRootAddr(inst));
+        if (!debugVar)
+            return false;
+        SpvInst* spvInst = nullptr;
+        m_mapIRInstToSpvInst.tryGetValue(debugVar, spvInst);
+        return !spvInst || spvInst->opcode != SpvOpVariable;
+    }
+
     SpvInst* emitDebugVarBackingLocalVarDeclaration(SpvInstParent* parent, IRDebugVar* debugVar)
     {
+        if (findDebugVarStorage(debugVar))
+            return nullptr;
+
         IRBuilder builder(debugVar);
         builder.setInsertBefore(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
@@ -11123,13 +11214,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         auto debugVar = debugValue->getDebugVar();
         auto debugValueVal = debugValue->getValue();
-        // We are asked to update the value for a debug variable.
-        // A debug variable is already emitted as an OpDebugLocalVariable +
-        // OpVariable + OpDebugDeclare. We need to both:
-        // 1. Emit an OpDebugValue (can be helpful if the OpVariable gets
-        //    optimized out).
-        // 2. Store the new value into the associated OpVariable (for the
-        //    DebugDeclare association).
+        // We are asked to update the value for a debug variable. We emit an OpDebugValue
+        // (helpful if the variable's storage gets optimized out) and, if the debug variable
+        // has a `_dbgvar_` helper OpVariable, store the new value into it to keep its
+        // DebugDeclare current. A debug variable declared on program storage maps to its
+        // OpDebugLocalVariable instead and needs no store: the program's own store has
+        // already written the value.
         //
         IRBuilder builder(debugValue);
         builder.setInsertBefore(debugValue);
