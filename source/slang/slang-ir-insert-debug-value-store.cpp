@@ -171,22 +171,28 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 
         mapVarToDebugVar[param] = debugVar;
 
-        // An `out`/`inout` parameter is a pointer to the caller's storage, and every write the
-        // function makes to the source parameter goes through it, so a backend can declare the
-        // debug variable on the parameter itself. A `borrow in` pointer is excluded because the
-        // function never writes through it. Entry-point parameters are shader inputs and
-        // outputs rather than pointers to a caller's storage, so linking removes the decoration
-        // from them (see `specializeAndCloneEntryPoint`).
-        if (as<IROutParamTypeBase>(param->getDataType()))
+        // A pointer parameter (`out`, `inout` or `borrow in`) points at the caller's storage,
+        // and the function reads and writes the source parameter only through it, so that
+        // storage holds the parameter's value for the whole call. A by-value `in` parameter is
+        // a value, not storage; when the function modifies it, the in-param proxy var below
+        // holds it instead. Entry-point parameters are shader inputs and outputs rather than
+        // pointers to a caller's storage, so linking removes the decoration from them (see
+        // `specializeAndCloneEntryPoint`).
+        if (isRefParam)
             builder.addDecoration(param, kIROp_DebugVarStorageDecoration, debugVar);
 
-        // Map any in-param proxy vars to the debug var.
+        // A by-value parameter that the function modifies lives in its in-param proxy var, so
+        // the proxy is the parameter's storage.
         bool hasProxyVar = false;
         for (auto use = param->firstUse; use; use = use->nextUse)
         {
             if (auto inParamProxyVarDecor = as<IRInParamProxyVarDecoration>(use->getUser()))
             {
                 mapVarToDebugVar[inParamProxyVarDecor->parent] = debugVar;
+                builder.addDecoration(
+                    inParamProxyVarDecor->parent,
+                    kIROp_DebugVarStorageDecoration,
+                    debugVar);
                 hasProxyVar = true;
             }
         }
