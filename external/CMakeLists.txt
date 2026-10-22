@@ -348,7 +348,8 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         # SPIRV-Tools' source/mimalloc.cpp includes mimalloc-new-delete.h, so on MSVC it needs
         # /Zc:__cplusplus for the same reason as source/slang/slang-mimalloc.cpp. With SPIRV-Tools
         # built static, these are the targets that compile the file. A source property on a target
-        # that does not compile it is silently ignored, so we check the list.
+        # that does not compile it is silently ignored, so we check that each listed target still
+        # compiles it; a new target that starts compiling it would not be caught.
         if(SLANG_MIMALLOC_AVAILABLE AND SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
             set(_spvtools_mimalloc_cpp
                 "${spirv-tools_SOURCE_DIR}/source/mimalloc.cpp"
@@ -406,8 +407,10 @@ if(SLANG_ENABLE_MIMALLOC AND NOT TARGET mimalloc-static)
     _slang_add_mimalloc_target()
 endif()
 
-# Mimalloc defaults to level 2 in Debug builds, which enables additional internal assertions.
-# Reduce this to level 1 to retain basic heap diagnostics while improving Debug execution time.
+# We build mimalloc-static at assertion level 1 in Debug, which keeps basic heap diagnostics without
+# the cost of mimalloc's internal invariant checks. On its own, mimalloc would use level 2 in a
+# single-config Debug build and level 0 under a multi-config generator, where it normally treats
+# every configuration as a release build.
 if(SLANG_ENABLE_MIMALLOC AND TARGET mimalloc-static AND NOT MI_DEBUG_FULL)
     target_compile_definitions(
         mimalloc-static
