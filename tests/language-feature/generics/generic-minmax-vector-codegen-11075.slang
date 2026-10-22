@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=NODYN):-target cpp -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=NODYN):-target cuda -entry computeMain -stage compute
 
 // Regression test for shader-slang/slang#11075: on cpp/cuda a generic `IFloat` `min`/`max` on a
 // vector lowers to per-element scalar calls, the same code the concrete vector overload emits.
@@ -32,3 +34,7 @@ void computeMain()
 // CHECK-DAG: F32_max(({{.*}}.x), ({{.*}}.x))
 // CHECK-DAG: F32_max(({{.*}}.y), ({{.*}}.y))
 // CHECK-DAG: F32_max(({{.*}}.z), ({{.*}}.z))
+
+// No element is read through a dynamic index, and no vector element is written in a loop.
+// NODYN-NOT: _slang_vector_get_element
+// NODYN-NOT: {{result_[0-9]+}}[
