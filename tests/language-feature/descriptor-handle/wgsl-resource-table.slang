@@ -29,6 +29,8 @@
 // HEAP-NOT: getResource
 // HEAP: _slang_resource_heap
 // HEAP: tex_0 : vec2<u32>
+// HEAP: smp_0 : vec2<u32>
+// HEAP: gTex_0 : vec2<u32>
 
 struct Material
 {
