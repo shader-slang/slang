@@ -27,18 +27,6 @@ namespace Slang
 // File-local helpers
 // =============================================================================
 
-static bool _hasStructuralRayTracingGenericSubstitution(DeclRefBase* declRef)
-{
-    // A reference to `GenericMiss<uint>` carries a mapping from its generic parameter to `uint`;
-    // an ordinary `Miss` has no such mapping. This only asks whether a mapping exists. Its
-    // arguments can still be generic parameters, so this does not test whether the type is fully
-    // specialized or whether specialization is possible.
-    bool result = false;
-    SubstitutionSet(declRef).forEachGenericSubstitution([&](GenericDecl*, Val::OperandView<Val>)
-                                                        { result = true; });
-    return result;
-}
-
 // The annotation already identifies the AST type that DeclRefType::create constructs. Reading
 // its class here avoids constructing a type merely to classify a declaration during checking.
 static ASTNodeType _getMagicTypeClass(Decl* declaration)
@@ -607,7 +595,7 @@ String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* stage
     if (!declRefType)
         return String();
 
-    if (_hasStructuralRayTracingGenericSubstitution(declRefType->getDeclRef().declRefBase))
+    if (SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef())
     {
         // `GenericMiss<uint>` and `GenericMiss<float>` share one declaration path. Ordinary type
         // mangling preserves the selected arguments and provides a distinct name for each type.
