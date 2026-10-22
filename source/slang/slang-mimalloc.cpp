@@ -12,9 +12,9 @@
 #pragma warning(pop)
 #endif
 
-// `SLANG_DYNAMIC_EXPORT` is defined only while building the shared slang-compiler. In a static
-// build this object is linked into the host's own module, where a `DllMain` would collide with or
-// replace the host's.
+// `SLANG_DYNAMIC_EXPORT` is defined only while Slang is compiled into a shared library. In a
+// static build this object is linked into the host's own module, where a `DllMain` would collide
+// with or replace the host's.
 #if defined(_MSC_VER) && defined(SLANG_DYNAMIC_EXPORT)
 #include <windows.h>
 
@@ -25,7 +25,8 @@
 // cycle (#13828).
 //
 // The hook only sets `mi_option_destroy_on_exit`; mimalloc v2.1.7's `mi_process_done` reads it
-// and then unmaps every arena (external/mimalloc/src/init.c, `mi_process_done`). That happens late
+// and then frees the OS memory of every arena it owns (external/mimalloc/src/init.c,
+// `mi_process_done`). That happens late
 // enough because of two facts we rely on:
 // - On `DLL_PROCESS_DETACH`, the MSVC CRT's `_DllMainCRTStartup` calls this `DllMain` before it
 //   runs the DLL's static destructors and `atexit` functions.
@@ -33,7 +34,10 @@
 //   initializer, which runs before any C++ static is constructed, so `mi_process_done` is the
 //   last `atexit` function to run, after every static of this DLL has freed its allocations.
 // Both are specific to the MSVC CRT and to this mimalloc version, which is why the hooks are
-// limited to `_MSC_VER` and must be re-checked when mimalloc is upgraded.
+// limited to `_MSC_VER` and must be re-checked when mimalloc is upgraded. A MinGW build is left as
+// before: there mimalloc registers `mi_process_done` from an `__attribute__((constructor))`, which
+// is not ordered before the C++ static constructors, so a static destructor could run after the
+// arenas were freed.
 //
 // Destroying the arenas also destroys every block still allocated in them, including pages of
 // other live threads and buffers a host got from this DLL and has not freed. Those are already

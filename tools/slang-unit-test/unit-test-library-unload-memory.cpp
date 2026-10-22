@@ -14,10 +14,10 @@
 #include <mutex>
 #include <thread>
 
-// The unload hooks under test exist only in shared MSVC builds (see
-// source/slang/slang-mimalloc.cpp), and the memory thresholds below assume 64-bit arenas. Every
-// target that links `core` sees `SLANG_STATIC`, so `SLANG_DYNAMIC` is what says that slang-compiler
-// itself is a DLL.
+// The unload hooks under test exist only in MSVC builds (see source/slang/slang-mimalloc.cpp), the
+// memory thresholds below assume 64-bit arenas, and the test drives slang-compiler as a DLL, so it
+// runs only for 64-bit MSVC builds of a shared slang-compiler. Every target that links `core` sees
+// `SLANG_STATIC`, so `SLANG_DYNAMIC` is what says that slang-compiler itself is a DLL.
 #if defined(_MSC_VER) && SLANG_PTR_IS_64 && defined(SLANG_DYNAMIC)
 #define SLANG_UNLOAD_TEST_ENABLED 1
 #endif
