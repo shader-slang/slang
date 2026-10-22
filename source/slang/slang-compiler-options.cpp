@@ -96,7 +96,8 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::WGSLDiagnostic:
             for (auto v : option.value)
             {
-                sb << " " << name << " " << v.stringValue << ":" << v.stringValue2;
+                // stringValue: rule; stringValue2: severity.
+                sb << " " << name << " " << v.stringValue2 << ":" << v.stringValue;
             }
             break;
         case CompilerOptionName::VulkanBindShift: // intValue0 (higher 8 bits): kind;
