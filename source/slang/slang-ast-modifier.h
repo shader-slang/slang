@@ -405,6 +405,22 @@ class BorrowModifier : public Modifier
     FIDDLE(...)
 };
 
+// The `__ref_readonly` modifier: pass by reference, and the callee may only read
+// through the reference.
+FIDDLE()
+class RefReadOnlyModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// The `__ref_writeonly` modifier: pass by reference, and the callee may only write
+// through the reference.
+FIDDLE()
+class RefWriteOnlyModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 // This is a special sentinel modifier that gets added
 // to the list when we have multiple variable declarations
 // all sharing the same modifiers:

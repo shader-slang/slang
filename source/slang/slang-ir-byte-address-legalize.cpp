@@ -719,6 +719,24 @@ struct ByteAddressBufferLegalizationContext
             //
             if (m_options.useBitCastFromUInt)
             {
+                if (m_options.loadHalfFrom32BitWords && basicType->getOp() == kIROp_HalfType)
+                {
+                    // Load a `half` on a target without 16-bit integer types: the containing
+                    // word is shifted as for any value smaller than 4 bytes
+                    // (`emitLoadContainingWordShifted`), but the last step is a bitcast of the
+                    // whole word to `vector<half, 2>` rather than a mask and a cast to a 16-bit
+                    // integer. This relies on WGSL's `bitcast<vec2<f16>>(u32)` placing bits 0..15
+                    // in element 0, and on `lowerBitCast` leaving that bitcast intact on WGPU
+                    // targets (see `isWGSLHalfVectorBitCast`); otherwise it would be split back
+                    // into 16-bit integers.
+                    SLANG_ASSERT(
+                        m_options.lowerBasicTypeOps && !m_options.translateToStructuredBufferOps);
+                    auto offset = emitOffsetAddIfNeeded(baseOffset, immediateOffset);
+                    auto shifted = emitLoadContainingWordShifted(buffer, offset);
+                    auto halfPair =
+                        m_builder.emitBitCast(m_builder.getVectorType(basicType, 2), shifted);
+                    return m_builder.emitElementExtract(halfPair, (IRIntegerValue)0);
+                }
                 if (auto unsignedType = getSameSizeUIntType(basicType))
                 {
                     auto unsignedVal =
@@ -942,25 +960,7 @@ struct ByteAddressBufferLegalizationContext
             }
             else if (sizeAlignment.size < 4)
             {
-                auto alignedOffset = m_builder.emitDiv(
-                    offset->getDataType(),
-                    offset,
-                    m_builder.getIntValue(offset->getDataType(), 4));
-                alignedOffset = m_builder.emitMul(
-                    offset->getDataType(),
-                    alignedOffset,
-                    m_builder.getIntValue(offset->getDataType(), 4));
-                IRInst* loadArgs[] = {buffer, alignedOffset};
-                auto val = m_builder.emitIntrinsicInst(
-                    m_builder.getUIntType(),
-                    kIROp_ByteAddressBufferLoad,
-                    2,
-                    loadArgs);
-                auto shiftAmount = m_builder.emitSub(offset->getDataType(), offset, alignedOffset);
-                shiftAmount = m_builder.emitMul(
-                    offset->getDataType(),
-                    shiftAmount,
-                    m_builder.getIntValue(offset->getDataType(), 8));
+                auto shift = emitLoadContainingWordShifted(buffer, offset);
                 IRInst* mask = nullptr;
                 switch (sizeAlignment.size)
                 {
@@ -974,7 +974,6 @@ struct ByteAddressBufferLegalizationContext
                     SLANG_ASSERT(!"Unexpected size");
                     break;
                 }
-                auto shift = m_builder.emitShr(m_builder.getUIntType(), val, shiftAmount);
                 auto masked = m_builder.emitBitAnd(m_builder.getUIntType(), shift, mask);
                 IRInst* casted = nullptr;
                 switch (sizeAlignment.size)
@@ -1000,6 +999,32 @@ struct ByteAddressBufferLegalizationContext
             IRInst* loadArgs[] = {buffer, offset};
             return m_builder.emitIntrinsicInst(type, kIROp_ByteAddressBufferLoad, 2, loadArgs);
         }
+    }
+
+    // Loads the 32-bit word that contains the byte at `offset` and shifts it right so that this
+    // byte is the lowest byte of the result; the bits above hold the following bytes of the same
+    // word, then zeros. Loads of values smaller than 4 bytes start here. The value at `offset` must
+    // fit inside the containing word, i.e. a 2-byte value must be at a 2-byte aligned offset.
+    // Callers that mask the result read only the low bytes; the `half` load reads element 0 of
+    // the result bit-cast to `vector<half, 2>`, which is the low 16 bits.
+    IRInst* emitLoadContainingWordShifted(IRInst* buffer, IRInst* offset)
+    {
+        auto offsetType = offset->getDataType();
+        auto alignedOffset = m_builder.emitMul(
+            offsetType,
+            m_builder.emitDiv(offsetType, offset, m_builder.getIntValue(offsetType, 4)),
+            m_builder.getIntValue(offsetType, 4));
+        IRInst* loadArgs[] = {buffer, alignedOffset};
+        auto word = m_builder.emitIntrinsicInst(
+            m_builder.getUIntType(),
+            kIROp_ByteAddressBufferLoad,
+            2,
+            loadArgs);
+        auto shiftAmount = m_builder.emitMul(
+            offsetType,
+            m_builder.emitSub(offsetType, offset, alignedOffset),
+            m_builder.getIntValue(offsetType, 8));
+        return m_builder.emitShr(m_builder.getUIntType(), word, shiftAmount);
     }
 
     IRInst* emitOffsetAddIfNeeded(IRInst* baseOffset, IRIntegerValue immediateOffset)
