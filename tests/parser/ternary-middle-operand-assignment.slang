@@ -1,5 +1,6 @@
-// The middle operand of `?:` is a full expression, as in C, C++, HLSL and GLSL, so an assignment or
-// a comma operator there needs no parentheses (shader-slang/slang#13870).
+// The middle operand of `?:` is an `expression` at the comma level, as in C, C++, HLSL and GLSL, so
+// an assignment or a comma operator there needs no parentheses (shader-slang/slang#13870). The
+// comma-operator warning is off in Slang 2026, so only the other lines need `-Wno-41024`.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -Wno-41024
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -Wno-41024

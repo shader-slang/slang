@@ -10,7 +10,9 @@ layout(std430, binding = 0) buffer Buf
     float v[];
 } buf;
 
-// The division stays behind the branch on `b > g`.
+// A wrong parse fails with E20001, so `OpEntryPoint` alone covers the parser fix. The other checks
+// guard short-circuit evaluation: the assignment in the middle operand runs only on the true path,
+// the first block after the branch. The optimizer may rewrite `/ 2.0` as `* 0.5`.
 // CHECK: OpEntryPoint GLCompute %main "main"
 // CHECK: OpFOrdGreaterThan
 // CHECK: OpBranchConditional
