@@ -821,8 +821,8 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
     {
         checkForRedeclaration(decl);
 
-        // The members of transparent parameter groups are compared in one pass over the
-        // whole scope, which we run when checking the first transparent variable.
+        // One ordered pass over the scope covers all of its transparent variables, so we run
+        // it only for the first one; running it for each would report every conflict again.
         if (decl->hasModifier<TransparentModifier>() &&
             decl->parentDecl->getTransparentDirectMemberDecls().getFirst() == decl)
         {
