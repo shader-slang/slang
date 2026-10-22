@@ -8001,22 +8001,22 @@ struct TriangleStream
 };
 
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 #define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 //@public:
 
@@ -11518,6 +11518,7 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
     case spirv: return spirv_asm {
         OpFConvert $$vector<float, N> result $value
     };
+    case wgsl: __intrinsic_asm "$TR($0)";
     case llvm: __intrinsic_asm "%result = fpext $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, f16tof32, value);
@@ -11556,6 +11557,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
     case spirv: return spirv_asm {
         OpFConvert $$vector<float16_t, N> result $value
     };
+    case wgsl: __intrinsic_asm "$TR($0)";
     case llvm: __intrinsic_asm "%result = fptrunc $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float16_t, N, f32tof16_, value);
@@ -12046,6 +12048,9 @@ vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
     case spirv: return spirv_asm {
         result:$$vector<T,N> = OpFRem $x $y
     };
+    case wgsl:
+        // WGSL `%` on floats is the truncated remainder, as for the scalar overload.
+        __intrinsic_asm "(($0) % ($1))";
     default:
         VECTOR_MAP_BINARY(T, N, fmod, x, y);
     }
@@ -12832,6 +12837,7 @@ vector<bool, N> isfinite(vector<T, N> x)
     case hlsl: __intrinsic_asm "isfinite";
     case glsl:
     case spirv:
+    case wgsl:
         return !(isinf(x) || isnan(x));
     case metal:
         __intrinsic_asm "isfinite";
@@ -12874,7 +12880,7 @@ bool isinf(T x)
     case spirv:
         return spirv_asm { result:$$bool = OpIsInf $x};
     case wgsl:
-        static_assert(T is float, "isnan is implemented only for float type");
+        static_assert(T is float, "isinf is implemented only for float type");
         if (let f = x as float)
         {
             let bits = asuint(f);
@@ -12900,6 +12906,12 @@ vector<bool, N> isinf(vector<T, N> x)
         __intrinsic_asm "isinf";
     case spirv:
         return spirv_asm { result:$$vector<bool,N> = OpIsInf $x};
+    case wgsl:
+        // The scalar bit test, on the whole vector.
+        static_assert(T is float, "isinf is implemented only for float type");
+        if (let f = x as vector<float, N>)
+            return (asuint(f) & 0x7fffffffu) == 0x7f800000u;
+        return vector<bool, N>(false);
     default:
         VECTOR_MAP_UNARY(bool, N, isinf, x);
     }
@@ -12965,6 +12977,12 @@ vector<bool, N> isnan(vector<T, N> x)
         __intrinsic_asm "isnan";
     case spirv:
         return spirv_asm { result:$$vector<bool, N> = OpIsNan $x};
+    case wgsl:
+        // The scalar bit test, on the whole vector.
+        static_assert(T is float, "isnan is implemented only for float type");
+        if (let f = x as vector<float, N>)
+            return (asuint(f) & 0x7fffffffu) > 0x7f800000u;
+        return vector<bool, N>(false);
     default:
         VECTOR_MAP_UNARY(bool, N, isnan, x);
     }
@@ -15593,6 +15611,7 @@ T rsqrt(T x)
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 InverseSqrt $x
     };
+    case wgsl: __intrinsic_asm "inverseSqrt";
     default:
         return T(1.0) / sqrt(x);
     }
@@ -15611,6 +15630,7 @@ vector<T, N> rsqrt(vector<T, N> x)
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 InverseSqrt $x
     };
+    case wgsl: __intrinsic_asm "inverseSqrt";
     case llvm:
         return vector<T, N>(1.0) / sqrt(x);
     default:
