@@ -88,6 +88,16 @@ set_source_files_properties(
         COMPILE_OPTIONS "${RICH_DIAG_SIZE_OPT_FLAGS}"
 )
 
+# mimalloc-new-delete.h defines the aligned operator new/delete overloads only when __cplusplus
+# reports C++17 or later, which MSVC does only with /Zc:__cplusplus. The precompiled header is
+# built without that option, so this file does not use it.
+set_source_files_properties(
+    slang-mimalloc.cpp
+    PROPERTIES
+        SKIP_PRECOMPILE_HEADERS ON
+        COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>"
+)
+
 #
 # generate capability files
 #
