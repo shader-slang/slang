@@ -299,7 +299,7 @@ jobs:
         if: github.ref == 'refs/heads/master'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         with:
-          app-id: ${{ secrets.SLANG_COVERAGE_APP_CLIENT_ID }}
+          client-id: ${{ secrets.SLANG_COVERAGE_APP_CLIENT_ID }}
           private-key: ${{ secrets.SLANG_COVERAGE_APP_PRIVATE_KEY }}
           owner: shader-slang
           repositories: slang-coverage-reports
