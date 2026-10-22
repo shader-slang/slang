@@ -19,3 +19,33 @@ cbuffer CB
 */
     int unique;
 }
+
+// A declaration after the `cbuffer` is compared with the shadow's members as well, and the
+// members of a second `cbuffer` are compared with those of the first.
+
+cbuffer LaterCB
+{
+    int laterUniform;
+/*CHECK:
+        ^^^^^^^^^^^^ see previous declaration of 'laterUniform'
+*/
+    int sharedMember;
+/*CHECK:
+        ^^^^^^^^^^^^ see previous declaration of 'sharedMember'
+*/
+}
+
+int laterUniform;
+/*CHECK:
+    ^^^^^^^^^^^^ conflicting declaration
+    ^^^^^^^^^^^^ declaration of 'laterUniform' conflicts with existing declaration
+*/
+
+cbuffer SecondCB
+{
+    int sharedMember;
+/*CHECK:
+        ^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^ declaration of 'sharedMember' conflicts with existing declaration
+*/
+}
