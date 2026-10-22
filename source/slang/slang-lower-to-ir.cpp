@@ -2920,18 +2920,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         List<IRInst*> operands;
-        auto resourceType = as<ResourceType>(type);
         // If there are any substitutions attached to the declRef,
         // add them as operands of the IR type.
         SubstitutionSet(type->getDeclRef())
             .forEachSubstitutionArg(
                 [&](Val* arg)
                 {
-                    // The AST preserves the original texel argument for inference and
-                    // reflection. IR texture operand zero is the load/store data type:
-                    // for example, `Texture2D<RGBA16F>` lowers with `float4` here.
-                    if (resourceType && operands.getCount() == 0)
-                        arg = resourceType->getElementType();
                     auto argVal = lowerVal(context, arg).val;
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);
@@ -2940,6 +2934,17 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             op,
             static_cast<UInt>(operands.getCount()),
             operands.getBuffer());
+    }
+
+    // The AST encodes a reference parameter's access in the class of its wrapper type, while
+    // `IRRefParamType` records it as an operand after the value type.
+    IRType* visitRefParamTypeBase(RefParamTypeBase* type)
+    {
+        auto paramInfo = getParamInfoFromTypeWithModeWrapper(type);
+        return getBuilder()->getRefParamType(
+            lowerType(context, paramInfo.type),
+            getRefParamPassingModeAccess(paramInfo.mode),
+            AddressSpace::Generic);
     }
 
     IRType* visitResourceType(ResourceType* type) { return lowerSimpleIntrinsicType(type); }
@@ -3488,7 +3493,9 @@ void addArg(
         addSimpleArg(context, ioArgs, argVal);
         break;
 
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         {
             // The next easiest case is the `ref` parameter passing
             // mode, because we always want to pass a pointer to
@@ -3676,7 +3683,9 @@ void addCallArgsForParam(
 {
     switch (paramPassingMode)
     {
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
     case ParamPassingMode::BorrowIn:
     case ParamPassingMode::Out:
     case ParamPassingMode::BorrowInOut:
@@ -3707,9 +3716,16 @@ void addCallArgsForParam(
 
 ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
+    if (paramDecl->hasModifier<RefReadOnlyModifier>())
+        return ParamPassingMode::RefReadOnly;
+    if (paramDecl->hasModifier<RefWriteOnlyModifier>())
+        return ParamPassingMode::RefWriteOnly;
     if (paramDecl->hasModifier<RefModifier>())
     {
-        return ParamPassingMode::Ref;
+        // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`.
+        if (paramDecl->hasModifier<ConstModifier>())
+            return ParamPassingMode::RefReadOnly;
+        return ParamPassingMode::RefReadWrite;
     }
     if (paramDecl->hasModifier<BorrowModifier>() || paramDecl->hasModifier<HLSLPayloadModifier>())
     {
@@ -4173,8 +4189,13 @@ void _lowerInfoFromFuncParameters(
         case ParamPassingMode::BorrowInOut:
             irParamType = builder->getBorrowInOutParamType(irParamType);
             break;
-        case ParamPassingMode::Ref:
-            irParamType = builder->getRefParamType(irParamType, AddressSpace::Generic);
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
+            irParamType = builder->getRefParamType(
+                irParamType,
+                getRefParamPassingModeAccess(paramInfo.actualParamPassingModeToUse),
+                AddressSpace::Generic);
             break;
         case ParamPassingMode::BorrowIn:
             irParamType = builder->getBorrowInParamType(irParamType, AddressSpace::Generic);

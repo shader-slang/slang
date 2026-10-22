@@ -184,6 +184,10 @@ protected:
 
     Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints;
 
+    // Whether the module declares more than one push-constant block, in which case
+    // `emitParameterGroupImpl` omits the unused ones.
+    bool m_hasMultiplePushConstantBlocks = false;
+
     RefPtr<ShaderExtensionTracker> m_glslExtensionTracker;
 };
 

@@ -422,9 +422,7 @@ interface __BuiltinScalarType : __BuiltinType
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-// Arithmetic constraints imply ITexelData, with Element supplied by each nominal
-// scalar's conformance. Thus (unorm float).Element is float even through a generic constraint.
-interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement, ITexelData
+interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement
 {
 }
 
@@ -1850,6 +1848,16 @@ struct BorrowInOutParam<T>
 __magic_type(RefParamType)
 __intrinsic_type($(kIROp_RefParamType))
 struct RefParam<T>
+{};
+
+__magic_type(RefReadOnlyParamType)
+__intrinsic_type($(kIROp_RefParamType))
+struct RefReadOnlyParam<T>
+{};
+
+__magic_type(RefWriteOnlyParamType)
+__intrinsic_type($(kIROp_RefParamType))
+struct RefWriteOnlyParam<T>
 {};
 
 __magic_type(BorrowInParamType)
@@ -4785,7 +4793,7 @@ attribute_syntax [mutating] : MutatingAttribute;
 /// it to be called with a non-mutating value of `S`.
 /// @see `[mutating]`.
 ///
-__attributeTarget(AccessorDecl)
+__attributeTarget(FunctionDeclBase)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
 /// Marks a function whose return value should not be discarded. When a call to a
