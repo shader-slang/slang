@@ -209,9 +209,9 @@ target_include_directories(
     INTERFACE "${_fast_float_include}"
 )
 
-# Slang and SPIRV-Tools share one mimalloc target. Resolve the checkout before either consumer is
-# configured so slang-compiler can use mimalloc even when SPIRV-Tools is disabled or provided by
-# the system.
+# Slang and SPIRV-Tools share one mimalloc target. Resolve the checkout and the shared mimalloc
+# build options before either consumer is configured so slang-compiler can use mimalloc even when
+# SPIRV-Tools is disabled or provided by the system.
 set(SLANG_BUILD_MIMALLOC OFF)
 if(SLANG_ENABLE_MIMALLOC)
     set(SLANG_BUILD_MIMALLOC ON)
@@ -244,6 +244,12 @@ if(SLANG_BUILD_MIMALLOC)
 
     set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
     set(SLANG_MIMALLOC_AVAILABLE ON)
+
+    # Slang and SPIRV-Tools replace the C++ allocation operators in their own sources, so
+    # mimalloc-static must not override allocation as well. We set it here, before
+    # add_subdirectory(spirv-tools), so that it applies whether SPIRV-Tools or the fallback below
+    # creates mimalloc-static.
+    set(MI_OVERRIDE OFF)
 endif()
 
 # SPIRV-Headers
@@ -346,10 +352,10 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
 endif()
 
 # SPIRV-Tools normally creates mimalloc-static. Create it here when slang-compiler needs it and
-# SPIRV-Tools did not, while keeping the global allocation override in Slang-owned source code.
+# SPIRV-Tools did not. MI_OVERRIDE is inherited from the if(SLANG_BUILD_MIMALLOC) block above, so
+# the global allocation override stays in Slang-owned source code.
 if(SLANG_ENABLE_MIMALLOC AND NOT TARGET mimalloc-static)
     function(_slang_add_mimalloc_target)
-        set(MI_OVERRIDE OFF)
         set(MI_BUILD_SHARED OFF)
         set(MI_BUILD_STATIC ON)
         set(MI_BUILD_OBJECT OFF)
