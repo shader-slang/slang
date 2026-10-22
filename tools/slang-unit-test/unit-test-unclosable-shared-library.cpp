@@ -5,13 +5,12 @@
 
 using namespace Slang;
 
-/// `slang-llvm` must never be unmapped once it has been loaded, because the allocator runtimes
-/// statically linked into it (LLVM's vendored rpmalloc, and mimalloc) register a thread-exit
-/// destructor that the OS still invokes during process shutdown, long after any module has been
-/// unloaded. Unmapping the library leaves that callback dangling and turns a normal process exit
-/// into an execute access violation -- see issue #12292, where
-/// `tests/cpu-program/gfx-smoke.slang` produced all of its expected output and then died with
-/// `0xC0000005` inside `ntdll!RtlpFlsDataCleanup`.
+/// `slang-llvm` must never be unmapped once it has been loaded, because LLVM's vendored rpmalloc,
+/// statically linked into it, registers a thread-exit destructor that the OS still invokes during
+/// process shutdown, long after any module has been unloaded. Unmapping the library leaves that
+/// callback dangling and turns a normal process exit into an execute access violation -- see issue
+/// #12292, where `tests/cpu-program/gfx-smoke.slang` produced all of its expected output and then
+/// died with `0xC0000005` inside `ntdll!RtlpFlsDataCleanup`.
 ///
 /// `SharedLibrary::loadWithPlatformPath` keeps every library that `SharedLibrary::isUnclosable`
 /// reports resident, so this checks that predicate. The teardown crash itself only reproduces in

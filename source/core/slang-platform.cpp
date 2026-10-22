@@ -70,16 +70,16 @@ namespace Slang
 /// The libraries that must never be unmapped, and why each one is here. See the declaration in
 /// `slang-platform.h` for what this predicate is for.
 ///
-/// * `slang-llvm` statically links two allocator runtimes that install a thread-exit destructor:
-///   LLVM's vendored rpmalloc, which the official LLVM Windows packages enable and ship inside
-///   `LLVMSupport.lib`, and Slang's own mimalloc. On Windows both register their destructor with
-///   `FlsAlloc`, and Windows calls FLS destructors from `ntdll!RtlpFlsDataCleanup` inside
-///   `LdrShutdownProcess` -- that is, during process exit, after every module has already been
-///   unloaded. Neither allocator frees its FLS index when the module goes away, so once
-///   `slang-llvm.dll` has been unloaded, process exit jumps into the hole it left behind and
-///   raises an execute access violation (issue #12292). There is no earlier point at which
-///   unloading would be safe, because the destructor is required to remain callable until the very
-///   end of process shutdown.
+/// * `slang-llvm` statically links LLVM's vendored rpmalloc, which the official LLVM Windows
+///   packages enable and ship inside `LLVMSupport.lib`, and which installs a thread-exit
+///   destructor. On Windows it registers that destructor with `FlsAlloc`, and Windows calls FLS
+///   destructors from `ntdll!RtlpFlsDataCleanup` inside `LdrShutdownProcess` -- that is, during
+///   process exit, after every module has already been unloaded. rpmalloc does not free its FLS
+///   index when the module goes away, so once `slang-llvm.dll` has been unloaded, process exit
+///   jumps into the hole it left behind and raises an execute access violation (issue #12292).
+///   There is no earlier point at which unloading would be safe, because the destructor is required
+///   to remain callable until the very end of process shutdown. Slang's own mimalloc, which
+///   `slang-llvm` also links when it is enabled, uses TLS callbacks in the module image, not FLS.
 /// * `libdxcompiler` invokes undefined behaviour on `dlclose`, see
 ///   https://github.com/microsoft/DirectXShaderCompiler/issues/5119.
 /// * `libdxvk_d3d11` and `libdxvk_dxgi` break GDB when closed, see
