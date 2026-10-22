@@ -403,7 +403,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             if (isMultisample)
             {
                 ++paramCount;
-                params << ", " << t << "sampleCount";
+                params << ", " << t << "numberOfSamples";
                 metal << "(*($" << String(paramCount) << ") = $0.get_num_samples()),";
                 if (cuda.getLength() > 1 && cuda[cuda.getLength() - 1] != ';')
                     cuda << "; ";
@@ -591,7 +591,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 if (isMultisample)
                 {
                     spirv << "%__sampleCount : $$uint = OpImageQuerySamples" << imageVar << ";";
-                    convertAndStore(UnownedStringSlice("__sampleCount"), "sampleCount");
+                    convertAndStore(UnownedStringSlice("__sampleCount"), "numberOfSamples");
                 }
 
                 if (includeMipInfo)
