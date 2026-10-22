@@ -911,9 +911,16 @@ struct PeepholeContext : InstPassBase
                 for (UInt i = 0; i < opCount; i++)
                 {
                     auto element = inst->getOperand(0)->getOperand(i);
+                    // An operand can be a vector or a Metal packed vector. Both have an element
+                    // count, and the packed vector is converted to a vector by the `MakeVector`.
+                    IRInst* elementCount = nullptr;
                     if (auto elementVecType = as<IRVectorType>(element->getDataType()))
+                        elementCount = elementVecType->getElementCount();
+                    else if (auto packedType = as<IRMetalPackedVectorType>(element->getDataType()))
+                        elementCount = packedType->getElementCount();
+                    if (elementCount)
                     {
-                        auto vecSize = as<IRIntLit>(elementVecType->getElementCount());
+                        auto vecSize = as<IRIntLit>(elementCount);
                         if (!vecSize)
                             break;
                         if (index->getValue() >= startIndex &&
@@ -1529,6 +1536,29 @@ struct PeepholeContext : InstPassBase
                                     maybeRemoveOldInst(inst);
                                     changed = true;
                                 }
+                            }
+                        }
+                        else if (auto toArr = as<IRArrayType>(toType))
+                        {
+                            auto fromCountLit = as<IRIntLit>(fromArr->getElementCount());
+                            auto toCountLit = as<IRIntLit>(toArr->getElementCount());
+                            if (as<IRArrayType>(fromArr) && fromCountLit && toCountLit &&
+                                fromCountLit->getValue() == toCountLit->getValue())
+                            {
+                                List<IRInst*> elems;
+                                auto count = (UInt)toCountLit->getValue();
+                                elems.setCount((Index)count);
+                                for (UInt i = 0; i < count; ++i)
+                                {
+                                    elems[(Index)i] = builder.emitCast(
+                                        toArr->getElementType(),
+                                        builder.emitElementExtract(val, i));
+                                }
+                                auto newInst =
+                                    builder.emitMakeArray(toType, count, elems.getBuffer());
+                                inst->replaceUsesWith(newInst);
+                                maybeRemoveOldInst(inst);
+                                changed = true;
                             }
                         }
                     }

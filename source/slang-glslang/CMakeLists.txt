@@ -28,9 +28,12 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         SKIP_SANITIZERS
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt SPIRV-Tools-link
         INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
             ${slang_SOURCE_DIR}/include
             ${CMAKE_CURRENT_BINARY_DIR}/../slang/slang-version-header
             ${slang_glslang_extra_includes}
+        INCLUDE_FROM_PRIVATE
+            unordered_dense::unordered_dense
         INSTALL
         EXPORT_SET_NAME SlangTargets
     )
