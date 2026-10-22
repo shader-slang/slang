@@ -335,8 +335,9 @@ parameters remain available, and the input remains in the AST function signature
 The generated name includes both the selected type and shader stage. For a struct `MultiStage`
 that implements closest-hit and any-hit, the generated names are `MultiStage_closesthit` and
 `MultiStage_anyhit`; selecting `Miss` as a miss shader produces `Miss_miss`. The public entry name
-remains the selected source name. `getStructuralRayTracingSourceTypeName` supplies the declaration
-path for a non-generic type. For a generic specialization, it uses the canonical type's existing
+remains the selected source name. `getStructuralRayTracingSourceTypeName` reuses ordinary
+type/declaration-reference formatting (`DeclRefType::toString()`) for a non-generic type's qualified
+name. For a generic specialization, it uses the canonical type's existing
 mangled name, which includes the selected type arguments.
 `getStructuralRayTracingEntryPointName` replaces dots in that type name with underscores, then
 appends `_` and the canonical spelling from `getStageName(stage)`. For example, `Stages.Miss`

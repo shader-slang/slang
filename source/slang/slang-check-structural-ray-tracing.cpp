@@ -27,32 +27,6 @@ namespace Slang
 // File-local helpers
 // =============================================================================
 
-static String _getStructuralRayTracingSourceDeclName(Decl* decl)
-{
-    if (!decl)
-        return String();
-
-    auto leafName = decl->getName();
-    if (!leafName || leafName->text.getLength() == 0)
-        return String();
-
-    auto parentDecl = decl->parentDecl;
-    if (auto genericParentDecl = as<GenericDecl>(parentDecl))
-        parentDecl = genericParentDecl->parentDecl;
-    if (auto fileParentDecl = as<FileDecl>(parentDecl))
-        parentDecl = fileParentDecl->parentDecl;
-    if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
-        parentDecl = moduleParentDecl->parentDecl;
-
-    auto parentName = _getStructuralRayTracingSourceDeclName(parentDecl);
-    if (parentName.getLength() == 0)
-        return leafName->text;
-
-    StringBuilder result;
-    result << parentName << "." << leafName->text;
-    return result.produceString();
-}
-
 static bool _hasStructuralRayTracingGenericSubstitution(DeclRefBase* declRef)
 {
     // Consider `GenericMiss<uint>` and an ordinary `Miss`. The first decl-ref contains a
@@ -633,16 +607,15 @@ String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type)
     if (!declRefType)
         return String();
 
-    auto sourceName = _getStructuralRayTracingSourceDeclName(declRefType->getDeclRef().getDecl());
-    if (sourceName.getLength() == 0 ||
-        !_hasStructuralRayTracingGenericSubstitution(declRefType->getDeclRef().declRefBase))
+    if (_hasStructuralRayTracingGenericSubstitution(declRefType->getDeclRef().declRefBase))
     {
-        return sourceName;
+        // `GenericMiss<uint>` and `GenericMiss<float>` share one declaration path. Ordinary type
+        // mangling preserves the selected arguments and provides a distinct name for each type.
+        return getMangledTypeName(astBuilder, type->getCanonicalType());
     }
 
-    // `GenericMiss<uint>` and `GenericMiss<float>` share one declaration path. Ordinary type
-    // mangling preserves the selected arguments and provides a distinct name for each type.
-    return getMangledTypeName(astBuilder, type->getCanonicalType());
+    // Ordinary declaration-reference printing gives names such as `Stages.Miss`, omitting modules.
+    return declRefType->toString();
 }
 
 String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName, Stage stage)
