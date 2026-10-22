@@ -10,6 +10,7 @@ static void findDebugInfo(IRInst* inst, List<IRInst*>& debugInstructions)
     {
     case kIROp_DebugValue:
     case kIROp_DebugVar:
+    case kIROp_DebugVarStorageDecoration:
     case kIROp_DebugLine:
     case kIROp_DebugLocationDecoration:
     case kIROp_DebugSource:

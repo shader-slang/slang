@@ -3517,6 +3517,7 @@ bool isDebugInfoInst(IRInst* inst)
     {
     case kIROp_DebugValue:
     case kIROp_DebugVar:
+    case kIROp_DebugVarStorageDecoration:
     case kIROp_DebugLine:
     case kIROp_DebugLocationDecoration:
     case kIROp_DebugFuncDecoration:

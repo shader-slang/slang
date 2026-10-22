@@ -189,6 +189,11 @@ struct CleanUpVoidContext
                         {
                             debugValueUsersToRemove.add(debugValue);
                         }
+                        else if (as<IRDebugVarStorageDecoration>(use->getUser()))
+                        {
+                            // The storage of a removed debug variable no longer describes it.
+                            debugValueUsersToRemove.add(use->getUser());
+                        }
                         else
                         {
                             hasOnlyDebugValueUsers = false;

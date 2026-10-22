@@ -2157,6 +2157,10 @@ static LegalVal legalizeInst(
     case kIROp_DebugValue:
         result = legalizeDebugValue(context, args[0], args[1], (IRDebugValue*)inst);
         break;
+    case kIROp_DebugVarStorageDecoration:
+        // The debug variable was legalized away (for example, a zero-length array), so the
+        // storage no longer describes one and the decoration is removed.
+        return LegalVal();
 
     case kIROp_MakeStruct:
         result = legalizeMakeStruct(context, type, args.getBuffer(), inst->getOperandCount());

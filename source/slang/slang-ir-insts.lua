@@ -2406,6 +2406,16 @@ local insts = {
 			-- Marks a var as a temporary local variable to replace references to a `in` parameter from the function body
 			-- This is to support legacy code that modifies an `in` parameter as if it is copied to a local variable.
 			{ InParamProxyVar = { struct_name = "InParamProxyVarDecoration", min_operands = 1 } },
+			{
+				DebugVarStorage = {
+					-- Placed on a `var` or pointer `param` that holds the value of the source variable
+					-- described by the `DebugVar` operand, so that a backend can declare the debug
+					-- variable on this storage instead of creating a separate debug-only copy.
+					-- A decoration rather than a `DebugVar` operand, so the storage stays promotable to SSA.
+					struct_name = "DebugVarStorageDecoration",
+					operands = { { "debugVar" } },
+				},
+			},
 			{ TempCallArgImmutableVar = { struct_name = "TempCallArgImmutableVarDecoration" } },
 			{ TempCallArgVar = { struct_name = "TempCallArgVarDecoration" } },
 			{
