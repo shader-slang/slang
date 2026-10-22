@@ -2091,6 +2091,18 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
             subContext = subContext.withOuterScope(outerScope);
         _dispatchDeclCheckingVisitor(decl, nextState, subContext);
 
+        // A visitor can advance `decl` past several states at once. Consider `let x = 1;`:
+        // the header visitor checks the initializer to infer the type of `x`, and then marks
+        // `x` as `DefinitionChecked`. The `ReadyForReference` step compares `decl` with the
+        // other declarations in its scope, so we still run that step when a visitor skips it.
+        // Without it, `int x; let x = 1;` would be accepted while `let x = 1; int x;` is not.
+        //
+        if (nextState < DeclCheckState::ReadyForReference &&
+            decl->checkState.getState() >= DeclCheckState::ReadyForReference)
+        {
+            _dispatchDeclCheckingVisitor(decl, DeclCheckState::ReadyForReference, subContext);
+        }
+
         // In the common case, the visitor will have done the necessary
         // checking, but will *not* have updated the `checkState` on
         // `decl`. In that case we will do the update here, to save
