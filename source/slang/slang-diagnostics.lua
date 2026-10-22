@@ -3438,11 +3438,11 @@ warning(
     span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
 )
 
-warning(
+err(
     "const-on-writable-parameter",
     31232,
     "'const' conflicts with parameter passing mode '~mode:ParamPassingMode'",
-    span { loc = "modifier:Modifier", message = "an '~mode:ParamPassingMode' parameter is meant to be written by its function, but 'const' makes '~param:Decl' read-only in the function body" }
+    span { loc = "modifier:Modifier", message = "an '~mode:ParamPassingMode' parameter is meant to be written by its function, so '~param:Decl' cannot be 'const'" }
 )
 
 -- Enums (320xx)

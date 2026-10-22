@@ -1698,45 +1698,45 @@ QualType getTypeForDeclRef(
             // We make references immutable when the shadow must alias its parameter instead.
             isLValue = !shadowVar->shouldBeImmutableAlias;
         }
+        if (varDeclRef.getDecl()->findModifier<ConstModifier>())
+            isLValue = false;
+
         bool isReadOnlyMemoryLocation = false;
         if (auto paramDecl = as<ParamDecl>(varDeclRef.getDecl()))
         {
-            // The effective passing mode decides how the body may access a parameter.
-            const bool isConst = paramDecl->hasModifier<ConstModifier>();
+            // Function parameters declared in the "modern" style
+            // are immutable unless their passing mode is meant to be written.
+            const bool isModernParam = as<ModernParamDecl>(paramDecl) != nullptr;
+
+            // The effective passing mode decides whether the body may write a parameter.
             switch (getParamPassingMode(paramDecl))
             {
             case ParamPassingMode::In:
+                // A legacy (C-style) `in` parameter is a mutable local copy.
+                if (isModernParam)
+                    isLValue = false;
+                break;
             case ParamPassingMode::BorrowIn:
-                // A legacy (C-style) `in` or borrow parameter is mutable in the body unless it is
-                // `const`.
-                //
-                // TODO: A borrow is meant to be an immutable borrow of a value, so it should not be
-                // writable here. Making it read-only is a breaking change, which we leave to a
-                // separate change that can assess its impact.
-                isLValue = !as<ModernParamDecl>(paramDecl) && !isConst;
+                // TODO(#13833): A borrow is an immutable borrow of its argument, so its body should
+                // not be able to write it, and code that does is already incorrect. Making it
+                // read-only is a bug fix that requires updating existing tests, so we leave it to a
+                // separate change. Until then, a borrow follows the rule for `in`.
+                if (isModernParam)
+                    isLValue = false;
                 break;
             case ParamPassingMode::Out:
             case ParamPassingMode::BorrowInOut:
-                isLValue = !isConst;
-                break;
             case ParamPassingMode::RefReadWrite:
             case ParamPassingMode::RefWriteOnly:
-                isLValue = true;
+                // These parameters are meant to be written.
                 break;
             case ParamPassingMode::RefReadOnly:
-                // A read-only reference parameter names its argument's memory location. A
-                // `__constref` parameter is a borrow, which may be a temporary holding the
-                // argument's value, so it does not name a memory location.
                 isLValue = false;
                 isReadOnlyMemoryLocation = true;
                 break;
             default:
                 SLANG_UNEXPECTED("unhandled parameter-passing mode");
             }
-        }
-        else if (varDeclRef.getDecl()->hasModifier<ConstModifier>())
-        {
-            isLValue = false;
         }
 
         // Global-scope shader parameters should not be writable,
@@ -14973,9 +14973,9 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         }
     }
 
-    // HLSL accepts `const out` and `const inout`, so we warn rather than reject them, even
-    // though the body cannot write the parameter. The check precedes the parameter-pack
-    // handling below, which adds `const` to every pack parameter.
+    // An `out` or `inout` parameter is meant to be written by its function, so `const` on one
+    // contradicts its passing mode. We reject it even though DXC accepts it. The check precedes
+    // the parameter-pack handling below, which adds `const` to every pack parameter.
     if (auto constModifier = paramDecl->findModifier<ConstModifier>())
     {
         const auto mode = getParamPassingMode(paramDecl);
