@@ -8298,10 +8298,10 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
 
             select->arguments.add(expr);
 
-            // As in C, C++, HLSL and GLSL, the middle operand is a full expression that can
-            // contain an assignment or a comma operator, because the `:` that must follow it
-            // already delimits it.
-            select->arguments.add(parser->ParseExpression());
+            // As in C, C++, HLSL and GLSL, the middle operand is an `expression` at the comma
+            // level, so it can contain an assignment or a comma operator: the `:` that must
+            // follow it already delimits it.
+            select->arguments.add(parser->ParseExpression(Precedence::Comma));
             parser->ReadToken(TokenType::Colon);
             select->arguments.add(parser->ParseExpression(opPrec));
 
