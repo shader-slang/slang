@@ -1850,6 +1850,16 @@ __intrinsic_type($(kIROp_RefParamType))
 struct RefParam<T>
 {};
 
+__magic_type(RefReadOnlyParamType)
+__intrinsic_type($(kIROp_RefParamType))
+struct RefReadOnlyParam<T>
+{};
+
+__magic_type(RefWriteOnlyParamType)
+__intrinsic_type($(kIROp_RefParamType))
+struct RefWriteOnlyParam<T>
+{};
+
 __magic_type(BorrowInParamType)
 __intrinsic_type($(kIROp_BorrowInParamType))
 struct BorrowInParam<T>

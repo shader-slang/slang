@@ -3012,10 +3012,18 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
+    return getRefParamType(valueType, AccessQualifier::ReadWrite, addrSpace);
+}
+
+IRRefParamType* IRBuilder::getRefParamType(
+    IRType* valueType,
+    AccessQualifier accessQualifier,
+    AddressSpace addrSpace)
+{
     return (IRRefParamType*)getPtrType(
         kIROp_RefParamType,
         valueType,
-        AccessQualifier::ReadWrite,
+        accessQualifier,
         addrSpace,
         getDefaultBufferLayoutType());
 }
