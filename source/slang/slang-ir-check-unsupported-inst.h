@@ -23,5 +23,8 @@ void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, Dia
 /// Call it last, after the passes that can still create these values (for example the peephole
 /// that turns `if (p)` into `p != nullptr`). Pointers read from memory are not checked; a pointer
 /// unpacked from an existential (AnyValue) value is made with `BitCast` and is reported.
-void checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink);
+///
+/// A value that only debug information observes is removed instead of reported. Returns true if
+/// anything was removed, in which case the caller removes the code that is now dead.
+bool checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang

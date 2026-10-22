@@ -2964,7 +2964,12 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.usePhysicalPointers &&
         (isWGPUTarget(targetRequest) || isD3DTarget(targetRequest)) &&
         !codeGenContext->shouldSkipSPIRVValidation())
-        SLANG_PASS(checkUnsupportedPhysicalPointers, sink);
+    {
+        // With `-g`, the check removes pointer values that only debug information observes; the
+        // globals they read, such as an unused `uniform float*`, are dead after that.
+        if (SLANG_PASS(checkUnsupportedPhysicalPointers, sink))
+            SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
+    }
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 

@@ -4,8 +4,8 @@
 // makes from an integer, with `bit_cast`, or from `nullptr` is an error on those targets. Each
 // such value is reported once per source location, at every optimization level: at the cast or
 // the `nullptr` use when it has a location, otherwise at a use, and without a location as a last
-// resort. A value that only debug information uses is not emitted and is not reported. SPIR-V
-// compiles the same shader.
+// resort. A value that only debug information observes is removed instead, so `-g` reports and
+// emits the same as a build without it. SPIR-V compiles the same shader.
 //
 // `computeMain` runs on every target and optimization level. Each other entry point tests one
 // shape, with a few target and optimization combinations.
@@ -30,19 +30,22 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CONST): -target dxil -entry constantMain -profile cs_6_5
 //DIAGNOSTIC_TEST:SIMPLE(diag=CONSTEXPR): -target wgsl -entry constexprMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CONSTEXPR): -target hlsl -entry constexprMain -stage compute -O0
-//DIAGNOSTIC_TEST:SIMPLE(diag=DEBUG_COPY): -target hlsl -entry debugCopyMain -stage compute -g
-//DIAGNOSTIC_TEST:SIMPLE(diag=DEBUG_COPY): -target wgsl -entry debugCopyMain -stage compute -g -O0
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEBUG_CALL): -target hlsl -entry debugCallMain -stage compute -g
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEBUG_CALL): -target wgsl -entry debugCallMain -stage compute -g -O0
 //DIAGNOSTIC_TEST:SIMPLE(diag=NOLOC): -target wgsl -entry reinterpretMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=DEBUG_TWICE): -target hlsl -entry debugTwiceMain -stage compute -g
-//DIAGNOSTIC_TEST:SIMPLE(diag=DEBUG_TWICE): -target wgsl -entry debugTwiceMain -stage compute -g -O0
 //DIAGNOSTIC_TEST:SIMPLE(diag=NOLOC): -target hlsl -entry reinterpretMain -stage compute -O0
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute -minimum-slang-optimization
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target wgsl -entry computeMain -stage compute -minimum-slang-optimization
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=DEBUG_ONLY): -target hlsl -entry debugOnlyMain -stage compute -g
+//TEST:SIMPLE(filecheck=DEBUG_ONLY): -target hlsl -entry debugOnlyMain -stage compute -g -O0
+//TEST:SIMPLE(filecheck=DEBUG_ONLY): -target wgsl -entry debugOnlyMain -stage compute -g
+//TEST:SIMPLE(filecheck=DEBUG_ONLY): -target wgsl -entry debugOnlyMain -stage compute -g -O0
 
 // SPV: OpConvertUToPtr
+// DEBUG_ONLY-NOT: Ptr<
+// DEBUG_ONLY-NOT: ptr<,
+// DEBUG_ONLY: debugOnlyMain
 
 RWStructuredBuffer<uint2> addrs;
 RWStructuredBuffer<float> outBuf;
@@ -132,19 +135,6 @@ void constexprMain(uint3 tid: SV_DispatchThreadID)
     colors[tid.x] = tex.SampleLevel(samp, float2(0.5), 0, int2(int(uint64_t(p) >> 3), 0));
 }
 
-// With `-g`, `x` is declared because it has several uses, and its initializer prints the pointer
-// type, so the cast is reported.
-[shader("compute")]
-[numthreads(1, 1, 1)]
-void debugCopyMain(uint3 tid: SV_DispatchThreadID)
-{
-    uint64_t x = uint64_t((float*)uint64_t(addrs[tid.x].x));
-//DEBUG_COPY:             ^ pointers to memory addresses are not supported on this target
-//DEBUG_COPY:             ^ the current code generation target has no pointers to memory addresses
-    x = x * x;
-    outBuf[tid.x] = 1.0;
-}
-
 [noinline]
 bool storeAndTest(float* p)
 {
@@ -177,15 +167,19 @@ void reinterpretMain(uint3 tid: SV_DispatchThreadID)
 //NOLOC: the current code generation target has no pointers to memory addresses
 
 uniform float* gUniformPointer;
+static const bool kIsNull = (float*)0 == nullptr;
 
-// With `-g`, two debug uses keep `isNull` declared, so its `nullptr` is emitted and reported.
+// Only debug information reads these values. A build without `-g` removes them as dead code, so
+// with `-g` they are removed too, rather than reported or emitted.
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void debugTwiceMain(uint3 tid: SV_DispatchThreadID)
+void debugOnlyMain(uint3 tid: SV_DispatchThreadID)
 {
+    uint64_t x = uint64_t((float*)uint64_t(addrs[tid.x].x));
+    x = x * x;
     bool isNull = gUniformPointer == nullptr;
-//DEBUG_TWICE:                    ^^ pointers to memory addresses are not supported on this target
-//DEBUG_TWICE:                    ^^ the current code generation target has no pointers to memory addresses
     bool copy = isNull;
+    let isNullToo = gUniformPointer == nullptr;
+    let constant = kIsNull;
     outBuf[tid.x] = 1.0;
 }

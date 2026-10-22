@@ -219,31 +219,41 @@ void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, Dia
     }
 }
 
-/// Return true if `inst` has no side effects, has at least one use, and every use is a debug
-/// instruction.
+/// Return true if nothing but debug information observes `inst`: `inst` has no side effects,
+/// and every user is a debug instruction or, recursively, such a value.
 //
-// The source emitters drop debug instructions and, on targets without pointers, fold every
-// pointer value into its uses, so such a value does not appear in the output. For example, with
-// `-g` the unused local in `float* q = (float*)addr;` is kept alive only by `DebugValue`. A value
-// with any other user is reported, because that user may be emitted and print the pointer type.
-static bool isUsedOnlyByDebugInfo(IRInst* inst)
+// With `-g`, `DebugValue` keeps alive values that the program never reads, such as `x` in
+// `uint64_t x = uint64_t((float*)a); x = x * x;`, which a build without `-g` removes as dead code.
+// `cache` keeps the walk linear. A value that is still being visited counts as observed, so a use
+// cycle is reported rather than removed.
+static bool isObservedOnlyByDebugInfo(IRInst* inst, Dictionary<IRInst*, bool>& cache)
 {
-    if (!inst->hasUses() || inst->mightHaveSideEffects())
-        return false;
-    // A value that is not a pointer is folded only into a single use in the same block; otherwise
-    // the emitter declares it, as `bool c = b;` does for `bool b = p != nullptr;`.
-    if (!as<IRPtrTypeBase>(inst->getDataType()) &&
-        (inst->hasMoreThanOneUse() || inst->firstUse->getUser()->getParent() != inst->getParent()))
-        return false;
-    for (auto use = inst->firstUse; use; use = use->nextUse)
+    if (auto cached = cache.tryGetValue(inst))
+        return *cached;
+    cache[inst] = false;
+    bool result = !inst->mightHaveSideEffects();
+    for (auto use = inst->firstUse; result && use; use = use->nextUse)
     {
-        if (!isDebugInfoInst(use->getUser()))
-            return false;
+        auto user = use->getUser();
+        if (!isDebugInfoInst(user) && !isObservedOnlyByDebugInfo(user, cache))
+            result = false;
     }
-    return true;
+    cache[inst] = result;
+    return result;
 }
 
-void checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink)
+/// Append `inst` and its transitive users to `outInsts`, each user before the value it uses, so
+/// that removing them in that order never leaves a use of a removed instruction.
+static void collectUsersFirst(IRInst* inst, HashSet<IRInst*>& visited, List<IRInst*>& outInsts)
+{
+    if (!visited.add(inst))
+        return;
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+        collectUsersFirst(use->getUser(), visited, outInsts);
+    outInsts.add(inst);
+}
+
+bool checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink)
 {
     // A physical pointer is a `T*`: a `Ptr` in the `UserPointer` address space. After
     // specialization, a `T*` value in code comes from an integer (`CastIntToPtr`, or `BitCast` from
@@ -253,14 +263,24 @@ void checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink)
     // `(float*)addr` is reported at the cast. `p != nullptr` and `static float* g = nullptr;` use a
     // `PtrLit` that has no location, so we report each of its users.
     //
+    // A value that only debug information observes is not an error. We remove it, its users and
+    // their debug uses, so `-g` reports and emits the same as a build without debug information.
     // Compiler-made copies of a value can have no location. We report one of those only if
     // nothing else is reported, so that the compilation still fails.
     HashSet<SourceLoc::RawValue> diagnosedLocations;
     bool hasValueWithoutLocation = false;
+    Dictionary<IRInst*, bool> observedOnlyByDebugInfo;
+    HashSet<IRInst*> instsToRemoveSet;
+    List<IRInst*> instsToRemove;
     auto diagnose = [&](IRInst* inst)
     {
-        if (isDebugInfoInst(inst) || isUsedOnlyByDebugInfo(inst))
+        if (isDebugInfoInst(inst))
             return;
+        if (isObservedOnlyByDebugInfo(inst, observedOnlyByDebugInfo))
+        {
+            collectUsersFirst(inst, instsToRemoveSet, instsToRemove);
+            return;
+        }
         auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
         if (!loc.isValid())
             hasValueWithoutLocation = true;
@@ -296,8 +316,11 @@ void checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink)
             }
         }
     }
+    for (auto inst : instsToRemove)
+        inst->removeAndDeallocate();
     if (hasValueWithoutLocation && diagnosedLocations.getCount() == 0)
         sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = SourceLoc()});
+    return instsToRemove.getCount() != 0;
 }
 
 // True if `target` is a C++/CUDA *kernel* output target. The `String` type is
