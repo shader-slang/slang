@@ -1,6 +1,7 @@
 import * as wasmModule from '../slang-wasm.js';
 import { readFileSync } from 'fs';
 import { resolve, basename } from 'path';
+import { runInNewContext } from 'vm';
 
 async function runSmokeTest() {
     try {
@@ -208,7 +209,29 @@ async function runSmokeTest() {
         if (!badBlobError || badBlobError.type !== 'USER') {
             throw new Error('IR blob: garbage bytes should set a USER error');
         }
-        for (const notBytes of [null, undefined, [1, 2, 3]]) {
+        // A module name that is already loaded returns that module; the bytes are not read.
+        const reloadedLib = irSession.loadModuleFromIRBlob('irlib', '/other.slang-module',
+            new Uint8Array([1, 2, 3, 4]));
+        if (!reloadedLib) {
+            throw new Error('IR blob: a loaded name should return the loaded module');
+        }
+        reloadedLib.delete();
+        // A Uint8Array from another realm (as from an iframe) fails `instanceof Uint8Array` here,
+        // but it is still accepted.
+        const foreignBytes = runInNewContext('new Uint8Array(length)', { length: irBytes.length });
+        foreignBytes.set(irBytes);
+        if (foreignBytes instanceof Uint8Array) {
+            throw new Error('IR blob: the test needs a Uint8Array from another realm');
+        }
+        const foreignSession = globalSession.createSession(wgslTargetValue);
+        const foreignLib = foreignSession.loadModuleFromIRBlob('irlib', '/irlib.slang-module', foreignBytes);
+        if (!foreignLib) {
+            const error = module.getLastError();
+            throw new Error(`IR blob: a Uint8Array from another realm should load: ${error ? error.message : ''}`);
+        }
+        foreignLib.delete();
+        foreignSession.delete();
+        for (const notBytes of [null, undefined, [1, 2, 3], new Uint16Array([1, 2, 3])]) {
             if (irSession.loadModuleFromIRBlob('bad', '/bad.slang-module', notBytes)) {
                 throw new Error(`IR blob: ${notBytes} should not load`);
             }

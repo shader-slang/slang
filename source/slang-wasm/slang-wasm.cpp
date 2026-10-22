@@ -144,13 +144,23 @@ emscripten::val Session::loadModuleFromSource(
     return emscripten::val(Module(module, this));
 }
 
+// True for a Uint8Array from any realm. `instanceof Uint8Array` is false for one created in
+// another realm (an iframe, say), so this checks the object's type tag instead.
+static bool isUint8Array(const emscripten::val& value)
+{
+    if (value.isNull() || value.isUndefined() ||
+        !emscripten::val::global("ArrayBuffer").call<bool>("isView", value))
+        return false;
+    const emscripten::val toString = emscripten::val::global("Object")["prototype"]["toString"];
+    return toString.call<std::string>("call", value) == "[object Uint8Array]";
+}
+
 emscripten::val Session::loadModuleFromIRBlob(
     const std::string& name,
     const std::string& path,
     emscripten::val source)
 {
-    if (source.isNull() || source.isUndefined() || !source.instanceof
-        (emscripten::val::global("Uint8Array")))
+    if (!isUint8Array(source))
     {
         g_error.type = std::string("USER");
         g_error.result = SLANG_E_INVALID_ARG;

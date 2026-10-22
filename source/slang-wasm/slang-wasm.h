@@ -312,7 +312,9 @@ public:
 
     // Loads a precompiled module: the bytes of a serialized module (a `.slang-module` file, or
     // Module.serialize()) as a Uint8Array. A module can only be loaded by the same Slang version
-    // that produced it. Returns Module or null.
+    // that produced it. As in C++, if the session already has a module called `name`, that
+    // module is returned and `source` is not read, even if the bytes differ. Returns Module or
+    // null.
     emscripten::val loadModuleFromIRBlob(
         const std::string& name,
         const std::string& path,
