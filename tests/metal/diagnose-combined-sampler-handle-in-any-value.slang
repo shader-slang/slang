@@ -2,8 +2,8 @@
 // on Metal. Metal lowers it to a `{ texture, sampler }` struct of two 64-bit resource IDs,
 // but AnyValue marshalling would treat it as a single 8-byte handle and cast the struct to
 // and from `ulong`, which is not valid MSL. Combined handles are not supported on Metal
-// (#11540), so we report E41014 instead. Each type is diagnosed once, at its declaration
-// when it has one.
+// (#11540), so we report E41014 instead. Each location is diagnosed once: a user struct at
+// its declaration, anything else where it is packed or unpacked.
 //
 // The TexLight lanes cover a closed set of conformers (`makeLight`), the `DescriptorHandle`
 // spelling, and an open-world `createDynamicObject` with one or two conformers. The
@@ -17,15 +17,22 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -entry computeMain -stage compute -DDYNAMIC_OBJECT -DSINGLE_CONFORMER -conformance "TexLight:ILight=0"
 //DIAGNOSTIC_TEST:SIMPLE(diag=REINTERPRET): -target metal -entry computeMain -stage compute -DREINTERPRET
 //DIAGNOSTIC_TEST:SIMPLE(diag=THROWS): -target metal -entry computeMain -stage compute -DTHROWS
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -entry computeMain -stage compute -DCLOSED_SET -DARRAY_FIELD
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -entry computeMain -stage compute -DCLOSED_SET -DNESTED_FIELD
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -entry computeMain -stage compute -DCLOSED_SET -DUNWRAPPED_FIELD
+//DIAGNOSTIC_TEST:SIMPLE(diag=ASSOC): -target metal -entry computeMain -stage compute -DASSOC
 
 // A combined handle that never reaches AnyValue packing still compiles on Metal, and the
 // closed-set, `reinterpret` and `throws` sources still compile for CUDA.
+// The controls match the emitted kernel signature, which a failed compile never prints.
 //TEST:SIMPLE(filecheck=STATIC): -target metal -entry computeMain -stage compute -DSTATIC_DISPATCH
-//STATIC: computeMain
+//STATIC-NOT: error[E
+//STATIC: {{\[\[kernel\]\]}} void computeMain(
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -DCLOSED_SET
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -DREINTERPRET
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -DTHROWS
-//CUDA: computeMain
+//CUDA-NOT: error[E
+//CUDA: __global__ void computeMain(
 
 RWStructuredBuffer<float4> outBuf;
 
@@ -36,16 +43,31 @@ interface ILight
     float4 eval(float2 uv);
 }
 
+struct Inner
+{
+    Sampler2D.Handle tex;
+}
+
 export struct TexLight : ILight
 //CHECK:      ^^^^^^^^ type cannot be packed for dynamic dispatch
 //CHECK:      ^^^^^^^^ type 'TexLight' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
-#ifdef USE_DESCRIPTOR_HANDLE_SPELLING
+#if defined(USE_DESCRIPTOR_HANDLE_SPELLING)
     DescriptorHandle<Sampler2D> tex;
+    float4 eval(float2 uv) { return tex.SampleLevel(uv, 0); }
+#elif defined(ARRAY_FIELD)
+    Sampler2D.Handle tex[2];
+    float4 eval(float2 uv) { return tex[1].SampleLevel(uv, 0); }
+#elif defined(NESTED_FIELD)
+    Inner inner;
+    float4 eval(float2 uv) { return inner.tex.SampleLevel(uv, 0); }
+#elif defined(UNWRAPPED_FIELD)
+    Sampler2D tex;
+    float4 eval(float2 uv) { return tex.SampleLevel(uv, 0); }
 #else
     Sampler2D.Handle tex;
-#endif
     float4 eval(float2 uv) { return tex.SampleLevel(uv, 0); }
+#endif
 }
 
 #ifndef SINGLE_CONFORMER
@@ -113,6 +135,62 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     bitsOut[tid.x] = reinterpret<uint4>(handles[tid.x]);
 //REINTERPRET:                         ^ type cannot be packed for dynamic dispatch
 //REINTERPRET:                         ^ type 'DescriptorHandle<Sampler2D>' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
+}
+
+#elif defined(ASSOC)
+
+// The handle is a method's return and parameter type rather than a field, so it is packed and
+// unpacked inside the witness-table wrapper and reported at the implementing methods.
+interface IProvider
+{
+    associatedtype H;
+    H get();
+    float4 use(H h);
+}
+
+export struct HandleProvider : IProvider
+//ASSOC:      ^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//ASSOC:      ^^^^^^^^^^^^^^ type 'HandleProvider' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
+{
+    typealias H = Sampler2D.Handle;
+    Sampler2D.Handle h;
+    H get() { return h; }
+/*ASSOC:
+      ^^^ type cannot be packed for dynamic dispatch
+      ^^^ type 'DescriptorHandle<Sampler2D>' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
+*/
+    float4 use(H x) { return x.SampleLevel(float2(0.5), 0); }
+/*ASSOC:
+           ^^^ type cannot be packed for dynamic dispatch
+           ^^^ type 'DescriptorHandle<Sampler2D>' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
+*/
+}
+
+export struct ScalarProvider : IProvider
+{
+    typealias H = float;
+    float f;
+    H get() { return f; }
+    float4 use(H x) { return float4(x); }
+}
+
+StructuredBuffer<HandleProvider> providers;
+
+IProvider makeProvider(uint i)
+{
+    if (i == 1)
+        return providers[i];
+    ScalarProvider s;
+    s.f = 1;
+    return s;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMain(uint3 tid: SV_DispatchThreadID)
+{
+    IProvider p = makeProvider(tid.x);
+    outBuf[tid.x] = p.use(p.get());
 }
 
 #elif defined(THROWS)
