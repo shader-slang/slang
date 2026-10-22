@@ -92,9 +92,8 @@ struct OnlyStatic
 }
 
 // A static member of the struct's own type is legal because it does not live
-// in an instance. Before the fix the front end gave up on this type and the
-// IR fallback produced 4, so only the `SizeTag` check below, which needs a
-// front-end constant, detects the change.
+// in an instance. Its size must still fold in the front end, so that it can
+// serve as a generic value argument (see `SizeTag` below).
 struct SelfStatic
 {
     static SelfStatic shared;
