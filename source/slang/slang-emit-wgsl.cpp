@@ -1851,22 +1851,23 @@ void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
     // `-wgsl-diagnostic <severity>:<rule>`: global diagnostic directives. Like `enable`, they
     // must come before every declaration, including the prelude helpers emitted after this front
     // matter. WGSL rejects two severities for one rule, so the last one given for a rule wins.
+    // Each value holds the rule in `stringValue` and the severity in `stringValue2`.
     OrderedDictionary<String, String> severityByRule;
     for (auto& value :
          getTargetProgram()->getOptionSet().getArray(CompilerOptionName::WGSLDiagnostic))
     {
         // The command line validates its operand, but API option entries arrive unchecked.
         if (!isValidWGSLDiagnosticFilter(
-                value.stringValue.getUnownedSlice(),
-                value.stringValue2.getUnownedSlice()))
+                value.stringValue2.getUnownedSlice(),
+                value.stringValue.getUnownedSlice()))
         {
             getSink()->diagnose(Diagnostics::InvalidWgslDiagnosticFilter{
-                .severity = value.stringValue,
-                .rule = value.stringValue2,
+                .severity = value.stringValue2,
+                .rule = value.stringValue,
                 .syntax = kWGSLDiagnosticFilterSyntax});
             continue;
         }
-        severityByRule[value.stringValue2] = value.stringValue;
+        severityByRule[value.stringValue] = value.stringValue2;
     }
     for (auto& ruleAndSeverity : severityByRule)
     {

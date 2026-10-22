@@ -684,7 +684,7 @@ Specify the byte stride for the sampler descriptor heap when generating SPIRV wi
 
 **-wgsl-diagnostic &lt;severity&gt;:&lt;rule&gt;**
 
-Emit a WGSL `diagnostic(&lt;severity&gt;, &lt;rule&gt;);` directive, e.g. `-wgsl-diagnostic off:subgroup_uniformity`. &lt;severity&gt; is one of error, warning, info, off; &lt;rule&gt; is a WGSL identifier or two identifiers separated by a period. Can be repeated; for a repeated rule the last severity is used. Ignored for other targets. 
+Emit a WGSL `diagnostic(&lt;severity&gt;, &lt;rule&gt;);` directive, e.g. `-wgsl-diagnostic off:subgroup_uniformity`. &lt;severity&gt; is one of error, warning, info, off; &lt;rule&gt; is a WGSL identifier or two identifiers separated by a period. Can be repeated; for a repeated rule the last severity is used. Also applies to the WGSL that the wgsl-spirv targets compile with Tint; ignored for other targets. 
 
 
 <a id="spirv-unified-descriptor-heap-stride"></a>
