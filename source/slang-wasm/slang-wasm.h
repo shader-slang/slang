@@ -316,7 +316,7 @@ public:
     emscripten::val loadModuleFromIRBlob(
         const std::string& name,
         const std::string& path,
-        emscripten::val bytes);
+        emscripten::val source);
 
     // `components` is a javascript array of ComponentType/Module/EntryPoint objects.
     // Returns ComponentType or null.

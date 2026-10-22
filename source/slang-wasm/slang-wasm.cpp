@@ -147,9 +147,9 @@ emscripten::val Session::loadModuleFromSource(
 emscripten::val Session::loadModuleFromIRBlob(
     const std::string& name,
     const std::string& path,
-    emscripten::val bytes)
+    emscripten::val source)
 {
-    if (bytes.isNull() || bytes.isUndefined() || !bytes.instanceof
+    if (source.isNull() || source.isUndefined() || !source.instanceof
         (emscripten::val::global("Uint8Array")))
     {
         g_error.type = std::string("USER");
@@ -157,7 +157,7 @@ emscripten::val Session::loadModuleFromIRBlob(
         g_error.message = std::string("loadModuleFromIRBlob: expected a Uint8Array");
         return emscripten::val::null();
     }
-    const std::vector<uint8_t> data = emscripten::convertJSArrayToNumberVector<uint8_t>(bytes);
+    const std::vector<uint8_t> data = emscripten::convertJSArrayToNumberVector<uint8_t>(source);
     Slang::ComPtr<ISlangBlob> blob = Slang::RawBlob::create(data.data(), data.size());
     Slang::ComPtr<slang::IBlob> diagnosticsBlob;
     IModule* module = m_interface->loadModuleFromIRBlob(
