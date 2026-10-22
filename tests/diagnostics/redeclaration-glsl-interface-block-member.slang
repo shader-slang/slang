@@ -18,13 +18,46 @@ float blockMember;
       ^^^^^^^^^^^ declaration of 'blockMember' conflicts with existing declaration
 */
 
+layout(std430, binding = 1) buffer Storage
+{
+    float storageMember;
+/*CHECK:
+          ^^^^^^^^^^^^^ see previous declaration of 'storageMember'
+*/
+};
+
+float storageMember;
+/*CHECK:
+      ^^^^^^^^^^^^^ conflicting declaration
+      ^^^^^^^^^^^^^ declaration of 'storageMember' conflicts with existing declaration
+*/
+
+layout(location = 0) in VertexIn
+{
+    vec3 sharedVarying;
+/*CHECK:
+         ^^^^^^^^^^^^^ see previous declaration of 'sharedVarying'
+*/
+};
+
+layout(location = 0) out VertexOut
+{
+    vec3 sharedVarying;
+/*CHECK:
+         ^^^^^^^^^^^^^ conflicting declaration
+         ^^^^^^^^^^^^^ declaration of 'sharedVarying' conflicts with existing declaration
+*/
+};
+
 // The compiler ignores a redeclaration of a builtin block, so its members are not
-// declared in this scope.
+// declared in this scope, and a later declaration of the same name does not conflict.
 
 out gl_PerVertex
 {
     vec4 gl_Position;
 };
+
+float gl_Position;
 
 void main()
 {

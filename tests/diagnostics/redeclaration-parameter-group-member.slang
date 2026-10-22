@@ -103,8 +103,9 @@ tbuffer ThirdBuffer
 */
 }
 
-// A declaration that conflicts with several earlier ones gets one diagnostic, against the
-// nearest of them.
+// A declaration that conflicts with several earlier ones gets one diagnostic. It is compared
+// with the nearest earlier declaration, unless it has an earlier declaration of the same name
+// in its own scope (`aroundBuffer`), which `checkForRedeclaration` compares it with.
 
 cbuffer FirstOfTwo
 {
@@ -180,6 +181,56 @@ struct typeName
        ^^^^^^^^ declaration of 'typeName' conflicts with existing declaration
 */
 {
+}
+
+// A function or type declared before a buffer member also conflicts with it.
+
+int funcFirst()
+/*CHECK:
+    ^^^^^^^^^ see previous declaration of 'funcFirst'
+*/
+{
+    return 0;
+}
+
+struct TypeFirst
+/*CHECK:
+       ^^^^^^^^^ see previous declaration of 'TypeFirst'
+*/
+{
+}
+
+cbuffer BufferAfterOtherKinds
+{
+    int funcFirst;
+/*CHECK:
+        ^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^ declaration of 'funcFirst' conflicts with existing declaration
+*/
+    int TypeFirst;
+/*CHECK:
+        ^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^ declaration of 'TypeFirst' conflicts with existing declaration
+*/
+}
+
+// A buffer in a namespace conflicts with the other declarations of that namespace.
+
+namespace BufferNamespace
+{
+static const int namespaceName = 1;
+/*CHECK:
+                 ^^^^^^^^^^^^^ see previous declaration of 'namespaceName'
+*/
+
+cbuffer BufferInNamespace
+{
+    int namespaceName;
+/*CHECK:
+        ^^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^^ declaration of 'namespaceName' conflicts with existing declaration
+*/
+}
 }
 
 // These declarations are in different scopes, so they do not conflict with the members.
