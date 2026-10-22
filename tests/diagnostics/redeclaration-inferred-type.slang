@@ -56,6 +56,23 @@ enum SecondEnum
 */
 };
 
+// A repeated case is reported once. The parser adds no alias for it, so the alias of the
+// first case does not conflict with it a second time.
+
+[UnscopedEnum]
+enum RepeatedCase
+{
+    repeatedCase,
+/*CHECK:
+    ^^^^^^^^^^^^ see previous declaration of 'repeatedCase'
+*/
+    repeatedCase,
+/*CHECK:
+    ^^^^^^^^^^^^ conflicting declaration
+    ^^^^^^^^^^^^ declaration of 'repeatedCase' conflicts with existing declaration
+*/
+};
+
 // An unsized array takes its size from its initializer in the same step.
 
 static const int sizedFirst = 1;
