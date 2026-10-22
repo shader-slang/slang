@@ -16,7 +16,7 @@
 
 // The mimalloc statically linked into slang-compiler.dll keeps its OS memory reserved after
 // `FreeLibrary` unless `mi_option_destroy_on_exit` is set when it shuts down, so a host that
-// repeatedly loads and unloads Slang would grow by at least one 1 GiB arena per cycle (#13828).
+// repeatedly loads and unloads Slang would keep another arena reservation on every cycle (#13828).
 // The MSVC CRT calls this `DllMain` before it runs the DLL's static destructors and `atexit`
 // functions, and mimalloc registers its shutdown as the first of those `atexit` functions, so it
 // releases the memory only after every static has freed its allocations.

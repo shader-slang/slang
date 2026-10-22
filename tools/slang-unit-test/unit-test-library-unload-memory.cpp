@@ -24,11 +24,12 @@
 
 using namespace Slang;
 
-// On Windows, slang-compiler.dll and slang-glslang.dll each statically link their own copy of
-// mimalloc, which reserves address space in 1 GiB arenas. Unless the DLL turns on mimalloc's
-// `destroy_on_exit` option before it is unloaded, those arenas stay reserved after `FreeLibrary`,
-// together with the pages that other, still-running threads allocated through the DLL, so a host
-// that repeatedly loads, uses and unloads Slang grows by at least 1 GiB per cycle (issue #13828).
+// In Windows builds with mimalloc, slang-compiler.dll and slang-glslang.dll each statically link
+// their own copy of it, which on 64-bit reserves address space in 1 GiB arenas. Unless the DLL
+// turns on mimalloc's `destroy_on_exit` option before it is unloaded, those arenas stay reserved
+// after `FreeLibrary`, together with the pages that other, still-running threads allocated through
+// the DLL, so a host that repeatedly loads, uses and unloads Slang grows by at least 1 GiB per
+// cycle (issue #13828).
 //
 // We check this by repeatedly loading a private copy of each DLL, compiling something on a worker
 // thread and on this thread, and unloading the copy while the worker is still alive. The copy is

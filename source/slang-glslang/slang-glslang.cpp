@@ -948,7 +948,7 @@ static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_3& request)
 #if defined(_WIN32) && defined(SLANG_GLSLANG_USES_MIMALLOC)
 // SPIRV-Tools-opt links its own mimalloc into this DLL, which keeps its OS memory reserved after
 // `FreeLibrary` unless `mi_option_destroy_on_exit` is set when it shuts down, so every load and
-// unload of slang-glslang would leave at least one 1 GiB arena behind (#13828). The MSVC CRT calls
+// unload of slang-glslang would leave an arena reservation behind (#13828). The MSVC CRT calls
 // this `DllMain` before it runs the DLL's static destructors (including `ProcessInitializer`
 // below) and `atexit` functions, and mimalloc registers its shutdown as the first of those
 // `atexit` functions, so it releases the memory only after every static has freed its allocations.

@@ -718,10 +718,8 @@ endif()
 
 fetch_or_build_slang_llvm()
 
-# slang-glslang does not use mimalloc itself, but SPIRV-Tools-opt links its own copy of it into
-# slang-glslang when built from source with SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC. We read that from
-# the link line rather than repeating SPIRV-Tools' own conditions, so that an override or system
-# SPIRV-Tools which does not link mimalloc is handled too.
+# slang-glslang gets mimalloc only through SPIRV-Tools-opt, and an overridden or system
+# SPIRV-Tools-opt may not link it, so we decide from SPIRV-Tools-opt's actual link dependencies.
 set(SLANG_GLSLANG_USES_MIMALLOC OFF)
 if(WIN32 AND TARGET SPIRV-Tools-opt AND TARGET mimalloc-static)
     get_target_property(
