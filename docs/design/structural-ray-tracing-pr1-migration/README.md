@@ -191,11 +191,9 @@ descriptor identity on struct declarations. Both use the existing `DeclRefType::
 path with one inherited declaration reference, so ordinary substitution and serialization preserve
 their generic arguments. No new AST constructor or IR lowering path is needed for the descriptor.
 
-The annotation constants now belong to the ray-tracing module as `rt::__RayTracingBuiltin`.
-The module's `compiler-intrinsics.slang` also declares the internal callable attribute
-`__RayTracingCallShader`. Core no longer declares this RT-only name. Its C++ attribute class
-and checker stay in the compiler. Remove `__RayTracingTrace` and its C++ attribute class;
-public trace methods need no trace-specific annotation.
+The annotation constants belong to the ray-tracing module as `rt::__RayTracingBuiltin`.
+The module's `compiler-intrinsics.slang` includes the generated constants. Public trace and
+callable methods are ordinary functions without operation-specific source attributes.
 
 Build `raytracing-builtins.meta.slang` into the ordinary `raytracing-builtins.slang` include using
 `slang-standard-module-generator`. Its values come directly from `KnownBuiltinDeclName` in the
@@ -204,9 +202,9 @@ other RT source files so source compilation and serialized imports use the same 
 
 Stage checking reads the declaration annotations preserved through source imports and serialized
 modules; an unannotated interface named `IMissShader` remains an ordinary interface. Metal trace
-calls lower to an explicit IR instruction, as described in section 11. Callable dispatch still uses its
-source-operation IR decoration. Builtin loading and ownership are separate responsibilities,
-described in section 9.
+calls lower to an explicit IR instruction, as described in section 11. Metal callable dispatch
+uses a static assertion until its implementation is available. Builtin loading and ownership are
+separate responsibilities, described in section 9.
 
 Application modules implement or refine the RT library's stage interfaces and use
 `rt::TraceProgramDescriptor` directly. Tests check these references through source and serialized
@@ -490,11 +488,8 @@ public void trace(RayTraversalDesc desc,
 ```
 
 Both wrappers and payload-taking implementations are ordinary library methods without trace
-annotations. Both public call forms reach the same payload implementation. Remove
-`__RayTracingTrace`, `__RayTracingPayload`, the explicit/implicit method classifier, and the separate
-implicit-payload IR operation kind from the full implementation. Only `CallShader = 2` remains
-in the source-operation decoration enum; values 0 and 1 are unused. Rebuild serialized RT modules
-after this change.
+annotations. Both public call forms reach the same payload implementation. No source-operation
+decoration or operation-kind enum is needed.
 
 Post-link lowering must normalize the internal empty value with the reached stages' application
 empty payload types. The frontend neither selects a unique application empty type nor inserts an
@@ -604,10 +599,8 @@ types. The payload operand is an ordinary typed `inout` pointer. Later Metal low
 those types directly without reconstructing generic arguments from a callee or a second schema
 operand.
 
-Remove the trace source-operation decoration and its `Trace` enum value from the full
-implementation, together with `__RayTracingTrace`. Shader declarations now choose the API family,
-so the library's native `TraceRay` calls need no annotation-based exemption. Keep
-`__RayTracingCallShader` for its callable IR decoration; it has no API-family role. The serialized name for `metalTraceRay` has stable ID 912.
+Shader declarations choose the API family, so the library's native `TraceRay` calls need no
+annotation-based exemption. The serialized name for `metalTraceRay` has stable ID 912.
 
 After `linkIR` selects target-switch branches, the centralized unfinished-operation check walks
 functions reachable from entry points and looks for the actual `IRMetalTraceRay` instruction.
@@ -616,6 +609,21 @@ operation. Descriptor layout and native stage-adapter guards still prevent incom
 paths from generating code. A later backend pass must consume this operation and generate the
 Metal intersector dispatch, shared tables, adapters and payload transport; that synthesis is
 deferred.
+
+`RayTracer.callShader` is an ordinary library method. Its native branch calls core `CallShader`.
+Its Metal branch uses the existing assertion mechanism while callable dispatch is unfinished:
+
+```slang
+case metal:
+    static_assert(false, "Metal structural ray-tracing callable dispatch requires compiler synthesis");
+    break;
+```
+
+Target selection retains this assertion only for Metal, and ordinary static-assert checking
+reports reachable uses. The earlier descriptor guard can report first in this frontend slice.
+There is no callable-specific AST attribute, operation-kind enum, IR decoration, or post-link
+marker scan. A later Metal implementation can replace the assertion with an internal intrinsic
+and explicit operation, following the trace-call pattern when its operands and lowering are known.
 
 ## Additional API and integration updates
 

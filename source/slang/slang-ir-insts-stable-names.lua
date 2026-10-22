@@ -883,7 +883,6 @@ return {
 	["Decoration.fileOrNamespaceScopeMutableVar"] = 907,
 	["Decoration.uninitializedGlobalCheckFoundPossibleWrite"] = 908,
 	["Decoration.glslPatch"] = 909,
-	["Decoration.structuralRayTracingSourceOperation"] = 916,
 	["Type.TraceProgramDescriptor"] = 917,
 	["metalTraceRay"] = 918
 }

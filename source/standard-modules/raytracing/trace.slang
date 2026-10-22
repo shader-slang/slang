@@ -311,7 +311,6 @@ public extension<Schema> RayTracer<Schema>
     /// `CallableContext.TraceContext == Schema.TraceContext` requires the callable stage and the
     /// descriptor to share the same traversal contract.
     [ForceInline]
-    [__RayTracingCallShader]
     public void callShader<CallableContext>(
         uint callableIndex,
         TraceProgramDescriptor<Schema> descriptor,
@@ -323,6 +322,9 @@ public extension<Schema> RayTracer<Schema>
         {
         case metal:
             // TODO: Lower this structural dispatch to a Metal visible-function-table call.
+            static_assert(
+                false,
+                "Metal structural ray-tracing callable dispatch requires compiler synthesis");
             break;
         default:
             CallShader(callableIndex, data);

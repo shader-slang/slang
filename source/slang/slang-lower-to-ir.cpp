@@ -35,7 +35,6 @@
 #include "slang-ir-ssa.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-strip.h"
-#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-use-uninitialized-values.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
@@ -13860,20 +13859,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return true;
     }
 
-    // Callable dispatch still uses a marked function until it has an explicit IR operation.
-    // Metal trace calls already lower through __intrinsic_op to IRMetalTraceRay, so they need
-    // no function decoration. Ordinary serialization preserves that instruction and its operands.
-    void addStructuralRayTracingSourceOperationDecoration(IRFunc* irFunc, FunctionDeclBase* decl)
-    {
-        if (isStructuralRayTracingCallShaderMethod(decl))
-        {
-            addStructuralRayTracingSourceOperation(
-                *getBuilder(),
-                irFunc,
-                StructuralRayTracingSourceOperationKind::CallShader);
-        }
-    }
-
     LoweredValInfo lowerFuncDeclInContext(
         IRGenContext* subContext,
         IRBuilder* subBuilder,
@@ -14460,8 +14445,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
 
         addTargetRequirementDecorations(irFunc, decl);
-
-        addStructuralRayTracingSourceOperationDecoration(as<IRFunc>(irFunc), decl);
 
         bool isInline = false;
 

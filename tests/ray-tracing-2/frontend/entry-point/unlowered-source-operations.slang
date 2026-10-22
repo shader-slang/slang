@@ -1,5 +1,5 @@
-// Native trace calls retain their opaque structural descriptor until target adapter lowering
-// chooses its representation. Callable dispatch also retains its unfinished operation marker.
+// Trace and callable dispatch retain their opaque structural descriptor until target adapter
+// lowering chooses its representation.
 //DIAGNOSTIC_TEST:SIMPLE(diag=TRACE): -experimental-feature -entry traceMain -stage raygeneration -target hlsl
 //DIAGNOSTIC_TEST:SIMPLE(diag=TRACE): -experimental-feature -entry tracePayloadMain -stage raygeneration -target hlsl
 //DIAGNOSTIC_TEST:SIMPLE(diag=CALL): -experimental-feature -entry callMain -stage raygeneration -target hlsl
@@ -104,10 +104,6 @@ void tracePayloadMain()
 
 [shader("raygeneration")]
 void callMain()
-/*CALL:
-     ^^^^^^^^ structural ray-tracing source operation was not lowered
-     ^^^^^^^^ structural ray-tracing operation 'callShader' reachable from this entry point must be lowered before target code generation
-*/
 {
     rt::RayTracer<Schema> tracer;
     CallableData data = {};

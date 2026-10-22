@@ -7,12 +7,3 @@ implementing raytracing;
 // spelling. Keeping the StageContext annotation when renaming Context to ShaderContext lets the
 // compiler keep the same lookup; shader code using the old name would still need updating.
 #include "raytracing-builtins.slang"
-
-namespace rt
-{
-
-// Callable dispatch still carries an operation decoration until it has its own IR instruction.
-__attributeTarget(FuncDecl)
-internal attribute_syntax [__RayTracingCallShader] : RayTracingCallShaderAttribute;
-
-} // namespace rt

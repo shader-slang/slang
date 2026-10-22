@@ -2159,14 +2159,6 @@ local insts = {
 					},
 				},
 			},
-			{
-				-- Marks an annotated structural operation whose source semantics must be lowered before
-				-- ordinary entry-point ABI legalization. This decoration is deliberately non-operational.
-				structuralRayTracingSourceOperation = {
-					struct_name = "StructuralRayTracingSourceOperationDecoration",
-					operands = { { "operationKind", "IRIntLit" } },
-				},
-			},
 			{ CudaKernel = { struct_name = "CudaKernelDecoration" } },
 			{ CudaHost = { struct_name = "CudaHostDecoration" } },
 			{

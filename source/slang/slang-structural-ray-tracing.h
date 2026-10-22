@@ -38,18 +38,6 @@ enum class RayTracingAPIFamily
     Legacy,
 };
 
-/// Identifies a structural operation that still requires target-independent lowering.
-///
-/// These values are serialized on the corresponding standard-module IR functions. They describe
-/// source semantics only; they are not target opcodes and must be consumed before entry-point ABI
-/// legalization begins.
-enum class StructuralRayTracingSourceOperationKind
-{
-    // Values 0 and 1 previously marked trace functions. Metal tracing now has an explicit IR
-    // instruction; leave those values unused rather than changing CallShader's saved value.
-    CallShader = 2,
-};
-
 /// Names the concrete entries and matching subtype witnesses encoded by a section-list type.
 ///
 /// Concrete lists keep the two packs index-aligned, including two zero-length packs for an empty
@@ -79,9 +67,6 @@ Stage getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl);
 
 /// Returns the stage identified by a KnownBuiltin role, or Stage::Unknown for other roles.
 Stage getStructuralRayTracingStageInputKind(KnownBuiltinDeclName builtin);
-
-/// Returns whether the function is an annotated structural callable operation.
-bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl);
 
 /// Returns this executable interface's `invoke` requirement, or null for other interfaces.
 FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* interfaceDecl);

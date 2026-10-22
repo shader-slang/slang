@@ -494,8 +494,7 @@ static bool _diagnoseUnloweredStructuralRayTracingEntryPoints(
 // calls __metalTraceRay or __metalTraceRayMotion, which lowers directly to IRMetalTraceRay. Follow
 // the ordinary reference graph through wrappers and generic specializations, then inspect each
 // reached function's instructions. linkIR has already selected target-switch branches, so native
-// paths do not acquire a Metal diagnostic. An unreachable function is harmless. Callable dispatch
-// still uses its existing function decoration until its own instruction is introduced.
+// paths do not acquire a Metal diagnostic. An unreachable function is harmless.
 static bool _diagnoseUnloweredStructuralRayTracingOperations(IRModule* module, DiagnosticSink* sink)
 {
     bool found = false;
@@ -506,42 +505,29 @@ static bool _diagnoseUnloweredStructuralRayTracingOperations(IRModule* module, D
         auto func = as<IRFunc>(inst);
         if (!func || entryPoints.getCount() == 0)
             continue;
-        auto marker = func->findDecoration<IRStructuralRayTracingSourceOperationDecoration>();
-        const char* operationName = nullptr;
-        if (marker)
+        bool hasMetalTrace = false;
+        for (auto block : func->getBlocks())
         {
-            auto operationKindInst = as<IRIntLit>(marker->getOperationKind());
-            SLANG_RELEASE_ASSERT(operationKindInst);
-            SLANG_RELEASE_ASSERT(
-                StructuralRayTracingSourceOperationKind(operationKindInst->getValue()) ==
-                StructuralRayTracingSourceOperationKind::CallShader);
-            operationName = "callShader";
-        }
-        else
-        {
-            for (auto block : func->getBlocks())
+            for (auto instruction : block->getOrdinaryInsts())
             {
-                for (auto instruction : block->getOrdinaryInsts())
+                if (as<IRMetalTraceRay>(instruction))
                 {
-                    if (as<IRMetalTraceRay>(instruction))
-                    {
-                        operationName = "trace";
-                        break;
-                    }
-                }
-                if (operationName)
+                    hasMetalTrace = true;
                     break;
+                }
             }
+            if (hasMetalTrace)
+                break;
         }
 
-        if (!operationName)
+        if (!hasMetalTrace)
             continue;
 
         // Diagnose the user's entry point rather than the operation's installed-library location.
         for (auto entryPoint : entryPoints)
         {
             sink->diagnose(Diagnostics::UnloweredStructuralRayTracingSourceOperation{
-                .operationName = String(operationName),
+                .operationName = String("trace"),
                 .entryPoint = entryPoint});
         }
         found = true;
@@ -667,11 +653,6 @@ Stage getStructuralRayTracingStageInputKind(KnownBuiltinDeclName builtin)
     default:
         return Stage::Unknown;
     }
-}
-
-bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl)
-{
-    return functionDecl && functionDecl->hasModifier<RayTracingCallShaderAttribute>();
 }
 
 FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* interfaceDecl)
