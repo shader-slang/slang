@@ -197,3 +197,25 @@ Translates to:
 ```wgsl
 @id(7) override a : i32 = 2;
 ```
+
+A specialization constant can also set the workgroup size. When it is used in `[numthreads]`, the `@workgroup_size` attribute names the `override`, so the size can be set when the pipeline is created (through `GPUProgrammableStage.constants`, keyed by the `@id` number).
+WGSL requires all `@workgroup_size` arguments to have the same type, so literal axes are emitted as abstract-int literals (which convert to either type) and a `u32` override is converted with `i32(...)`, even when it is the only override. Other specialization-constant types, such as `int64_t`, are not supported in `[numthreads]` on WGSL.
+For example:
+
+```csharp
+[vk::constant_id(0)]
+const uint groupSizeX = 64;
+
+[numthreads(groupSizeX, 1, 1)]
+void main() { ... }
+```
+
+Translates to:
+
+```wgsl
+@id(0) override groupSizeX : u32 = u32(64);
+
+@compute
+@workgroup_size(i32(groupSizeX), 1, 1)
+fn main() { ... }
+```

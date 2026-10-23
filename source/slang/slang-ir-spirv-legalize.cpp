@@ -1747,11 +1747,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void maybeHoistConstructInstToGlobalScope(IRInst* inst)
     {
-        // If all of the operands to this instruction are global, and are not global
-        // variables, we can hoist this constructor to be a global too.
+        // If every operand of this instruction is a global that can be emitted as a
+        // non-specialization constant, we can hoist this constructor to be a global too.
         // This is important to make sure
         // that vectors made of constant components end up being emitted as
         // constant vectors (using OpConstantComposite).
+        //
+        // A specialization constant is an `IRGlobalParam`, and a value computed from one (such
+        // as `intCast(kX)`) has the spec-const rate. OpConstantComposite cannot take either as
+        // a constituent. Constructors are outside `canOperationBeSpecConst`, so they never get
+        // the spec-const rate and are not emitted as OpSpecConstantComposite; such a
+        // constructor stays in the function and is emitted as OpCompositeConstruct.
         UIndex opIndex = 0;
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount();
              operand++, opIndex++)
@@ -1760,6 +1766,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 return;
 
             if (as<IRGlobalParam>(operand->get()))
+                return;
+
+            if (isSpecConstRateType(operand->get()->getFullType()))
                 return;
         }
         inst->insertAtEnd(m_module->getModuleInst());
