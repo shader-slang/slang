@@ -380,7 +380,11 @@ static bool allowExperimentalDynamicDispatch(
            !isSlang2026OrLater(visitor);
 }
 
-static void validateDynInterfaceUsage(
+/// Validate requirements and inherited interfaces of a declaration with `[anyValueSize]`.
+///
+/// These restrictions apply in Slang 2026 and later unless experimental dynamic dispatch is
+/// enabled; they keep the explicitly sized interface within the supported dispatch feature set.
+static void validateSizedInterfaceUsage(
     SemanticsDeclVisitorBase* visitor,
     DiagnosticSink* sink,
     CompilerOptionSet& optionSet,
@@ -389,22 +393,23 @@ static void validateDynInterfaceUsage(
     if (allowExperimentalDynamicDispatch(visitor, optionSet))
         return;
 
-    if (!decl->hasModifier<DynModifier>())
+    if (!decl->hasModifier<AnyValueSizeAttribute>())
         return;
 
-    // validate members inside `dyn interface`
     for (auto m : decl->getDirectMemberDecls())
     {
         if (isAssociatedTypeDecl(m))
         {
-            sink->diagnose(Diagnostics::CannotHaveAssociatedTypeInDynInterface{.member = m});
+            sink->diagnose(
+                Diagnostics::CannotHaveAssociatedTypeInInterfaceWithAnyValueSize{.member = m});
             continue;
         }
         else if (auto genericDecl = as<GenericDecl>(m))
         {
             if (as<FuncDecl>(genericDecl->inner))
             {
-                sink->diagnose(Diagnostics::CannotHaveGenericMethodInDynInterface{.member = m});
+                sink->diagnose(
+                    Diagnostics::CannotHaveGenericMethodInInterfaceWithAnyValueSize{.member = m});
             }
             continue;
         }
@@ -415,13 +420,14 @@ static void validateDynInterfaceUsage(
             {
                 if (as<MutatingAttribute>(modifier))
                 {
-                    sink->diagnose(
-                        Diagnostics::CannotHaveMutatingMethodInDynInterface{.member = m});
+                    sink->diagnose(Diagnostics::CannotHaveMutatingMethodInInterfaceWithAnyValueSize{
+                        .member = m});
                 }
                 else if (as<DifferentiableAttribute>(modifier))
                 {
                     sink->diagnose(
-                        Diagnostics::CannotHaveDifferentiableMethodInDynInterface{.member = m});
+                        Diagnostics::CannotHaveDifferentiableMethodInInterfaceWithAnyValueSize{
+                            .member = m});
                 }
             }
             continue;
@@ -435,22 +441,27 @@ static void validateDynInterfaceUsage(
                 continue;
 
             auto inheritedInterfaceDecl = inheritedInterfaceDeclRefType.getDecl();
-            if (!inheritedInterfaceDecl->hasModifier<DynModifier>())
-                sink->diagnose(Diagnostics::DynInterfaceCannotInheritNonDynInterface{
-                    .dynInterface = decl,
-                    .inherited = inheritedInterfaceDecl,
-                    .inheritance = m});
+            if (!inheritedInterfaceDecl->hasModifier<AnyValueSizeAttribute>())
+                sink->diagnose(
+                    Diagnostics::InterfaceWithAnyValueSizeCannotInheritInterfaceWithoutAnyValueSize{
+                        .sizedInterface = decl,
+                        .inherited = inheritedInterfaceDecl,
+                        .inheritance = m});
         }
     }
 
-    // dyn interface cannot be generic
+    // An interface with an explicit AnyValue size cannot be generic.
     if (visitor->GetOuterGeneric(decl))
     {
-        sink->diagnose(Diagnostics::CannotHaveGenericDynInterface{.decl = decl});
+        sink->diagnose(Diagnostics::CannotHaveGenericInterfaceWithAnyValueSize{.decl = decl});
     }
 }
 
-static void validateDynInterfaceUseWithInheritanceDecl(
+/// Validate a checked inheritance clause whose base may specify `[anyValueSize]`.
+///
+/// Generic and extension conformances have the same version/experimental gate as
+/// `validateSizedInterfaceUsage`. Conforming aggregate fields must be packable in every mode.
+static void validateSizedInterfaceUseWithInheritanceDecl(
     SemanticsDeclVisitorBase* visitor,
     DiagnosticSink* sink,
     CompilerOptionSet& optionSet,
@@ -460,22 +471,22 @@ static void validateDynInterfaceUseWithInheritanceDecl(
     if (!interfaceDeclRef)
         return;
     auto interfaceDecl = interfaceDeclRef.getDecl();
-    bool interfaceDeclIsDyn = interfaceDecl->hasModifier<DynModifier>();
-    if (!interfaceDeclIsDyn)
+    bool hasExplicitAnyValueSize = interfaceDecl->hasModifier<AnyValueSizeAttribute>();
+    if (!hasExplicitAnyValueSize)
         return;
 
     if (!allowExperimentalDynamicDispatch(visitor, optionSet))
     {
         if (auto extensionDeclParent = as<ExtensionDecl>(decl->parentDecl))
         {
-            // not allowed to extend to conform to a 'dyn interface'
-            sink->diagnose(Diagnostics::CannotUseExtensionToMakeTypeConformToDynInterface{
+            // An extension cannot add a conformance to an explicitly sized interface.
+            sink->diagnose(Diagnostics::CannotUseExtensionToConformToInterfaceWithAnyValueSize{
                 .interface = interfaceDecl,
                 .extension = extensionDeclParent});
         }
         else if (visitor->GetOuterGeneric(decl->parentDecl))
         {
-            sink->diagnose(Diagnostics::CannotConformGenericToDynInterface{
+            sink->diagnose(Diagnostics::CannotConformGenericTypeToInterfaceWithAnyValueSize{
                 .generic = decl->parentDecl,
                 .interface = interfaceDecl,
                 .inheritance = decl});
@@ -483,30 +494,33 @@ static void validateDynInterfaceUseWithInheritanceDecl(
     }
     if (auto aggTypeDeclParent = as<AggTypeDecl>(decl->parentDecl))
     {
-        // Ensure if we inherit from a `dyn interface` that the parent does not have: opaque
-        // types, unsized types, non-copyable types
+        // Conforming payloads must fit an ordinary byte representation. Unsized, opaque,
+        // and non-copyable fields cannot be packed into the interface's AnyValue storage.
         for (auto varDecl : aggTypeDeclParent->getDirectMemberDeclsOfType<VarDecl>())
         {
             visitor->ensureDecl(varDecl, DeclCheckState::ReadyForLookup);
 
             if (isNonCopyableType(varDecl->getType()))
             {
-                sink->diagnose(Diagnostics::CannotHaveNonCopyableMemberWhenInheritingDynInterface{
-                    .interface = interfaceDecl,
-                    .member = varDecl});
+                sink->diagnose(
+                    Diagnostics::CannotHaveNonCopyableMemberWhenInheritingInterfaceWithAnyValueSize{
+                        .interface = interfaceDecl,
+                        .member = varDecl});
             }
 
             int varTypeTags = (int)visitor->getTypeTags(varDecl->getType());
             bool isUnsized = varTypeTags & (int)TypeTag::Unsized;
             bool isOpaque = varTypeTags & (int)TypeTag::Opaque;
             if (isUnsized)
-                sink->diagnose(Diagnostics::CannotHaveUnsizedMemberWhenInheritingDynInterface{
-                    .interface = interfaceDecl,
-                    .member = varDecl});
+                sink->diagnose(
+                    Diagnostics::CannotHaveUnsizedMemberWhenInheritingInterfaceWithAnyValueSize{
+                        .interface = interfaceDecl,
+                        .member = varDecl});
             if (isOpaque)
-                sink->diagnose(Diagnostics::CannotHaveOpaqueMemberWhenInheritingDynInterface{
-                    .interface = interfaceDecl,
-                    .member = varDecl});
+                sink->diagnose(
+                    Diagnostics::CannotHaveOpaqueMemberWhenInheritingInterfaceWithAnyValueSize{
+                        .interface = interfaceDecl,
+                        .member = varDecl});
         }
     }
 }
@@ -912,7 +926,7 @@ struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
         visitTypeExp(inheritanceDecl->base);
-        validateDynInterfaceUseWithInheritanceDecl(
+        validateSizedInterfaceUseWithInheritanceDecl(
             this,
             getSink(),
             getOptionSet(),
@@ -1223,6 +1237,10 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     {
         dispatchIfNotNull(expr->left.type);
         dispatchIfNotNull(expr->right.type);
+    }
+    void visitExistentialTypeExpr(ExistentialTypeExpr* expr)
+    {
+        dispatchIfNotNull(expr->interfaceType.type);
     }
     void visitPointerTypeExpr(PointerTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
     void visitAsTypeExpr(AsTypeExpr* expr)
@@ -2216,7 +2234,7 @@ bool doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(Type* 
 {
     if (as<PtrTypeBase>(type))
         return true;
-    if (isDeclRefTypeOf<InterfaceDecl>(type))
+    if (as<ExistentialType>(type))
         return true;
     if (isDeclRefTypeOf<ClassDecl>(type))
         return true;
@@ -2308,10 +2326,7 @@ void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceD
 {
     visitDecl(interfaceDecl);
 
-    if (interfaceDecl->hasModifier<AnyValueSizeAttribute>())
-        addModifier(interfaceDecl, m_astBuilder->create<DynModifier>());
-
-    validateDynInterfaceUsage(this, getSink(), getOptionSet(), interfaceDecl);
+    validateSizedInterfaceUsage(this, getSink(), getOptionSet(), interfaceDecl);
 }
 
 void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
@@ -13634,7 +13649,7 @@ void SemanticsVisitor::ensureDeclBase(
 void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
 {
     SemanticsVisitor visitor(withDeclToExcludeFromLookup(decl));
-    decl->type = visitor.CheckProperType(decl->type);
+    decl->type = visitor.checkAliasableType(decl->type);
     checkVisibility(decl);
     propagateOptionalConstraintsThroughTypealias(decl);
 }
@@ -17504,7 +17519,7 @@ void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
     // that the type it names is one that it makes sense
     // to extend.
     //
-    decl->targetType = CheckProperType(decl->targetType);
+    decl->targetType = checkAliasableType(decl->targetType);
 
     _validateExtensionDeclTargetType(decl);
 
@@ -18163,15 +18178,14 @@ static bool _astTypeIncludesDynamicDispatch(
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
 
-    if (auto declRefType = as<DeclRefType>(type))
+    if (auto boxType = as<ExistentialType>(type))
     {
-        if (auto interfaceDecl = as<InterfaceDecl>(declRefType->getDeclRef().getDecl()))
-        {
-            bool isCom = interfaceDecl->findModifier<ComInterfaceAttribute>() != nullptr;
-            bool isBuiltin = interfaceDecl->findModifier<BuiltinAttribute>() != nullptr;
-            if (!isCom && !isBuiltin)
-                return true;
-        }
+        auto interfaceDecl = isDeclRefTypeOf<InterfaceDecl>(boxType->getInterfaceType()).getDecl();
+        SLANG_RELEASE_ASSERT(interfaceDecl);
+        bool isCom = interfaceDecl->findModifier<ComInterfaceAttribute>() != nullptr;
+        bool isBuiltin = interfaceDecl->findModifier<BuiltinAttribute>() != nullptr;
+        if (!isCom && !isBuiltin)
+            return true;
     }
 
     if (auto structType = as<DeclRefType>(type))
@@ -19993,11 +20007,20 @@ static Expr* getDerivativeExprWithPrimalGenericArgumentsIfNeeded(
     return genericAppExpr;
 }
 
-// Checks a derivative against a primal declaration reference. `genericSignatureResolutionStatus`
-// states whether this function must still infer a mapping between their outer generic signatures
-// or preserve the specialized primal reference that higher-order overload resolution already chose.
+// Check a derivative callable's parameters, receiver, and outer generic signature against a primal.
+//
+// Returns true with `attr->funcExpr` naming the resolved callable after its parameter count, types,
+// passing modes, receiver, and outer generic signature pass these checks. Result types are not
+// compared here. On failure, this function diagnoses and returns false, but `attr->funcExpr` and
+// `attr->args[0]`, when present, may already contain a checked rejected expression. Callers use the
+// result before synthesizing derivative associations; the expression's subclass does not prove
+// successful resolution.
+//
+// `genericSignatureResolutionStatus` states whether this function must still infer a mapping
+// between the outer generic signatures or preserve the specialization selected by higher-order
+// resolution.
 template<typename TDerivativeAttr>
-void checkDerivativeAttributeImpl(
+bool checkDerivativeAttributeImpl(
     SemanticsVisitor* visitor,
     DeclRef<FunctionDeclBase> primalDeclRef,
     TDerivativeAttr* attr,
@@ -20012,7 +20035,7 @@ void checkDerivativeAttributeImpl(
     {
         visitor->getSink()->diagnose(
             Diagnostics::CannotAssociateInterfaceRequirementWithDerivative{.attr = attr->loc});
-        return;
+        return false;
     }
 
     SemanticsContext::ExprLocalScope scope;
@@ -20046,7 +20069,7 @@ void checkDerivativeAttributeImpl(
         {
             visitor->getSink()->diagnose(
                 Diagnostics::CannotResolveDerivativeFunction{.attr = attr->loc});
-            return;
+            return false;
         }
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(checkedDerivativeExpr))
@@ -20078,7 +20101,7 @@ void checkDerivativeAttributeImpl(
     {
         visitor->getSink()->diagnose(
             Diagnostics::CannotResolveDerivativeFunction{.attr = attr->loc});
-        return;
+        return false;
     }
 
     /*if (!as<DeclRefExpr>(checkedDerivativeExpr))
@@ -20139,18 +20162,19 @@ void checkDerivativeAttributeImpl(
                 visitor->getSink()->diagnose(
                     Diagnostics::CannotResolveGenericArgumentForDerivativeFunction{
                         .attr = attr->loc});
-                return;
+                return false;
             }
             if (isInterfaceRequirement(resolvedDerivativeDeclRefExpr->declRef.getDecl()))
             {
                 visitor->getSink()->diagnose(
                     Diagnostics::CannotUseInterfaceRequirementAsDerivative{.attr = attr->loc});
-                return;
+                return false;
             }
             if (funcType->getParamCount() != argList.getCount())
             {
                 goto error;
             }
+            bool parametersMatch = true;
             for (Index ii = 0; ii < argList.getCount(); ++ii)
             {
                 // Check if the resolved invoke argument type is an error type.
@@ -20160,6 +20184,7 @@ void checkDerivativeAttributeImpl(
                         ctx.getASTBuilder()->getErrorType()) ||
                     funcType->getParamPassingMode(ii) != paramDirections[ii])
                 {
+                    parametersMatch = false;
                     visitor->getSink()->diagnose(
                         Diagnostics::CustomDerivativeSignatureMismatchAtPosition{
                             .position = (int64_t)ii,
@@ -20194,7 +20219,7 @@ void checkDerivativeAttributeImpl(
                     visitor->getSink()->diagnose(
                         Diagnostics::CustomDerivativeSignatureThisParamMismatch{.attr = attr->loc});
                 }
-                return;
+                return false;
             }
 
             if (expectedDerivativeThisInfo &&
@@ -20206,7 +20231,7 @@ void checkDerivativeAttributeImpl(
             {
                 visitor->getSink()->diagnose(
                     Diagnostics::CustomDerivativeSignatureThisParamMismatch{.attr = attr->loc});
-                return;
+                return false;
             }
 
             // A `[ForwardDerivative]`, `[BackwardDerivative]`, or `[PrimalSubstitute]` attribute on
@@ -20229,7 +20254,7 @@ void checkDerivativeAttributeImpl(
                     visitor->getSink()->diagnose(
                         Diagnostics::CannotResolveGenericArgumentForDerivativeFunction{
                             .attr = attr->loc});
-                    return;
+                    return false;
                 }
 
                 if (primalNextGeneric != derivativeNextGeneric)
@@ -20243,7 +20268,7 @@ void checkDerivativeAttributeImpl(
                         visitor->getSink()->diagnose(Diagnostics::CustomDerivativeSignatureMismatch{
                             .expectedSignature = String{},
                             .attr = attr->loc});
-                        return;
+                        return false;
                     }
 
                     resolvedDerivativeDeclRefExpr->declRef = substituteDeclRef(
@@ -20257,10 +20282,13 @@ void checkDerivativeAttributeImpl(
                 }
             }
 
+            if (!parametersMatch)
+                return false;
+
             attr->funcExpr = resolvedDerivativeDeclRefExpr;
             if (attr->args.getCount())
                 attr->args[0] = attr->funcExpr;
-            return;
+            return true;
         }
     }
 error:;
@@ -20283,12 +20311,13 @@ error:;
     visitor->getSink()->diagnose(Diagnostics::CustomDerivativeSignatureMismatch{
         .expectedSignature = builder.produceString(),
         .attr = attr->loc});
+    return false;
 }
 
 // Checks a derivative named by `[ForwardDerivative]`, `[BackwardDerivative]`, or
 // `[PrimalSubstitute]` on the primal, using the primal's ordinary generic context.
 template<typename TDerivativeAttr>
-void checkDerivativeAttributeImpl(
+bool checkDerivativeAttributeImpl(
     SemanticsVisitor* visitor,
     FunctionDeclBase* primalFuncDecl,
     TDerivativeAttr* attr,
@@ -20302,7 +20331,7 @@ void checkDerivativeAttributeImpl(
                              visitor,
                              primalFuncDecl->getDefaultDeclRef())
                              .as<FunctionDeclBase>();
-    checkDerivativeAttributeImpl(
+    return checkDerivativeAttributeImpl(
         visitor,
         primalDeclRef,
         attr,
@@ -20960,20 +20989,16 @@ static void checkDerivativeAttribute(
 
     ArgsWithDirectionInfo imaginaryArguments =
         getImaginaryArgsToForwardDerivative(visitor, primalDeclRef, attr->loc);
-    checkDerivativeAttributeImpl(
-        visitor,
-        primalDeclRef,
-        attr,
-        imaginaryArguments.args,
-        imaginaryArguments.directions,
-        imaginaryArguments.thisArg,
-        imaginaryArguments.thisArgDirection,
-        PrimalAndDerivativeGenericSignatureResolutionStatus::AlreadyResolved);
-
-    if (!as<DeclRefExpr>(attr->funcExpr))
+    if (!checkDerivativeAttributeImpl(
+            visitor,
+            primalDeclRef,
+            attr,
+            imaginaryArguments.args,
+            imaginaryArguments.directions,
+            imaginaryArguments.thisArg,
+            imaginaryArguments.thisArgDirection,
+            PrimalAndDerivativeGenericSignatureResolutionStatus::AlreadyResolved))
     {
-        // `checkDerivativeAttributeImpl` diagnosed the failed derivative resolution. AD 2.0
-        // translation requires its declaration reference, so no association can be synthesized.
         return;
     }
 
@@ -20997,19 +21022,16 @@ static void checkDerivativeAttribute(
                              .as<FunctionDeclBase>();
     ArgsWithDirectionInfo imaginaryArguments =
         getImaginaryArgsToForwardDerivative(visitor, primalDeclRef, attr->loc);
-    checkDerivativeAttributeImpl(
-        visitor,
-        primalDeclRef,
-        attr,
-        imaginaryArguments.args,
-        imaginaryArguments.directions,
-        imaginaryArguments.thisArg,
-        imaginaryArguments.thisArgDirection,
-        PrimalAndDerivativeGenericSignatureResolutionStatus::NotYetResolved);
-
-    if (!as<DeclRefExpr>(attr->funcExpr))
+    if (!checkDerivativeAttributeImpl(
+            visitor,
+            primalDeclRef,
+            attr,
+            imaginaryArguments.args,
+            imaginaryArguments.directions,
+            imaginaryArguments.thisArg,
+            imaginaryArguments.thisArgDirection,
+            PrimalAndDerivativeGenericSignatureResolutionStatus::NotYetResolved))
     {
-        // If the funcExpr did not resolve to a declRefExpr, we can't do anything.
         return;
     }
 
@@ -21037,19 +21059,16 @@ static void checkDerivativeAttribute(
                              .as<FunctionDeclBase>();
     ArgsWithDirectionInfo imaginaryArguments =
         getImaginaryArgsToBackwardDerivative(visitor, primalDeclRef, attr->loc);
-    checkDerivativeAttributeImpl(
-        visitor,
-        primalDeclRef,
-        attr,
-        imaginaryArguments.args,
-        imaginaryArguments.directions,
-        imaginaryArguments.thisArg,
-        imaginaryArguments.thisArgDirection,
-        PrimalAndDerivativeGenericSignatureResolutionStatus::NotYetResolved);
-
-    if (!as<DeclRefExpr>(attr->funcExpr))
+    if (!checkDerivativeAttributeImpl(
+            visitor,
+            primalDeclRef,
+            attr,
+            imaginaryArguments.args,
+            imaginaryArguments.directions,
+            imaginaryArguments.thisArg,
+            imaginaryArguments.thisArgDirection,
+            PrimalAndDerivativeGenericSignatureResolutionStatus::NotYetResolved))
     {
-        // If the funcExpr did not resolve to a declRefExpr, we can't do anything.
         return;
     }
 
@@ -21080,14 +21099,17 @@ static void checkDerivativeAttribute(
 
     ArgsWithDirectionInfo imaginaryArguments =
         getImaginaryArgsToFunc(visitor->getASTBuilder(), funcDecl, attr->loc);
-    checkDerivativeAttributeImpl(
-        visitor,
-        funcDecl,
-        attr,
-        imaginaryArguments.args,
-        imaginaryArguments.directions,
-        imaginaryArguments.thisArg,
-        imaginaryArguments.thisArgDirection);
+    if (!checkDerivativeAttributeImpl(
+            visitor,
+            funcDecl,
+            attr,
+            imaginaryArguments.args,
+            imaginaryArguments.directions,
+            imaginaryArguments.thisArg,
+            imaginaryArguments.thisArgDirection))
+    {
+        return;
+    }
 
     // For primal-substitute we'd also want to make sure that the differentiability
     // level of the target is as high as the funcDecl itself

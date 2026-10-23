@@ -13,6 +13,31 @@
 namespace Slang
 {
 
+/// Check whether box packing loses the storage required by a reference-qualified parameter.
+///
+/// Both read-only and writable reference modes require actual box-typed storage; a concrete
+/// argument's storage cannot serve as a reference to the temporary box produced by packing it.
+static bool doesBoxPackingLoseRequiredReferenceStorage(
+    Expr* coercedArgument,
+    QualType argumentType,
+    QualType parameterType)
+{
+    // A failed conversion already has its own diagnostic. An l-value result supplies the
+    // required storage, and a value parameter does not require reference storage.
+    if (!coercedArgument)
+        return false;
+    if (coercedArgument->type.isLeftValue)
+        return false;
+    if (!parameterType.isLeftValue)
+        return false;
+
+    // Passing an existing box does not pack a concrete value. A concrete argument instead
+    // needs a conversion that creates a box, so its original storage has the wrong type.
+    if (as<ExistentialType>(argumentType))
+        return false;
+    return as<ExistentialType>(parameterType) != nullptr;
+}
+
 bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* paramDecl)
 {
     if (auto declRef = isDeclRefTypeOf<GenericTypePackParamDecl>(type))
@@ -922,9 +947,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         {
             Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
-            // Check if concrete-to-interface coercion caused loss of l-valueness.
-            if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
-                !isInterfaceType(arg.type) && isInterfaceType(paramType.type))
+            if (doesBoxPackingLoseRequiredReferenceStorage(coercedExpr, arg.type, paramType))
             {
                 if (context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
@@ -937,11 +960,14 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                     else
                         name.append(paramIndex, 10);
 
-                    getSink()->diagnose(Diagnostics::ConcreteArgumentToOutputInterface{
-                        .paramName = name,
-                        .argType = arg.type,
-                        .paramType = paramType.type,
-                        .location = context.loc});
+                    getSink()->diagnose(
+                        Diagnostics::ConcreteArgumentToExistentialReferenceParameter{
+                            .paramName = name,
+                            .paramType = paramType.type,
+                            .argType = arg.type,
+                            .constraintInterface =
+                                as<ExistentialType>(paramType)->getInterfaceType(),
+                            .location = context.loc});
                 }
                 return {nullptr, nullptr};
             }

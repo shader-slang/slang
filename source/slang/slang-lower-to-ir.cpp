@@ -2440,6 +2440,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
     }
 
+    /// Lower box differentiability metadata through its interface refinement proof.
+    LoweredValInfo visitExistentialDifferentiabilityWitness(
+        ExistentialDifferentiabilityWitness* witness)
+    {
+        return lowerVal(context, witness->getInterfaceWitness());
+    }
+
     LoweredValInfo visitBuiltinTypeCoercionWitness(BuiltinTypeCoercionWitness* witness)
     {
         auto irBuilder = getBuilder();
@@ -2717,14 +2724,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitDifferentialPairType(DifferentialPairType* pairType)
     {
         IRType* primalType = lowerType(context, pairType->getPrimalType());
-        if (isDeclRefTypeOf<InterfaceDecl>(pairType->getPrimalType()))
+        if (as<ExistentialType>(pairType->getPrimalType()))
         {
             // Existential differential pairs are handled specially later in autodiff lowering:
             // their differential type is modeled as `IDifferentiable`, and the witness operand
-            // on `DifferentialPair<interface>` is not consulted.
+            // on a differential pair with a boxed primal is not consulted.
             //
-            // We intentionally lower a poison witness for any interface primal so we don't try to
-            // eagerly materialize front-end interface conformance through this operand.
+            // We lower a poison witness for a boxed primal because the box itself does not conform
+            // to `IDifferentiable`; differentiation uses the conformance of its packed value.
             //
             // Use a sub-builder so that the insert point isn't affected.
             IRBuilder subBuilder(context->irBuilder->getModule());
@@ -2841,6 +2848,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         auto loweredDeclRef = emitDeclRef(context, declRef, context->irBuilder->getTypeKind());
         return (IRType*)getSimpleVal(context, loweredDeclRef);
+    }
+
+    /// Lower a box to the existing IR interface type used for existential values.
+    IRType* visitExistentialType(ExistentialType* type)
+    {
+        return lowerType(context, type->getInterfaceType());
     }
 
     IRType* visitValuePackType(ValuePackType* type)
@@ -4552,38 +4565,6 @@ struct ExprLoweringContext
         }
     }
 
-    /// Return `expr` with any outer casts to interface types stripped away
-    Expr* maybeIgnoreCastToInterface(Expr* expr)
-    {
-        auto e = expr;
-        while (auto castExpr = as<CastToSuperTypeExpr>(e))
-        {
-            if (auto declRefType = as<DeclRefType>(e->type))
-            {
-                if (declRefType->getDeclRef().as<InterfaceDecl>())
-                {
-                    e = castExpr->valueArg;
-                    continue;
-                }
-            }
-            else if (auto andType = as<AndType>(e->type); andType)
-            {
-                // TODO: We might eventually need to tell the difference
-                // between conjunctions of interfaces and conjunctions
-                // that might include non-interface types.
-                //
-                // For now we assume that any case to a conjunction
-                // is effectively a cast to an interface type.
-                //
-                e = castExpr->valueArg;
-                continue;
-            }
-            break;
-        }
-        return e;
-    }
-
-
     // Lower an expression that should have the same l-value-ness
     // as the visitor itself.
     LoweredValInfo lowerSubExpr(Expr* expr)
@@ -5005,15 +4986,6 @@ struct ExprLoweringContext
             auto funcDeclRef =
                 DeclRef<Decl>(as<DeclRefBase>(resolvedInfo.funcDeclRef.declRefBase->resolve()));
             auto baseExpr = resolvedInfo.baseExpr;
-            if (baseExpr)
-            {
-                // The base expression might be an "upcast" to a base interface, in
-                // which case we don't want to emit the result of the cast, but instead
-                // the source.
-                //
-                baseExpr = this->maybeIgnoreCastToInterface(baseExpr);
-            }
-
             // If the thing being invoked is a subscript operation,
             // then we need to handle multiple extra details
             // that don't arise for other kinds of calls.
@@ -5824,7 +5796,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto loweredType = lowerType(context, expr->type);
 
         auto baseExpr = expr->baseExpression;
-        baseExpr = sharedLoweringContext.maybeIgnoreCastToInterface(baseExpr);
         auto loweredBase = lowerSubExpr(baseExpr);
 
         auto declRef = expr->declRef;
@@ -6173,10 +6144,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 return LoweredValInfo::simple(getBuilder()->getIntValue(irType, 0));
             }
-            else if (declRef.as<InterfaceDecl>())
-            {
-                return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
-            }
             else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>();
                      aggTypeDeclRef && isConcreteFieldOwningAggregate(aggTypeDeclRef))
             {
@@ -6254,34 +6221,30 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         //
         if (argCount == 0)
         {
-            // ... However, that "almost" does not count interface
-            // types. Interfaces should not be default-initialized to avoid
-            // unspecified behavior, so we'll warn about it here.
-            if (auto declRefType = as<DeclRefType>(type))
+            // An empty initializer cannot supply the concrete value and conformance that a box
+            // requires. We diagnose the empty box according to the selected language version.
+            if (as<ExistentialType>(type))
             {
-                if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                auto moduleDecl = context->getMainModuleDecl();
+
+                if (moduleDecl && moduleDecl->languageVersion >=
+                                      SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2026)
                 {
-                    auto moduleDecl = context->getMainModuleDecl();
+                    context->getSink()->diagnose(
+                        Diagnostics::InterfaceDefaultInitializerError{.expr = expr});
+                }
+                else
+                {
+                    // We should always have moduleDecl available. But let's diagnose
+                    // it just in case
+                    if (!moduleDecl)
+                        context->getSink()->diagnose(Diagnostics::Unexpected{
+                            .message = "Cannot determine source language version: context has "
+                                       "no main module declaration",
+                            .location = expr->loc});
 
-                    if (moduleDecl && moduleDecl->languageVersion >=
-                                          SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2026)
-                    {
-                        context->getSink()->diagnose(
-                            Diagnostics::InterfaceDefaultInitializerError{.expr = expr});
-                    }
-                    else
-                    {
-                        // We should always have moduleDecl available. But let's diagnose
-                        // it just in case
-                        if (!moduleDecl)
-                            context->getSink()->diagnose(Diagnostics::Unexpected{
-                                .message = "Cannot determine source language version: context has "
-                                           "no main module declaration",
-                                .location = expr->loc});
-
-                        context->getSink()->diagnose(
-                            Diagnostics::InterfaceDefaultInitializer{.expr = expr});
-                    }
+                    context->getSink()->diagnose(
+                        Diagnostics::InterfaceDefaultInitializer{.expr = expr});
                 }
             }
 
@@ -6863,73 +6826,44 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         auto value = lowerRValueExpr(context, expr->valueArg);
 
-        // The actual operation that we need to perform here
-        // depends on the kind of subtype relationship we
-        // are making use of.
-        //
-        // The first important case is when the super type is
-        // an interface type, such that casting from a concrete
-        // value to that type creates a value of existential
-        // type that binds together the concrete value and the
-        // witness table that represents the subtype relationship.
-        //
+        // A conversion to a box packages a concrete value with its conformance witness.
+        // The witness proves conformance to the boxed interface, not to the box itself.
+        if (as<ExistentialType>(expr->type))
+        {
+            auto concreteValue = getSimpleVal(context, value);
+            auto builder = getBuilder();
+
+            // For an upcast from `dyn IDerived` to `dyn IBase`, we open the original box and
+            // follow the interface inheritance proof to obtain the packed value's `IBase` table.
+            // An interface inheritance declaration lowers to a requirement key, so lowering that
+            // declaration directly would not produce the concrete witness table needed by the box.
+            if (as<ExistentialType>(expr->valueArg->type))
+            {
+                auto extractedType = builder->emitExtractExistentialType(concreteValue);
+                auto extractedValue =
+                    builder->emitExtractExistentialValue(extractedType, concreteValue);
+                auto originalWitness = builder->emitExtractExistentialWitnessTable(concreteValue);
+
+                auto witness = as<SubtypeWitness>(expr->witnessArg);
+                SLANG_RELEASE_ASSERT(witness);
+                auto targetWitness = emitCastToInterfaceSuperTypeRec(originalWitness, witness);
+                return LoweredValInfo::simple(
+                    builder->emitMakeExistential(superType, extractedValue, targetWitness));
+            }
+
+            // For a concrete value, semantic checking supplies its conformance table directly.
+            auto witnessTable = lowerSimpleVal(context, expr->witnessArg);
+            return LoweredValInfo::simple(
+                builder->emitMakeExistential(superType, concreteValue, witnessTable));
+        }
+
         if (auto declRefType = as<DeclRefType>(expr->type))
         {
-            auto declRef = declRefType->getDeclRef();
-            if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
+            if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>(); structDeclRef)
             {
-                auto concreteValue = getSimpleVal(context, value);
-                auto builder = getBuilder();
-
-                // If the source is already an existential (interface type),
-                // this is an interface-to-interface upcast.  The witness
-                // provided by the type-checker can't be lowered as a static
-                // witness table (an interface's inheritance clause lowers to
-                // a requirement key, not a witness table).  Instead: decompose
-                // the source existential, walk the witness to compute a new
-                // witness table via `lookupWitnessMethod`, then recompose.
-                // Check the AST type (robust to generic instantiations whose
-                // IR form is `Specialize(Generic(...),...)` rather than a
-                // plain `IRInterfaceType`).
-                if (expr->valueArg && isInterfaceType(expr->valueArg->type))
-                {
-                    auto extractedType = builder->emitExtractExistentialType(concreteValue);
-                    auto extractedValue =
-                        builder->emitExtractExistentialValue(extractedType, concreteValue);
-                    auto sourceWT = builder->emitExtractExistentialWitnessTable(concreteValue);
-
-                    auto witness = as<SubtypeWitness>(expr->witnessArg);
-                    SLANG_RELEASE_ASSERT(witness);
-                    auto targetWT = emitCastToInterfaceSuperTypeRec(sourceWT, witness);
-
-                    return LoweredValInfo::simple(
-                        builder->emitMakeExistential(superType, extractedValue, targetWT));
-                }
-
-                // Concrete-to-interface: the witness lowers to a real witness table.
-                //
-                // At the IR level, this will become a `makeExistential` instruction,
-                // which collects the above information into a single IR-level value.
-                // A dynamic CPU implementation of Slang might encode an existential
-                // as a "fat pointer" representation, which includes a pointer to
-                // data for the concrete value, plus a pointer to the witness table.
-                //
-                // Note: if/when Slang supports more general existential types, such
-                // as compositions of interface (e.g., `IReadable & IWritable`), then
-                // we should probably extend the AST and IR mechanism here to accept
-                // a sequence of witness tables.
-                //
-                auto witnessTable = lowerSimpleVal(context, expr->witnessArg);
-                return LoweredValInfo::simple(
-                    builder->emitMakeExistential(superType, concreteValue, witnessTable));
-            }
-            else if (auto structDeclRef = declRef.as<StructDecl>())
-            {
-                // We are up-casting to a concrete `struct` super-type,
-                // such that the witness will represent a field of the super-type
-                // that is stored in instances of the sub-type (or a chain
-                // of such fields for a transitive witness).
-                //
+                // A concrete base struct occupies a field of the derived struct. The inheritance
+                // witness identifies that field, including intermediate fields for transitive
+                // bases.
                 return emitCastToConcreteSuperTypeRec(value, superType, expr->witnessArg);
             }
         }
@@ -7174,6 +7108,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitAndTypeExpr(AndTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("'&' type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitExistentialTypeExpr(ExistentialTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("'dyn' type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 

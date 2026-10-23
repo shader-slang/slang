@@ -63,6 +63,6 @@ int exerciseInvalidSubscriptRecovery()
     InvalidSubscripts storage;
     ConcreteIndex index;
     return storage[index];
-//diag:           ^ concrete type passed to interface-typed output parameter
-//diag:           ^ argument passed to parameter 'index' is of concrete type 'ConcreteIndex', but interface-typed output parameters require interface-typed arguments
+//diag:           ^ concrete type passed to an existential reference parameter
+//diag:           ^ parameter 'index' requires storage of type 'dyn IIndex', but argument has concrete type 'ConcreteIndex'
 }

@@ -750,6 +750,20 @@ public:
 
     Type* getAndType(Type* left, Type* right);
 
+    /// Get the canonical proper type of a box for `interfaceType`.
+    ///
+    /// Requires a checked type naming one `InterfaceDecl`, with any generic arguments applied.
+    /// Aliases are canonicalized before interning the box.
+    ExistentialType* getExistentialType(Type* interfaceType);
+
+    /// Get differentiability metadata for a box from its interface's refinement proof.
+    ///
+    /// Requires `interfaceWitness` to start at the boxed interface and end at `IDifferentiable`
+    /// or `IDifferentiablePtrType`. The metadata's supertype is derived from that proof.
+    ExistentialDifferentiabilityWitness* getExistentialDifferentiabilityWitness(
+        ExistentialType* boxType,
+        SubtypeWitness* interfaceWitness);
+
     Type* getModifiedType(Type* base, Count modifierCount, Val* const* modifiers);
     Type* getModifiedType(Type* base, List<Val*> const& modifiers)
     {

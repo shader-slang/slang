@@ -10,7 +10,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry main -conformance NestedPtrImpl:IFoo -conformance ArrayPtrImpl:IFoo
 
-dyn interface IFoo
+interface IFoo
 {
     float get();
 };

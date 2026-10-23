@@ -230,7 +230,7 @@ SLANG_UNIT_TEST(functionReflection)
     // More testing for specializeWithArgTypes
     //
 
-    // bar1 (IFloat, IFloat) -> int
+    // `bar1` takes two boxed `IFloat` values and returns `int`.
     //
     auto bar1Reflection = module->getLayout()->findFunctionByName("bar1");
     SLANG_CHECK(bar1Reflection != nullptr);
@@ -247,9 +247,11 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK(resolvedFunctionReflection != nullptr);
     SLANG_CHECK(resolvedFunctionReflection->getParameterCount() == 2);
     SLANG_CHECK(
-        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(0)->getType()) == "IFloat");
+        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(0)->getType()) ==
+        "dyn IFloat");
     SLANG_CHECK(
-        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(1)->getType()) == "IFloat");
+        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(1)->getType()) ==
+        "dyn IFloat");
 
     // bar2 (T : IFloat, float3) -> int
     //

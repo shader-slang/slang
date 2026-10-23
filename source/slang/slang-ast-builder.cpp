@@ -958,6 +958,34 @@ Type* ASTBuilder::getAndType(Type* left, Type* right)
     return type;
 }
 
+ExistentialType* ASTBuilder::getExistentialType(Type* interfaceType)
+{
+    SLANG_RELEASE_ASSERT(interfaceType);
+    interfaceType = interfaceType->getCanonicalType();
+    SLANG_RELEASE_ASSERT(isDeclRefTypeOf<InterfaceDecl>(interfaceType));
+    return getOrCreate<ExistentialType>(interfaceType);
+}
+
+ExistentialDifferentiabilityWitness* ASTBuilder::getExistentialDifferentiabilityWitness(
+    ExistentialType* boxType,
+    SubtypeWitness* interfaceWitness)
+{
+    // The proof starts at the interface inside the box. We derive the metadata's supertype from
+    // the proof so callers cannot record a different differentiability interface.
+    SLANG_RELEASE_ASSERT(boxType);
+    SLANG_RELEASE_ASSERT(interfaceWitness);
+    SLANG_RELEASE_ASSERT(boxType->getInterfaceType()->equals(interfaceWitness->getSub()));
+    auto differentiabilityInterface = interfaceWitness->getSup();
+    if (!differentiabilityInterface->equals(getDifferentiableInterfaceType()))
+        SLANG_RELEASE_ASSERT(
+            differentiabilityInterface->equals(getDifferentiableRefInterfaceType()));
+
+    return getOrCreate<ExistentialDifferentiabilityWitness>(
+        boxType,
+        differentiabilityInterface,
+        interfaceWitness);
+}
+
 Type* ASTBuilder::getModifiedType(Type* base, Count modifierCount, Val* const* modifiers)
 {
     auto type = getOrCreate<ModifiedType>(base, makeArrayView((Val**)modifiers, modifierCount));

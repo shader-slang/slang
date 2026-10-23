@@ -1,6 +1,5 @@
-// Explicitly specializing a generic interface method with an interface
-// type should be rejected with the same existential-specialization
-// diagnostic as the implicit form. Previously this crashed in typeflow.
+// Explicitly specializing a generic interface method with an existential box is rejected
+// because the box does not conform to the stored interface. This check happens before typeflow.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
@@ -45,7 +44,7 @@ void computeMain(int id : SV_DispatchThreadID)
     IBar b = createDynamicObject<IBar>(id, 0);
     IFoo df = createDynamicObject<IFoo>(id, 0);
     int result = b.eval<IFoo>(df);
-//CHECK:                     ^ error E33180
-//CHECK:                     ^ specializing 'B.eval' with an existential type is not allowed.
+//CHECK:           ^^^^ type argument doesn't conform to interface
+//CHECK:           ^^^^ type argument 'dyn IFoo' does not conform to the required interface 'IFoo'
     outputBuffer[0] = result;
 }

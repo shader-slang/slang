@@ -2750,6 +2750,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             }
             return structLayout;
         }
+        else if (as<ExistentialType>(type))
+        {
+            // A box has no fixed set of varying registers until its concrete type is selected.
+            return nullptr;
+        }
         // Catch declaration-reference types late in the sequence, since
         // otherwise they will include all of the above cases...
         else if (auto declRefType = as<DeclRefType>(type))
@@ -2936,10 +2941,6 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 RefPtr<TypeLayout> assocTypeLayout = new TypeLayout();
                 assocTypeLayout->type = type;
                 return assocTypeLayout;
-            }
-            else if (declRef.as<InterfaceDecl>())
-            {
-                return nullptr;
             }
             else
             {
