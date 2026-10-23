@@ -470,26 +470,34 @@ class InOutImplicitCastExpr : public LValueImplicitCastExpr
     }
 };
 
-/// A cast of a value to a super-type of its type.
+/// An implicit conversion justified by a subtype witness.
 ///
-/// The type being cast to is stored as this expression's `type`.
+/// This represents a concrete base projection or equality cast, or packing/upcasting an
+/// existential box. Box conversions carry a proof about the payload's interface rather than
+/// a conformance to the box type itself. The result type is this expression's `type`.
 ///
 FIDDLE()
 class CastToSuperTypeExpr : public Expr
 {
     FIDDLE(...)
-    /// The value being cast to a super type
+    /// The value being converted.
     ///
     /// The type being cast from is `valueArg->type`.
     ///
     FIDDLE() Expr* valueArg = nullptr;
 
-    /// A witness showing that `valueArg`'s type is a sub-type of this expression's `type`
+    /// The proof justifying the conversion.
+    ///
+    /// For concrete base or equality casts, its endpoints are `valueArg->type` and `type`.
+    /// For box packing, the target endpoint is the interface inside the result box.
+    /// For a box-to-box upcast, both endpoints are the interfaces inside the two boxes.
     FIDDLE() Val* witnessArg = nullptr;
 };
 
-/// A `value is Type` expression that evaluates to `true` if type of `value` is a sub-type of
-/// `Type`.
+/// A `value is Type` expression that tests a value's type or a type-level subtype relation.
+///
+/// For a boxed value, the test concerns its hidden payload. A type-level operand denotes the
+/// type being tested directly, without opening it.
 FIDDLE()
 class IsTypeExpr : public Expr
 {
@@ -497,7 +505,9 @@ class IsTypeExpr : public Expr
     FIDDLE() Expr* value = nullptr;
     FIDDLE() TypeExp typeExpr;
 
-    // A witness showing that `typeExpr.type` is a subtype of `typeof(value)`.
+    // For a runtime payload test, this proves that `typeExpr.type` conforms to the interface
+    // constraining the opened `value`. For an optional-constraint test, this is instead the
+    // forward proof from the tested type or payload constraint to `typeExpr.type`.
     FIDDLE() Val* witnessArg = nullptr;
 
     // non-null if evaluates to a constant.
@@ -513,7 +523,8 @@ class AsTypeExpr : public Expr
     FIDDLE() Expr* value = nullptr;
     FIDDLE() Expr* typeExpr = nullptr;
 
-    // A witness showing that `typeExpr` is a subtype of `typeof(value)`.
+    // For a runtime payload cast, this proves that the target type conforms to the interface
+    // constraining the opened `value`. A statically proven cast uses `MakeOptionalExpr` instead.
     FIDDLE() Val* witnessArg = nullptr;
 };
 
@@ -956,6 +967,17 @@ class AndTypeExpr : public Expr
     FIDDLE(...)
     FIDDLE() TypeExp left;
     FIDDLE() TypeExp right;
+};
+
+/// A type expression of the form `dyn IFoo` that denotes an existential box type.
+///
+/// The `interfaceType` operand names the interface to be boxed. Semantic checking rejects operands
+/// that do not denote a single interface, including conjunctions and existential box types.
+FIDDLE()
+class ExistentialTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp interfaceType;
 };
 
 /// A type exprssion that applies one or more modifiers to another type

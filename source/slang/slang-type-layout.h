@@ -1099,13 +1099,11 @@ public:
     Index paramIndex = 0;
 };
 
-/// Layout information for an interface/existential type
+/// Layout information for an existential box type.
 ///
-/// This class is used to represent the layout of an interface type
-/// such as `IThing`, including both the information about the
-/// space consumed by the existential itself (including, e.g., the
-/// RTTI and witness-table infromation), along with any
-/// "pending" data related to legacy static specialization.
+/// For a type such as `dyn IThing`, the layout records the storage consumed by the packed value,
+/// RTTI, and witness table, along with any pending data for static specialization.
+/// Canonicalizing `type` yields an `ExistentialType`; an interface constraint has no data layout.
 ///
 class ExistentialTypeLayout : public TypeLayout
 {

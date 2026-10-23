@@ -17,13 +17,19 @@ void parseSourceFile(
     Scope* outerScope,
     ContainerDecl* parentDecl);
 
+/// Parse an unchecked standalone expression in `outerScope`.
+///
+/// `outerScope` is the lookup root for ordinary and explicitly global (`::`) references; no
+/// containing module is required. The caller supplies the effective source language and language
+/// version after preprocessing. Parsing diagnostics go to `sink`.
 Expr* parseTermFromSourceFile(
     ASTBuilder* astBuilder,
     TokenSpan const& tokens,
     DiagnosticSink* sink,
     Scope* outerScope,
     NamePool* namePool,
-    SourceLanguage sourceLanguage);
+    SourceLanguage sourceLanguage,
+    SlangLanguageVersion languageVersion);
 
 struct SemanticsVisitor;
 

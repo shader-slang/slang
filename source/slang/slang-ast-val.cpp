@@ -973,6 +973,43 @@ void TransitiveSubtypeWitness::_toTextOverride(StringBuilder& out)
         << toSlice(")");
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExistentialDifferentiabilityWitness
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ExistentialDifferentiabilityWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "ExistentialDifferentiabilityWitness(" << getSub() << ", " << getSup() << ", "
+        << getInterfaceWitness() << ")";
+}
+
+Val* ExistentialDifferentiabilityWitness::_resolveImplOverride()
+{
+    auto boxType = as<ExistentialType>(getSub()->resolve());
+    auto interfaceWitness = as<SubtypeWitness>(getInterfaceWitness()->resolve());
+    return getCurrentASTBuilder()->getExistentialDifferentiabilityWitness(
+        boxType,
+        interfaceWitness);
+}
+
+Val* ExistentialDifferentiabilityWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    // The box and its interface proof must use the same substituted generic arguments.
+    int diff = 0;
+    auto substitutedBox = as<ExistentialType>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto substitutedInterfaceWitness =
+        as<SubtypeWitness>(getInterfaceWitness()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return astBuilder->getExistentialDifferentiabilityWitness(
+        substitutedBox,
+        substitutedInterfaceWitness);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialSubtypeWitness
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

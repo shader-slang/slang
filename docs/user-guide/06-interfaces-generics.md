@@ -71,6 +71,42 @@ struct MyType2 : IFoo
 }
 ```
 
+### Existential Box Types
+
+An interface names a contract.
+The type `dyn IFoo` is an _existential box_: a value of an unknown concrete type that conforms to `IFoo`, packaged with the information needed to dispatch its requirements.
+For example:
+
+```slang
+int evaluate(dyn IFoo value)
+{
+    return value.myMethod(1.0);
+}
+```
+
+Use `IFoo` itself in constraints such as `<T : IFoo>` and conformance declarations such as `struct MyType : IFoo`.
+Use `dyn IFoo` where a value type is needed, such as a parameter, field, array element, or generic type argument.
+Legacy, Slang 2025, and Slang 2026 also accept a bare interface in these value-type contexts and implicitly form its box type.
+Slang 202c requires explicit `dyn`.
+The `dyn` operator does not enable additional dynamic-dispatch capabilities on a target.
+
+Type aliases preserve this distinction:
+
+```slang
+typealias Contract = IFoo;       // An interface.
+typealias Box = dyn IFoo;        // A value type.
+typealias Both = IFoo & IBar;    // A conjunction of interface contracts.
+```
+
+Conjunctions can be used in constraints and aliases, but existential boxes over conjunctions, including `dyn (IFoo & IBar)`, are not supported.
+Qualification and generic arguments belong to the operand of `dyn`; pointer and array suffixes apply to the box.
+Thus `dyn IFoo*` is a pointer to a box, and `dyn IFoo[4]` is an array of four boxes.
+
+A box does not itself conform to its interface.
+An implicitly opened box can supply its hidden payload to a constrained generic function, but explicitly using `dyn IFoo` as a type argument constrained by `IFoo` is an error.
+Calling a static requirement through a bare interface, such as `IFoo.required()`, also has no concrete conformance to dispatch and is rejected.
+Existential box types are currently not supported as the right-hand operand of `is` or `as`.
+
 ## Generics
 
 Generics can be used to eliminate duplicate code for shared logic that operates on different types. The following example shows how to define a generic method in Slang.

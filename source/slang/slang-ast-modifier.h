@@ -114,12 +114,6 @@ class ExternModifier : public Modifier
 };
 
 FIDDLE()
-class DynModifier : public Modifier
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
 class HLSLExportModifier : public Modifier
 {
     FIDDLE(...)
