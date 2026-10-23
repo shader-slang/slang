@@ -2936,6 +2936,17 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             operands.getBuffer());
     }
 
+    // The AST encodes a reference parameter's access in the class of its wrapper type, while
+    // `IRRefParamType` records it as an operand after the value type.
+    IRType* visitRefParamTypeBase(RefParamTypeBase* type)
+    {
+        auto paramInfo = getParamInfoFromTypeWithModeWrapper(type);
+        return getBuilder()->getRefParamType(
+            lowerType(context, paramInfo.type),
+            getRefParamPassingModeAccess(paramInfo.mode),
+            AddressSpace::Generic);
+    }
+
     IRType* visitResourceType(ResourceType* type) { return lowerSimpleIntrinsicType(type); }
 
     IRType* visitSamplerStateType(SamplerStateType* type) { return lowerSimpleIntrinsicType(type); }
@@ -3482,7 +3493,9 @@ void addArg(
         addSimpleArg(context, ioArgs, argVal);
         break;
 
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         {
             // The next easiest case is the `ref` parameter passing
             // mode, because we always want to pass a pointer to
@@ -3670,7 +3683,9 @@ void addCallArgsForParam(
 {
     switch (paramPassingMode)
     {
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
     case ParamPassingMode::BorrowIn:
     case ParamPassingMode::Out:
     case ParamPassingMode::BorrowInOut:
@@ -3701,9 +3716,16 @@ void addCallArgsForParam(
 
 ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
+    if (paramDecl->hasModifier<RefReadOnlyModifier>())
+        return ParamPassingMode::RefReadOnly;
+    if (paramDecl->hasModifier<RefWriteOnlyModifier>())
+        return ParamPassingMode::RefWriteOnly;
     if (paramDecl->hasModifier<RefModifier>())
     {
-        return ParamPassingMode::Ref;
+        // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`.
+        if (paramDecl->hasModifier<ConstModifier>())
+            return ParamPassingMode::RefReadOnly;
+        return ParamPassingMode::RefReadWrite;
     }
     if (paramDecl->hasModifier<BorrowModifier>() || paramDecl->hasModifier<HLSLPayloadModifier>())
     {
@@ -4167,8 +4189,13 @@ void _lowerInfoFromFuncParameters(
         case ParamPassingMode::BorrowInOut:
             irParamType = builder->getBorrowInOutParamType(irParamType);
             break;
-        case ParamPassingMode::Ref:
-            irParamType = builder->getRefParamType(irParamType, AddressSpace::Generic);
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
+            irParamType = builder->getRefParamType(
+                irParamType,
+                getRefParamPassingModeAccess(paramInfo.actualParamPassingModeToUse),
+                AddressSpace::Generic);
             break;
         case ParamPassingMode::BorrowIn:
             irParamType = builder->getBorrowInParamType(irParamType, AddressSpace::Generic);
@@ -9262,9 +9289,27 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     }
 };
 
+// Resolve token-pasted names to the source that produced them for debug attribution.
+// For example, `void test_##name()` has a name in a synthetic, pathless source view.
+// That view retains the location of the paste, which may itself come from another paste.
+// Keep the AST location intact for diagnostics, and use the same resolved location for
+// both the debug source and its line/column information.
+static SourceLoc _getDebugSourceLoc(SourceManager* sourceManager, SourceLoc loc)
+{
+    while (auto view = sourceManager->findSourceView(loc))
+    {
+        if (view->getSourceFile()->getPathInfo().type != PathInfo::Type::TokenPaste ||
+            !view->getInitiatingSourceLoc().isValid())
+            break;
+        loc = view->getInitiatingSourceLoc();
+    }
+    return loc;
+}
+
 IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
 {
     auto sourceManager = context->getLinkage()->getSourceManager();
+    loc = _getDebugSourceLoc(sourceManager, loc);
     auto sourceView = sourceManager->findSourceView(loc);
     if (!sourceView)
         return nullptr;
@@ -9473,6 +9518,7 @@ static HumaneSourceLoc _getDebugHumaneLoc(
     SourceLoc loc)
 {
     auto sourceManager = context->getLinkage()->getSourceManager();
+    loc = _getDebugSourceLoc(sourceManager, loc);
     auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
     humaneLoc.column =
         _clampDebugColumn(context, debugSourceInst, humaneLoc.line, humaneLoc.column);
@@ -9540,7 +9586,8 @@ void maybeEmitDebugLine(
         return;
 
     auto sourceManager = context->getLinkage()->getSourceManager();
-    auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
+    auto humaneLoc =
+        sourceManager->getHumaneLoc(_getDebugSourceLoc(sourceManager, loc), SourceLocType::Emit);
     IRIntegerValue colStart = humaneLoc.column;
     IRIntegerValue colEnd = humaneLoc.column + 1;
     _clampDebugLineColumns(context, debugSourceInst, humaneLoc.line, colStart, colEnd);
@@ -11569,7 +11616,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (isGlobalDecl(decl))
         {
             if (decl->hasModifier<HLSLStaticModifier>())
-                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeMutableVarDecoration);
         }
 
         if (auto initExpr = decl->initExpr)
@@ -11640,12 +11687,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Mutable shadows have the storage rules of file/namespace `static` variables.
         // We record that category for validation of types resolved during linking.
-        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeMutableVarDecoration);
 
         // Next, we emit the initializer's return value. `getSimpleVal` obtains an ordinary
-        // parameter value directly, or loads the contents of a legacy `cbuffer`. The
-        // `MoveGlobalVarInitializationToEntryPointsPass` later emits a store at each entry point;
-        // on HLSL paths it may instead leave initialization for emission in the declaration.
+        // parameter value directly, or loads the contents of a legacy `cbuffer`.
+        // `moveGlobalVarInitializationToEntryPoints` examines all global initializers before
+        // resource-global replacement. It moves the shadow's initializer into entry points when
+        // the shadow will be replaced or the target requires per-entry-point initialization.
+        // Otherwise, emission retains the initializer at module scope.
         beginGlobalVarInitializer(builder, storage);
         builder->emitReturn(getSimpleVal(subContext, initialValue));
 

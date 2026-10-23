@@ -89,6 +89,12 @@ bool Test_Scalar()
         // WGSL: pow(
         && zero == pow<T>(zero, one)
 
+        // WGSL: inverseSqrt(
+        && one == rsqrt<T>(one)
+
+        // WGSL: ) % (
+        && zero == fmod<T>(zero, one)
+
         // WGSL: round(
         && zero == round<T>(zero)
 

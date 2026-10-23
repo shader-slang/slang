@@ -765,7 +765,9 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
     {
     case ParamPassingMode::BorrowInOut:
     case ParamPassingMode::Out:
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         isLVal = true;
         break;
     }
@@ -799,7 +801,7 @@ static QualType getParamQualType(Type* paramType)
             isLVal = true;
         if (as<OutParamType>(paramDirType))
             isLVal = true;
-        if (as<RefParamType>(paramDirType))
+        if (as<RefParamTypeBase>(paramDirType))
             isLVal = true;
     }
     return QualType(unwrapModifiedType(valueType), isLVal);
@@ -1667,6 +1669,13 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
 
                 callExpr->originalFunctionExpr = callExpr->functionExpr;
                 callExpr->functionExpr = baseExpr;
+
+                // `ConstructLookupResultExpr` can diagnose an invalid member reference (e.g. a
+                // non-static member named from a static function) after overload selection,
+                // which leaves a valid candidate result type but a callee with `ErrorType`.
+                if (IsErrorExpr(baseExpr))
+                    return CreateErrorExpr(callExpr);
+
                 callExpr->type = QualType(candidate.resultType);
 
                 // A call may yield an l-value, and we should take a look at the candidate to be
@@ -1978,13 +1987,32 @@ int SemanticsVisitor::CompareLookupResultItems(
     // If both left and right are extern, then they are equal.
     // If only one of them is extern, then the other one is preferred.
     // If neither is extern, then we continue with the rest of the checks.
-    if (leftIsExtern)
+    //
+    // The preference only applies when the two candidates are one function (an `extern`
+    // declaration and its definition). Two functions with different signatures are distinct
+    // overloads, and `extern` must not make one of them win.
+    bool isSameFunction = true;
+    if (leftIsExtern != rigthIsExtern)
     {
-        return (rigthIsExtern ? 0 : 1);
+        auto leftFunc = as<FuncDecl>(left.declRef.getDecl());
+        auto rightFunc = as<FuncDecl>(right.declRef.getDecl());
+        if (leftFunc && rightFunc)
+        {
+            isSameFunction = doFunctionSignaturesMatch(
+                left.declRef.as<FuncDecl>(),
+                right.declRef.as<FuncDecl>());
+        }
     }
-    if (rigthIsExtern)
+    if (isSameFunction)
     {
-        return (leftIsExtern ? -1 : 0);
+        if (leftIsExtern)
+        {
+            return (rigthIsExtern ? 0 : 1);
+        }
+        if (rigthIsExtern)
+        {
+            return -1;
+        }
     }
 
     // If one of the candidates is a free-form extension, it is always worse than
@@ -3885,7 +3913,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 {
                 case ParamPassingMode::Out:
                 case ParamPassingMode::BorrowInOut:
-                case ParamPassingMode::Ref:
+                case ParamPassingMode::RefReadWrite:
+                case ParamPassingMode::RefReadOnly:
+                case ParamPassingMode::RefWriteOnly:
                 case ParamPassingMode::BorrowIn:
                     break;
                 default:
