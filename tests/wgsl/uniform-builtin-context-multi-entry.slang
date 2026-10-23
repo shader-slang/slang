@@ -3,9 +3,11 @@
 
 // When a module with several entry points is compiled into one output (`-whole-program`),
 // `translateGlobalVaryingVar` links the lane-count shadow to the parameter of only the first entry
-// point that reads it (shader-slang/slang#13687). If the shadow were moved into a context, `mainB`
-// would pass an uninitialized value to `laneCount`, so the shadow stays a `var<private>` until
-// every entry point that reaches a read is linked.
+// point that reads it (shader-slang/slang#13687), so `mainB` never initializes it in either form.
+// The shadow stays a `var<private>`, which leaves the module where it was before contexts: Tint
+// rejects it whenever uniformity matters, instead of accepting a context that would silently carry a
+// wrong value. These checks therefore pin output that is known to be wrong for `mainB`; a fix for
+// shader-slang/slang#13687 is expected to change them.
 
 // CHECK: var<private> [[V:[A-Za-z0-9_]+]] : u32;
 // CHECK: fn laneCount{{[_0-9]*}}() -> u32

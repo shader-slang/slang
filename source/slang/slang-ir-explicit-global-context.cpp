@@ -112,9 +112,12 @@ static bool doesFuncReachGlobal(IRFunc* func, IRInst* globalVar, HashSet<IRFunc*
 //
 // `translateGlobalVaryingVar` emits exactly one initialization per linked entry point, at the top
 // of its first block, so equal counts with every store in a linked entry block identify those
-// initializations without matching their values. An entry point that reaches a read of the global
-// without being linked to it would read an uninitialized context, so such a module keeps the
-// `var<private>` (see shader-slang/slang#13687).
+// initializations without matching their values.
+//
+// An entry point that reaches a read of the global without being linked to it gets no
+// initialization in either form (shader-slang/slang#13687). Keeping the `var<private>` there leaves
+// such a module where it was: Tint rejects it whenever uniformity matters, instead of accepting a
+// context that would silently carry a wrong value.
 static bool isWorkgroupUniformInputShadow(IRInst* globalVar)
 {
     List<IRFunc*> shadowingEntryPoints;
@@ -507,6 +510,8 @@ struct IntroduceExplicitGlobalContextPass
             //
             auto globalVar = m_globalVars[0];
             m_contextType = globalVar->getDataType()->getValueType();
+            // An empty entry (no field key, no dereference) keeps the lookups shared with the
+            // struct path valid.
             m_mapInstToContextFieldInfo.add(globalVar, ContextFieldInfo{});
             if (auto nameHint = findShadowedInputNameHint(globalVar))
                 m_contextNameHint = nameHint->getName();
