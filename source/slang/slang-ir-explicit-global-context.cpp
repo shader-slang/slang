@@ -3,6 +3,7 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -12,6 +13,107 @@ namespace Slang
 // that are actually scoped to a single shader thread or
 // thread-group, and wrap them up in an explicit "context"
 // type that gets passed between functions.
+//
+// WGSL can keep thread-local globals as `var<private>`, but its uniformity analysis treats
+// every read of one as possibly non-uniform. On WGSL the pass therefore moves only the shadow
+// copies of workgroup-uniform built-in inputs, so that subgroup operations and barriers whose
+// control flow depends on those values still validate.
+
+// Return whether `user`, an instruction that uses an address, only reads the memory at that
+// address, either directly or through element and field addresses derived from it.
+static bool isReadOnlyAddressUse(IRInst* user)
+{
+    switch (user->getOp())
+    {
+    case kIROp_Load:
+        return true;
+    case kIROp_GetElementPtr:
+    case kIROp_FieldAddress:
+        for (auto use = user->firstUse; use; use = use->nextUse)
+        {
+            if (!isReadOnlyAddressUse(use->getUser()))
+                return false;
+        }
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Return whether `param` is a parameter of a compute entry point whose system-value semantic
+// holds a workgroup-uniform value.
+static bool isWorkgroupUniformEntryPointInput(IRInst* param)
+{
+    auto func = getParentFunc(param);
+    auto entryPointDecor = func ? func->findDecoration<IREntryPointDecoration>() : nullptr;
+    if (!entryPointDecor)
+        return false;
+
+    // `translateGlobalVaryingVar` gives every parameter it creates for a global input a layout.
+    auto varLayout = findVarLayout(param);
+    SLANG_RELEASE_ASSERT(varLayout);
+    auto semanticAttr = varLayout->findSystemValueSemanticAttr();
+    if (!semanticAttr)
+        return false;
+    return isWorkgroupUniformSystemValue(
+        convertSystemValueSemanticNameToEnum(String(semanticAttr->getName())),
+        entryPointDecor->getProfile().getStage());
+}
+
+// Return whether `globalVar` is a shadow copy that `translateGlobalVaryingVar` made of a
+// workgroup-uniform built-in input, and whether its value stays uniform.
+//
+// Consider this example:
+//
+//     in uint gLaneCount : SV_WaveLaneCount;
+//     [noinline] uint numWaves() { return 256 / gLaneCount; }
+//
+// `translateGlobalVaryingVar` gives the entry point a `gLaneCount` parameter, stores that
+// parameter into the global at the top of the entry block, and links the two with a
+// `GlobalVariableShadowingGlobalParameterDecoration` on the parameter. The global qualifies when
+// at least one such link exists, every linked parameter belongs to a compute entry point and has
+// a workgroup-uniform semantic, and the only stores are those initializations. A shader can
+// also write to a global input (`gLaneCount = 3;`), and such a write could make the value
+// non-uniform, so any other store, or any use that lets the address escape, disqualifies it.
+static bool isWorkgroupUniformInputShadow(IRInst* globalVar)
+{
+    List<IRFunc*> shadowingEntryPoints;
+    List<IRStore*> stores;
+    for (auto use = globalVar->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (user->getOp() == kIROp_GlobalVariableShadowingGlobalParameterDecoration)
+        {
+            auto param = user->getParent();
+            if (!isWorkgroupUniformEntryPointInput(param))
+                return false;
+            shadowingEntryPoints.add(getParentFunc(param));
+            continue;
+        }
+        if (as<IRDecoration>(user))
+            continue;
+        if (auto store = as<IRStore>(user))
+        {
+            if (use != store->getPtrUse())
+                return false;
+            stores.add(store);
+            continue;
+        }
+        if (!isReadOnlyAddressUse(user))
+            return false;
+    }
+
+    if (shadowingEntryPoints.getCount() == 0 ||
+        stores.getCount() != shadowingEntryPoints.getCount())
+        return false;
+    for (auto store : stores)
+    {
+        auto func = getParentFunc(store);
+        if (!shadowingEntryPoints.contains(func) || store->getParent() != func->getFirstBlock())
+            return false;
+    }
+    return true;
+}
 
 enum class GlobalObjectKind : UInt
 {
@@ -70,6 +172,10 @@ struct IntroduceExplicitGlobalContextPass
                     (UInt)HoistGlobalVarOptions::RaytracingGlobal);
                 break;
             }
+
+            // A global passed by value loses writes made outside the entry point, so that option
+            // is only combined with the filter that admits globals no other function writes.
+            SLANG_ASSERT(!passSoleValueByValue || hoistOnlyWorkgroupUniformInputShadows);
         }
 
         bool canHoistType(GlobalObjectKind hoistable)
@@ -79,6 +185,9 @@ struct IntroduceExplicitGlobalContextPass
 
         bool canHoistGlobalVar(IRInst* inst)
         {
+            if (hoistOnlyWorkgroupUniformInputShadows && !isWorkgroupUniformInputShadow(inst))
+                return false;
+
             if (!((UInt)hoistGlobalVarOptions & (UInt)HoistGlobalVarOptions::SharedGlobal) &&
                 as<IRGroupSharedRate>(inst->getRate()))
                 return false;
@@ -128,6 +237,7 @@ struct IntroduceExplicitGlobalContextPass
         HoistGlobalVarOptions hoistGlobalVarOptions = HoistGlobalVarOptions::All;
         GlobalObjectKind hoistableGlobalObjectKind = GlobalObjectKind::All;
         bool requiresFuncTypeCorrectionPass = false;
+        bool hoistOnlyWorkgroupUniformInputShadows = false;
 
         // When exactly one global is hoisted, the context is that global's value itself rather
         // than a struct, and functions receive it by value. This is only correct when no
