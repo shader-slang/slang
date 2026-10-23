@@ -63,6 +63,12 @@ struct SPIRVEmitSharedContext
         m_voidType = builder.getVoidType();
     }
     SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic);
+
+    // Maps `FloatOrDouble` to `Float` or `Double` for matching result types, leaving `type`
+    // unchanged otherwise.
+    static SpvSnippet::ASMType resolveSnippetConstantType(
+        SpvSnippet::ASMType type,
+        IRType* resultType);
 };
 
 void legalizeIRForSPIRV(
