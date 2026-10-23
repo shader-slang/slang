@@ -3,7 +3,8 @@
 // Name lookup stops at the first scope level that has hits, unless one of those hits is
 // overloadable. Two `using namespace` directives in one scope make the named namespaces one
 // lookup level, so two same-named variables or types found through them are ambiguous with each
-// other, and a same-named declaration in an outer scope is not a candidate.
+// other, and a same-named declaration in an outer scope is not a candidate. The test checks every
+// diagnostic, so a candidate note for an outer declaration makes it fail.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
@@ -37,7 +38,8 @@ namespace Outer
 }
 
 // The same lookup with `C` and `D` nested in a namespace that does not contain the outer
-// variable `plugh`.
+// variable `plugh`. Unlike the first case, its expected result does not depend on how members
+// named by `using namespace` rank against the global namespace (shader-slang/slang#13750).
 static const int plugh = 789;
 
 namespace Nested
@@ -160,6 +162,40 @@ namespace Calls
             return k(7);
 //CHECK:            ^ E30016
 //CHECK:            ^ no call operation found for type 'int'
+        }
+    }
+}
+
+// Two same-named variables at one level also hide an outer struct type, so the name in a type
+// position does not refer to the type. A single variable already hides the outer type this way.
+struct Shape
+{
+    int c;
+}
+
+namespace TypePosition
+{
+    namespace SA
+    {
+        static const int Shape = 1;
+    }
+
+    namespace SB
+    {
+        static const int Shape = 2;
+    }
+
+    namespace Inner
+    {
+        using namespace SA;
+        using namespace SB;
+
+        int get()
+        {
+            Shape s;
+//CHECK:    ^^^^^ E30060
+//CHECK:    ^^^^^ expected a type, got a 'overload group' for 'Shape'
+            return 0;
         }
     }
 }

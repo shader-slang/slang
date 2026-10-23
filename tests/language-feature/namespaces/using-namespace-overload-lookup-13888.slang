@@ -3,7 +3,8 @@
 // Name lookup continues to outer scopes when the first scope level with hits contains an
 // overloadable declaration, so that a call can still resolve to a function declared farther out.
 // When no declaration at that level is overloadable, the declarations there hide same-named
-// declarations in outer scopes, also when there are several of them.
+// declarations in outer scopes. In a type or extension scope, the level also holds the inherited
+// members, interface requirements and extension members that member lookup finds there.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
@@ -44,9 +45,24 @@ namespace Outer
             return f(1.5f);
         }
     }
+
+    // `addSiblingScopeForContainerDecl` puts the most recent `using namespace` first among the
+    // peers, so here the variable `A::f` is the first hit. Lookup still continues because the
+    // function `B::f` is on the same level.
+    namespace Reversed
+    {
+        using namespace B;
+        using namespace A;
+
+        int callFloat()
+        {
+            return f(1.5f);
+        }
+    }
 }
 
-// Functions found in an inner scope are not hidden by an outer variable of the same name.
+// `N` holds two overloads of `g`, so lookup continues and also finds the global variable `g`.
+// Overload resolution still picks `N::g(int)`, as it did on master.
 static const int g = 5;
 
 namespace N
@@ -69,7 +85,8 @@ namespace N
 
 // Inside `S`, lookup of `Count` finds the member `S::Count` and the requirement `IFoo::Count` at
 // one level. They hide the global `Count`, and the concrete member is preferred over the
-// requirement.
+// requirement. On master lookup also collected the global `Count`, and the reference was
+// ambiguous (E39999).
 static const int Count = 100;
 
 interface IFoo
@@ -88,7 +105,8 @@ struct S : IFoo
 }
 
 // Inside an extension of `E<int>`, lookup of `K` finds the `K` of both extensions at one level.
-// They hide the global `K`, and the less generic extension is preferred.
+// They hide the global `K`, and the less generic extension is preferred. On master lookup also
+// collected the global `K`, which won as a non-extension declaration, so `get()` returned 100.
 static const int K = 100;
 
 struct E<T>
@@ -111,7 +129,7 @@ extension E<int>
     }
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -132,4 +150,6 @@ void computeMain()
     e.a = 0;
     // CHECK: 2
     outputBuffer[4] = e.get();
+    // CHECK: 20
+    outputBuffer[5] = Outer.Reversed.callFloat();
 }
