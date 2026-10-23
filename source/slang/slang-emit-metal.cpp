@@ -1007,6 +1007,32 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             return true;
         }
         break;
+    case kIROp_GetElementPtr:
+        {
+            // MSL rejects the address of a vector element (`&v[i]` and `&v.x` alike), so we
+            // address an element through a scalar pointer to the vector,
+            // `((T <addrspace>*)(&v)) + i`; both `T<N>` and `packed_T<N>` store their elements as
+            // contiguous `T`s. Only uses that need the address itself, such as an atomic
+            // destination, reach here: loads and stores go through `emitDereferenceOperand`.
+            auto basePtrType = as<IRPtrTypeBase>(inst->getOperand(0)->getDataType());
+            if (!basePtrType)
+                break;
+            auto baseValueType = unwrapAttributedType(basePtrType->getValueType());
+            if (!as<IRVectorType>(baseValueType) && !as<IRMetalPackedVectorType>(baseValueType))
+                break;
+
+            EmitOpInfo outerPrec = inOuterPrec;
+            auto prec = getInfo(EmitOp::Add);
+            bool needClose = maybeEmitParens(outerPrec, prec);
+            m_writer->emit("((");
+            emitType(inst->getDataType());
+            m_writer->emit(")(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")) + ");
+            emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
+            maybeCloseParens(needClose);
+            return true;
+        }
     case kIROp_RWStructuredBufferGetElementPtr:
         {
             EmitOpInfo outerPrec = inOuterPrec;
