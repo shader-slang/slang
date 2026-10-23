@@ -333,7 +333,6 @@ struct IntroduceExplicitGlobalContextPass
     IRPtrType* m_contextPtrType = nullptr;
     bool m_passContextByValue = false;
 
-    // The name hint given to every context variable and parameter.
     UnownedStringSlice m_contextNameHint = UnownedTerminatedStringSlice("kernelContext");
 
     struct GlobalParamInfo
