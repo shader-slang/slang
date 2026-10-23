@@ -98,4 +98,17 @@ enum class SystemValueSemanticName
 
 SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticName);
 
+/// Return whether WGSL's uniformity analysis treats the built-in input that `semantic` maps to as
+/// uniform across a whole workgroup of a `stage` shader, so that control flow depending only on it
+/// stays uniform for subgroup operations and workgroup barriers alike.
+///
+/// The WGSL specification's "Uniformity Rules for Expressions" lists `workgroup_id`,
+/// `num_workgroups`, `subgroup_size` and `num_subgroups` as uniform built-in inputs of a compute
+/// shader. Of these, only `workgroup_id` (`SV_GroupID`) and `subgroup_size` (`SV_WaveLaneCount`)
+/// have a Slang system-value semantic. `subgroup_id` (`SV_WaveIndex`) is uniform only within a
+/// subgroup, and outside compute shaders none of these values is uniform. Other targets can differ;
+/// for example, whether the lane count is workgroup-uniform on Vulkan depends on subgroup-size
+/// control.
+bool isWGSLWorkgroupUniformSystemValue(SystemValueSemanticName semantic, Stage stage);
+
 } // namespace Slang
