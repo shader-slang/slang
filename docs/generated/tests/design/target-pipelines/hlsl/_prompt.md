@@ -278,9 +278,17 @@ These are in addition to `_common.md` and `pipeline-06-emit.md`.
   `(buf).Load<T>(...)` in HLSL emit.** `RWByteAddressBuffer.Store`
   lowers to a `Store(offset, val)` form (no template parameter on
   scalar stores).
-- **`#line N "<file>"` directives appear in HLSL emit by default**
-  and may reference `core.meta.slang` / `hlsl.meta.slang` for
-  core-module-sourced items. Use a wildcard for the file name.
+- **HLSL emit writes `#line N "<file>"` directives by default, and
+  each names the file that the emitted code's source location is
+  in.** Use a wildcard for the file name. A meta-module function gets a meta-module `#line` when
+  it keeps a Slang body on HLSL (no HLSL `__intrinsic_asm`) and is
+  not force-inlined (no `[ForceInline]`, `[__unsafeForceInlineEarly]`
+  or `__intrinsic_op`): HLSL emit then writes it as its own function
+  at its meta-module location, for example `exp10`
+  (`hlsl.meta.slang`) and tuple `concat` (`core.meta.slang`).
+  Inlined code takes the call site's location. The split `Sampler2D`
+  texture and sampler globals take the location of the user's
+  `Sampler2D` global, so they get a user-file `#line`.
 - **Enum lowering eats the enumerator name.** `Color.Green` becomes
   `int(1)` in HLSL emit; there is no surviving `Green` identifier.
 - **HLSL output always emits `void main(...)`** for an entry point

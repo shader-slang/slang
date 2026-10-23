@@ -9,21 +9,33 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Using a built-in that draws from `hlsl.meta.slang` /
-// `core.meta.slang` causes the `SourceWriter` to emit `#line`
-// directives that point at the meta-module sources.
+// A `#line` names the file that the emitted code's source location is in.
+// `exp10` (hlsl.meta.slang) and `concat` (core.meta.slang) keep a Slang body
+// on HLSL and have no `[ForceInline]`, `[__unsafeForceInlineEarly]` or
+// `__intrinsic_op`, so each is emitted as its own function under a
+// meta-module `#line`. Only these two calls matter to the meta CHECKs.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=HLSLMETA):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=COREMETA):-target hlsl -entry main -stage compute
 
-Sampler2D combined;
-RWStructuredBuffer<float4> outBuf;
+RWStructuredBuffer<float> outBuf;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
-    outBuf[tid.x] = combined.SampleLevel(float2(0.5, 0.5), 0);
+    let pair = concat(makeTuple(float(tid.x)), makeTuple(2.0f));
+    outBuf[tid.x] = exp10(pair._0) + pair._1;
 }
 
+// CHECK-DAG: #line {{[0-9]+}} "{{.*}}line-directive-references-core-meta.slang"
 // CHECK-DAG: #line {{[0-9]+}} "{{.*}}core.meta.slang"
 // CHECK-DAG: #line {{[0-9]+}} "{{.*}}hlsl.meta.slang"
+
+// A type declaration can also emit a meta-module `#line`, so each of these
+// checks binds the directive to the function it should precede.
+// HLSLMETA: #line {{[0-9]+}} "{{.*}}hlsl.meta.slang"
+// HLSLMETA-NEXT: exp10_{{[0-9]+}}(
+// COREMETA: #line {{[0-9]+}} "{{.*}}core.meta.slang"
+// COREMETA-NEXT: concat_{{[0-9]+}}(
