@@ -767,6 +767,12 @@ bool isPointerToImmutableLocation(IRInst* ptrInst);
 
 // Check if `use` is the `baseAddr` operand of a GetElement/FieldExtract inst.
 // This is true if `use` is the first operand of the user inst.
+// Whether `load` has an attribute that describes the whole memory access (an alignment or a
+// memory scope). Such a load cannot be split into loads of its parts, or deferred to a load of a
+// part, without losing the attribute: a part at another offset may not have that alignment, and
+// the memory-scope semantics apply to the access as written.
+bool hasWholeAccessAttr(IRInst* load);
+
 inline bool isUseBaseAddrOperand(IRUse* use, IRInst* user)
 {
     return user->getOperandUse(0) == use;
