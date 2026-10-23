@@ -8263,6 +8263,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         maybeEmitPointerDecoration(varInst, inst->getDataType(), as<IRVar>(inst), inst->getOp());
     }
 
+    /// Decorate `varInst` with `NonReadable` when the global parameter `inst` holds a
+    /// write-only texture (`WTexture*`) or an array of them, including the unsized-array
+    /// heap that `DescriptorHandle<WTexture*>` indexes. The decoration goes on the variable
+    /// and every array element has the same access, so we decide it from the element type,
+    /// as `GLSLSourceEmitter::emitImageFormatModifierImpl` does when it emits `writeonly`.
     void maybeEmitWriteOnlyImageDecoration(SpvInst* varInst, IRInst* inst)
     {
         auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
