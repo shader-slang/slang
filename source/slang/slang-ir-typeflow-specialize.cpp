@@ -4735,6 +4735,31 @@ struct TypeFlowSpecializationContext
                 WorkItem(InterproceduralEdge::Direction::CallToFunc, context, inst, callee));
         };
 
+        // A set-specialized generic takes one runtime tag per dynamic witness-table argument, and
+        // `specializeCall` reads those tags from the arguments of the function-local `Specialize`
+        // that the call names as its callee. A call that reaches such a generic any other way has
+        // no tag in scope, and the type-flow pass does not yet represent one that a witness table
+        // or struct value could carry. Consider `use(make_target(b))` where `b` is a dynamic
+        // `IBSDF` and `use<T : ITarget>` calls `target.value()`: `T` is `Target<UntaggedUnion>`,
+        // its `ITarget` witness table is specialized over the set of `IBSDF` witness tables, and
+        // the table's `value` entry is a set-specialized generic that `use` has no tag for. That
+        // entry has no function type, so we report E33180 here, before the code below reads the
+        // callee's `IRFuncType`; without this check the compiler crashed on that null type.
+        //
+        // We classify the callee before resolving it, because `resolveInst` can remove it (a
+        // module-scope lookup is replaced by the witness entry it names). We assume a module-scope
+        // set-specialized `Specialize` does not reach this point as a callee: `specializeCall`
+        // installs one only together with its tag arguments, and the module pass lowers it to a
+        // function before the next type-flow round.
+        const bool calleeCarriesTags = as<IRSpecialize>(callee) && !isGlobalInst(callee);
+        auto diagnoseIfSetSpecializedCalleeLacksTags = [&](IRInst* resolvedCallee)
+        {
+            if (!isSetSpecializedGeneric(resolvedCallee) || calleeCarriesTags)
+                return false;
+            emitExistentialSpecializationDiagnostic(resolvedCallee, inst->sourceLoc, inst);
+            return true;
+        };
+
         auto convertArgInfosToParamInfos = [&](IRFuncType* calleeFuncType) -> List<IRInst*>
         {
             List<IRInst*> paramInfos;
@@ -4813,6 +4838,9 @@ struct TypeFlowSpecializationContext
                     module->getContainerPool().free(&funcs);
                     return none();
                 }
+                // Skip only this element, so the other callees in the set are still analyzed.
+                if (diagnoseIfSetSpecializedCalleeLacksTags(resolvedFunc))
+                    continue;
                 auto paramInfos =
                     convertArgInfosToParamInfos(cast<IRFuncType>(resolvedFunc->getDataType()));
                 if (auto boundCallee = maybeGetBoundFunc(resolvedFunc, paramInfos, workQueue))
@@ -4824,7 +4852,7 @@ struct TypeFlowSpecializationContext
         else if (isGlobalInst(callee))
         {
             auto resolvedCallee = translationContext.resolveInst(callee);
-            if (!resolvedCallee)
+            if (!resolvedCallee || diagnoseIfSetSpecializedCalleeLacksTags(resolvedCallee))
                 return none();
 
             auto paramInfos =
@@ -6990,7 +7018,6 @@ struct TypeFlowSpecializationContext
                     addArgsForSetSpecializedGeneric(cast<IRSpecialize>(callee), callArgs);
                     callee = selectedCallee;
                     effectiveFuncType = getEffectiveFuncType(callee);
-                    globalsWorkList.enqueue(callee);
                 }
             }
             else if (auto specCallee = as<IRSpecialize>(callee))
