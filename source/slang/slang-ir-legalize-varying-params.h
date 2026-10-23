@@ -98,4 +98,14 @@ enum class SystemValueSemanticName
 
 SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticName);
 
+/// Return whether a system-value input holds the same value for every invocation of a workgroup of
+/// a `stage` shader, so that control flow depending only on it stays uniform for subgroup
+/// operations and workgroup barriers alike.
+///
+/// WGSL §15.2.8 lists `workgroup_id`, `num_workgroups`, `subgroup_size` and `num_subgroups` as the
+/// uniform built-in inputs of a compute shader; `SV_GroupID` and `SV_WaveLaneCount` are the system
+/// values that map to them. `SV_WaveIndex` (`subgroup_id`) is uniform only within a subgroup, and
+/// outside compute shaders none of these values is uniform.
+bool isWorkgroupUniformSystemValue(SystemValueSemanticName semantic, Stage stage);
+
 } // namespace Slang
