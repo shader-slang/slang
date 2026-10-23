@@ -1,4 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+// Clarification is part of code generation, so it must not depend on the validation passes.
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -disable-non-essential-validations
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
 
 interface IMaybe

@@ -221,15 +221,17 @@ struct UnzippingContext
         }
     }
 
-    /// Splits a no_diff call or an absent optional derivative into the primal call and zero
-    /// differentials. Both out and inout outputs stop carrying the incoming tangent.
+    /// Splits a call without a backward derivative into the primal call and zero differentials.
+    /// Both out and inout outputs stop carrying the incoming tangent.
     InstPair splitCallWithoutBackwardDerivative(
         IRBuilder* primalBuilder,
         IRBuilder* diffBuilder,
         IRCall* mixedCall,
         IRInst* primalFunc)
     {
-        // Only a callee that is not differentiable at all has a zero derivative.
+        // A callee that has a forward derivative but no backward derivative loses a derivative
+        // here, which is an error unless the call is clarified, as in the differentiability
+        // checker. A callee that is not differentiable at all has a zero derivative.
         auto fwdFunc =
             diffTypeContext.tryGetAssociationOfKind(primalFunc, AnnotationKind::ForwardDerivative);
         if (fwdFunc && !isAbsentOptionalDerivative(fwdFunc) &&
@@ -292,8 +294,7 @@ struct UnzippingContext
         auto applyBwdFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
             AnnotationKind::BackwardDerivativeApply);
-        if (isAbsentOptionalDerivative(applyBwdFunc) ||
-            (!applyBwdFunc && mixedCall->findDecoration<IRTreatCallAsDifferentiableDecoration>()))
+        if (!applyBwdFunc || isAbsentOptionalDerivative(applyBwdFunc))
             return splitCallWithoutBackwardDerivative(
                 primalBuilder,
                 diffBuilder,

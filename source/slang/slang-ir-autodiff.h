@@ -602,6 +602,15 @@ bool isNeverDiffFuncType(IRFuncType* funcType);
 /// and looking up a requirement in that table produces IRVoidLit.
 bool isAbsentOptionalDerivative(IRInst* inst);
 
+/// Returns whether every argument that `call` passes to a differentiable parameter of `calleeType`
+/// is a compile-time constant. Such a call propagates no derivative through its arguments, so a
+/// differentiable function may make it without `no_diff`, as it may make a call that takes no
+/// differentiable arguments at all. `calleeType` must have one parameter per argument of `call`.
+bool hasOnlyConstantDifferentiableArgs(
+    DifferentiableTypeConformanceContext& diffTypeContext,
+    IRCall* call,
+    IRFuncType* calleeType);
+
 // True if `inst` is the value produced by a `bwd_diff(...)` operation, i.e. a callable
 // backward-derivative function. Unwraps `Specialize`/generic layers on the way in.
 bool isBackwardDerivativeValue(IRInst* inst);

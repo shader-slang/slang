@@ -458,6 +458,20 @@ static DeclRef<CallableDecl> getCallableDeclRefFromFuncTypeBase(Val* resolvedBas
     return DeclRef<CallableDecl>();
 }
 
+/// Returns the signature of the callable that a derivative function type is built from.
+/// Derivative function types pair each parameter of this signature with the differentiability
+/// witness at the same index, so the signature and `diffTypeWitness` must have the same number of
+/// parameters.
+static FuncType* getSignatureForDiffTypeWitness(
+    ASTBuilder* astBuilder,
+    Val* resolvedBase,
+    DiffTypeInfoWitness* diffTypeWitness)
+{
+    auto funcType = getFuncType(astBuilder, getCallableDeclRefFromFuncTypeBase(resolvedBase));
+    SLANG_RELEASE_ASSERT(funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
+    return funcType;
+}
+
 /// Returns the parameter mode produced by the backward-callable transformation.
 ///
 /// This mapping is shared by ordinary parameters and an effective `this` parameter after the
@@ -499,10 +513,7 @@ Val* BwdCallableFuncType::_resolveImplOverride()
         // If we have a concrete witness, we should be able to turn this into a concrete func-type.
         List<Type*> newParamTypes;
 
-        auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
-        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
-        SLANG_RELEASE_ASSERT(
-            funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
+        auto funcType = getSignatureForDiffTypeWitness(astBuilder, resolvedBase, diffTypeWitness);
 
         // First translate the this-type.
         // Get the differential value type and add it with flipped direction.
@@ -618,10 +629,7 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
         // If we have a concrete witness, we should be able to turn this into a concrete func-type.
         List<Type*> newParamTypes;
 
-        auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
-        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
-        SLANG_RELEASE_ASSERT(
-            funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
+        auto funcType = getSignatureForDiffTypeWitness(astBuilder, resolvedBase, diffTypeWitness);
 
         // The result type is Tuple<FuncResultType, MinimalContextType> when non-void,
         // or just MinimalContextType when the function returns void.
@@ -699,10 +707,7 @@ Val* RematFuncType::_resolveImplOverride()
     {
         List<Type*> newParamTypes;
 
-        auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
-        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
-        SLANG_RELEASE_ASSERT(
-            funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
+        auto funcType = getSignatureForDiffTypeWitness(astBuilder, resolvedBase, diffTypeWitness);
 
         // First parameter is always the MinimalCtxType.
         newParamTypes.add(resolvedMinimalCtxType);
@@ -790,10 +795,7 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         // If we have a concrete witness, we should be able to turn this into a concrete func-type.
         List<Type*> newParamTypes;
 
-        auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
-        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
-        SLANG_RELEASE_ASSERT(
-            funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
+        auto funcType = getSignatureForDiffTypeWitness(astBuilder, resolvedBase, diffTypeWitness);
 
         // The backward diff return type is void.
         auto resultType = astBuilder->getVoidType();
@@ -946,10 +948,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         List<Type*> newParamTypes;
 
         auto astBuilder = getCurrentASTBuilder();
-        auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
-        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
-        SLANG_RELEASE_ASSERT(
-            funcType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
+        auto funcType = getSignatureForDiffTypeWitness(astBuilder, resolvedBase, diffTypeWitness);
 
         auto thisParamType = diffTypeWitness->getThisParamType();
         if (thisParamType)

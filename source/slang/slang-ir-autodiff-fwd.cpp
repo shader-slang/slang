@@ -1331,38 +1331,43 @@ struct ForwardDiffTranslationContext
         IRInst* diffCallee = (this->diffTypeContext.tryGetAssociationOfKind(
             primalCallee,
             AnnotationKind::ForwardDerivative));
-
-        bool treatAsDifferentiable =
-            origCall->findDecoration<IRTreatCallAsDifferentiableDecoration>() != nullptr;
         auto backwardDerivative = diffTypeContext.tryGetAssociationOfKind(
             primalCallee,
             AnnotationKind::BackwardDerivativeApply);
         bool isHigherOrderCall = isHigherOrderDerivativeCall(origCall);
-        // Ordinary unannotated callees retain their primal-only transcription.
-        bool needsTrivialDerivative =
-            treatAsDifferentiable && (diffCallee || backwardDerivative || isHigherOrderCall) &&
-            (isForBackwardDiff
-                 ? !backwardDerivative || isAbsentOptionalDerivative(backwardDerivative)
-                 : !diffCallee || isAbsentOptionalDerivative(diffCallee));
-        if (!treatAsDifferentiable && isHigherOrderCall)
+
+        // A call is clarified when it is written as `no_diff(...)` or passes only constants to
+        // differentiable parameters; either way, an unavailable derivative contributes zero.
+        // We classify the call here rather than reading a decoration from the differentiability
+        // checker, because that checker is a validation pass that can be disabled. Ordinary
+        // unannotated callees retain their primal-only transcription and need no classification.
+        IRFuncType* calleeType = nullptr;
+        bool isClarifiedCall = false;
+        if (diffCallee || backwardDerivative || isHigherOrderCall)
         {
-            auto requiredDerivative = isForBackwardDiff
-                                          ? diffTypeContext.tryGetAssociationOfKind(
-                                                primalCallee,
-                                                AnnotationKind::BackwardDerivativeApply)
-                                          : diffCallee;
-            if (!requiredDerivative || isAbsentOptionalDerivative(requiredDerivative))
-            {
-                getSink()->diagnose(
-                    Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
-                        .diffLevel = isForBackwardDiff ? "backward" : "forward",
-                        .funcName = getResolvedInstForDecorations(primalCallee),
-                        .location = origCall->sourceLoc,
-                    });
-                return InstPair(maybeCloneForPrimalInst(builder, origCall), nullptr);
-            }
+            calleeType = _getCalleeActualFuncType(&diffTypeContext, primalCallee);
+            SLANG_ASSERT(calleeType);
+            isClarifiedCall =
+                origCall->findDecoration<IRTreatCallAsDifferentiableDecoration>() ||
+                hasOnlyConstantDifferentiableArgs(diffTypeContext, origCall, calleeType);
         }
 
+        // Reverse transcription builds forward IR first, but the derivative it eventually calls is
+        // the callee's backward derivative.
+        auto requiredDerivative = isForBackwardDiff ? backwardDerivative : diffCallee;
+        bool isRequiredDerivativeMissing =
+            !requiredDerivative || isAbsentOptionalDerivative(requiredDerivative);
+        if (isHigherOrderCall && isRequiredDerivativeMissing && !isClarifiedCall)
+        {
+            getSink()->diagnose(Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
+                .diffLevel = isForBackwardDiff ? "backward" : "forward",
+                .funcName = getResolvedInstForDecorations(primalCallee),
+                .location = origCall->sourceLoc,
+            });
+            return InstPair(maybeCloneForPrimalInst(builder, origCall), nullptr);
+        }
+
+        bool needsTrivialDerivative = isClarifiedCall && isRequiredDerivativeMissing;
         if (needsTrivialDerivative || !diffCallee || isAbsentOptionalDerivative(diffCallee))
         {
             // A backward-only callee uses a trivial forward pass so reverse unzipping can
@@ -1402,7 +1407,7 @@ struct ForwardDiffTranslationContext
         }
 
 
-        auto calleeType = _getCalleeActualFuncType(&diffTypeContext, primalCallee);
+        // A callee with a derivative was classified above.
         SLANG_ASSERT(calleeType);
         SLANG_RELEASE_ASSERT(calleeType->getParamCount() == origCall->getArgCount());
 
@@ -1566,7 +1571,9 @@ struct ForwardDiffTranslationContext
         }
 
         auto callInst = argBuilder.emitCallInst(diffReturnType, diffCallee, args);
-        if (treatAsDifferentiable)
+        // The derivative call takes pairs rather than the original constants, so reverse unzipping
+        // and any higher-order transcription of this call read the clarification from here.
+        if (isClarifiedCall)
             argBuilder.addDecoration(callInst, kIROp_TreatCallAsDifferentiableDecoration);
         placeholderCall->removeAndDeallocate();
         placeholderCallee->removeAndDeallocate();

@@ -10395,9 +10395,14 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
     return doesSignatureMatch;
 }
 
-/// Returns whether to record optional higher-order witnesses for a user member.
-/// Core members omit these tables to avoid expanding every module's core conformances; a request
-/// for an unavailable higher-order derivative must diagnose rather than assume a zero gradient.
+/// Returns whether the optional higher-order conformances of the forward derivative synthesized
+/// by `synFuncDecl` are recorded, rather than marked absent with `NoneWitness`.
+///
+/// Only the derivative of a member (a method, accessor, initializer, or `operator()`) is looked
+/// up through an interface witness table. A free function cannot be used as an interface value, so
+/// its higher-order derivatives are always referenced directly and synthesized on demand. We omit
+/// these conformances for core-module members because recording them would grow the conformance
+/// tables of every module that uses the core module.
 static bool shouldRecordHigherOrderDiffWitness(SynthesizedFuncDecl* synFuncDecl)
 {
     SLANG_RELEASE_ASSERT(
@@ -10405,16 +10410,7 @@ static bool shouldRecordHigherOrderDiffWitness(SynthesizedFuncDecl* synFuncDecl)
     auto baseDeclRef = as<DeclRefBase>(synFuncDecl->operands[0]);
     auto baseDecl = baseDeclRef ? as<FunctionDeclBase>(baseDeclRef->getDecl()) : nullptr;
     SLANG_RELEASE_ASSERT(baseDecl);
-    if (isFromCoreModule(baseDecl))
-        return false;
-    auto parent = getParentDecl(baseDecl);
-    // An accessor belongs to its subscript or property.
-    if (as<AccessorDecl>(baseDecl))
-    {
-        if (as<SubscriptDecl>(parent) || as<PropertyDecl>(parent))
-            parent = getParentDecl(parent);
-    }
-    return as<AggTypeDeclBase>(parent) != nullptr;
+    return !isFromCoreModule(baseDecl) && getParentAggTypeDeclBase(baseDecl) != nullptr;
 }
 
 SubtypeWitness* SemanticsVisitor::findSynthesizedHigherOrderDiffWitness(

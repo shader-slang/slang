@@ -5,6 +5,7 @@
 #include "slang-ir-autodiff-pairs.h"
 #include "slang-ir-autodiff-rev.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-sccp.h"
 #include "slang-ir-single-return.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-validate.h"
@@ -20,6 +21,57 @@ bool isAbsentOptionalDerivative(IRInst* inst)
     if (auto table = as<IRWitnessTable>(inst))
         return as<IRVoidType>(table->getConformanceType()) != nullptr;
     return false;
+}
+
+/// Returns whether `inst` is a literal, a value pack of constants, or an evaluable operation whose
+/// operands are all constants.
+static bool isConstantVal(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_IntLit:
+    case kIROp_FloatLit:
+        return true;
+    case kIROp_MakeValuePack:
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (!isConstantVal(inst->getOperand(i)))
+                    return false;
+            }
+            return true;
+        }
+    }
+
+    if (isEvaluableOpCode(inst->getOp()))
+    {
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            if (!isConstantVal(inst->getOperand(i)))
+                return false;
+        }
+        return true;
+    }
+
+    return false;
+}
+
+bool hasOnlyConstantDifferentiableArgs(
+    DifferentiableTypeConformanceContext& diffTypeContext,
+    IRCall* call,
+    IRFuncType* calleeType)
+{
+    SLANG_RELEASE_ASSERT(calleeType->getParamCount() == call->getArgCount());
+
+    for (UInt paramIndex = 0; paramIndex < calleeType->getParamCount(); paramIndex++)
+    {
+        auto [paramDirectionInfo, paramBaseType] =
+            splitParameterDirectionAndType(calleeType->getParamType(paramIndex));
+        if (diffTypeContext.isDifferentiableType(paramBaseType) &&
+            !isConstantVal(call->getArg(paramIndex)))
+            return false;
+    }
+    return true;
 }
 
 IRInst* _lookupWitness(
