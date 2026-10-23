@@ -3,6 +3,8 @@
 
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
+#include "slang-intrinsic-expand.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 
@@ -711,6 +713,78 @@ void CUDASourceEmitter::_emitInitializerList(
     m_writer->emit("\n}");
 }
 
+/// Emit a `kIROp_ImageLoad` or `kIROp_ImageStore` as a `surf*read`/`surf*write` call.
+///
+/// On CUDA these ops come only from `legalizeImageSubscript`, which turns a write through a texture
+/// subscript, such as `tex[i].w = v`, into whole-texel image ops whose texel type is the texture's
+/// element type. That pass reports every access we cannot spell (see
+/// `diagnoseUnavailableCUDASurfaceAccess`), and a reported error stops compilation before
+/// emission, so the asserts below hold. We spell the call the same way the `RWTexture`
+/// `Load`/`Store` accessors in hlsl.meta.slang do (see `CUDASurfaceAccessInfo`), e.g.
+/// `surf2Dwrite<float4>(value, tex, (coord).x * 16, (coord).y, SLANG_CUDA_BOUNDARY_MODE)`.
+void CUDASourceEmitter::_emitSurfaceAccess(IRInst* inst)
+{
+    auto imageStore = as<IRImageStore>(inst);
+    auto imageLoad = as<IRImageLoad>(inst);
+    SLANG_RELEASE_ASSERT(imageStore || imageLoad);
+    const bool isWrite = imageStore != nullptr;
+    IRInst* image = isWrite ? imageStore->getImage() : imageLoad->getImage();
+    IRInst* coord = isWrite ? imageStore->getCoord() : imageLoad->getCoord();
+    auto textureType = as<IRTextureTypeBase>(image->getDataType());
+    SLANG_RELEASE_ASSERT(textureType);
+    SLANG_RELEASE_ASSERT(!textureType->isMultisample());
+    IRType* texelType = textureType->getElementType();
+    SLANG_RELEASE_ASSERT(
+        (isWrite ? imageStore->getValue()->getDataType() : imageLoad->getDataType()) == texelType);
+
+    const Index dimensionCount = getCUDASurfaceDimensionCount(textureType->GetBaseShape());
+    SLANG_RELEASE_ASSERT(dimensionCount != 0);
+    const bool isArray = textureType->isArray();
+    const CUDASurfaceAccessInfo access = getCUDASurfaceAccessInfo(image, isWrite);
+    SLANG_RELEASE_ASSERT(access.isConversionAvailable);
+
+    const Index coordCount = getIRVectorElementSize(coord->getDataType());
+    SLANG_RELEASE_ASSERT(coordCount == dimensionCount + (isArray ? 1 : 0));
+
+    if (access.requiresHalf)
+        m_extensionTracker->requireBaseType(BaseType::Half);
+
+    m_writer->emit("surf");
+    m_writer->emitInt64(dimensionCount);
+    m_writer->emit("D");
+    if (isArray)
+        m_writer->emit("Layered");
+    m_writer->emit(isWrite ? "write" : "read");
+    if (access.isFormatConversion)
+        m_writer->emit("_convert");
+    m_writer->emit("<");
+    emitType(texelType);
+    m_writer->emit(">(");
+    if (isWrite)
+    {
+        emitOperand(imageStore->getValue(), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+    }
+    emitOperand(image, getInfo(EmitOp::General));
+    for (Index i = 0; i < coordCount; ++i)
+    {
+        m_writer->emit(", (");
+        emitOperand(coord, getInfo(EmitOp::General));
+        m_writer->emit(")");
+        if (coordCount != 1)
+        {
+            m_writer->emit(".");
+            m_writer->emitChar("xyzw"[i]);
+        }
+        if (i == 0)
+        {
+            m_writer->emit(" * ");
+            m_writer->emitUInt64(UInt64(access.xScale));
+        }
+    }
+    m_writer->emit(", SLANG_CUDA_BOUNDARY_MODE)");
+}
+
 void CUDASourceEmitter::emitIntrinsicCallExprImpl(
     IRCall* inst,
     UnownedStringSlice intrinsicDefinition,
@@ -1071,6 +1145,12 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 }
             }
             m_writer->emit(")");
+            return true;
+        }
+    case kIROp_ImageLoad:
+    case kIROp_ImageStore:
+        {
+            _emitSurfaceAccess(inst);
             return true;
         }
     case kIROp_FloatCast:

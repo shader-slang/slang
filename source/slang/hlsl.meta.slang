@@ -5654,6 +5654,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
             case glsl:
                 __intrinsic_asm "$(glslIntrinsic)";
             case cuda:
+                // `CUDASourceEmitter::_emitSurfaceAccess` spells the same surface calls for the
+                // image ops that `legalizeImageSubscript` produces. Its function names, coordinate
+                // order and boundary mode must match these; see `CUDASurfaceAccessInfo`
+                // (shader-slang/slang#13364).
                 if (isArray != 0)
                 {
                     switch(Shape.flavor)
@@ -5835,6 +5839,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
             case glsl:
                 __glslImageStore(location, newValue);
             case cuda:
+                // `CUDASourceEmitter::_emitSurfaceAccess` spells the same surface calls for the
+                // image ops that `legalizeImageSubscript` produces. Its function names, coordinate
+                // order and boundary mode must match these; see `CUDASurfaceAccessInfo`
+                // (shader-slang/slang#13364).
                 if (isArray != 0)
                 {
                     switch(Shape.flavor)
