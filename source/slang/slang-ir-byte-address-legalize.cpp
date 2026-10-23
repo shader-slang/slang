@@ -130,6 +130,13 @@ struct ByteAddressBufferLegalizationContext
         //
         auto type = load->getDataType();
 
+        // Every load this function sees has its (buffer, offset, alignment) operands: the front
+        // end always emits the alignment, and buffer-load-arg specialization copies it into the
+        // loads it rebuilds. The 2-operand loads `emitLegalLoad` creates below are inserted
+        // before `load` and are never visited, because the walk iterates a snapshot of the
+        // children. Stores need no matching check, because specialization never rebuilds them.
+        SLANG_RELEASE_ASSERT(load->getOperandCount() == 3);
+
         // Validate the load's `location`/`alignment` contract up front so the diagnostic
         // fires regardless of whether the loaded type happens to need legalization.
         validateExplicitAlignment(load->getOperand(1), load->getOperand(2), type);
