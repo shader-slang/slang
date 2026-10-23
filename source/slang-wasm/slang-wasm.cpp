@@ -144,6 +144,67 @@ emscripten::val Session::loadModuleFromSource(
     return emscripten::val(Module(module, this));
 }
 
+// True for a Uint8Array from any realm. `instanceof Uint8Array` is false for one created in
+// another realm (an iframe, say), so this checks the object's type tag instead.
+static bool isUint8Array(const emscripten::val& value)
+{
+    if (value.isNull() || value.isUndefined() ||
+        !emscripten::val::global("ArrayBuffer").call<bool>("isView", value))
+        return false;
+    const emscripten::val toString = emscripten::val::global("Object")["prototype"]["toString"];
+    return toString.call<std::string>("call", value) == "[object Uint8Array]";
+}
+
+emscripten::val Session::loadModuleFromIRBlob(
+    const std::string& name,
+    const std::string& path,
+    emscripten::val source)
+{
+    if (!isUint8Array(source))
+    {
+        g_error.type = std::string("USER");
+        g_error.result = SLANG_E_INVALID_ARG;
+        g_error.message = std::string("loadModuleFromIRBlob: expected a Uint8Array");
+        return emscripten::val::null();
+    }
+    const std::vector<uint8_t> data = emscripten::convertJSArrayToNumberVector<uint8_t>(source);
+    Slang::ComPtr<ISlangBlob> blob = Slang::RawBlob::create(data.data(), data.size());
+    Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+    IModule* module = m_interface->loadModuleFromIRBlob(
+        name.c_str(),
+        path.c_str(),
+        blob,
+        diagnosticsBlob.writeRef());
+    if (!module)
+    {
+        g_error.type = std::string("USER");
+        g_error.result = SLANG_FAIL;
+        g_error.message = diagnosticsBlob ? std::string(
+                                                (char*)diagnosticsBlob->getBufferPointer(),
+                                                diagnosticsBlob->getBufferSize())
+                                          : std::string("loadModuleFromIRBlob failed");
+        return emscripten::val::null();
+    }
+    return emscripten::val(Module(module, this));
+}
+
+emscripten::val Module::serialize()
+{
+    Slang::ComPtr<ISlangBlob> blob;
+    SlangResult result = moduleInterface()->serialize(blob.writeRef());
+    if (SLANG_FAILED(result) || !blob)
+    {
+        g_error.type = std::string("USER");
+        g_error.result = result;
+        return emscripten::val::null();
+    }
+    // Copy into a JS-owned array: the blob is released when this function returns.
+    const auto view = emscripten::typed_memory_view(
+        blob->getBufferSize(),
+        (const uint8_t*)blob->getBufferPointer());
+    return emscripten::val::global("Uint8Array").new_(view);
+}
+
 emscripten::val Module::findEntryPointByName(const std::string& name)
 {
     Slang::ComPtr<IEntryPoint> entryPoint;
