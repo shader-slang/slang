@@ -14850,6 +14850,27 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     return SLANG_FAIL;
 }
 
+/// Return whether `decl` is the `static const` alias that the unscoped enum `enumDecl` adds to
+/// its enclosing scope for its own case of the same name, as in
+/// `[UnscopedEnum] enum Mode { Mode }`. The parser creates the alias in `CompleteDecl` with the
+/// case's name and location, and with an initializer that refers to the case.
+///
+static bool isUnscopedEnumCaseAliasOfOwnEnum(Decl* decl, Decl* enumDecl)
+{
+    if (!isUnscopedEnum(enumDecl))
+        return false;
+    auto letDecl = as<LetDecl>(decl);
+    if (!letDecl)
+        return false;
+    auto initExpr = as<DeclRefExpr>(letDecl->initExpr);
+    if (!initExpr)
+        return false;
+    auto caseDecl = as<EnumCaseDecl>(initExpr->declRef.getDecl());
+    return caseDecl && caseDecl->parentDecl == enumDecl &&
+           caseDecl->getName() == letDecl->getName() &&
+           caseDecl->getNameLoc() == letDecl->getNameLoc();
+}
+
 Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
 {
     // If either of the declarations being looked at is generic, then
@@ -14884,6 +14905,16 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     {
         // It is allowed to have a decl whose name is the same as the module.
         return SLANG_OK;
+    }
+
+    // Consider `[UnscopedEnum] enum Mode { Mode, Other }`. The case alias `Mode` that the parser
+    // adds to the enclosing scope conflicts with the enum type `Mode`. Lookup still tells the type
+    // and the value apart by where the name is used, and DXC accepts the declaration, so we warn
+    // in every language version instead of reporting an error.
+    if (isUnscopedEnumCaseAliasOfOwnEnum(newDecl, oldDecl))
+    {
+        getSink()->diagnose(Diagnostics::UnscopedEnumCaseNamedLikeEnum{.decl = newDecl});
+        return SLANG_FAIL;
     }
 
 
