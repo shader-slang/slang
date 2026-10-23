@@ -4,13 +4,15 @@
 //META: source_commit=57fb63455095efe1465661001ad147b24b968932
 //META: doc_ref=docs/language-reference/basics-memory-model-special-topics.md#function-parameters-with-inout-inout-modifiers
 //META: doc_section_digest=50b3040fe642ee135f57002e37f20cd9b949f33677eec525295c406b3b231822
-//META: purpose=Passing the same variable as both an `in` parameter and an `out` parameter elicits no W30051, because the `in` argument is copied before the call; the warning applies only when both parameters may refer to the argument's storage.
+//META: purpose=Passing the same variable as both an `in` parameter and an `out` parameter elicits no W30051, although the doc calls it undefined behavior: the compiler passes an `in` argument as a copy, and the warning applies only when both parameters may refer to the argument's storage.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that passing the same variable to an `in` parameter and an `out` parameter
-// does not trigger W30051, unlike the inout+inout case.
+// does not trigger W30051, unlike the inout+inout case. The doc calls this
+// undefined behavior; the warning is narrower because the compiler passes an `in`
+// argument as a copy.
 // The call passes `x` as both arguments to `combine(in int a, out int b)` and carries
 // no annotation: DIAGNOSTIC_TEST is exhaustive by default, so a W30051 on it fails the
 // test. A control call to `combineInout`, which differs only in taking `a` as `inout`,
@@ -34,7 +36,8 @@ void combineInout(inout int a, out int b)
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int x = output[0];
-    // `a` receives a copy of `x` before the call, so writing `b` cannot change `a`.
+    // Undefined behavior per the doc, but no W30051: the compiler copies `x` into `a`
+    // before the call, so writing `b` cannot change `a`.
     combine(x, x);
     // Control: with `a` as `inout`, both parameters may refer to the storage of `x`.
     combineInout(x, x);

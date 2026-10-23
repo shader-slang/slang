@@ -42,14 +42,14 @@ The doc (≈72 lines, 2 sections) covers two special-topic corners of the Slang 
   no observable surface. Mark untested with reason `non-normative`.
 - **Data race with concurrent threads (C6)**: Purely runtime concern; no emission or
   diagnostic surface. Mark untested with reason `gpu-other`.
-- **Aliasing UB / W30051 (C7)**: Normative and compiler-observable — the compiler emits
-  `W30051` when the same variable appears as two `out`/`inout` arguments. Test with
-  `DIAGNOSTIC_TEST` pinning `W30051`. Cover two sub-cases: inout+inout (from the doc's
-  own example) and in+out (the "at least one is out/inout" minimum case). The in+out case
-  elicits no `W30051`, because the `in` argument is copied before the call. Pin that with an
-  exhaustive `DIAGNOSTIC_TEST` in which the in+out call has no annotation, plus a control call
-  that differs only in taking the `in` parameter as `inout` and carries a caret-anchored
-  `W30051` CHECK.
+- **Aliasing UB / W30051 (C7)**: Test with `DIAGNOSTIC_TEST`, one file per sub-case.
+  The inout+inout sub-case (the doc's own example) elicits `W30051`; pin it with caret-anchored
+  CHECKs. The in+out sub-case (the "at least one is out/inout" minimum case) elicits no
+  `W30051`, although the doc calls it undefined behavior: the compiler passes an `in` argument
+  as a copy and warns only when both parameters may refer to the argument's storage (#13406).
+  Leave the in+out call unannotated in an exhaustive `DIAGNOSTIC_TEST`, add a control call that
+  differs only in taking the `in` parameter as `inout` and carries a caret-anchored `W30051`
+  CHECK. The tests assert only the diagnostic, not the passing mechanism.
 - **Aliasing via binding (C8–C10)**: The fact that `ConstantBuffer<T>` and `RWStructuredBuffer<T>`
   can alias is a runtime concern, but the compilability and emission shape of the two resource
   types is observable. Emit tests pin that both resources compile to distinct binding declarations.
