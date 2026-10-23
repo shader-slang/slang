@@ -1,5 +1,3 @@
-// Library module for using-namespace-inaccessible-lookup-13888.slang.
-
 module "using-namespace-inaccessible-lookup-13888-lib";
 
 namespace NA

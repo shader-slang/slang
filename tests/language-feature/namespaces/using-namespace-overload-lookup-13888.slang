@@ -62,7 +62,7 @@ namespace Outer
 }
 
 // `N` holds two overloads of `g`, so lookup continues and also finds the global variable `g`.
-// Overload resolution still picks `N::g(int)`, as it did on master.
+// Overload resolution still picks `N::g(int)` despite that extra candidate.
 static const int g = 5;
 
 namespace N
@@ -85,8 +85,8 @@ namespace N
 
 // Inside `S`, lookup of `Count` finds the member `S::Count` and the requirement `IFoo::Count` at
 // one level. They hide the global `Count`, and the concrete member is preferred over the
-// requirement. On master lookup also collected the global `Count`, and the reference was
-// ambiguous (E39999).
+// requirement. If the global `Count` joined the result, the reference would instead be ambiguous
+// (E39999).
 static const int Count = 100;
 
 interface IFoo
@@ -105,8 +105,8 @@ struct S : IFoo
 }
 
 // Inside an extension of `E<int>`, lookup of `K` finds the `K` of both extensions at one level.
-// They hide the global `K`, and the less generic extension is preferred. On master lookup also
-// collected the global `K`, which won as a non-extension declaration, so `get()` returned 100.
+// They hide the global `K`, and the less generic extension is preferred. Including the global `K`
+// would make its non-extension declaration win and return 100.
 static const int K = 100;
 
 struct E<T>
