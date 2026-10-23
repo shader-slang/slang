@@ -142,7 +142,7 @@ jobs:
     needs: [generate_cmdline_ref, apply_cmdline_ref]
     if: always() && needs.generate_cmdline_ref.result != 'skipped'
     permissions:
-      contents: read
+      contents: write
       issues: write
       pull-requests: write
     uses: ./.github/workflows/slash-regenerate-publish.yml
@@ -151,6 +151,3 @@ jobs:
       commit-message: "regenerate command line reference"
       generate-result: ${{ needs.apply_cmdline_ref.result }}
       changed: ${{ needs.apply_cmdline_ref.outputs.changed }}
-    secrets:
-      app-client-id: ${{ secrets.SLANG_CI_APP_CLIENT_ID }}
-      app-private-key: ${{ secrets.SLANG_CI_APP_PRIVATE_KEY }}
