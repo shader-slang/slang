@@ -122,10 +122,18 @@ struct IntroduceExplicitGlobalContextPass
 
         AddressSpace getAddressSpaceOfLocal() { return addressSpaceOfLocals; }
 
+        bool shouldPassSoleValueByValue() { return passSoleValueByValue; }
+
     private:
         HoistGlobalVarOptions hoistGlobalVarOptions = HoistGlobalVarOptions::All;
         GlobalObjectKind hoistableGlobalObjectKind = GlobalObjectKind::All;
         bool requiresFuncTypeCorrectionPass = false;
+
+        // When exactly one global is hoisted, the context is that global's value itself rather
+        // than a struct, and functions receive it by value. This is only correct when no
+        // function other than an entry point writes the global, so a policy that sets it must
+        // hoist only such globals.
+        bool passSoleValueByValue = false;
         AddressSpace addressSpaceOfLocals = AddressSpace::ThreadLocal;
         CodeGenTarget target;
     };
@@ -138,8 +146,13 @@ struct IntroduceExplicitGlobalContextPass
     IRModule* m_module = nullptr;
     CodeGenTarget m_target = CodeGenTarget::Unknown;
 
+    // The context is usually a `KernelContext` struct passed by pointer. When the policy passes
+    // a sole hoisted global by value, `m_contextType` is instead that global's value type, and
+    // `m_contextStructType` and `m_contextPtrType` stay null.
     IRStructType* m_contextStructType = nullptr;
-    IRPtrType* m_contextStructPtrType = nullptr;
+    IRType* m_contextType = nullptr;
+    IRPtrType* m_contextPtrType = nullptr;
+    bool m_passContextByValue = false;
 
     struct GlobalParamInfo
     {
@@ -304,57 +317,25 @@ struct IntroduceExplicitGlobalContextPass
         // Now that we've capture all the relevant global entities from the IR,
         // we can being to transform them in an appropriate order.
         //
-        // The global context will be represneted by a `struct`
-        // type with a name hint of `KernelContext`.
-        //
-        m_contextStructType = builder.createStructType();
-        if (m_target == CodeGenTarget::CPPHeader)
+        m_passContextByValue = m_options.shouldPassSoleValueByValue() &&
+                               m_globalParams.getCount() == 0 && m_globalVars.getCount() == 1;
+        if (m_passContextByValue)
         {
-            builder.addExternCppDecoration(
-                m_contextStructType,
-                UnownedTerminatedStringSlice("KernelContext"));
-        }
-        builder.addNameHintDecoration(
-            m_contextStructType,
-            UnownedTerminatedStringSlice("KernelContext"));
-
-        // The context will usually be passed around by pointer,
-        // so we get and cache that pointer type up front.
-        //
-        m_contextStructPtrType = builder.getPtrType(m_contextStructType, getAddressSpaceOfLocal());
-
-
-        // The first step will be to create fields in the `KernelContext`
-        // type to represent any global parameters or global variables.
-        //
-        // The keys for the fields that are created will be remembered
-        // in a dictionary, so that we can find them later based on
-        // the global parameter/variable.
-        //
-        for (auto globalParam : m_globalParams)
-        {
-            // For the parameter representing all the global uniform shader
-            // parameters, we create a field that exactly matches its type.
+            // A sole hoisted global is its own context: the value stands in for the global in
+            // each function, so no field key is needed to reach it.
             //
-            createContextStructField(
-                globalParam.globalParam,
-                GlobalObjectKind::GlobalParam,
-                globalParam.globalParam->getFullType());
+            auto globalVar = m_globalVars[0];
+            m_contextType = globalVar->getDataType()->getValueType();
+            m_mapInstToContextFieldInfo.add(globalVar, ContextFieldInfo{});
         }
-        for (auto globalVar : m_globalVars)
+        else
         {
-            // A `IRGlobalVar` represents a pointer to where the variable is stored,
-            // so we need to create a field of the pointed-to type to represent it.
-            //
-            createContextStructField(
-                globalVar,
-                GlobalObjectKind::GlobalVar,
-                getGlobalVarPtrType(globalVar));
+            createContextStructType(builder);
         }
 
-        // Once all the fields have been created, we can process the entry points.
+        // Once the context type is known, we can process the entry points.
         //
-        // Each entry point will create a local `KernelContext` variable and
+        // Each entry point will create a local context variable and
         // initialize it based on the parameters passed to the entry point.
         //
         // The local variable introduced here will be registered as the representation
@@ -393,6 +374,54 @@ struct IntroduceExplicitGlobalContextPass
                     continue;
                 fixUpFuncType(pairOfFuncs.first);
             }
+        }
+    }
+
+    void createContextStructType(IRBuilder& builder)
+    {
+        m_contextStructType = builder.createStructType();
+        m_contextType = m_contextStructType;
+        if (m_target == CodeGenTarget::CPPHeader)
+        {
+            builder.addExternCppDecoration(
+                m_contextStructType,
+                UnownedTerminatedStringSlice("KernelContext"));
+        }
+        builder.addNameHintDecoration(
+            m_contextStructType,
+            UnownedTerminatedStringSlice("KernelContext"));
+
+        // The struct is passed around by pointer, so we get and
+        // cache that pointer type up front.
+        //
+        m_contextPtrType = builder.getPtrType(m_contextStructType, getAddressSpaceOfLocal());
+
+        // The first step will be to create fields in the `KernelContext`
+        // type to represent any global parameters or global variables.
+        //
+        // The keys for the fields that are created will be remembered
+        // in a dictionary, so that we can find them later based on
+        // the global parameter/variable.
+        //
+        for (auto globalParam : m_globalParams)
+        {
+            // For the parameter representing all the global uniform shader
+            // parameters, we create a field that exactly matches its type.
+            //
+            createContextStructField(
+                globalParam.globalParam,
+                GlobalObjectKind::GlobalParam,
+                globalParam.globalParam->getFullType());
+        }
+        for (auto globalVar : m_globalVars)
+        {
+            // A `IRGlobalVar` represents a pointer to where the variable is stored,
+            // so we need to create a field of the pointed-to type to represent it.
+            //
+            createContextStructField(
+                globalVar,
+                GlobalObjectKind::GlobalVar,
+                getGlobalVarPtrType(globalVar));
         }
     }
 
@@ -523,7 +552,7 @@ struct IntroduceExplicitGlobalContextPass
         // The `KernelContext` to use inside the entry point
         // will be a local variable declared in the first block.
         //
-        auto contextVarPtr = builder.emitVar(m_contextStructType);
+        auto contextVarPtr = builder.emitVar(m_contextType);
         addKernelContextNameHint(contextVarPtr);
         m_mapFuncToContextPtr.add(entryPointFunc, contextVarPtr);
 
@@ -702,9 +731,12 @@ struct IntroduceExplicitGlobalContextPass
 
             // The address of the variable can be produced by
             // taking the address of the corresponding field
-            // in the context struct.
+            // in the context struct, or is the context itself
+            // when a sole global is passed by value.
             //
-            auto ptr = builder.emitFieldAddress(ptrType, contextParam, fieldInfo.key);
+            IRInst* ptr = contextParam;
+            if (!m_passContextByValue)
+                ptr = builder.emitFieldAddress(ptrType, contextParam, fieldInfo.key);
             if (fieldInfo.needDereference)
                 ptr = builder.emitLoad(ptr);
             use->set(ptr);
@@ -766,11 +798,23 @@ struct IntroduceExplicitGlobalContextPass
         SLANG_ASSERT(firstBlock);
 
         // We create a new parameter at the end of the parameter
-        // list for `func`, with a type of `KernelContext*`.
+        // list for `func`. It points to the `KernelContext` struct, or, in
+        // by-value mode, has the hoisted global's value type; `func` then copies
+        // it into a local variable whose address stands in for the global.
         //
-        IRParam* contextParam = builder.createParam(m_contextStructPtrType);
+        auto firstOrdinary = firstBlock->getFirstOrdinaryInst();
+        IRParam* contextParam =
+            builder.createParam(m_passContextByValue ? m_contextType : m_contextPtrType);
         addKernelContextNameHint(contextParam);
-        contextParam->insertBefore(firstBlock->getFirstOrdinaryInst());
+        contextParam->insertBefore(firstOrdinary);
+        IRInst* contextPtr = contextParam;
+        if (m_passContextByValue)
+        {
+            builder.setInsertBefore(firstOrdinary);
+            contextPtr = builder.emitVar(m_contextType);
+            addKernelContextNameHint(contextPtr);
+            builder.emitStore(contextPtr, contextParam);
+        }
 
         // Update the type of the function to reflect this new parameter.
         fixUpFuncType(func);
@@ -782,7 +826,7 @@ struct IntroduceExplicitGlobalContextPass
         // that call `func` to protect against a possible infinite-recursion
         // situation if `func` is recursive along some path.
         //
-        m_mapFuncToContextPtr.add(func, contextParam);
+        m_mapFuncToContextPtr.add(func, contextPtr);
 
         // Any code that calls `func` now needs to be updated to pass
         // the context parameter.
@@ -827,24 +871,25 @@ struct IntroduceExplicitGlobalContextPass
             }
 
             // ... plus an additional argument representing
-            // the context pointer at the call site (note that
+            // the context at the call site, by value or pointer (note that
             // this step leads to a potential for recursion in this pass;
             // the maximum depth of the recursion is bounded by the
             // maximum length of a cycle-free path through the call
             // graph of the program).
             //
-            args.add(findOrCreateContextPtrForInst(call));
+            auto callerContextPtr = findOrCreateContextPtrForInst(call);
 
             // The new call will be emitted right before the old one,
             // then used to replace it.
             //
             builder.setInsertBefore(call);
+            args.add(m_passContextByValue ? builder.emitLoad(callerContextPtr) : callerContextPtr);
             auto newCall = builder.emitCallInst(call->getFullType(), call->getCallee(), args);
             call->replaceUsesWith(newCall);
             call->removeAndDeallocate();
         }
 
-        return contextParam;
+        return contextPtr;
     }
 
     // Because we have multiple places where instructions representing
