@@ -2406,6 +2406,28 @@ local insts = {
 			-- Marks a var as a temporary local variable to replace references to a `in` parameter from the function body
 			-- This is to support legacy code that modifies an `in` parameter as if it is copied to a local variable.
 			{ InParamProxyVar = { struct_name = "InParamProxyVarDecoration", min_operands = 1 } },
+			{
+				DebugVarStorage = {
+					-- Placed on the program storage of a source variable: a `var` or pointer `param`
+					-- through which the program reads and writes the variable described by the
+					-- `DebugVar` operand. A backend declares the debug variable on this storage
+					-- instead of on a separate copy, so the storage holds the variable's value at every
+					-- `DebugValue` of it. Invariant: the storage and the `DebugVar` are in the same
+					-- function, the storage's pointee type is the `DebugVar`'s pointee type, and at most
+					-- one storage names a given `DebugVar`. A pass keeps the invariant as follows:
+					-- one that removes the `DebugVar` removes this decoration; one that clones a
+					-- function's parameters ahead of its body repoints the cloned decorations with
+					-- `rebindDebugVarStorageDecorations`; one that moves the value into other memory,
+					-- or changes the storage's pointee type, removes this decoration. A pass that only
+					-- changes the storage's address space keeps it, and a backend may still decline
+					-- such storage (SPIR-V declares only on Function storage). `-validate-ir` checks
+					-- the function and kind of storage. The link is a decoration on the storage, not an
+					-- operand of an instruction that uses the storage, because such a use would stop
+					-- the storage being promoted to SSA.
+					struct_name = "DebugVarStorageDecoration",
+					operands = { { "debugVar" } },
+				},
+			},
 			{ TempCallArgImmutableVar = { struct_name = "TempCallArgImmutableVarDecoration" } },
 			{ TempCallArgVar = { struct_name = "TempCallArgVarDecoration" } },
 			{
