@@ -1,0 +1,16 @@
+{
+	"name": "slang-playground-extension-client",
+	"description": "VSCode interfacing part of a the extension",
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"dependencies": {
+		"vscode-languageclient": "^9.0.1",
+		"slang-playground-shared": "0.0.1"
+	},
+	"devDependencies": {
+		"@types/vscode": "^1.85.0",
+		"@vscode/test-web": "^0.0.51",
+		"@webgpu/types": "^0.1.51"
+	}
+}
