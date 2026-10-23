@@ -91,4 +91,18 @@ SLANG_UNIT_TEST(globalTypeParamSpecialize)
         const char* diagnostics = (const char*)diagnosticBlob->getBufferPointer();
         SLANG_CHECK(strstr(diagnostics, "38207") == nullptr);
     }
+
+    // An interface metadata object cannot satisfy a constrained data-type parameter by reflexivity.
+    auto interfaceType = program->getLayout()->findTypeByName("IFoo");
+    SLANG_CHECK_ABORT(interfaceType != nullptr);
+    auto invalidArgument = slang::SpecializationArg::fromType(interfaceType);
+    ComPtr<slang::IComponentType> invalidSpecialization;
+    diagnosticBlob = nullptr;
+    SLANG_CHECK(SLANG_FAILED(program->specialize(
+        &invalidArgument,
+        1,
+        invalidSpecialization.writeRef(),
+        diagnosticBlob.writeRef())));
+    SLANG_CHECK(invalidSpecialization == nullptr);
+    SLANG_CHECK(diagnosticBlob != nullptr);
 }

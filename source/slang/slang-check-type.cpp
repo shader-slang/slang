@@ -1,4 +1,5 @@
 // slang-check-type.cpp
+#include "slang-ast-print.h"
 #include "slang-check-impl.h"
 #include "slang-rich-diagnostics.h"
 
@@ -260,6 +261,8 @@ Type* SemanticsVisitor::InstantiateGenericType(
 
 bool isManagedType(Type* type)
 {
+    if (auto boxType = as<ExistentialType>(type))
+        type = boxType->getInterfaceType();
     if (auto declRefValueType = as<DeclRefType>(type))
     {
         auto decl = declRefValueType->getDeclRef().getDecl();
@@ -271,11 +274,12 @@ bool isManagedType(Type* type)
     return false;
 }
 
-bool SemanticsVisitor::CoerceToProperTypeImpl(
+bool SemanticsVisitor::coerceToAliasableTypeImpl(
     TypeExp const& typeExp,
-    Type** outProperType,
+    Type** outType,
     DiagnosticSink* diagSink)
 {
+    SLANG_RELEASE_ASSERT(outType);
     Type* result = nullptr;
     Type* type = typeExp.type;
     auto originalExpr = typeExp.exp;
@@ -323,144 +327,180 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             }
         }
 
-        if (outProperType)
-        {
-            *outProperType = nullptr;
-        }
+        *outType = nullptr;
         return false;
     }
 
     if (auto genericDeclRefType = as<GenericDeclRefType>(type))
     {
-        // We are using a reference to a generic declaration as a concrete
-        // type. This means we should substitute in any default parameter values
-        // if they are available.
-        //
-        // TODO(tfoley): A more expressive type system would substitute in
-        // "fresh" variables and then solve for their values...
-        //
-
+        // We complete a bare generic name using only declared defaults. Missing defaults and
+        // parameter packs require an argument list, even if call inference could find an argument.
+        // For example, `Tuple<>` is a proper type, but `Tuple` still requires an argument list.
         auto genericDeclRef = genericDeclRefType->getDeclRef();
         ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
-        List<Val*> args;
-        List<Val*> witnessArgs;
-        for (Decl* member : genericDeclRef.getDecl()->getDirectMemberDecls())
+        for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
         {
+            bool requiresArgumentList = false;
             if (auto typeParam = as<GenericTypeParamDecl>(member))
+                requiresArgumentList = !typeParam->initType.type;
+            else if (auto valueParam = as<GenericValueParamDecl>(member))
+                requiresArgumentList = !valueParam->initExpr;
+            else
+                requiresArgumentList =
+                    as<GenericTypePackParamDecl>(member) || as<GenericValuePackParamDecl>(member);
+            if (requiresArgumentList)
             {
-                if (auto defaultArg = typeParam->initType.type)
+                if (diagSink)
+                    diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                        .type = type,
+                        .location = typeExp.exp ? typeExp.exp->loc : SourceLoc()});
+                *outType = m_astBuilder->getErrorType();
+                return false;
+            }
+        }
+
+        // We use `trySolveGenericArguments` to substitute dependent defaults and their
+        // conformance witnesses together. A constraint's interface remains an interface here.
+        GenericArgumentInferenceFailure failure;
+        GenericInferenceContext inferenceContext;
+        inferenceContext.genericDecl = genericDeclRef.getDecl();
+        inferenceContext.failure = &failure;
+        inferenceContext.applicationLoc = typeExp.exp ? typeExp.exp->loc : SourceLoc();
+        ConversionCost solveCost = kConversionCost_None;
+        auto specializedDeclRef = trySolveGenericArguments(
+            _Move(inferenceContext),
+            genericDeclRef,
+            ArrayView<Val*>(),
+            solveCost);
+        if (!specializedDeclRef)
+        {
+            if (diagSink)
+            {
+                if (failure.kind ==
+                    GenericArgumentInferenceFailure::Kind::InterfaceConformanceNotSatisfied)
                 {
-                    if (outProperType)
-                        args.add(defaultArg);
+                    auto& conformance = failure.interfaceConformanceNotSatisfied;
+                    diagSink->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                        .typeArg = conformance.subType,
+                        .interface = conformance.supType,
+                        .location = conformance.location});
+                }
+                else if (
+                    failure.kind ==
+                    GenericArgumentInferenceFailure::Kind::GenericConstraintNotSatisfied)
+                {
+                    auto& constraint = failure.genericConstraintNotSatisfied;
+                    diagSink->diagnose(Diagnostics::GenericArgumentDoesNotSatisfyConstraint{
+                        .constraint = ASTPrinter::getGenericConstraintString(
+                            constraint.constraintDecl,
+                            m_astBuilder),
+                        .location = constraint.location});
+                    diagSink->diagnose(Diagnostics::SeeGenericConstraintDeclaration{
+                        .location = constraint.constraintLoc});
                 }
                 else
                 {
-                    if (diagSink)
-                    {
-                        diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
-                            .type = typeExp.type,
-                            .typeExp = typeExp.exp});
-                        *outProperType = m_astBuilder->getErrorType();
-                    }
-                    return false;
-                }
-            }
-            else if (as<GenericTypePackParamDecl>(member) || as<GenericValuePackParamDecl>(member))
-            {
-                if (diagSink)
-                {
                     diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
-                        .type = typeExp.type,
-                        .typeExp = typeExp.exp});
-                    *outProperType = m_astBuilder->getErrorType();
-                }
-                return false;
-            }
-            else if (auto valParam = as<GenericValueParamDecl>(member))
-            {
-                if (!valParam->initExpr)
-                {
-                    if (diagSink)
-                    {
-                        diagSink->diagnose(Diagnostics::Unimplemented{
-                            .feature = "can't fill in default for generic type parameter",
-                            .location = typeExp.exp->loc});
-                        *outProperType = m_astBuilder->getErrorType();
-                    }
-                    return false;
-                }
-                // TODO: this is one place where syntax should get cloned!
-                if (outProperType)
-                {
-                    ConstantFoldingCircularityInfo newCircularityInfo(
-                        makeDeclRef(valParam),
-                        nullptr);
-                    args.add(ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo));
+                        .type = type,
+                        .location = typeExp.exp ? typeExp.exp->loc : SourceLoc()});
                 }
             }
+            *outType = m_astBuilder->getErrorType();
+            return false;
         }
-
-        for (auto constraintParam :
-             genericDeclRef.getDecl()->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
-        {
-            auto genericParam = as<DeclRefType>(constraintParam->sub.type)->getDeclRef();
-            if (!genericParam)
-                return false;
-            auto genericTypeParamDecl = as<GenericTypeParamDecl>(genericParam.getDecl());
-            if (!genericTypeParamDecl)
-            {
-                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
-                    .type = typeExp.type,
-                    .typeExp = typeExp.exp});
-                return false;
-            }
-            auto defaultType = CheckProperType(genericTypeParamDecl->initType);
-            if (!defaultType)
-            {
-                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
-                    .type = typeExp.type,
-                    .typeExp = typeExp.exp});
-                return false;
-            }
-            auto constraintType = CheckProperType(constraintParam->sup);
-            auto witness = tryGetSubtypeWitness(defaultType, constraintType);
-            if (!witness)
-            {
-                // diagnose
-                getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
-                    .typeArg = defaultType,
-                    .interface = constraintType,
-                    .location = genericTypeParamDecl->initType.exp->loc});
-                return false;
-            }
-            witnessArgs.add(witness);
-        }
-        // Combine args and witnessArgs
-        args.addRange(witnessArgs);
-
-        result = DeclRefType::create(
-            getASTBuilder(),
-            getASTBuilder()->getGenericAppDeclRef(genericDeclRef, args.getArrayView()));
+        result = DeclRefType::create(m_astBuilder, specializedDeclRef);
     }
-
-    // default case: we expect this to already be a proper type
+    // Non-generic types and interfaces need no argument completion.
     if (!result)
     {
         result = type;
     }
 
-    // Check for invalid types.
-    // We don't allow pointers to managed types.
     if (auto ptrType = as<PtrType>(result))
     {
         if (isManagedType(ptrType->getValueType()))
         {
-            getSink()->diagnose(
-                Diagnostics::CannotDefinePtrTypeToManagedResource{.typeExp = typeExp.exp});
+            if (diagSink)
+                diagSink->diagnose(Diagnostics::CannotDefinePtrTypeToManagedResource{
+                    .location = typeExp.exp ? typeExp.exp->loc : SourceLoc()});
+            *outType = m_astBuilder->getErrorType();
+            return false;
         }
     }
+    *outType = result;
+    return true;
+}
 
-    *outProperType = result;
+TypeExp SemanticsVisitor::coerceToAliasableType(TypeExp const& typeExp)
+{
+    TypeExp result = typeExp;
+    coerceToAliasableTypeImpl(typeExp, &result.type, getSink());
+    return result;
+}
+
+TypeExp SemanticsVisitor::checkAliasableType(TypeExp typeExp)
+{
+    return coerceToAliasableType(TranslateTypeNode(typeExp));
+}
+
+TypeExp SemanticsVisitor::checkInterfaceType(TypeExp typeExp)
+{
+    auto result = checkAliasableType(typeExp);
+    if (as<ErrorType>(result.type))
+        return result;
+    if (!isValidGenericConstraintType(result.type))
+    {
+        getSink()->diagnose(Diagnostics::ExpectedInterfaceType{
+            .type = result.type,
+            .location = result.exp ? result.exp->loc : SourceLoc()});
+        result.type = m_astBuilder->getErrorType();
+    }
+    return result;
+}
+
+Type* SemanticsVisitor::formExistentialType(TypeExp const& interfaceType, DiagnosticSink* diagSink)
+{
+    if (as<ErrorType>(interfaceType.type))
+        return interfaceType.type;
+    if (as<AndType>(interfaceType.type))
+    {
+        if (diagSink)
+            diagSink->diagnose(Diagnostics::ExistentialConjunctionNotSupported{
+                .location = interfaceType.exp ? interfaceType.exp->loc : SourceLoc()});
+        return m_astBuilder->getErrorType();
+    }
+    return m_astBuilder->getExistentialType(interfaceType.type);
+}
+
+bool SemanticsVisitor::CoerceToProperTypeImpl(
+    TypeExp const& typeExp,
+    Type** outProperType,
+    DiagnosticSink* diagSink)
+{
+    if (!coerceToAliasableTypeImpl(typeExp, outProperType, diagSink))
+        return false;
+    auto type = *outProperType;
+    if (!isValidGenericConstraintType(type))
+        return true;
+
+    // A conjunction is a valid constraint or alias, but we do not implement a box that
+    // packages witnesses for several interfaces. We diagnose formation before a value use
+    // could defer the failure to lowering, including when the box type is only aliased.
+    if (as<AndType>(type))
+    {
+        *outProperType = formExistentialType(TypeExp(typeExp.exp, type), diagSink);
+        return false;
+    }
+    if (isSlang202cOrLater(this))
+    {
+        if (diagSink)
+            diagSink->diagnose(Diagnostics::ExplicitDynRequired{
+                .type = type,
+                .location = typeExp.exp ? typeExp.exp->loc : SourceLoc()});
+        *outProperType = m_astBuilder->getErrorType();
+        return false;
+    }
+    *outProperType = m_astBuilder->getExistentialType(type);
     return true;
 }
 
@@ -580,8 +620,8 @@ Expr* SemanticsExprVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)
 {
     if (!expr->type.Ptr())
     {
-        expr->base = CheckProperType(expr->base);
-        expr->type = expr->base.exp->type;
+        expr->base = checkAliasableType(expr->base);
+        expr->type = m_astBuilder->getTypeType(expr->base.type);
     }
     return expr;
 }

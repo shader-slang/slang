@@ -13,7 +13,7 @@
 //TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal
 //TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl
 
-dyn interface IFoo
+interface IFoo
 {
     float getValue();
 }
