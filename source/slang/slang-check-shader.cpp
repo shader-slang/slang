@@ -4339,7 +4339,7 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
         auto unspecializedEntryPoint =
             unspecializedGlobalAndEntryPointsComponentType->getEntryPoint(ii);
 
-        // For code generation, a generic entry point must have concrete generic arguments. They can
+        // A generic entry point must have concrete generic arguments. They can
         // arrive either bound into the entry-point name (`-entry foo<int>`,
         // reflected in the func declRef) or as separate specialization-arg
         // strings (`-specialize`/`addEntryPointEx`, applied below by
@@ -4384,7 +4384,7 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 
         // These entry points (e.g. discovered via `[shader(...)]`) carry no
         // specialization arguments, so an unspecialized generic one can never be
-        // specialized and must be rejected for code generation (#10209). `isSpecialized` is false
+        // specialized and must be rejected (#10209). `isSpecialized` is false
         // only when the generic args are still the defaults (a discovered
         // `[shader]` entry point can't bind args via its name either).
         if (requireSpecializedEntryPoints &&
