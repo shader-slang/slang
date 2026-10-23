@@ -2772,9 +2772,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
 
-    // The checked reference includes concrete generic arguments even when the body and signature
-    // do not use them. Join these after the base requirements, as later specialization does, so
-    // conflicting requirements cannot be discarded by the collectors above.
+    // For `void genericMain<T>() {}` selected with `-entry genericMain<MetalOnly>`,
+    // entryPoint->getFuncDeclRef() identifies genericMain<MetalOnly>. If MetalOnly has
+    // [require(metal)], include that requirement even though T is unused.
+    //
+    // Add argument requirements after the body, stage, and signature requirements collected above.
+    // For example, a Metal-only argument and an HLSL-only signature must produce a conflict.
+    // The earlier collectors use nonDestructiveJoin(), which can ignore conflicting requirements;
+    // using join() here ensures target validation sees the conflict.
     List<Decl*> referencedDecls;
     auto shared = SharedSemanticsContext::createForOptionalModule(
         linkage,
