@@ -140,8 +140,9 @@ uint2 middleWindow(uint s, uint3 v)
     return uint4(s, v).yz;
 }
 
-// `__vectorReshape<1>` narrows with a one-element swizzle typed `vector<uint,1>`. The fold keeps
-// that vector type, and SPIR-V legalization then turns the one-element vector into a scalar.
+// `__vectorReshape<1>` narrows with a one-element swizzle typed `vector<uint,1>`. SPIR-V
+// legalization turns the one-element vector into a scalar, so these checks show which lane each
+// swizzle folds to, but not the type of the folded value.
 // CHECK-LABEL: %oneLaneFromScalar = OpFunction
 // CHECK-NEXT: %[[S:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
 // CHECK-NEXT: OpFunctionParameter %v2uint

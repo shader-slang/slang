@@ -402,7 +402,8 @@ struct PeepholeContext : InstPassBase
     }
 
     // Return the value of `swizzle(makeVector(...), ...)` computed directly from the `makeVector`
-    // operands, or nullptr if any selected lane is unresolved. For example:
+    // operands, or nullptr if a swizzle index is not a literal, a selected lane is unresolved, or
+    // a selected lane comes from a Metal packed operand, even in a one-lane swizzle. For example:
     //
     //   uint3(v, 0).y   ->  v.y              (a scalar result is the lane's value)
     //   uint3(v, 0).xy  ->  v                (every element of `v`, in order)
@@ -422,10 +423,10 @@ struct PeepholeContext : InstPassBase
             auto source = findMakeVectorLaneSource(swizzle->getBase(), index->getValue());
             if (!source.isResolved())
                 return nullptr;
-            // A swizzle that reads any lane of a packed operand keeps its `makeVector`
-            // conversion. Rebuilding a multi-lane result would swizzle or return the packed vector
-            // as a plain vector value. We leave one-lane swizzles alone too, so only `getElement`
-            // reads a packed operand directly.
+            // We don't fold a swizzle that reads a lane of a Metal packed operand: a multi-lane
+            // fold would swizzle the packed vector as if it were a plain vector. One-lane swizzles
+            // keep the conversion too, by choice, so every swizzle of a packed load reads the
+            // converted vector.
             if (as<IRMetalPackedVectorType>(unwrapAttributedType(source.operand->getDataType())))
                 return nullptr;
             sources.add(source);

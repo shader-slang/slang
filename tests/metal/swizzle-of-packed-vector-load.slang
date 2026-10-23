@@ -1,7 +1,7 @@
 // Metal buffer lowering loads a `float4` element as a `packed_float4` and converts it back
 // with a one-operand vector constructor, `float4(packed)`. An index reads its element directly
-// from the packed value, but a swizzle keeps the conversion, because folding it would swizzle
-// the packed value as if it were a `float4`.
+// from the packed value. A swizzle keeps the conversion: a multi-lane fold would swizzle the
+// packed value as if it were a `float4`, and one-lane swizzles keep the conversion too, by choice.
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute
 
