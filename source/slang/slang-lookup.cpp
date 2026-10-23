@@ -783,13 +783,9 @@ static bool _isDeclOverloadable(Decl* decl)
 }
 
 /// Returns whether any declaration in `result` is overloadable (see `_isDeclOverloadable`).
-///
-/// `_lookUpInScopes` calls this on its accumulated result. The hits from the first scope level
-/// with hits stay in that result, so the answer at every later level is the answer for that
-/// first level.
 static bool _doesLookupResultContainOverloadableDecl(LookupResult const& result)
 {
-    for (auto& item : result)
+    for (auto item : result)
     {
         if (_isDeclOverloadable(item.declRef.getDecl()))
             return true;
@@ -1029,13 +1025,19 @@ static void _lookUpInScopes(
 
         if (result.isValid())
         {
-            // Lookup continues to outer scopes when the result contains an overloadable decl,
-            // so that a call can consider overloads declared farther out, and for a completion
-            // request, which wants every visible name. Otherwise the decls found so far hide
-            // same-named decls in outer scopes, even when there are several of them. For
-            // example, after `using namespace A; using namespace B;` where `A::x` and `B::x`
-            // are variables, a reference to `x` is ambiguous between those two only, and a
-            // global `x` is not a candidate.
+            // We treat one iteration of this loop as one level: `scope`, its `nextSibling` peers
+            // (such as the namespaces named by `using namespace`), and for a type or extension
+            // scope every member that `_lookUpMembersInType` finds, including inherited members,
+            // interface requirements and the members of applicable extensions.
+            //
+            // The first level with hits decides the rest of the walk. If no hit on that level is
+            // overloadable, those hits hide same-named decls farther out, and a later step
+            // reports several of them as ambiguous. If any hit is overloadable, lookup continues
+            // to the last scope, so that a call such as `f(1.5f)` can reach an outer `f(float)`
+            // when the level holds a function `f(int)` next to a variable `f`; overload
+            // resolution then drops the candidates it cannot call. The hits of that first level
+            // stay in `result`, so the check below gives the same answer at every later level.
+            // A completion request always continues, because it wants every visible name.
             if (_doesLookupResultContainOverloadableDecl(result) || request.isCompletionRequest())
             {
                 continue;
