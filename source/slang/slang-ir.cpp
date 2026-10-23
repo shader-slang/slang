@@ -3012,10 +3012,18 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
+    return getRefParamType(valueType, AccessQualifier::ReadWrite, addrSpace);
+}
+
+IRRefParamType* IRBuilder::getRefParamType(
+    IRType* valueType,
+    AccessQualifier accessQualifier,
+    AddressSpace addrSpace)
+{
     return (IRRefParamType*)getPtrType(
         kIROp_RefParamType,
         valueType,
-        AccessQualifier::ReadWrite,
+        accessQualifier,
         addrSpace,
         getDefaultBufferLayoutType());
 }
@@ -7371,7 +7379,7 @@ IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(
 // IR emitter for a dedicated instruction to represent NonUniformResourceIndex qualifier.
 IRInst* IRBuilder::emitNonUniformResourceIndexInst(IRInst* val)
 {
-    const auto i = createInst<IRInst>(this, kIROp_NonUniformResourceIndex, getTypeType(), val);
+    const auto i = createInst<IRInst>(this, kIROp_NonUniformResourceIndex, val->getFullType(), val);
     addInst(i);
     return i;
 }

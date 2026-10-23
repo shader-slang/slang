@@ -882,9 +882,32 @@ class BorrowInOutParamType : public OutParamTypeBase
     void _toTextOverride(StringBuilder& out);
 };
 
+// A type that represents the pointer passed for any by-reference parameter
+FIDDLE(abstract)
+class RefParamTypeBase : public ParamPassingModeType
+{
+    FIDDLE(...)
+};
+
 // The type for a by-reference parameter, e.g., `ref T`
 FIDDLE()
-class RefParamType : public ParamPassingModeType
+class RefParamType : public RefParamTypeBase
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+};
+
+// The type for a read-only by-reference parameter, e.g., `ref_readonly T`
+FIDDLE()
+class RefReadOnlyParamType : public RefParamTypeBase
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+};
+
+// The type for a write-only by-reference parameter, e.g., `ref_writeonly T`
+FIDDLE()
+class RefWriteOnlyParamType : public RefParamTypeBase
 {
     FIDDLE(...)
     void _toTextOverride(StringBuilder& out);

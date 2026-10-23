@@ -452,8 +452,14 @@ struct ByteAddressBuffer
     ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
-    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
+    /// This overload takes no alignment guarantee from the caller, so a `location` known only at
+    /// run time may be lowered to scalar 4-byte loads. When `location` is a literal, the compiler
+    /// reads what it can from the address itself: on the targets `LoadAligned<T>` lists as loading
+    /// `float2` groups, a vector within `T` is loaded whole when its address is a multiple of its
+    /// size, and otherwise in the widest 4- or 2-component groups whose address is a multiple of
+    /// the group's size (a `bool` vector per component). For example, `Load<float3>(0)` is one
+    /// `float3` load, `Load<float4>(8)` is two `float2` loads, and `Load<float4>(4)` is a `float`,
+    /// a `float2` and a `float`. Use `LoadAligned<T>` when `location` has a known alignment.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
@@ -468,8 +474,18 @@ struct ByteAddressBuffer
     ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
-    /// On other targets, `alignment` is forwarded to the lowered load instruction.
+    /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
+    /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
+    /// for any remainder. The rule applies to each vector within `T`: a struct is loaded field by
+    /// field, a 3-component vector is always split because no power-of-two `alignment` is a
+    /// multiple of its size, and a partially covered `bool` vector is loaded per component. For
+    /// example, `LoadAligned<float4>(location, 8)` lowers as follows:
+    /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
+    ///   `asfloat`.
+    /// - HLSL with a Shader Model 5.1 or later profile, SPIR-V, GLSL, CUDA and C++: two `float2`
+    ///   loads.
+    /// - Metal, WGSL and LLVM-based CPU targets: four per-component loads, for any valid
+    ///   `alignment`.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
@@ -2284,7 +2300,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -2299,6 +2315,87 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
             case glsl:
                 __intrinsic_asm "$ctextureGrad($0, $1, $2, $3)$z";
+            case cuda:
+                // The 'tex*Grad<T>' CUDA runtime built-ins have no half or 3-component texel
+                // overloads. A half texel is rejected here because NVRTC would reject the
+                // CUDA; a float3/int3/uint3 texel fetches four components and reshapes back
+                // to three (other 3-component texel types stay unsupported, as for
+                // SampleLevel). The 3D and cube forms take float4 gradients, so we pad the
+                // float3 gradients with a zero w component.
+                static_assert(!__isHalf<T>(),
+                    "'SampleGrad' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
+                if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayeredGrad<float4>($0, ($1).x, int(($1).y), ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayeredGrad<int4>($0, ($1).x, int(($1).y), ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayeredGrad<uint4>($0, ($1).x, int(($1).y), ($2), ($3)))";
+                        __intrinsic_asm "tex1DLayeredGrad<$T0>($0, ($1).x, int(($1).y), ($2), ($3))";
+                    case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayeredGrad<float4>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayeredGrad<int4>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayeredGrad<uint4>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3)))";
+                        __intrinsic_asm "tex2DLayeredGrad<$T0>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredGrad<float4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayeredGrad<int4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayeredGrad<uint4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        __intrinsic_asm "texCubemapLayeredGrad<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DGrad<float4>($0, ($1), ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DGrad<int4>($0, ($1), ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DGrad<uint4>($0, ($1), ($2), ($3)))";
+                        __intrinsic_asm "tex1DGrad<$T0>($0, ($1), ($2), ($3))";
+                    case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DGrad<float4>($0, ($1).x, ($1).y, ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DGrad<int4>($0, ($1).x, ($1).y, ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DGrad<uint4>($0, ($1).x, ($1).y, ($2), ($3)))";
+                        __intrinsic_asm "tex2DGrad<$T0>($0, ($1).x, ($1).y, ($2), ($3))";
+                    case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3DGrad<float4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3DGrad<int4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3DGrad<uint4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        __intrinsic_asm "tex3DGrad<$T0>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapGrad<float4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapGrad<int4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapGrad<uint4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        __intrinsic_asm "texCubemapGrad<$T0>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
             case spirv:
                 return spirv_asm
                 {
@@ -6934,8 +7031,14 @@ struct $(item.name)
     ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
-    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
+    /// This overload takes no alignment guarantee from the caller, so a `location` known only at
+    /// run time may be lowered to scalar 4-byte loads. When `location` is a literal, the compiler
+    /// reads what it can from the address itself: on the targets `LoadAligned<T>` lists as loading
+    /// `float2` groups, a vector within `T` is loaded whole when its address is a multiple of its
+    /// size, and otherwise in the widest 4- or 2-component groups whose address is a multiple of
+    /// the group's size (a `bool` vector per component). For example, `Load<float3>(0)` is one
+    /// `float3` load, `Load<float4>(8)` is two `float2` loads, and `Load<float4>(4)` is a `float`,
+    /// a `float2` and a `float`. Use `LoadAligned<T>` when `location` has a known alignment.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
@@ -6950,8 +7053,18 @@ struct $(item.name)
     ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
-    /// On other targets, `alignment` is forwarded to the lowered load instruction.
+    /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
+    /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
+    /// for any remainder. The rule applies to each vector within `T`: a struct is loaded field by
+    /// field, a 3-component vector is always split because no power-of-two `alignment` is a
+    /// multiple of its size, and a partially covered `bool` vector is loaded per component. For
+    /// example, `LoadAligned<float4>(location, 8)` lowers as follows:
+    /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
+    ///   `asfloat`.
+    /// - HLSL with a Shader Model 5.1 or later profile, SPIR-V, GLSL, CUDA and C++: two `float2`
+    ///   loads.
+    /// - Metal, WGSL and LLVM-based CPU targets: four per-component loads, for any valid
+    ///   `alignment`.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
@@ -7637,6 +7750,13 @@ $}
         }
     }
 
+    /// Store a value with type `T` to the buffer at the specified location.
+    ///@param T The type of the value to store.
+    ///@param address The output address in bytes, which must be a multiple of 4.
+    ///@param value The value to store.
+    ///@remarks
+    /// The access width is chosen as for `Load<T>(location)`; for example, on the same targets,
+    /// `Store<float4>(8, value)` is two `float2` stores.
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store<T>(uint address, T value)
@@ -7644,6 +7764,13 @@ $}
         __byteAddressBufferStore(this, address, 0, value);
     }
 
+    /// Store a value with type `T` to the buffer at the specified location with a known alignment.
+    ///@param T The type of the value to store.
+    ///@param address The output address in bytes, which must be a multiple of `alignment`.
+    ///@param value The value to store.
+    ///@param alignment The known alignment of `address` in bytes; a compile-time constant.
+    ///@remarks
+    /// `alignment` selects the access width as for `LoadAligned<T>(location, alignment)`.
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store<T>(uint address, T value, constexpr uint alignment)
@@ -7874,22 +8001,22 @@ struct TriangleStream
 };
 
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 #define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 //@public:
 
@@ -11391,6 +11518,7 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
     case spirv: return spirv_asm {
         OpFConvert $$vector<float, N> result $value
     };
+    case wgsl: __intrinsic_asm "$TR($0)";
     case llvm: __intrinsic_asm "%result = fpext $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, f16tof32, value);
@@ -11429,6 +11557,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
     case spirv: return spirv_asm {
         OpFConvert $$vector<float16_t, N> result $value
     };
+    case wgsl: __intrinsic_asm "$TR($0)";
     case llvm: __intrinsic_asm "%result = fptrunc $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float16_t, N, f32tof16_, value);
@@ -11919,6 +12048,9 @@ vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
     case spirv: return spirv_asm {
         result:$$vector<T,N> = OpFRem $x $y
     };
+    case wgsl:
+        // WGSL `%` on floats is the truncated remainder, as for the scalar overload.
+        __intrinsic_asm "(($0) % ($1))";
     default:
         VECTOR_MAP_BINARY(T, N, fmod, x, y);
     }
@@ -12705,6 +12837,7 @@ vector<bool, N> isfinite(vector<T, N> x)
     case hlsl: __intrinsic_asm "isfinite";
     case glsl:
     case spirv:
+    case wgsl:
         return !(isinf(x) || isnan(x));
     case metal:
         __intrinsic_asm "isfinite";
@@ -12747,7 +12880,7 @@ bool isinf(T x)
     case spirv:
         return spirv_asm { result:$$bool = OpIsInf $x};
     case wgsl:
-        static_assert(T is float, "isnan is implemented only for float type");
+        static_assert(T is float, "isinf is implemented only for float type");
         if (let f = x as float)
         {
             let bits = asuint(f);
@@ -12773,6 +12906,12 @@ vector<bool, N> isinf(vector<T, N> x)
         __intrinsic_asm "isinf";
     case spirv:
         return spirv_asm { result:$$vector<bool,N> = OpIsInf $x};
+    case wgsl:
+        // The scalar bit test, on the whole vector.
+        static_assert(T is float, "isinf is implemented only for float type");
+        if (let f = x as vector<float, N>)
+            return (asuint(f) & 0x7fffffffu) == 0x7f800000u;
+        return vector<bool, N>(false);
     default:
         VECTOR_MAP_UNARY(bool, N, isinf, x);
     }
@@ -12838,6 +12977,12 @@ vector<bool, N> isnan(vector<T, N> x)
         __intrinsic_asm "isnan";
     case spirv:
         return spirv_asm { result:$$vector<bool, N> = OpIsNan $x};
+    case wgsl:
+        // The scalar bit test, on the whole vector.
+        static_assert(T is float, "isnan is implemented only for float type");
+        if (let f = x as vector<float, N>)
+            return (asuint(f) & 0x7fffffffu) > 0x7f800000u;
+        return vector<bool, N>(false);
     default:
         VECTOR_MAP_UNARY(bool, N, isnan, x);
     }
@@ -15466,6 +15611,7 @@ T rsqrt(T x)
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 InverseSqrt $x
     };
+    case wgsl: __intrinsic_asm "inverseSqrt";
     default:
         return T(1.0) / sqrt(x);
     }
@@ -15484,6 +15630,7 @@ vector<T, N> rsqrt(vector<T, N> x)
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 InverseSqrt $x
     };
+    case wgsl: __intrinsic_asm "inverseSqrt";
     case llvm:
         return vector<T, N>(1.0) / sqrt(x);
     default:
@@ -32230,6 +32377,19 @@ linalg.CoopMat<T, S, M, N, R> operator *<
     return rhs * lhs;
 }
 
+${
+// On HLSL a CoopVec is a per-lane vector, and DXC implements a dynamic index into a vector by
+// spilling it to an indexable local. Every loop over the elements of a CoopVec therefore has to
+// be unrolled so that each index is a constant. `emitUnrollableLoop` emits `loop` (the source of
+// one `for` statement over `i < N`) twice: as a plain loop for vectors longer than
+// `__kMaxUnrolledElements`, and under `[ForceUnroll]` otherwise. The `N` test folds to a constant,
+// so only one of the two copies survives in the IR.
+auto emitUnrollableLoop = [&](char const* loop)
+{
+    sb << "if (N > __kMaxUnrolledElements)\n{\n" << loop << "\n}\nelse\n{\n[ForceUnroll]\n" << loop << "\n}\n";
+};
+$}
+
 //
 // Cooperative Vector
 //
@@ -32243,6 +32403,10 @@ __intrinsic_type($(kIROp_CoopVectorType))
 [require(cooperative_vector)]
 struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmetic
 {
+    // Shader Model 6.9 limits a vector to 1024 elements, so every CoopVec that DXC accepts is
+    // unrolled; a longer vector falls back to a plain loop instead of failing the unroll.
+    static const int __kMaxUnrolledElements = 1024;
+
     //
     // Initialization
     //
@@ -32331,8 +32495,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case hlsl:
              __intrinsic_asm "$0 = $1";
         default:
-            for(int i = 0; i < N; ++i)
-                this[i] = t;
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    this[i] = t;
+            )SLANG");
+$}
             return;
         }
     }
@@ -32355,8 +32523,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case hlsl:
             __intrinsic_asm "$1.Store< vector<$[0], $[1]> >($2, $0)", T, N;
         default:
-            for(int i = 0; i < N; ++i)
-                buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
+            )SLANG");
+$}
             return;
         }
     }
@@ -32374,8 +32546,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
             return;
         default:
-            for(int i = 0; i < N; ++i)
-                buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+            )SLANG");
+$}
         }
     }
 
@@ -32418,8 +32594,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
             return;
         default:
-            for(int i = 0; i < N; ++i)
-                data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+            )SLANG");
+$}
             return;
         }
     }
@@ -32476,8 +32656,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+            )SLANG");
+$}
             return vec;
         }
         return CoopVec<T, N>();
@@ -32500,8 +32684,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+            )SLANG");
+$}
             return vec;
         }
         return CoopVec<T, N>();
@@ -32521,8 +32709,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+            )SLANG");
+$}
             return vec;
         }
         return CoopVec<T, N>();
@@ -32542,8 +32734,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
         default:
             var vec = CoopVec<T, N>();
-            for(int i = 0; i < N; ++i)
-                vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
+            )SLANG");
+$}
             return vec;
         }
     }
@@ -32597,8 +32793,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             CoopVec<T,N> result;
-            for(int i = 0; i < N; ++i)
-                result[i] = data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    result[i] = data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)];
+            )SLANG");
+$}
             return result;
         }
     }
@@ -32711,13 +32911,17 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @return True if all corresponding elements are equal, false otherwise.
     bool equals(This other)
     {
-        for (int i = 0; i < N; i++)
-        {
-            if (this[i] != other[i])
+${
+        emitUnrollableLoop(R"SLANG(
+            for (int i = 0; i < N; i++)
             {
-                return false;
+                if (this[i] != other[i])
+                {
+                    return false;
+                }
             }
-        }
+        )SLANG");
+$}
         return true;
     }
 
@@ -32729,17 +32933,21 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// parallel computation rather than ordering.
     bool lessThan(This other)
     {
-        for (int i = 0; i < N; i++)
-        {
-            if (this[i] < other[i])
+${
+        emitUnrollableLoop(R"SLANG(
+            for (int i = 0; i < N; i++)
             {
-                return true;
+                if (this[i] < other[i])
+                {
+                    return true;
+                }
+                else if (this[i] > other[i])
+                {
+                    return false;
+                }
             }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
+        )SLANG");
+$}
         return false;
     }
 
@@ -32751,17 +32959,21 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// parallel computation rather than ordering.
     bool lessThanOrEquals(This other)
     {
-        for (int i = 0; i < N; i++)
-        {
-            if (this[i] < other[i])
+${
+        emitUnrollableLoop(R"SLANG(
+            for (int i = 0; i < N; i++)
             {
-                return true;
+                if (this[i] < other[i])
+                {
+                    return true;
+                }
+                else if (this[i] > other[i])
+                {
+                    return false;
+                }
             }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
+        )SLANG");
+$}
         return true;
     }
 
@@ -32916,8 +33128,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "$0 % $1";
         default:
             This ret;
-            for(int i = 0; i < N; ++i)
-                ret[i] = this[i] % other[i];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    ret[i] = this[i] % other[i];
+            )SLANG");
+$}
             return ret;
         }
     }
@@ -33018,9 +33234,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         __target_switch
         {
         case hlsl:
-            [ForceUnroll]
-            for(int i = 0; i < N; ++i)
-                this[i] = buffer[i + elemOffset];
+${
+            emitUnrollableLoop(R"SLANG(
+                for(int i = 0; i < N; ++i)
+                    this[i] = buffer[i + elemOffset];
+            )SLANG");
+$}
             return;
         }
     }
@@ -35748,7 +35967,10 @@ uint packUint4x8Clamp(int32_t4 unpackedValue)
     __target_switch
     {
     case hlsl: __intrinsic_asm "pack_clamp_u8";
-    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>($0))";
+    // pack4xU8Clamp takes vec4<u32>, so the i32 -> u32 conversion happens before it clamps, and a
+    // negative lane would wrap and clamp to 255. Clamp the low end in i32 first; the builtin still
+    // clamps the high end.
+    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>(max($0, vec4<i32>(0))))";
     default:
         return packInt4x8(clamp(unpackedValue, 0, 255));
     }

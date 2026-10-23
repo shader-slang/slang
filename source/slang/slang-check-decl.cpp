@@ -1701,6 +1701,44 @@ QualType getTypeForDeclRef(
         if (varDeclRef.getDecl()->findModifier<ConstModifier>())
             isLValue = false;
 
+        bool isReadOnlyMemoryLocation = false;
+        if (auto paramDecl = as<ParamDecl>(varDeclRef.getDecl()))
+        {
+            // Function parameters declared in the "modern" style
+            // are immutable unless their passing mode is meant to be written.
+            const bool isModernParam = as<ModernParamDecl>(paramDecl) != nullptr;
+
+            // The effective passing mode decides whether the body may write a parameter.
+            switch (getParamPassingMode(paramDecl))
+            {
+            case ParamPassingMode::In:
+                // A legacy (C-style) `in` parameter is a mutable local copy.
+                if (isModernParam)
+                    isLValue = false;
+                break;
+            case ParamPassingMode::BorrowIn:
+                // TODO(#13833): A borrow is an immutable borrow of its argument, so its body should
+                // not be able to write it, and code that does is already incorrect. Making it
+                // read-only is a bug fix that requires updating existing tests, so we leave it to a
+                // separate change. Until then, a borrow follows the rule for `in`.
+                if (isModernParam)
+                    isLValue = false;
+                break;
+            case ParamPassingMode::Out:
+            case ParamPassingMode::BorrowInOut:
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefWriteOnly:
+                // These parameters are meant to be written.
+                break;
+            case ParamPassingMode::RefReadOnly:
+                isLValue = false;
+                isReadOnlyMemoryLocation = true;
+                break;
+            default:
+                SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            }
+        }
+
         // Global-scope shader parameters should not be writable,
         // since they are effectively program inputs.
         //
@@ -1717,20 +1755,6 @@ QualType getTypeForDeclRef(
         // Generic value parameters are always immutable
         if (isGenericValueParam(varDeclRef))
             isLValue = false;
-
-        // Function parameters declared in the "modern" style
-        // are immutable unless they have an `out` or `inout` modifier.
-        if (varDeclRef.is<ModernParamDecl>())
-        {
-            // Note: the `inout` modifier AST class inherits from
-            // the class for the `out` modifier so that we can
-            // make simple checks like this.
-            //
-            if (!varDeclRef.getDecl()->hasModifier<OutModifier>())
-            {
-                isLValue = false;
-            }
-        }
 
         // An explicit `readonly` or `writeonly` qualifier still restricts parameter uses in
         // compatibility mode. The parser keeps these modifiers on the underlying parameter,
@@ -1752,6 +1776,7 @@ QualType getTypeForDeclRef(
         }
 
         qualType.isLeftValue = isLValue;
+        qualType.isReadOnlyMemoryLocation = isReadOnlyMemoryLocation;
         qualType.isWriteOnly = isWriteOnly;
         return qualType;
     }
@@ -2678,18 +2703,125 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
     _validateCircularVarDefinition(varDecl);
 }
 
-// Test whether `typeTags` permit mutable file or namespace variable storage.
+/// Return whether `type` meets the type requirements of the later post-link
+/// `legalizeResourceGlobalVars` pass.
+static bool _isResourceTypeSupportedForPerInvocationReplacement(Type* type)
+{
+    // We need the stored value to remain one IR value when `legalizeResourceGlobalVars` replaces
+    // a mutable file- or namespace-scope resource variable with function-local storage and
+    // additional parameters for non-entry-point functions. We therefore admit only types with
+    // that representation on every target. Other semantic checks validate storage modifiers, and
+    // the replacement pass diagnoses uses it cannot rewrite. The design comment at the top of
+    // `slang-ir-legalize-resource-globals.cpp` explains the complete transformation.
+    //
+    // Semantic checking owns the language-level type restrictions. Every type accepted here must
+    // lower to a type accepted by `isResourceValueOrArrayTypeSupportedForPerInvocationReplacement`
+    // after the target's selected resource- and empty-type legalization passes. When changing
+    // either predicate, we must check that relationship rather than compare AST and IR type names.
+
+    // A type modifier does not change the representation that the replacement pass must carry.
+    // We therefore look through each modifier before classifying the underlying type.
+    for (;;)
+    {
+        if (auto modifiedType = as<ModifiedType>(type))
+        {
+            type = modifiedType->getBase();
+            continue;
+        }
+
+        // A fixed-size array remains one IR value after linking and specialization resolve its
+        // element count, so we continue with its element type. An unsized array has no element
+        // count to resolve and cannot be allocated as a local.
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            if (arrayType->isUnsized())
+                return false;
+            type = arrayType->getElementType();
+            continue;
+        }
+
+        break;
+    }
+
+    // By default we allow a `ResourceType` as a per-invocation variable because values of that
+    // type remain one IR value when target-specific resource legalization runs. A combined
+    // texture-sampler can instead be split into separate texture and sampler values, so we exclude
+    // combined resources from a transformation that carries exactly one replacement value.
+    if (auto resourceType = as<ResourceType>(type))
+        return !resourceType->isCombined();
+
+    // We allow a sampler state because target legalization also leaves it as one IR value.
+    if (as<SamplerStateType>(type))
+        return true;
+
+    // We allow the listed structured buffers because each remains one IR value. We name the
+    // variants individually because their common base class also includes append and consume
+    // buffers, whose counter requires additional state that this transformation cannot carry.
+    if (as<HLSLStructuredBufferType>(type))
+        return true;
+    if (as<HLSLRWStructuredBufferType>(type))
+        return true;
+    if (as<HLSLRasterizerOrderedStructuredBufferType>(type))
+        return true;
+
+    // We allow the listed byte-address buffers because each remains one IR value.
+    if (as<HLSLByteAddressBufferType>(type))
+        return true;
+    if (as<HLSLRWByteAddressBufferType>(type))
+        return true;
+    if (as<HLSLRasterizerOrderedByteAddressBufferType>(type))
+        return true;
+
+    // Every remaining opaque type lacks an established representation for this transformation. An
+    // append or consume buffer carries a counter in addition to its buffer data, and a struct or
+    // parameter group may be legalized into several IR values. The pass cannot carry either shape
+    // with one local and, in a helper, at most one parameter.
+    //
+    // Acceleration structures remain single values, but GLSL, SPIR-V, and WGSL do not permit those
+    // values in function-local variables. On GLSL and SPIR-V, a `__DynamicResource` cast must
+    // retain the identity of the module-scope parameter, or indexed element, that supplied its
+    // value; assignment through a local could erase that identity. Because this front-end rule is
+    // target-independent, we reject these types on every target as well.
+    return false;
+}
+
+/// Return whether `decl` is a mutable `static` variable declared at file or namespace scope.
+static bool _isMutableFileOrNamespaceScopeStaticVariable(VarDeclBase* decl)
+{
+    if (!isGlobalDecl(decl))
+        return false;
+    if (!decl->hasModifier<HLSLStaticModifier>())
+        return false;
+    return !decl->hasModifier<ConstModifier>();
+}
+
+/// Return whether `decl` requests storage or memory-access semantics that per-invocation resource
+/// replacement cannot preserve.
+static bool _hasStorageModifierUnsupportedForPerInvocationResourceReplacement(VarDeclBase* decl)
+{
+    // `groupshared` requires one value shared by a thread group. A memory qualifier such as
+    // `globallycoherent` or `volatile` constrains accesses to the declared storage. Replacing
+    // either declaration with ordinary function-local storage would discard the requested
+    // semantics.
+    if (decl->hasModifier<HLSLGroupSharedModifier>())
+        return true;
+    return decl->hasModifier<MemoryQualifierSetModifier>();
+}
+
+// Test whether `type` can use ordinary mutable variable storage or per-invocation resource
+// replacement.
 //
 // This is the shared type restriction for ordinary `static` globals and uniform shadows.
-// Requires the tags of the checked variable type. A true result means no currently known
-// storage restriction applies. Ordinary type checking still validates the type; after linking,
-// shared IR validation rejects opaque or unsized storage that a replacement definition introduces.
-static bool isTypeAllowedForMutableGlobalVariable(TypeTag typeTags)
+// Requires `typeTags` to describe the checked `type`. A true result means either that ordinary
+// mutable storage is supported or that resource-global legalization can replace the storage after
+// linking. Shared IR validation checks the linked type before that replacement occurs.
+static bool isTypeSupportedForMutableGlobalVariable(Type* type, TypeTag typeTags)
 {
-    // We need to reject resource storage until the back end can legalize mutable resource
-    // globals. `TypeTag::Opaque` includes structs and arrays containing such resources.
+    // Opaque types need a separate representation rather than ordinary mutable storage. Resource
+    // replacement provides that representation only for the resource values and fixed-size arrays
+    // recognized by the semantic predicate.
     if ((int)typeTags & (int)TypeTag::Opaque)
-        return false;
+        return _isResourceTypeSupportedForPerInvocationReplacement(type);
 
     // We cannot allocate a private variable containing an array with an absent or unbounded
     // element count. A count that will be resolved by linking is a separate, allowed case.
@@ -2702,54 +2834,72 @@ static bool isTypeAllowedForMutableGlobalVariable(TypeTag typeTags)
     if ((int)typeTags & (int)TypeTag::NonAddressable)
         return false;
 
-    // No known storage restriction applies. We allow the general case, including types
-    // whose final definition or array size will be supplied during linking. After linking
-    // and specialization, `validateMutableGlobalVariableTypes` checks opaque and unsized storage.
+    // No known storage restriction applies. We allow the general case, including types whose final
+    // definition or array size will be supplied during linking. After linking and specialization,
+    // `validateMutableGlobalVariableTypes` checks opaque and unsized storage.
     return true;
 }
 
-// Check the type of a mutable file or namespace `static` variable.
+// Check the storage requirements of a mutable file- or namespace-scope `static` variable.
 //
-// Requires `typeTags` to describe `decl`'s checked type. Diagnoses opaque and non-addressable
-// storage; `SemanticsDeclBodyVisitor::checkVarDeclCommon` reports unsized storage before calling.
-static void checkMutableGlobalVariableType(
+// Requires `typeTags` to describe `decl`'s checked type. Diagnoses an unsupported opaque or
+// non-addressable type, and diagnoses a supported resource type when a storage or memory-access
+// modifier prevents per-invocation replacement. The caller reports unsized storage first.
+static void checkMutableGlobalVariableStorage(
     SemanticsVisitor* visitor,
     VarDeclBase* decl,
     TypeTag typeTags)
 {
-    // We only apply the mutable-global restriction to file and namespace `static` variables.
-    // Function locals and shader parameters have different storage rules.
-    if (!isGlobalDecl(decl))
-        return;
-    if (!decl->hasModifier<HLSLStaticModifier>())
-        return;
-
-    // A `const` global does not need mutable storage, so the restriction does not apply.
-    if (decl->hasModifier<ConstModifier>())
-        return;
-    if (isTypeAllowedForMutableGlobalVariable(typeTags))
+    // We answer three questions in order. First, is `decl` a mutable `static` variable at file or
+    // namespace scope? Second, can its type use ordinary mutable storage or resource replacement?
+    // Third, if replacement supports the resource value or fixed-size resource array, do the
+    // declaration's modifiers require storage semantics that a function-local value cannot
+    // preserve?
+    if (!_isMutableFileOrNamespaceScopeStaticVariable(decl))
         return;
 
-    // We diagnose attempts to allocate mutable resource globals, including arrays and structs
-    // containing resources. Removing mutability or declaring a shader parameter can be valid
-    // alternatives, depending on whether the declaration has an initializer.
-    if ((int)typeTags & (int)TypeTag::Opaque)
-    {
-        visitor->getSink()->diagnose(Diagnostics::GlobalVarCannotHaveOpaqueType{.decl = decl});
-        if (decl->initExpr)
-            visitor->getSink()->diagnose(Diagnostics::DoYouMeanStaticConst{.decl = decl});
-        else
-            visitor->getSink()->diagnose(Diagnostics::DoYouMeanUniform{.decl = decl});
-        return;
-    }
-
-    // `SemanticsDeclBodyVisitor::checkVarDeclCommon` already reported unsized storage.
-    // We avoid reporting a second error for the same storage restriction.
+    // `checkVariableStorageRequirements` has already diagnosed an unsized variable. We stop before
+    // applying the opaque-type policy so that an unbounded resource array produces one storage
+    // diagnostic.
     if ((int)typeTags & (int)TypeTag::Unsized)
         return;
 
-    // The remaining unsupported form is a non-addressable value, such as `ParameterBlock<T>`.
-    // We diagnose it before lowering attempts to allocate mutable global storage.
+    if ((int)typeTags & (int)TypeTag::Opaque)
+    {
+        if (!_isResourceTypeSupportedForPerInvocationReplacement(decl->getType()))
+        {
+            // The type itself cannot be represented by resource replacement. We suggest a shader
+            // parameter only when the declaration has no initializer and uses neither
+            // `groupshared` nor a memory-access qualifier. A uniform parameter cannot provide the
+            // semantics requested by either kind of modifier.
+            visitor->getSink()->diagnose(Diagnostics::OpaqueTypeNotSupportedForMutableStatic{
+                .type = decl->getType(),
+                .decl = decl});
+            if (!decl->initExpr)
+            {
+                if (!_hasStorageModifierUnsupportedForPerInvocationResourceReplacement(decl))
+                    visitor->getSink()->diagnose(Diagnostics::DoYouMeanUniform{.decl = decl});
+            }
+            return;
+        }
+
+        // At this point the value has a supported resource representation. A storage or
+        // memory-access modifier is therefore the only remaining front-end condition that can
+        // prevent replacement.
+        if (_hasStorageModifierUnsupportedForPerInvocationResourceReplacement(decl))
+        {
+            visitor->getSink()->diagnose(
+                Diagnostics::MutableStaticResourceCannotUseSharedOrQualifiedStorage{.decl = decl});
+        }
+        return;
+    }
+
+    // A non-opaque type with no storage restriction uses ordinary mutable global storage.
+    if (isTypeSupportedForMutableGlobalVariable(decl->getType(), typeTags))
+        return;
+
+    // We returned above for unsized and opaque types. Only a non-addressable value such as
+    // `ParameterBlock<T>` can reach this point.
     SLANG_RELEASE_ASSERT((int)typeTags & (int)TypeTag::NonAddressable);
     visitor->getSink()->diagnose(Diagnostics::MutableGlobalRequiresAddressableType{.decl = decl});
 }
@@ -2771,6 +2921,27 @@ static bool requiresSizedVariableType(VarDeclBase* decl)
         return isEffectivelyStatic(decl);
 
     return true;
+}
+
+// Apply the sized-type rule and mutable-global storage policy shared by header and body checking.
+static void checkVariableStorageRequirements(
+    SemanticsVisitor* visitor,
+    VarDeclBase* decl,
+    TypeTag typeTags)
+{
+    // Shader parameters receive their storage from the application, function parameters receive it
+    // from the caller, and a non-static field is stored as part of its enclosing aggregate. Those
+    // declarations have separate rules for unsized types.
+    if (!requiresSizedVariableType(decl))
+        return;
+
+    // Every other variable must have a sized type. We report that general requirement
+    // before applying the more specific policy for mutable file- or namespace-scope `static`
+    // variables.
+    if ((int)typeTags & (int)TypeTag::Unsized)
+        visitor->getSink()->diagnose(Diagnostics::VarCannotBeUnsized{.decl = decl});
+
+    checkMutableGlobalVariableStorage(visitor, decl, typeTags);
 }
 
 void SemanticsDeclHeaderVisitor::visitUniformParameterShadowVarDecl(
@@ -2799,11 +2970,16 @@ void SemanticsDeclHeaderVisitor::visitUniformParameterShadowVarDecl(
     }
     decl->type.type = valueType;
 
-    // We apply the same type restriction as for an ordinary mutable `static` global.
-    // `GetTypeForDeclRef` uses the flag to reject writes to an unsupported type, while reads
-    // remain valid. IR lowering aliases the parameter value without allocating unsupported
-    // storage. We keep the computed `valueType` in either case.
-    decl->shouldBeImmutableAlias = !isTypeAllowedForMutableGlobalVariable(getTypeTags(valueType));
+    // A mutable shadow must be able to represent both the parameter's value and the semantics of
+    // its storage. We therefore use an immutable alias when either the value type cannot use
+    // mutable global storage or the parameter has a memory qualifier. Aliasing a qualified
+    // parameter keeps operations on the resource attached to the original declaration; copying
+    // the resource value into ordinary storage would discard qualifiers such as
+    // `globallycoherent`.
+    decl->shouldBeImmutableAlias =
+        !isTypeSupportedForMutableGlobalVariable(valueType, getTypeTags(valueType));
+    if (_hasStorageModifierUnsupportedForPerInvocationResourceReplacement(parameter))
+        decl->shouldBeImmutableAlias = true;
 
     // References to specialization constants must retain their identity as compile-time
     // constants, for example when used in `numthreads`. We alias these parameters even when
@@ -3115,10 +3291,21 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             varDecl->setCheckState(DeclCheckState::SignatureChecked);
     }
 
-    // Header checking has already advanced declarations with inferred types or array bounds
-    // to `DefinitionChecked`. We validate their array elements here because
-    // `SemanticsDeclBodyVisitor` will not run for those declarations.
-    validateArrayElementTypeForVariable(varDecl);
+    // Header checking advances declarations with inferred types or array bounds to
+    // `DefinitionChecked`, so `SemanticsDeclBodyVisitor` will not run for them. We therefore
+    // validate their array element type now that the header has finished adjusting the type.
+    // Declarations that remain at `SignatureChecked` receive that check from the body visitor.
+    if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
+    {
+        validateArrayElementTypeForVariable(varDecl);
+
+        // We require inferred mutable globals to meet the same storage policy as explicitly typed
+        // globals. We do not apply that policy to inferred locals: `int copy[] = parameter;` is
+        // valid when `parameter` is an unsized array parameter. The caller supplies the array's
+        // length rather than the local declaration.
+        if (_isMutableFileOrNamespaceScopeStaticVariable(varDecl))
+            checkVariableStorageRequirements(this, varDecl, getTypeTags(varDecl->getType()));
+    }
 }
 
 static void addAutoDiffModifiersToFunc(
@@ -3790,18 +3977,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     validateStructuredBufferElementType(this, varDecl);
 
-    // We reject unsized ordinary variables, while parameters and trailing aggregate fields
-    // have separate rules. Mutable `static` globals also use the shared type restriction.
-    if (requiresSizedVariableType(varDecl))
-    {
-        bool isUnsized = (((int)varTypeTags & (int)TypeTag::Unsized) != 0);
-        if (isUnsized)
-        {
-            getSink()->diagnose(Diagnostics::VarCannotBeUnsized{.decl = varDecl});
-        }
-
-        checkMutableGlobalVariableType(this, varDecl, varTypeTags);
-    }
+    // Declarations that reach body checking have not yet received the storage checks that the
+    // header applies to declarations completed during type or array-bound inference.
+    checkVariableStorageRequirements(this, varDecl, varTypeTags);
 
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))
     {
@@ -7013,6 +7191,7 @@ static void populateParams(
         synArg->declRef = makeDeclRef(paramDecl);
         synArg->type.type = paramInfo.type;
         synArg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(paramInfo.mode);
+        synArg->type.isReadOnlyMemoryLocation = paramInfo.mode == ParamPassingMode::RefReadOnly;
         synArg->loc = synthesizedLoc;
         synArgs.add(synArg);
     }
@@ -7424,6 +7603,43 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         auto thisVisibility = getDeclVisibility(context->parentDecl);
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
         addVisibilityModifier(synthesized, visibility);
+    }
+}
+
+/// Add the modifiers that spell `mode` to `paramDecl`. A parameter built from a
+/// function type has only its effective mode, and several spellings can produce the
+/// same mode (for example, `__ref_readonly` and its legacy alias `const __ref`), so
+/// we spell each mode one canonical way.
+static void addModifiersForParamPassingMode(
+    ASTBuilder* astBuilder,
+    ParamDecl* paramDecl,
+    ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::In:
+        break;
+    case ParamPassingMode::Out:
+        addModifier(paramDecl, astBuilder->create<OutModifier>());
+        break;
+    case ParamPassingMode::BorrowInOut:
+        addModifier(paramDecl, astBuilder->create<InOutModifier>());
+        break;
+    case ParamPassingMode::BorrowIn:
+        addModifier(paramDecl, astBuilder->create<BorrowModifier>());
+        break;
+    case ParamPassingMode::RefReadWrite:
+        addModifier(paramDecl, astBuilder->create<RefModifier>());
+        break;
+    case ParamPassingMode::RefReadOnly:
+        addModifier(paramDecl, astBuilder->create<RefReadOnlyModifier>());
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        addModifier(paramDecl, astBuilder->create<RefWriteOnlyModifier>());
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        break;
     }
 }
 
@@ -14806,6 +15022,21 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         }
     }
 
+    // An `out` or `inout` parameter is meant to be written by its function, so `const` on one
+    // contradicts its passing mode. We reject it even though DXC accepts it. The check precedes
+    // the parameter-pack handling below, which adds `const` to every pack parameter.
+    if (auto constModifier = paramDecl->findModifier<ConstModifier>())
+    {
+        const auto mode = getParamPassingMode(paramDecl);
+        if (mode == ParamPassingMode::Out || mode == ParamPassingMode::BorrowInOut)
+        {
+            getSink()->diagnose(Diagnostics::ConstOnWritableParameter{
+                .mode = mode,
+                .param = paramDecl,
+                .modifier = constModifier});
+        }
+    }
+
     if (isTypePack(paramDecl->type.type))
     {
         // For now, we only allow parameter packs to be `const`.
@@ -14813,7 +15044,8 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         for (auto modifier : paramDecl->modifiers)
         {
             if (as<OutModifier>(modifier) || as<InOutModifier>(modifier) ||
-                as<RefModifier>(modifier) || as<BorrowModifier>(modifier))
+                as<RefModifier>(modifier) || as<RefReadOnlyModifier>(modifier) ||
+                as<RefWriteOnlyModifier>(modifier) || as<BorrowModifier>(modifier))
             {
                 // TODO(tfoley): The diagnostic in this case should probably not refer
                 // to the `const` modifier at all (since that is not actually what is
@@ -15326,23 +15558,7 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
 
         auto param = m_astBuilder->create<ParamDecl>();
         param->type.type = paramType;
-        switch (paramDir)
-        {
-        case ParamPassingMode::BorrowInOut:
-            addModifier(param, m_astBuilder->create<InOutModifier>());
-            break;
-        case ParamPassingMode::Out:
-            addModifier(param, m_astBuilder->create<OutModifier>());
-            break;
-        case ParamPassingMode::Ref:
-            addModifier(param, m_astBuilder->create<RefModifier>());
-            break;
-        case ParamPassingMode::BorrowIn:
-            addModifier(param, m_astBuilder->create<BorrowModifier>());
-            break;
-        default:
-            break;
-        }
+        addModifiersForParamPassingMode(m_astBuilder, param, paramDir);
         decl->addMember(param);
     }
 }
@@ -15866,6 +16082,22 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
     // extension __func_as_type(decl) : IBackwardDifferentiable<__func_as_type(decl)>
     // { /* ..empty.. */ }
     //
+    // For each mode, `__func_as_type(decl)` must have exactly one conformance to the derivative
+    // interface: either the synthesized extension here, or the one that
+    // `translateFwdDerivativeAttributeToAD2` / `translateBwdDerivativeAttributeToAD2` creates later
+    // (at `ReadyForLookup`) from a `[ForwardDerivative]` / `[BackwardDerivative]` on the decl.
+    // Two conformances of the same function type to the same interface get the same witness-table
+    // linkage name in `visitInheritanceDecl`, and the linker keeps only one of them, so calls
+    // through an interface requirement could silently use the synthesized derivative instead of the
+    // user's. We therefore skip the synthesized extension for a mode whose attribute is present.
+    // For the forward mode, that also skips the synthesized higher-order conformances of
+    // `fwd_diff`; a differentiable user derivative provides them instead.
+    //
+    // The guard only sees attributes on the decl itself. A derivative attached from the other side
+    // with `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]`, or one a `[Differentiable]` decl
+    // gets through `[PrimalSubstitute]`, is not visible here, so those spellings can still produce
+    // both conformances.
+    //
 
     if (decl->findModifier<DifferentiableAttribute>())
     {
@@ -15898,8 +16130,9 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
         };
         if (!isInterfaceRequirement(decl))
         {
-            if (decl->findModifier<ForwardDifferentiableAttribute>() ||
-                decl->findModifier<BackwardDifferentiableAttribute>())
+            if ((decl->findModifier<ForwardDifferentiableAttribute>() ||
+                 decl->findModifier<BackwardDifferentiableAttribute>()) &&
+                !decl->findModifier<ForwardDerivativeAttribute>())
             {
                 auto declsToExtend = ShortList<FunctionDeclBase*, 4>{as<FunctionDeclBase>(decl)};
                 for (auto _decl : getCurrentASTBuilder()->m_substituteMap[decl])
@@ -15975,7 +16208,8 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
                 }
             }
 
-            if (decl->findModifier<BackwardDifferentiableAttribute>())
+            if (decl->findModifier<BackwardDifferentiableAttribute>() &&
+                !decl->findModifier<BackwardDerivativeAttribute>())
             {
                 auto declsToExtend = ShortList<FunctionDeclBase*, 4>{as<FunctionDeclBase>(decl)};
                 for (auto _decl : getCurrentASTBuilder()->m_substituteMap[decl])
@@ -17198,7 +17432,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
         auto paramMode = getParamPassingMode(param);
         arg->type.isLeftValue = paramMode == ParamPassingMode::Out ||
                                 paramMode == ParamPassingMode::BorrowInOut ||
-                                paramMode == ParamPassingMode::Ref;
+                                isByReferenceParamPassingMode(paramMode);
         arg->type.type = param->getType();
         arg->loc = decl->loc;
         fakeArgs.add(arg);
@@ -17227,7 +17461,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
                 thisArg->type.type = thisArgType;
                 thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
                                             thisArgDirection == ParamPassingMode::BorrowInOut ||
-                                            thisArgDirection == ParamPassingMode::Ref;
+                                            isByReferenceParamPassingMode(thisArgDirection);
                 thisArg->loc = decl->loc;
                 fakeArgs.insert(0, thisArg);
             }
@@ -17457,42 +17691,114 @@ Type* SemanticsVisitor::calcThisType(Type* type)
     }
 }
 
-static bool _isThisParamModeAttribute(Modifier* modifier)
+/// Does `modifier` specify the passing mode of a declaration's receiver parameter?
+static bool _isReceiverParamModeSpecifier(Modifier* modifier)
 {
-    return as<MutatingAttribute>(modifier) || as<ConstRefAttribute>(modifier) ||
-           as<RefAttribute>(modifier) || as<NonmutatingAttribute>(modifier);
+    if (as<ReceiverParamModeSpecifierAttribute>(modifier))
+        return true;
+    return as<CppStyleTrailingReceiverParamConstModifier>(modifier) != nullptr;
 }
 
-ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode defaultMode)
+/// Return the receiver parameter mode specifiers attached to `decl`, in the order written.
+static ShortList<Modifier*, 1> _getReceiverParamModeSpecifiers(Decl* decl)
 {
-    auto mode = defaultMode;
-    if (policyDecl->hasModifier<MutatingAttribute>())
-        mode = ParamPassingMode::BorrowInOut;
-    else if (policyDecl->hasModifier<ConstRefAttribute>())
-        mode = ParamPassingMode::BorrowIn;
-    else if (policyDecl->hasModifier<RefAttribute>())
-        mode = ParamPassingMode::Ref;
-    else if (policyDecl->hasModifier<NonmutatingAttribute>())
-        mode = ParamPassingMode::In;
-    else if (as<SetterDecl>(policyDecl))
-        mode = ParamPassingMode::BorrowInOut;
-    return mode;
+    ShortList<Modifier*, 1> specifiers;
+
+    // `CompleteDecl` appends prefix attributes after the parser has attached trailing `const`.
+    // We collect attributes first so a conflict is diagnosed at the later trailing `const`.
+    for (auto modifier : decl->modifiers)
+        if (as<ReceiverParamModeSpecifierAttribute>(modifier))
+            specifiers.add(modifier);
+    for (auto modifier : decl->modifiers)
+        if (as<CppStyleTrailingReceiverParamConstModifier>(modifier))
+            specifiers.add(modifier);
+    return specifiers;
 }
 
-static ParamPassingMode _foldThisParamModePolicies(
-    List<Decl*> const& policyDecls,
-    ParamPassingMode defaultMode)
+void SemanticsVisitor::checkReceiverParamModeSpecifiers(Decl* decl)
 {
-    // Fold from the innermost declaration toward its transparent parents. An outer declaration's
-    // policy replaces the mode carried from its child, while the ordering below preserves the
-    // established precedence when multiple spellings occur on the same declaration.
-    auto mode = defaultMode;
+    // Each declaration can specify its receiver mode only once, so identical repeats are
+    // diagnosed just like conflicting spellings.
+    auto specifiers = _getReceiverParamModeSpecifiers(decl);
+    if (specifiers.getCount() <= 1)
+        return;
+
+    auto firstSpecifier = specifiers[0];
+    for (Index i = 1; i < specifiers.getCount(); ++i)
+    {
+        getSink()->diagnose(Diagnostics::DuplicateModifier{
+            .existingModifier = firstSpecifier,
+            .modifier = specifiers[i]});
+    }
+}
+
+/// Calculate the receiver parameter mode specified directly on `decl`.
+///
+/// Returns no mode when no specifier is present. Modifier checking diagnoses multiple specifiers,
+/// including identical repeats; error recovery uses the first specifier in the order written.
+static std::optional<ParamPassingMode> _calcReceiverParamModeFromSpecifiers(Decl* decl)
+{
+    auto specifiers = _getReceiverParamModeSpecifiers(decl);
+    if (specifiers.getCount() == 0)
+        return std::nullopt;
+
+    auto specifier = specifiers[0];
+    if (as<MutatingAttribute>(specifier))
+        return ParamPassingMode::BorrowInOut;
+    if (as<ConstRefAttribute>(specifier))
+        return ParamPassingMode::BorrowIn;
+    if (as<RefAttribute>(specifier))
+        return ParamPassingMode::RefReadWrite;
+    if (as<NonmutatingAttribute>(specifier))
+        return ParamPassingMode::In;
+    if (as<CppStyleTrailingReceiverParamConstModifier>(specifier))
+        return ParamPassingMode::In;
+    SLANG_UNREACHABLE("all receiver parameter mode specifiers handled");
+}
+
+ParamPassingMode SemanticsVisitor::getDefaultReceiverParamMode(Decl* decl)
+{
+    if (as<SetterDecl>(decl))
+        return ParamPassingMode::BorrowInOut;
+
+    // Declarations other than `FuncDecl`s default to `in`.
+    if (!as<FuncDecl>(decl))
+        return ParamPassingMode::In;
+
+    // We default synthesized functions to `in` rather than adopting the surrounding HLSL default.
+    // For example, `visitLambdaExpr` synthesizes an `operator()` that must satisfy core `IFunc`'s
+    // `in` receiver requirement.
+    if (decl->hasModifier<SynthesizedModifier>())
+        return ParamPassingMode::In;
+
+    // Imported modules finish signature checking in their own semantic context before import.
+    // Reflection and specialization read the attached mode, so this language query runs while
+    // checking a written method in its owning translation unit.
+    if (getSourceLanguage() == SourceLanguage::HLSL)
+        return ParamPassingMode::BorrowInOut;
+    return ParamPassingMode::In;
+}
+
+/// Return the mode specified by the outermost declaration in `policyDecls` that has a specifier.
+///
+/// Requires innermost-to-outermost declaration order. Returns no mode if none is specified.
+static std::optional<ParamPassingMode> _foldReceiverParamModeSpecifiers(
+    List<Decl*> const& policyDecls)
+{
+    std::optional<ParamPassingMode> mode;
     for (auto policyDecl : policyDecls)
-        mode = applyThisParamModePolicy(policyDecl, mode);
+    {
+        if (auto specifiedMode = _calcReceiverParamModeFromSpecifiers(policyDecl))
+            mode = specifiedMode;
+    }
     return mode;
 }
 
-static void _diagnoseThisParamModeAttributes(
+/// Diagnose receiver parameter mode specifiers on declarations that cannot use them.
+///
+/// Requires declarations for class members when `isClassMember` is true, or declarations
+/// without a receiver parameter otherwise.
+static void _diagnoseReceiverParamModeSpecifiers(
     SemanticsVisitor* semantics,
     List<Decl*> const& policyDecls,
     bool isClassMember)
@@ -17501,19 +17807,19 @@ static void _diagnoseThisParamModeAttributes(
     {
         for (auto modifier : policyDecl->modifiers)
         {
-            if (!_isThisParamModeAttribute(modifier))
+            if (!_isReceiverParamModeSpecifier(modifier))
                 continue;
 
             if (isClassMember)
             {
                 semantics->getSink()->diagnose(
-                    Diagnostics::ThisParamModeAttributeOnClassMember{.attribute = modifier});
+                    Diagnostics::ReceiverParamModeSpecifierOnClassMember{.specifier = modifier});
             }
             else
             {
                 semantics->getSink()->diagnose(
-                    Diagnostics::ThisParamModeAttributeWithoutEffectiveThisParam{
-                        .attribute = modifier});
+                    Diagnostics::ReceiverParamModeSpecifierWithoutReceiverParam{
+                        .specifier = modifier});
             }
         }
     }
@@ -17547,17 +17853,17 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
     // Next, resolve that receiver type. An extension on a callable delegates to the callable's
     // effective `this` parameter so that it preserves the callable ABI. Then select the effective
     // mode: a `SynthesizedParamPassingModeModifier` makes the mode declaration-owned; otherwise the
-    // collected policy and declared receiver type determine it. Declaration ownership is what lets
-    // a synthesized wrapper retain a non-`In` mode even for a class receiver; an ordinary class
-    // member instead diagnoses mode attributes and defaults to `In`. Finally, encode `no_diff` in
-    // the parameter value type and return the `ParamInfo`.
+    // default receiver mode, collected policy, and declared receiver type determine it. Declaration
+    // ownership is what lets a synthesized wrapper retain a non-`In` mode even for a class
+    // receiver; an ordinary class member instead diagnoses mode specifiers and defaults to `In`.
+    // Finally, encode `no_diff` in the parameter value type and return the `ParamInfo`.
     List<Decl*> policyDecls;
     policyDecls.add(decl);
 
     auto diagnoseModeAttributes = [&](bool isClassMember)
     {
         if (shouldDiagnoseModeAttributes)
-            _diagnoseThisParamModeAttributes(this, policyDecls, isClassMember);
+            _diagnoseReceiverParamModeSpecifiers(this, policyDecls, isClassMember);
     };
 
     // A constructor operates on a local `this` value that is uninitialized on entry and returned
@@ -17677,7 +17983,10 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
     }
     else if (!hasDeclarationOwnedMode)
     {
-        mode = _foldThisParamModePolicies(policyDecls, mode);
+        if (auto specifiedMode = _foldReceiverParamModeSpecifiers(policyDecls))
+            mode = *specifiedMode;
+        else
+            mode = getDefaultReceiverParamMode(decl);
         mode = adjustParamPassingModeBasedOnParamType(mode, receiverType);
     }
 
@@ -18628,6 +18937,11 @@ void SemanticsDeclScopeWiringVisitor::visitUsingDecl(UsingDecl* decl)
 
 void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
 {
+    // Every scope that the parser creates for a namespace is in `lexicalScopes`, so wiring
+    // all of them covers `ownedScope` too. A namespace with no body, such as one that a
+    // `syntax` declaration creates, has no scopes and nothing to wire.
+    SLANG_ASSERT(!decl->ownedScope || decl->lexicalScopes.contains(decl->ownedScope));
+
     // We need to wire up the scope of namespaces with other namespace decls of the same name
     // that is accessible from the current context.
     auto parent = as<ContainerDecl>(getParentDecl(decl));
@@ -18653,7 +18967,11 @@ void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
                 {
                     ensureDecl(ns, DeclCheckState::ScopesWired);
                 }
-                addSiblingScopeForContainerDecl(getASTBuilder(), decl, otherNamespace);
+                // We attach the other namespace to every scope of `decl`, not only to
+                // `ownedScope`, because code in each body of a reopened namespace looks up
+                // names through the scope of that body.
+                for (auto lexicalScope : decl->lexicalScopes)
+                    addSiblingScopeForContainerDecl(getASTBuilder(), lexicalScope, otherNamespace);
             }
         }
         // For file decls, we need to continue searching up in the parent module scope.
