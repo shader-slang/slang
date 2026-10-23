@@ -14867,6 +14867,7 @@ static bool isUnscopedEnumCaseAliasOfOwnEnum(Decl* decl, Decl* enumDecl)
         return false;
     auto caseDecl = as<EnumCaseDecl>(initExpr->declRef.getDecl());
     return caseDecl && caseDecl->parentDecl == enumDecl &&
+           caseDecl->getName() == enumDecl->getName() &&
            caseDecl->getName() == letDecl->getName() &&
            caseDecl->getNameLoc() == letDecl->getNameLoc();
 }
@@ -14909,8 +14910,10 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
 
     // Consider `[UnscopedEnum] enum Mode { Mode, Other }`. The case alias `Mode` that the parser
     // adds to the enclosing scope conflicts with the enum type `Mode`. Lookup still tells the type
-    // and the value apart by where the name is used, and DXC accepts the declaration, so we warn
-    // in every language version instead of reporting an error.
+    // and the value apart by where the name is used, and both DXC and earlier Slang versions accept
+    // the code, so for compatibility we warn in every language version instead of reporting an
+    // error. Only this synthesized alias is exempt. The failure result stops the caller's loop
+    // over older declarations; a conflict with one of those is reported at the enum itself.
     if (isUnscopedEnumCaseAliasOfOwnEnum(newDecl, oldDecl))
     {
         getSink()->diagnose(Diagnostics::UnscopedEnumCaseNamedLikeEnum{.decl = newDecl});
