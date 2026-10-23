@@ -2839,7 +2839,9 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
         if (as<IRParam>(ptr) || as<IRVar>(ptr))
         {
             // An exception is a load of a constref parameter, which should
-            // remain constant throughout the function.
+            // remain constant throughout the function. A `__ref_readonly`
+            // parameter is not an exception: it may be aliased, so its
+            // contents may change.
             if (as<IRBorrowInParamType>(getRootAddr(ptr)->getDataType()))
                 return true;
             if (isInstInPrimalOrTransposedParameterBlocks(ptr))
