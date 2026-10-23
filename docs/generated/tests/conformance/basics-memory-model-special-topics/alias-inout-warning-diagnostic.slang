@@ -4,7 +4,7 @@
 //META: source_commit=57fb63455095efe1465661001ad147b24b968932
 //META: doc_ref=docs/language-reference/basics-memory-model-special-topics.md#function-parameters-with-inout-inout-modifiers
 //META: doc_section_digest=50b3040fe642ee135f57002e37f20cd9b949f33677eec525295c406b3b231822
-//META: purpose=Passing the same variable to two `inout` parameters of one function call elicits diagnostic W30051 (potentially aliased argument to out/inout/ref parameter).
+//META: purpose=Passing the same variable to two `inout` parameters of one function call elicits diagnostic W30051 (potentially aliased argument to a parameter that may be written).
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
@@ -34,7 +34,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     int b = dispatchThreadID.y;
     // undefined behavior: a is passed twice to inout parameters
     addConsumeTwoValues(a, b, a);
-//CHECK:                ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
-//CHECK:                ^ argument for 'inout' parameter 'i1' may alias argument for 'inout' parameter 'o'; passing the same value to both may produce unexpected results
+//CHECK:                ^ potentially aliased argument to a parameter that may be written
+//CHECK:                ^ argument for 'inout' parameter 'i1' may alias argument for 'inout' parameter 'o'; passing the same value to both may produce undefined behavior
     output[0] = a;
 }

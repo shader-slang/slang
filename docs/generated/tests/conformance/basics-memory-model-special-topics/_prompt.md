@@ -15,6 +15,7 @@ The doc (≈72 lines, 2 sections) covers two special-topic corners of the Slang 
 1. **Function Parameters with in/out/inout Modifiers** (lines 3–61): Normative rules about
    how the `in`, `out`, and `inout` directional qualifiers govern how arguments may be
    accessed during a function call. The section includes:
+
    - Access rules: `in` = any number of reads; `out` = any number of writes; `inout` = any
      number of reads and writes.
    - A "default direction" claim: `in` is the default.
@@ -43,8 +44,12 @@ The doc (≈72 lines, 2 sections) covers two special-topic corners of the Slang 
   diagnostic surface. Mark untested with reason `gpu-other`.
 - **Aliasing UB / W30051 (C7)**: Normative and compiler-observable — the compiler emits
   `W30051` when the same variable appears as two `out`/`inout` arguments. Test with
-  `DIAGNOSTIC_TEST` pinning `E30051`. Cover two sub-cases: inout+inout (from the doc's
-  own example) and in+out (the "at least one is out/inout" minimum case).
+  `DIAGNOSTIC_TEST` pinning `W30051`. Cover two sub-cases: inout+inout (from the doc's
+  own example) and in+out (the "at least one is out/inout" minimum case). The in+out case
+  elicits no `W30051`, because the `in` argument is copied before the call. Pin that with an
+  exhaustive `DIAGNOSTIC_TEST` in which the in+out call has no annotation, plus a control call
+  that differs only in taking the `in` parameter as `inout` and carries a caret-anchored
+  `W30051` CHECK.
 - **Aliasing via binding (C8–C10)**: The fact that `ConstantBuffer<T>` and `RWStructuredBuffer<T>`
   can alias is a runtime concern, but the compilability and emission shape of the two resource
   types is observable. Emit tests pin that both resources compile to distinct binding declarations.
@@ -57,5 +62,4 @@ The doc (≈72 lines, 2 sections) covers two special-topic corners of the Slang 
 - The specific implementation approach (copy-in/copy-out vs pointer) — the remark explicitly
   says it is unspecified; asserting either approach would be testing an implementation detail.
 - Multi-file or multi-dispatch tests — `in`/`out`/`inout` semantics are single-call.
-- `ref` parameters — the doc does not name `ref` in this section (though W30051 mentions it
-  in its message text).
+- `ref` parameters — the doc does not name `ref` in this section.
