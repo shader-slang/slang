@@ -312,15 +312,29 @@ bool WGSLSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
 
 void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
 {
-    if (!maybeEmitSystemSemantic(inst))
+    if (maybeEmitSystemSemantic(inst))
+        return;
+
+    // A varying's location is the one its layout assigned, which is also what reflection reports.
+    if (auto varLayout = findVarLayout(inst))
     {
-        if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
+        auto offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingInput);
+        if (!offsetAttr)
+            offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+        if (offsetAttr)
         {
             m_writer->emit("@location(");
-            m_writer->emit(semanticDecoration->getEffectiveSemanticIndex());
+            m_writer->emit(offsetAttr->getOffset());
             m_writer->emit(")");
             return;
         }
+    }
+
+    if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
+    {
+        m_writer->emit("@location(");
+        m_writer->emit(semanticDecoration->getEffectiveSemanticIndex());
+        m_writer->emit(")");
     }
 }
 
