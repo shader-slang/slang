@@ -3521,7 +3521,15 @@ $(type_info.return_type) $(type_info.method_name)(
     // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
     IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
 
+    // Form a read-write reference parameter type to `valueType` in `addrSpace`.
     IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
+
+    // Form a reference parameter type to `valueType` in `addrSpace` with the access
+    // `accessQualifier` (read-write, read-only, or write-only).
+    IRRefParamType* getRefParamType(
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
     IRPtrType* getPtrType(
         IROp op,
@@ -5059,6 +5067,14 @@ $(type_info.return_type) $(type_info.method_name)(
     {
         addDecoration(value, kIROp_PatchConstantFuncDecoration, patchConstantFunc);
     }
+
+    /// Marks a global variable as belonging to the patch constant interface of a
+    /// tessellation shader, so that emit can distinguish it from per-control-point I/O:
+    /// SPIR-V emits the `Patch` decoration (SpvDecorationPatch), while GLSL emits the
+    /// patch storage qualifier. The interface consists of patch constant function
+    /// outputs in a hull (tessellation control) shader and patch constant inputs in a
+    /// domain (tessellation evaluation) shader.
+    void addGLSLPatchDecoration(IRInst* value) { addDecoration(value, kIROp_GLSLPatchDecoration); }
 
     void addImportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
