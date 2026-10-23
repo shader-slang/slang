@@ -87,6 +87,27 @@ struct ContainerTypeKey
     }
 };
 
+struct TypeConformanceSequentialIDKey
+{
+    typedef TypeConformanceSequentialIDKey ThisType;
+
+    String interfaceMangledName;
+    uint32_t sequentialID;
+
+    bool operator==(const ThisType& other) const
+    {
+        return interfaceMangledName == other.interfaceMangledName &&
+               sequentialID == other.sequentialID;
+    }
+
+    HashCode getHashCode() const
+    {
+        return combineHash(
+            Slang::getHashCode(interfaceMangledName),
+            Slang::getHashCode(sequentialID));
+    }
+};
+
 /// A context for loading and re-using code modules.
 class Linkage : public RefObject, public slang::ISession
 {
@@ -233,6 +254,14 @@ public:
 
     RefPtr<ASTBuilder> m_astBuilder;
 
+    // These helpers update/read the shared sequential-ID maps. Callers must hold
+    // `m_sequentialIDMapMutex`.
+    uint32_t getFirstFreeTypeConformanceWitnessSequentialID(String const& interfaceMangledName);
+    void registerTypeConformanceWitnessSequentialID(
+        String const& witnessTableMangledName,
+        String const& interfaceMangledName,
+        uint32_t sequentialID);
+
     // Cache for container types.
     Dictionary<ContainerTypeKey, Type*> m_containerTypes;
 
@@ -259,6 +288,9 @@ public:
     // Map from the mangled name of RTTI objects to sequential IDs
     // used by `switch`-based dynamic dispatch.
     Dictionary<String, uint32_t> mapMangledNameToRTTIObjectIndex;
+
+    // Tracks which interface/sequential-ID pairs are already occupied.
+    HashSet<TypeConformanceSequentialIDKey> usedTypeConformanceWitnessSequentialIDKeys;
 
     // Counters for allocating sequential IDs to witness tables conforming to each interface type.
     Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;
