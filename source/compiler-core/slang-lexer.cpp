@@ -688,12 +688,17 @@ static TokenType _lexNumber(Lexer* lexer, int base)
     return tokenType;
 }
 
-static int _maybeReadDigit(char const** ioCursor, int base)
+// Token content is not always followed by a terminating zero: a token that contains or follows an
+// escaped newline is copied into an unterminated buffer. The literal decoders therefore stop at
+// `end` rather than relying on a non-digit byte after the token.
+static int _maybeReadDigit(char const** ioCursor, char const* end, int base)
 {
     auto& cursor = *ioCursor;
 
     for (;;)
     {
+        if (cursor == end)
+            return -1;
         int c = *cursor;
         switch (c)
         {
@@ -747,12 +752,14 @@ static int _maybeReadDigit(char const** ioCursor, int base)
     }
 }
 
-static int _readOptionalBase(char const** ioCursor)
+static int _readOptionalBase(char const** ioCursor, char const* end)
 {
     auto& cursor = *ioCursor;
-    if (*cursor == '0')
+    if (cursor != end && *cursor == '0')
     {
         cursor++;
+        if (cursor == end)
+            return 10;
         switch (*cursor)
         {
         case 'x':
@@ -800,12 +807,12 @@ IntegerLiteralValue getIntegerLiteralValue(
     char const* cursor = content.begin();
     char const* end = content.end();
 
-    int base = _readOptionalBase(&cursor);
+    int base = _readOptionalBase(&cursor, end);
     bool hasOverflowed = false;
 
     for (;;)
     {
-        int digit = _maybeReadDigit(&cursor, base);
+        int digit = _maybeReadDigit(&cursor, end, base);
         if (digit < 0)
             break;
 
