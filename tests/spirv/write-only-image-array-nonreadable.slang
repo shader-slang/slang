@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -stage compute -entry computeMain -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=NEG):-target spirv -emit-spirv-directly
-//TEST:SIMPLE(filecheck=NEG):-target spirv -stage compute -entry computeMain -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=NEG):-target spirv -emit-spirv-via-glsl
 
 // An array of write-only textures must get the `NonReadable` decoration on
 // its variable, the same as a single write-only texture does, and the direct
@@ -15,12 +15,20 @@
 // CHECK-DAG: OpDecorate %layered{{(_0)?}} NonReadable
 // CHECK-DAG: OpDecorate %entryPointParams_epArr{{(_0)?}} NonReadable
 // CHECK-DAG: OpDecorate %pb_arr{{(_0)?}} NonReadable
+
+// The two `Binding` checks show that `readWrite` and `readOnly` exist under
+// these names, so the `NEG-NOT` checks below cannot pass only because a name
+// changed.
 // CHECK-DAG: OpDecorate %readWrite{{(_0)?}} Binding
 // CHECK-DAG: OpDecorate %readOnly{{(_0)?}} Binding
 
-// Read-write and read-only texture arrays must stay readable. The read-write
-// array declares its format so that it does not itself need
-// StorageImageReadWithoutFormat.
+// Read-write and read-only texture arrays must stay readable. `NEG` is a
+// separate run so that its `NOT` checks scan the whole output. The issue also
+// requires that write-only arrays add only `StorageImageWriteWithoutFormat`.
+// The direct emitter decides that capability from the image type, not from
+// `NonReadable`, so that check guards the capability and not the decoration.
+// The read-write array declares its format so that it does not itself need
+// `StorageImageReadWithoutFormat`.
 // NEG-NOT: OpCapability StorageImageReadWithoutFormat
 // NEG-NOT: OpDecorate %readWrite{{(_0)?}} NonReadable
 // NEG-NOT: OpDecorate %readOnly{{(_0)?}} NonReadable
