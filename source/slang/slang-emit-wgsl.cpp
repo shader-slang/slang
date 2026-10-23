@@ -31,24 +31,25 @@
 namespace Slang
 {
 
-// In WGSL, expression of "1.0/0.0" is not allowed, it will report compile error,
-// so to construct infinity or nan, we have to assign the float literal to a variable
-// and then use it to bypass the compile error.
+// WGSL has no NaN or infinity literal, and a const-expression that evaluates to one is a
+// shader-creation error. These helpers reinterpret the IEEE bit pattern held in a `let`, which is a
+// runtime expression rather than a const-expression; without the `let`, `bitcast` of a literal is a
+// const-expression and is rejected. We use bit patterns rather than a runtime `0.0 / 0.0` because
+// the NVIDIA Vulkan driver crashes creating a pipeline whose function-local `f32` array holds such
+// a division and is indexed at run time (issue #13658).
 static const char* kWGSLBuiltinPreludeGetInfinity = R"(
 fn _slang_getInfinity(positive: bool) -> f32
 {
-    let a = select(f32(-1.0), f32(1.0), positive);
-    let b = f32(0.0);
-    return a / b;
+    let bits = select(0xff800000u, 0x7f800000u, positive);
+    return bitcast<f32>(bits);
 }
 )";
 
 static const char* kWGSLBuiltinPreludeGetNan = R"(
 fn _slang_getNan() -> f32
 {
-    let a = f32(0.0);
-    let b = f32(0.0);
-    return a / b;
+    let bits = 0x7fc00000u;
+    return bitcast<f32>(bits);
 }
 )";
 
@@ -829,6 +830,15 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
+    // A NaN or infinity literal is emitted as a call to a prelude helper
+    // (`kWGSLBuiltinPreludeGetNan` / `kWGSLBuiltinPreludeGetInfinity`), which is not a
+    // const-expression. Literals are themselves module-scope insts, so this check comes before the
+    // module-scope test below; it reaches values built from such a literal through the operand
+    // recursion. A module-scope aggregate holding one never gets here, because WGSL legalization
+    // (`GlobalInstInliningContext` in slang-ir-wgsl-legalize.cpp) has already sunk it into the
+    // functions that use it.
+    if (isNonFiniteFloatLit(inst))
+        return false;
     if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
