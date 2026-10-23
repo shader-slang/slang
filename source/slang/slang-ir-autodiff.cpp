@@ -988,7 +988,9 @@ void stripTempDecorations(IRInst* inst)
             decor->removeAndDeallocate();
             break;
         case kIROp_AutoDiffOriginalValueDecoration:
-            // Calls retain their primal callee until higher-order differentiation is finished.
+            // `isHigherOrderDerivativeCall` reads a call's primal callee during later
+            // transcription. `stripAutoDiffDecorations` removes this link after differentiation
+            // finishes.
             if (!as<IRCall>(inst))
                 decor->removeAndDeallocate();
             break;

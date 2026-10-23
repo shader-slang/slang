@@ -182,8 +182,9 @@ float slopeSurface<C : ISurface>(no_diff C c, float t)
     return __fwd_diff(evalSurface<C>)(c, diffPair(t, 1.0), 2.5, diffPair(1.0, 0.0)).d;
 }
 
-// `x * eval'(detach(x))`, so its derivative is `eval'(x) = 3x^2`; the inner derivative still
-// goes through reverse mode, with a detached argument.
+// The inner `fwd_diff` computes `eval'(detach(x))`; the outer `bwd_diff` differentiates
+// `x * eval'(detach(x))`. The detached argument leaves only the multiplication's derivative,
+// `eval'(x) = 3x^2`, which is 27 at x = 3.
 [Differentiable]
 float detachedGeneric<C : ICurve>(no_diff C c, float x)
 {

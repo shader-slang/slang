@@ -87,7 +87,9 @@ bool isTypePack(Type* type);
 bool isAbstractTypePack(Type* type);
 bool isPackType(Type* type);
 
-/// The type of a differential pair of `primalType`; a type pack pairs element-wise.
+/// Returns the differential pair type for `primalType`, pairing a type pack element-wise.
+/// An `IDifferentiable` witness selects `DifferentialPair`; an `IDifferentiablePtrType` witness
+/// selects `DifferentialPtrPair`. Other witness kinds are out of contract.
 Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitness);
 
 // Base class for types that can be used in arithmetic expressions
