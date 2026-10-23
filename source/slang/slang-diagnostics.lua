@@ -6267,6 +6267,12 @@ err(
 )
 
 err(
+    "invalid-wgsl-diagnostic-filter",
+    56110,
+    "invalid WGSL diagnostic filter '~severity:~rule'; expected '~syntax'"
+)
+
+err(
     "assign-to-ref-not-supported",
     56104,
     "mesh output must be assigned as whole struct",

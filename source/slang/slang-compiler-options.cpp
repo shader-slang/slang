@@ -93,6 +93,13 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                     sb << "=" << v.stringValue2;
             }
             break;
+        case CompilerOptionName::WGSLDiagnostic:
+            for (auto v : option.value)
+            {
+                // stringValue: rule; stringValue2: severity.
+                sb << " " << name << " " << v.stringValue2 << ":" << v.stringValue;
+            }
+            break;
         case CompilerOptionName::VulkanBindShift: // intValue0 (higher 8 bits): kind;
                                                   // intValue0(higher bits): set; intValue1:
                                                   // shift
@@ -450,6 +457,36 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
     }
 }
 
+const char* const kWGSLDiagnosticFilterSyntax = "<error|warning|info|off>:<rule>[.<rule>]";
+
+// A WGSL identifier, ASCII subset: a letter or `_` followed by letters, digits or `_`; not `_`
+// alone, and not starting with `__` (reserved).
+static bool isWGSLIdentifier(UnownedStringSlice text)
+{
+    if (text.getLength() == 0 || text == toSlice("_") || text.startsWith(toSlice("__")))
+        return false;
+    for (Index i = 0; i < text.getLength(); i++)
+    {
+        const char c = text[i];
+        const bool isLetter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+        const bool isDigit = c >= '0' && c <= '9';
+        if (!isLetter && !(isDigit && i > 0))
+            return false;
+    }
+    return true;
+}
+
+bool isValidWGSLDiagnosticFilter(UnownedStringSlice severity, UnownedStringSlice rule)
+{
+    if (severity != toSlice("error") && severity != toSlice("warning") &&
+        severity != toSlice("info") && severity != toSlice("off"))
+        return false;
+    const Index dot = rule.indexOf('.');
+    if (dot < 0)
+        return isWGSLIdentifier(rule);
+    return isWGSLIdentifier(rule.head(dot)) && isWGSLIdentifier(rule.tail(dot + 1));
+}
+
 bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
 {
     switch (name)
@@ -466,6 +503,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
     case CompilerOptionName::TypeConformance:
+    case CompilerOptionName::WGSLDiagnostic:
     case CompilerOptionName::DumpIRBefore:
     case CompilerOptionName::DumpIRAfter:
     case CompilerOptionName::TraceCoverageReservedSpace:
