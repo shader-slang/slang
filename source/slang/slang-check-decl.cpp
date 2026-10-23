@@ -1467,6 +1467,7 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void visitContainerDecl(ContainerDecl* decl);
+    void visitStructDecl(StructDecl* decl);
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -22138,6 +22139,9 @@ struct CapabilityDeclReferenceVisitor
     const ParentDiagnosticFunc handleParentDiagnosticFunc;
     RequireCapabilityAttribute* maybeRequireCapability;
     SemanticsContext& outerContext;
+    // Struct inference follows the alias dependency graph. Other uses consume the
+    // resulting inferred requirements without traversing those members again.
+    bool includeTypeAliasDependencies = false;
     CapabilityDeclReferenceVisitor(
         const ProcessFunc& processFunc,
         const ParentDiagnosticFunc& parentDiagnosticFunc,
@@ -22151,12 +22155,75 @@ struct CapabilityDeclReferenceVisitor
               CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>>(outer)
     {
     }
+
+    void visitDeclRefType(DeclRefType* type)
+    {
+        // GenericContext<int> contributes both its arguments and GenericContext's
+        // member aliases. Follow the declaration from the type rather than from
+        // every DeclRef: references inside witnesses can describe inheritance
+        // relationships whose enclosing struct is still being checked.
+        Base::visitVal(type);
+        if (includeTypeAliasDependencies)
+            this->dispatchIfNotNull(type->getDeclRef().getDecl()->getDefaultDeclRef());
+    }
+
+    void visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* witness)
+    {
+        if (!includeTypeAliasDependencies)
+        {
+            Base::visitVal(witness);
+            return;
+        }
+        if (!Base::visitedVals.add(witness))
+            return;
+
+        // An alias needs the types used by a conformance, not its validation result.
+        // Consider `struct Value : IValue { typealias Box = Holder<Value>; }`, where
+        // Holder<T> requires T : IValue. The checked specialization carries a witness
+        // that points back to Value's inheritance declaration. Checking that declaration
+        // would first require Value's completed capabilities, creating a cycle. Its
+        // inferred requirements come from the base type, which the witness already
+        // records as its supertype, so the type dependencies suffice here.
+        this->dispatchIfNotNull(witness->getSub());
+        this->dispatchIfNotNull(witness->getSup());
+        // A specialized conformance can also carry generic arguments and witnesses.
+        // Traverse those operands without reporting the inheritance declaration itself.
+        Base::visitVal(witness->getDeclRef().declRefBase);
+    }
+
     virtual void processReferencedDecl(Decl* decl) override
     {
         SourceLoc loc = SourceLoc();
         if (Base::sourceLocStack.getCount())
             loc = Base::sourceLocStack.getLast();
+        // Structs and their alias dependencies may be forward references. Finish their
+        // inference before reading the frozen requirements. A struct already being
+        // checked is a valid alias cycle; its remaining aliases are still visited below.
+        if ((includeTypeAliasDependencies || as<StructDecl>(decl)) &&
+            !decl->checkState.isBeingChecked())
+            this->ensureDecl(decl, DeclCheckState::CapabilityChecked);
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
+
+        // A member alias is part of the enclosing struct's capability requirements.
+        // Visit its checked type in the same traversal so that visitedVals also covers
+        // aliases that refer back to a struct we have already seen. For example,
+        // `struct Context { typealias Self = Context; typealias Element = MetalOnly; }`
+        // must retain MetalOnly's requirements without repeatedly visiting Self.
+        if (auto structDecl = as<StructDecl>(decl); includeTypeAliasDependencies && structDecl)
+        {
+            // A generic alias such as `typealias Element<U> = MetalElement<U>` is
+            // wrapped in GenericDecl, so its inner declaration identifies the alias.
+            for (auto member : structDecl->getDirectMemberDecls())
+            {
+                auto typeAlias = as<TypeDefDecl>(maybeGetInner(member));
+                if (!typeAlias)
+                    continue;
+                typename Base::PushSourceLocRAII sourceLocRAII(
+                    Base::sourceLocStack,
+                    typeAlias->loc);
+                this->dispatchIfNotNull(typeAlias->type.type);
+            }
+        }
     }
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
     {
@@ -22506,13 +22573,15 @@ void visitReferencedDecls(
     SourceLoc initialLoc,
     RequireCapabilityAttribute* maybeRequireCapability,
     const ProcessFunc& processFunc,
-    const ParentDiagnosticFunc& parentDiagnosticFunc)
+    const ParentDiagnosticFunc& parentDiagnosticFunc,
+    bool includeTypeAliasDependencies = false)
 {
     CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc> visitor(
         processFunc,
         parentDiagnosticFunc,
         maybeRequireCapability,
         context);
+    visitor.includeTypeAliasDependencies = includeTypeAliasDependencies;
     visitor.sourceLocStack.add(initialLoc);
 
     if (auto val = as<Val>(node))
@@ -22578,37 +22647,23 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
     for (Decl* parent = decl; parent; parent = getParentDecl(parent))
     {
         CapabilitySet localDeclaredCaps;
-        bool shouldBreak = false;
-        if (!as<AggTypeDeclBase>(parent) || !parent->inferredCapabilityRequirements ||
-            parent->inferredCapabilityRequirements->isEmpty())
+        // Inferred requirements can also come from member aliases. Only explicit
+        // declarations belong here; instance methods separately inherit the enclosing
+        // type's inferred requirements in visitFunctionDeclBase.
+        for (auto mod : parent->modifiers)
         {
-            for (auto mod : parent->modifiers)
-            {
-                if (auto decoration = as<RequireCapabilityAttribute>(mod))
-                    localDeclaredCaps.unionWith(decoration->capabilitySet);
-                else if (as<Shader64BitIndexingAttribute>(mod))
-                    localDeclaredCaps.unionWith(
-                        CapabilitySet(CapabilityName::spvShader64BitIndexingEXT));
-                else if (auto entrypoint = as<EntryPointAttribute>(mod))
-                    stageToJoin = entrypoint->capabilitySet
-                                      ? entrypoint->capabilitySet->getTargetStage()
-                                      : CapabilityAtom::Invalid;
-            }
-        }
-        else
-        {
-            shouldBreak = true;
+            if (auto decoration = as<RequireCapabilityAttribute>(mod))
+                localDeclaredCaps.unionWith(decoration->capabilitySet);
+            else if (as<Shader64BitIndexingAttribute>(mod))
+                localDeclaredCaps.unionWith(
+                    CapabilitySet(CapabilityName::spvShader64BitIndexingEXT));
+            else if (auto entrypoint = as<EntryPointAttribute>(mod))
+                stageToJoin = entrypoint->capabilitySet
+                                  ? entrypoint->capabilitySet->getTargetStage()
+                                  : CapabilityAtom::Invalid;
         }
         // Merge decl's capability declaration with the parent.
-        if (shouldBreak)
-        {
-            declaredCaps.nonDestructiveJoin(parent->inferredCapabilityRequirements);
-            // If the parent already has inferred capability requirements, we should stop now
-            // since that already covers transitive parents.
-            break;
-        }
-        else
-            declaredCaps.nonDestructiveJoin(localDeclaredCaps);
+        declaredCaps.nonDestructiveJoin(localDeclaredCaps);
     }
     if (!declaredCaps.isEmpty() && stageToJoin != CapabilityAtom::Invalid)
         declaredCaps.join(CapabilitySet((CapabilityName)stageToJoin));
@@ -22619,6 +22674,27 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
     // Any potential child must get it's capabilities from `getDeclaredCapabilitySet`.
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl).freeze(getASTBuilder());
+}
+
+void SemanticsDeclCapabilityVisitor::visitStructDecl(StructDecl* decl)
+{
+    visitContainerDecl(decl);
+    CapabilitySet inferredCaps{decl->inferredCapabilityRequirements};
+    // Start from the struct declaration itself, including for a generic struct, so
+    // member aliases contribute to the requirements stored on this declaration.
+    visitReferencedDecls(
+        *this,
+        decl->getDefaultDeclRef(),
+        decl->loc,
+        decl->findModifier<RequireCapabilityAttribute>(),
+        [this,
+         decl,
+         &inferredCaps](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
+        { _propagateRequirement(this, inferredCaps, decl, node, nodeCaps, refLoc); },
+        [this, decl](DiagnosticCategory category)
+        { _propagateSeeDefinitionOf(this, decl, category); },
+        true);
+    decl->inferredCapabilityRequirements = inferredCaps.freeze(getASTBuilder());
 }
 
 void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extensionDecl)
