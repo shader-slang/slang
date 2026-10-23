@@ -2501,6 +2501,20 @@ Result linkAndOptimizeIR(
     {
     default:
         break;
+    case CodeGenTarget::WGSL:
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly:
+        {
+            // WGSL passes structs and arrays by value. Pass the large read-only ones
+            // by `ptr<function, T>`, so that a call does not copy the whole aggregate.
+            const IRIntegerValue kMinByPointerParamSizeInBytes = 64;
+            SLANG_PASS(
+                transformLargeParamsToConstRefForWGSL,
+                targetRequest,
+                kMinByPointerParamSizeInBytes,
+                codeGenContext->getSink());
+        }
+        break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
