@@ -4,7 +4,8 @@
 // `arr` is a local array of an empty struct that keeps its var, because it is indexed
 // dynamically. Type legalization removes its debug variable, so it also removes the
 // `DebugVarStorage` decoration that names the debug variable; with the decoration left in place,
-// legalization would fail on an operand it cannot legalize.
+// legalization would fail on an operand it cannot legalize. `h` is a struct whose empty member
+// legalizes away while the struct keeps a field, so its debug variable and decoration survive.
 
 struct Empty
 {
@@ -36,3 +37,4 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 
 // CHECK: OpEntryPoint
 // CHECK-NOT: = OpString "arr"
+// CHECK: DebugDeclare {{%[A-Za-z_0-9]+}} %h {{%[0-9]+}}{{$}}

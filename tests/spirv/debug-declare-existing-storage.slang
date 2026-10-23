@@ -8,7 +8,7 @@
 // `= OpString "<name>"` and on `OpName %id "<name>"` (the source blob escapes quotes as \").
 // Each variable has its own name, so that its OpString identifies it.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -g2 -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -g2 -O0 -validate-ir
 // NOCOPY repeats the CHECK compile with a prefix that has only -NOT lines after one anchor, so that
 // it scans the whole module rather than the gaps between CHECK matches.
 //TEST:SIMPLE(filecheck=NOCOPY): -target spirv-asm -entry computeMain -stage compute -g2 -O0

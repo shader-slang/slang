@@ -2418,8 +2418,10 @@ local insts = {
 					-- one that removes the `DebugVar` removes this decoration; one that clones a
 					-- function's parameters ahead of its body repoints the cloned decorations with
 					-- `rebindDebugVarStorageDecorations`; one that moves the value into other memory,
-					-- or retypes the storage, removes this decoration. `-validate-ir` checks the
-					-- function and kind of storage. The link is a decoration on the storage, not an
+					-- or changes the storage's pointee type, removes this decoration. A pass that only
+					-- changes the storage's address space keeps it, and a backend may still decline
+					-- such storage (SPIR-V declares only on Function storage). `-validate-ir` checks
+					-- the function and kind of storage. The link is a decoration on the storage, not an
 					-- operand of an instruction that uses the storage, because such a use would stop
 					-- the storage being promoted to SSA.
 					struct_name = "DebugVarStorageDecoration",

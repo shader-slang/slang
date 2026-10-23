@@ -4902,16 +4902,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     // Declares the `_dbgvar_` copy of `debugVar` unless it has program storage or its type cannot
     // be bound to memory.
-    SpvInst* emitDebugVarCopy(SpvInstParent* parent, IRDebugVar* debugVar)
+    void emitDebugVarCopy(SpvInstParent* parent, IRDebugVar* debugVar)
     {
         if (findDebugVarStorage(debugVar))
-            return nullptr;
+            return;
 
         IRBuilder builder(debugVar);
         builder.setInsertBefore(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
         if (!canBindDebugVarToMemory(varType))
-            return nullptr;
+            return;
 
         requireVariableBufferCapabilityIfNeeded(varType);
 
@@ -4921,7 +4921,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         maybeEmitName(copy, debugVar, toSlice("_dbgvar_"));
         maybeEmitPointerDecoration(copy, debugVar);
         m_mapDebugVarToCopy.add(debugVar, copy);
-        return copy;
     }
 
     void maybeEmitDebugGlobalVariable(IRInst* globalInst, SpvInst* spvVar)
