@@ -782,6 +782,17 @@ static bool _isDeclOverloadable(Decl* decl)
     return false;
 }
 
+/// Returns whether any declaration in `result` is overloadable (see `_isDeclOverloadable`).
+static bool _doesLookupResultContainOverloadableDecl(LookupResult const& result)
+{
+    for (auto item : result)
+    {
+        if (_isDeclOverloadable(item.declRef.getDecl()))
+            return true;
+    }
+    return false;
+}
+
 /// Returns whether leaving `decl`'s scope blocks implicit use of an enclosing `this` value.
 ///
 /// A true result requires a type base for members found in farther-out type scopes.
@@ -827,6 +838,10 @@ static void _lookUpInScopes(
 
     // The file decl that this scope is in.
     FileDecl* thisFileDecl = nullptr;
+
+    // Whether the first level with hits let lookup continue to the last scope (see below). We
+    // record the decision once, so that farther-out levels do not re-check the growing result.
+    bool collectsOuterHits = false;
 
     for (; scope != endScope; scope = scope->parent)
     {
@@ -1012,19 +1027,25 @@ static void _lookUpInScopes(
             }
         }
 
-        if (result.isValid())
+        if (result.isValid() && !collectsOuterHits)
         {
-            // If it's overloaded or the decl we have is of an overloadable type, or if we are
-            // looking up for completion suggestions then we just keep going
-            if (result.isOverloaded() || _isDeclOverloadable(result.item.declRef.getDecl()) ||
-                ((int32_t)request.options & (int32_t)LookupOptions::Completion) != 0)
+            // We treat one iteration of this loop as one level: `scope`, its `nextSibling` peers
+            // (such as the namespaces named by `using namespace`), and for a type or extension
+            // scope every member that `_lookUpMembersInType` finds, including inherited members,
+            // interface requirements and the members of applicable extensions.
+            //
+            // The first level with hits decides the rest of the walk. If no hit on that level is
+            // overloadable, those hits hide same-named decls farther out, and a later step
+            // reports several of them as ambiguous. If any hit is overloadable, lookup continues
+            // to the last scope, so that a call such as `f(1.5f)` can reach an outer `f(float)`
+            // when the level holds a function `f(int)` next to a variable `f`; overload
+            // resolution then drops the candidates it cannot call. A completion request always
+            // continues, because it wants every visible name.
+            if (!request.isCompletionRequest() && !_doesLookupResultContainOverloadableDecl(result))
             {
-                continue;
+                break;
             }
-
-            // If we've found a result in this scope (and it's not overloadable), then there
-            // is no reason to look further up (for now).
-            break;
+            collectsOuterHits = true;
         }
     }
 
