@@ -311,53 +311,67 @@ struct PeepholeContext : InstPassBase
         bool isInVectorOperand() const { return indexInOperand >= 0; }
     };
 
+    // The element type `T`, without attributes such as `unorm`, and the element count `N` of a
+    // `vector<T,N>` or a Metal `packed_T<N>`. Both are null for any other type.
+    struct VectorLanes
+    {
+        IRInst* elementType = nullptr;
+        IRInst* elementCount = nullptr;
+    };
+
+    static VectorLanes getVectorLanes(IRInst* type)
+    {
+        type = unwrapAttributedType(type);
+        if (auto vectorType = as<IRVectorType>(type))
+            return {
+                unwrapAttributedType(vectorType->getElementType()),
+                vectorType->getElementCount()};
+        if (auto packedType = as<IRMetalPackedVectorType>(type))
+            return {
+                unwrapAttributedType(packedType->getElementType()),
+                packedType->getElementCount()};
+        return {};
+    }
+
     // Find where lane `laneIndex` of `makeVector`'s result comes from. A scalar operand supplies
     // one lane and a vector operand one lane per element, so lane 2 of `uint4(a, b)` is element 0
     // of `b`.
     //
-    // An operand supplies lanes only if it is a scalar of the result's element type, or an
-    // `IRVectorType` with that element type and a literal element count, ignoring type
-    // attributes such as `unorm` on both sides. Any other operand leaves its own lanes and every
-    // later lane unresolved, as does an out-of-range `laneIndex`. That rule conservatively skips
-    // the `makeVector(float4, packed)` that Metal buffer lowering uses to convert a packed load:
-    // the packed operand's elements do line up with the result's lanes, but we don't look
-    // through a `MetalPackedVectorType`, so that conversion is never folded away.
+    // An operand supplies lanes only if it is a scalar of the result's element type, or a
+    // `vector<T,N>` or Metal `packed_T<N>` with that element type and a literal element count,
+    // ignoring type attributes such as `unorm` on both sides. Any other operand leaves its own
+    // lanes and every later lane unresolved, as does an out-of-range `laneIndex`. A packed
+    // operand appears in the `makeVector(float4, packed)` that Metal buffer lowering uses to
+    // convert a packed load, and element `i` of the packed vector is lane `i` of the result.
     //
     // The `makeVector` itself has a vector type, or a `MetalPackedVectorType` for the opposite
-    // conversion, `makeVector(packed, v)`, which Metal buffer lowering emits before a store.
-    // Resolving lanes of the latter keeps the `getElement` fold's earlier behaviour for it; any
+    // conversion, `makeVector(packed, v)`, which Metal buffer lowering emits before a store. Any
     // other result type is left unresolved.
     static MakeVectorLaneSource findMakeVectorLaneSource(
         IRInst* makeVector,
         IRIntegerValue laneIndex)
     {
         SLANG_ASSERT(makeVector->getOp() == kIROp_MakeVector);
-        auto makeVectorType = unwrapAttributedType(makeVector->getDataType());
-        IRInst* elementType = nullptr;
-        if (auto vectorType = as<IRVectorType>(makeVectorType))
-            elementType = unwrapAttributedType(vectorType->getElementType());
-        else if (auto packedType = as<IRMetalPackedVectorType>(makeVectorType))
-            elementType = unwrapAttributedType(packedType->getElementType());
-        else
+        auto elementType = getVectorLanes(makeVector->getDataType()).elementType;
+        if (!elementType)
             return {};
         IRIntegerValue startIndex = 0;
         for (UInt i = 0; i < makeVector->getOperandCount(); i++)
         {
             auto operand = makeVector->getOperand(i);
-            auto operandType = unwrapAttributedType(operand->getDataType());
-            auto operandVectorType = as<IRVectorType>(operandType);
-            if (!operandVectorType)
+            auto operandLanes = getVectorLanes(operand->getDataType());
+            if (!operandLanes.elementType)
             {
-                if (operandType != elementType)
+                if (unwrapAttributedType(operand->getDataType()) != elementType)
                     return {};
                 if (laneIndex == startIndex)
                     return {operand, -1};
                 startIndex++;
                 continue;
             }
-            if (unwrapAttributedType(operandVectorType->getElementType()) != elementType)
+            if (operandLanes.elementType != elementType)
                 return {};
-            auto operandSize = as<IRIntLit>(operandVectorType->getElementCount());
+            auto operandSize = as<IRIntLit>(operandLanes.elementCount);
             if (!operandSize)
                 return {};
             if (laneIndex >= startIndex && laneIndex < startIndex + operandSize->getValue())
@@ -367,7 +381,6 @@ struct PeepholeContext : InstPassBase
         return {};
     }
 
-    // `source` must be resolved.
     static IRInst* getMakeVectorLaneValue(IRBuilder& builder, MakeVectorLaneSource source)
     {
         SLANG_ASSERT(source.isResolved());
@@ -408,6 +421,12 @@ struct PeepholeContext : InstPassBase
                 return nullptr;
             auto source = findMakeVectorLaneSource(swizzle->getBase(), index->getValue());
             if (!source.isResolved())
+                return nullptr;
+            // A swizzle that reads any lane of a packed operand keeps its `makeVector`
+            // conversion. Rebuilding a multi-lane result would swizzle or return the packed vector
+            // as a plain vector value. We leave one-lane swizzles alone too, so only `getElement`
+            // reads a packed operand directly.
+            if (as<IRMetalPackedVectorType>(unwrapAttributedType(source.operand->getDataType())))
                 return nullptr;
             sources.add(source);
         }
