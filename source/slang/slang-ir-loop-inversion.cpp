@@ -11,15 +11,37 @@
 namespace Slang
 {
 
+// Returns whether the instruction attributes a source location or lexical scope to later
+// instructions. DebugVar and DebugValue carry variable state, so they must not be ignored here.
+static bool isDebugLocationOrScopeMarker(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_DebugLine:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Returns whether scrutinee is target or can be erased after redirecting its sole use to target.
+// Leading location and scope markers do not prevent an argument-free branch from being trivial.
 static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 {
     if (target == scrutinee)
         return true;
-    const auto br = as<IRUnconditionalBranch>(scrutinee->getFirstOrdinaryInst());
+    auto firstInst = scrutinee->getFirstOrdinaryInst();
+    while (firstInst && isDebugLocationOrScopeMarker(firstInst))
+        firstInst = firstInst->getNextInst();
+    const auto br = as<IRUnconditionalBranch>(firstInst);
     return br && br->getTargetBlock() == target && br->getArgCount() == 0 &&
            !scrutinee->hasMoreThanOneUse();
 };
 
+// Returns whether duplicating the block fits the instruction budget.
+// Location and scope markers do not count toward that budget.
 static bool isSmallBlock(IRBlock* c)
 {
     // Somewhat arbitrarily, 4 instructions, enough for:
@@ -28,8 +50,8 @@ static bool isSmallBlock(IRBlock* c)
     // - Negation
     // - Terminator
     Int n = 0;
-    for ([[maybe_unused]] const auto i : c->getOrdinaryInsts())
-        if (++n > 4)
+    for (const auto inst : c->getOrdinaryInsts())
+        if (!isDebugLocationOrScopeMarker(inst) && ++n > 4)
             return false;
     return true;
 }

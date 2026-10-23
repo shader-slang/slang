@@ -15,4 +15,7 @@
 // Module file name for the experimental workgraph module
 #define SLANG_WORKGRAPH_MODULE_FILE_NAME "@SLANG_WORKGRAPH_MODULE_FILE_NAME@"
 
+// Note IDs disabled by default in this Slang library build.
+#define SLANG_DISABLE_NOTE_IDS "@SLANG_DISABLE_NOTE_IDS@"
+
 #endif // SLANG_STANDARD_MODULE_CONFIG_H_INCLUDED

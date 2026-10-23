@@ -1124,7 +1124,14 @@ SlangResult EndToEndCompileRequest::maybeWriteContainer(const String& fileName)
     // Only write if there is something to write
     if (writeArtifact)
     {
-        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(writeArtifact, fileName));
+        // Report write failures here, so that callers that ignore the result still fail the compile
+        // through the sink's error count.
+        const SlangResult res = ArtifactContainerUtil::writeContainer(writeArtifact, fileName);
+        if (SLANG_FAILED(res))
+        {
+            getSink()->diagnose(Diagnostics::CannotWriteOutputFile{.path = fileName});
+            return res;
+        }
     }
 
     return SLANG_OK;
@@ -1941,11 +1948,12 @@ SlangResult EndToEndCompileRequest::compile()
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         // This situation indicates a fatal (but not necessarily internal) error
@@ -1978,6 +1986,7 @@ SlangResult EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
     }
+#endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
 
 #else

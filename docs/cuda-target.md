@@ -132,7 +132,9 @@ Slang has some preliminary support for TextureSampler type - a combined Texture 
 
 Load on a read-only texture is supported for `Texture1D`, `Texture2D`, `Texture3D`, and the 1D/2D array forms (it lowers to the `tex*fetch_int<T>` prelude templates); the mip map selection argument is ignored, because these fetch paths read the base level only. RWTexture also allows Load on its supported dimensions.
 
-Reading a half-typed read-only texture (e.g. `Texture2D<half4>`) is not supported on CUDA. `Load` lowers to the `tex*fetch_int<T>` CUDA-prelude templates and `SampleLevel` lowers to the `tex*Lod<T>` CUDA runtime built-ins; neither is defined for `__half` types (both are float/uint/int only), so a half texel is rejected at compile time with an error. Use a float texture instead - CUDA widens f16-format data to f32 on read for free, and you can narrow the result back to half in-shader if needed.
+The combined-sampler `SampleGrad(location, gradX, gradY)` is supported for `Sampler1D`, `Sampler2D`, `Sampler3D`, `SamplerCube` and their array forms; it lowers to the `tex*Grad<T>` CUDA runtime built-ins, which sample through the texture object's own sampler state. The separate-sampler `SampleGrad(s, location, gradX, gradY)` is not supported on CUDA, because a `CUtexObject` cannot take a separate `SamplerState`; nor are the overloads that also take a texel offset or a minimum-LOD clamp. Using any of them on CUDA is a compile-time capability error (E36107).
+
+Reading a half-typed read-only texture (e.g. `Texture2D<half4>`) is not supported on CUDA. `Load` lowers to the `tex*fetch_int<T>` CUDA-prelude templates, `SampleLevel` lowers to the `tex*Lod<T>` CUDA runtime built-ins and `SampleGrad` lowers to the `tex*Grad<T>` CUDA runtime built-ins; none of these is defined for `__half` types, so a half texel is rejected at compile time with an error. Use a float texture instead - CUDA widens f16-format data to f32 on read for free, and you can narrow the result back to half in-shader if needed.
 
 ## RWTexture
 
@@ -146,6 +148,8 @@ RWTexture2D<float2> rwt2D_2;
 ```
 
 The format names used are the same as for [GLSL layout format types](<https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)>). If no format is specified Slang will _assume_ that the format is the same as the type specified.
+
+Hardware write conversions are available for `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTexture1DArray` and `RWTexture2DArray` whose element type is a `float`, `int` or `uint` scalar, 2-vector or 4-vector; other element types (3-vectors, `half`, 64-bit types) are not supported and fail when the generated CUDA is compiled.
 
 Note that the format attribution is on variables/parameters/fields and not part of the type system. This means that if you have a scenario like...
 
@@ -338,6 +342,46 @@ Slang tries several mechanisms to locate `optix.h` when NVRTC is initiated. The 
 If this fails, the default OptiX SDK install locations are searched. On Windows this is `%{PROGRAMDATA}\NVIDIA Corporation\OptiX SDK X.X.X\include`. On Linux this is `${HOME}/NVIDIA-OptiX-SDK-X.X.X-suffix`.
 
 If OptiX headers cannot be found, compilation will fail.
+
+## Geometry index
+
+D3D12 and Vulkan define the geometry index as the zero-based index of a build input (geometry) within a bottom-level
+acceleration structure. OptiX has no device-side query for that index. The closest value it provides is the _SBT GAS
+index_: the index of a primitive's record in the shader binding table (SBT), relative to its geometry acceleration
+structure (GAS). For a primitive in build input _k_, it is the sum of `numSbtRecords` over build inputs `0` to `k-1`,
+plus the primitive's entry in `sbtIndexOffsetBuffer` if one is set. See the shader binding table chapter of the OptiX
+Programming Guide for details.
+
+Slang maps the geometry-index operations to the SBT GAS index:
+
+- `GeometryIndex()` and `gl_GeometryIndexEXT` return `optixGetSbtGASIndex()`. This requires OptiX 7.1 or later.
+- `HitObject.GetGeometryIndex()` returns `optixHitObjectGetSbtGASIndex()`.
+- `HitObject.MakeHit` and `HitObject.MakeMotionHit` take an SBT GAS index as their `GeometryIndex` argument. With
+  OptiX 8.1 they pass it to OptiX as `sbtGASIdx`. With OptiX 9.0 and later, see the limitation below.
+
+The returned values (and the `GeometryIndex` argument of the OptiX 8.1 `MakeHit` path) are SBT GAS indices. An SBT GAS
+index equals the D3D12/Vulkan geometry index when every build input of the GAS has exactly one SBT record
+(`numSbtRecords = 1`). OptiX requires each `sbtIndexOffsetBuffer` entry to be less than `numSbtRecords`, so with one
+record per build input every per-primitive offset is 0. Curve build inputs always have one SBT record.
+[slang-rhi](https://github.com/shader-slang/slang-rhi) builds triangle, custom-primitive, sphere and curve build
+inputs this way.
+
+Cluster acceleration structures do not use per-build-input SBT records. The SBT GAS index of a cluster triangle is the
+`sbtIndex` set when the cluster is built, so it equals the geometry index that the application assigns to the triangle
+only if the application uses that value as the `sbtIndex`. slang-rhi documents its cluster geometry index as the OptiX
+`sbtIndex`.
+
+Applications that build acceleration structures with the OptiX API directly and give a build input more than one SBT
+record still get the SBT GAS index from these operations. It then differs from the D3D12/Vulkan geometry index for
+the build inputs that follow that build input, and for primitives that use a non-zero SBT index offset.
+
+**Limitation:** with OptiX 9.0 and later, `HitObject.MakeHit` and `HitObject.MakeMotionHit` build the new hit object
+from the serialized _current outgoing hit object_ (`optixHitObjectGetTraverseData`) rather than from their
+hit-identifying arguments. `AccelerationStructure`, `Ray.Origin`, `Ray.Direction`, `Ray.TMin` and, for motion hits,
+`CurrentTime` are still passed to OptiX. The `InstanceIndex`, `GeometryIndex`, `PrimitiveIndex`, `HitKind`, `Ray.TMax`
+and attribute arguments, and the shader-table arguments (`RayContributionToHitGroupIndex`,
+`MultiplierForGeometryContributionToHitGroupIndex`, `HitGroupRecordIndex`), are not used, so the resulting hit
+describes the hit object that was current before the call rather than the primitive the caller names.
 
 Limitations
 ===========
