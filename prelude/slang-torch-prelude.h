@@ -6,6 +6,7 @@
 
 #include <ATen/cuda/CUDAContext.h>
 #include <ATen/cuda/CUDAUtils.h>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -71,16 +72,24 @@ static const int kSlangTorchTensorMaxDim = 5;
 
 // NOTE: If you change this struct's layout, also update the hard-coded size/alignment
 // in _createTypeLayout() in slang-type-layout.cpp.
-struct TensorView
+template<typename Offset>
+struct TensorViewT
 {
+    using OffsetType = Offset;
+
     uint8_t* data;
-    uint32_t strides[kSlangTorchTensorMaxDim];
-    uint32_t sizes[kSlangTorchTensorMaxDim];
+    Offset strides[kSlangTorchTensorMaxDim];
+    Offset sizes[kSlangTorchTensorMaxDim];
     uint32_t dimensionCount;
 };
 
+// Keep this type distinct so that default kernel signatures retain their C++ mangled names.
+struct TensorView : TensorViewT<uint32_t>
+{
+};
 
-TensorView make_tensor_view(
+template<typename Offset>
+TensorViewT<Offset> make_tensor_view(
     torch::Tensor val,
     const char* name,
     torch::ScalarType targetScalarType,
@@ -105,7 +114,7 @@ TensorView make_tensor_view(
     if (requireContiguous && !val.is_contiguous())
         throw std::runtime_error(std::string(name).append(": tensor is not contiguous.").c_str());
 
-    TensorView res = {};
+    TensorViewT<Offset> res = {};
     res.dimensionCount = val.dim();
     res.data = nullptr;
     size_t elementSize = 4;
@@ -161,21 +170,53 @@ TensorView make_tensor_view(
     // A tensor can have zero elements even if some dimensions are non-zero
     // (e.g. shape (10, 0)). Emptiness must be based on numel().
     bool isEmpty = (val.numel() == 0);
+    const uint64_t maxOffset = (std::numeric_limits<Offset>::max)();
+    uint64_t maxByteOffset = 0;
     for (int i = 0; i < val.dim(); ++i)
     {
+        // Check sizes before narrowing and strides before multiplying so that conversion
+        // cannot overflow the selected offset type.
+        if (uint64_t(val.size(i)) > maxOffset)
+            throw std::runtime_error(
+                std::string(name).append(": tensor dimension size exceeds offset type limit."));
+        if (uint64_t(val.stride(i)) > maxOffset / elementSize)
+            throw std::runtime_error(
+                std::string(name).append(": tensor byte stride exceeds offset type limit."));
         res.sizes[i] = val.size(i);
-        res.strides[i] = val.stride(i) * elementSize;
+        res.strides[i] = uint64_t(val.stride(i)) * elementSize;
         if (!isEmpty && res.strides[i] == 0)
             throw std::runtime_error(
                 std::string(name)
                     .append(": tensors with broadcasted dimensions are not supported (use "
                             "tensor.contiguous() to make tensor whole)")
                     .c_str());
+        // Representable strides alone do not guarantee representable addresses. For example,
+        // a contiguous float tensor can exceed 4 GiB even though its byte stride is only four.
+        if (!isEmpty && res.sizes[i] > 1)
+        {
+            uint64_t lastIndex = res.sizes[i] - 1;
+            if (uint64_t(res.strides[i]) > (maxOffset - maxByteOffset) / lastIndex)
+                throw std::runtime_error(
+                    std::string(name).append(": tensor byte offset exceeds offset type limit."));
+            maxByteOffset += uint64_t(res.strides[i]) * lastIndex;
+        }
     }
 
     if (!res.data && !isEmpty)
         throw std::runtime_error(std::string(name).append(": data pointer is invalid.").c_str());
 
+    return res;
+}
+
+TensorView make_tensor_view(
+    torch::Tensor val,
+    const char* name,
+    torch::ScalarType targetScalarType,
+    bool requireContiguous)
+{
+    TensorView res = {};
+    static_cast<TensorViewT<uint32_t>&>(res) =
+        make_tensor_view<uint32_t>(val, name, targetScalarType, requireContiguous);
     return res;
 }
 

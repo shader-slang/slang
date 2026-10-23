@@ -840,7 +840,7 @@ IRInst* generateHostParamForCUDAParam(
     return castedParam;
 }
 
-void markTypeForPyExport(IRType* type, DiagnosticSink* sink)
+void markTypeForPyExport(IRType* type, DiagnosticSink* sink, HashSet<String>& exportedTypeNames)
 {
     // If it's a basic type, we're done.
     if (as<IRBasicType>(type) || as<IRVoidType>(type))
@@ -864,12 +864,24 @@ void markTypeForPyExport(IRType* type, DiagnosticSink* sink)
                 SLANG_UNEXPECTED("struct marked for export has no name");
             }
 
-            builder.addPyExportDecoration(structType, nameHint);
+            // Specializations share a name hint. For example, a kernel taking
+            // both DiffTensorView<float> and DiffTensorView<float, uint64_t>
+            // needs distinct reflection names for the two concrete types.
+            // Assign the name here so parameter metadata, field metadata, and
+            // reflection functions all read the same name from the decoration.
+            String exportName(nameHint);
+            for (Index suffix = 1; !exportedTypeNames.add(exportName); suffix++)
+            {
+                StringBuilder nameBuilder;
+                nameBuilder << nameHint << "_" << suffix;
+                exportName = nameBuilder.produceString();
+            }
+            builder.addPyExportDecoration(structType, exportName.getUnownedSlice());
         }
 
         for (auto field : structType->getFields())
         {
-            markTypeForPyExport(field->getFieldType(), sink);
+            markTypeForPyExport(field->getFieldType(), sink, exportedTypeNames);
         }
         return;
     }
@@ -879,7 +891,7 @@ void markTypeForPyExport(IRType* type, DiagnosticSink* sink)
         if (!arrayType->findDecoration<IRPyExportDecoration>())
             builder.addPyExportDecoration(arrayType, UnownedStringSlice("Array"));
 
-        markTypeForPyExport(arrayType->getElementType(), sink);
+        markTypeForPyExport(arrayType->getElementType(), sink, exportedTypeNames);
         return;
     }
 }
@@ -1017,7 +1029,10 @@ void generateReflectionForType(IRType* type, DiagnosticSink* sink)
     builder.addKeepAliveDecoration(reflFunc);
 }
 
-IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
+IRFunc* generateCUDAWrapperForFunc(
+    IRFunc* func,
+    DiagnosticSink* sink,
+    HashSet<String>& exportedTypeNames)
 {
     // Check that the function has an auto-bind decoration
     if (!func->findDecoration<IRAutoPyBindCudaDecoration>())
@@ -1089,7 +1104,7 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
     // IRPyExportDecoration reflection roots.
     // TODO: confirm whether PyExport reflection should root the translated host type instead.
     for (auto param : func->getFirstBlock()->getParams())
-        markTypeForPyExport(param->getDataType(), sink);
+        markTypeForPyExport(param->getDataType(), sink, exportedTypeNames);
 
     // Dispatch the original function.
     builder.emitDispatchKernelInst(
@@ -1268,8 +1283,14 @@ void lowerBuiltinTypesForKernelEntryPoints(IRModule* module, DiagnosticSink*)
 void generateHostFunctionsForAutoBindCuda(IRModule* module, DiagnosticSink* sink)
 {
     List<IRFunc*> autoBindRequests;
+    HashSet<String> exportedTypeNames;
     for (auto globalInst : module->getGlobalInsts())
     {
+        if (as<IRStructType>(globalInst))
+        {
+            if (auto decoration = globalInst->findDecoration<IRPyExportDecoration>())
+                exportedTypeNames.add(String(decoration->getExportName()));
+        }
         if (auto func = as<IRFunc>(globalInst))
         {
             if (func->findDecoration<IRAutoPyBindCudaDecoration>())
@@ -1281,7 +1302,7 @@ void generateHostFunctionsForAutoBindCuda(IRModule* module, DiagnosticSink* sink
 
     for (auto func : autoBindRequests)
     {
-        generateCUDAWrapperForFunc(func, sink);
+        generateCUDAWrapperForFunc(func, sink, exportedTypeNames);
     }
 }
 
