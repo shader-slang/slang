@@ -812,11 +812,28 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
 
     CASE(EnumCaseDecl)
     CASE(FuncDecl)
-    CASE(VarDeclBase)
     CASE(SimpleTypeDecl)
     CASE(AggTypeDecl)
 
 #undef CASE
+
+    void visitVarDeclBase(VarDeclBase* decl)
+    {
+        checkForRedeclaration(decl);
+
+        // One ordered pass over the scope covers all of its transparent variables, so we run
+        // it only for the first one; running it for each would report every conflict again.
+        // The inner declaration of a `__generic` (a parse error that the language server still
+        // checks) is not in its parent's member list, so the list can be empty.
+        if (decl->hasModifier<TransparentModifier>())
+        {
+            auto& transparentDecls = decl->parentDecl->getTransparentDirectMemberDecls();
+            if (transparentDecls.getCount() != 0 && transparentDecls.getFirst() == decl)
+                checkForRedeclarationOfBufferBlockMembers(decl->parentDecl);
+        }
+    }
+
+    void checkForRedeclarationOfBufferBlockMembers(ContainerDecl* containerDecl);
 };
 
 
@@ -1986,7 +2003,8 @@ bool SemanticsVisitor::isUsableAsStaticMember(LookupResultItem const& item)
 
 /// Dispatch an appropriate visitor to check `decl` up to state `state`
 ///
-/// The current state of `decl` must be `state-1`.
+/// The current state of `decl` must be `state-1`. The one exception is that `ensureDecl`
+/// also dispatches `ReadyForReference` for a declaration that a visitor moved past it.
 /// This call does *not* handle updating the state of `decl`; the
 /// caller takes responsibility for doing so.
 ///
@@ -2090,6 +2108,20 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
         if (outerScope)
             subContext = subContext.withOuterScope(outerScope);
         _dispatchDeclCheckingVisitor(decl, nextState, subContext);
+
+        // A visitor can advance `decl` past several states at once. Consider `let x = 1;`:
+        // the header visitor checks the initializer to infer the type of `x`, and then marks
+        // `x` as `DefinitionChecked`. Such a visitor has checked `decl` itself, but the
+        // `ReadyForReference` step also compares `decl` with the other declarations in its
+        // scope, so we still run that step. Without it, `int x; let x = 1;` would be accepted
+        // while `let x = 1; int x;` is not. We run the step here, rather than at each place
+        // that advances a declaration, so that a new such place cannot skip the comparison.
+        //
+        if (nextState < DeclCheckState::ReadyForReference &&
+            decl->checkState.getState() >= DeclCheckState::ReadyForReference)
+        {
+            _dispatchDeclCheckingVisitor(decl, DeclCheckState::ReadyForReference, subContext);
+        }
 
         // In the common case, the visitor will have done the necessary
         // checking, but will *not* have updated the `checkState` on
@@ -14818,6 +14850,28 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     return SLANG_FAIL;
 }
 
+/// Return whether `decl` is the `static const` alias that the unscoped enum `enumDecl` adds to
+/// its enclosing scope for its own case of the same name, as in
+/// `[UnscopedEnum] enum Mode { Mode }`. The parser creates the alias in `CompleteDecl` with the
+/// case's name and location, and with an initializer that refers to the case.
+///
+static bool isUnscopedEnumCaseAliasOfOwnEnum(Decl* decl, Decl* enumDecl)
+{
+    if (!isUnscopedEnum(enumDecl))
+        return false;
+    auto letDecl = as<LetDecl>(decl);
+    if (!letDecl)
+        return false;
+    auto initExpr = as<DeclRefExpr>(letDecl->initExpr);
+    if (!initExpr)
+        return false;
+    auto caseDecl = as<EnumCaseDecl>(initExpr->declRef.getDecl());
+    return caseDecl && caseDecl->parentDecl == enumDecl &&
+           caseDecl->getName() == enumDecl->getName() &&
+           caseDecl->getName() == letDecl->getName() &&
+           caseDecl->getNameLoc() == letDecl->getNameLoc();
+}
+
 Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
 {
     // If either of the declarations being looked at is generic, then
@@ -14852,6 +14906,18 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     {
         // It is allowed to have a decl whose name is the same as the module.
         return SLANG_OK;
+    }
+
+    // Consider `[UnscopedEnum] enum Mode { Mode, Other }`. The case alias `Mode` that the parser
+    // adds to the enclosing scope conflicts with the enum type `Mode`. Lookup still tells the type
+    // and the value apart by where the name is used, and both DXC and earlier Slang versions accept
+    // the code, so for compatibility we warn in every language version instead of reporting an
+    // error. Only this synthesized alias is exempt. The failure result stops the caller's loop
+    // over older declarations; a conflict with one of those is reported at the enum itself.
+    if (isUnscopedEnumCaseAliasOfOwnEnum(newDecl, oldDecl))
+    {
+        getSink()->diagnose(Diagnostics::UnscopedEnumCaseNamedLikeEnum{.decl = newDecl});
+        return SLANG_FAIL;
     }
 
 
@@ -14931,6 +14997,96 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         //
         if (SLANG_FAILED(checkResult))
             break;
+    }
+}
+
+/// Return whether `decl` is the transparent variable of a buffer block without an instance
+/// name, such as `cbuffer CB { ... }`, or the `-Gec` shadow that carries its `__transparent`
+/// modifier (see `ParseBufferBlockDecl` and `createUniformParameterShadowVarIfNeeded`).
+///
+static bool isTransparentBufferBlockVariable(Decl* decl)
+{
+    if (!decl->hasModifier<TransparentModifier>())
+        return false;
+    if (auto shadowVarDecl = as<UniformParameterShadowVarDecl>(decl))
+        decl = shadowVarDecl->uniformParameter;
+    return decl->hasModifier<ImplicitParameterGroupVariableModifier>();
+}
+
+/// Check the members of the `cbuffer`, `tbuffer` and GLSL interface blocks without an instance
+/// name in `containerDecl` against the other declarations that lookup finds in that scope.
+///
+/// Consider this example:
+///
+///     static const int x = 1;
+///     cbuffer CB { int x; }
+///
+/// The parser desugars the `cbuffer` into a struct that holds `x` and is marked with
+/// `ImplicitParameterGroupElementTypeModifier`, followed by a `__transparent` variable of type
+/// `ConstantBuffer<...>`. Lookup in the enclosing scope sees through the transparent variable,
+/// so a use of `x` finds both declarations. The member `x` is not a direct member of the
+/// enclosing scope, so `checkForRedeclaration` never compares it with the `static const`.
+///
+/// We walk the direct members in order and treat the members of each struct as declared at the
+/// buffer block's transparent variable. `ParseBufferBlockDecl` adds the struct to the scope just
+/// before the variable, and with `-Gec` the transparent shadow follows the renamed variable, so
+/// the most recent marked struct is the element type of the next transparent buffer block
+/// variable. A struct that no such variable follows (the parser drops the variable of a GLSL
+/// `gl_PerVertex` redeclaration) exposes nothing. Other transparent variables, such as the one
+/// that the `synthesizedDeclarationRegistryDrainsNewRoots` unit test builds, are treated as
+/// ordinary direct members.
+///
+/// As in `checkForRedeclaration`, the later declaration gets the diagnostic, and a declaration
+/// that has an earlier same-name sibling in its own container is left to
+/// `checkForRedeclaration`, so each declaration gets at most one conflict diagnostic. Every other
+/// declaration is compared with the nearest earlier declaration of its name only, so we do not
+/// need the result of `checkRedeclaration`, which tells a caller when to stop comparing.
+/// Buffer members are variables, which ordinary lookup always finds, so only direct members go
+/// through the lookup-mask filter, which skips declarations such as attributes.
+///
+void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMembers(
+    ContainerDecl* containerDecl)
+{
+    // For each name, the most recent declaration so far that lookup in `containerDecl` finds,
+    // either a direct member or a member of a buffer block.
+    Dictionary<Name*, Decl*> visibleDecls;
+    AggTypeDecl* elementTypeDecl = nullptr;
+    for (auto memberDecl : containerDecl->getDirectMemberDecls())
+    {
+        if (memberDecl->hasModifier<ImplicitParameterGroupElementTypeModifier>())
+        {
+            elementTypeDecl = as<AggTypeDecl>(memberDecl);
+            continue;
+        }
+
+        if (isTransparentBufferBlockVariable(memberDecl))
+        {
+            SLANG_RELEASE_ASSERT(elementTypeDecl);
+            for (auto bufferMemberDecl : elementTypeDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+            {
+                auto name = bufferMemberDecl->getName();
+                Decl* prevDecl = nullptr;
+                if (!elementTypeDecl->getPrevDirectMemberDeclWithSameName(bufferMemberDecl) &&
+                    visibleDecls.tryGetValue(name, prevDecl))
+                {
+                    checkRedeclaration(bufferMemberDecl, prevDecl);
+                }
+                visibleDecls[name] = bufferMemberDecl;
+            }
+            elementTypeDecl = nullptr;
+            continue;
+        }
+
+        auto name = memberDecl->getName();
+        if (!name || !DeclPassesLookupMask(memberDecl, LookupMask::Default))
+            continue;
+        Decl* prevDecl = nullptr;
+        if (!containerDecl->getPrevDirectMemberDeclWithSameName(memberDecl) &&
+            visibleDecls.tryGetValue(name, prevDecl))
+        {
+            checkRedeclaration(memberDecl, prevDecl);
+        }
+        visibleDecls[name] = memberDecl;
     }
 }
 
