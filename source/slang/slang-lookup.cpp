@@ -782,6 +782,21 @@ static bool _isDeclOverloadable(Decl* decl)
     return false;
 }
 
+/// Returns whether any declaration in `result` is overloadable (see `_isDeclOverloadable`).
+///
+/// `_lookUpInScopes` calls this on its accumulated result. The hits from the first scope level
+/// with hits stay in that result, so the answer at every later level is the answer for that
+/// first level.
+static bool _doesLookupResultContainOverloadableDecl(LookupResult const& result)
+{
+    for (auto& item : result)
+    {
+        if (_isDeclOverloadable(item.declRef.getDecl()))
+            return true;
+    }
+    return false;
+}
+
 /// Returns whether leaving `decl`'s scope blocks implicit use of an enclosing `this` value.
 ///
 /// A true result requires a type base for members found in farther-out type scopes.
@@ -1014,16 +1029,17 @@ static void _lookUpInScopes(
 
         if (result.isValid())
         {
-            // If it's overloaded or the decl we have is of an overloadable type, or if we are
-            // looking up for completion suggestions then we just keep going
-            if (result.isOverloaded() || _isDeclOverloadable(result.item.declRef.getDecl()) ||
-                ((int32_t)request.options & (int32_t)LookupOptions::Completion) != 0)
+            // Lookup continues to outer scopes when the result contains an overloadable decl,
+            // so that a call can consider overloads declared farther out, and for a completion
+            // request, which wants every visible name. Otherwise the decls found so far hide
+            // same-named decls in outer scopes, even when there are several of them. For
+            // example, after `using namespace A; using namespace B;` where `A::x` and `B::x`
+            // are variables, a reference to `x` is ambiguous between those two only, and a
+            // global `x` is not a candidate.
+            if (_doesLookupResultContainOverloadableDecl(result) || request.isCompletionRequest())
             {
                 continue;
             }
-
-            // If we've found a result in this scope (and it's not overloadable), then there
-            // is no reason to look further up (for now).
             break;
         }
     }
