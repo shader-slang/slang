@@ -3856,9 +3856,11 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
     info->specializedFuncDeclRef = specializedFuncDeclRef;
 
-    // This is the first point where -specialize and IComponentType::specialize have a checked
-    // reference containing the concrete arguments. Preserve the base entry point's semantics
-    // requirements, then add the selected reference's requirements just as initial selection does.
+    // The generic arguments supplied through -specialize or IComponentType::specialize are now
+    // bound to the entry point's generic parameters. For example, specializing genericMain<T>
+    // with MetalOnly makes specializedFuncDeclRef identify genericMain<MetalOnly>.
+    // Add the concrete arguments' capability requirements, even if the body never uses them,
+    // to the base entry point's requirements, then check the combined set against each target.
     List<Decl*> referencedDecls;
     CapabilitySet specializedCaps{getInferredCapabilityRequirements()};
     specializedCaps.join(
