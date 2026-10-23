@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -output-using-type -g0
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
 
 // WGSL's uniformity analysis treats every read of a module-scope `var<private>` as possibly
@@ -11,7 +11,8 @@
 // the loop as not in subgroup-uniform control flow (shader-slang/slang#8774). The `-wgpu` row
 // runs the shader through Tint. Forwarding still stops at a block boundary, at any side-effecting
 // call between the store and the load (including every wave op) and at debug insts
-// (`-g`/`-g2`/`-g3`), so those shapes still read the `var<private>`.
+// (`-g`/`-g2`/`-g3`), so those shapes still read the `var<private>`. render-test emits debug info
+// by default, so the `-wgpu` row passes `-g0`.
 
 // CHECK: enable subgroups;
 // CHECK: fn computeMain(
