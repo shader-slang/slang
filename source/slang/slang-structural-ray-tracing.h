@@ -65,9 +65,6 @@ bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl
 /// Returns the stage named by the input struct's KnownBuiltin annotation, or Stage::Unknown.
 Stage getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl);
 
-/// Returns the stage identified by a KnownBuiltin role, or Stage::Unknown for other roles.
-Stage getStructuralRayTracingStageInputKind(KnownBuiltinDeclName builtin);
-
 /// Returns this executable interface's `invoke` requirement, or null for other interfaces.
 FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* interfaceDecl);
 
@@ -86,19 +83,11 @@ String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* stage
 String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName, Stage stage);
 
 class EntryPoint;
-struct IRModule;
-struct IRFunc;
 
 /// Sets the public and target names for an entry point selected by its source stage type.
 void initializeStructuralRayTracingEntryPoint(
     EntryPoint* entryPoint,
     Name* entryPointName,
     Type* stageType);
-
-/// Rejects structural source representations that remain before native ABI legalization.
-SlangResult diagnoseUnloweredStructuralRayTracing(
-    IRModule* module,
-    const List<IRFunc*>& entryPoints,
-    DiagnosticSink* sink);
 
 } // namespace Slang

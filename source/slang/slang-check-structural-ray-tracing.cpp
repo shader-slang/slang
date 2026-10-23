@@ -1,8 +1,5 @@
 #include "core/slang-string-util.h"
 #include "slang-check-impl.h"
-#include "slang-ir-call-graph.h"
-#include "slang-ir-insts.h"
-#include "slang-ir-util.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-module.h"
@@ -16,9 +13,8 @@ namespace Slang
 // This file owns the structural ray-tracing rules and their declaration identities.
 // Ordinary interfaces, associated-type constraints, overload resolution, and capability inference
 // remain in the normal checker. Their call sites delegate here only for the additional rules:
-// stage types and inputs, stage selection, schema entry uniqueness, API mixing, and the
-// boundary between logical shaders and native entry points. Each rule below states its example
-// and the representation or API contract it preserves.
+// stage types and inputs, stage selection, schema entry uniqueness, and API mixing. Each rule
+// below states its example and the representation or API contract it preserves.
 //
 // Schemas, lists, and hit groups are ordinary values. Empty payloads are ordinary payloads.
 // Concrete stage structs are ordinary values too; input generic uses retain the restriction below.
@@ -464,112 +460,6 @@ static bool _diagnoseRestrictedRayTracingGenericArgument(
     }
 }
 
-// Returns whether func accepts a structural stage-input type. For example,
-// invoke(ClosestHitInput<C>) keeps the input's KnownBuiltin annotation through ordinary
-// specialization. The post-link adapter check uses that annotation to recognize a logical input.
-static bool _hasStructuralRayTracingStageInput(IRFunc* func)
-{
-    for (auto paramType : func->getDataType()->getParamTypes())
-    {
-        auto inputType = getResolvedInstForDecorations(unwrapAttributedType(paramType));
-        auto builtin = inputType->findDecoration<IRKnownBuiltinDecoration>();
-        if (builtin && getStructuralRayTracingStageInputKind(builtin->getName()) != Stage::Unknown)
-            return true;
-    }
-    return false;
-}
-
-// Prevents a logical structural stage signature from reaching native entry-point ABI passes.
-//
-// Consider `-entry MyMiss` selecting a struct whose `invoke` takes `rt::MissInput<C>`.
-// Linking preserves that checked signature. Adapter synthesis must
-// replace it with a native entry point before normal ABI legalization can interpret its inputs.
-// This check reports any remaining stage-input parameter at that boundary, while adapter synthesis
-// remains unimplemented in this frontend slice.
-static bool _diagnoseUnloweredStructuralRayTracingEntryPoints(
-    const List<IRFunc*>& entryPoints,
-    DiagnosticSink* sink)
-{
-    bool found = false;
-    for (auto entryPoint : entryPoints)
-    {
-        if (!_hasStructuralRayTracingStageInput(entryPoint))
-            continue;
-        sink->diagnose(
-            Diagnostics::UnloweredStructuralRayTracingEntryPoint{.entryPoint = entryPoint});
-        found = true;
-    }
-    return found;
-}
-
-// Prevents reachable structural dispatch operations from reaching emission before lowering.
-//
-// Consider a ray-generation entry point calling tracer.trace(desc, scene, program). Its ordinary
-// library wrapper creates an empty payload and calls the payload overload. On Metal, that body
-// calls __metalTraceRay or __metalTraceRayMotion, which lowers directly to IRMetalTraceRay. Follow
-// the ordinary reference graph through wrappers and generic specializations, then inspect each
-// reached function's instructions. linkIR has already selected target-switch branches, so native
-// paths do not acquire a Metal diagnostic. An unreachable function is harmless.
-static bool _diagnoseUnloweredStructuralRayTracingOperations(IRModule* module, DiagnosticSink* sink)
-{
-    bool found = false;
-    Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
-    buildEntryPointReferenceGraph(referencingEntryPoints, module);
-    for (const auto& [inst, entryPoints] : referencingEntryPoints)
-    {
-        auto func = as<IRFunc>(inst);
-        if (!func || entryPoints.getCount() == 0)
-            continue;
-        bool hasMetalTrace = false;
-        for (auto block : func->getBlocks())
-        {
-            for (auto instruction : block->getOrdinaryInsts())
-            {
-                if (as<IRMetalTraceRay>(instruction))
-                {
-                    hasMetalTrace = true;
-                    break;
-                }
-            }
-            if (hasMetalTrace)
-                break;
-        }
-
-        if (!hasMetalTrace)
-            continue;
-
-        // Diagnose the user's entry point rather than the operation's installed-library location.
-        for (auto entryPoint : entryPoints)
-        {
-            sink->diagnose(Diagnostics::UnloweredStructuralRayTracingSourceOperation{
-                .operationName = String("trace"),
-                .entryPoint = entryPoint});
-        }
-        found = true;
-    }
-    return found;
-}
-
-// Requires descriptors to become target resources before ordinary parameter layout runs.
-//
-// Consider `uniform rt::TraceProgramDescriptor<MySchema> program` on an entry point. Its
-// resources remain part of that entry point's interface even if the body does not read `program`.
-// Concrete descriptor types are hoisted to module scope, so inspect those types rather than only
-// their executable uses. Adapter lowering must consume their opaque source representation first.
-static bool _diagnoseUnloweredTraceProgramDescriptors(IRModule* module, DiagnosticSink* sink)
-{
-    bool found = false;
-    for (auto inst : module->getGlobalInsts())
-    {
-        if (!as<IRTraceProgramDescriptorType>(inst))
-            continue;
-        sink->diagnose(
-            Diagnostics::UnloweredTraceProgramDescriptor{.location = findFirstUseLoc(inst)});
-        found = true;
-    }
-    return found;
-}
-
 // =============================================================================
 // Shared functions used by other compiler files
 // =============================================================================
@@ -648,12 +538,7 @@ bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl
 
 Stage getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl)
 {
-    return getStructuralRayTracingStageInputKind(_getRayTracingBuiltin(typeDecl));
-}
-
-Stage getStructuralRayTracingStageInputKind(KnownBuiltinDeclName builtin)
-{
-    switch (builtin)
+    switch (_getRayTracingBuiltin(typeDecl))
     {
     case KnownBuiltinDeclName::RayTracingClosestHitInput:
         return Stage::ClosestHit;
@@ -889,22 +774,6 @@ void initializeStructuralRayTracingEntryPoint(
     entryPoint->setEntryPointNameOverride(getStructuralRayTracingEntryPointName(
         sourceTypeName.getUnownedSlice(),
         entryPoint->getStage()));
-}
-
-// Checks the structural representations that must be consumed before native ABI legalization.
-//
-// For example, compiling `-entry MyMiss` must not send its logical `MissInput<C>` parameter to
-// the native shader-input legalizer. Keep the entry, operation, and descriptor boundary checks
-// together so adding adapter synthesis gives all three a single, explicit insertion point.
-SlangResult diagnoseUnloweredStructuralRayTracing(
-    IRModule* module,
-    const List<IRFunc*>& entryPoints,
-    DiagnosticSink* sink)
-{
-    bool foundEntryPoint = _diagnoseUnloweredStructuralRayTracingEntryPoints(entryPoints, sink);
-    bool foundOperation = _diagnoseUnloweredStructuralRayTracingOperations(module, sink);
-    bool foundDescriptor = _diagnoseUnloweredTraceProgramDescriptors(module, sink);
-    return foundEntryPoint || foundOperation || foundDescriptor ? SLANG_FAIL : SLANG_OK;
 }
 
 // =============================================================================

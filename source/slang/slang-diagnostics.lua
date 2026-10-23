@@ -4651,27 +4651,6 @@ err(
 
 
 err(
-    "unlowered-structural-ray-tracing-entry-point",
-    38084,
-    "structural ray-tracing entry point was not lowered",
-    span { loc = "entryPoint:IRInst", message = "structural ray-tracing entry point '~entryPoint' must be converted to a native adapter before target code generation" }
-)
-
-err(
-    "unlowered-structural-ray-tracing-source-operation",
-    38085,
-    "structural ray-tracing source operation was not lowered",
-    span { loc = "entryPoint:IRInst", message = "structural ray-tracing operation '~operationName:String' reachable from this entry point must be lowered before target code generation" }
-)
-
-err(
-    "unlowered-trace-program-descriptor",
-    38086,
-    "structural ray-tracing program descriptor must be lowered before target code generation",
-    span { loc = "location", message = "target adapter lowering must choose the descriptor's physical representation" }
-)
-
-err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",

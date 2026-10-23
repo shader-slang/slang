@@ -143,7 +143,6 @@
 #include "slang-mangle.h"
 #include "slang-pass-wrapper.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-structural-ray-tracing.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -1052,8 +1051,6 @@ Result linkAndOptimizeIR(
     //
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
-
-    SLANG_RETURN_ON_FAIL(diagnoseUnloweredStructuralRayTracing(irModule, irEntryPoints, sink));
 
     // Create the post-emit metadata object up-front so that IR passes
     // that need to record reportable data (e.g. `instrumentCoverage`'s

@@ -358,11 +358,7 @@ specialization.
 
 During linking, `specializeIRForEntryPoint` uses the selected `EntryPoint`'s structural flag to
 skip copying parameter layout onto the logical `invoke` input. Its current entry-point parameter
-layout is empty; the native adapter and its layout have not been generated yet. At the native
-ABI boundary, the file-local `_hasStructuralRayTracingStageInput` helper in
-`slang-check-structural-ray-tracing.cpp` examines the IR function's parameter types.
-A parameter whose declaration is annotated as a stage input identifies an entry that needs an
-adapter.
+layout is empty; the native adapter and its layout have not been generated yet.
 Future adapter synthesis must consume the checked input contract before transformations discard
 information it needs. It can generate dependent operations for ordinary specialization to resolve,
 or wait for concrete types where the target ABI requires them. PR1 does not implement that adapter.
@@ -510,9 +506,8 @@ Remove the call-level API bookkeeping, including name recognition for core `Trac
 `TraceMotionRay` and `CallShader`. A structural shader may call a native tracing function, and
 a native shader may call an ordinary structural trace wrapper, without the call itself recording
 a second family. Imports and helper layers therefore do not change the family classification.
-Keep the independent stage/input rules, capability checks and unfinished-backend guards. The
-post-link check still rejects a reachable Metal trace instruction; descriptor and stage-adapter
-checks still block incomplete native paths.
+Keep the independent stage/input rules and capability checks. Native stage adapters, descriptor
+layout and Metal dispatch remain backend work for a later PR.
 
 ## 9. Load RT as an optional builtin module
 
@@ -565,8 +560,8 @@ The CUDA motion branch now contains
 `static_assert(false, "CUDA structural ray-tracing motion is not implemented")`.
 Its pending OptiX implementation can no longer silently do nothing. Core `TraceMotionRay` currently
 supports GLSL/SPIR-V, while the CUDA `TraceRay` wrapper fixes time to zero and cannot implement a
-motion call. The current descriptor guard can diagnose first, before the compiler checks this
-assertion; the explicit failure remains necessary when descriptor lowering is implemented.
+motion call. Ordinary target selection and static-assert checking report this missing
+implementation.
 
 `MultiLevelAccelerationStructure<N>` retains its Metal requirement. There is a separate compiler
 [capability-checking bug](https://github.com/shader-slang/slang/issues/13579) where a generic type's
@@ -603,13 +598,10 @@ operand.
 Shader declarations choose the API family, so the library's native `TraceRay` calls need no
 annotation-based exemption. The serialized name for `metalTraceRay` has stable ID 912.
 
-After `linkIR` selects target-switch branches, the centralized unfinished-operation check walks
-functions reachable from entry points and looks for the actual `IRMetalTraceRay` instruction.
-Unused functions do not cause a trace diagnostic, and native branches do not acquire a Metal
-operation. Descriptor layout and native stage-adapter guards still prevent incomplete native
-paths from generating code. A later backend pass must consume this operation and generate the
-Metal intersector dispatch, shared tables, adapters and payload transport; that synthesis is
-deferred.
+The Metal operation remains in the target-selected function body for later backend lowering.
+That implementation must generate Metal intersector dispatch, shared tables, adapters and
+payload transport. Native stage adapters and the descriptor's target resource layout are also
+deferred; this PR checks the frontend contracts and preserves their IR representation.
 
 `RayTracer.callShader` is an ordinary library method. Its native branch calls core `CallShader`.
 Its Metal branch uses the existing assertion mechanism while callable dispatch is unfinished:
@@ -621,7 +613,7 @@ case metal:
 ```
 
 Target selection retains this assertion only for Metal, and ordinary static-assert checking
-reports reachable uses. The earlier descriptor guard can report first in this frontend slice.
+reports reachable uses.
 There is no callable-specific AST attribute, operation-kind enum, IR decoration, or post-link
 marker scan. A later Metal implementation can replace the assertion with an internal intrinsic
 and explicit operation, following the trace-call pattern when its operands and lowering are known.

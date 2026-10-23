@@ -1,14 +1,8 @@
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -target metal -dump-ir -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=TRACE): -experimental-feature -target metal -entry traceMain -stage compute
 //TEST:SIMPLE(filecheck=UNUSED): -experimental-feature -target metal -entry unusedMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=SELECTED_METAL): -experimental-feature -target metal -entry selectedMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=SELECTED_HLSL): -experimental-feature -target hlsl -entry selectedMain -stage compute
 //TEST:COMPILE: -experimental-feature tests/ray-tracing-2/frontend/module/metal_trace_intrinsic_library.slang -o tests/ray-tracing-2/frontend/module/metal-trace-intrinsic-cache.slang-module
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -r tests/ray-tracing-2/frontend/module/metal-trace-intrinsic-cache.slang-module -target metal -dump-ir -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=TRACE): -experimental-feature -r tests/ray-tracing-2/frontend/module/metal-trace-intrinsic-cache.slang-module -target metal -entry traceMain -stage compute
 //TEST:SIMPLE(filecheck=UNUSED): -experimental-feature -r tests/ray-tracing-2/frontend/module/metal-trace-intrinsic-cache.slang-module -target metal -entry unusedMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=SELECTED_METAL): -experimental-feature -r tests/ray-tracing-2/frontend/module/metal-trace-intrinsic-cache.slang-module -target metal -entry selectedMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=SELECTED_HLSL): -experimental-feature -r tests/ray-tracing-2/frontend/module/metal-trace-intrinsic-cache.slang-module -target hlsl -entry selectedMain -stage compute
 
 // The cache name differs from the import name so the first runs always use the source module.
 // Both imported declarations must produce one opcode, retaining the typed descriptor and mutable
@@ -55,25 +49,11 @@ RWStructuredBuffer<uint> output;
 // IR: [[MOTION_ORIGIN:%[0-9]+]] : Vec(Float, 3 : Int) = makeVector(4 : Float, 5 : Float, 6 : Float)
 // IR: [[MOTION_DIRECTION:%[0-9]+]] : Vec(Float, 3 : Int) = makeVector(0 : Float, 0 : Float, 1 : Float)
 // IR: metalTraceRay(%scene, %motionProgram, 6 : UInt, 7 : UInt, 8 : UInt, 9 : UInt, 10 : UInt, [[MOTION_ORIGIN]], 0.5 : Float, [[MOTION_DIRECTION]], 200 : Float, [[PAYLOAD]], 0 : Float)
-// This entry has no structural entry marker, and the intrinsic declarations have no source
-// operation marker. The unfinished instruction itself must trigger the frontend boundary check.
 [numthreads(1, 1, 1)]
 void traceMain(
-/*TRACE:
-     ^^^^^^^^^ structural ray-tracing source operation was not lowered
-     ^^^^^^^^^ structural ray-tracing operation 'trace' reachable from this entry point must be lowered before target code generation
-*/
     uniform RaytracingAccelerationStructure scene,
     uniform rt::TraceProgramDescriptor<Schema> program,
-/*TRACE:
-                                               ^^^^^^^ structural ray-tracing program descriptor must be lowered before target code generation
-                                               ^^^^^^^ target adapter lowering must choose the descriptor's physical representation
-*/
     uniform rt::TraceProgramDescriptor<MotionSchema> motionProgram)
-/*TRACE:
-                                                     ^^^^^^^^^^^^^ structural ray-tracing program descriptor must be lowered before target code generation
-                                                     ^^^^^^^^^^^^^ target adapter lowering must choose the descriptor's physical representation
-*/
 {
     Payload payload = { 11 };
     traceir::trace(scene, program, 1, 2, 3, 4, 5,
@@ -91,37 +71,4 @@ void traceMain(
 void unusedMain()
 {
     output[0] = 17;
-}
-
-// The linker's target selection must remove the Metal operation before the boundary check runs.
-// The bound descriptor still needs lowering even when the selected branch does not read it.
-[numthreads(1, 1, 1)]
-void selectedMain(
-/*SELECTED_METAL:
-     ^^^^^^^^^^^^ structural ray-tracing source operation was not lowered
-     ^^^^^^^^^^^^ structural ray-tracing operation 'trace' reachable from this entry point must be lowered before target code generation
-*/
-    uniform RaytracingAccelerationStructure scene,
-    uniform rt::TraceProgramDescriptor<Schema> program)
-/*SELECTED_METAL:
-                                               ^^^^^^^ structural ray-tracing program descriptor must be lowered before target code generation
-                                               ^^^^^^^ target adapter lowering must choose the descriptor's physical representation
-*/
-/*SELECTED_HLSL:
-                                               ^^^^^^^ structural ray-tracing program descriptor must be lowered before target code generation
-                                               ^^^^^^^ target adapter lowering must choose the descriptor's physical representation
-*/
-{
-    __target_switch
-    {
-    case metal:
-        Payload payload = { 19 };
-        traceir::trace(scene, program, 1, 2, 3, 4, 5,
-            float3(1, 2, 3), 0.25f, float3(0, 1, 0), 100.0f, payload);
-        output[0] = payload.value;
-        break;
-    default:
-        output[0] = 23;
-        break;
-    }
 }
