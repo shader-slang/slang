@@ -11907,10 +11907,14 @@ T fma(T a, T b, T c)
     case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
     case glsl: __intrinsic_asm "fma";
     case hlsl:
-        if (__isFloat<T>() || __isHalf<T>())
-            return mad(a, b, c);
+        // HLSL provides a fused (single-rounding) `fma` only for `double`, and DXIL lowers it to
+        // `Fma`, which requires the extended double-precision device feature. For `float` and
+        // `half` we lower to `mad`, which HLSL allows to be either fused or a separate multiply
+        // and add. The vector and matrix overloads below make the same selection.
+        if (__type_equals<T, double>())
+            __intrinsic_asm "fma";
         else
-            __intrinsic_asm "fma($0, $1, $2)";
+            __intrinsic_asm "mad";
     case metal: __intrinsic_asm "fma";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Fma $a $b $c
@@ -11930,7 +11934,12 @@ vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
     __target_switch
     {
     case glsl: __intrinsic_asm "fma";
-    case hlsl: __intrinsic_asm "fma";
+    case hlsl:
+        // Same `double`-only `fma` selection as the scalar overload above.
+        if (__type_equals<T, double>())
+            __intrinsic_asm "fma";
+        else
+            __intrinsic_asm "mad";
     case metal: __intrinsic_asm "fma";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Fma $a $b $c
@@ -11949,7 +11958,12 @@ matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "fma";
+    case hlsl:
+        // Same `double`-only `fma` selection as the scalar overload above.
+        if (__type_equals<T, double>())
+            __intrinsic_asm "fma";
+        else
+            __intrinsic_asm "mad";
     default:
         MATRIX_MAP_TRINARY(T, N, M, fma, a, b, c);
     }
