@@ -17,7 +17,7 @@
 // - a user-declared global input that the shader writes to can hold a non-uniform value, whether
 //   the entry point writes it, a callee writes one of its components, or it is passed `inout`.
 
-// No context struct is introduced; the helper signatures above show that no by-value context
+// No context struct is introduced; the helper signatures below show that no by-value context
 // parameter is added either.
 // NOCTX-NOT: struct KernelContext
 
