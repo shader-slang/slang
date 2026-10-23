@@ -932,9 +932,12 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
         sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
     type = visitor.TranslateTypeNode(typeExpr);
-    auto typeOut = visitor.tryCoerceToProperType(TypeExp(type));
-    if (typeOut.type)
-        type = typeOut.type;
+    // Type lookup also supplies interface metadata to conformance APIs. Default completion must
+    // preserve that category; callers that need stored data perform proper-type coercion
+    // separately.
+    Type* completedType = nullptr;
+    if (visitor.coerceToAliasableTypeImpl(TypeExp(typeExpr, type), &completedType, nullptr))
+        type = completedType;
 
     if (type)
     {
@@ -1086,6 +1089,10 @@ Expr* ComponentType::findDeclFromStringInType(
     LookupMask mask,
     DiagnosticSink* sink)
 {
+    // Reflection queries on a box inspect the declarations of its interface.
+    if (auto existentialType = as<ExistentialType>(type))
+        type = existentialType->getInterfaceType();
+
     // Only look up in the type if it is a DeclRefType
     if (!as<DeclRefType>(type))
         return nullptr;

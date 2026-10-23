@@ -2,6 +2,7 @@
 
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
+#include "slang-ast-synthesis.h"
 #include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
@@ -23,6 +24,18 @@
 
 namespace Slang
 {
+
+/// Get the declaration-bearing type for reflection queries about declaration metadata.
+///
+/// For a box, this function returns the enclosed interface type for name, attribute, and generic
+/// container queries. Returns null for types without a declaration. Queries about type identity
+/// and conformance must use the original type.
+static DeclRefType* getDeclRefTypeForReflection(Type* type)
+{
+    if (auto existentialType = as<ExistentialType>(type))
+        type = existentialType->getInterfaceType();
+    return as<DeclRefType>(type);
+}
 
 // Conversion routines to help with strongly-typed reflection API
 
@@ -511,6 +524,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_ARRAY;
     }
+    else if (as<ExistentialType>(type))
+    {
+        return SLANG_TYPE_KIND_INTERFACE;
+    }
     else if (auto declRefType = as<DeclRefType>(type))
     {
         const auto& declRef = declRefType->getDeclRef();
@@ -803,7 +820,7 @@ SLANG_API unsigned int spReflectionType_GetUserAttributeCount(SlangReflectionTyp
     auto type = convert(inType);
     if (!type)
         return 0;
-    if (auto declRefType = as<DeclRefType>(type))
+    if (auto declRefType = getDeclRefTypeForReflection(type))
     {
         return getUserAttributeCount(declRefType->getDeclRef().getDecl());
     }
@@ -816,7 +833,7 @@ SLANG_API SlangReflectionUserAttribute* spReflectionType_GetUserAttribute(
     auto type = convert(inType);
     if (!type)
         return 0;
-    if (auto declRefType = as<DeclRefType>(type))
+    if (auto declRefType = getDeclRefTypeForReflection(type))
     {
         return getUserAttributeByIndex(declRefType->getDeclRef().getDecl(), index);
     }
@@ -829,7 +846,7 @@ SLANG_API SlangReflectionUserAttribute* spReflectionType_FindUserAttributeByName
     auto type = convert(inType);
     if (!type)
         return 0;
-    if (auto declRefType = as<DeclRefType>(type))
+    if (auto declRefType = getDeclRefTypeForReflection(type))
     {
         ASTBuilder* astBuilder = declRefType->getASTBuilderForReflection();
         auto globalSession = astBuilder->getGlobalSession();
@@ -962,7 +979,7 @@ SLANG_API char const* spReflectionType_GetName(SlangReflectionType* inType)
 {
     auto type = convert(inType);
 
-    if (auto declRefType = as<DeclRefType>(type))
+    if (auto declRefType = getDeclRefTypeForReflection(type))
     {
         auto declRef = declRefType->getDeclRef();
 
@@ -1236,7 +1253,7 @@ DeclRef<Decl> getInnermostGenericParent(DeclRef<Decl> declRef)
 SLANG_API SlangReflectionGeneric* spReflectionType_GetGenericContainer(SlangReflectionType* type)
 {
     auto slangType = convert(type);
-    if (auto declRefType = as<DeclRefType>(slangType))
+    if (auto declRefType = getDeclRefTypeForReflection(slangType))
     {
         return convertDeclToGeneric(getInnermostGenericParent(declRefType->getDeclRef()));
     }
@@ -1256,6 +1273,12 @@ SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
     auto context = convert(reflection);
     auto type = convert(inType);
     auto targetReq = context->getTargetReq();
+
+    // This API requests data layout, so interface metadata needs the same version-aware
+    // proper-type checking as the session layout API. This entry point has no diagnostic output.
+    type = checkProperType(targetReq->getLinkage(), TypeExp(type), nullptr);
+    if (as<ErrorType>(type))
+        return nullptr;
 
     auto typeLayout = targetReq->getTypeLayout(type, (slang::LayoutRules)rules);
     return convert(typeLayout);
@@ -2021,18 +2044,6 @@ SlangBindingType _calcBindingType(Slang::TypeLayout* typeLayout, LayoutResourceK
     return _calcBindingType(kind);
 }
 
-static DeclRefType* asInterfaceType(Type* type)
-{
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        if (declRefType->getDeclRef().as<InterfaceDecl>())
-        {
-            return declRefType;
-        }
-    }
-    return nullptr;
-}
-
 struct ExtendedTypeLayoutContext
 {
     TypeLayout* m_typeLayout;
@@ -2401,10 +2412,9 @@ struct ExtendedTypeLayoutContext
             m_extendedInfo->m_subObjectRanges.add(subObjectRange);
             return;
         }
-        else if (asInterfaceType(typeLayout->type))
+        else if (as<ExistentialType>(typeLayout->type))
         {
-            // An `interface` type should introduce a binding range and a matching
-            // sub-object range.
+            // We add a binding range and a matching sub-object range for an existential box.
             //
             TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
             bindingRange.leafTypeLayout = typeLayout;
@@ -2733,11 +2743,11 @@ SLANG_API SlangInt spReflectionTypeLayout_isBindingRangeSpecializable(
         return SLANG_BINDING_TYPE_UNKNOWN;
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
     auto type = bindingRange.leafTypeLayout->getType();
-    if (asInterfaceType(type))
+    if (as<ExistentialType>(type))
         return 1;
     if (auto parameterGroupType = as<ParameterGroupType>(type))
     {
-        if (asInterfaceType(parameterGroupType->getElementType()))
+        if (as<ExistentialType>(parameterGroupType->getElementType()))
             return 1;
     }
     return 0;
@@ -5643,11 +5653,8 @@ SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
             case SLANG_GENERIC_ARG_TYPE:
                 {
                     auto type = convert(arg.typeVal);
-                    auto declRefType = as<DeclRefType>(type);
-                    auto declRefExpr = astBuilder->create<DeclRefExpr>();
-                    declRefExpr->declRef = declRefType->getDeclRef();
-                    declRefExpr->type.type = astBuilder->getOrCreate<TypeType>(type);
-                    argExprs.add(declRefExpr);
+                    ASTSynthesizer synthesizer(astBuilder, astBuilder->getNamePool());
+                    argExprs.add(synthesizer.emitStaticTypeExpr(type));
                     break;
                 }
             case SLANG_GENERIC_ARG_INT:

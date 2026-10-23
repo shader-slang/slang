@@ -570,7 +570,7 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
     if (isSlang2026OrLater(this))
     {
         // TODO: some/dyn types are also not C-style.
-        if (isDeclRefTypeOf<InterfaceDecl>(type))
+        if (as<ExistentialType>(type))
             return cacheResult(false);
     }
 
@@ -2399,37 +2399,39 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
-    // A type is always convertible to any of its supertypes.
-    //
-    if (auto witness = tryGetSubtypeWitness(fromType, toType))
+    // Packing a box requires a witness for its payload, rather than a conformance to the box.
+    // A box-to-box upcast reuses the interface refinement witness; lowering projects the stored
+    // witness table along that path without claiming that either box conforms to an interface.
+    auto fromBoxType = as<ExistentialType>(fromType);
+    auto toBoxType = as<ExistentialType>(toType);
+    auto witnessSubType = fromType.type;
+    if (toBoxType)
     {
-        // Interface-to-interface upcast may receive a compressed witness
-        // whose internal `DeclRef` is rooted in an intermediate interface
-        // rather than `fromType`.  Expand it into a transitive chain so
-        // IR lowering can walk the inheritance path mechanically without
-        // inspecting the inheritance graph itself.
-        if (isInterfaceType(fromType) && isInterfaceType(toType))
+        if (fromBoxType)
+            witnessSubType = fromBoxType->getInterfaceType();
+    }
+    auto witnessSuperType = toBoxType ? toBoxType->getInterfaceType() : toType;
+    if (auto witness = tryGetSubtypeWitness(witnessSubType, witnessSuperType))
+    {
+        // A box-to-box upcast may receive a compressed witness whose `DeclRef` is rooted in an
+        // intermediate interface rather than `witnessSubType`. We expand it into a transitive
+        // chain so IR lowering can follow the inheritance proof without inspecting the graph.
+        if (fromBoxType && toBoxType)
         {
-            witness = normalizeSubtypeWitnessForInterfaceUpcast(fromType, witness);
+            witness = normalizeSubtypeWitnessForInterfaceUpcast(witnessSubType, witness);
         }
 
         if (outToExpr)
         {
             *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
 
-            // If the original expression was an l-value, then the result
-            // of the cast may be an l-value itself. We want to be able
-            // to invoke `[mutating]` methods on a value that is cast to
-            // an interface it conforms to, and we also expect to be able
-            // to pass a value of a derived `struct` type into methods that
-            // expect a value of its base type.
-            //
+            // A concrete base projection can refer to the base fields in the original
+            // derived-struct storage, so an l-value argument still supplies an l-value result.
+            // Packing or upcasting a box instead creates a value with its own payload/table
+            // package; that result does not refer to the original argument's storage.
             if (fromExpr && fromExpr->type.isLeftValue)
             {
-                // If toType is an interface type, we need to wrap the original
-                // expression into a MakeExistential, and the result of
-                // MakeExistential is not an l-value.
-                (*outToExpr)->type.isLeftValue = !isInterfaceType(toType);
+                (*outToExpr)->type.isLeftValue = !toBoxType;
             }
         }
         if (outCost)
@@ -2962,13 +2964,21 @@ bool SemanticsVisitor::_coerce(
                         {
                             auto fromVal = fromPtrType->getValueType();
                             auto toVal = toPtrType->getValueType();
-                            if (!isInterfaceType(fromVal) && isInterfaceType(toVal) &&
-                                tryGetSubtypeWitness(fromVal, toVal))
+                            if (auto toBoxType = as<ExistentialType>(toVal))
                             {
-                                sink->diagnose(Diagnostics::NoteConcreteToInterfacePtrUnsafe{
-                                    .from = fromVal,
-                                    .to = toVal,
-                                    .location = fromExpr->loc});
+                                if (!as<ExistentialType>(fromVal))
+                                {
+                                    if (tryGetSubtypeWitness(
+                                            fromVal,
+                                            toBoxType->getInterfaceType()))
+                                    {
+                                        sink->diagnose(
+                                            Diagnostics::NoteConcreteToInterfacePtrUnsafe{
+                                                .from = fromVal,
+                                                .to = toVal,
+                                                .location = fromExpr->loc});
+                                    }
+                                }
                             }
                         }
                     }

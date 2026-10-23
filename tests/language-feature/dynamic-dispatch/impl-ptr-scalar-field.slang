@@ -6,7 +6,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry main -conformance Foo:IFoo -conformance Foo2:IFoo
 
-dyn interface IFoo
+interface IFoo
 {
     float getValue();
 };

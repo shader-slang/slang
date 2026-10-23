@@ -955,6 +955,18 @@ void ASTPrinter::addExpr(Expr* expr)
             sb << "<unknown-type>";
         }
     }
+    else if (const auto existentialTypeExpr = as<ExistentialTypeExpr>(expr))
+    {
+        sb << "dyn ";
+        if (existentialTypeExpr->interfaceType.type)
+        {
+            addType(existentialTypeExpr->interfaceType.type);
+        }
+        else
+        {
+            addExpr(existentialTypeExpr->interfaceType.exp);
+        }
+    }
     else if (const auto modifiedTypeExpr = as<ModifiedTypeExpr>(expr))
     {
         // Print modifiers

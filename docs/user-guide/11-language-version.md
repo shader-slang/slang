@@ -52,7 +52,8 @@ Slang language version 2025 brings these changes on top of the legacy language:
 Slang language version 2026 brings these changes on top of Slang 2025:
 
 - Comma expression is removed when it is used inside a parenthesis. The expression `(a, b)` no longer evaluates to have `b`'s type as in C/C++. Instead, `(a,b)` means `makeTuple(a,b)` and returns a tuple consisting of `a` and `b`. See [SP#027](https://github.com/shader-slang/spec/blob/main/proposals/027-tuple-syntax.md) for details.
-- Users must explicitly opt in to enable dynamic dispatch with the `dyn` keyword. More rigorous validations are enabled to make sure dynamic dispatch is not triggered accidentally. See [SP#024](https://github.com/shader-slang/spec/blob/main/proposals/024-any-dyn-types.md) for details.
+- Dynamic dispatch has additional validation in this version.
+  The `-enable-experimental-dynamic-dispatch` option enables experimental dynamic-dispatch support.
 - Modifier `volatile` has been removed from Slang. See GitHub issue
   [#10614](https://github.com/shader-slang/slang/issues/10614) for details. The modifier is still accepted
   in GLSL source code for compatibility reasons.
@@ -69,6 +70,10 @@ Slang language version 2026 brings these changes on top of Slang 2025:
 ## Slang 202c (in development)
 
 Slang language version 202c brings these changes on top of Slang 2026:
+
+- Existential box types require explicit `dyn`, as in `dyn IFoo value`.
+  A bare `IFoo` names the interface contract and is valid in aliases, constraints, and conformance declarations.
+  See [Existential Box Types](06-interfaces-generics.md#existential-box-types).
 
 - The generic-parameter-count overload tie-breaker has been removed.
   Older compilers treated required generic-parameter count as an ordinary ranking rule and

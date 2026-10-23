@@ -1265,6 +1265,25 @@ class NamespaceType : public Type
     Type* _createCanonicalTypeOverride();
 };
 
+/// An `ExistentialType` is the proper type of a box for one interface.
+///
+/// A box holds a value of an unknown concrete type that conforms to the interface.
+/// For `interface IFoo {}`, `dyn IFoo` denotes this type, while the `DeclRefType` naming
+/// `IFoo` denotes the interface itself. The operand names a single `InterfaceDecl`, including
+/// any generic arguments. Instances are constructed through `ASTBuilder::getExistentialType`.
+FIDDLE()
+class ExistentialType : public Type
+{
+    FIDDLE(...)
+    Type* getInterfaceType() const { return as<Type>(getOperand(0)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+
+    /// Substitute generic arguments in the interface without removing the box.
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 // The concrete type for a value wrapped in an existential, accessible
 // when the existential is "opened" in some context.
 FIDDLE()

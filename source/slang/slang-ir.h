@@ -2246,13 +2246,12 @@ public:
     // Adding an IR instruction requires a new writer version. Earlier modules can remain
     // supported when their AST and IR representations are compatible with the reader.
     //
-    // Adding `RefReadOnlyModifier`, `RefWriteOnlyModifier` and the reference parameter type
-    // classes shifts the sequential `ASTNodeType` values, so a version-36 module's later AST
-    // nodes would be decoded as different classes.
-    // Version 37 is the earliest module version with the updated AST node numbering, and with
-    // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
-    const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 37;
+    // `ExistentialTypeExpr` and `ExistentialType` change the sequential `ASTNodeType` values and
+    // distinguish interface declarations from existential box types. Version 38 is the earliest
+    // module version with those AST classes and semantics. We reject earlier modules before AST
+    // decoding, where their node tags would otherwise select the wrong classes.
+    const static UInt k_minSupportedModuleVersion = 38;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

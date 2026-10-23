@@ -715,6 +715,14 @@ SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
 
     auto target = targets[targetIndex];
 
+    // Layout is a proper-type context, while type lookup also returns interface metadata.
+    // Semantic checking applies the language version's implicit-boxing rule at this boundary.
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+    type = checkProperType(this, TypeExp(type), &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+    if (sink.getErrorCount())
+        return nullptr;
+
     // TODO: We need a way to pass through the layout rules
     // that the user requested (e.g., constant buffers vs.
     // structured buffer rules). Right now the API only
@@ -728,8 +736,6 @@ SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     // errors that occur during layout (e.g., types that
     // are invalid because of target-specific layout constraints).
     //
-    SLANG_UNUSED(outDiagnostics);
-
     return asExternal(typeLayout);
 }
 
@@ -1113,7 +1119,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         &sink,
         scope,
         getNamePool(),
-        SourceLanguage::Slang);
+        SourceLanguage::Slang,
+        languageVersion);
 }
 
 UInt Linkage::addTarget(CodeGenTarget target)

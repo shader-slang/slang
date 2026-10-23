@@ -1,8 +1,6 @@
-// Explicitly specializing a constrained generic function with an
-// interface type should be rejected with the same diagnostic as
-// implicit inference (error 33180). Previously crashed with an
-// internal compiler error (99999) on a different code path than
-// the implicit case in diagnose-generic-func-with-interface.slang.
+// Explicitly specializing a constrained generic function with an existential box is rejected
+// because the box does not conform to the stored interface. Implicit opening of a boxed
+// argument is distinct: it specializes the function with the concrete payload type instead.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain
@@ -47,8 +45,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     IFoo obj = makeInterface(dispatchThreadID.x);
 
     float result = genericFunc<IFoo>(obj, 3.0);
-//CHECK:                            ^ error E33180
-//CHECK:                            ^ specializing 'genericFunc' with an existential type is not allowed.
+//CHECK:           ^^^^^^^^^^^ type argument doesn't conform to interface
+//CHECK:           ^^^^^^^^^^^ type argument 'dyn IFoo' does not conform to the required interface 'IFoo'
 
     outputBuffer[0] = result;
 }

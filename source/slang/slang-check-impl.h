@@ -2208,24 +2208,43 @@ public:
         Expr* fromExpr,
         Expr** outExpr);
 
-    // A "proper" type is one that can be used as the type of an expression.
-    // Put simply, it can be a concrete type like `int`, or a generic
-    // type that is applied to arguments, like `Texture2D<float4>`.
-    // The type `void` is also a proper type, since we can have expressions
-    // that return a `void` result (e.g., many function calls).
-    //
-    // A "non-proper" type is any type that can't actually have values.
-    // A simple example of this in C++ is `std::vector` - you can't have
-    // a value of this type.
-    //
-    // Part of what this function does is give errors if somebody tries
-    // to use a non-proper type as the type of a variable (or anything
-    // else that needs a proper type).
-    //
-    // The other thing it handles is the fact that HLSL lets you use
-    // the name of a non-proper type, and then have the compiler fill
-    // in the default values for its type arguments (e.g., a variable
-    // given type `Texture2D` will actually have type `Texture2D<float4>`).
+    /// Resolve a checked type expression and complete default generic arguments without boxing.
+    ///
+    /// `typeExp` may have a semantic type, a checked expression, or neither. The result can be a
+    /// proper type, an interface, or an interface conjunction. `outType` must be non-null; it
+    /// receives the completed type on success, null if no type was found, or `ErrorType` if
+    /// completion or type validation failed. An existing `ErrorType` propagates as a success.
+    /// A null `diagSink` suppresses diagnostics from this coercion, for speculative API queries.
+    bool coerceToAliasableTypeImpl(
+        TypeExp const& typeExp,
+        Type** outType,
+        DiagnosticSink* diagSink);
+
+    /// Complete a checked type expression using the current diagnostic sink.
+    ///
+    /// The result preserves the expression and replaces its type with the result of
+    /// `coerceToAliasableTypeImpl`.
+    TypeExp coerceToAliasableType(TypeExp const& typeExp);
+
+    /// Check an unchecked type expression, then apply `coerceToAliasableType`.
+    TypeExp checkAliasableType(TypeExp typeExp);
+
+    /// Check an unchecked interface/conjunction expression, diagnosing other types as errors.
+    ///
+    /// The result is the checked type expression, with `ErrorType` on failure.
+    TypeExp checkInterfaceType(TypeExp typeExp);
+
+    /// Form a box from a checked interface, conjunction, or `ErrorType`.
+    ///
+    /// The result is the canonical single-interface box, an existing error, or `ErrorType` for
+    /// an unsupported conjunction. A null `diagSink` suppresses the conjunction diagnostic.
+    Type* formExistentialType(TypeExp const& interfaceType, DiagnosticSink* diagSink);
+
+    /// Coerce a type expression to a type that can have values, including `void`.
+    ///
+    /// Before Slang 202c, a bare interface in this context implicitly forms its box type.
+    /// The checked-input, required-output, and diagnostic-sink contracts match
+    /// `coerceToAliasableTypeImpl`; rejected box formation also returns false and `ErrorType`.
     bool CoerceToProperTypeImpl(
         TypeExp const& typeExp,
         Type** outProperType,
@@ -3675,6 +3694,14 @@ public:
     ///
     SubtypeWitness* tryGetInterfaceConformanceWitness(Type* type, Type* interfaceType);
 
+    /// Find the differentiability proof or boxed-payload metadata for `type`.
+    ///
+    /// `interfaceType` must be `IDifferentiable` or `IDifferentiablePtrType`. For an ordinary
+    /// type, the result is its subtype witness. For a box, the result is an
+    /// `ExistentialDifferentiabilityWitness` if the enclosed interface refines `interfaceType`.
+    /// Otherwise the result is null. Box metadata does not establish an ordinary conformance.
+    SubtypeWitness* tryGetDifferentiabilityWitness(Type* type, Type* interfaceType);
+
     Expr* createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, Val* witness);
 
     /// Expand a compressed interface-to-interface subtype witness into a
@@ -4453,6 +4480,8 @@ public:
     Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
     Expr* visitReturnValExpr(ReturnValExpr* expr);
     Expr* visitAndTypeExpr(AndTypeExpr* expr);
+
+    Expr* visitExistentialTypeExpr(ExistentialTypeExpr* expr);
     Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
     Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
     Expr* visitFuncTypeExpr(FuncTypeExpr* expr);

@@ -13,7 +13,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl
 
-dyn interface IFoo
+interface IFoo
 {
     float getValue();
 }
