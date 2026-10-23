@@ -839,6 +839,10 @@ static void _lookUpInScopes(
     // The file decl that this scope is in.
     FileDecl* thisFileDecl = nullptr;
 
+    // Whether the first level with hits let lookup continue to the last scope (see below). We
+    // record the decision once, so that farther-out levels do not re-check the growing result.
+    bool collectsOuterHits = false;
+
     for (; scope != endScope; scope = scope->parent)
     {
         // Note that we consider all "peer" scopes together,
@@ -1023,7 +1027,7 @@ static void _lookUpInScopes(
             }
         }
 
-        if (result.isValid())
+        if (result.isValid() && !collectsOuterHits)
         {
             // We treat one iteration of this loop as one level: `scope`, its `nextSibling` peers
             // (such as the namespaces named by `using namespace`), and for a type or extension
@@ -1035,14 +1039,13 @@ static void _lookUpInScopes(
             // reports several of them as ambiguous. If any hit is overloadable, lookup continues
             // to the last scope, so that a call such as `f(1.5f)` can reach an outer `f(float)`
             // when the level holds a function `f(int)` next to a variable `f`; overload
-            // resolution then drops the candidates it cannot call. The hits of that first level
-            // stay in `result`, so the check below gives the same answer at every later level.
-            // A completion request always continues, because it wants every visible name.
-            if (_doesLookupResultContainOverloadableDecl(result) || request.isCompletionRequest())
+            // resolution then drops the candidates it cannot call. A completion request always
+            // continues, because it wants every visible name.
+            if (!request.isCompletionRequest() && !_doesLookupResultContainOverloadableDecl(result))
             {
-                continue;
+                break;
             }
-            break;
+            collectsOuterHits = true;
         }
     }
 
