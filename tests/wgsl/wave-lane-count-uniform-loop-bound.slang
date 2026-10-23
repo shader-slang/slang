@@ -6,16 +6,16 @@
 // WGSL's uniformity analysis treats every read of a module-scope `var<private>` as possibly
 // non-uniform. On WGSL, `translateGlobalVaryingVar` stores `@builtin(subgroup_size)` into a
 // private shadow copy at the top of the entry point, and the inlined `WaveGetLaneCount()` emits
-// `__requireTargetExtension("subgroups")` between that store and its load of the copy. The loop
-// bound reads the builtin parameter directly, which `u32(256) / [[LC]]` checks, only when
-// store-to-load forwarding crosses the requirement; otherwise Tint rejects the `subgroupAdd` in
-// the loop as not in subgroup-uniform control flow (shader-slang/slang#8774). The `-wgpu` row
-// runs the shader through Tint.
+// `__requireTargetExtension("subgroups")` between that store and its load of the copy. A read of
+// the copy would make Tint reject the `subgroupAdd` in the loop as not in subgroup-uniform control
+// flow (shader-slang/slang#8774).
 //
-// In a compute shader, `introduceExplicitGlobalContext` also replaces this shadow with a local
-// copy, so the compute rows pass without forwarding. The fragment row pins the forwarding itself:
-// the lane count is not uniform in a fragment shader, so its shadow stays a `var<private>`, and
-// the read uses the builtin parameter only because the store is forwarded across the requirement.
+// Each row pins a different fix. In a compute shader, `introduceExplicitGlobalContext` replaces
+// the shadow with a local copy, so the compute CHECK lines and the `-wgpu` row, which runs the
+// shader through Tint, pass whether or not store-to-load forwarding runs. The fragment row pins
+// the forwarding: the lane count is not uniform in a fragment shader, so its shadow stays a
+// `var<private>`, and `u32(256) / [[FLC]]` reads the builtin parameter only because the store is
+// forwarded across the requirement.
 
 // CHECK: enable subgroups;
 // CHECK: fn computeMain(
