@@ -9,8 +9,9 @@
 // bound reads the builtin parameter directly, which `u32(256) / [[LC]]` checks, only when
 // store-to-load forwarding crosses the requirement; otherwise Tint rejects the `subgroupAdd` in
 // the loop as not in subgroup-uniform control flow (shader-slang/slang#8774). The `-wgpu` row
-// runs the shader through Tint. Forwarding still stops at a block boundary, at any call that may
-// write memory (every wave op) and at debug insts, so those shapes still read the `var<private>`.
+// runs the shader through Tint. Forwarding still stops at a block boundary, at any side-effecting
+// call between the store and the load (including every wave op) and at debug insts
+// (`-g`/`-g2`/`-g3`), so those shapes still read the `var<private>`.
 
 // CHECK: enable subgroups;
 // CHECK: fn computeMain(
