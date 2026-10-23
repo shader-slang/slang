@@ -1805,6 +1805,149 @@ static void collectGenericStructTypeUses(
     }
 }
 
+// Check an entry point's effective requirements against each requested target and profile.
+static void validateEntryPointCapabilities(
+    EntryPoint* entryPoint,
+    const CapabilitySet& entryPointInferredCaps,
+    const List<GenericStructTypeUse>& signatureStructUses,
+    DiagnosticSink* sink)
+{
+    auto linkage = entryPoint->getLinkage();
+    auto entryPointFuncDecl = entryPoint->getFuncDecl();
+    for (auto target : linkage->targets)
+    {
+        auto targetCaps = target->getTargetCaps();
+        auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
+        targetCaps.join(stageCapabilitySet);
+        if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
+        {
+            // Incompatable means we don't support a set of abstract atoms.
+            // Diagnose that we lack support for 'stage' and 'target' atoms with our provided
+            // entry-point
+            auto compileTarget = target->getTargetCaps().getCompileTarget();
+            auto stageTarget = stageCapabilitySet.getTargetStage();
+            maybeDiagnose(
+                sink,
+                linkage->m_optionSet,
+                DiagnosticCategory::Capability,
+                Diagnostics::EntryPointUsesUnavailableCapability{
+                    .stage = capabilityNameToString((CapabilityName)stageTarget),
+                    .target = capabilityNameToString((CapabilityName)compileTarget),
+                    .decl = entryPointFuncDecl});
+
+            // Find out what is incompatible (ancestor missing a super set of 'target+stage')
+            CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
+            diagnoseMissingCapabilityProvenance(
+                linkage->m_optionSet,
+                sink,
+                entryPointFuncDecl,
+                failedSet);
+
+            // The provenance walk above follows `capabilityRequirementProvenance`,
+            // which does not record generic struct signature types. Point at any
+            // such struct whose requirement is itself incompatible with the
+            // target, mirroring the notes emitted for non-generic structs.
+            for (auto& use : signatureStructUses)
+            {
+                if (!targetCaps.isIncompatibleWith(
+                        CapabilitySet{use.structDecl->inferredCapabilityRequirements}))
+                    continue;
+                maybeDiagnose(
+                    sink,
+                    linkage->m_optionSet,
+                    DiagnosticCategory::Capability,
+                    Diagnostics::SeeUsingOf{.decl = use.structDecl, .location = use.useLoc});
+                maybeDiagnose(
+                    sink,
+                    linkage->m_optionSet,
+                    DiagnosticCategory::Capability,
+                    Diagnostics::SeeDefinitionOf{.decl = use.structDecl});
+                if (auto requireAttr = use.structDecl->findModifier<RequireCapabilityAttribute>())
+                    maybeDiagnose(
+                        sink,
+                        linkage->m_optionSet,
+                        DiagnosticCategory::Capability,
+                        Diagnostics::SeeDeclarationOfModifier{.modifier = requireAttr});
+            }
+        }
+        else
+        {
+            auto& targetOptionSet = target->getOptionSet();
+            bool specificProfileRequested =
+                targetOptionSet.hasOption(CompilerOptionName::Profile) &&
+                (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
+                 SLANG_PROFILE_UNKNOWN);
+            bool specificCapabilityRequested = false;
+            for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+            {
+                switch (atomVal.kind)
+                {
+                case CompilerOptionValueKind::Int:
+                    if (atomVal.intValue != SLANG_CAPABILITY_UNKNOWN)
+                        specificCapabilityRequested = true;
+                    break;
+                case CompilerOptionValueKind::String:
+                    // User made a specific capability request
+                    specificCapabilityRequested = true;
+                    break;
+                }
+                if (specificCapabilityRequested)
+                    break;
+            }
+
+            if (auto declaredCapsMod =
+                    entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>())
+            {
+                // If the entry point has an explicitly declared capability, then we
+                // will merge that with the target capability set before checking if
+                // there is an implicit upgrade.
+                targetCaps.nonDestructiveJoin(declaredCapsMod->declaredCapabilityRequirements);
+            }
+
+            // Only attempt to error if a specific profile or capability is requested
+            if ((specificCapabilityRequested || specificProfileRequested) &&
+                targetCaps.atLeastOneSetImpliedInOther(entryPointInferredCaps) ==
+                    CapabilitySet::ImpliesReturnFlags::NotImplied)
+            {
+                CapabilitySet combinedSets = targetCaps;
+                combinedSets.join(entryPointInferredCaps);
+                CapabilityAtomSet addedAtoms{};
+                if (auto targetCapSet = targetCaps.getAtomSets())
+                {
+                    if (auto combinedSet = combinedSets.getAtomSets())
+                    {
+                        CapabilityAtomSet::calcSubtract(
+                            addedAtoms,
+                            (*combinedSet),
+                            (*targetCapSet));
+                    }
+                }
+                StringBuilder entryPointNameSb;
+                printDiagnosticArg(entryPointNameSb, entryPointFuncDecl);
+                auto atoms = addedAtoms.getElements<CapabilityAtom>();
+                StringBuilder capsSb;
+                printDiagnosticArg(capsSb, atoms);
+                maybeDiagnoseWarningOrError(
+                    sink,
+                    target->getOptionSet(),
+                    DiagnosticCategory::Capability,
+                    Diagnostics::ProfileImplicitlyUpgraded{
+                        .entryPoint = entryPointNameSb.produceString(),
+                        .profile = target->getOptionSet().getProfile().getName(),
+                        .capabilities = capsSb.produceString(),
+                        .location = entryPointFuncDecl->loc,
+                    },
+                    Diagnostics::ProfileImplicitlyUpgradedRestrictive{
+                        .entryPoint = entryPointNameSb.produceString(),
+                        .profile = target->getOptionSet().getProfile().getName(),
+                        .capabilities = capsSb.produceString(),
+                        .location = entryPointFuncDecl->loc,
+                    });
+            }
+        }
+    }
+}
+
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
@@ -2621,138 +2764,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     entryPoint->setInferredCapabilityRequirements(
         entryPointInferredCaps.freeze(linkage->getASTBuilder()));
 
-    for (auto target : linkage->targets)
-    {
-        auto targetCaps = target->getTargetCaps();
-        auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
-        targetCaps.join(stageCapabilitySet);
-        if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
-        {
-            // Incompatable means we don't support a set of abstract atoms.
-            // Diagnose that we lack support for 'stage' and 'target' atoms with our provided
-            // entry-point
-            auto compileTarget = target->getTargetCaps().getCompileTarget();
-            auto stageTarget = stageCapabilitySet.getTargetStage();
-            maybeDiagnose(
-                sink,
-                linkage->m_optionSet,
-                DiagnosticCategory::Capability,
-                Diagnostics::EntryPointUsesUnavailableCapability{
-                    .stage = capabilityNameToString((CapabilityName)stageTarget),
-                    .target = capabilityNameToString((CapabilityName)compileTarget),
-                    .decl = entryPointFuncDecl});
-
-            // Find out what is incompatible (ancestor missing a super set of 'target+stage')
-            CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
-            diagnoseMissingCapabilityProvenance(
-                linkage->m_optionSet,
-                sink,
-                entryPointFuncDecl,
-                failedSet);
-
-            // The provenance walk above follows `capabilityRequirementProvenance`,
-            // which does not record generic struct signature types. Point at any
-            // such struct whose requirement is itself incompatible with the
-            // target, mirroring the notes emitted for non-generic structs.
-            for (auto& use : signatureStructUses)
-            {
-                if (!targetCaps.isIncompatibleWith(
-                        CapabilitySet{use.structDecl->inferredCapabilityRequirements}))
-                    continue;
-                maybeDiagnose(
-                    sink,
-                    linkage->m_optionSet,
-                    DiagnosticCategory::Capability,
-                    Diagnostics::SeeUsingOf{.decl = use.structDecl, .location = use.useLoc});
-                maybeDiagnose(
-                    sink,
-                    linkage->m_optionSet,
-                    DiagnosticCategory::Capability,
-                    Diagnostics::SeeDefinitionOf{.decl = use.structDecl});
-                if (auto requireAttr = use.structDecl->findModifier<RequireCapabilityAttribute>())
-                    maybeDiagnose(
-                        sink,
-                        linkage->m_optionSet,
-                        DiagnosticCategory::Capability,
-                        Diagnostics::SeeDeclarationOfModifier{.modifier = requireAttr});
-            }
-        }
-        else
-        {
-            auto& targetOptionSet = target->getOptionSet();
-            bool specificProfileRequested =
-                targetOptionSet.hasOption(CompilerOptionName::Profile) &&
-                (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
-                 SLANG_PROFILE_UNKNOWN);
-            bool specificCapabilityRequested = false;
-            for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
-            {
-                switch (atomVal.kind)
-                {
-                case CompilerOptionValueKind::Int:
-                    if (atomVal.intValue != SLANG_CAPABILITY_UNKNOWN)
-                        specificCapabilityRequested = true;
-                    break;
-                case CompilerOptionValueKind::String:
-                    // User made a specific capability request
-                    specificCapabilityRequested = true;
-                    break;
-                }
-                if (specificCapabilityRequested)
-                    break;
-            }
-
-            if (auto declaredCapsMod =
-                    entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>())
-            {
-                // If the entry point has an explicitly declared capability, then we
-                // will merge that with the target capability set before checking if
-                // there is an implicit upgrade.
-                targetCaps.nonDestructiveJoin(declaredCapsMod->declaredCapabilityRequirements);
-            }
-
-            // Only attempt to error if a specific profile or capability is requested
-            if ((specificCapabilityRequested || specificProfileRequested) &&
-                targetCaps.atLeastOneSetImpliedInOther(entryPointInferredCaps) ==
-                    CapabilitySet::ImpliesReturnFlags::NotImplied)
-            {
-                CapabilitySet combinedSets = targetCaps;
-                combinedSets.join(entryPointInferredCaps);
-                CapabilityAtomSet addedAtoms{};
-                if (auto targetCapSet = targetCaps.getAtomSets())
-                {
-                    if (auto combinedSet = combinedSets.getAtomSets())
-                    {
-                        CapabilityAtomSet::calcSubtract(
-                            addedAtoms,
-                            (*combinedSet),
-                            (*targetCapSet));
-                    }
-                }
-                StringBuilder entryPointNameSb;
-                printDiagnosticArg(entryPointNameSb, entryPointFuncDecl);
-                auto atoms = addedAtoms.getElements<CapabilityAtom>();
-                StringBuilder capsSb;
-                printDiagnosticArg(capsSb, atoms);
-                maybeDiagnoseWarningOrError(
-                    sink,
-                    target->getOptionSet(),
-                    DiagnosticCategory::Capability,
-                    Diagnostics::ProfileImplicitlyUpgraded{
-                        .entryPoint = entryPointNameSb.produceString(),
-                        .profile = target->getOptionSet().getProfile().getName(),
-                        .capabilities = capsSb.produceString(),
-                        .location = entryPointFuncDecl->loc,
-                    },
-                    Diagnostics::ProfileImplicitlyUpgradedRestrictive{
-                        .entryPoint = entryPointNameSb.produceString(),
-                        .profile = target->getOptionSet().getProfile().getName(),
-                        .capabilities = capsSb.produceString(),
-                        .location = entryPointFuncDecl->loc,
-                    });
-            }
-        }
-    }
+    validateEntryPointCapabilities(entryPoint, entryPointInferredCaps, signatureStructUses, sink);
 }
 
 bool resolveStageOfProfileWithEntryPoint(
