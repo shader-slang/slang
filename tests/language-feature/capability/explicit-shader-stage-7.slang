@@ -1,18 +1,28 @@
 //TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry main -profile sm_5_0
 //TEST:SIMPLE(filecheck=CHECK_WARN): -target spirv -entry main -profile sm_5_0 -DWARN
 
-// Our code will stillwarn about spirv version being below 'spirv 1.3'. This is Because we are still using `Profile` internally.
-// 'Profile' is an issue which needs to be refactored out since it only stores the info in a single integer through 'profileRaw'
-//CHECK_PASS: warning[E50011]
-//
-// Our code does not warn about capabilities here since we specify profile 'sm_5_0' and a 'ser_motion_raygen' shader.
-// 'ser_motion_raygen' implicitly uses "raygen + raytracing_motion + ser" capabilities.
-//CHECK_PASS: main
+// The explicit ser_motion_raygen stage supplies the motion-blur and SER capabilities, so
+// TraceMotionRay does not need a capability-upgrade warning. Its ray-tracing requirement
+// also contributes SPIR-V 1.4, even though the requested profile is the HLSL sm_5_0 profile.
+//CHECK_PASS-NOT: warning[E41012]
+//CHECK_PASS-NOT: warning[E50011]
+//CHECK_PASS: Version: 1.4
+//CHECK_PASS-NOT: warning[E41012]
+//CHECK_PASS-NOT: warning[E50011]
+//CHECK_PASS: OpEntryPoint RayGenerationKHR %main "main"
+//CHECK_PASS-NOT: warning[E41012]
+//CHECK_PASS-NOT: warning[E50011]
 
-// On the contrary, our code will warn without 'ser_motion_raygen'.
+// The ordinary raygen stage still needs the capability-upgrade warning for motion blur.
+// Both variants honor the canonical SPIR-V version requirement, so neither emits the
+// obsolete warning about a version below 1.3.
+//CHECK_WARN-NOT: warning[E50011]
 //CHECK_WARN: warning[E41012]
-//CHECK_WARN: warning[E50011]
-
+//CHECK_WARN-NOT: warning[E50011]
+//CHECK_WARN: Version: 1.4
+//CHECK_WARN-NOT: warning[E50011]
+//CHECK_WARN: OpEntryPoint RayGenerationKHR %main "main"
+//CHECK_WARN-NOT: warning[E50011]
 
 struct RayPayload
 {
