@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=NOPRIV): -target wgsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -output-using-type -compute-dispatch 2,1,1
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type -compute-dispatch 2,1,1
 
 // When a compute shader reads more than one workgroup-uniform built-in, the values are combined in
 // one function-local context that holds only uniform values, and functions that read them receive
@@ -25,7 +25,7 @@
 
 // NOPRIV-NOT: var<private>
 
-//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 in uint3 gGroupId : SV_GroupID;
@@ -62,10 +62,14 @@ void computeMain(uint groupIndex: SV_GroupIndex)
     let total = subgroupLoop();
     if (groupIndex == 0)
     {
-        outputBuffer[0] = gShared;
-        outputBuffer[1] = total;
+        outputBuffer[gGroupId.x * 2] = gShared;
+        outputBuffer[gGroupId.x * 2 + 1] = total;
     }
 }
 
+// Two workgroups run, so the barrier loop's trip count and the output slots depend on the
+// `workgroup_id` value stored into the context; an uninitialized field would read 0 in both.
 // BUF: 1
+// BUF-NEXT: 256
+// BUF-NEXT: 2
 // BUF-NEXT: 256

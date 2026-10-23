@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -output-using-type -g0
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=FRAG): -target wgsl -entry fragmentMain -stage fragment
 
 // WGSL's uniformity analysis treats every read of a module-scope `var<private>` as possibly
 // non-uniform. On WGSL, `translateGlobalVaryingVar` stores `@builtin(subgroup_size)` into a
@@ -9,10 +10,12 @@
 // bound reads the builtin parameter directly, which `u32(256) / [[LC]]` checks, only when
 // store-to-load forwarding crosses the requirement; otherwise Tint rejects the `subgroupAdd` in
 // the loop as not in subgroup-uniform control flow (shader-slang/slang#8774). The `-wgpu` row
-// runs the shader through Tint. Forwarding still stops at a block boundary, at any side-effecting
-// call between the store and the load (including every wave op) and at debug insts
-// (`-g`/`-g2`/`-g3`), so those shapes still read the `var<private>`. render-test emits debug info
-// by default, so the `-wgpu` row passes `-g0`.
+// runs the shader through Tint.
+//
+// In a compute shader, `introduceExplicitGlobalContext` also replaces this shadow with a local
+// copy, so the compute rows pass without forwarding. The fragment row pins the forwarding itself:
+// the lane count is not uniform in a fragment shader, so its shadow stays a `var<private>`, and
+// the read uses the builtin parameter only because the store is forwarded across the requirement.
 
 // CHECK: enable subgroups;
 // CHECK: fn computeMain(
@@ -45,3 +48,14 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 }
 
 // BUF: 256
+
+[shader("fragment")]
+float4 fragmentMain() : SV_Target
+{
+    let laneCount = WaveGetLaneCount();
+    return float4(float(256 / laneCount), 0, 0, 1);
+}
+
+// FRAG: fn fragmentMain(
+// FRAG-SAME: @builtin(subgroup_size) [[FLC:[A-Za-z0-9_]+]] : u32
+// FRAG: u32(256) / [[FLC]]
