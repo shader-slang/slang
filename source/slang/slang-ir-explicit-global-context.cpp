@@ -15,12 +15,15 @@ namespace Slang
 // type that gets passed between functions.
 //
 // WGSL can keep thread-local globals as `var<private>`, but its uniformity analysis treats
-// every read of one as possibly non-uniform. On WGSL the pass therefore moves only the shadow
-// copies of workgroup-uniform built-in inputs, so that subgroup operations and barriers whose
-// control flow depends on those values still validate.
+// every read of one as possibly non-uniform. On WGSL the pass therefore moves the shadow copies
+// of workgroup-uniform built-in inputs, so that subgroup operations and barriers whose control
+// flow depends on those values still validate. It moves only those: the analysis does not track
+// struct fields separately, so a single non-uniform field, or a store under divergent control
+// flow, would make every read through the context non-uniform.
 
-// Return whether `user`, an instruction that uses an address, only reads the memory at that
-// address, either directly or through element and field addresses derived from it.
+// Return true when `user`, an instruction that uses an address, is known to only read the memory
+// at that address, either directly or through element and field addresses derived from it. Any
+// other use returns false, so a caller that needs a proof of read-only access stays conservative.
 static bool isReadOnlyAddressUse(IRInst* user)
 {
     switch (user->getOp())
@@ -40,8 +43,11 @@ static bool isReadOnlyAddressUse(IRInst* user)
     }
 }
 
-// Return whether `param` is a parameter of a compute entry point whose system-value semantic
-// holds a workgroup-uniform value.
+// Return whether `param`, the parameter that carries a
+// `GlobalVariableShadowingGlobalParameterDecoration`, belongs to a compute entry point and has a
+// system-value semantic whose WGSL built-in is workgroup-uniform. A copy of an entry point that
+// `fixEntryPointCallsites` makes for direct calls keeps the decoration but not the entry-point
+// decoration, so it is rejected here.
 static bool isWorkgroupUniformEntryPointInput(IRInst* param)
 {
     auto func = getParentFunc(param);
@@ -49,13 +55,15 @@ static bool isWorkgroupUniformEntryPointInput(IRInst* param)
     if (!entryPointDecor)
         return false;
 
-    // `translateGlobalVaryingVar` gives every parameter it creates for a global input a layout.
+    // `translateGlobalVaryingVar` gives every parameter it creates for a global input a layout,
+    // and WGSL entry-point legalization rewrites such a parameter's type in place, keeping the
+    // parameter, its layout and the decoration.
     auto varLayout = findVarLayout(param);
     SLANG_RELEASE_ASSERT(varLayout);
     auto semanticAttr = varLayout->findSystemValueSemanticAttr();
     if (!semanticAttr)
         return false;
-    return isWorkgroupUniformSystemValue(
+    return isWGSLWorkgroupUniformSystemValue(
         convertSystemValueSemanticNameToEnum(String(semanticAttr->getName())),
         entryPointDecor->getProfile().getStage());
 }
@@ -75,6 +83,10 @@ static bool isWorkgroupUniformEntryPointInput(IRInst* param)
 // a workgroup-uniform semantic, and the only stores are those initializations. A shader can
 // also write to a global input (`gLaneCount = 3;`), and such a write could make the value
 // non-uniform, so any other store, or any use that lets the address escape, disqualifies it.
+//
+// `translateGlobalVaryingVar` emits exactly one initialization per linked entry point, at the top
+// of its first block, so equal counts with every store in a linked entry block identify those
+// initializations without matching their values.
 static bool isWorkgroupUniformInputShadow(IRInst* globalVar)
 {
     List<IRFunc*> shadowingEntryPoints;
@@ -155,10 +167,14 @@ struct IntroduceExplicitGlobalContextPass
                 hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
             case CodeGenTarget::WGSL:
-                // WGSL keeps resource bindings and `var<workgroup>` at module scope, and keeps
-                // every other thread-local global as a `var<private>` except the shadows of
-                // workgroup-uniform built-in inputs. A single such value reaches the functions
-                // that read it as an ordinary parameter; several are combined in one context.
+                // WGSL keeps every thread-local global as a `var<private>` except the shadows of
+                // workgroup-uniform built-in inputs, which the filter below selects; resource
+                // bindings and `var<workgroup>` never pass it and stay at module scope. A single
+                // such value reaches the functions that read it as an ordinary parameter, so a
+                // function that needs one built-in takes just that value rather than a pointer to
+                // a one-field struct; several are combined in one context. Locals and the context
+                // pointer use the `function` address space, which WGSL requires for a pointer
+                // parameter to a function-local variable.
                 hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
                 hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 addressSpaceOfLocals = AddressSpace::Function;
@@ -185,8 +201,11 @@ struct IntroduceExplicitGlobalContextPass
             }
 
             // A global passed by value loses writes made outside the entry point, so that option
-            // is only combined with the filter that admits globals no other function writes.
+            // is only combined with the filter that admits globals no other function writes. It
+            // also makes every function's context a local `Var`, which the function-type fix-up
+            // in `processModule` takes to mean an entry point.
             SLANG_ASSERT(!passSoleValueByValue || hoistOnlyWorkgroupUniformInputShadows);
+            SLANG_ASSERT(!passSoleValueByValue || !requiresFuncTypeCorrectionPass);
         }
 
         bool canHoistType(GlobalObjectKind hoistable)
@@ -498,6 +517,10 @@ struct IntroduceExplicitGlobalContextPass
         }
     }
 
+    // Create the `KernelContext` struct and the pointer type it is passed by, add a field for
+    // every hoisted global parameter and global variable, and record each field's key in
+    // `m_mapInstToContextFieldInfo` for the later rewrites of their uses.
+    //
     void createContextStructType(IRBuilder& builder)
     {
         m_contextStructType = builder.createStructType();
@@ -670,8 +693,9 @@ struct IntroduceExplicitGlobalContextPass
             placeholderParam->insertBefore(firstOrdinary);
         }
 
-        // The `KernelContext` to use inside the entry point
-        // will be a local variable declared in the first block.
+        // The context to use inside the entry point (a `KernelContext`,
+        // or the sole hoisted global's value) will be a local variable
+        // declared in the first block.
         //
         auto contextVarPtr = builder.emitVar(m_contextType);
         addKernelContextNameHint(contextVarPtr);
@@ -847,17 +871,18 @@ struct IntroduceExplicitGlobalContextPass
             // At each use site, we need to look up the context
             // pointer that is appropriate for that use.
             //
-            auto contextParam = findOrCreateContextPtrForInst(user);
+            auto contextPtr = findOrCreateContextPtrForInst(user);
             builder.setInsertBefore(user);
 
             // The address of the variable can be produced by
             // taking the address of the corresponding field
-            // in the context struct, or is the context itself
-            // when a sole global is passed by value.
+            // in the context struct. When a sole global is passed
+            // by value, the function's local copy of that value
+            // already stands in for the global.
             //
-            IRInst* ptr = contextParam;
+            IRInst* ptr = contextPtr;
             if (!m_passContextByValue)
-                ptr = builder.emitFieldAddress(ptrType, contextParam, fieldInfo.key);
+                ptr = builder.emitFieldAddress(ptrType, contextPtr, fieldInfo.key);
             if (fieldInfo.needDereference)
                 ptr = builder.emitLoad(ptr);
             use->set(ptr);

@@ -39,7 +39,7 @@ SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticN
     return systemValueSemanticName;
 }
 
-bool isWorkgroupUniformSystemValue(SystemValueSemanticName semantic, Stage stage)
+bool isWGSLWorkgroupUniformSystemValue(SystemValueSemanticName semantic, Stage stage)
 {
     if (stage != Stage::Compute)
         return false;
