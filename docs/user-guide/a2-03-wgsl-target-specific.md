@@ -73,10 +73,42 @@ The following table lists Slang's support for various HLSL feature sets, when ta
 | mesh shader | No |
 | tessellation shader | No |
 | geometry shader | No |
-| wave intrinsics | No |
+| wave intrinsics | Partial, with the `subgroups` extension (see [Wave Intrinsics](#wave-intrinsics)) |
 | barriers | Yes |
 | atomics | Yes |
 | switch fall-through | Restructured (warning 41026) |
+
+### Wave Intrinsics
+
+With the WGSL `subgroups` extension, these wave and quad intrinsics are supported:
+`WaveGetLaneIndex`, `WaveGetLaneCount`, `WaveIsFirstLane`, `WaveGetLaneEqMask` and the other
+`WaveGetLane*Mask` functions, `WaveActiveSum`, `WaveActiveProduct`, `WaveActiveMin`,
+`WaveActiveMax`, `WaveActiveBitAnd`, `WaveActiveBitOr`, `WaveActiveBitXor`, `WaveActiveAllTrue`,
+`WaveActiveAnyTrue`, `WaveActiveBallot`, `WaveActiveCountBits`, `WaveActiveAllEqual`,
+`WavePrefixSum`, `WavePrefixProduct`, `WavePrefixCountBits`, `WaveReadLaneAt`, `WaveReadLaneFirst`,
+`WaveBroadcastLaneAt`, `WaveShuffle`, `QuadReadAcrossX`, `QuadReadAcrossY`, `QuadReadAcrossDiagonal`
+and `QuadReadLaneAt`.
+
+Matrix overloads are supported for `WaveActiveSum`, `WaveActiveProduct`, `WaveActiveMin`,
+`WaveActiveMax`, `WaveActiveBitAnd`, `WaveActiveBitOr`, `WaveActiveBitXor`, `WavePrefixSum`,
+`WavePrefixProduct`, `WaveReadLaneAt`, `WaveReadLaneFirst`, `WaveBroadcastLaneAt` and
+`QuadReadLaneAt`, and for the emulated `WaveMatch` and `WaveMultiPrefix*` scans listed below.
+`WaveActiveAllEqual`, `WaveShuffle` and `QuadReadAcrossX`/`Y`/`Diagonal` take scalars and vectors
+only.
+
+WGSL has no partitioned subgroup operations, so these are emulated:
+
+- `WaveMatch`, `WaveMultiPrefixSum`, `WaveMultiPrefixProduct`, `WaveMultiPrefixBitAnd`,
+  `WaveMultiPrefixBitOr` and `WaveMultiPrefixBitXor`, including the `Inclusive`/`Exclusive` forms of
+  the scans (`WaveMultiPrefixInclusiveSum`, `WaveMultiPrefixExclusiveBitOr`, ...), read every lane
+  of the subgroup in turn with `subgroupShuffle`, so their cost grows with the subgroup size:
+  `WaveMatch` does one `subgroupShuffle` and one `subgroupBallot` per lane, and each scan does one
+  `subgroupBallot` plus one `subgroupShuffle` per lane.
+- `WaveMultiPrefixCountBits` is one `subgroupBallot` and a bit count, with no per-lane loop.
+
+These are not supported on WGSL: the `WaveMask*` intrinsics, the `WaveMulti*` reductions,
+`WaveMultiPrefix` min/max, `WavePrefixMin`/`WavePrefixMax`, `WavePrefixBitAnd`/`WavePrefixBitOr`/
+`WavePrefixBitXor` and the clustered operations.
 
 ### Switch Fall-Through
 

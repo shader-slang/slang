@@ -270,7 +270,14 @@ T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize);
 
 `WaveMulti` intrinsics take an explicit `uint4` mask of lanes to operate on. They correspond to the subgroup partitioned intrinsics provided by `SPV_NV_shader_subgroup_partitioned` and the `WaveMultiPrefix*` intrinsics provided by HLSL SM 6.5. HLSL's `WaveMulti*` intrinsics only provide operations for exclusive prefix arithmetic operations, while Vulkan's `SPV_NV_shader_subgroup_partitioned` provides operations for both inclusive/exclusive prefix (scan) and non-prefix (reduction) arithmetic and min/max operations.
 
-Slang adds new `WaveMulti*` intrinsics in addition to HLSL's `WaveMultiPrefix*` to allow generating all partitioned intrinsics supported in SPIRV. The new, non-standard HLSL, `WaveMulti*` intrinsics are only supported when targeting SPIRV, GLSL and CUDA. The inclusive variants of HLSL's `WaveMultiPrefix*` intrinsics are emulated by Slang by performing an additional operation in the current invocation. Metal and WGSL targets do not support `WaveMulti` intrinsics.
+Slang adds new `WaveMulti*` intrinsics in addition to HLSL's `WaveMultiPrefix*` to allow generating all partitioned intrinsics supported in SPIRV. The new, non-standard HLSL, `WaveMulti*` intrinsics are supported when targeting SPIRV, GLSL and CUDA; on WGSL, the inclusive and exclusive sum, product and bitwise scans among them are also supported (see below). On HLSL and CUDA, the inclusive variants of HLSL's `WaveMultiPrefix*` intrinsics are emulated by Slang by performing an additional operation in the current invocation (SPIR-V and GLSL have native inclusive scans; WGSL includes the current invocation in its per-lane loop, see below). Metal does not support `WaveMulti` intrinsics.
+
+WGSL has no partitioned subgroup operations, and Slang emulates the following there:
+
+- `WaveMatch`, and `WaveMultiPrefixSum`, `WaveMultiPrefixProduct`, `WaveMultiPrefixBitAnd`, `WaveMultiPrefixBitOr`, `WaveMultiPrefixBitXor` with their `Inclusive`/`Exclusive` forms: each reads every lane of the subgroup in turn with `subgroupShuffle`, so its cost grows with the subgroup size. `WaveMatch` does one `subgroupShuffle` and one `subgroupBallot` per lane; each scan does one `subgroupBallot` plus one `subgroupShuffle` per lane.
+- `WaveMultiPrefixCountBits`: one `subgroupBallot` and a bit count.
+
+The `WaveMulti*` reductions (`WaveMultiSum`, ...) and the `WaveMultiPrefix` min/max scans are not supported on WGSL.
 
 ```
 // Across lane ops. These are only supported when targeting SPIRV, GLSL and CUDA.
@@ -290,7 +297,8 @@ T WaveMultiBitOr(T value, uint4 mask);
 T WaveMultiBitXor(T value, uint4 mask);
 
 
-// Prefix arithmetic operations. Supported when targeting SPIRV, GLSL, CUDA and HLSL.
+// Prefix arithmetic operations. Supported when targeting SPIRV, GLSL, CUDA and HLSL, and on
+// WGSL by emulation (each reads every lane of the subgroup in turn).
 // In addition to these non-HLSL standard intrinsics are the standard `WaveMultiPrefix*`
 // intrinsics provided by SM 6.5, detailed in the `Standard Wave Intrinsics` section.
 
