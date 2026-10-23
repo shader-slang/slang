@@ -458,6 +458,146 @@ SLANG_UNIT_TEST(genericEntryPointCompile)
     }
 }
 
+SLANG_UNIT_TEST(genericEntryPointSpecializationCapabilities)
+{
+    const char* userSourceBody = R"(
+        [require(metal)]
+        struct MetalOnly { uint value; }
+        struct Plain { uint value; }
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void genericMain<T>() {}
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const SlangCompileTarget targets[] = {SLANG_HLSL, SLANG_METAL};
+    const char* typeNames[] = {"Plain", "MetalOnly", "Plain"};
+    const char* entryPointNames[] = {
+        "genericMain<Plain>",
+        "genericMain<MetalOnly>",
+        "genericMain<Plain>"};
+
+    for (auto target : targets)
+    {
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = target;
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = session->loadModuleFromSourceString(
+            "specializationCapabilities",
+            "specializationCapabilities.slang",
+            userSourceBody,
+            diagnostics.writeRef());
+        SLANG_CHECK_ABORT(module != nullptr);
+
+        ComPtr<slang::IEntryPoint> genericEntryPoint;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+            "genericMain",
+            SLANG_STAGE_COMPUTE,
+            genericEntryPoint.writeRef(),
+            diagnostics.writeRef())));
+
+        slang::IComponentType* genericComponents[] = {module, genericEntryPoint.get()};
+        ComPtr<slang::IComponentType> genericProgram;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+            genericComponents,
+            SLANG_COUNT_OF(genericComponents),
+            genericProgram.writeRef(),
+            diagnostics.writeRef())));
+
+        // All API paths share the same function declaration. Build every specialization before
+        // generating code to catch capability requirements leaking between their entry points.
+        enum class SelectionMode
+        {
+            SpecializeEntryPoint,
+            EntryPointExpression,
+            SpecializeComposite,
+        };
+        const SelectionMode modes[] = {
+            SelectionMode::SpecializeEntryPoint,
+            SelectionMode::EntryPointExpression,
+            SelectionMode::SpecializeComposite};
+        for (auto mode : modes)
+        {
+            ComPtr<slang::IComponentType> programs[SLANG_COUNT_OF(typeNames)];
+            for (Index i = 0; i < SLANG_COUNT_OF(typeNames); i++)
+            {
+                ComPtr<slang::IComponentType> specializedComponent;
+                SlangResult result;
+                if (mode == SelectionMode::EntryPointExpression)
+                {
+                    ComPtr<slang::IEntryPoint> entryPoint;
+                    result = module->findAndCheckEntryPoint(
+                        entryPointNames[i],
+                        SLANG_STAGE_COMPUTE,
+                        entryPoint.writeRef(),
+                        diagnostics.writeRef());
+                    specializedComponent = entryPoint;
+                }
+                else
+                {
+                    auto type = module->getLayout()->findTypeByName(typeNames[i]);
+                    SLANG_CHECK_ABORT(type != nullptr);
+                    auto argument = slang::SpecializationArg::fromType(type);
+                    slang::IComponentType* genericComponent =
+                        mode == SelectionMode::SpecializeComposite ? genericProgram.get()
+                                                                   : genericEntryPoint.get();
+                    result = genericComponent->specialize(
+                        &argument,
+                        1,
+                        specializedComponent.writeRef(),
+                        diagnostics.writeRef());
+                }
+
+                if (target == SLANG_HLSL && i == 1)
+                {
+                    SLANG_CHECK(SLANG_FAILED(result));
+                    SLANG_CHECK(
+                        _blobToString(diagnostics).getUnownedSlice().indexOf(toSlice("E36107")) !=
+                        -1);
+                    continue;
+                }
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+                SLANG_CHECK_ABORT(specializedComponent != nullptr);
+
+                ComPtr<slang::IComponentType> composite = specializedComponent;
+                if (mode != SelectionMode::SpecializeComposite)
+                {
+                    slang::IComponentType* components[] = {module, specializedComponent.get()};
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+                        components,
+                        SLANG_COUNT_OF(components),
+                        composite.writeRef(),
+                        diagnostics.writeRef())));
+                }
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    composite->link(programs[i].writeRef(), diagnostics.writeRef())));
+            }
+
+            for (auto& program : programs)
+            {
+                if (!program)
+                    continue;
+                ComPtr<slang::IBlob> code;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    program->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef())));
+                SLANG_CHECK_ABORT(code != nullptr);
+                SLANG_CHECK(code->getBufferSize() != 0);
+            }
+        }
+    }
+}
+
 SLANG_UNIT_TEST(parallelGenericEntryPointCompile)
 {
     const int iterationCount = _getParallelGenericEntryPointIterationCount();

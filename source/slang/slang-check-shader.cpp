@@ -1805,10 +1805,13 @@ static void collectGenericStructTypeUses(
     }
 }
 
-// Check an entry point's effective requirements against each requested target and profile.
+// Check a selected entry point's effective requirements against each requested target.
+// Both initial selection and later specialization use this check; the latter must not write
+// its requirements onto the base EntryPoint, which can have other independent specializations.
 static void validateEntryPointCapabilities(
     EntryPoint* entryPoint,
     const CapabilitySet& entryPointInferredCaps,
+    const List<Decl*>& referencedDecls,
     const List<GenericStructTypeUse>& signatureStructUses,
     DiagnosticSink* sink)
 {
@@ -1837,11 +1840,27 @@ static void validateEntryPointCapabilities(
 
             // Find out what is incompatible (ancestor missing a super set of 'target+stage')
             CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
-            diagnoseMissingCapabilityProvenance(
-                linkage->m_optionSet,
-                sink,
-                entryPointFuncDecl,
-                failedSet);
+            if (targetCaps.isIncompatibleWith(
+                    CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}))
+                diagnoseMissingCapabilityProvenance(
+                    linkage->m_optionSet,
+                    sink,
+                    entryPointFuncDecl,
+                    failedSet);
+
+            // Generic arguments belong to this selection, so their provenance cannot be stored
+            // on the shared function declaration. Continue the ordinary provenance walk from
+            // each contributing declaration whose requirements reject this target.
+            for (auto decl : referencedDecls)
+            {
+                if (targetCaps.isIncompatibleWith(
+                        CapabilitySet{decl->inferredCapabilityRequirements}))
+                    diagnoseMissingCapabilityProvenance(
+                        linkage->m_optionSet,
+                        sink,
+                        decl,
+                        failedSet);
+            }
 
             // The provenance walk above follows `capabilityRequirementProvenance`,
             // which does not record generic struct signature types. Point at any
@@ -2205,13 +2224,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         paramDirections.add(checkEntryPointParamPassingMode(param, sink));
     }
 
-    // The entry point's effective requirements, seeded from the decl's inferred set and augmented
-    // at this boundary with two contributions the per-decl capability walk does not record: the
-    // SV_ semantic-accessor requirements (walk just below) and the signature's generic-struct
-    // requirements (`signatureStructUses` loop further below). Both are gathered into this local
-    // set — matching the existing generic-struct handling — because the accessor match is resolved
-    // here using the entry-point stage, and the decl's own `inferredCapabilityRequirements` was
-    // already frozen in the earlier CapabilityChecked phase.
+    // Collect the requirements that depend on the entry point's stage and signature.
+    // The checked reference's generic arguments are joined after these base requirements below.
     CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
 
     // Validate system value semantics, and collect the capabilities their accessors require:
@@ -2758,13 +2772,31 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
 
+    // The checked reference includes concrete generic arguments even when the body and signature
+    // do not use them. Join these after the base requirements, as later specialization does, so
+    // conflicting requirements cannot be discarded by the collectors above.
+    List<Decl*> referencedDecls;
+    auto shared = SharedSemanticsContext::createForOptionalModule(
+        linkage,
+        module,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
+    SemanticsVisitor visitor(shared);
+    entryPointInferredCaps.join(
+        getDeclRefCapabilityRequirements(&visitor, entryPoint->getFuncDeclRef(), referencedDecls));
+
     // The entry point's stage-specific requirements belong to the `EntryPoint`, not the
     // stage-agnostic `FuncDecl`; store the finalized set there as the source of truth for
     // downstream entry-point consumers.
     entryPoint->setInferredCapabilityRequirements(
         entryPointInferredCaps.freeze(linkage->getASTBuilder()));
 
-    validateEntryPointCapabilities(entryPoint, entryPointInferredCaps, signatureStructUses, sink);
+    validateEntryPointCapabilities(
+        entryPoint,
+        entryPointInferredCaps,
+        referencedDecls,
+        signatureStructUses,
+        sink);
 }
 
 bool resolveStageOfProfileWithEntryPoint(
@@ -3824,6 +3856,16 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
     info->specializedFuncDeclRef = specializedFuncDeclRef;
 
+    // This is the first point where -specialize and IComponentType::specialize have a checked
+    // reference containing the concrete arguments. Preserve the base entry point's semantics
+    // requirements, then add the selected reference's requirements just as initial selection does.
+    List<Decl*> referencedDecls;
+    CapabilitySet specializedCaps{getInferredCapabilityRequirements()};
+    specializedCaps.join(
+        getDeclRefCapabilityRequirements(&visitor, specializedFuncDeclRef, referencedDecls));
+    info->inferredCapabilityRequirements = specializedCaps.freeze(getLinkage()->getASTBuilder());
+    validateEntryPointCapabilities(this, specializedCaps, referencedDecls, {}, sink);
+
     // Once the generic parameters (if any) have been dealt with,
     // any remaining specialization arguments are for existential/interface
     // specialization parameters, attached to the value parameters
@@ -4276,6 +4318,11 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 
     SLANG_ASSERT(foundEntryPointCount >= specifiedEntryPointCount);
 
+    // Checking an unspecialized generic is valid when no code will be emitted. Only the
+    // code-generation path needs concrete entry points that IR linking can turn into functions.
+    const bool requireSpecializedEntryPoints =
+        !endToEndReq->getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen);
+
     // For any entry points that were specified, we can use the specialization
     // argument information provided via API or command line.
     //
@@ -4285,7 +4332,7 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
         auto unspecializedEntryPoint =
             unspecializedGlobalAndEntryPointsComponentType->getEntryPoint(ii);
 
-        // A generic entry point must have concrete generic arguments. They can
+        // For code generation, a generic entry point must have concrete generic arguments. They can
         // arrive either bound into the entry-point name (`-entry foo<int>`,
         // reflected in the func declRef) or as separate specialization-arg
         // strings (`-specialize`/`addEntryPointEx`, applied below by
@@ -4297,7 +4344,8 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
         // declRef's generic args against the defaults, so it correctly accepts
         // name-bound args (and nested-generic entry points) while still flagging
         // a genuinely unbound generic.
-        if (!endToEndReq->getLinkage()->isSpecialized(unspecializedEntryPoint->getFuncDeclRef()) &&
+        if (requireSpecializedEntryPoints &&
+            !endToEndReq->getLinkage()->isSpecialized(unspecializedEntryPoint->getFuncDeclRef()) &&
             entryPointInfo.specializationArgStrings.getCount() == 0)
         {
             diagnoseGenericEntryPoint(unspecializedEntryPoint, endToEndReq->getSink());
@@ -4329,10 +4377,11 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 
         // These entry points (e.g. discovered via `[shader(...)]`) carry no
         // specialization arguments, so an unspecialized generic one can never be
-        // specialized and must be rejected (#10209). `isSpecialized` is false
+        // specialized and must be rejected for code generation (#10209). `isSpecialized` is false
         // only when the generic args are still the defaults (a discovered
         // `[shader]` entry point can't bind args via its name either).
-        if (!endToEndReq->getLinkage()->isSpecialized(unspecializedEntryPoint->getFuncDeclRef()))
+        if (requireSpecializedEntryPoints &&
+            !endToEndReq->getLinkage()->isSpecialized(unspecializedEntryPoint->getFuncDeclRef()))
         {
             diagnoseGenericEntryPoint(unspecializedEntryPoint, endToEndReq->getSink());
             continue;
