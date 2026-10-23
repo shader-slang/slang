@@ -154,6 +154,17 @@ struct IntroduceExplicitGlobalContextPass
                 addressSpaceOfLocals = AddressSpace::Function;
                 hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
+            case CodeGenTarget::WGSL:
+                // WGSL keeps resource bindings and `var<workgroup>` at module scope, and keeps
+                // every other thread-local global as a `var<private>` except the shadows of
+                // workgroup-uniform built-in inputs. A single such value reaches the functions
+                // that read it as an ordinary parameter; several are combined in one context.
+                hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
+                hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
+                addressSpaceOfLocals = AddressSpace::Function;
+                hoistOnlyWorkgroupUniformInputShadows = true;
+                passSoleValueByValue = true;
+                break;
             case CodeGenTarget::CUDASource:
             case CodeGenTarget::CUDAHeader:
                 hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
