@@ -27,6 +27,7 @@ from datetime import timezone
 # Import shared helpers from parent ci/ directory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from gh_api import gh_api_list
+from ci_job_outcomes import yielded_marker_failed
 
 DEFAULT_REPO = "shader-slang/slang"
 DEFAULT_DAYS = 7
@@ -410,6 +411,8 @@ def extract_job_data(job, run):
     return {
         "id": job["id"],
         "run_id": run["id"],
+        "run_attempt": run.get("run_attempt", 1),
+        "priority_yielded": yielded_marker_failed(job),
         "name": job.get("name", ""),
         "workflow_name": run.get("name", ""),
         "workflow_path": run.get("path", ""),
@@ -441,7 +444,7 @@ def collect_jobs(
     rate limit hits or interruptions.
     """
     all_jobs = list(existing) if existing else []
-    existing_ids = {j["id"] for j in all_jobs}
+    existing_indices = {job["id"]: i for i, job in enumerate(all_jobs)}
     total = len(runs)
     initial_count = len(all_jobs)
 
@@ -471,12 +474,15 @@ def collect_jobs(
                 done += 1
                 continue
             for job in jobs:
-                if (
-                    job.get("status") == "completed"
-                    and job["id"] not in existing_ids
-                ):
-                    all_jobs.append(extract_job_data(job, run))
-                    existing_ids.add(job["id"])
+                if job.get("status") == "completed":
+                    record = extract_job_data(job, run)
+                    if job["id"] in existing_indices:
+                        # Refresh overlap records so new marker/attempt fields
+                        # reach previously archived jobs without duplicating them.
+                        all_jobs[existing_indices[job["id"]]] = record
+                    else:
+                        existing_indices[job["id"]] = len(all_jobs)
+                        all_jobs.append(record)
 
             done += 1
             if done % 50 == 0 or done == total:
@@ -499,16 +505,18 @@ def collect_jobs(
 
 
 def merge_data(existing, new_data, verbose=False):
-    """Merge new job data with existing, deduplicating by job ID."""
+    """Merge job data by ID, refreshing existing records from new API data."""
     if not existing:
         return new_data
 
-    existing_ids = {job["id"] for job in existing}
+    existing_indices = {job["id"]: i for i, job in enumerate(existing)}
     added = 0
     for job in new_data:
-        if job["id"] not in existing_ids:
+        if job["id"] in existing_indices:
+            existing[existing_indices[job["id"]]] = job
+        else:
+            existing_indices[job["id"]] = len(existing)
             existing.append(job)
-            existing_ids.add(job["id"])
             added += 1
 
     if verbose:
