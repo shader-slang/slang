@@ -221,9 +221,11 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_OK;
     }
 
-    // Specialization is part of semantic checking, including when code generation is disabled.
-    // For example, `-entry main -specialize MetalOnly -target hlsl -no-codegen` must check the
-    // concrete argument's requirements just like selecting `main<MetalOnly>` directly.
+    // Parse, bind, and check the supplied generic arguments before the -no-codegen return below.
+    // For example, if MetalOnly has [require(metal)], then
+    // `-entry main -specialize MetalOnly -target hlsl -no-codegen` must reject that argument.
+    // These calls record the checked arguments in component types. The post-link IR specialization
+    // pass runs later during code generation.
     if (m_passThrough == PassThroughMode::None)
     {
         m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
