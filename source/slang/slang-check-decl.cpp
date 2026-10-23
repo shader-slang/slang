@@ -1601,6 +1601,11 @@ bool isGlobalDecl(Decl* decl)
     return as<NamespaceDeclBase>(parentDecl) != nullptr || as<FileDecl>(parentDecl) != nullptr;
 }
 
+bool isMagicOrIntrinsicTypeDecl(Decl* decl)
+{
+    return decl->hasModifier<MagicTypeModifier>() || decl->hasModifier<IntrinsicTypeModifier>();
+}
+
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
 {
     return funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>();
@@ -22163,6 +22168,51 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
+    // Within a `Val`, the base walk contributes a decl only through `visitDirectDeclRef`. A
+    // specialized generic such as `Foo<3>` (`GenericAppDeclRef`) and a member of one such as
+    // `Outer<3>.In` (`MemberDeclRef`) hold their decl as a plain operand, which `visitVal` skips,
+    // so without these overrides a `[require]` on a generic type would be enforced or dropped
+    // depending on spelling. We override them here rather than in the base walk so that the walk
+    // shared with `CollectReferencedDeclsVisitor` (the generic-parameter reference checks) is
+    // unchanged. A `LookupDeclRef` (`T.A`) names an interface requirement through a witness, whose
+    // capabilities are checked at the conformance, so it is left alone.
+    void visitGenericAppDeclRef(GenericAppDeclRef* declRef) { referenceAggTypeOfDeclRef(declRef); }
+    void visitMemberDeclRef(MemberDeclRef* declRef) { referenceAggTypeOfDeclRef(declRef); }
+
+    // Contribute the requirements of the type declaration that `declRef` names, once per
+    // `declRef`, then continue the usual operand walk. Every `AggTypeDecl` (struct, enum,
+    // interface, ...) contributes except a magic/intrinsic one such as `CoopVec<T, N>`, because
+    // the core-module functions that use those do not redeclare their requirements; a `[require]`
+    // generic type declared in plain Slang, including in a standard module, contributes.
+    //
+    // A member function is not a type declaration and contributes nothing here, because the
+    // core-module functions that call such members do not redeclare their requirements either.
+    // For `G<3>.make()`, `G` is still reached through the parent `GenericAppDeclRef`, but a
+    // `[require]` on `make` itself is not: a static member access never reaches
+    // `processDeclModifiers`, while the non-generic `S.make()` is a `DirectDeclRef` to `make`.
+    void referenceAggTypeOfDeclRef(DeclRefBase* declRef)
+    {
+        // `visitedVals` is tested before `Base::visitVal` records `declRef`, so a repeated visit
+        // contributes nothing.
+        auto aggTypeDecl = as<AggTypeDecl>(declRef->getDecl());
+        if (aggTypeDecl && !isMagicOrIntrinsicTypeDecl(aggTypeDecl) &&
+            !Base::visitedVals.contains(declRef))
+        {
+            // This walk runs only within some declaration's `CapabilityChecked` step, after the
+            // module checker has taken every module-level declaration through the earlier states,
+            // and a type's own `CapabilityChecked` step (`visitContainerDecl`) never runs this
+            // walk, so no check of the type is in progress here. `_propagateRequirement` keeps its
+            // cycle skip for recursive references such as a function that calls itself.
+            SLANG_ASSERT(!aggTypeDecl->checkState.isBeingChecked());
+            // `processReferencedDecl` reads the requirement before `_propagateRequirement` checks
+            // the decl, so a type declared after this use must be checked first. The
+            // `visitDirectDeclRef` path has the same ordering, so a non-generic type reached only
+            // through it before its declaration, as in `typeOnly<Late>()`, is still dropped.
+            this->ensureDecl(aggTypeDecl, DeclCheckState::CapabilityChecked);
+            processReferencedDecl(aggTypeDecl);
+        }
+        Base::visitVal(declRef);
+    }
     // Join a user-defined derivative's capability requirements into the differentiating
     // function, gated on the derivative carrying an explicit `[require]`. The gate is
     // essential rather than cosmetic: the core module differentiates its own builtins
@@ -23359,11 +23409,7 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
     }
 }
 
-void diagnoseMissingCapabilityProvenance(
-    CompilerOptionSet& optionSet,
-    DiagnosticSink* sink,
-    Decl* decl,
-    CapabilitySet const& setToFind)
+ProvenenceNodeWithLoc findMissingCapabilityProvenance(Decl* decl, CapabilitySet const& setToFind)
 {
     HashSet<NodeBase*> checkedDecls;
     ProvenenceNodeWithLoc provNode;
@@ -23400,6 +23446,14 @@ void diagnoseMissingCapabilityProvenance(
         }
     }
 
+    return provNode;
+}
+
+void diagnoseMissingCapabilityProvenance(
+    CompilerOptionSet& optionSet,
+    DiagnosticSink* sink,
+    ProvenenceNodeWithLoc const& provNode)
+{
     if (!provNode.referencedNode)
         return;
 
