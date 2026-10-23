@@ -21779,7 +21779,6 @@ float4 GetSpherePositionAndRadius()
         return spirv_asm
         {
             OpExtension "SPV_NV_linear_swept_spheres";
-            OpCapability RayTracingLinearSweptSpheresGeometryNV;
             OpCapability RayTracingSpheresGeometryNV;
             %__pos:$$float3 = OpLoad builtin(HitSpherePositionNV:float3);
             %__rad:$$float = OpLoad builtin(HitSphereRadiusNV:float);
@@ -21806,7 +21805,6 @@ float2x4 GetLssPositionsAndRadii()
         {
             OpExtension "SPV_NV_linear_swept_spheres";
             OpCapability RayTracingLinearSweptSpheresGeometryNV;
-            OpCapability RayTracingSpheresGeometryNV;
             %__positions:$$float3[2] = OpLoad builtin(HitLSSPositionsNV:float3[2]);
             %__radii:$$float[2] = OpLoad builtin(HitLSSRadiiNV:float[2]);
             %__r0:$$float = OpCompositeExtract %__radii 0;
@@ -21838,7 +21836,6 @@ bool IsSphereHit()
         return spirv_asm
         {
             OpExtension "SPV_NV_linear_swept_spheres";
-            OpCapability RayTracingLinearSweptSpheresGeometryNV;
             OpCapability RayTracingSpheresGeometryNV;
             result:$$bool = OpLoad builtin(HitIsSphereNV:bool);
         };
@@ -21863,7 +21860,6 @@ bool IsLssHit()
         {
             OpExtension "SPV_NV_linear_swept_spheres";
             OpCapability RayTracingLinearSweptSpheresGeometryNV;
-            OpCapability RayTracingSpheresGeometryNV;
             result:$$bool = OpLoad builtin(HitIsLSSNV:bool);
         };
     }
@@ -25659,7 +25655,6 @@ struct HitObject
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
                 OpCapability ShaderInvocationReorderNV;
-                OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
                 %__position:$$float3 = OpHitObjectGetSpherePositionNV &this;
                 %__radius:$$float = OpHitObjectGetSphereRadiusNV &this;
@@ -25688,7 +25683,6 @@ struct HitObject
                 OpExtension "SPV_NV_linear_swept_spheres";
                 OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
-                OpCapability RayTracingSpheresGeometryNV;
                 %__positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
                 %__radii:$$float[2] = OpHitObjectGetLSSRadiiNV &this;
                 %__r0:$$float = OpCompositeExtract %__radii 0;
@@ -25721,7 +25715,7 @@ struct HitObject
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
                 OpCapability ShaderInvocationReorderNV;
-                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                OpCapability RayTracingSpheresGeometryNV;
                 result:$$bool = OpHitObjectIsSphereHitNV &this;
             };
         }
