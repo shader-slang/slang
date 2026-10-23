@@ -25,8 +25,26 @@ DEFAULT_BOT_LOGINS = {
     "nv-slang-bot[bot]",
 }
 
-# Run statuses that mean a run still holds, or is waiting for, runner capacity.
+# Candidate statuses. Waiting runs need a job-level capacity check below.
 ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
+
+
+def waiting_run_uses_runner_capacity(repo, run):
+    """Check jobs before treating an approval-waiting run as a blocker.
+
+    For example, a run can have all its build/test jobs completed while its
+    Falcor gate still awaits approval. It consumes no runner capacity and
+    must not prevent bot CI or retries. A waiting run with a queued/running
+    sibling still blocks. Empty or unknown job state is kept conservatively.
+    """
+    jobs, err = gh_api_list(
+        f"/repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100", "jobs"
+    )
+    if err:
+        raise RuntimeError(f"Failed to list jobs for waiting run {run['id']}: {err}")
+    return not jobs or any(
+        job.get("status") not in {"completed", "waiting"} for job in jobs
+    )
 
 
 def normalize_bot_logins(extra_logins=None):
@@ -55,25 +73,43 @@ def run_actor_login(run):
     return ""
 
 
-def fetch_active_runs(repo, workflow):
-    """Return active CI runs for the workflow across all active statuses.
+def fetch_active_runs(repo, workflow, include_run=None):
+    """Find sufficient evidence that relevant CI still needs runner capacity.
 
-    Queries every status in ACTIVE_STATUSES and paginates each query, so a
-    higher-priority run is never missed because it sits in a less-common state
-    or on a later page.
+    The gate and retry scheduler need a busy/quiet decision, not an exhaustive
+    inventory. Query runner-active statuses first and stop on a relevant run.
+    Only when those are quiet, inspect waiting runs one at a time, stopping at
+    the first runnable sibling. For example, an active human build makes it
+    unnecessary to inspect a backlog of 100 Falcor approval requests.
+
+    The gate supplies include_run to exclude itself and newer bot runs before
+    any job requests. The retry scheduler considers every run. A quiet result
+    still requires checking all relevant waiting runs; missing/API-error state
+    must never be interpreted as permission to proceed.
     """
-    runs = {}
-    for status in sorted(ACTIVE_STATUSES):
+    def relevant(run):
+        return include_run is None or include_run(run)
+
+    endpoint = f"/repos/{repo}/actions/workflows/{workflow}/runs"
+    for status in sorted(ACTIVE_STATUSES - {"waiting"}):
         items, err = gh_api_list(
-            f"/repos/{repo}/actions/workflows/{workflow}/runs"
-            f"?status={status}&per_page=100",
-            "workflow_runs",
+            f"{endpoint}?status={status}&per_page=100", "workflow_runs"
         )
         if err:
             raise RuntimeError(f"Failed to list {status} runs: {err}")
-        for run in items or []:
-            runs[run["id"]] = run
-    return list(runs.values())
+        active = [run for run in items or [] if relevant(run)]
+        if active:
+            return active
+
+    waiting, err = gh_api_list(
+        f"{endpoint}?status=waiting&per_page=100", "workflow_runs"
+    )
+    if err:
+        raise RuntimeError(f"Failed to list waiting runs: {err}")
+    for run in waiting or []:
+        if relevant(run) and waiting_run_uses_runner_capacity(repo, run):
+            return [run]
+    return []
 
 
 def parse_github_time(value):
