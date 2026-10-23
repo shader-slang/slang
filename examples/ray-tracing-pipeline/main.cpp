@@ -520,7 +520,7 @@ struct RayTracing : public WindowedAppBase
         ComPtr<IShaderProgram> shaderProgram;
         SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, false, shaderProgram.writeRef()));
         ColorTargetDesc colorTarget;
-        colorTarget.format = Format::RGBA16Float;
+        colorTarget.format = getColorFormat();
         RenderPipelineDesc desc;
         desc.inputLayout = inputLayout;
         desc.program = shaderProgram;
