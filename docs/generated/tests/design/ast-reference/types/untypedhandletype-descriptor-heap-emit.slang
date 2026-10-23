@@ -50,5 +50,5 @@ void computeMain()
 // GLSL and WGSL both emit an unsized heap array subscripted by the index.
 //GLSL-DAG: uniform texture2D {{.*}}_slang_resource_heap{{[A-Za-z0-9_]*}}[];
 //GLSL-DAG: uniform sampler {{.*}}_slang_resource_heap{{[A-Za-z0-9_]*}}[];
-//WGSL-DAG: _slang_resource_heap{{[A-Za-z0-9_]*}} : array<texture_2d<f32>>;
-//WGSL-DAG: _slang_resource_heap{{[A-Za-z0-9_]*}} : array<sampler>;
+//WGSL-DAG: _slang_resource_heap{{[A-Za-z0-9_]*}} : binding_array<texture_2d<f32>>;
+//WGSL-DAG: _slang_resource_heap{{[A-Za-z0-9_]*}} : binding_array<sampler>;

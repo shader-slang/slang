@@ -19,7 +19,7 @@
 // own bindless form, so the fan-out pins what each one does with the
 // stored index. GLSL and SPIR-V declare an unbounded descriptor array
 // and subscript it with the handle's index before sampling; WGSL does
-// the same with an `array<texture_2d<f32>>` heap; Metal has no
+// the same with a `binding_array<texture_2d<f32>>` heap; Metal has no
 // descriptor-heap indirection, so the handle is realised directly as
 // the resource member of an argument buffer and the sample is issued
 // off that member.
@@ -55,8 +55,8 @@ RWStructuredBuffer<float4> outBuf;
 //SPIRV-DAG: OpAccessChain %_ptr_UniformConstant_{{[0-9]+}} %__slang_resource_heap %{{[0-9]+}}
 //SPIRV-DAG: OpAccessChain %_ptr_UniformConstant_{{[0-9]+}} %__slang_resource_heap_0 %{{[0-9]+}}
 
-//WGSL-DAG: var _slang_resource_heap_{{[0-9]+}} : array<texture_2d<f32>>
-//WGSL-DAG: var _slang_resource_heap_{{[0-9]+}} : array<sampler>
+//WGSL-DAG: var _slang_resource_heap_{{[0-9]+}} : binding_array<texture_2d<f32>>
+//WGSL-DAG: var _slang_resource_heap_{{[0-9]+}} : binding_array<sampler>
 //WGSL: textureSampleLevel((_slang_resource_heap_{{[0-9]+}}[cb_0.tex_0.x]), (_slang_resource_heap_{{[0-9]+}}[cb_0.samp_0.x])
 [numthreads(1, 1, 1)]
 void computeMain()
