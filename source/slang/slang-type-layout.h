@@ -1160,6 +1160,9 @@ public:
     // The corresponding function declaration
     DeclRef<FuncDecl> entryPoint;
 
+    // Requirements for this entry-point selection, including its specialization arguments.
+    CapabilitySetVal* inferredCapabilityRequirements = nullptr;
+
     ComponentType* program = nullptr;
 
     DeclRef<FuncDecl> getFuncDeclRef() { return entryPoint; }
