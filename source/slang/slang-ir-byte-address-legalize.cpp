@@ -212,6 +212,14 @@ struct ByteAddressBufferLegalizationContext
                 {
                     return false; // Force legalization for 64-bit integer types
                 }
+
+                // The target's byte-address access works on 32-bit words, so 8- and 16-bit
+                // values must be legalized too: a load extracts them from the containing word,
+                // and a store is lowered as `emitSimpleStore` decides.
+                if (unsignedBaseType == BaseType::UInt8 || unsignedBaseType == BaseType::UInt16)
+                {
+                    return false;
+                }
             }
 
             // Otherwise, scalar types are assumed
@@ -1998,6 +2006,21 @@ struct ByteAddressBufferLegalizationContext
                 IRInst* alignment = m_builder.getIntValue(m_builder.getUIntType(), 0);
                 m_builder.emitByteAddressBufferStore(buffer, loOffset, alignment, loVal);
                 m_builder.emitByteAddressBufferStore(buffer, hiOffset, alignment, hiVal);
+                return SLANG_OK;
+            }
+            else if (sizeAlignment.size < 4 && m_options.storeSubWordValuesDirectly)
+            {
+                // Store only the value's own bytes. A read-modify-write of the containing word
+                // (below) would race with other invocations that store the other bytes of the
+                // same word.
+                auto unsignedType = getSameSizeUIntType(value->getDataType());
+                SLANG_ASSERT(unsignedType);
+                if (!unsignedType)
+                    return SLANG_FAIL;
+                auto bits = value->getDataType() == unsignedType
+                                ? value
+                                : m_builder.emitBitCast(unsignedType, value);
+                m_builder.emitByteAddressBufferStore(buffer, offset, bits);
                 return SLANG_OK;
             }
             else if (sizeAlignment.size < 4)
