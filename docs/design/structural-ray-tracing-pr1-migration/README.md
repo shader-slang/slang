@@ -430,8 +430,7 @@ The adapter implementation must preserve an ordinary callable body when generati
 entry wrapper. The source `invoke` remains callable with its checked input parameter, while the
 wrapper supplies native shader parameters and constructs that input. Ordinary entry-point
 callsite handling provides the existing separation between an entry wrapper and a helper body.
-PR1 stops code generation while a selected entry still has a structural input parameter; the
-positive tests here check frontend acceptance only.
+Native adapters remain deferred; the positive tests here check frontend acceptance only.
 
 Fresh construction (`MissInput<C>()` or `{}`), uninitialized locals, global variables, `uniform`
 parameters, fields, writable/reference parameters, returned views, and arbitrary input generic
