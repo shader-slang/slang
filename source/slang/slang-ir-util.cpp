@@ -1712,6 +1712,12 @@ bool canInstHaveSideEffectAtAddress(
             }
         }
         break;
+    case kIROp_RequireTargetExtension:
+        // A target-extension requirement is consumed only when code is emitted and neither reads
+        // nor writes memory, so loads and stores can be forwarded across it. It still reports a
+        // side effect through `mightHaveSideEffects`, which is what keeps the otherwise unused
+        // requirement alive through DCE.
+        break;
     default:
         // Default behavior is that any insts that have side effect may affect `addr`.
         if (inst->mightHaveSideEffects())
