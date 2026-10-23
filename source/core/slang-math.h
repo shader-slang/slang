@@ -209,6 +209,33 @@ SLANG_FORCE_INLINE double Int64AsDouble(int64_t value)
     return Math::DoubleInt64Union::makeFromInt64(value).dvalue;
 }
 
+// Widen the Float32 value with bit pattern `bits` to a double. A hardware float-to-double
+// conversion quiets a signaling NaN, so a NaN is widened by moving its sign and fraction bits
+// instead. `DoubleToFloatBits` is the inverse, so every Float32 NaN round-trips exactly.
+SLANG_FORCE_INLINE double FloatBitsToDouble(uint32_t bits)
+{
+    if ((bits & 0x7F800000u) == 0x7F800000u && (bits & 0x007FFFFFu) != 0)
+    {
+        const uint64_t sign = uint64_t(bits >> 31) << 63;
+        const uint64_t fraction = uint64_t(bits & 0x007FFFFFu) << 29;
+        return Int64AsDouble(int64_t(sign | (uint64_t(0x7FF) << 52) | fraction));
+    }
+    return double(IntAsFloat(int(bits)));
+}
+
+// Narrow `value` to Float32 and return its bit pattern. If `value` is a NaN whose top 23 fraction
+// bits are not all zero, return its sign and those bits unchanged, signaling or not, where a
+// hardware double-to-float conversion would quiet it. Any other NaN would truncate to an
+// infinity, so it goes through the hardware conversion.
+SLANG_FORCE_INLINE uint32_t DoubleToFloatBits(double value)
+{
+    const uint64_t bits = uint64_t(DoubleAsInt64(value));
+    const uint32_t fraction = uint32_t((bits >> 29) & 0x007FFFFFu);
+    if (((bits >> 52) & 0x7FF) == 0x7FF && fraction != 0)
+        return (uint32_t(bits >> 63) << 31) | 0x7F800000u | fraction;
+    return uint32_t(FloatAsInt(float(value)));
+}
+
 // Rounds a Float32 value to the nearest Half, choosing the even encoding on ties. Constant
 // folding must agree with runtime narrowing: for example, 1.00048828125 is halfway between
 // Half 1.0 and its successor, so it rounds to 1.0. Retain every discarded bit until rounding,

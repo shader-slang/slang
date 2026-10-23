@@ -2570,7 +2570,11 @@ IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
     switch (type->getOp())
     {
     case kIROp_FloatType:
-        keyInst.value.floatVal = static_cast<float>(inValue);
+        // A `float` literal holds the double that `FloatBitsToDouble` gives for its bits, so
+        // a signaling NaN keeps its bits. Read it back with `DoubleToFloatBits`, not `(float)`,
+        // which would quiet it. A value conversion that should quiet a NaN, as one at run time
+        // does, quiets the value before calling this (see `SCCPContext::evalCast`).
+        keyInst.value.floatVal = FloatBitsToDouble(DoubleToFloatBits(inValue));
         break;
     case kIROp_HalfType:
         keyInst.value.floatVal = HalfToFloat(FloatToHalf((float)inValue));
