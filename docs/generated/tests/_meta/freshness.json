@@ -1,11 +1,25 @@
 {
   "bundles": {
+    "conformance/basics-execution-divergence-reconvergence": {
+      "generated_at": "2026-09-29T08:02:01+00:00",
+      "model": "gpt-6",
+      "source_commit": "3bb522221d5db85fbdf8dcf441c05ffc3b801358",
+      "source_doc_digest": "5390dfefbb80dbe1826fa029f9aa83391e6d5018a0017c1187364e7d3ae0f1df",
+      "watched_paths_digest": "f85ba3748551a080ccaa6925f67b24f7c66cc9a697da96cd9e36f0c365c0369b"
+    },
     "conformance/generics": {
       "generated_at": "2026-09-12T14:58:32+00:00",
       "model": "claude-opus-5[1m]",
       "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
       "source_doc_digest": "161ac2b8c4ff8931f9b82ee45ac6cc5874f5a355a04ed060e8249023e6226a57",
       "watched_paths_digest": "ca9187e8ddccaa6bb8226d601b512b917a01796e8417c385f4f4ac128f59413f"
+    },
+    "conformance/statements": {
+      "generated_at": "2026-09-29T08:02:01+00:00",
+      "model": "gpt-6",
+      "source_commit": "3bb522221d5db85fbdf8dcf441c05ffc3b801358",
+      "source_doc_digest": "747a734d035e84e8688e7558ecfdb25b84ba0fcb615360c90825ab466b3e5a4b",
+      "watched_paths_digest": "d6ff7742115bd83aa5f94ce96398ed62e5992d3431e5355782acfb90c67e8eb1"
     },
     "coverage/autodiff": {
       "generated_at": "2026-06-11T12:00:00+00:00",
@@ -329,11 +343,11 @@
       "watched_paths_digest": "5f653785ed78510785a1eb4ae35a6cbc43f97d20bbd6f3f87d35a63e9ba0524f"
     },
     "design/pipeline/overview": {
-      "generated_at": "2026-09-11T14:31:19+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "generated_at": "2026-09-29T08:02:01+00:00",
+      "model": "gpt-6",
+      "source_commit": "3bb522221d5db85fbdf8dcf441c05ffc3b801358",
       "source_doc_digest": "68de969f14d030acd4661b1ca75c7150c209c30bdf772f70e5d673521ab9038f",
-      "watched_paths_digest": "ac034c53f21fbf6e845c2af2288c9b81206ea6c62787403c188af7fff47b2c7d"
+      "watched_paths_digest": "dd09620b5d063076c1114b0c1aa11fd1e30d216a2ba4522874620c4a948833dd"
     },
     "design/syntax-reference/grammar": {
       "generated_at": "2026-09-11T14:31:19+00:00",
@@ -364,11 +378,11 @@
       "watched_paths_digest": "cc1bfb5c7f168a5d644931cad25ab14568abe04820e170e0fd240e3e3f62b61c"
     },
     "design/target-pipelines/hlsl": {
-      "generated_at": "2026-09-11T14:31:20+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "generated_at": "2026-09-29T08:02:02+00:00",
+      "model": "gpt-6",
+      "source_commit": "3bb522221d5db85fbdf8dcf441c05ffc3b801358",
       "source_doc_digest": "3b058c4e4d88489b721fccbef419f1b97b9a04cb8e11276e516d343a3cdc2cb9",
-      "watched_paths_digest": "fbb6ebc7eff6c34a4d8595d19234ef72a62be6fabe6de7b2a7f7dc3efb381872"
+      "watched_paths_digest": "0996576913f2378ab3a271fb095dc13553fdc9be9264a277d2ee4bcf7654950f"
     },
     "design/target-pipelines/metal": {
       "generated_at": "2026-09-11T14:31:20+00:00",

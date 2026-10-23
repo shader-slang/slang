@@ -169,6 +169,19 @@ set(SLANG_RECORD_REPLAY_SYSTEM
     "${slang_SOURCE_DIR}/source/slang-record-replay/proxy"
 )
 
+# When SLANG_ENABLE_RECORD_REPLAY is OFF we exclude the record-replay sources from both the slang
+# library and the slang-common-objects object target. slang_add_target reports an error for a
+# keyword given no values, so we omit the whole EXTRA_SOURCE_DIRS fragment rather than pass it an
+# empty list.
+if(SLANG_ENABLE_RECORD_REPLAY)
+    set(slang_record_replay_source_args
+        EXTRA_SOURCE_DIRS
+        ${SLANG_RECORD_REPLAY_SYSTEM}
+    )
+else()
+    set(slang_record_replay_source_args)
+endif()
+
 add_custom_command(
     OUTPUT ${SLANG_LOOKUP_GENERATED_SOURCE}
     COMMAND
@@ -249,7 +262,6 @@ set(slang_build_args
     # a warning is disabled for a memset boundary check.
     # everything looked fine and it is unclear why the checking fails
     $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow>
-    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<BOOL:${SLANG_ENABLE_ASAN}>>:/bigobj>
     INCLUDE_DIRECTORIES_PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     ${CMAKE_CURRENT_BINARY_DIR}/../standard-modules/slang-standard-module-config-header
@@ -258,8 +270,9 @@ set(slang_build_args
     SLANG
     EXPORT_TYPE_AS
     ${SLANG_LIB_TYPE}
-    EXTRA_SOURCE_DIRS
-    ${SLANG_RECORD_REPLAY_SYSTEM}
+    ${slang_record_replay_source_args}
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+    SLANG_ENABLE_RECORD_REPLAY=$<BOOL:${SLANG_ENABLE_RECORD_REPLAY}>
     REQUIRES
     copy_slang_headers
     generate_standard_module_config_header
@@ -429,8 +442,7 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED" AND SLANG_ENABLE_SLANG_PROXY)
     # Create a minimal C++ source file (some linkers require at least one source)
     set(SLANG_PROXY_STUB_CPP "${CMAKE_CURRENT_BINARY_DIR}/slang-proxy-stub.cpp")
     file(
-        WRITE
-        "${SLANG_PROXY_STUB_CPP}"
+        WRITE "${SLANG_PROXY_STUB_CPP}"
         "// Minimal stub file for slang.dll proxy\n"
         "// All exports are forwarded to slang-compiler.dll via the .def file\n"
     )
@@ -444,8 +456,7 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED" AND SLANG_ENABLE_SLANG_PROXY)
         "${CMAKE_CURRENT_BINARY_DIR}/generate-def-wrapper-$<CONFIG>.cmake"
     )
     file(
-        GENERATE OUTPUT
-        "${DEF_GEN_WRAPPER}"
+        GENERATE OUTPUT "${DEF_GEN_WRAPPER}"
         CONTENT
             "
 set(DLL_PATH \"$<TARGET_FILE:slang>\")

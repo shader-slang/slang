@@ -16,8 +16,21 @@ TargetProgram::TargetProgram(ComponentType* componentType, TargetRequest* target
     : m_program(componentType), m_targetReq(targetReq)
 {
     m_entryPointResults.setCount(componentType->getEntryPointCount());
+    composeDownstreamArgs();
     m_optionSet.overrideWith(m_program->getOptionSet());
     m_optionSet.inheritFrom(targetReq->getOptionSet());
+}
+
+void TargetProgram::composeDownstreamArgs()
+{
+    CompilerOptionSet* lowerLevels[] = {
+        &m_targetReq->getLinkage()->m_optionSet,
+        &m_targetReq->getOptionSet()};
+    for (auto level : lowerLevels)
+    {
+        if (auto args = level->options.tryGetValue(CompilerOptionName::DownstreamArgs))
+            m_optionSet.appendLevelLocal(CompilerOptionName::DownstreamArgs, *args);
+    }
 }
 
 IArtifact* TargetProgram::_createWholeProgramResult(
@@ -132,7 +145,7 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
             return artifact;
     }
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         // If we haven't yet computed a layout for this target
         // program, we need to make sure that is done before
@@ -145,6 +158,7 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
 
         return _createEntryPointResult(entryPointIndex, sink);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const Exception& e)
     {
         sink->diagnose(Diagnostics::CompilationAbortedDueToException{
@@ -152,6 +166,7 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
             .exceptionMessage = e.Message});
         return nullptr;
     }
+#endif
 }
 
 } // namespace Slang
