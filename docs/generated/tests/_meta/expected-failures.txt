@@ -173,3 +173,13 @@ docs/generated/tests/design/ir-reference/differentiation/builtin-requirement-dec
 # the diagnostic sorts the list, which would make the text order-stable by
 # construction rather than a reflection of the merge order.
 docs/generated/tests/design/pipeline/05-ir-passes/typeflow-report-dynamic-dispatch-sites.slang
+
+# https://github.com/shader-slang/slang/pull/13694 makes NonUniformResourceIndex
+# compile on Metal and WGSL (the emitter drops it), so these negative tests no
+# longer see E36107. They expect that error, so they will not start passing on
+# their own and the nightly will not flag these entries. Test content awaiting
+# regeneration: remove these entries once the bundles and the Metal/WGSL
+# pipeline docs (metal.md pass table row 7, wgsl.md `floatNonUniformResourceIndex`)
+# are regenerated.
+docs/generated/tests/design/target-pipelines/metal/nonuniform-resource-index-rejected-metal.slang
+docs/generated/tests/design/target-pipelines/wgsl/non-uniform-resource-index-rejected.slang
