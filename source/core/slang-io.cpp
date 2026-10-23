@@ -1193,7 +1193,9 @@ SlangResult File::writeAllBytes(const String& path, const void* data, size_t siz
     SLANG_RETURN_ON_FAIL(
         stream.init(path, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
     SLANG_RETURN_ON_FAIL(stream.write(data, size));
-    return SLANG_OK;
+    // A small write only fills the stdio buffer, so failures such as ENOSPC or EFBIG surface at
+    // flush time; the destructor's close() cannot report them.
+    return stream.flush();
 }
 
 SlangResult File::writeAllText(const Slang::String& fileName, const Slang::String& text)
@@ -1227,10 +1229,12 @@ SlangResult File::writeAllTextIfChanged(const String& fileName, UnownedStringSli
         return SLANG_FAIL;
     }
 
-    const auto count = fwrite(data, size, 1, file);
-    fclose(file);
+    const bool writeOk = (fwrite(data, size, 1, file) == 1);
+    // Buffered write failures only surface at fflush/fclose, so both results are checked.
+    const bool flushOk = (fflush(file) == 0);
+    const bool closeOk = (fclose(file) == 0);
 
-    return (count == 1) ? SLANG_OK : SLANG_FAIL;
+    return (writeOk && flushOk && closeOk) ? SLANG_OK : SLANG_FAIL;
 }
 
 String URI::getPath() const
