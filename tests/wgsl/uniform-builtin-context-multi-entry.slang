@@ -11,7 +11,7 @@
 // CHECK: fn laneCount{{[_0-9]*}}() -> u32
 // CHECK: return [[V]];
 
-// NOCTX-NOT: {{[Kk]}}ernelContext
+// NOCTX-NOT: struct KernelContext
 
 RWStructuredBuffer<uint> outputBuffer;
 

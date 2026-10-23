@@ -17,8 +17,9 @@
 // - a user-declared global input that the shader writes to can hold a non-uniform value, whether
 //   the entry point writes it, a callee writes one of its components, or it is passed `inout`.
 
-// No context is introduced, whether a struct or a by-value parameter.
-// NOCTX-NOT: {{[Kk]}}ernelContext
+// No context struct is introduced; the helper signatures above show that no by-value context
+// parameter is added either.
+// NOCTX-NOT: struct KernelContext
 
 // WAVEINDEX: var<private> [[V:[A-Za-z0-9_]+]] : u32;
 // WAVEINDEX: fn waveIndexOf{{[_0-9]*}}() -> u32

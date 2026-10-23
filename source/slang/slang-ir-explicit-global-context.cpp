@@ -333,6 +333,9 @@ struct IntroduceExplicitGlobalContextPass
     IRPtrType* m_contextPtrType = nullptr;
     bool m_passContextByValue = false;
 
+    // The name hint given to every context variable and parameter.
+    UnownedStringSlice m_contextNameHint = UnownedTerminatedStringSlice("kernelContext");
+
     struct GlobalParamInfo
     {
         // Original global param inst.
@@ -506,6 +509,8 @@ struct IntroduceExplicitGlobalContextPass
             auto globalVar = m_globalVars[0];
             m_contextType = globalVar->getDataType()->getValueType();
             m_mapInstToContextFieldInfo.add(globalVar, ContextFieldInfo{});
+            if (auto nameHint = findShadowedInputNameHint(globalVar))
+                m_contextNameHint = nameHint->getName();
         }
         else
         {
@@ -1077,6 +1082,26 @@ struct IntroduceExplicitGlobalContextPass
         return contextPtr;
     }
 
+    // Return the name hint of the input that `globalVar` shadows, or null. A sole global passed
+    // by value is named after it, so that `fn f(laneCount : u32)` reads as the value it holds.
+    // `translateGlobalVaryingVar` moves the global's own decorations to the entry-point parameter
+    // that shadows it, so the name is found there.
+    //
+    static IRNameHintDecoration* findShadowedInputNameHint(IRInst* globalVar)
+    {
+        if (auto nameHint = globalVar->findDecoration<IRNameHintDecoration>())
+            return nameHint;
+        for (auto use = globalVar->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (user->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
+                continue;
+            if (auto nameHint = user->getParent()->findDecoration<IRNameHintDecoration>())
+                return nameHint;
+        }
+        return nullptr;
+    }
+
     // Because we have multiple places where instructions representing
     // the kernel context get introduced, we have factored out a subroutine
     // for setting up the name hint to be used by those instructions.
@@ -1084,7 +1109,7 @@ struct IntroduceExplicitGlobalContextPass
     void addKernelContextNameHint(IRInst* inst)
     {
         IRBuilder builder(m_module);
-        builder.addNameHintDecoration(inst, UnownedTerminatedStringSlice("kernelContext"));
+        builder.addNameHintDecoration(inst, m_contextNameHint);
     }
 };
 
