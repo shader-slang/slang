@@ -68,6 +68,32 @@ static bool isWorkgroupUniformEntryPointInput(IRInst* param)
         entryPointDecor->getProfile().getStage());
 }
 
+// Return whether `func`, or any function it calls, uses `globalVar`. A call through anything other
+// than a known function counts as a use, because its callee cannot be inspected.
+static bool doesFuncReachGlobal(IRFunc* func, IRInst* globalVar, HashSet<IRFunc*>& visited)
+{
+    if (!visited.add(func))
+        return false;
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (inst->getOperand(i) == globalVar)
+                    return true;
+            }
+            if (auto call = as<IRCall>(inst))
+            {
+                auto callee = as<IRFunc>(call->getCallee());
+                if (!callee || doesFuncReachGlobal(callee, globalVar, visited))
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
 // Return whether `globalVar` is a shadow copy that `translateGlobalVaryingVar` made of a
 // workgroup-uniform built-in input, and whether its value stays uniform.
 //
@@ -86,7 +112,9 @@ static bool isWorkgroupUniformEntryPointInput(IRInst* param)
 //
 // `translateGlobalVaryingVar` emits exactly one initialization per linked entry point, at the top
 // of its first block, so equal counts with every store in a linked entry block identify those
-// initializations without matching their values.
+// initializations without matching their values. An entry point that reaches a read of the global
+// without being linked to it would read an uninitialized context, so such a module keeps the
+// `var<private>` (see shader-slang/slang#13687).
 static bool isWorkgroupUniformInputShadow(IRInst* globalVar)
 {
     List<IRFunc*> shadowingEntryPoints;
@@ -122,6 +150,17 @@ static bool isWorkgroupUniformInputShadow(IRInst* globalVar)
     {
         auto func = getParentFunc(store);
         if (!shadowingEntryPoints.contains(func) || store->getParent() != func->getFirstBlock())
+            return false;
+    }
+
+    HashSet<IRFunc*> visited;
+    for (auto inst : globalVar->getModule()->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func || !func->findDecoration<IREntryPointDecoration>() ||
+            shadowingEntryPoints.contains(func))
+            continue;
+        if (doesFuncReachGlobal(func, globalVar, visited))
             return false;
     }
     return true;
