@@ -5692,9 +5692,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                             i = addr.val;
                         else
                         {
+                            // E29103 is an error, so the compile request fails right after IR
+                            // generation. We give the asm instruction a poison operand rather than
+                            // a null one so that the IR stays well-formed until then.
                             context->getSink()->diagnose(
                                 Diagnostics::NoSuchAddress{.location = operand.expr->loc});
-                            return nullptr;
+                            i = builder->getPoison(
+                                builder->getPtrType(lowerType(context, operand.expr->type)));
                         }
                     }
                     return builder->emitSPIRVAsmOperandInst(i);
