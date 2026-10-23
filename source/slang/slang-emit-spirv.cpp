@@ -8268,7 +8268,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
         if (!ptrType)
             return;
-        auto textureType = as<IRTextureType>(ptrType->getValueType());
+        auto textureType = as<IRTextureType>(unwrapArray(ptrType->getValueType()));
         if (!textureType)
             return;
 
