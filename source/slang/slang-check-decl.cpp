@@ -825,11 +825,11 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
         // it only for the first one; running it for each would report every conflict again.
         // The inner declaration of a `__generic` (a parse error that the language server still
         // checks) is not in its parent's member list, so the list can be empty.
-        auto& transparentDecls = decl->parentDecl->getTransparentDirectMemberDecls();
-        if (decl->hasModifier<TransparentModifier>() && transparentDecls.getCount() != 0 &&
-            transparentDecls.getFirst() == decl)
+        if (decl->hasModifier<TransparentModifier>())
         {
-            checkForRedeclarationOfBufferBlockMembers(decl->parentDecl);
+            auto& transparentDecls = decl->parentDecl->getTransparentDirectMemberDecls();
+            if (transparentDecls.getCount() != 0 && transparentDecls.getFirst() == decl)
+                checkForRedeclarationOfBufferBlockMembers(decl->parentDecl);
         }
     }
 
