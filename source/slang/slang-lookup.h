@@ -56,6 +56,10 @@ QualType getTypeForDeclRef(
 
 QualType getTypeForDeclRef(ASTBuilder* astBuilder, DeclRef<Decl> declRef, SourceLoc loc);
 
+/// Returns whether `decl` is a function parameter or a non-static local variable. Lookup from a
+/// member of a function-local type does not find these declarations of an enclosing function.
+bool isAutomaticStorageDecl(Decl* decl);
+
 /// Add a found item to a lookup result
 void AddToLookupResult(LookupResult& result, LookupResultItem item);
 void AddToLookupResult(LookupResult& result, const LookupResult& items);
