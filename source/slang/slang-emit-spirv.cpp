@@ -1457,6 +1457,51 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return spvInst;
     }
 
+    // Like `emitInstMemoizedCustomOperandFunc`, for an instruction whose result id comes after
+    // its result type (such as `OpConstantTrue`) instead of first. `f` emits every operand except
+    // the result id, and must start with the result type, as one word; the result id is inserted
+    // after it. The memo key is the opcode plus the words `f` emits, so two instructions that
+    // differ only in their result id are merged: on a hit, the earlier instruction is returned
+    // and `irInst` is mapped to it.
+    template<typename OperandEmitFunc>
+    SpvInst* emitInstMemoizedResultIdAfterTypeCustomOperandFunc(
+        SpvInstParent* parent,
+        IRInst* irInst,
+        SpvOp opcode,
+        const OperandEmitFunc& f)
+    {
+        List<SpvWord> ourOperands;
+        {
+            auto scopePeek = OperandMemoizeScope(this);
+            f();
+            ourOperands = std::move(m_operandStack);
+        }
+        SLANG_ASSERT(ourOperands.getCount() >= 1);
+
+        SpvInstKey key;
+        key.instWords.add(opcode);
+        key.instWords.addRange(ourOperands);
+
+        if (SpvInst** memoized = m_memoizedSpvInsts.tryGetValue(key))
+        {
+            if (irInst)
+                m_mapIRInstToSpvInst.addIfNotExists(irInst, *memoized);
+            return *memoized;
+        }
+
+        InstConstructScope scopeInst(this, opcode, irInst);
+        SpvInst* spvInst = scopeInst;
+        m_memoizedSpvInsts[key] = spvInst;
+
+        m_operandStack.add(ourOperands[0]);
+        emitOperand(kResultID);
+        for (Index i = 1; i < ourOperands.getCount(); i++)
+            m_operandStack.add(ourOperands[i]);
+
+        parent->addInst(spvInst);
+        return spvInst;
+    }
+
     template<typename OperandEmitFunc>
     SpvInst* emitInstMemoizedNoResultIDCustomOperandFunc(
         SpvInstParent* parent,
@@ -11660,12 +11705,50 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    // The constant opcodes whose `spirv_asm` instances may share an id (see `emitSPIRVAsm`).
+    // Specialization constants are left out, and so are `OpConstantSampler` (Kernel only) and
+    // the vendor constant opcodes, which are emitted as written.
+    static bool isMemoizableAsmConstantOpcode(SpvOp opcode)
+    {
+        switch (opcode)
+        {
+        case SpvOpConstantTrue:
+        case SpvOpConstantFalse:
+        case SpvOpConstant:
+        case SpvOpConstantComposite:
+        case SpvOpConstantNull:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     SpvInst* emitSPIRVAsm(SpvInstParent* parent, IRSPIRVAsm* inst)
     {
         SpvInst* last = nullptr;
 
         // This keeps track of the named IDs used in the asm block
         Dictionary<UnownedStringSlice, SpvWord> idMap;
+
+        // Every named ID that appears in an annotation instruction of this block, such as `%c`
+        // in `OpDecorate %c RelaxedPrecision`. This is conservative: it also holds IDs that are
+        // decoration arguments (`OpDecorateId`) or group members (`OpGroupDecorate`), not only
+        // decoration targets. A constant with one of these names is not memoized (see below).
+        HashSet<UnownedStringSlice> annotationReferencedIds;
+        for (const auto spvInst : inst->getInsts())
+        {
+            if (spvInst->getOpcodeOperand()->getOp() == kIROp_SPIRVAsmOperandTruncate)
+                continue;
+            const auto info = m_grammarInfo->opInfos.lookup(SpvOp(spvInst->getOpcodeOperandWord()));
+            if (!info || info->class_ != SPIRVCoreGrammarInfo::OpInfo::Annotation)
+                continue;
+            for (const auto operand : spvInst->getSPIRVOperands())
+            {
+                if (operand->getOp() == kIROp_SPIRVAsmOperandId)
+                    annotationReferencedIds.add(
+                        cast<IRStringLit>(operand->getValue())->getStringSlice());
+            }
+        }
 
         for (const auto spvInst : inst->getInsts())
         {
@@ -11979,7 +12062,37 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         as<IRStringLit>(spvInst->getOperand(1)->getOperand(0))->getStringSlice());
                     continue;
                 case SpvOpExecutionMode:
+                case SpvOpExecutionModeId:
                     {
+                        // Both opcodes follow the same rule. With `__entryPoint` as the entry
+                        // point operand, the mode is applied to every entry point that calls the
+                        // enclosing function, directly or indirectly. With a named entry point
+                        // (`$main`, where `main` is an entry point function), it is emitted as
+                        // written, for that entry point only. Either way, identical instructions
+                        // are emitted once, even when the block is inlined into several call
+                        // sites. "Identical" compares ids: an in-block id operand that is not
+                        // memoized (a specialization constant, or a constant the block
+                        // decorates) differs in each inlined copy, so each copy emits its own
+                        // mode, and spirv-val reports a mode that may appear only once.
+                        //
+                        // Malformed assembly with no entry point operand (`OpExecutionMode;`,
+                        // which the parser accepts) is emitted as written by the generic path
+                        // below, and the SPIR-V tools then reject it.
+                        if (spvInst->getOperandCount() < 2)
+                            break;
+                        if (spvInst->getOperand(1)->getOp() != kIROp_SPIRVAsmOperandEntryPoint)
+                        {
+                            emitInstMemoizedNoResultIDCustomOperandFunc(
+                                getSection(SpvLogicalSectionID::ExecutionModes),
+                                nullptr,
+                                opcode,
+                                [&]()
+                                {
+                                    for (const auto operand : spvInst->getSPIRVOperands())
+                                        emitSpvAsmOperand(operand);
+                                });
+                            continue;
+                        }
                         if (auto refEntryPointSet =
                                 m_referencingEntryPoints.tryGetValue(getParentFunc(inst)))
                         {
@@ -11988,7 +12101,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 emitInstMemoizedNoResultIDCustomOperandFunc(
                                     getSection(SpvLogicalSectionID::ExecutionModes),
                                     nullptr,
-                                    SpvOpExecutionMode,
+                                    opcode,
                                     [&]()
                                     {
                                         emitOperand(entryPoint);
@@ -12043,10 +12156,37 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 const auto opParent = parentForOpCode(opcode, parent);
                 const auto opInfo = m_grammarInfo->opInfos.lookup(opcode);
 
-                // TODO: handle resultIdIndex == 1, for constants
                 const bool memoizeTypeInst =
                     opParent == getSection(SpvLogicalSectionID::ConstantsAndTypes) && opInfo &&
                     opInfo->resultIdIndex == 0;
+                // Constants are memoized too, so that identical constants written in
+                // `spirv_asm` share one id. Two constants can share an id when nothing can tell
+                // them apart: same opcode, type and value, and nothing that refers to the id
+                // itself rather than to the value. That holds for the non-specialization
+                // constants in `isMemoizableAsmConstantOpcode`, except when an annotation of
+                // the block names the constant: sharing the id would apply the annotation to
+                // the other constants too. Specialization constants are never shared, because
+                // each one gets its own `SpecId` and is overridden on its own.
+                //
+                // This is what keeps an inlined block from emitting an `OpExecutionModeId
+                // __entryPoint ... %c` once per copy: with one id for `%c`, the copies are
+                // identical and the execution-mode memoization above emits one. Deduplicating
+                // execution modes by mode instead would also hide modes that really conflict.
+                //
+                // The result id is operand 2 of the instruction (after the opcode and the
+                // result type), which is element 1 of `getSPIRVOperands()`.
+                IRSPIRVAsmOperand* constantResultOperand = nullptr;
+                if (opParent == getSection(SpvLogicalSectionID::ConstantsAndTypes) && opInfo &&
+                    opInfo->resultIdIndex == 1 && isMemoizableAsmConstantOpcode(opcode) &&
+                    spvInst->getOperandCount() >= 3)
+                {
+                    const auto resultOperand = cast<IRSPIRVAsmOperand>(spvInst->getOperand(2));
+                    if (resultOperand->getOp() != kIROp_SPIRVAsmOperandId ||
+                        !annotationReferencedIds.contains(
+                            cast<IRStringLit>(resultOperand->getValue())->getStringSlice()))
+                        constantResultOperand = resultOperand;
+                }
+                const bool memoizeConstantInst = constantResultOperand != nullptr;
                 // Only no-result instructions in the annotations section are safe to memoize.
                 // Result-producing annotations like OpDecorationGroup must keep
                 // distinct IDs because later group decorations reference them.
@@ -12090,6 +12230,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     {
                         const auto idName =
                             cast<IRStringLit>(resOperand->getValue())->getStringSlice();
+                        idMap[idName] = last->id;
+                    }
+                }
+                else if (memoizeConstantInst)
+                {
+                    last = emitInstMemoizedResultIdAfterTypeCustomOperandFunc(
+                        opParent,
+                        assignedInst,
+                        opcode,
+                        [&]()
+                        {
+                            // Everything but the result id, which the helper inserts itself.
+                            for (const auto operand : spvInst->getSPIRVOperands())
+                            {
+                                if (operand != constantResultOperand)
+                                    emitSpvAsmOperand(operand);
+                            }
+                        });
+
+                    // As for types above: point the result id at the memoized instruction.
+                    if (constantResultOperand->getOp() == kIROp_SPIRVAsmOperandId)
+                    {
+                        const auto idName =
+                            cast<IRStringLit>(constantResultOperand->getValue())->getStringSlice();
                         idMap[idName] = last->id;
                     }
                 }
