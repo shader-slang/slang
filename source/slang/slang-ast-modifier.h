@@ -814,6 +814,10 @@ class UncheckedAttribute : public AttributeBase
     FIDDLE(...)
 
     Scope* scope = nullptr;
+
+    // The attribute name as written (`VarExpr` or `StaticMemberExpr` chain), resolved by the
+    // checker. Null for a completion request or when the first identifier is missing.
+    FIDDLE() Expr* attributeNameExpr = nullptr;
 };
 
 // A GLSL layout qualifier whose value has not yet been resolved or validated.
