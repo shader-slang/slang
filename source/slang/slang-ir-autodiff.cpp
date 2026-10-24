@@ -1352,63 +1352,110 @@ bool isDiffInst(IRInst* inst)
     return false;
 }
 
-void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
+// Re-root onto `derivativeDebugFunc`, the derivative's own record, the debug scope tree that
+// `derivativeFunc`'s body inherited and that is rooted at `inheritedDebugRoot`. Consider
+// reverse-mode differentiation of
+//
+//     [Differentiable]
+//     float f(float x)
+//     {
+//         float acc = x;
+//         for (int i = 0; i < 4; i++)
+//             acc = acc * acc;
+//         return acc;
+//     }
+//
+// Forward-mode translation transcribes a body from a primal clone of f, and cloning a function
+// gives the clone its own DebugFunction and lexical blocks (cloneDebugScopesForFunc), so the
+// DebugScope, DebugVar and DebugInlinedAt operands transcribed from the clone's own code name the
+// clone's tree. Reverse mode
+// then splits s_apply_f, s_bwdProp_f and s_remat_f out of that forward derivative, so they inherit
+// its tree in turn. We give the derivative its own copy of the inherited tree, rooted at
+// `derivativeDebugFunc`, and redirect the uses inside the derivative to it. Scopes outside that
+// tree, such as a callee's scopes that the inliner copied without an inlinedAt operand, keep naming
+// the callee.
+static void rerootDerivativeDebugScopes(
+    IRBuilder* builder,
+    IRInst* derivativeFunc,
+    IRInst* derivativeDebugFunc,
+    IRInst* inheritedDebugRoot)
 {
-    // cloneDecoration re-references (shares) a decoration's operands rather than deep-copying them,
-    // which is fine for the decorations cloned below: they reference shared source/scope context.
-    // A function's IRDebugFunction, however, uniquely names and identifies one function body, so
-    // DebugFuncDecoration is not cloned -- each derivative gets its own record, rebuilt below.
+    IRCloneEnv cloneEnv;
+    cloneDebugScopeTree(&cloneEnv, builder, inheritedDebugRoot, derivativeDebugFunc);
+
+    for (const auto& [oldScope, newScope] : cloneEnv.mapOldValToNew)
+    {
+        List<IRUse*> usesInDerivative;
+        for (auto use = oldScope->firstUse; use; use = use->nextUse)
+        {
+            if (isChildInstOf(use->getUser(), derivativeFunc))
+                usesInDerivative.add(use);
+        }
+        for (auto use : usesInDerivative)
+            use->set(newScope);
+    }
+}
+
+// Give the derivative `destFunc` its own IRDebugFunction, built from `srcDebugFunc` (the record of
+// the function it was derived from), and re-root the scope tree its body inherited from
+// `inheritedDebugRoot` (if any) onto that record. A DebugFunction record names and identifies a
+// single function body, so a derivative cannot share its source's. The caller has already given
+// `destFunc` its final name hint and data type, and its body is complete.
+static void buildDerivativeDebugFunction(
+    IRInst* srcFunc,
+    IRDebugFunction* srcDebugFunc,
+    IRInst* destFunc,
+    IRInst* inheritedDebugRoot)
+{
+    // generateName / translateFuncHeader give a derivative a name hint only when the original had
+    // one, so a derivative without a hint comes from an unnamed original whose debug name came from
+    // its linkage name, and the derivative reuses that name.
+    IRInst* name;
+    if (auto nameHint = destFunc->findDecoration<IRNameHintDecoration>())
+    {
+        name = nameHint->getNameOperand();
+    }
+    else
+    {
+        SLANG_RELEASE_ASSERT(!srcFunc->findDecoration<IRNameHintDecoration>());
+        name = srcDebugFunc->getName();
+    }
+
+    // The record goes in the derivative's own scope (before destFunc), as lower-to-ir places it,
+    // because a derivative still nested in an IRGeneric can have a type that refers to the
+    // generic's parameters.
+    IRBuilder builder(destFunc->getModule());
+    builder.setInsertBefore(destFunc);
+    auto derivativeDebugFunc = builder.emitDebugFunction(
+        name,
+        srcDebugFunc->getLine(),
+        srcDebugFunc->getCol(),
+        srcDebugFunc->getFile(),
+        destFunc->getDataType(),
+        srcDebugFunc->getParentScope());
+    builder.addDecoration(destFunc, kIROp_DebugFuncDecoration, derivativeDebugFunc);
+    if (inheritedDebugRoot)
+        rerootDerivativeDebugScopes(&builder, destFunc, derivativeDebugFunc, inheritedDebugRoot);
+}
+
+void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc, IRInst* inheritedDebugRoot)
+{
     for (auto decor : srcFunc->getDecorations())
     {
         switch (decor->getOp())
         {
-        case kIROp_DebugInlinedAt:
-        case kIROp_DebugScope:
-        case kIROp_DebugNoScope:
-        case kIROp_DebugInlinedVariable:
         case kIROp_DebugLocationDecoration:
+            // A function's own location carries no scope operand: lower-to-ir gives a scope only
+            // to the location of an IRVar or IRParam, which lives in the body and is re-rooted
+            // there. Sharing the source location is therefore safe.
             cloneDecoration(decor, destFunc);
             break;
         case kIROp_DebugFuncDecoration:
-            {
-                // Each derivative needs its OWN IRDebugFunction: a DebugFunction record identifies
-                // a single function body (one DebugFunctionDefinition per record) and supplies its
-                // debug name.
-                auto srcDebugFunc =
-                    cast<IRDebugFunction>(as<IRDebugFuncDecoration>(decor)->getDebugFunc());
-
-                // Name the record from the derivative's own name hint. generateName /
-                // translateFuncHeader add that hint before this runs, but only when the original
-                // had one, so a missing hint means the original was itself unnamed (its debug name
-                // came from a linkage name) -- asserted below. In that case we reuse the source
-                // name; the derivative still gets its own IRDebugFunction instance, only the name
-                // text is shared.
-                IRInst* name;
-                if (auto nameHint = destFunc->findDecoration<IRNameHintDecoration>())
-                {
-                    name = nameHint->getNameOperand();
-                }
-                else
-                {
-                    SLANG_RELEASE_ASSERT(!srcFunc->findDecoration<IRNameHintDecoration>());
-                    name = srcDebugFunc->getName();
-                }
-
-                // Insert the record in the derivative's own scope (before destFunc), as
-                // lower-to-ir does. copyDebugInfo can run while a derivative is still nested in an
-                // IRGeneric, and its type operand may reference that generic's parameters, so the
-                // record must share the derivative's scope rather than sit at module scope.
-                IRBuilder builder(destFunc->getModule());
-                builder.setInsertBefore(destFunc);
-                auto derivativeDebugFunc = builder.emitDebugFunction(
-                    name,
-                    srcDebugFunc->getLine(),
-                    srcDebugFunc->getCol(),
-                    srcDebugFunc->getFile(),
-                    destFunc->getDataType(),
-                    srcDebugFunc->getParentScope());
-                builder.addDecoration(destFunc, kIROp_DebugFuncDecoration, derivativeDebugFunc);
-            }
+            buildDerivativeDebugFunction(
+                srcFunc,
+                cast<IRDebugFunction>(cast<IRDebugFuncDecoration>(decor)->getDebugFunc()),
+                destFunc,
+                inheritedDebugRoot);
             break;
         default:
             break;
