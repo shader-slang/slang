@@ -10931,7 +10931,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     // Bind a DebugFunction record to at most one concrete OpFunction body. Lexical scopes and
     // debug variables can emit the record before its body, so definition tracking is separate
-    // from the metadata cache.
+    // from the metadata cache. On the SPIR-V path the known producers give each function body its
+    // own record (autodiff derivatives via copyDebugInfo, clones via cloneDebugScopesForFunc), so
+    // a repeated record here means a producer regression; deduplicating by record keeps such a
+    // regression to a missing definition instead of a second definition for one record.
     void maybeEmitDebugFunctionDefinition(
         SpvInst* firstBlock,
         SpvInst* spvFunc,
