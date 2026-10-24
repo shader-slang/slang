@@ -68,12 +68,20 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
             SLANG_ASSERT(requireComputeDerivative);
             SLANG_ASSERT(m_entryPointStage == Stage::Compute);
 
-            // Compute derivatives are quad by default, add the decoration if entry point
-            // does not not explicit linear decoration.
-            bool isQuad = !entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
-            if (isQuad)
+            // Grouping may be explicit or already inferred for an earlier derivative operation.
+            if (!entryPoint->findDecoration<IRDerivativeGroupDecoration>())
             {
-                builder.addDecoration(entryPoint, kIROp_DerivativeGroupQuadDecoration);
+                switch (inferDerivativeGroupMode(entryPoint))
+                {
+                case DerivativeGroupMode::Quad:
+                    builder.addDecoration(entryPoint, kIROp_DerivativeGroupQuadDecoration);
+                    break;
+                case DerivativeGroupMode::Linear:
+                    builder.addDecoration(entryPoint, kIROp_DerivativeGroupLinearDecoration);
+                    break;
+                default:
+                    SLANG_UNEXPECTED("unexpected derivative-group mode");
+                }
             }
         }
     }

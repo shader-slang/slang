@@ -164,6 +164,17 @@ bool Workspace::updatePredefinedLanguageVersion(SlangLanguageVersion version)
     return changed;
 }
 
+bool Workspace::updateWorkspaceFlavor(WorkspaceFlavor flavor)
+{
+    bool changed = workspaceFlavor != flavor;
+    workspaceFlavor = flavor;
+    if (changed)
+    {
+        invalidate();
+    }
+    return changed;
+}
+
 void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
 {
     for (auto uri : rootDirURI)
