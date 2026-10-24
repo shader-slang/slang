@@ -193,13 +193,7 @@ static AttributeDecl* _getAttributeDeclFromResolvedNameDecl(SemanticsVisitor* vi
 
 AttributeDecl* SemanticsVisitor::lookUpAttributeDeclFromNameExpr(Expr* attributeNameExpr)
 {
-    // Resolve the attribute name written inside `[...]` using ordinary name resolution, so that a
-    // qualified name — including a user-defined attribute declared in a namespace, e.g.
-    // `[my_namespace::Example(...)]` — is looked up exactly as any other `my_namespace::Example`
-    // reference would be. `attributeNameExpr` is a `VarExpr` for an unqualified `[Name]` or a
-    // `StaticMemberExpr` chain for a qualified `[a::b::Name]`; both resolve through `CheckTerm`,
-    // which already performs merged-namespace-across-modules member lookup, so no bespoke qualifier
-    // walking is needed here.
+    // `CheckTerm` handles member lookup across namespaces merged from imported modules.
     if (!attributeNameExpr)
         return nullptr;
 
@@ -259,8 +253,6 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDeclFromNameExpr(Expr* attribute
         return nullptr;
     };
 
-    // First the name as written (a builtin `AttributeDecl`, or a `[__AttributeUsage]` struct named
-    // exactly as written), then the `Foo` -> `FooAttribute` convention.
     if (auto decl = resolveSpelling(String()))
     {
         if (auto attributeDecl = _getAttributeDeclFromResolvedNameDecl(this, decl))
