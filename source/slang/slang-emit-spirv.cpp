@@ -2421,6 +2421,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             return true;
 
+        case kIROp_DebugLexicalBlock:
+            if (shouldEmitExtendedDebugInfo)
+            {
+                *emittedSpvInst = emitDebugLexicalBlock(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    as<IRDebugLexicalBlock>(inst));
+            }
+            return true;
+
         case kIROp_DebugInlinedAt:
             if (shouldEmitExtendedDebugInfo)
             {
@@ -3030,6 +3039,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugBuildIdentifier:
         case kIROp_DebugCompilationUnit:
         case kIROp_DebugFunction:
+        case kIROp_DebugLexicalBlock:
         case kIROp_DebugInlinedAt:
             SLANG_UNEXPECTED(
                 "Debug instruction should have been handled by processDebugGlobalInst");
@@ -3271,7 +3281,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                            : ImageOpConstants::notMultisampled;
         SpvWord sampled = 2;
         requireSPIRVCapability(SpvCapabilityInputAttachment);
-        requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
         setImageFormatCapabilityAndExtension(SpvImageFormatUnknown, SpvCapabilityShader);
         return emitOpTypeImage(
             assignee,
@@ -3739,6 +3748,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ensureExtensionDeclarationBeforeSpv15(
                     UnownedStringSlice("SPV_EXT_descriptor_indexing"));
                 requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
+                break;
+            case kIROp_GLSLPatchDecoration:
+                // User patch I/O only; gl_TessLevel* get Patch from getBuiltinGlobalVar.
+                emitOpDecorate(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decor,
+                    varInst,
+                    SpvDecorationPatch);
                 break;
             }
         }
@@ -4692,9 +4709,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // The `actualHelperVar` is used to update the actual value of the variable
         // at each kIROp_DebugValue instruction.
         //
-        auto scope = findDebugScope(debugVar);
-        if (!scope)
-            return nullptr;
+        auto scope = ensureInst(debugVar->getScope());
+        SLANG_RELEASE_ASSERT(scope);
 
         bool hasBackingVar = m_mapIRInstToSpvInst.containsKey(debugVar);
 
@@ -4764,10 +4780,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugVarBackingLocalVarDeclaration(SpvInstParent* parent, IRDebugVar* debugVar)
     {
-        auto scope = findDebugScope(debugVar);
-        if (!scope)
-            return nullptr;
-
         IRBuilder builder(debugVar);
         builder.setInsertBefore(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
@@ -4939,6 +4951,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     nullptr,
                     nullptr,
                     as<IRDebugFunction>(inst));
+            }
+            return true;
+
+        case kIROp_DebugLexicalBlock:
+            if (shouldEmitExtendedDebugInfo)
+            {
+                *emittedSpvInst = emitDebugLexicalBlock(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    as<IRDebugLexicalBlock>(inst));
             }
             return true;
 
@@ -5364,15 +5385,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     getReferencingEntryPoints(m_referencingEntryPoints, parentFunc);
                 for (IRFunc* entryPoint : *entryPointsUsingInst)
                 {
-                    bool isQuad = true;
-                    IREntryPointDecoration* entryPointDecor = nullptr;
-                    for (auto dec : entryPoint->getDecorations())
-                    {
-                        if (auto maybeEntryPointDecor = as<IREntryPointDecoration>(dec))
-                            entryPointDecor = maybeEntryPointDecor;
-                        if (as<IRDerivativeGroupLinearDecoration>(dec))
-                            isQuad = false;
-                    }
+                    auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
                     if (!entryPointDecor ||
                         entryPointDecor->getProfile().getStage() != Stage::Compute)
                         continue;
@@ -5380,8 +5393,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_compute_shader_derivatives"));
                     auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
-                    if (isQuad)
+                    switch (inferDerivativeGroupMode(entryPoint))
                     {
+                    case DerivativeGroupMode::Quad:
                         verifyComputeDerivativeGroupModifiers(
                             this->m_sink,
                             inst->sourceLoc,
@@ -5393,9 +5407,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             getIRInstSpvID(entryPoint),
                             SpvExecutionModeDerivativeGroupQuadsKHR);
                         requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupQuadsKHR);
-                    }
-                    else
-                    {
+                        break;
+                    case DerivativeGroupMode::Linear:
                         verifyComputeDerivativeGroupModifiers(
                             this->m_sink,
                             inst->sourceLoc,
@@ -5407,6 +5420,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             getIRInstSpvID(entryPoint),
                             SpvExecutionModeDerivativeGroupLinearKHR);
                         requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupLinearKHR);
+                        break;
+                    default:
+                        SLANG_UNEXPECTED("unexpected derivative-group mode");
                     }
                 }
 
@@ -5867,6 +5883,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugVar:
         case kIROp_DebugValue:
         case kIROp_DebugFunction:
+        case kIROp_DebugLexicalBlock:
         case kIROp_DebugInlinedAt:
         case kIROp_DebugScope:
         case kIROp_DebugNoScope:
@@ -5919,8 +5936,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitSubpassLoad(SpvInstParent* parent, IRSubpassLoad* inst)
     {
-        requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
-
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
         auto zeroVec = builder.emitMakeVectorFromScalar(
@@ -6336,8 +6351,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 List<SpvInst*> params;
                 HashSet<SpvInst*> paramsSet;
                 List<IRInst*> referencedBuiltinIRVars;
-                // `interface` part: reference all global variables that are used by this
-                // entrypoint.
+                HashSet<IRInst*> interfaceDependencies;
+
+                // An unused ray-tracing parameter still declares part of the shader interface.
+                // For example, `void miss(inout Payload p) {}` has no executable reference to p.
+                // Entry-point legalization represents it as a global with a DependsOn decoration
+                // on this entry point. Emit that global and include it in this entry point's
+                // interface, even though the executable reference graph does not contain it.
+                for (auto decor : entryPoint->getDecorations())
+                {
+                    if (auto dependency = as<IRDependsOnDecoration>(decor))
+                    {
+                        auto globalInst = dependency->getOperand(0);
+                        if (as<IRGlobalVar>(globalInst) || as<IRGlobalParam>(globalInst))
+                        {
+                            interfaceDependencies.add(globalInst);
+                            ensureInst(globalInst);
+                        }
+                    }
+                }
+
+                // `interface` part: reference all global variables used by this entry point,
+                // including its explicitly declared interface dependencies.
                 for (auto globalInst : m_irModule->getModuleInst()->getChildren())
                 {
                     switch (globalInst->getOp())
@@ -6353,7 +6388,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             {
                                 // Is this globalInst referenced by this entry point?
                                 auto refSet = m_referencingEntryPoints.tryGetValue(globalInst);
-                                if (refSet && refSet->contains(entryPoint))
+                                if (interfaceDependencies.contains(globalInst) ||
+                                    (refSet && refSet->contains(entryPoint)))
                                 {
                                     if (!isSpirv14OrLater())
                                     {
@@ -7259,6 +7295,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
+    // Builtin variables that require volatile semantics; see
+    // `maybeRequireVolatileSemanticsForBuiltinVar`.
+    HashSet<SpvInst*> m_volatileBuiltinVars;
     struct DescriptorRuntimeArrayKey
     {
         SpvInst* descriptorElementType = nullptr;
@@ -7344,6 +7383,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat, ptrType->getValueType());
         if (m_builtinGlobalVars.tryGetValue(key, result))
         {
+            // The variable is shared by every IR inst with the same key, so a later inst
+            // used in a ray-tracing stage can require volatile semantics that an earlier
+            // inst did not.
+            maybeRequireVolatileSemanticsForBuiltinVar(result, builtinVal, irInst);
             return result;
         }
         IRBuilder builder(m_irModule);
@@ -7377,8 +7420,58 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRInterpolationMode::NoInterpolation,
                 getID(varInst));
         }
+        maybeRequireVolatileSemanticsForBuiltinVar(varInst, builtinVal, irInst);
 
         return varInst;
+    }
+
+    // Record that the builtin variable `varInst` requires volatile semantics if `irInst`, an
+    // IR inst referring to it, is used in a ray-tracing stage where the builtin's value can
+    // change during the invocation. For example, `RayTmaxKHR` changes after each
+    // `OpReportIntersectionKHR` in an intersection shader, and the subgroup builtins can
+    // change after the invocation is repacked. Vulkan requires such variables to be decorated
+    // `Volatile` (VUID-StandaloneSpirv-VulkanMemoryModel-04678), or, under the Vulkan memory
+    // model where that decoration is disallowed, to be loaded with a `Volatile` memory access
+    // (VUID-04679); `emitSPIRVAsm` adds that access for loads from `m_volatileBuiltinVars`.
+    void maybeRequireVolatileSemanticsForBuiltinVar(
+        SpvInst* varInst,
+        SpvBuiltIn builtinVal,
+        IRInst* irInst)
+    {
+        bool needVolatile = false;
+        switch (builtinVal)
+        {
+        case SpvBuiltInRayTmaxKHR:
+            needVolatile = isInstUsedInStage(irInst, Stage::Intersection);
+            break;
+        case SpvBuiltInSMIDNV:
+        case SpvBuiltInWarpIDNV:
+        case SpvBuiltInSubgroupSize:
+        case SpvBuiltInSubgroupLocalInvocationId:
+        case SpvBuiltInSubgroupEqMask:
+        case SpvBuiltInSubgroupGeMask:
+        case SpvBuiltInSubgroupGtMask:
+        case SpvBuiltInSubgroupLeMask:
+        case SpvBuiltInSubgroupLtMask:
+            needVolatile = isInstUsedInStage(irInst, Stage::RayGeneration) ||
+                           isInstUsedInStage(irInst, Stage::ClosestHit) ||
+                           isInstUsedInStage(irInst, Stage::Miss) ||
+                           isInstUsedInStage(irInst, Stage::Intersection) ||
+                           isInstUsedInStage(irInst, Stage::Callable);
+            break;
+        default:
+            break;
+        }
+        if (!needVolatile || !m_volatileBuiltinVars.add(varInst))
+            return;
+        if (m_memoryModel != SpvMemoryModelVulkan)
+        {
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                varInst,
+                SpvDecorationVolatile);
+        }
     }
 
     SpvInst* emitDescriptorHeapBuiltinVar(IRInst* builtinVarInst)
@@ -10567,15 +10660,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 workList.add(inst);
         };
 
-        // Seed from every `precise`-decorated value inside a function body, then walk backward
-        // to a fixpoint. Propagation stays within a function: a value computed in a callee is
+        // Seed from every `precise`-decorated value inside a function body and every
+        // legalized precise output address, then walk backward to a fixpoint. Propagation
+        // stays within a function: a value computed in a callee is
         // reached only if that callee is inlined before emit. Making a called function's body
         // precise for one precise call site -- without penalizing its other, non-precise
         // callers -- would require specializing the callee, which is out of scope here. (A
-        // `precise` global variable is likewise not covered: by the time the SPIR-V emitter
-        // runs, its decoration is no longer reachable from the module's global insts.)
+        // source-level `precise` global variable is likewise not covered: by the time the
+        // SPIR-V emitter runs, its decoration is no longer reachable from the module's
+        // global insts.)
         for (auto globalInst : m_irModule->getGlobalInsts())
         {
+            if (as<IRGlobalParam>(globalInst) && globalInst->findDecoration<IRPreciseDecoration>())
+                enqueue(globalInst);
             auto func = as<IRGlobalValueWithCode>(globalInst);
             if (!func)
                 continue;
@@ -10808,15 +10905,33 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
-    // Emit the DebugFunctionDefinition that binds the concrete OpFunction body `spvFunc` (whose
-    // first block is `firstBlock`) to its DebugFunction record `debugFuncInfo`, at most once per
-    // record. A DebugFunction binds to a single body — the NonSemantic invariant that a
-    // DebugFunction has one DebugFunctionDefinition — so we dedup on the record, not the body. This
-    // is separate from the record cache (m_mapIRInstToSpvInst) because the record may already have
-    // been emitted early and bare via the global debug-inst path — for example when a
-    // caller-scope-restore DebugScope inserted by inlining precedes a DebugVar and resolves this
-    // function as that var's scope — whereas the definition must still be emitted for the concrete
-    // body.
+    // Emit the explicit lexical parent chain recorded during lowering.
+    SpvInst* emitDebugLexicalBlock(SpvInstParent* parent, IRDebugLexicalBlock* debugLexicalBlock)
+    {
+        // A scope reference may have emitted this record before its own instruction is visited.
+        SpvInst* debugBlockInfo = nullptr;
+        if (m_mapIRInstToSpvInst.tryGetValue(debugLexicalBlock, debugBlockInfo))
+            return debugBlockInfo;
+
+        auto parentScope = debugLexicalBlock->getParentScope();
+        SLANG_RELEASE_ASSERT(
+            as<IRDebugFunction>(parentScope) || as<IRDebugLexicalBlock>(parentScope));
+        auto scope = ensureInst(parentScope);
+        SLANG_RELEASE_ASSERT(scope);
+        return emitOpDebugLexicalBlock(
+            parent,
+            debugLexicalBlock,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            debugLexicalBlock->getSource(),
+            debugLexicalBlock->getLine(),
+            debugLexicalBlock->getCol(),
+            scope);
+    }
+
+    // Bind a DebugFunction record to at most one concrete OpFunction body. Lexical scopes and
+    // debug variables can emit the record before its body, so definition tracking is separate
+    // from the metadata cache.
     void maybeEmitDebugFunctionDefinition(
         SpvInst* firstBlock,
         SpvInst* spvFunc,
@@ -10850,57 +10965,44 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRFunc* irFunc = nullptr)
     {
         SpvInst* debugFuncInfo = nullptr;
-        if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
+        // Lexical blocks can request this metadata before the function body is emitted.
+        // Reuse the metadata, then register the function scope and bind its definition below.
+        if (!debugFunc || !m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
         {
-            // The record was already emitted, possibly bare via the global debug-inst path (which
-            // passes a null irFunc, so this function was never registered as its own debug scope).
-            // The record cache covers neither the per-body definition nor that scope registration,
-            // so we do both here for a concrete body. Without the registration, findDebugScope's
-            // IRFunc fallback misses and a pre-inline DebugVar (a parameter, or a local before the
-            // first inlined call) resolves its OpDebugLocalVariable scope to the module compilation
-            // unit instead of the function.
-            if (irFunc && !m_mapIRInstToSpvDebugInst.containsKey(irFunc))
-                registerDebugInst(irFunc, debugFuncInfo);
-            maybeEmitDebugFunctionDefinition(firstBlock, spvFunc, debugFuncInfo);
-            return debugFuncInfo;
+            // Use the parent scope bound at IR-gen so an imported function resolves to its own
+            // module's compilation unit. Fall back to the module-global scope for an included or
+            // line-remapped source without a compilation unit, or an IR blob predating this
+            // operand. findDebugScope also handles a null debugFunc (no IRDebugFuncDecoration).
+            SpvInst* scope = nullptr;
+            if (debugFunc)
+            {
+                if (auto irParentScope = debugFunc->getParentScope())
+                    scope = ensureInst(irParentScope);
+            }
+            if (!scope)
+                scope = findDebugScope(debugFunc);
+            if (!scope)
+                return nullptr;
+
+            SpvInst* neededDebugType = emitDebugType(as<IRFuncType>(debugFunc->getDebugType()));
+            SLANG_ASSERT(neededDebugType);
+
+            IRBuilder builder(debugFunc);
+            debugFuncInfo = emitOpDebugFunction(
+                parent,
+                debugFunc,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugFunc->getName(),
+                neededDebugType,
+                debugFunc->getFile(),
+                debugFunc->getLine(),
+                debugFunc->getCol(),
+                scope,
+                debugFunc->getName(),
+                builder.getIntValue(builder.getUIntType(), 0),
+                debugFunc->getLine());
         }
-
-        // Use the parent scope bound to the function at IR-gen, which is the compilation unit of
-        // the module the function belongs to, so an imported function resolves to its own module's
-        // compilation unit rather than the entry point's. The parent scope is absent for a function
-        // whose source has no compilation unit of its own (an #include'd/#line-remapped source) and
-        // for a function from an IR blob that predates the operand; in those cases fall back to the
-        // module-global scope. findDebugScope also handles a null debugFunc (a function with no
-        // IRDebugFuncDecoration), so the getParentScope() read is guarded by that null check.
-        SpvInst* scope = nullptr;
-        if (debugFunc)
-        {
-            if (auto irParentScope = debugFunc->getParentScope())
-                scope = ensureInst(irParentScope);
-        }
-        if (!scope)
-            scope = findDebugScope(debugFunc);
-        if (!scope)
-            return nullptr;
-
-        SpvInst* neededDebugType = emitDebugType(as<IRFuncType>(debugFunc->getDebugType()));
-        SLANG_ASSERT(neededDebugType);
-
-        IRBuilder builder(debugFunc);
-        debugFuncInfo = emitOpDebugFunction(
-            parent,
-            debugFunc,
-            m_voidType,
-            getNonSemanticDebugInfoExtInst(),
-            debugFunc->getName(),
-            neededDebugType,
-            debugFunc->getFile(),
-            debugFunc->getLine(),
-            debugFunc->getCol(),
-            scope,
-            debugFunc->getName(),
-            builder.getIntValue(builder.getUIntType(), 0),
-            debugFunc->getLine());
 
         if (irFunc)
         {
@@ -10920,15 +11022,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         IRInst* lineInst = debugInlinedAt->getLine();
 
-        SpvInst* scope = nullptr;
-        if (as<IRDebugFunction>(debugInlinedAt->getDebugFunc()))
-        {
-            scope = ensureInst(debugInlinedAt->getDebugFunc());
-        }
-        if (scope == nullptr)
-        {
-            scope = findDebugScope(debugInlinedAt);
-        }
+        auto irScope = debugInlinedAt->getScope();
+        SLANG_RELEASE_ASSERT(as<IRDebugFunction>(irScope) || as<IRDebugLexicalBlock>(irScope));
+        SpvInst* scope = ensureInst(irScope);
+        SLANG_RELEASE_ASSERT(scope);
 
         // If it's not chained to another IRDebugInlinedAt, we don't use this.
         SpvInst* inlined = nullptr;
@@ -12018,6 +12115,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                     }
 
+                    // Under the Vulkan memory model, a builtin that needs volatile semantics
+                    // (see `maybeRequireVolatileSemanticsForBuiltinVar`) must be loaded with a
+                    // `Volatile` memory access. The core module reads these builtins as
+                    // `result:$$float = OpLoad builtin(RayTmaxKHR:float)`, whose operands are
+                    // the result type, the result id, and the pointer. We leave a load whose
+                    // author wrote explicit memory operands as written.
+                    bool needVolatileLoad = false;
+                    if (opcode == SpvOpLoad && m_memoryModel == SpvMemoryModelVulkan)
+                    {
+                        auto operands = spvInst->getSPIRVOperands();
+                        needVolatileLoad =
+                            operands.getCount() == 3 &&
+                            operands[2]->getOp() == kIROp_SPIRVAsmOperandBuiltinVar &&
+                            m_volatileBuiltinVars.contains(ensureInst(operands[2]));
+                    }
+
                     last = emitInstCustomOperandFunc(
                         opParent,
                         assignedInst,
@@ -12026,6 +12139,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         {
                             for (const auto operand : spvInst->getSPIRVOperands())
                                 emitSpvAsmOperand(operand);
+                            if (needVolatileLoad)
+                                emitOperand(SpvLiteralInteger::from32(SpvMemoryAccessVolatileMask));
 
                             if (needToUseCoherentLoadOrStore)
                             {
@@ -12375,7 +12490,10 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
+    const auto errorCountBeforeLegalize = sink->getErrorCount();
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
+    if (sink->getErrorCount() > errorCountBeforeLegalize)
+        return SLANG_FAIL;
 
 #if 0
     {
@@ -12403,11 +12521,13 @@ SlangResult emitSPIRVFromIR(
     auto generateWholeProgram = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::GenerateWholeProgram);
 
-    // Note: Debug info emission is controlled by the IR generation phase based on the debug level:
+    // IR generation preserves debug information according to the source module's debug level.
+    // The emission level may differ when compiling a serialized module:
     // - None (g0): No debug instructions in IR
-    // - Minimal (g1): IRDebugSource (content only when `-debug-info-include-source` is set) and
-    //                 IRDebugLine for line numbers only. Emits standard SPIR-V debug instructions
-    //                 (OpString, OpLine, OpSource)
+    // - Minimal (g1): Source/line records and function/compilation-unit scope metadata.
+    //                 Source text is retained only with `-debug-info-include-source`.
+    //                 Emitting at g1 uses only standard SPIR-V debug instructions
+    //                 (OpString, OpLine, OpSource).
     // - Standard (g2): Full NonSemantic debug info including IRDebugVar for local variables
     // - Maximal (g3): Same as Standard
     //

@@ -45,16 +45,53 @@ timers as `[*] <phase> <count> <ms>`. The runner captures **all** of them per ru
   Attribution therefore uses **leaf** timers (a jump in `generateOutput` is just
   its child `linkAndOptimizeIR`, whose jump is its child `specializeModule`…).
 
-- **Robustness:** each data point is `1 warmup + 5 timed` runs; the **median** is
-  saved and used for cross-version comparison (reflects the typical run, and is
-  steadier than the min when a build's run-to-run spread shifts). All of
-  `median`/`min`/`mean`/`stdev` are kept in `results.json`; the reporting tools
-  take `--metric` to switch (default `median`).
+- **Robustness:** prepare inputs and dependencies once, then run one warmup
+  pass and five timed passes over all selected workload/size pairs. For A, B,
+  and C, the timed order is `ABC ABC ABC ABC ABC`, rather than `AAAAA BBBBB CCCCC`.
+  This spreads each workload's samples across the suite so a short host
+  disturbance is less likely to affect most of its five samples. The **median**
+  remains the default comparison metric. Raw samples and
+  `median`/`min`/`mean`/`stdev` remain in `results.json`; reporting tools accept
+  `--metric` to switch. `--warmup` and `--samples` set the number of complete
+  passes; generation and module precompilation are not repeated between passes.
+  Interleaving does not remove disturbances lasting the whole suite.
+- **Sampling provenance:** each record identifies `sampling_strategy` as
+  `interleaved` (the CLI) or `consecutive` (the isolated `run_spec` API).
+  The nightly trend gate compares only matching known strategies, in addition
+  to matching runner, size, and timer schema. Older records without the marker
+  remain available for historical reporting but cannot seed the new gate's
+  baseline. Judgement resumes after enough comparable points accumulate; a
+  skipped comparison is reported explicitly rather than treated as a pass.
 - **Memory:** peak RSS per compile is captured when the platform query
   succeeds (`rss_kb`: `os.wait4` `ru_maxrss` on POSIX,
   `GetProcessMemoryInfo` on Windows; `None` if it fails — a gap in the
   memory charts is that, not a bug) — see the Memory footprint section
   below.
+- **Comparison coverage:** the candidate archive records how many metrics had
+  a usable baseline. If none were judged, the CI summary and Slack report
+  “Insufficient comparable history” instead of a clean performance verdict.
+  This is informational, not a performance alarm; normal comparisons resume
+  as compatible history accumulates.
+- **Nightly alert confirmation:** a warning (5%) or regression (10%) first
+  triggers one additional batch for the affected workloads on the same runner
+  and compiler. The rerun uses the original sizes, sample count (default five),
+  and warmup count. Only the same counter crossing the original, frozen
+  baseline in both batches can alert. Two error-level crossings are required
+  for a red alarm; an error followed by a warning confirms only a warning.
+  Clean runs do no extra measurements. A failed or incomplete rerun is an
+  evaluation failure, not recovery. Original graph points stay unchanged;
+  `daily/<label>/confirmation.json` preserves the baseline, candidate rows and
+  rerun's raw samples, and both batches are also uploaded as a CI artifact.
+  `confirm.py measure` runs before publication, while `confirm.py report`
+  emits the final verdict on the notification host. Direct `trend.py` calls
+  remain useful for inspecting unconfirmed historical changes.
+- **Matrix workload size:** all five `backend_matrix_*` targets default to
+  512, with 256 retained in the size sweep. A local same-binary Windows study
+  with interleaved sampling found lower HLSL/GLSL total-time variation and
+  fewer Metal simplification spikes at 512. The larger inputs cost more time
+  and did not improve every counter; confirmation is still required. Keep the
+  family sizes equal for cross-target comparisons. Size provenance excludes
+  the old 256-size measurements from the new alert baseline.
 - **Floor + slope:** `ladder_scaling.py --workload <name>` fits
   `time = floor + slope·N` per release from `--sweep` (multi-size) runs,
   separating a fixed-cost regression (heavier stdlib) from a per-element one
@@ -167,7 +204,7 @@ other workload in the suite measures.
 > One axis per workload is not a stylistic preference here. A mixed
 > "kitchen sink" cross-target shader was tried first and **failed**: a shared
 > super-linear front-end cost dominated it and flattened a 21× cuda/spirv
-> divergence to 1.1×. See `COVERAGE-ANALYSIS.md`.
+> divergence to 1.1×.
 
 | Test                   | Targets                        | What it generates                                                  | Isolates                                                                                                                                                                                         | Primary timers                                     |
 | ---------------------- | ------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
@@ -383,9 +420,22 @@ via `--results <checkout-path>`.
 | `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
 | `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
 
+The publishing nightly also exports daily results and newly measured releases for
+BenchView; release exports include only active tests at their current default sizes.
+Runs with `sweep=true` skip BenchView and defer new-release discovery. Older suite
+checkouts defer release discovery when they lack release-export support.
+The benchmark host handles collection and delivery. Export failures do not block
+existing reports; an invalid release export also leaves the daily export intact.
+Skipped or failed release exports require a separate export of the archived results;
+they are not automatically retried after the release enters the tracked history.
+For local or historical exports, see `python3 benchview.py --help`.
+
 ---
 
 ## Notes / caveats
+
+Run the regression tests from the repository root with
+`python3 -m unittest discover -s tools/compile-perf/tests -t tools/compile-perf -p 'test_*.py'`.
 
 - **`parse` is sema-dominated:** `parseTranslationUnit` is cheap even for huge
   files; use that timer (not `frontEndExecute`) for the pure-parse signal.
