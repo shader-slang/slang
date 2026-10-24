@@ -105,7 +105,10 @@ struct AddressInstEliminationContext
         }
 
         builder.setInsertBefore(call);
-        auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
+        auto addrType = addr->getFullType();
+        if (auto rateQualifiedType = as<IRRateQualifiedType>(addrType))
+            addrType = rateQualifiedType->getValueType();
+        auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addrType)->getValueType());
 
         // Store the initial value of the mutable argument into temp var.
         // If this is an `out` var, the initial value will be undefined,

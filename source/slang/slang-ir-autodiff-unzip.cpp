@@ -317,11 +317,14 @@ struct UnzippingContext
                 {
                     return clonedVar;
                 }
-                else if (paramDirection == ParameterDirectionInfo::BorrowInOut)
+                else if (
+                    paramDirection == ParameterDirectionInfo::BorrowInOut ||
+                    paramDirection.kind == ParameterDirectionInfo::Kind::Ref)
                 {
-                    // For inout parameters, we need to store the original value into the cloned var
-                    // at the beginning of the function, and then load from the cloned var at every
-                    // use.
+                    // For inout and reference parameters, we need to store the original value into
+                    // the cloned var at the beginning of the function, and then load from the
+                    // cloned var at every use. Address elimination has already turned a reference
+                    // argument into a copy-in/copy-out temporary, like an inout argument.
                     if (auto use = findUniqueStoredVal(var))
                         primalBuilder->emitStore(
                             clonedVar,
