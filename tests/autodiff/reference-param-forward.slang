@@ -1,10 +1,11 @@
 // A differentiable function may forward its reference parameter to a differentiable callee.
 // Autodiff passes the reference argument by copy-in/copy-out, as it does for `inout`, so the
 // callee's writes reach the caller's storage and values read before a write are the ones used
-// for the derivative.
+// for the derivative. The warning for passing shared memory this way is covered by
+// tests/diagnostics/groupshared-argument-copied-by-differentiable-call.slang.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -Xslang -warnings-disable -Xslang 38049
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -Xslang -warnings-disable -Xslang 38049
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

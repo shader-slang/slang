@@ -4612,6 +4612,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 funcType,
                 callableDeclRef,
                 paramDeclRefs);
+            checkGroupSharedArgumentsCopiedByDifferentiableCall(invoke, funcType, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
             {
@@ -7914,6 +7915,55 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
             getSink()->diagnose(Diagnostics::GroupsharedArgumentToCopiedParameter{
                 .param = "this",
                 .arg = memberExpr->baseExpression});
+    }
+}
+
+// Autodiff passes a reference argument by copy-in/copy-out, so a callee given thread-group-shared
+// memory through a reference works on a private copy of it. We warn where the shared memory
+// enters the chain of reference parameters: a call inside a differentiable function, or a call
+// to `fwd_diff(f)` or `bwd_diff(f)`. An argument that forwards one of the enclosing function's
+// own parameters was already reported where that parameter's caller passed the shared memory.
+//
+// Consider this example:
+//
+//     [Differentiable] float mid(no_diff groupshared float a, float x) { return helper(a, x); }
+//     [Differentiable] float f(float x, uint j) { return mid(g[j], x); }
+//
+// We warn on `g[j]` in `f`, but not on `a` in `mid`.
+void SemanticsVisitor::checkGroupSharedArgumentsCopiedByDifferentiableCall(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+{
+    auto differentiateExpr = as<DifferentiateExpr>(invoke->functionExpr);
+    if (!m_parentDifferentiableAttr && !differentiateExpr)
+        return;
+
+    Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
+    for (Index i = 0; i < checkCount; ++i)
+    {
+        if (!isByReferenceParamPassingMode(funcType->getParamInfo(i).mode))
+            continue;
+
+        auto argExpr = invoke->arguments[i];
+        if (isArgumentOfFailedCheck(argExpr) || !argumentNamesGroupSharedStorage(argExpr))
+            continue;
+
+        if (auto baseDeclRefExpr = as<DeclRefExpr>(getBaseObjectOfProjection(argExpr)))
+        {
+            if (baseDeclRefExpr->declRef.as<ParamDecl>())
+                continue;
+        }
+
+        String paramName;
+        if (i < paramDeclRefs.getCount())
+            paramName = getText(paramDeclRefs[i].getDecl()->getName());
+        else if (differentiateExpr && i < differentiateExpr->newParameterNames.getCount())
+            paramName = getText(differentiateExpr->newParameterNames[i]);
+
+        getSink()->diagnose(Diagnostics::GroupsharedArgumentCopiedByDifferentiableCall{
+            .param = paramName,
+            .arg = argExpr});
     }
 }
 
