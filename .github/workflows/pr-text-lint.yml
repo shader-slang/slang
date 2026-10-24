@@ -1,0 +1,35 @@
+name: PR Text Lint
+# Checks the PR title and description against the four-section format in
+# AGENTS.md ("Commit & Pull Request Guidelines"): Motivation, Approach, Key
+# choices, Evidence; three lines each; under 1,500 characters outside
+# <details>; no tables. Reports warnings until the repository variable
+# PR_TEXT_LINT_ENFORCE is "true", then fails the check.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-text-lint:
+    runs-on: ubuntu-latest
+    steps:
+      # The merge ref (default) so the PR that adds or changes the script is
+      # linted by its own copy. The job has read-only permissions and no
+      # secrets, and the script only reads the PR text.
+      - name: Checkout the lint script
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          sparse-checkout: |
+            extras/pr_text_lint.py
+          sparse-checkout-cone-mode: false
+
+      - name: Lint PR title and description
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          ENFORCE: ${{ vars.PR_TEXT_LINT_ENFORCE == 'true' && '--enforce' || '' }}
+        run: |
+          printf '%s' "$PR_BODY" > /tmp/pr-body.md
+          python3 extras/pr_text_lint.py --title "$PR_TITLE" --body-file /tmp/pr-body.md --format github $ENFORCE

@@ -255,26 +255,21 @@ this layer owns the logic, with a code trace from producer to consumer.
 - For formatting failures, run installed hooks from `./extras/install-git-hooks.sh` or
   request the format bot with `/format`.
 
-Write the PR description in this five-part format:
+Write the PR description in four sections, each at most three lines, under 1,500 characters
+in total (counting the text outside any `<details>` block). The description becomes the squash
+commit message, so it is written for `git log`, not for the review thread.
+`.github/PULL_REQUEST_TEMPLATE.md` carries the headings:
 
-1. **Motivation** — the problem, with a concrete example / motivating test case.
-2. **Proposed solution** — the approach and why it is principled.
-3. **Change summary** — the files/areas touched and what each does.
-4. **Concepts and vocabulary** — a short glossary between the change summary and the process report.
-   Restate only the codebase-specific or subtle terms the report relies on (e.g. witness, facet,
-   the fixpoint solver, a non-obvious distinction the fix hinges on), as a reminder. Do not explain
-   basic, well-known concepts (interface, associated type) — assume them.
-5. **Process report** — explain every change with a logical reason. For a change addressing a
-   cascading issue, describe the issue (with its motivating test case) and justify the fix with a
-   code trace (the exact functions/insts involved), explaining why it is necessary and principled
-   rather than a workaround. For any change that handles, guards, or special-cases a particular
-   input shape, the report must answer the input-shape check from the methodology — is that shape
-   correct and principled, or should its producer have been fixed instead? — so a reviewer can
-   confirm the fix sits at the right layer.
+1. **Motivation** — the problem or, for a bug, the root cause. It makes sense without opening
+   the issue.
+2. **Approach** — where the change sits in the architecture, and why there.
+3. **Key choices** — where another engineer might decide differently, and what affects future
+   maintainers (a field made private, an invariant now behind an accessor, a format or ABI
+   touched).
+4. **Evidence** — tests added and run, and what was not run and why.
 
-Write for a reviewer without the full context in their head. Use the same conversational style
-expected in code comments: start from a concrete user-code example, include the full relevant
-snippet rather than just a type or function name, and explain the logical steps in order. Say what
-the compiler builds, how that representation flows through named functions or IR instructions, and
-why the chosen fix preserves the invariant. Avoid terse headings like "AST trace"; make the prose
-read like an explanation to a reviewer who is learning the scenario for the first time.
+Then `Fixes #N`. No tables, logs or file-by-file notes. The process report — per-change
+reasoning, code traces, and the input-shape check from the Problem-Solving Methodology — goes in
+one collapsed `<details>` block at the end, where it is not counted. The title is
+`component: imperative summary`, under 72 characters. The `pr-text-lint` workflow checks the
+shape and reports the exact fix.
