@@ -733,6 +733,7 @@ inline Name* getSubscriptOperatorName(ASTBuilder* astBuilder)
     return astBuilder->getNamePool()->getName("operator[]");
 }
 
+/// Returns the substituted signature, using an __associatedfunc's declared type when present.
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef);
 
 GenericDeclRefType* getGenericDeclRefType(
