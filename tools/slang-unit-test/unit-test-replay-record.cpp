@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-record-replay.cpp
 //
 // Tests that verify the record-replay system works correctly by:
@@ -335,3 +336,4 @@ SLANG_UNIT_TEST(replayRecord_model_viewer)
 }
 
 #endif
+#endif // SLANG_ENABLE_RECORD_REPLAY

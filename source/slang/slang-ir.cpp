@@ -3012,10 +3012,18 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
+    return getRefParamType(valueType, AccessQualifier::ReadWrite, addrSpace);
+}
+
+IRRefParamType* IRBuilder::getRefParamType(
+    IRType* valueType,
+    AccessQualifier accessQualifier,
+    AddressSpace addrSpace)
+{
     return (IRRefParamType*)getPtrType(
         kIROp_RefParamType,
         valueType,
-        AccessQualifier::ReadWrite,
+        accessQualifier,
         addrSpace,
         getDefaultBufferLayoutType());
 }
@@ -3616,18 +3624,31 @@ IRInst* IRBuilder::emitDebugVar(
     IRInst* source,
     IRInst* line,
     IRInst* col,
+    IRInst* scope,
     IRInst* argIndex)
 {
+    SLANG_RELEASE_ASSERT(as<IRDebugFunction>(scope) || as<IRDebugLexicalBlock>(scope));
     if (argIndex)
     {
-        IRInst* args[] = {source, line, col, argIndex};
-        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
+        IRInst* args[] = {source, line, col, scope, argIndex};
+        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 5, args);
     }
     else
     {
-        IRInst* args[] = {source, line, col};
-        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 3, args);
+        IRInst* args[] = {source, line, col, scope};
+        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
     }
+}
+
+IRInst* IRBuilder::emitDebugLexicalBlock(
+    IRInst* source,
+    IRInst* line,
+    IRInst* col,
+    IRInst* parentScope)
+{
+    SLANG_RELEASE_ASSERT(as<IRDebugFunction>(parentScope) || as<IRDebugLexicalBlock>(parentScope));
+    IRInst* args[] = {source, line, col, parentScope};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugLexicalBlock, 4, args);
 }
 
 IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue)
@@ -7358,7 +7379,7 @@ IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(
 // IR emitter for a dedicated instruction to represent NonUniformResourceIndex qualifier.
 IRInst* IRBuilder::emitNonUniformResourceIndexInst(IRInst* val)
 {
-    const auto i = createInst<IRInst>(this, kIROp_NonUniformResourceIndex, getTypeType(), val);
+    const auto i = createInst<IRInst>(this, kIROp_NonUniformResourceIndex, val->getFullType(), val);
     addInst(i);
     return i;
 }
@@ -9534,6 +9555,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_RTTIType:
     case kIROp_Func:
     case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
     case kIROp_Generic:
     case kIROp_Var:
     case kIROp_Param:

@@ -14,7 +14,7 @@
 // the `DebugSource` inst is emitted either way; the difference is its
 // second operand. Plain `-g1` leaves that operand an empty string, and the
 // regex CHECKs distinguish an empty second operand from a non-empty one.
-// The MIN run additionally asserts the compilation-unit inst that only the
+// The MIN run additionally asserts the variable-record inst that only the
 // Standard level would add is still absent, so the flag really did not
 // raise the level; the INC run cannot repeat that assertion because the
 // embedded source text itself now contains the inst's name.
@@ -34,7 +34,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 // Minimal level alone: the text operand is the empty string.
 // MIN-LABEL: ### LOWER-TO-IR:
 // MIN: DebugSource("{{.*}}", "", {{.*}})
-// MIN-NOT: DebugCompilationUnit(
+// MIN-NOT: DebugVa{{r}}(
 
 // Minimal level plus the include-source toggle: the text operand carries
 // the shader source, so the entry-point declaration is quoted inside it.

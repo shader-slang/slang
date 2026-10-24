@@ -1093,7 +1093,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler2DShadow
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
+        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && (float(0) == textureOffset(uniform_sampler2DShadow, vec3(coord), offset2D) || ignoreResultF32)
 
@@ -1117,7 +1117,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler2DRectShadow
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
+        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && float(0) == textureOffset(uniform_sampler2DRectShadow, vec3(coord), offset2D)
 

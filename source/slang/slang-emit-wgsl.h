@@ -32,6 +32,9 @@ public:
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault)
         SLANG_OVERRIDE;
 
+    // Prefer WGSL's native `loop` spelling for structured unconditional loops.
+    virtual char const* getUnconditionalLoopHeader() SLANG_OVERRIDE { return "loop"; }
+
     // WGSL doesn't support fall-through in switch statements
     virtual bool supportsSwitchFallThrough() SLANG_OVERRIDE { return false; }
 
@@ -92,6 +95,9 @@ private:
     void _requireExtension(const UnownedStringSlice& name);
 
     bool m_f16ExtensionEnabled = false;
+
+    // Set when a push-constant buffer is emitted as `var<immediate>`.
+    bool m_requiresImmediateAddressSpace = false;
 
     RefPtr<ShaderExtensionTracker> m_extensionTracker;
 };
