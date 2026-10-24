@@ -2656,6 +2656,7 @@ struct ForwardDiffTranslationContext
         case kIROp_MakeCoopVectorFromValuePack:
         case kIROp_MakeTuple:
         case kIROp_MakeOptionalValue:
+        case kIROp_MakeConditionalValue:
         case kIROp_MakeResultValue:
         case kIROp_MakeValuePack:
         case kIROp_BuiltinCast:
@@ -2710,6 +2711,7 @@ struct ForwardDiffTranslationContext
         case kIROp_DifferentialPairGetDifferential:
             return translateDifferentialPairGetElement(builder, origInst);
 
+        case kIROp_GetConditionalValue:
         case kIROp_ExtractExistentialValue:
             return translateSingleOperandInst(builder, origInst);
 
