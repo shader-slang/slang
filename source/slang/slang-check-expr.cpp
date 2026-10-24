@@ -314,14 +314,6 @@ static SourceLoc _getMemberOpLoc(Expr* expr)
     return SourceLoc();
 }
 
-void addSiblingScopeForContainerDecl(
-    ASTBuilder* builder,
-    ContainerDecl* dest,
-    ContainerDecl* source)
-{
-    addSiblingScopeForContainerDecl(builder, dest->ownedScope, source);
-}
-
 void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source)
 {
     auto subScope = builder->create<Scope>();
@@ -605,6 +597,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                 expr->type = m_astBuilder->getErrorType();
             }
 
+            const bool isFieldWritableThroughWritableBase =
+                expr->type.isLeftValue && as<VarDeclBase>(declRef.getDecl());
+
             // The member's `QualType` supplies its own l-value status. An ordinary instance
             // member additionally requires an l-value base. Buffer accesses and property
             // accessors have the separate rules below when the base is not an l-value.
@@ -661,6 +656,13 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                     expr->type.isLeftValue = isLValue;
                 }
             }
+
+            // A field of a read-only memory location is part of that location, provided the
+            // field would be writable through a writable base. A property is excluded because
+            // its accessors do not name a memory location.
+            expr->type.isReadOnlyMemoryLocation = !expr->type.isLeftValue &&
+                                                  baseExpr->type.isReadOnlyMemoryLocation &&
+                                                  isFieldWritableThroughWritableBase;
             return expr;
         }
     }
@@ -718,8 +720,9 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         // however, and so the code here might need updating sooner or
         // later.
         //
-        bool baseIsLVal = QualType(base->type.type).isLeftValue;
-        derefExpr->type.isLeftValue = baseIsLVal;
+        QualType refQualType(base->type.type);
+        derefExpr->type.isLeftValue = refQualType.isLeftValue;
+        derefExpr->type.isReadOnlyMemoryLocation = refQualType.isReadOnlyMemoryLocation;
     }
     else if (isImmutableBufferType(base->type))
     {
@@ -730,6 +733,7 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     {
         derefExpr->type.isLeftValue = base->type.isLeftValue;
         derefExpr->type.isLeftValue = base->type.isLeftValue;
+        derefExpr->type.isReadOnlyMemoryLocation = base->type.isReadOnlyMemoryLocation;
         derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
         derefExpr->type.isWriteOnly = base->type.isWriteOnly;
     }
@@ -3492,6 +3496,7 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
     // TODO(tfoley): need to be more careful about this stuff
     subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
+    subscriptExpr->type.isReadOnlyMemoryLocation = baseExpr->type.isReadOnlyMemoryLocation;
 
     return subscriptExpr;
 }
@@ -4219,22 +4224,52 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     return false;
 }
 
-static bool _isOutInOutOrRefParam(FuncType* funcType, Index paramIndex)
+/// Return whether a parameter of mode `mode` may be a reference to its argument's storage during
+/// the call, rather than a copy of it.
+static bool _mayParamBeReferenceToArgumentStorage(ParamPassingMode mode)
 {
-    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
-    return as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType);
+    // An `in` parameter may become a borrow in `transformParamsToConstRef`, but that borrow is
+    // never a reference to argument storage the call can modify.
+    if (mode == ParamPassingMode::In)
+        return false;
+
+    // The `ref` modes are always references. The language defines `out`, `inout`, and borrow
+    // parameters as copies, but lets the compiler pass them by reference instead, on the
+    // assumption that well-written code cannot tell the difference. Targets make different
+    // choices: when `addArg` lowers such an argument that names a memory location, it passes the
+    // address of that location, which HLSL and GLSL then emit as copying parameters, while SPIR-V,
+    // Metal, CUDA, C++, and WGSL keep it as a pointer to the caller's variable.
+    return true;
 }
 
-static const char* _getDirectionString(FuncType* funcType, Index paramIndex)
+/// Return whether passing overlapping argument storage to parameters of modes `first` and `second`
+/// may be undefined behavior, so that the potential-aliasing warning applies.
+static bool _mayAliasedArgumentsInterfere(ParamPassingMode first, ParamPassingMode second)
 {
-    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
-    if (as<OutParamType>(paramType))
-        return "out";
-    if (as<BorrowInOutParamType>(paramType))
-        return "inout";
-    if (as<RefParamType>(paramType))
-        return "ref";
-    return "in";
+    // A copy is taken before the call, so nothing done through the other parameter can affect it.
+    if (!_mayParamBeReferenceToArgumentStorage(first) ||
+        !_mayParamBeReferenceToArgumentStorage(second))
+        return false;
+
+    // A function that declares two reference parameters has opted into reference semantics for
+    // both, so we assume it handles their aliasing. A borrow, `out`, or `inout` parameter has value
+    // semantics that the target may implement by reference, so pairing one with any parameter that
+    // may write the storage still warns.
+    if (isByReferenceParamPassingMode(first) && isByReferenceParamPassingMode(second))
+        return false;
+
+    // Both parameters may be references to the same storage. Two read-only references
+    // (`ref_readonly`, `borrow`, `constref`) cannot change it, but a write through either one
+    // makes the result depend on how the target passed them. Consider this example:
+    //
+    //     int f(inout int a, __borrow int b) { a = 5; return b; }
+    //     int x = 1;
+    //     f(x, x);
+    //
+    // On HLSL, `a` and `b` are copies of `x`, so `f` returns 1. On Metal, both are pointers to
+    // `x`, so `f` returns 5.
+    return doesParamPassingModeIndicateWritableStorage(first) ||
+           doesParamPassingModeIndicateWritableStorage(second);
 }
 
 void SemanticsVisitor::_checkAliasedOutArguments(
@@ -4254,29 +4289,28 @@ void SemanticsVisitor::_checkAliasedOutArguments(
     Index checkCount = Math::Min(argCount, paramCount);
 
     // For each pair of arguments, check if they refer to the same storage
-    // and at least one parameter is out/inout/ref. We compare expressions
-    // structurally: bare variables (a == a), member accesses (s.x == s.x
-    // but not s.x == s.y), and constant-index subscripts (arr[0] == arr[0]
-    // but not arr[0] == arr[1]).
+    // and their parameters' modes let the aliasing interfere. We compare
+    // expressions structurally: bare variables (a == a), member accesses
+    // (s.x == s.x but not s.x == s.y), and constant-index subscripts
+    // (arr[0] == arr[0] but not arr[0] == arr[1]).
     for (Index i = 0; i < checkCount; ++i)
     {
-        bool iIsOut = _isOutInOutOrRefParam(funcType, i);
+        const auto iMode = funcType->getParamPassingMode(i);
 
         for (Index j = i + 1; j < checkCount; ++j)
         {
-            // At least one of the two must be out/inout/ref.
-            bool jIsOut = _isOutInOutOrRefParam(funcType, j);
-            if (!iIsOut && !jIsOut)
+            const auto jMode = funcType->getParamPassingMode(j);
+            if (!_mayAliasedArgumentsInterfere(iMode, jMode))
                 continue;
 
             if (!_exprsDefinitelyAlias(invoke->arguments[i], invoke->arguments[j]))
                 continue;
 
-            // Both arguments refer to the same variable and at least
-            // one is out/inout/ref. Put the out/inout/ref parameter
-            // first in the diagnostic for clarity.
-            Index first = iIsOut ? i : j;
-            Index second = iIsOut ? j : i;
+            // Both arguments refer to the same variable. Put a parameter that
+            // may be written first in the diagnostic for clarity.
+            const bool iMayBeWritten = doesParamPassingModeIndicateWritableStorage(iMode);
+            Index first = iMayBeWritten ? i : j;
+            Index second = iMayBeWritten ? j : i;
 
             Name* paramNameFirst = nullptr;
             Name* paramNameSecond = nullptr;
@@ -4286,9 +4320,9 @@ void SemanticsVisitor::_checkAliasedOutArguments(
                 paramNameSecond = paramDeclRefs[second].getName();
 
             getSink()->diagnose(Diagnostics::PotentiallyAliasedOutParameter{
-                .direction1 = _getDirectionString(funcType, first),
+                .direction1 = funcType->getParamPassingMode(first),
                 .param1 = paramNameFirst,
-                .direction2 = _getDirectionString(funcType, second),
+                .direction2 = funcType->getParamPassingMode(second),
                 .param2 = paramNameSecond,
                 .firstArg = invoke->arguments[first]});
             break; // One warning per outer index i is enough.
@@ -4380,7 +4414,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
 
-                if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
+                if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
                     // an *exact* match on the type of the argument.
@@ -4389,9 +4423,14 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                     // for an `inout` parameter to be converted in both
                     // directions.
                     //
+                    // A `__ref_readonly` parameter only reads its argument, so the argument
+                    // may also be a memory location that the caller cannot write.
+                    const bool acceptsReadOnlyMemoryLocation =
+                        as<RefReadOnlyParamType>(paramType) != nullptr;
                     if (argExpr)
                     {
-                        if (!argExpr->type.isLeftValue)
+                        if (!argExpr->type.isLeftValue && !(acceptsReadOnlyMemoryLocation &&
+                                                            argExpr->type.isReadOnlyMemoryLocation))
                         {
                             auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
@@ -4500,7 +4539,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1)
                                 {
                                     // Try and determine reason for failure
-                                    if (as<RefParamType>(paramType))
+                                    if (as<RefParamTypeBase>(paramType))
                                     {
                                         // Ref types are not allowed to use this mechanism
                                         // because it breaks atomics
@@ -4562,10 +4601,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            // Check for potentially aliased out/inout/ref arguments.
-            // If two arguments refer to the same root variable and at
-            // least one of them is out/inout/ref, the behavior is
-            // undefined (issue #10699).
+            // Warn when the same storage is passed to two parameters that may both be references
+            // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
@@ -5750,7 +5787,7 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
         // support autodiff, but it is not clear what a correct
         // one-size-fits-all behavior should be in that case.
         //
-        if (as<RefParamType>(primalParamType))
+        if (as<RefParamTypeBase>(primalParamType))
             return primalParamWrapperType;
 
         // Given a primal type that is a wrapper like `Out<T>`, we can
@@ -6012,7 +6049,9 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
 
                 break;
             }
-        case ParamPassingMode::Ref:
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
             {
                 // Not allowed..
                 SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
@@ -8512,8 +8551,11 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     }
 
     // A swizzle of a writable base can be used as an l-value as long as there were no
-    // duplicates in the list of components.
+    // duplicates in the list of components. Only a single element is a memory location,
+    // because the elements of a matrix row or column need not be adjacent.
     swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        elementCount == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
 
     return swizExpr;
 }
@@ -8626,9 +8668,24 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     }
 
     // A swizzle of a writable base can be used as an l-value as long as there were no
-    // duplicates in the list of components.
+    // duplicates in the list of components. A single element is a memory location, while
+    // several elements form a new tuple and so do not name one.
     swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        swizExpr->elementIndices.getCount() == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
     return swizExpr;
+}
+
+/// Return whether the components of a vector swizzle are adjacent and in increasing order, as in
+/// `v.y` or `v.yzw` but not `v.xz` or `v.yx`. Only such a swizzle names a memory location.
+static bool areSwizzleComponentsContiguous(ShortList<uint32_t, 4> const& elementIndices)
+{
+    for (Index i = 1; i < elementIndices.getCount(); i++)
+    {
+        if (elementIndices[i] != elementIndices[0] + uint32_t(i))
+            return false;
+    }
+    return true;
 }
 
 Expr* SemanticsVisitor::CheckSwizzleExpr(
@@ -8734,9 +8791,13 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
     }
 
     // A swizzle of a writable base can be used as an l-value as long as there were no
-    // duplicates in the list of components.
-    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base && swizExpr->base->type &&
-                                 swizExpr->base->type.isLeftValue;
+    // duplicates in the list of components. It is a memory location only if its components
+    // are adjacent and in order, as in `v.yz`; `v.xz` and `v.yx` can be written component by
+    // component but have no single address.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        areSwizzleComponentsContiguous(swizExpr->elementIndices) &&
+        swizExpr->base->type.isReadOnlyMemoryLocation;
 
     return swizExpr;
 }
