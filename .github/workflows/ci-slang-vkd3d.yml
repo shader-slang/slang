@@ -1,0 +1,80 @@
+name: CI Native DXBC
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  vkd3d:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+          submodules: "recursive"
+          fetch-depth: "250"
+          fetch-tags: true
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            bison flex libjson-perl libvulkan-dev spirv-headers
+
+      - name: Build vkd3d-shader
+        run: |
+          source_dir="$RUNNER_TEMP/vkd3d-source"
+          build_dir="$RUNNER_TEMP/vkd3d-build"
+          prefix="$RUNNER_TEMP/vkd3d"
+          archive="$RUNNER_TEMP/vkd3d-2.1.tar.xz"
+          curl --fail --location --retry 3 \
+            https://dl.winehq.org/vkd3d/source/vkd3d-2.1.tar.xz -o "$archive"
+          echo "7510146aff2adfb4ae07ab890701a607e5ff7c66e57100cfc9f630ec92eeda6a  $archive" \
+            | sha256sum --check
+          mkdir -p "$source_dir" "$build_dir"
+          tar -xJf "$archive" -C "$source_dir" --strip-components=1
+          cd "$build_dir"
+          "$source_dir/configure" --prefix="$prefix" --disable-tests --disable-demos \
+            --without-ncurses --without-opengl --without-xcb --without-spirv-tools
+          make --jobs="$(nproc)" include/private/vkd3d_version.h \
+            include/private/spirv_grammar.h libs/vkd3d-shader/hlsl.tab.h \
+            libs/vkd3d-shader/preproc.tab.h
+          make --jobs="$(nproc)" libvkd3d-shader.la
+          make install-libLTLIBRARIES lib_LTLIBRARIES=libvkd3d-shader.la
+          install -Dm644 "$source_dir/include/vkd3d_shader.h" \
+            "$prefix/include/vkd3d/vkd3d_shader.h"
+          install -Dm644 "$source_dir/include/vkd3d_types.h" \
+            "$prefix/include/vkd3d/vkd3d_types.h"
+          echo "VKD3D_PREFIX=$prefix" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$prefix/lib" >> "$GITHUB_ENV"
+
+      - name: Build Slang with native DXBC
+        run: |
+          cmake --preset default \
+            -DSLANG_ENABLE_VKD3D_SHADER=ON \
+            -DSLANG_VKD3D_INCLUDE_DIR="$VKD3D_PREFIX/include/vkd3d" \
+            -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY_IF_POSSIBLE \
+            -DSLANG_ENABLE_DXIL=OFF \
+            -DSLANG_DXC_BUILD_FROM_SOURCE=OFF \
+            -DSLANG_ENABLE_GFX=OFF \
+            -DSLANG_ENABLE_EXAMPLES=OFF
+          cmake --build --preset release --target slangc slang-test --parallel "$(nproc)"
+
+      - name: Test native DXBC
+        run: |
+          build/Release/bin/slang-test tests/downstream/vkd3d | tee vkd3d-tests.log
+          build/Release/bin/slang-test slang-unit-test-tool/vkd3dGeneratedDXBC \
+            | tee vkd3d-api.log
+          for log in vkd3d-tests.log vkd3d-api.log; do
+            if ! grep -qE '^100% of tests passed \([1-9][0-9]*/[1-9][0-9]*\)' "$log" \
+              || grep -q 'tests ignored' "$log"; then
+              echo "::error::native DXBC tests must run and pass without being ignored"
+              exit 1
+            fi
+          done

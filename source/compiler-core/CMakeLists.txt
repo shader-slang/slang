@@ -21,3 +21,34 @@ if(NOT MSVC)
         DIRECTORY ${slang_SOURCE_DIR}
     )
 endif()
+
+if(SLANG_ENABLE_VKD3D_SHADER)
+    find_path(
+        SLANG_VKD3D_INCLUDE_DIR
+        vkd3d_shader.h
+        PATH_SUFFIXES vkd3d
+        REQUIRED
+    )
+    include(CheckCXXSourceCompiles)
+    include(CMakePushCheckState)
+    cmake_push_check_state(RESET)
+    set(CMAKE_REQUIRED_INCLUDES ${SLANG_VKD3D_INCLUDE_DIR})
+    unset(SLANG_VKD3D_HAS_REQUIRED_API CACHE)
+    check_cxx_source_compiles(
+        "#include <vkd3d_shader.h>
+int main() { return VKD3D_SHADER_API_VERSION_2_1; }"
+        SLANG_VKD3D_HAS_REQUIRED_API
+    )
+    cmake_pop_check_state()
+    if(NOT SLANG_VKD3D_HAS_REQUIRED_API)
+        message(
+            FATAL_ERROR
+            "SLANG_ENABLE_VKD3D_SHADER requires upstream vkd3d 2.1 or newer headers"
+        )
+    endif()
+    target_include_directories(compiler-core PRIVATE ${SLANG_VKD3D_INCLUDE_DIR})
+endif()
+target_compile_definitions(
+    compiler-core
+    PRIVATE SLANG_ENABLE_VKD3D_SHADER=$<BOOL:${SLANG_ENABLE_VKD3D_SHADER}>
+)

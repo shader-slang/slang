@@ -1,6 +1,7 @@
 // slang-pass-through.cpp
 #include "slang-pass-through.h"
 
+#include "compiler-core/slang-downstream-compiler-util.h"
 #include "compiler-core/slang-slice-allocator.h"
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
@@ -21,6 +22,7 @@ SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode com
         {
             return SourceLanguage::Unknown;
         }
+    case PassThroughMode::Vkd3d:
     case PassThroughMode::Fxc:
     case PassThroughMode::Dxc:
         {
@@ -99,7 +101,7 @@ PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::DXBytecodeAssembly:
         {
-            return PassThroughMode::Fxc;
+            return PassThroughMode(DownstreamCompilerUtil::getDefaultDXBCCompiler());
         }
     case CodeGenTarget::DXIL:
     case CodeGenTarget::DXILAssembly:

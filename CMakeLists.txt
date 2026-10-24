@@ -147,6 +147,11 @@ option(
 )
 
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
+option(
+    SLANG_ENABLE_VKD3D_SHADER
+    "Enable generating DXBC with native vkd3d-shader"
+    OFF
+)
 
 option(SLANG_ENABLE_VALIDATION_IR "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_VALIDATION_VM_BYTECODE "Enable VM bytecode validation" ON)

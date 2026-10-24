@@ -645,7 +645,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     Profile profile;
 
     if (compilerType == PassThroughMode::Fxc || compilerType == PassThroughMode::Dxc ||
-        compilerType == PassThroughMode::Glslang)
+        compilerType == PassThroughMode::Glslang || compilerType == PassThroughMode::Vkd3d)
     {
         const auto entryPointIndices = getEntryPointIndices();
         auto targetReq = getTargetReq();
@@ -721,7 +721,10 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             {
                 options.flags |= CompileOptions::Flag::EnableFloat16;
             }
+        }
 
+        if (compilerType == PassThroughMode::Dxc || compilerType == PassThroughMode::Vkd3d)
+        {
             // Set the matrix layout
             options.matrixLayout =
                 (SlangMatrixLayoutMode)getTargetProgram()->getOptionSet().getMatrixLayoutMode();
