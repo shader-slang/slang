@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -g2 -O0 -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir-after finalizeAutoDiffPass -o - -entry computeMain -stage compute -g2
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -g2 -O0 -entry computeMain -stage compute -validate-ir
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir-after finalizeAutoDiffPass -o - -entry computeMain -stage compute -g2 -validate-ir
 
 // Regression test for shader-slang/slang#13238: each autodiff-generated derivative must carry its
 // own DebugFunction record, named after the derivative, rather than sharing the original function's
