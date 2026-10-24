@@ -120,6 +120,21 @@ void cloneInstDecorationsAndChildren(
 ///
 IRInst* cloneInst(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst);
 
+/// Clone the debug scope tree rooted at `rootScope` (an `IRDebugFunction` or
+/// `IRDebugLexicalBlock`) into `env`: the root and every lexical block nested under it,
+/// with each clone's parent operand remapped onto its parent's clone. When
+/// `rootReplacement` is non-null it becomes the root's replacement in `env` instead of a
+/// clone of the root, and only the lexical descendants are cloned, nested under it. The
+/// copies are emitted at `builder`'s insertion point. A function body cloned with `env`
+/// afterwards refers to the cloned tree; a caller that keeps an existing body redirects
+/// that body's uses itself.
+///
+void cloneDebugScopeTree(
+    IRCloneEnv* env,
+    IRBuilder* builder,
+    IRInst* rootScope,
+    IRInst* rootReplacement);
+
 /// Clone `oldDecoration` and attach the clone to `newParent`.
 ///
 /// Uses `module` to allocate any new instructions.
