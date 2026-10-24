@@ -928,6 +928,29 @@ struct LLVMLayoutRules : IRTypeLayoutRules
     }
 };
 
+// The native MSL layout of a Metal constant buffer: C layout (one-byte `bool`, struct sizes
+// rounded up to their alignment), except that a vector is padded to a power-of-two element count
+// and aligned to its size (`float3` is 16 bytes). Reflection computes the same layout in
+// `MetalLayoutRulesImpl` (`slang-type-layout.cpp`), and nothing checks the two against each
+// other, so a change to one has to be made to both. Buffer lowering uses these rules for the
+// array strides and size decorations of a constant buffer's storage types; the MSL emitter does
+// not print them, because the native MSL types already have this layout.
+struct MetalConstantBufferLayoutRules : CLayoutRules
+{
+    MetalConstantBufferLayoutRules() { ruleName = IRTypeLayoutRuleName::MetalConstantBuffer; }
+
+    virtual IRSizeAndAlignment getVectorSizeAndAlignment(
+        IRSizeAndAlignment element,
+        IRIntegerValue count)
+    {
+        IRIntegerValue alignedCount = 1;
+        while (alignedCount < count)
+            alignedCount *= 2;
+        IRIntegerValue size = element.size * alignedCount;
+        return IRSizeAndAlignment(size, (int)size);
+    }
+};
+
 Result getNaturalSizeAndAlignment(
     TargetRequest* targetReq,
     IRType* type,
@@ -1007,6 +1030,12 @@ IRTypeLayoutRules* IRTypeLayoutRules::getConstantBuffer()
     return &rules;
 }
 
+IRTypeLayoutRules* IRTypeLayoutRules::getMetalConstantBuffer()
+{
+    static MetalConstantBufferLayoutRules rules;
+    return &rules;
+}
+
 IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
 {
     switch (name)
@@ -1026,6 +1055,8 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getConstantBuffer();
     case IRTypeLayoutRuleName::LLVM:
         return getLLVM();
+    case IRTypeLayoutRuleName::MetalConstantBuffer:
+        return getMetalConstantBuffer();
     default:
         return nullptr;
     }
@@ -1056,6 +1087,8 @@ std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(
         return IRTypeLayoutRuleName::CUDA;
     case kIROp_LLVMBufferLayoutType:
         return IRTypeLayoutRuleName::LLVM;
+    case kIROp_MetalConstantBufferLayoutType:
+        return IRTypeLayoutRuleName::MetalConstantBuffer;
     }
     return {};
 }
@@ -1080,6 +1113,8 @@ IROp getOpFromTypeLayoutRuleName(IRTypeLayoutRuleName ruleName)
         return kIROp_CUDABufferLayoutType;
     case IRTypeLayoutRuleName::LLVM:
         return kIROp_LLVMBufferLayoutType;
+    case IRTypeLayoutRuleName::MetalConstantBuffer:
+        return kIROp_MetalConstantBufferLayoutType;
     default:
         return kIROp_DefaultBufferLayoutType;
     }
