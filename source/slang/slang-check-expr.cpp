@@ -6248,6 +6248,65 @@ struct PassthroughHighOrderExprCheckingActionsBase : HigherOrderInvokeExprChecki
     }
 };
 
+static bool _isInstanceMethod(Decl* decl)
+{
+    if (auto genericDecl = as<GenericDecl>(decl))
+        decl = genericDecl->inner;
+    return as<CallableDecl>(decl) && !isEffectivelyStatic(decl);
+}
+
+static bool _isBoundToThis(LookupResultItem const& item)
+{
+    for (auto breadcrumb = item.breadcrumbs; breadcrumb; breadcrumb = breadcrumb->next)
+    {
+        if (breadcrumb->kind == LookupResultItem::Breadcrumb::Kind::ThisExpr)
+            return true;
+    }
+    return false;
+}
+
+// Removes the non-static methods that `funcExpr` binds to an instance, as in `obj.method`, from
+// the candidates it names. `outMethod` is set to one of them if no candidate remains.
+static Expr* _removeInstanceBoundMethods(
+    SemanticsVisitor* semantics,
+    Expr* funcExpr,
+    Decl*& outMethod)
+{
+    if (auto memberExpr = as<MemberExpr>(funcExpr))
+    {
+        if (_isInstanceMethod(memberExpr->declRef.getDecl()))
+            outMethod = memberExpr->declRef.getDecl();
+        return funcExpr;
+    }
+    auto overloadedExpr = as<OverloadedExpr>(funcExpr);
+    if (!overloadedExpr || (overloadedExpr->base && as<TypeType>(overloadedExpr->base->type.type)))
+        return funcExpr;
+
+    Decl* method = nullptr;
+    LookupResult remaining;
+    for (auto item : overloadedExpr->lookupResult2)
+    {
+        if (_isInstanceMethod(item.declRef.getDecl()) &&
+            (overloadedExpr->base || _isBoundToThis(item)))
+            method = item.declRef.getDecl();
+        else
+            AddToLookupResult(remaining, item);
+    }
+    if (!method)
+        return funcExpr;
+    if (!remaining.isValid())
+    {
+        outMethod = method;
+        return funcExpr;
+    }
+    return semantics->createLookupResultExpr(
+        overloadedExpr->name,
+        remaining,
+        overloadedExpr->base,
+        overloadedExpr->loc,
+        overloadedExpr->originalExpr);
+}
+
 static Expr* _checkHigherOrderInvokeExpr(
     SemanticsVisitor* semantics,
     HigherOrderInvokeExpr* expr,
@@ -6255,7 +6314,13 @@ static Expr* _checkHigherOrderInvokeExpr(
 {
     // Check/Resolve inner function declaration.
     SemanticsVisitor subVisitor(semantics->getShared());
-    subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();
+    // An existential receiver is opened into the caller's expression-local scope. A nested
+    // derivative checks its own operand under the caller's rules.
+    subVisitor = subVisitor.withSink(semantics->getSink())
+                     .withExprLocalScope(semantics->getExprLocalScope());
+    if (!as<HigherOrderInvokeExpr>(expr->baseFunction) ||
+        semantics->getAllowStaticReferenceToNonStaticMember())
+        subVisitor = subVisitor.allowStaticReferenceToNonStaticMember();
     // expr->baseFunction = subVisitor.CheckExpr(expr->baseFunction);
     expr->baseFunction = subVisitor.dispatchExpr(expr->baseFunction, subVisitor);
     expr->baseFunction =
@@ -6263,6 +6328,21 @@ static Expr* _checkHigherOrderInvokeExpr(
 
     if (semantics->IsErrorExpr(expr->baseFunction))
         return semantics->CreateErrorExpr(expr);
+
+    // Where a method is only named, as by a derivative attribute, its receiver is not used.
+    if (!semantics->getAllowStaticReferenceToNonStaticMember())
+    {
+        Decl* method = nullptr;
+        expr->baseFunction = _removeInstanceBoundMethods(semantics, expr->baseFunction, method);
+        if (method)
+        {
+            semantics->getSink()->diagnose(
+                Diagnostics::NonStaticMemberFunctionNotAllowedAsDiffOperand{
+                    .func = method,
+                    .expr = expr->baseFunction});
+            return semantics->CreateErrorExpr(expr);
+        }
+    }
 
     auto astBuilder = semantics->getASTBuilder();
 
