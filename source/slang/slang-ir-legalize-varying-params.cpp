@@ -2907,6 +2907,8 @@ protected:
 
         bool isUnsupported = false;
         bool isSpecial = false;
+        // The target defines the value only on stage outputs, so it is unsupported on an input.
+        bool isOutputOnly = false;
     };
 
     struct SystemValLegalizationWorkItem
@@ -3011,7 +3013,8 @@ protected:
             handleSpecialSystemValue(entryPoint, workItem, info, builder);
         }
 
-        if (info.isUnsupported)
+        bool isInput = !as<IROutParamType>(var->getDataType());
+        if (info.isUnsupported || (info.isOutputOnly && isInput))
         {
             reportUnsupportedSystemAttribute(var, semanticName);
             return;
@@ -3510,18 +3513,26 @@ private:
                 {
                     // The key, not the field, carries the location of the field declaration.
                     auto indexAsString = String(UInt(semanticDecor->getEffectiveSemanticIndex()));
+                    auto errorCount = m_sink->getErrorCount();
                     auto sysValInfo =
                         getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, key);
-                    if (sysValInfo.isUnsupported)
-                    {
-                        reportUnsupportedSystemAttribute(key, semanticDecor->getSemanticName());
-                    }
-                    else
+                    bool isSupported =
+                        !sysValInfo.isUnsupported &&
+                        !(K == LayoutResourceKind::VaryingInput && sysValInfo.isOutputOnly);
+
+                    // A value without a target spelling, such as an input that the target
+                    // computes only for an entry-point parameter, cannot be a struct member; an
+                    // empty spelling would be emitted as an empty attribute such as Metal's `[[]]`.
+                    if (isSupported && sysValInfo.systemValueName.getLength() != 0)
                     {
                         builder.addTargetSystemValueDecoration(
                             key,
                             sysValInfo.systemValueName.getUnownedSlice());
                         semanticDecor->removeAndDeallocate();
+                    }
+                    else if (m_sink->getErrorCount() == errorCount)
+                    {
+                        reportUnsupportedSystemAttribute(key, semanticDecor->getSemanticName());
                     }
                 }
                 index++;
@@ -4325,6 +4336,9 @@ private:
     }
 };
 
+// MSL's clip-distance attribute, which MSL types as `float` or a native `float[n]`.
+static const UnownedStringSlice kMetalClipDistanceAttribute = toSlice("clip_distance");
+
 class LegalizeMetalEntryPointContext : public LegalizeShaderEntryPointContext
 {
 public:
@@ -4364,12 +4378,16 @@ protected:
             }
         case SystemValueSemanticName::ClipDistance:
             {
-                result.isSpecial = true;
+                // MSL defines [[clip_distance]] only for vertex and mesh outputs, and reading it
+                // in a fragment function is undefined.
+                result.systemValueName = kMetalClipDistanceAttribute;
+                result.isOutputOnly = true;
                 break;
             }
         case SystemValueSemanticName::CullDistance:
             {
-                result.isSpecial = true;
+                // MSL has no cull-distance attribute.
+                result.isUnsupported = true;
                 break;
             }
         case SystemValueSemanticName::Coverage:

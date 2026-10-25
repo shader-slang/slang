@@ -1,0 +1,118 @@
+// MSL has no cull-distance attribute, and defines [[clip_distance]] only for vertex and mesh
+// outputs (reading it in a fragment function is undefined), so Metal reports these system values
+// as unsupported instead of emitting an empty `[[]]` attribute or an unattributed parameter.
+
+//DIAGNOSTIC_TEST:SIMPLE(diag=CULL): -target metal -stage vertex -entry vsCull
+//DIAGNOSTIC_TEST:SIMPLE(diag=CLIPIN): -target metal -stage fragment -entry psClipInput
+//DIAGNOSTIC_TEST:SIMPLE(diag=CULLIN): -target metal -stage fragment -entry psCullInput
+//TEST:SIMPLE(filecheck=SHAREDVS): -target metal -stage vertex -entry vsShared
+//DIAGNOSTIC_TEST:SIMPLE(diag=SHAREDPS): -target metal -stage fragment -entry psShared
+//DIAGNOSTIC_TEST:SIMPLE(diag=NESTED): -target metal -stage fragment -entry psNested
+//DIAGNOSTIC_TEST:SIMPLE(diag=UNKNOWN): -target metal -stage vertex -entry vsUnknown
+
+struct CullOut
+{
+    float4 pos : SV_Position;
+    float cull[2] : SV_CullDistance;
+//CULL:   ^^^^ error E55202
+//CULL:   ^^^^ system value semantic 'sv_culldistance' is not supported for the current target.
+};
+
+[shader("vertex")]
+CullOut vsCull(uint vid : SV_VertexID)
+{
+    CullOut o;
+    o.pos = float4(float(vid), 0, 0, 1);
+    o.cull[0] = 1.0;
+    o.cull[1] = -1.0;
+    return o;
+}
+
+[shader("fragment")]
+float4 psClipInput(float4 pos : SV_Position, float clip : SV_ClipDistance0) : SV_Target
+//CLIPIN:                                          ^^^^ error E55202
+//CLIPIN:                                          ^^^^ system value semantic 'sv_clipdistance0' is not supported for the current target.
+{
+    return float4(clip, 0, 0, 1);
+}
+
+[shader("fragment")]
+float4 psCullInput(float4 pos : SV_Position, float cull : SV_CullDistance0) : SV_Target
+//CULLIN:                                          ^^^^ error E55202
+//CULLIN:                                          ^^^^ system value semantic 'sv_culldistance0' is not supported for the current target.
+{
+    return float4(cull, 0, 0, 1);
+}
+
+// One struct used as the vertex output and the fragment input: the output maps to
+// [[clip_distance]], and the fragment input is reported.
+struct SharedVaryings
+{
+    float4 pos : SV_Position;
+    float clip : SV_ClipDistance0;
+/*SHAREDPS:
+          ^^^^ error E55202
+          ^^^^ system value semantic 'sv_clipdistance0' is not supported for the current target.
+*/
+};
+
+// SHAREDVS: float clip{{[_0-9]*}} {{\[\[}}clip_distance{{\]\]}};
+[shader("vertex")]
+SharedVaryings vsShared(uint vid : SV_VertexID)
+{
+    SharedVaryings o;
+    o.pos = float4(float(vid), 0, 0, 1);
+    o.clip = 1.0;
+    return o;
+}
+
+[shader("fragment")]
+float4 psShared(SharedVaryings input) : SV_Target
+{
+    return input.pos;
+}
+
+// A clip distance in a nested input struct reaches legalization as a stage_in struct member
+// rather than as an entry-point parameter, and is reported the same way.
+struct NestedClip
+{
+    float2 uv : TEXCOORD0;
+    float clip : SV_ClipDistance0;
+/*NESTED:
+          ^^^^ error E55202
+          ^^^^ system value semantic 'sv_clipdistance' is not supported for the current target.
+*/
+};
+
+struct NestedVaryings
+{
+    float4 pos : SV_Position;
+    NestedClip inner;
+};
+
+[shader("fragment")]
+float4 psNested(NestedVaryings input) : SV_Target
+{
+    return float4(input.inner.uv, input.inner.clip, 1);
+}
+
+// A system value without a Metal case is reported once, not followed by a second diagnostic or an
+// internal error.
+struct UnknownOut
+{
+    float4 pos : SV_Position;
+    uint rate : SV_ShadingRate;
+/*UNKNOWN:
+         ^^^^ error E40006
+         ^^^^ unknown system-value semantic 'sv_shadingrate'
+*/
+};
+
+[shader("vertex")]
+UnknownOut vsUnknown(uint vid : SV_VertexID)
+{
+    UnknownOut o;
+    o.pos = float4(float(vid), 0, 0, 1);
+    o.rate = 0;
+    return o;
+}
