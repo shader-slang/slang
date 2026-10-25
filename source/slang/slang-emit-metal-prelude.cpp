@@ -86,15 +86,4 @@ const char* MetalSourceEmitter::kMetalBuiltinPreludeLogging = R"(
 #include <metal_logging>
 )";
 
-// Copies the bits of a value into a value of another type of the same size, through memory. Used
-// for a texture, sampler or acceleration structure handle and its 64-bit value, which neither a
-// cast nor `as_type` converts between.
-const char* MetalSourceEmitter::kMetalBuiltinPreludeReinterpretBits = R"(
-template<typename To, typename From>
-To _slang_reinterpretBits(From from)
-{
-    return *(thread To*)(&from);
-}
-)";
-
 } // namespace Slang

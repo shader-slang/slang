@@ -1,9 +1,9 @@
 // Regression test for https://github.com/shader-slang/slang/issues/13753
 // A texture, sampler or acceleration structure DescriptorHandle carried in an interface value is
 // packed into an AnyValue as its 64-bit value. Metal spells such a handle as the resource type
-// itself, which no cast converts to or from an integer, so the bits are copied through memory by
-// the `_slang_reinterpretBits` helper instead of a C-style cast. The run-time round trip is checked
-// by descriptor-handle-texture-dispatch-runtime.slang.
+// itself, which no cast converts to or from an integer, so the bits are copied through memory
+// (`*(thread T*)(&value)`) instead of a C-style cast. The run-time round trip is checked by
+// descriptor-handle-texture-dispatch-runtime.slang.
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=NOCAST): -target metal -entry computeMain -stage compute
@@ -87,21 +87,26 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // NOCAST-NOT: (sampler)(
 // NOCAST-NOT: (metal::raytracing::acceleration_structure<{{.*}}>)(
 
-// The helper is defined once, and each handle is packed and unpacked through it. Each check names
-// its own field and the handle's MSL type, so none depends on the order in which the marshalling
-// functions are emitted.
-// CHECK: To _slang_reinterpretBits(From from)
-// CHECK-DAG: _slang_reinterpretBits<ulong>({{.*}}tex_{{[0-9]+}})
-// CHECK-DAG: tex_{{[0-9]+}} = _slang_reinterpretBits<texture2d<float, access::sample>>(
-// CHECK-DAG: _slang_reinterpretBits<ulong>({{.*}}samp_{{[0-9]+}})
-// CHECK-DAG: samp_{{[0-9]+}} = _slang_reinterpretBits<sampler>(
-// CHECK-DAG: _slang_reinterpretBits<ulong>({{.*}}scene_{{[0-9]+}})
-// CHECK-DAG: scene_{{[0-9]+}} = _slang_reinterpretBits<metal::raytracing::acceleration_structure<{{.*}}>>(
-// CHECK-DAG: _slang_reinterpretBits<ulong>({{.*}}depth_{{[0-9]+}})
-// CHECK-DAG: depth_{{[0-9]+}} = _slang_reinterpretBits<depth2d<float, access::sample>>(
-// CHECK-DAG: _slang_reinterpretBits<ulong>({{.*}}cmp_{{[0-9]+}})
-// CHECK-DAG: cmp_{{[0-9]+}} = _slang_reinterpretBits<sampler>(
-// CHECK-DAG: _slang_reinterpretBits<ulong>({{.*}}rw_{{[0-9]+}})
-// CHECK-DAG: rw_{{[0-9]+}} = _slang_reinterpretBits<texture2d<float, access::read_write>>(
+// Each handle is packed and unpacked by copying its bits through memory. The copied value is a
+// named variable, because its address is taken. Each check names its own field and the handle's
+// MSL type, so none depends on the order in which the marshalling functions are emitted.
+// CHECK-DAG: texture2d<float, access::sample> [[TEX:_S[0-9]+]] = {{.*}}->tex_{{[0-9]+}};
+// CHECK-DAG: = *(thread ulong*)(&[[TEX]]);
+// CHECK-DAG: tex_{{[0-9]+}} = *(thread texture2d<float, access::sample>*)(&_S{{[0-9]+}});
+// CHECK-DAG: sampler [[SAMP:_S[0-9]+]] = {{.*}}->samp_{{[0-9]+}};
+// CHECK-DAG: = *(thread ulong*)(&[[SAMP]]);
+// CHECK-DAG: samp_{{[0-9]+}} = *(thread sampler*)(&_S{{[0-9]+}});
+// CHECK-DAG: metal::raytracing::acceleration_structure<{{.*}}> [[SCENE:_S[0-9]+]] = {{.*}}->scene_{{[0-9]+}};
+// CHECK-DAG: = *(thread ulong*)(&[[SCENE]]);
+// CHECK-DAG: scene_{{[0-9]+}} = *(thread metal::raytracing::acceleration_structure<{{.*}}>*)(&_S{{[0-9]+}});
+// CHECK-DAG: depth2d<float, access::sample> [[DEPTH:_S[0-9]+]] = {{.*}}->depth_{{[0-9]+}};
+// CHECK-DAG: = *(thread ulong*)(&[[DEPTH]]);
+// CHECK-DAG: depth_{{[0-9]+}} = *(thread depth2d<float, access::sample>*)(&_S{{[0-9]+}});
+// CHECK-DAG: sampler [[CMP:_S[0-9]+]] = {{.*}}->cmp_{{[0-9]+}};
+// CHECK-DAG: = *(thread ulong*)(&[[CMP]]);
+// CHECK-DAG: cmp_{{[0-9]+}} = *(thread sampler*)(&_S{{[0-9]+}});
+// CHECK-DAG: texture2d<float, access::read_write> [[RW:_S[0-9]+]] = {{.*}}->rw_{{[0-9]+}};
+// CHECK-DAG: = *(thread ulong*)(&[[RW]]);
+// CHECK-DAG: rw_{{[0-9]+}} = *(thread texture2d<float, access::read_write>*)(&_S{{[0-9]+}});
 
 // LIB: define void @computeMain
