@@ -159,11 +159,15 @@ struct ScalarizedTypeAdapterValImpl : ScalarizedValImpl
     IRType* pretendType; // the type this value pretends to have
 };
 
+// A value stored in element `index` of `arrayVal`. When `elementCount` is greater than one,
+// the value is instead a vector of `elementCount` components of `elementType`, stored one
+// component per element in the consecutive elements starting at `index`.
 struct ScalarizedArrayIndexValImpl : ScalarizedValImpl
 {
     ScalarizedVal arrayVal;
     Index index;
     IRType* elementType;
+    Count elementCount = 1;
 };
 
 struct FakeIndirectionValImpl : ScalarizedValImpl
@@ -245,6 +249,11 @@ struct GLSLSystemValueInfo
     // If the built in GLSL variable is an array, holds the index into the array.
     // If < 0, then there is no array indexing
     Index arrayIndex;
+
+    // If true, a vector-typed value is stored one component per array element, in the
+    // consecutive elements starting at `arrayIndex`, as `SV_ClipDistance` is. Otherwise the
+    // whole value is stored in element `arrayIndex`.
+    bool storesVectorAsElements = false;
 
     // The kind of the system value that requires special treatment.
     GLSLSystemValueKind kind = GLSLSystemValueKind::General;
@@ -451,6 +460,49 @@ struct OuterParamInfoLink
     OuterParamInfoLink* next;
 };
 
+// Return the location of the innermost declaration on the access chain `outerParamInfo`
+// that has one. IR struct fields carry no location, so a field is represented by its key.
+static SourceLoc findVaryingSourceLoc(OuterParamInfoLink* outerParamInfo)
+{
+    for (auto paramInfo = outerParamInfo; paramInfo; paramInfo = paramInfo->next)
+    {
+        IRInst* decl = paramInfo->outerParam;
+        if (auto field = as<IRStructField>(decl))
+            decl = field->getKey();
+        if (decl->sourceLoc.isValid())
+            return decl->sourceLoc;
+    }
+    return SourceLoc();
+}
+
+// Return the type that an `SV_ClipDistance` / `SV_CullDistance` varying of type `type` takes
+// in GLSL: `float` for a scalar, or a `float` vector whose components occupy consecutive
+// elements of `gl_ClipDistance` / `gl_CullDistance`. An arrayed varying (non-null
+// `declarator`, e.g. a mesh-shader vertex output) gets no such packing, so a vector there is
+// diagnosed rather than reduced to its first component.
+static IRType* getClipOrCullDistanceRequiredType(
+    GLSLLegalizationContext* context,
+    IRType* type,
+    GlobalVaryingDeclarator* declarator,
+    String const& semanticName,
+    OuterParamInfoLink* outerParamInfo)
+{
+    auto builder = context->getBuilder();
+    auto floatType = builder->getBasicType(BaseType::Float);
+    auto componentCount = getIRVectorElementSize(type);
+    if (componentCount == 1)
+        return floatType;
+    if (declarator)
+    {
+        context->getSink()->diagnose(Diagnostics::ClipCullDistanceVectorInArrayedVarying{
+            .semanticName = semanticName,
+            .type = type,
+            .location = findVaryingSourceLoc(outerParamInfo)});
+        return floatType;
+    }
+    return builder->getVectorType(floatType, componentCount);
+}
+
 // The number of distances (1 for `float`, N for `floatN`) held by each non-arrayed
 // `SV_ClipDistanceN` / `SV_CullDistanceN` value of one varying signature, keyed by N.
 struct ClipCullDistanceWidths
@@ -618,6 +670,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     char const* name = nullptr;
     char const* outerArrayName = nullptr;
     int arrayIndex = -1;
+    bool storesVectorAsElements = false;
     GLSLSystemValueKind systemValueKind = GLSLSystemValueKind::General;
     IRTargetBuiltinVarName targetVarName = IRTargetBuiltinVarName::Unknown;
     auto semanticInst = varLayout->findSystemValueSemanticAttr();
@@ -686,30 +739,38 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "sv_clipdistance")
     {
-        // TODO: type conversion is required here.
-
-        // float in hlsl & glsl.
+        // float, float2, float3 or float4 in hlsl; a float array in glsl.
         // "Clip distance data. SV_ClipDistance values are each assumed to be a float32 signed
         // distance to a plane." In glsl clipping value meaning is probably different
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_ClipDistance.xhtml
 
         name = "gl_ClipDistance";
-        requiredType = builder->getBasicType(BaseType::Float);
-
+        requiredType = getClipOrCullDistanceRequiredType(
+            context,
+            type,
+            declarator,
+            semanticNameSpelling,
+            outerParamInfo);
+        storesVectorAsElements = true;
         if (!declarator)
             arrayIndex = int(context->clipDistanceOffsets.getValue(semanticInst->getIndex()));
     }
     else if (semanticName == "sv_culldistance")
     {
-        // float in hlsl & glsl.
+        // float, float2, float3 or float4 in hlsl; a float array in glsl.
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_CullDistance.xhtml
 
         // gl_CullDistance is core since GLSL 4.50.
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
 
-        // TODO: type conversion is required here.
         name = "gl_CullDistance";
-        requiredType = builder->getBasicType(BaseType::Float);
+        requiredType = getClipOrCullDistanceRequiredType(
+            context,
+            type,
+            declarator,
+            semanticNameSpelling,
+            outerParamInfo);
+        storesVectorAsElements = true;
         if (!declarator)
             arrayIndex = int(context->cullDistanceOffsets.getValue(semanticInst->getIndex()));
     }
@@ -1178,6 +1239,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         inStorage->outerArrayName = outerArrayName;
         inStorage->requiredType = requiredType;
         inStorage->arrayIndex = arrayIndex;
+        inStorage->storesVectorAsElements = storesVectorAsElements;
         inStorage->kind = systemValueKind;
         return inStorage;
     }
@@ -1992,8 +2054,9 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // for multiple parameters using the same semantic name with different semantic indices,
     // such as `SV_ClipDistance0` vs. `SV_ClipDistance1`), but GLSL/SPIR-V only support a
     // single builtin varying with an array type. In such cases, the user-declared shader
-    // parameter only maps to a single index into the array, which is given by the
-    // `systemValue->arrayIndex` field.
+    // parameter maps to the element of the array given by the `systemValue->arrayIndex` field,
+    // or, for a vector-typed `SV_ClipDistance`/`SV_CullDistance`, to consecutive elements
+    // starting there.
     //
     // We detect the case where that `arrayIndex` field has been set, but the user-declared
     // shader parameter is not an array (there are no `declarator`s), and handle it with
@@ -2037,6 +2100,15 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         auto sharedGlobalArrayInfoForSystemValue =
             context->systemNameToGlobalMap.tryGetValue(systemValueName);
 
+        IRType* arrayElementType = legalizedParamType;
+        Count arrayElementCount = 1;
+        if (systemValueInfo->storesVectorAsElements)
+        {
+            arrayElementType = getIRVectorBaseType(legalizedParamType);
+            arrayElementCount = getIRVectorElementSize(legalizedParamType);
+        }
+        Index lastArrayIndex = systemValueInfo->arrayIndex + arrayElementCount - 1;
+
         if (sharedGlobalArrayInfoForSystemValue == nullptr)
         {
             //
@@ -2056,10 +2128,10 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             // know the maximum index and be able to fill in the array element count
             // that we leave off for now.
             //
-            freshGlobalArrayInfo.maxIndex = Count(systemValueInfo->arrayIndex);
+            freshGlobalArrayInfo.maxIndex = Count(lastArrayIndex);
 
             // Set the array size to 0, to mean it is unsized
-            auto arrayType = builder->getArrayType(legalizedParamType, 0);
+            auto arrayType = builder->getArrayType(arrayElementType, 0);
 
             auto accessQualifier = AccessQualifier::ReadWrite;
             if (kind == LayoutResourceKind::VaryingInput)
@@ -2106,7 +2178,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         // is needed for the global array that will be shared by all
         // varying parameters with the same system-value semantic.
         //
-        sharedGlobalArrayInfoForSystemValue->addIndex(systemValueInfo->arrayIndex);
+        sharedGlobalArrayInfoForSystemValue->addIndex(lastArrayIndex);
 
         // We need to package up a `ScalarizedVal` to represent this shader parameter.
         // The global parameter that was allocated above is already a pointer to an
@@ -2126,7 +2198,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             RefPtr<ScalarizedArrayIndexValImpl> indexingInfo = new ScalarizedArrayIndexValImpl();
             indexingInfo->arrayVal = sharedGlobalArrayVal;
             indexingInfo->index = systemValueInfo->arrayIndex;
-            indexingInfo->elementType = legalizedParamType;
+            indexingInfo->elementType = arrayElementType;
+            indexingInfo->elementCount = arrayElementCount;
             legalizedParamVal = ScalarizedVal::scalarizedArrayIndex(indexingInfo);
         }
     }
@@ -2740,6 +2813,44 @@ IRInst* convertMaterializedValue(IRBuilder* builder, IRInst* val, IRType* toType
     return builder->emitCast(toType, val);
 }
 
+// Load the value held by `impl`: a single array element, or a vector assembled from
+// `impl->elementCount` consecutive elements.
+static IRInst* materializeArrayIndexVal(IRBuilder* builder, ScalarizedArrayIndexValImpl* impl)
+{
+    List<IRInst*> components;
+    for (Index i = 0; i < impl->elementCount; ++i)
+    {
+        auto elementVal =
+            getSubscriptVal(builder, impl->elementType, impl->arrayVal, impl->index + i);
+        components.add(materializeValue(builder, elementVal));
+    }
+    if (impl->elementCount == 1)
+        return components[0];
+    return builder->emitMakeVector(
+        builder->getVectorType(impl->elementType, impl->elementCount),
+        components);
+}
+
+// Store `val` into the array element(s) that `impl` refers to, one component per element
+// when `impl->elementCount` is greater than one.
+static void storeArrayIndexVal(IRBuilder* builder, ScalarizedArrayIndexValImpl* impl, IRInst* val)
+{
+    for (Index i = 0; i < impl->elementCount; ++i)
+    {
+        auto elementVal =
+            getSubscriptVal(builder, impl->elementType, impl->arrayVal, impl->index + i);
+        auto component = val;
+        if (impl->elementCount > 1)
+        {
+            component = builder->emitElementExtract(
+                impl->elementType,
+                val,
+                builder->getIntValue(builder->getIntType(), i));
+        }
+        builder->emitStore(elementVal.irValue, component);
+    }
+}
+
 ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType* fromType)
 {
     return ScalarizedVal::value(convertMaterializedValue(builder, val, toType, fromType));
@@ -2774,6 +2885,16 @@ ScalarizedVal adaptType(
     case ScalarizedVal::Flavor::arrayIndex:
         {
             auto arrayImpl = as<ScalarizedArrayIndexValImpl>(val.impl);
+            // The components of a vector-typed value are spread over several elements, so it
+            // has no single address to adapt and is loaded instead.
+            if (arrayImpl->elementCount > 1)
+            {
+                return adaptType(
+                    builder,
+                    materializeArrayIndexVal(builder, arrayImpl),
+                    toType,
+                    fromType);
+            }
             auto elementVal =
                 getSubscriptVal(builder, fromType, arrayImpl->arrayVal, arrayImpl->index);
             return adaptType(builder, elementVal, toType, fromType);
@@ -2798,18 +2919,8 @@ void assign(
         return;
     case ScalarizedVal::Flavor::arrayIndex:
         {
-            // Get the rhs value
             auto rhs = materializeValue(builder, right);
-
-            // Determine the index
-            auto leftArrayIndexVal = as<ScalarizedArrayIndexValImpl>(left.impl);
-            auto leftVal = getSubscriptVal(
-                builder,
-                leftArrayIndexVal->elementType,
-                leftArrayIndexVal->arrayVal,
-                leftArrayIndexVal->index);
-            builder->emitStore(leftVal.irValue, rhs);
-
+            storeArrayIndexVal(builder, as<ScalarizedArrayIndexValImpl>(left.impl), rhs);
             break;
         }
     case ScalarizedVal::Flavor::address:
@@ -2960,6 +3071,19 @@ ScalarizedVal getSubscriptVal(
             }
             return subscriptVal;
         }
+    case ScalarizedVal::Flavor::arrayIndex:
+        {
+            // Component `indexVal` of a vector stored one component per element is element
+            // `index + indexVal` of the array.
+            auto arrayIndexImpl = val.impl.as<ScalarizedArrayIndexValImpl>();
+            SLANG_ASSERT(arrayIndexImpl->elementCount > 1);
+            auto indexType = indexVal->getDataType();
+            auto elementIndex = builder->emitAdd(
+                indexType,
+                builder->getIntValue(indexType, arrayIndexImpl->index),
+                indexVal);
+            return getSubscriptVal(builder, elementType, arrayIndexImpl->arrayVal, elementIndex);
+        }
     case ScalarizedVal::Flavor::fakeIndirection:
         {
             auto fakeIndirectionInfo = val.impl.as<FakeIndirectionValImpl>();
@@ -3061,12 +3185,7 @@ IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
         break;
 
     case ScalarizedVal::Flavor::arrayIndex:
-        {
-            auto impl = as<ScalarizedArrayIndexValImpl>(val.impl);
-            auto elementVal =
-                getSubscriptVal(builder, impl->elementType, impl->arrayVal, impl->index);
-            return materializeValue(builder, elementVal);
-        }
+        return materializeArrayIndexVal(builder, as<ScalarizedArrayIndexValImpl>(val.impl));
     case ScalarizedVal::Flavor::tuple:
         {
             // auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
@@ -4196,13 +4315,7 @@ void tryReplaceUsesOfStageInput(
                     auto user = use->getUser();
                     IRBuilder builder(user);
                     setInsertBeforeOrdinaryInst(&builder, user);
-                    auto subscriptVal = getSubscriptVal(
-                        &builder,
-                        arrayIndexImpl->elementType,
-                        arrayIndexImpl->arrayVal,
-                        arrayIndexImpl->index);
-                    setInsertBeforeOrdinaryInst(&builder, user);
-                    auto materializedInner = materializeValue(&builder, subscriptVal);
+                    auto materializedInner = materializeArrayIndexVal(&builder, arrayIndexImpl);
                     if (user->getOp() == kIROp_Load)
                     {
                         user->replaceUsesWith(materializedInner);

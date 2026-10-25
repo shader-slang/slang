@@ -6024,6 +6024,13 @@ err(
 )
 
 err(
+    "clip-cull-distance-vector-in-arrayed-varying",
+    55219,
+    "vector clip or cull distance in an arrayed varying",
+    span { loc = "location", message = "system value semantic '~semanticName' cannot have type '~type:IRInst' here: vector-typed clip and cull distances are only supported for varyings that are not arrays, such as vertex-shader outputs, on this target. Declare it as 'float' or as a 'float' array instead." }
+)
+
+err(
     "unsupported-target-intrinsic",
     55204,
     "unsupported intrinsic operation",
