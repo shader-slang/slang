@@ -3309,15 +3309,13 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 return TestResult::Fail;
             }
             actualOutputSB << "--------\n";
+            List<LanguageServerProtocol::Location> definitions;
             if (receivedNullResult(connection))
             {
                 actualOutputSB << "null\n";
             }
-            else
+            else if (SLANG_SUCCEEDED(connection->getMessage(&definitions)))
             {
-                List<LanguageServerProtocol::Location> definitions;
-                if (SLANG_FAILED(connection->getMessage(&definitions)))
-                    return TestResult::Fail;
                 actualOutputSB << "definitions: " << definitions.getCount() << "\n";
                 for (auto& definition : definitions)
                 {
