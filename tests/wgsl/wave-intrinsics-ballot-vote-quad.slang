@@ -114,14 +114,13 @@ void quadReadLaneAtMain(uint3 tid: SV_DispatchThreadID)
     floatBuffer[tid.x] = QuadReadLaneAt(floatBuffer[tid.x], 2);
 }
 
-// A matrix is read row by row through the vector overload, on WGSL and the other targets.
-// QUADMATSPV: OpGroupNonUniformQuadBroadcast %v2float
+// A matrix is read row by row through the vector overload (`MATRIX_MAP_BINARY`), on WGSL and the
+// other targets. Every row reads the same lane.
 // QUADMATSPV: OpGroupNonUniformQuadBroadcast %v2float
 // QUADMAT: fn [[VEC:QuadReadLaneAt_[0-9]+]]( sourceValue_{{[0-9]+}} : vec2<f32>,  quadLaneID_{{[0-9]+}} : u32) -> vec2<f32>
 // QUADMAT: quadBroadcast(
-// QUADMAT: fn QuadReadLaneAt_{{[0-9]+}}( sourceValue_{{[0-9]+}} : mat2x2<f32>,  quadLaneID_{{[0-9]+}} : u32) -> mat2x2<f32>
-// QUADMAT: [[VEC]](sourceValue_{{[0-9]+}}[i32(0)],
-// QUADMAT: [[VEC]](sourceValue_{{[0-9]+}}[i32(1)],
+// QUADMAT: fn QuadReadLaneAt_{{[0-9]+}}( sourceValue_{{[0-9]+}} : mat2x2<f32>,  [[LANE:quadLaneID_[0-9]+]] : u32) -> mat2x2<f32>
+// QUADMAT: [[VEC]](sourceValue_{{[0-9]+}}[i_{{[0-9]+}}], [[LANE]])
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void quadReadLaneAtMatrixMain(uint3 tid: SV_DispatchThreadID)
