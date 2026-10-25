@@ -2275,6 +2275,7 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             byteAddressBufferOptions.useBitCastFromUInt = true;
+            byteAddressBufferOptions.minimumStoreScalarSize = 4;
             byteAddressBufferOptions.loadHalfFrom32BitWords = true;
             byteAddressBufferOptions.storeAlignedHalfPairsAsWords = true;
             break;

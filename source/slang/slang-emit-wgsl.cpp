@@ -285,6 +285,14 @@ void WGSLSourceEmitter::emitStructDeclarationSeparatorImpl()
     m_writer->emit(",");
 }
 
+// WGSL cannot use a texture or a sampler as an `array` element; an array of them is a
+// `binding_array`. Tint accepts a sized `binding_array` of sampled textures (the
+// `sized_binding_array` language feature); naga also accepts unsized ones and samplers.
+static bool isBindingArrayElementType(IRInst* elementType)
+{
+    return as<IRTextureTypeBase>(elementType) || as<IRSamplerStateTypeBase>(elementType);
+}
+
 static bool isPowerOf2(const uint32_t n)
 {
     return (n != 0U) && ((n - 1U) & n) == 0U;
@@ -631,6 +639,8 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     case kIROp_ArrayType:
         {
+            if (isBindingArrayElementType(type->getOperand(0)))
+                m_writer->emit("binding_");
             m_writer->emit("array<");
             emitType((IRType*)type->getOperand(0));
             m_writer->emit(", ");
@@ -640,6 +650,8 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_UnsizedArrayType:
         {
+            if (isBindingArrayElementType(type->getOperand(0)))
+                m_writer->emit("binding_");
             m_writer->emit("array<");
             emitType((IRType*)type->getOperand(0));
             m_writer->emit(">");
