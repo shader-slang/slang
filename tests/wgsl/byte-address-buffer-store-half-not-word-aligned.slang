@@ -5,9 +5,9 @@
 // Only a `half2` or `half4` at an offset known to be a multiple of 4 is stored as whole words on
 // WGSL (see byte-address-buffer-store-half-pairs.slang). These stores would need a
 // read-modify-write of a word that another invocation may be writing, so they are still
-// rejected.
+// rejected, with #13735's error.
 
-// CHECK: error[E
+// CHECK: error[E56112]
 
 RWByteAddressBuffer pool;
 
