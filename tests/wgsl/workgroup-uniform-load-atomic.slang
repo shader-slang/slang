@@ -16,6 +16,9 @@ void computeMain(uint3 tid: SV_DispatchThreadID, uint gi: SV_GroupIndex)
 {
     if (gi == 0)
         batchStart.add(64);
+    // workgroupUniformLoad synchronizes on WGSL only; on the other targets (see #13631) it is a plain
+    // atomic load, so this barrier orders the add before every invocation's load.
+    GroupMemoryBarrierWithGroupSync();
     // Uniform across the workgroup, so the loop below may contain barriers.
     uint start = workgroupUniformLoad(batchStart);
     for (uint i = 0; i < start; i += 64)
