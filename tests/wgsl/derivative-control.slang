@@ -11,13 +11,21 @@ struct FSInput
 };
 
 // SPV: OpEntryPoint
+// clip(x) discards exactly when x < 0.
+// WGSL: fn clip_{{[0-9]+}}( [[X:x_[0-9]+]] : f32)
+// WGSL-NEXT: {
+// WGSL-NEXT: if(([[X]] < 0.0f))
+// WGSL-NEXT: {
+// WGSL-NEXT: discard;
+// WGSL-NEXT: }
+// WGSL: @fragment
+// WGSL: clip_{{[0-9]+}}({{.*}} - 0.25f);
 // WGSL-DAG: dpdxFine(
 // WGSL-DAG: dpdyFine(
 // WGSL-DAG: dpdxCoarse(
 // WGSL-DAG: dpdyCoarse(
 // WGSL-DAG: fwidthFine(
 // WGSL-DAG: fwidthCoarse(
-// WGSL-DAG: discard;
 [shader("fragment")]
 float4 fragMain(FSInput input) : SV_Target
 {
