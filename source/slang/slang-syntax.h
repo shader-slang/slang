@@ -734,6 +734,7 @@ inline Name* getSubscriptOperatorName(ASTBuilder* astBuilder)
 }
 
 /// Returns the substituted signature, using an __associatedfunc's declared type when present.
+/// That type must resolve to a FuncType.
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef);
 
 GenericDeclRefType* getGenericDeclRefType(
