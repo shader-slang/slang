@@ -642,7 +642,11 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitBlockStmt(BlockStmt* stmt)
     {
-        if (!_isLocInRange(context, stmt->loc, stmt->closingSourceLoc))
+        // Constructor synthesis can wrap an authored body in a generated block to insert
+        // member initializers. That block has no source range, but its nested authored body does.
+        // Only a known range can exclude the cursor; nested expressions still match their own locs.
+        if (stmt->loc.isValid() && stmt->closingSourceLoc.isValid() &&
+            !_isLocInRange(context, stmt->loc, stmt->closingSourceLoc))
             return false;
         return dispatchIfNotNull(stmt->body);
     }
