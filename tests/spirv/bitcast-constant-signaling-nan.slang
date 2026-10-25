@@ -20,8 +20,9 @@
 // CHECK-DAG: OpConstant %uint 4286578689
 // CHECK-DAG: OpConstant %uint 2143289343
 
-// The two lanes of the vector bit cast keep their bits, 0xFF800001 and 0x7FA00000.
-// VEC-DAG: OpConstant %uint 4286578689
+// The two lanes of the vector bit cast keep their bits, 0xFF800003 and 0x7FA00000. Neither
+// pattern is used by any other output, so each check can only match its own lane.
+// VEC-DAG: OpConstant %uint 4286578691
 // VEC-DAG: OpConstant %uint 2141192192
 
 // At -O1 every bit cast is folded, so the constants above are folded results, not the inputs.
@@ -76,7 +77,7 @@ void computeMain()
     // VEC at compile time only: CI also runs the Vulkan lanes through GLSL
     // (`-emit-spirv-via-glsl`), and the GLSL emitter writes every NaN constant as `0.0 / 0.0`,
     // so there these elements read back 0x7FC00000.
-    float2 v = bit_cast<float2>(uint2(0xFF800001u, 0x7FA00000u));
+    float2 v = bit_cast<float2>(uint2(0xFF800003u, 0x7FA00000u));
     outputBuffer[10] = asuint(v.x);
     outputBuffer[11] = asuint(v.y);
     // Not checked at run time: at -O0 the driver may fold `asuint` of a float constant and
