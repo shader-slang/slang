@@ -5143,9 +5143,32 @@ protected:
 
         case SystemValueSemanticName::ClipDistance:
             {
-                // TODO: Implement this based on the 'clip-distances' feature in WGSL
-                // https: // www.w3.org/TR/webgpu/#dom-gpufeaturename-clip-distances
-                result.isUnsupported = true;
+                // WGSL's clip_distances built-in (`enable clip_distances;`, the WebGPU
+                // `clip-distances` feature) is an array<f32, N> with N <= 8: an HLSL
+                // `float d[N] : SV_ClipDistance` maps to it directly.
+                // https://www.w3.org/TR/WGSL/#built-in-values-clip_distances
+                IRType* varType = nullptr;
+                if (auto field = as<IRStructField>(parentVar))
+                    varType = field->getFieldType();
+                else if (parentVar)
+                    varType = parentVar->getDataType();
+                if (auto ptrType = as<IRPtrTypeBase>(varType))
+                    varType = ptrType->getValueType();
+                auto arrayType = as<IRArrayType>(varType);
+                auto count = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
+                if (arrayType && count && count->getValue() >= 1 && count->getValue() <= 8 &&
+                    as<IRBasicType>(arrayType->getElementType()) &&
+                    arrayType->getElementType()->getOp() == kIROp_FloatType)
+                {
+                    result.systemValueName = toSlice("clip_distances");
+                    result.permittedTypes.add(arrayType);
+                }
+                else
+                {
+                    // A scalar or vector SV_ClipDistance would have to be packed into the
+                    // array; not supported.
+                    result.isUnsupported = true;
+                }
             }
             break;
 
