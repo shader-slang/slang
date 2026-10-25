@@ -7528,6 +7528,7 @@ public void subgroupMemoryBarrierShared()
     }
 }
 
+[__removableIfUnused]
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 [ForceInline]
@@ -7632,6 +7633,7 @@ public T subgroupMax(T value)
     return WaveActiveMax(value);
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -7664,6 +7666,7 @@ public T subgroupAnd(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -7696,6 +7699,7 @@ public T subgroupOr(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -7728,6 +7732,7 @@ public T subgroupXor(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -7753,6 +7758,7 @@ public T subgroupInclusiveAdd(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -7778,6 +7784,7 @@ public T subgroupInclusiveMul(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -7801,6 +7808,7 @@ public T subgroupInclusiveMin(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -7824,6 +7832,7 @@ public T subgroupInclusiveMax(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -7851,6 +7860,7 @@ public T subgroupInclusiveAnd(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -7878,6 +7888,7 @@ public T subgroupInclusiveOr(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8025,6 +8036,7 @@ public vector<T,N> subgroupMax(vector<T,N> value)
     return WaveActiveMax(value);
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8059,6 +8071,7 @@ public vector<T,N> subgroupAnd(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8092,6 +8105,7 @@ public vector<T,N> subgroupOr(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8124,6 +8138,7 @@ public vector<T,N> subgroupXor(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8149,6 +8164,7 @@ public vector<T,N> subgroupInclusiveAdd(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8174,6 +8190,7 @@ public vector<T,N> subgroupInclusiveMul(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8197,6 +8214,7 @@ public vector<T,N> subgroupInclusiveMin(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8220,6 +8238,7 @@ public vector<T,N> subgroupInclusiveMax(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8238,6 +8257,7 @@ public vector<T,N> subgroupInclusiveAnd(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8256,6 +8276,7 @@ public vector<T,N> subgroupInclusiveOr(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -8357,6 +8378,7 @@ public vector<T,N> subgroupExclusiveXor(vector<T,N> value)
 
 // GL_KHR_shader_subgroup_ballot
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
@@ -8375,6 +8397,7 @@ public T subgroupBroadcast(T value, uint id)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
@@ -8435,6 +8458,7 @@ public uvec4 subgroupBallot(bool value)
 // note 2: we have a waveLaneCount check because based on wave lane count we can determine if we can do a
 // fast path or slow path (know index is 0 or non 0)
 // }
+[__removableIfUnused]
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
@@ -8470,6 +8494,7 @@ public bool subgroupInverseBallot(uvec4 value)
 }
 
 // same logic as subgroupInverseBallot
+[__removableIfUnused]
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
@@ -8504,6 +8529,7 @@ public bool subgroupBallotBitExtract(uvec4 value, uint index)
 
 
 // the count is only supposed to use uvec4 values within bottom bits of subgroup launched, not a simple countbits
+[__removableIfUnused]
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
@@ -8522,6 +8548,7 @@ public uint subgroupBallotBitCount(uvec4 value)
     }
 }
 
+[__removableIfUnused]
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
@@ -8540,6 +8567,7 @@ public uint subgroupBallotInclusiveBitCount(uvec4 value)
     }
 }
 
+[__removableIfUnused]
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
@@ -8558,6 +8586,7 @@ public uint subgroupBallotExclusiveBitCount(uvec4 value)
     }
 }
 
+[__removableIfUnused]
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
@@ -8576,6 +8605,7 @@ public uint subgroupBallotFindLSB(uvec4 value)
     }
 }
 
+[__removableIfUnused]
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
@@ -8641,6 +8671,7 @@ public vector<T,N> subgroupShuffle(vector<T,N> value, uint index)
     return WaveShuffle(value, index);
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
@@ -8668,6 +8699,7 @@ public vector<T,N> subgroupShuffleXor(vector<T,N> value, uint mask)
 
 // GL_KHR_shader_subgroup_shuffle_relative
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
@@ -8692,6 +8724,7 @@ public T subgroupShuffleUp(T value, uint delta)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
@@ -8717,6 +8750,7 @@ public T subgroupShuffleDown(T value, uint delta)
 }
 
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
@@ -8741,6 +8775,7 @@ public vector<T,N> subgroupShuffleUp(vector<T,N> value, uint delta)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
@@ -9347,6 +9382,7 @@ public vector<T, N> subgroupPartitionedExclusiveXorNV(vector<T, N> value, uvec4 
     return WaveMultiPrefixExclusiveBitXor(value, ballot);
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 public uvec4 subgroupPartitionNV(T value)
