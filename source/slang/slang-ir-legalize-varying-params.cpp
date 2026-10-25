@@ -2932,9 +2932,12 @@ protected:
     virtual UnownedStringSlice getUserSemanticNameSlice(String& loweredName, bool isUserSemantic)
         const = 0;
 
+    /// Mark the field that holds a fragment shader's non-struct return value as color output
+    /// `targetIndex` (`SV_Target<targetIndex>`).
     virtual void addFragmentShaderReturnValueDecoration(
         IRBuilder& builder,
-        IRInst* returnValueStructKey) const = 0;
+        IRInst* returnValueStructKey,
+        UInt targetIndex) const = 0;
 
 
     virtual IRVarLayout* handleGeometryStageParameterVarLayout(
@@ -4241,6 +4244,27 @@ private:
         builder.addNameHintDecoration(key, toSlice("output"));
         builder.addLayoutDecoration(key, resultLayout);
         builder.createStructField(structType, key, returnType);
+
+        // The return value's own system-value semantic (`float main() : SV_Depth`,
+        // `float4 main() : SV_Target1`). A render target keeps the color-output path below with
+        // its index; any other system value goes on the field, where
+        // ensureStructHasUserSemantic maps it (or reports it unsupported) as for a struct field.
+        UInt targetIndex = 0;
+        bool isOtherSystemValue = false;
+        if (auto systemValueAttr =
+                resultLayout ? resultLayout->findSystemValueSemanticAttr() : nullptr)
+        {
+            auto name = systemValueAttr->getName();
+            if (name.startsWithCaseInsensitive(toSlice("sv_target")))
+            {
+                targetIndex = systemValueAttr->getIndex();
+            }
+            else
+            {
+                isOtherSystemValue = true;
+                builder.addSemanticDecoration(key, name, (int)systemValueAttr->getIndex());
+            }
+        }
         IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
         structTypeLayoutBuilder.addField(key, resultLayout);
         auto typeLayout = structTypeLayoutBuilder.build();
@@ -4262,7 +4286,8 @@ private:
         case Stage::Compute:
         case Stage::Fragment:
             {
-                addFragmentShaderReturnValueDecoration(builder, key);
+                if (!isOtherSystemValue)
+                    addFragmentShaderReturnValueDecoration(builder, key, targetIndex);
                 break;
             }
         case Stage::Vertex:
@@ -4635,10 +4660,14 @@ protected:
         return loweredName.getUnownedSlice();
     };
 
-    void addFragmentShaderReturnValueDecoration(IRBuilder& builder, IRInst* returnValueStructKey)
-        const SLANG_OVERRIDE
+    void addFragmentShaderReturnValueDecoration(
+        IRBuilder& builder,
+        IRInst* returnValueStructKey,
+        UInt targetIndex) const SLANG_OVERRIDE
     {
-        builder.addTargetSystemValueDecoration(returnValueStructKey, toSlice("color(0)"));
+        builder.addTargetSystemValueDecoration(
+            returnValueStructKey,
+            (String("color(") + String(targetIndex) + ")").getUnownedSlice());
     }
 
     IRVarLayout* handleGeometryStageParameterVarLayout(
@@ -5166,7 +5195,11 @@ protected:
         case SystemValueSemanticName::DepthGreaterEqual:
         case SystemValueSemanticName::DepthLessEqual:
             {
-                result.isUnsupported = true;
+                // Conservative depth: WGSL's `frag_depth` takes a `less`/`greater` depth mode
+                // only with the `fragment_depth` language extension, which is an optimization
+                // hint; a plain frag_depth writes the same depth.
+                result.systemValueName = toSlice("frag_depth");
+                result.permittedTypes.add(builder.getBasicType(BaseType::Float));
             }
             break;
 
@@ -5340,12 +5373,14 @@ protected:
         return isUserSemantic ? userSemanticName : loweredName.getUnownedSlice();
     }
 
-    void addFragmentShaderReturnValueDecoration(IRBuilder& builder, IRInst* returnValueStructKey)
-        const SLANG_OVERRIDE
+    void addFragmentShaderReturnValueDecoration(
+        IRBuilder& builder,
+        IRInst* returnValueStructKey,
+        UInt targetIndex) const SLANG_OVERRIDE
     {
         IRInst* operands[] = {
             builder.getStringValue(userSemanticName),
-            builder.getIntValue(builder.getIntType(), 0)};
+            builder.getIntValue(builder.getIntType(), IRIntegerValue(targetIndex))};
         builder.addDecoration(
             returnValueStructKey,
             kIROp_SemanticDecoration,
