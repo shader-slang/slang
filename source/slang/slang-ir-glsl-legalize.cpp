@@ -162,8 +162,8 @@ struct ScalarizedTypeAdapterValImpl : ScalarizedValImpl
 // `componentCount` is greater than one, the value is instead a vector of `componentCount`
 // components of type `elementType`, stored one component per element in the consecutive
 // elements starting at `index` (a vector `SV_ClipDistance` in `gl_ClipDistance`). Such a
-// value supports being loaded, stored, type-adapted as a whole and subscripted by component;
-// it has no single address.
+// value can be loaded, stored and type-adapted as a whole; it has no single address, so its
+// components are accessed through a loaded copy.
 struct ScalarizedArrayIndexValImpl : ScalarizedValImpl
 {
     ScalarizedVal arrayVal;
@@ -3156,24 +3156,6 @@ ScalarizedVal getSubscriptVal(
             }
             return subscriptVal;
         }
-    case ScalarizedVal::Flavor::arrayIndex:
-        {
-            // Component `indexVal` of a vector stored one component per element is element
-            // `index + indexVal` of the array.
-            auto arrayIndexImpl = val.impl.as<ScalarizedArrayIndexValImpl>();
-            SLANG_RELEASE_ASSERT(arrayIndexImpl->componentCount > 1);
-            SLANG_RELEASE_ASSERT(elementType == arrayIndexImpl->elementType);
-            auto indexType = indexVal->getDataType();
-            auto elementIndex = builder->emitAdd(
-                indexType,
-                builder->getIntValue(indexType, arrayIndexImpl->index),
-                indexVal);
-            return getSubscriptVal(
-                builder,
-                arrayIndexImpl->elementType,
-                arrayIndexImpl->arrayVal,
-                elementIndex);
-        }
     case ScalarizedVal::Flavor::fakeIndirection:
         {
             auto fakeIndirectionInfo = val.impl.as<FakeIndirectionValImpl>();
@@ -4343,6 +4325,19 @@ void tryReplaceUsesOfStageInput(
                         break;
                     case kIROp_GetElementPtr:
                         {
+                            // A vector stored one component per builtin-array element has
+                            // no single address, and GLSL indexes an unsized builtin array
+                            // only with constants, so we index a temporary copy instead.
+                            if (typeAdapter->val.flavor == ScalarizedVal::Flavor::arrayIndex &&
+                                as<ScalarizedArrayIndexValImpl>(typeAdapter->val.impl)
+                                        ->componentCount > 1)
+                            {
+                                auto materialized = materializeValue(&builder, val);
+                                auto tmpVar = builder.emitVar(materialized->getDataType());
+                                builder.emitStore(tmpVar, materialized);
+                                use->set(tmpVar);
+                                break;
+                            }
                             auto actualElementType =
                                 getElementType(builder, typeAdapter->actualType);
                             auto pretendElementType =
