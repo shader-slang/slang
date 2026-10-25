@@ -310,10 +310,34 @@ bool WGSLSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
     return false;
 }
 
+// The location and `vk::index` (dual-source blend index) of a fragment color output: the
+// front-end layout keeps the index in the VaryingOutput offset's space.
+static IRVarOffsetAttr* getVaryingOutputOffset(IRInst* inst)
+{
+    auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecoration)
+        return nullptr;
+    auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+    if (!varLayout)
+        return nullptr;
+    return varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+}
+
 void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
 {
     if (!maybeEmitSystemSemantic(inst))
     {
+        // The second output of dual-source blending (`[[vk::location(0), vk::index(1)]]`)
+        // shares the location of the first: take it from the layout, not from the semantic
+        // index (which legalization made unique). emitStructFieldAttributes adds @blend_src.
+        auto offset = getVaryingOutputOffset(inst);
+        if (offset && offset->getSpace() != 0)
+        {
+            m_writer->emit("@location(");
+            m_writer->emit(offset->getOffset());
+            m_writer->emit(")");
+            return;
+        }
         if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
         {
             m_writer->emit("@location(");
@@ -330,6 +354,31 @@ void WGSLSourceEmitter::emitStructFieldAttributes(
     bool allowOffsetLayout)
 {
     SLANG_UNUSED(allowOffsetLayout);
+
+    // Dual-source blending: a fragment output struct with a `vk::index` (non-zero blend index)
+    // on a color output. Both outputs at that location take @blend_src(index), under
+    // `enable dual_source_blending;`.
+    if (auto fieldOffset = getVaryingOutputOffset(field->getKey()))
+    {
+        bool isDualSource = false;
+        for (auto other : structType->getFields())
+        {
+            auto otherOffset = getVaryingOutputOffset(other->getKey());
+            if (otherOffset && otherOffset->getSpace() != 0 &&
+                otherOffset->getOffset() == fieldOffset->getOffset())
+            {
+                isDualSource = true;
+                break;
+            }
+        }
+        if (isDualSource)
+        {
+            m_requiresDualSourceBlending = true;
+            m_writer->emit(" @blend_src(");
+            m_writer->emit(fieldOffset->getSpace());
+            m_writer->emit(")");
+        }
+    }
 
     // If the struct type is not used for physical storage, then we don't need to
     // emit any layout attributes.
@@ -1845,6 +1894,11 @@ void WGSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
 
 void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
 {
+    if (m_requiresDualSourceBlending)
+    {
+        m_writer->emit("enable dual_source_blending;\n");
+    }
+
     if (m_f16ExtensionEnabled)
     {
         m_writer->emit("enable f16;\n");

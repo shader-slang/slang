@@ -2957,6 +2957,63 @@ protected:
         SLANG_UNUSED(builder);
     }
 
+    /// Mark a fragment color output that takes part in dual-source blending: the output at
+    /// `location` with blend source `index` (`[[vk::location(location), vk::index(index)]]`).
+    virtual void markDualSourceBlendOutput(
+        IRBuilder& builder,
+        IRInst* fieldKey,
+        IRVarLayout* fieldLayout,
+        UInt location,
+        UInt index) const
+    {
+        SLANG_UNUSED(builder);
+        SLANG_UNUSED(fieldKey);
+        SLANG_UNUSED(fieldLayout);
+        SLANG_UNUSED(location);
+        SLANG_UNUSED(index);
+    }
+
+    // Dual-source blending: when a fragment output struct has a color output with a non-zero
+    // `vk::index`, the front-end layout puts both outputs at one location (the index in the
+    // VaryingOutput offset's space). Hand every output at such a location to
+    // markDualSourceBlendOutput, so the target does not turn them into two render targets.
+    void markDualSourceBlendOutputs(
+        IRBuilder& builder,
+        IRStructType* structType,
+        IRVarLayout* resultLayout) const
+    {
+        auto structLayout =
+            resultLayout ? as<IRStructTypeLayout>(resultLayout->getTypeLayout()) : nullptr;
+        if (!structLayout)
+            return;
+        HashSet<UInt> dualSourceLocations;
+        for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
+        {
+            auto offset = fieldAttr->getLayout()->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+            if (offset && offset->getSpace() != 0)
+                dualSourceLocations.add(offset->getOffset());
+        }
+        if (dualSourceLocations.getCount() == 0)
+            return;
+        HashSet<IRInst*> structKeys;
+        for (auto field : structType->getFields())
+            structKeys.add(field->getKey());
+        for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
+        {
+            auto key = fieldAttr->getFieldKey();
+            auto offset = fieldAttr->getLayout()->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+            if (!offset || !dualSourceLocations.contains(offset->getOffset()) ||
+                !structKeys.contains(key))
+                continue;
+            markDualSourceBlendOutput(
+                builder,
+                key,
+                fieldAttr->getLayout(),
+                offset->getOffset(),
+                offset->getSpace());
+        }
+    }
+
     virtual void legalizeAmplificationStageEntryPoint(const EntryPointInfo& entryPoint) const
     {
         SLANG_UNUSED(entryPoint);
@@ -4227,6 +4284,8 @@ private:
             ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(
                 flattenedStruct,
                 resultLayout);
+            if (entryPoint.entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                markDualSourceBlendOutputs(builder, flattenedStruct, resultLayout);
             return;
         }
 
@@ -4329,6 +4388,22 @@ public:
         : LegalizeShaderEntryPointContext(module, sink)
     {
         generatePermittedTypes_sv_target();
+    }
+
+    void markDualSourceBlendOutput(
+        IRBuilder& builder,
+        IRInst* fieldKey,
+        IRVarLayout* fieldLayout,
+        UInt location,
+        UInt index) const SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(fieldLayout);
+        if (auto systemValue = fieldKey->findDecoration<IRTargetSystemValueDecoration>())
+            systemValue->removeAndDeallocate();
+        builder.addTargetSystemValueDecoration(
+            fieldKey,
+            (String("color(") + String(location) + "), index(" + String(index) + ")")
+                .getUnownedSlice());
     }
 
 protected:
@@ -5112,6 +5187,21 @@ public:
     LegalizeWGSLEntryPointContext(IRModule* module, DiagnosticSink* sink)
         : LegalizeShaderEntryPointContext(module, sink)
     {
+    }
+
+    void markDualSourceBlendOutput(
+        IRBuilder& builder,
+        IRInst* fieldKey,
+        IRVarLayout* fieldLayout,
+        UInt location,
+        UInt index) const SLANG_OVERRIDE
+    {
+        // The WGSL emitter reads the location and blend source from this layout
+        // (@location(location) @blend_src(index)).
+        SLANG_UNUSED(location);
+        SLANG_UNUSED(index);
+        if (!fieldKey->findDecoration<IRLayoutDecoration>())
+            builder.addLayoutDecoration(fieldKey, fieldLayout);
     }
 
 protected:
