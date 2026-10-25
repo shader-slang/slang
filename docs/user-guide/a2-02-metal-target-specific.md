@@ -30,7 +30,9 @@ The system-value semantics are translated to the following Metal attributes:
 | SV semantic name            | Metal attribute                                      |
 | --------------------------- | ---------------------------------------------------- |
 | `SV_Position`               | `[[position]]`                                       |
+| `SV_ClipDistance<N>`        | `[[clip_distance]]` (vertex and mesh outputs only)   |
 | `SV_Coverage`               | `[[sample_mask]]`                                    |
+| `SV_CullDistance<N>`        | `(Not supported)`                                    |
 | `SV_Depth`                  | `[[depth(any)]]`                                     |
 | `SV_DepthGreaterEqual`      | `[[depth(greater)]]`                                 |
 | `SV_DepthLessEqual`         | `[[depth(less)]]`                                    |
@@ -55,6 +57,11 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_VulkanInstanceID`       | `[[instance_id]]`                                    |
 | `SV_VulkanSamplePosition`   | `(Not supported)`                                    |
 | `SV_VulkanVertexID`         | `[[vertex_id]]`                                      |
+
+_Note_ that Metal allows one `[[clip_distance]]` output, of type `float` or `float[N]`, and Slang
+does not yet pack several `SV_ClipDistance<N>` outputs into one array for Metal, so declare all clip
+distances as one `float[N]` array with `SV_ClipDistance`. Slang emits that array as a native array,
+`float clip [[clip_distance]] [N]`.
 
 _Note_ that `SV_InstanceID` counts from zero within a draw call, as in D3D, while Metal's
 `[[instance_id]]` includes the base instance, so the two are not the same value. Use
