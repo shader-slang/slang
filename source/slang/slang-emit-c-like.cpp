@@ -1312,6 +1312,16 @@ String CLikeSourceEmitter::getUnmangledName(IRInst* inst)
     return getName(inst);
 }
 
+void CLikeSourceEmitter::emitHexLiteral(uint64_t value, int digitCount)
+{
+    // Sixteen digits for a 64-bit value, plus the terminator that `intToAscii` writes.
+    char digits[2 * sizeof(value) + 1];
+    SLANG_ASSERT(digitCount > 0 && digitCount <= int(2 * sizeof(value)));
+    intToAscii(digits, value, 16, digitCount);
+    m_writer->emit("0x");
+    m_writer->emit(digits);
+}
+
 void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->getOp())
@@ -3985,6 +3995,9 @@ void CLikeSourceEmitter::emitFunctionBody(IRGlobalValueWithCode* code)
     Dictionary<IRInst*, bool> foldSafetyCache;
     m_foldSafetyCache = &foldSafetyCache;
     SLANG_DEFER(m_foldSafetyCache = nullptr);
+    SLANG_ASSERT(!m_isEmittingFunctionBody);
+    m_isEmittingFunctionBody = true;
+    SLANG_DEFER(m_isEmittingFunctionBody = false);
     emitRegionTree(regionTree);
 }
 

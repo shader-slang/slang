@@ -347,6 +347,11 @@ public:
 
     void emitSimpleValue(IRInst* inst) { emitSimpleValueImpl(inst); }
 
+    /// Emit `value` as `0x` followed by `digitCount` hexadecimal digits, with no suffix. The text
+    /// emitters write a NaN literal as a bit cast of such a literal, which keeps its sign and
+    /// payload.
+    void emitHexLiteral(uint64_t value, int digitCount);
+
     enum class FoldPolicy
     {
         Never,
@@ -829,6 +834,10 @@ protected:
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
 
     Dictionary<IRInst*, bool>* m_foldSafetyCache = nullptr;
+
+    // True while a function body is emitted. Module-scope declarations are emitted when it is
+    // false, and on some targets their initializers must be constant expressions.
+    bool m_isEmittingFunctionBody = false;
 
     bool isSafeToFoldIntoUseSitesUncached(IRInst* inst);
 

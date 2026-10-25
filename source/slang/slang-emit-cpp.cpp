@@ -1085,10 +1085,43 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
         {
         case IRConstant::FloatKind::Nan:
             {
-                // TODO(JS):
-                // It's not clear this will work on all targets.
-                // In particular Visual Studio reports an error with this expression.
-                m_writer->emit("(0.0 / 0.0)");
+                // `(0.0 / 0.0)` would lose the NaN's sign and payload (and MSVC rejects it), so
+                // rebuild a `float` or `double` NaN from its bits. CUDA needs a constant
+                // expression for a `__device__` variable's initializer, which the prelude's
+                // `U32_asfloat` is not, so it uses `__builtin_bit_cast`. Other types (e.g. `half`)
+                // keep `(0.0 / 0.0)`.
+                const IRFloatingPointValue value = constantInst->value.floatVal;
+                const bool isCUDA = isCUDATarget(getTargetReq());
+                switch (type ? type->getOp() : kIROp_Invalid)
+                {
+                case kIROp_FloatType:
+                    m_writer->emit(isCUDA ? "__builtin_bit_cast(float, " : "U32_asfloat(");
+                    emitHexLiteral(DoubleToFloatBits(value), 8);
+                    m_writer->emit("U)");
+                    break;
+                case kIROp_DoubleType:
+                    {
+                        const uint64_t bits = uint64_t(DoubleAsInt64(value));
+                        if (isCUDA)
+                        {
+                            m_writer->emit("__builtin_bit_cast(double, ");
+                            emitHexLiteral(bits, 16);
+                            m_writer->emit("ULL)");
+                        }
+                        else
+                        {
+                            m_writer->emit("U32_asdouble(");
+                            emitHexLiteral(uint32_t(bits), 8);
+                            m_writer->emit("U, ");
+                            emitHexLiteral(uint32_t(bits >> 32), 8);
+                            m_writer->emit("U)");
+                        }
+                        break;
+                    }
+                default:
+                    m_writer->emit("(0.0 / 0.0)");
+                    break;
+                }
                 break;
             }
         case IRConstant::FloatKind::PositiveInfinity:
