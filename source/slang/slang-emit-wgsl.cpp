@@ -855,21 +855,50 @@ static bool isStaticConst(IRInst* inst)
     return false;
 }
 
+// Return true if the module-scope value `inst` can be written as a WGSL const-expression, i.e. it
+// does not depend on an `override` (a specialization constant) or on a variable.
+static bool isWGSLConstExpression(IRInst* inst, HashSet<IRInst*>& visited)
+{
+    if (!visited.add(inst))
+        return true;
+    switch (inst->getOp())
+    {
+    case kIROp_GlobalParam:
+    case kIROp_GlobalVar:
+        return false;
+    default:
+        break;
+    }
+    if (as<IRConstant>(inst))
+        return true;
+    if (!inst->getParent() || inst->getParent()->getOp() != kIROp_ModuleInst)
+        return false;
+    for (UInt i = 0; i < inst->getOperandCount(); i++)
+    {
+        if (!isWGSLConstExpression(inst->getOperand(i), visited))
+            return false;
+    }
+    return true;
+}
+
 void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
 {
-    // A module-scope `static const` array is emitted as `var<private>`, not `const`: a WGSL
-    // `const` value of array type may only be indexed by a const-expression, so a constant array
-    // indexed by a runtime value (e.g. `positions[SV_VertexID]`) is rejected by the validator. A
-    // `var<private>` takes the same const-expression initializer but, being addressable, is
-    // runtime-indexable. Only arrays are converted -- a scalar/vector/matrix *value* is already
-    // runtime-indexable in WGSL. The type-based conversion is safe because constant-indexed reads
-    // fold away before emit (see the PR description). The `!= kIROp_GlobalParam` guard is
-    // load-bearing: this predicate is reused in the address-space chain below, where a
-    // `GlobalParam` array (e.g. a descriptor array) must keep its own address space, not
-    // `<private>`.
-    const bool emitModuleScopeArrayConstAsPrivateVar = isStaticConst(varDecl) &&
-                                                       varDecl->getOp() != kIROp_GlobalParam &&
-                                                       type->getOp() == kIROp_ArrayType;
+    // A module-scope `static const` array is emitted as a module-scope `const`. WGSL allows a
+    // concrete array value to be indexed by a run-time value (WGSL spec, "Array Access
+    // Expression"), and a `const` is not a variable, so it does not count against the 8192-byte
+    // limit on private variables that some implementations (e.g. WebKit) enforce. An array whose
+    // value is not a const-expression (it reads an `override` or a variable) keeps `var<private>`,
+    // because the initializer of a `var<private>` may be an override-expression but that of a
+    // `const` may not. The `!= kIROp_GlobalParam` guard is load-bearing: this predicate is reused
+    // in the address-space chain below, where a `GlobalParam` array (e.g. a descriptor array) must
+    // keep its own address space, not `<private>`.
+    bool emitModuleScopeArrayConstAsPrivateVar = false;
+    if (isStaticConst(varDecl) && varDecl->getOp() != kIROp_GlobalParam &&
+        varDecl->getOp() != kIROp_GlobalVar && type->getOp() == kIROp_ArrayType)
+    {
+        HashSet<IRInst*> visited;
+        emitModuleScopeArrayConstAsPrivateVar = !isWGSLConstExpression(varDecl, visited);
+    }
 
     switch (varDecl->getOp())
     {
@@ -943,8 +972,8 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
     else if (varDecl->getOp() == kIROp_GlobalVar || emitModuleScopeArrayConstAsPrivateVar)
     {
         // Global ("module-scope") non-handle variables need to specify storage space. This also
-        // covers an array constant converted to `var<private>` above (which is not a GlobalVar
-        // but is likewise emitted as a module-scope private variable).
+        // covers an array that is not a const-expression, emitted as `var<private>` above (which
+        // is not a GlobalVar but is likewise emitted as a module-scope private variable).
 
         // https://www.w3.org/TR/WGSL/#var-decls
         // "
