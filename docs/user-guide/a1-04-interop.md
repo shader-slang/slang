@@ -206,7 +206,7 @@ float modf(float x, out float ip)
 }
 ```
 
-Opcodes such as `OpCapability`, `OpExtension` and type definitions are allowed inside a `spirv_asm` block. These instructions will be deduplicated and inserted into the correct sections defined by the SPIR-V specification, for example:
+Opcodes such as `OpCapability`, `OpExtension`, type definitions and constants are allowed inside a `spirv_asm` block. These instructions will be deduplicated and inserted into the correct sections defined by the SPIR-V specification. Identical constants share one id, unless the block decorates or names the constant, and specialization constants are never shared. For example:
 ```cpp
 uint4 WaveMatch(T value)
 {
@@ -240,8 +240,14 @@ uint InstanceIndex()
 }
 ```
 
+To set an execution mode from a function that is not itself an entry point, use the `__entryPoint` operand in an `OpExecutionMode` or `OpExecutionModeId` instruction. The execution mode is applied to every entry point that calls the function, directly or indirectly, so the block can live in a shared helper.
 
-To set an execution mode from a function that is not itself an entry point, use the `__entryPoint` operand in an `OpExecutionMode` or `OpExecutionModeId` instruction. The execution mode is applied to every entry point that calls the function, directly or indirectly, so the block can live in a shared helper. An instruction that names its entry point instead, such as `OpExecutionMode $main ...` where `main` is an entry point function, applies only to that entry point. In `OpExecutionModeId`, the remaining operands are ids. Prefer a Slang constant, such as a `[vk::constant_id]` specialization constant referenced with `$`: a specialization constant or decorated constant defined inside the block gets a new id each time the block is inlined, so the mode would be repeated. For example:
+An instruction that names its entry point instead, such as `OpExecutionMode $main ...` where `main` is an entry point function, applies only to that entry point. When a compile does not include `main` as an entry point, the instruction is dropped.
+
+In `OpExecutionModeId`, the remaining operands are ids. Reference a constant declared in Slang with `$`, such as a `[vk::constant_id]` specialization constant. Avoid an id defined inside the block with `%name = OpSpecConstant...`, or an in-block constant that the block decorates: it gets a new id each time the block is inlined, so the mode is emitted once per copy, and SPIR-V validation rejects the repeated mode.
+
+For example:
+
 ```cpp
 [vk::constant_id(2)]
 const bool kEnableOpacityMicromap = false;
