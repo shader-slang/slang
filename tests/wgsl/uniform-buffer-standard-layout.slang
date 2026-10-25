@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
 //TEST:REFLECTION(filecheck=REFLECT):-stage compute -entry computeMain -target wgsl -no-codegen
-// The explicit layout wins over the D3D layout option, as it does in reflection.
+// The WGSL targets ignore the D3D layout option, as their reflection does.
 //TEST:SIMPLE(filecheck=DX): -target wgsl -entry computeMain -stage compute -fvk-use-dx-layout
 // An array of std430 constant buffers needs the extension too.
 //TEST:SIMPLE(filecheck=ARR): -target wgsl -entry arrayMain -stage compute
@@ -28,6 +28,8 @@
 // DX-NEXT: a_{{[0-9]+}} : array<f32, i32(4)>,
 // DX: var<uniform> c430_{{[0-9]+}} : U_std430_{{[0-9]+}};
 // DX: var<uniform> cscalar_{{[0-9]+}} : U_std430_{{[0-9]+}};
+// DX: struct _Array_std140_float4_{{[0-9]+}}
+// DX: var<uniform> cdefault_{{[0-9]+}} : U_std140_{{[0-9]+}};
 
 // ARR: requires uniform_buffer_standard_layout;
 // ARR: var<uniform> carray_{{[0-9]+}} : array<U_std430_{{[0-9]+}}, i32(2)>;

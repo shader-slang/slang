@@ -2542,23 +2542,9 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             return IRTypeLayoutRuleName::Natural;
     }
 
-    // On WGSL, an explicit std430 or scalar layout on a uniform buffer takes precedence over the
-    // D3D layout option, as it does in reflection (WGSLLayoutRulesFamilyImpl).
-    bool hasExplicitWGSLStandardLayout = false;
-    if (isWGPUTarget(targetReq))
-    {
-        if (auto paramGroupType = as<IRUniformParameterGroupType>(bufferType))
-        {
-            if (auto dataLayout = paramGroupType->getDataLayout())
-            {
-                hasExplicitWGSLStandardLayout =
-                    dataLayout->getOp() == kIROp_Std430BufferLayoutType ||
-                    dataLayout->getOp() == kIROp_ScalarBufferLayoutType;
-            }
-        }
-    }
-
-    if (target->getOptionSet().shouldUseDXLayout() && !hasExplicitWGSLStandardLayout)
+    // The WebGPU targets ignore the D3D layout option, as their reflection does
+    // (WGSLLayoutRulesFamilyImpl): WGSL has no D3D constant-buffer packing.
+    if (target->getOptionSet().shouldUseDXLayout() && !isWGPUTarget(targetReq))
     {
         if (as<IRUniformParameterGroupType>(bufferType))
         {
