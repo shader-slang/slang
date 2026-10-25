@@ -5068,7 +5068,7 @@ protected:
                             // getSystemValueInfo decides support, as it does for vertex outputs.
                             if (getSystemValueInfo(semanticName, nullptr, field).isUnsupported)
                                 reportUnsupportedSystemAttribute(key, semanticName);
-                            else
+                            else if (systemValue == SystemValueSemanticName::ClipDistance)
                                 clipDistanceKeys.add(key);
                         }
                     }
@@ -5145,7 +5145,7 @@ public:
     /// Report every clip-distance field of `entryPoint`'s result struct after the first. MSL
     /// allows one [[clip_distance]] member, and Slang does not yet pack several clip-distance
     /// outputs such as `SV_ClipDistance0` and `SV_ClipDistance1` into one array for Metal, as it
-    /// does for GLSL.
+    /// does for GLSL; shader-slang/slang#13947 tracks that packing.
     void diagnoseRepeatedClipDistanceOutputs(const EntryPointInfo& entryPoint)
     {
         if (auto resultStruct = as<IRStructType>(entryPoint.entryPointFunc->getResultType()))

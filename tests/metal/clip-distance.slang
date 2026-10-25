@@ -117,13 +117,13 @@ void msArray(
 
 // A second mesh entry point that shares the vertex struct declares its mesh over the same output
 // struct, and its `set_vertex` call receives a value of that struct.
+// MESH2-NOT: MeshVertexOutput_1
 // MESH2: metal::mesh<MeshVertexOutput_0,
 // MESH2: thread MeshVertexOutput_0 [[V1:_S[0-9]+]];
 // MESH2: set_vertex({{.*}},[[V1]])
 // MESH2: metal::mesh<MeshVertexOutput_0,
 // MESH2: thread MeshVertexOutput_0 [[V2:_S[0-9]+]];
 // MESH2: set_vertex({{.*}},[[V2]])
-// MESH2-NOT: MeshVertexOutput_1
 [shader("mesh")]
 [numthreads(3, 1, 1)]
 [outputtopology("triangle")]

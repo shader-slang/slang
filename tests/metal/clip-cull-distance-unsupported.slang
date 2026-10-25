@@ -16,6 +16,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=HALFMESH): -target metal -stage mesh -entry msHalf
 //DIAGNOSTIC_TEST:SIMPLE(diag=MESHTWOCLIP): -target metal -stage mesh -entry msTwoClip
 //DIAGNOSTIC_TEST:SIMPLE(diag=INNERCOV): -target metal -stage fragment -entry psNestedInnerCoverage
+//TEST:SIMPLE(filecheck=INNERCOVPARAM): -target metal -stage fragment -entry psInnerCoverageParam
 
 struct CullOut
 {
@@ -277,4 +278,12 @@ struct InnerCoverageVaryings
 float4 psNestedInnerCoverage(InnerCoverageVaryings input) : SV_Target
 {
     return float4(input.inner.uv, float(input.inner.ic), 1);
+}
+
+// INNERCOVPARAM: psInnerCoverageParam(
+// INNERCOVPARAM-NOT: error
+[shader("fragment")]
+float4 psInnerCoverageParam(float4 pos : SV_Position, uint ic : SV_InnerCoverage) : SV_Target
+{
+    return float4(float(ic), 0, 0, 1);
 }
