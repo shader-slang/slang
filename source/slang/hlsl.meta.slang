@@ -8020,10 +8020,12 @@ struct TriangleStream
 
 //@public:
 
-/// Try to terminate the current draw or dispatch call (HLSL SM 4.0)
-/// @remarks Only HLSL and C++ have this zero-argument form; other targets report it as
-/// unavailable instead of emitting an undefined `abort()` call. On Vulkan targets, use
-/// `abort(format, args...)` (VK_KHR_shader_abort).
+/// Terminate execution.
+/// @remarks Available on HLSL and C++ only. On HLSL (SM 4.0 and later) it tries to terminate the
+/// current draw or dispatch call. On C++ it calls the host `abort()` from `<stdlib.h>`, which ends
+/// the whole process. Calling it for any other target is a capability error. GLSL and SPIR-V
+/// targets have `abort(format, args...)` (VK_KHR_shader_abort) instead. CUDA, Metal and WGSL have
+/// no form of `abort`.
 [require(cpp_hlsl)]
 void abort();
 
