@@ -16511,6 +16511,7 @@ matrix<T, N, M> trunc(matrix<T, N, M> x)
 //@hidden:
 typedef uint WaveMask;
 
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
@@ -16537,6 +16538,7 @@ WaveMask WaveGetConvergedMask()
 __intrinsic_op($(kIROp_WaveGetActiveMask))
 WaveMask __WaveGetActiveMask();
 
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_metal_spirv, subgroup_ballot_activemask)]
@@ -16562,6 +16564,7 @@ WaveMask WaveGetActiveMask()
     }
 }
 
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_basic)]
@@ -16584,6 +16587,7 @@ bool WaveMaskIsFirstLane(WaveMask mask)
     }
 }
 
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
@@ -16606,6 +16610,7 @@ bool WaveMaskAllTrue(WaveMask mask, bool condition)
     }
 }
 
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
@@ -16628,6 +16633,7 @@ bool WaveMaskAnyTrue(WaveMask mask, bool condition)
     }
 }
 
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
@@ -16650,6 +16656,7 @@ WaveMask WaveMaskBallot(WaveMask mask, bool condition)
     }
 }
 
+[__removableIfUnused]
 [require(cuda_glsl_hlsl_spirv, subgroup_basic_ballot)]
 uint WaveMaskCountBits(WaveMask mask, bool value)
 {
@@ -16776,6 +16783,7 @@ void GroupMemoryBarrierWithWaveSync()
 // Versions SPIR-V greater than 1.4 loosen this restriction, and allow 'dynamic uniform' index
 // If that's the behavior required then client code should use WaveReadLaneAt which works this way.
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -16796,6 +16804,7 @@ T WaveMaskBroadcastLaneAt(WaveMask mask, T value, constexpr int lane)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -16815,6 +16824,7 @@ vector<T,N> WaveMaskBroadcastLaneAt(WaveMask mask, vector<T,N> value, constexpr 
         };
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_hlsl, subgroup_ballot)]
 matrix<T,N,M> WaveMaskBroadcastLaneAt(WaveMask mask, matrix<T,N,M> value, constexpr int lane)
@@ -16828,6 +16838,7 @@ matrix<T,N,M> WaveMaskBroadcastLaneAt(WaveMask mask, matrix<T,N,M> value, conste
 
 // TODO(JS): If it can be determines that the `laneId` is constExpr, then subgroupBroadcast
 // could be used on GLSL. For now we just use subgroupShuffle
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
@@ -16847,6 +16858,7 @@ T WaveMaskReadLaneAt(WaveMask mask, T value, int lane)
         };
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
@@ -16866,6 +16878,7 @@ vector<T,N> WaveMaskReadLaneAt(WaveMask mask, vector<T,N> value, int lane)
         };
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_hlsl, subgroup_shuffle)]
 matrix<T,N,M> WaveMaskReadLaneAt(WaveMask mask, matrix<T,N,M> value, int lane)
@@ -16880,18 +16893,21 @@ matrix<T,N,M> WaveMaskReadLaneAt(WaveMask mask, matrix<T,N,M> value, int lane)
 // NOTE! WaveMaskShuffle is a NON STANDARD HLSL intrinsic! It will map to WaveReadLaneAt on HLSL
 // which means it will only work on hardware which allows arbitrary laneIds which is not true
 // in general because it breaks the HLSL standard, which requires it's 'dynamically uniform' across the Wave.
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 [__unsafeForceInlineEarly]
 T WaveMaskShuffle(WaveMask mask, T value, int lane)
 {
     return WaveMaskReadLaneAt(mask, value, lane);
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 [__unsafeForceInlineEarly]
 vector<T,N> WaveMaskShuffle(WaveMask mask, vector<T,N> value, int lane)
 {
     return WaveMaskReadLaneAt(mask, value, lane);
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__unsafeForceInlineEarly]
 matrix<T,N,M> WaveMaskShuffle(WaveMask mask, matrix<T,N,M> value, int lane)
@@ -16899,6 +16915,7 @@ matrix<T,N,M> WaveMaskShuffle(WaveMask mask, matrix<T,N,M> value, int lane)
     return WaveMaskReadLaneAt(mask, value, lane);
 }
 
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
@@ -16921,6 +16938,7 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
 
 // Across lane ops
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -16935,6 +16953,7 @@ T WaveMaskBitAnd(WaveMask mask, T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -16948,6 +16967,7 @@ vector<T,N> WaveMaskBitAnd(WaveMask mask, vector<T,N> expr)
         return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -16962,6 +16982,7 @@ matrix<T,N,M> WaveMaskBitAnd(WaveMask mask, matrix<T,N,M> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -16975,6 +16996,7 @@ T WaveMaskBitOr(WaveMask mask, T expr)
         return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 [ForceInline]
@@ -16989,6 +17011,7 @@ vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17003,6 +17026,7 @@ matrix<T,N,M> WaveMaskBitOr(WaveMask mask, matrix<T,N,M> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17017,6 +17041,7 @@ T WaveMaskBitXor(WaveMask mask, T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17031,6 +17056,7 @@ vector<T,N> WaveMaskBitXor(WaveMask mask, vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17045,6 +17071,7 @@ matrix<T,N,M> WaveMaskBitXor(WaveMask mask, matrix<T,N,M> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17059,6 +17086,7 @@ T WaveMaskMax(WaveMask mask, T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17073,6 +17101,7 @@ vector<T,N> WaveMaskMax(WaveMask mask, vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17087,6 +17116,7 @@ matrix<T,N,M> WaveMaskMax(WaveMask mask, matrix<T,N,M> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17101,6 +17131,7 @@ T WaveMaskMin(WaveMask mask, T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17115,6 +17146,7 @@ vector<T,N> WaveMaskMin(WaveMask mask, vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17129,6 +17161,7 @@ matrix<T,N,M> WaveMaskMin(WaveMask mask, matrix<T,N,M> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17143,6 +17176,7 @@ T WaveMaskProduct(WaveMask mask, T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17157,6 +17191,7 @@ vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17171,6 +17206,7 @@ matrix<T,N,M> WaveMaskProduct(WaveMask mask, matrix<T,N,M> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17184,6 +17220,7 @@ T WaveMaskSum(WaveMask mask, T expr)
         return WaveMultiSum(expr, uint4(mask, 0, 0, 0));
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17198,6 +17235,7 @@ vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17212,6 +17250,7 @@ matrix<T,N,M> WaveMaskSum(WaveMask mask, matrix<T,N,M> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
@@ -17236,6 +17275,7 @@ bool WaveMaskAllEqual(WaveMask mask, T value)
         };
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
@@ -17260,6 +17300,7 @@ bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
         };
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 __cuda_sm_version(7.0)
 [require(cuda_hlsl, subgroup_vote)]
@@ -17274,6 +17315,7 @@ bool WaveMaskAllEqual(WaveMask mask, matrix<T,N,M> value)
 
 // Prefix
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17281,6 +17323,7 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
 {
     return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17288,6 +17331,7 @@ vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
 {
     return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17296,6 +17340,7 @@ matrix<T,N,M> WaveMaskPrefixProduct(WaveMask mask, matrix<T,N,M> expr)
     return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17304,6 +17349,7 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
     return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17311,6 +17357,7 @@ vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
 {
     return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17322,6 +17369,7 @@ matrix<T,N,M> WaveMaskPrefixSum(WaveMask mask, matrix<T,N,M> expr)
 /// Exclusive prefix minimum within a masked subset of lanes.
 /// Returns the minimum of all values from masked lanes with a lower index.
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(cuda_glsl_spirv, subgroup_partitioned)]
@@ -17330,6 +17378,7 @@ T WaveMaskPrefixMin(WaveMask mask, T expr)
     return WaveMultiPrefixExclusiveMin(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cuda_glsl_spirv, subgroup_partitioned)]
@@ -17338,6 +17387,7 @@ vector<T,N> WaveMaskPrefixMin(WaveMask mask, vector<T,N> expr)
     return WaveMultiPrefixExclusiveMin(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_spirv, subgroup_partitioned)]
@@ -17349,6 +17399,7 @@ matrix<T,N,M> WaveMaskPrefixMin(WaveMask mask, matrix<T,N,M> expr)
 /// Exclusive prefix maximum within a masked subset of lanes.
 /// Returns the maximum of all values from masked lanes with a lower index.
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
 [require(cuda_glsl_spirv, subgroup_partitioned)]
@@ -17357,6 +17408,7 @@ T WaveMaskPrefixMax(WaveMask mask, T expr)
     return WaveMultiPrefixExclusiveMax(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cuda_glsl_spirv, subgroup_partitioned)]
@@ -17365,6 +17417,7 @@ vector<T,N> WaveMaskPrefixMax(WaveMask mask, vector<T,N> expr)
     return WaveMultiPrefixExclusiveMax(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_spirv, subgroup_partitioned)]
@@ -17373,6 +17426,7 @@ matrix<T,N,M> WaveMaskPrefixMax(WaveMask mask, matrix<T,N,M> expr)
     return WaveMultiPrefixExclusiveMax(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -17388,6 +17442,7 @@ T WaveMaskReadLaneFirst(WaveMask mask, T expr)
         return spirv_asm {OpCapability GroupNonUniformBallot; OpGroupNonUniformBroadcastFirst $$T result Subgroup $expr};
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -17404,6 +17459,7 @@ vector<T,N> WaveMaskReadLaneFirst(WaveMask mask, vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda, subgroup_ballot)]
 matrix<T,N,M> WaveMaskReadLaneFirst(WaveMask mask, matrix<T,N,M> expr)
@@ -17418,6 +17474,7 @@ matrix<T,N,M> WaveMaskReadLaneFirst(WaveMask mask, matrix<T,N,M> expr)
 
 // TODO(JS): On HLSL it only works for 32 bits or less
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.1)
@@ -17439,6 +17496,7 @@ WaveMask WaveMaskMatch(WaveMask mask, T value)
         }).x;
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.1)
@@ -17461,6 +17519,7 @@ WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.3)
@@ -17476,6 +17535,7 @@ WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17484,6 +17544,7 @@ T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
     return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17492,6 +17553,7 @@ vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
     return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_hlsl, subgroup_partitioned)]
@@ -17500,6 +17562,7 @@ matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr)
     return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17508,6 +17571,7 @@ T WaveMaskPrefixBitOr(WaveMask mask, T expr)
     return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17516,6 +17580,7 @@ vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
     return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17524,6 +17589,7 @@ matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr)
     return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17532,6 +17598,7 @@ T WaveMaskPrefixBitXor(WaveMask mask, T expr)
     return WaveMultiPrefixBitXor(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17540,6 +17607,7 @@ vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
     return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17556,6 +17624,7 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -17580,6 +17649,7 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, (_getLaneId() & 0xFFFFFFFC) | ($1 & 3))";
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -17603,9 +17673,11 @@ vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, (_getLaneId() & 0xFFFFFFFC) | ($1 & 3))";
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID);
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -17633,6 +17705,7 @@ T QuadReadAcrossX(T localValue)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -17659,9 +17732,11 @@ vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 1)";
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossX(matrix<T,N,M> localValue);
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -17688,6 +17763,7 @@ T QuadReadAcrossY(T localValue)
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 2)";
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -17714,9 +17790,11 @@ vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 2)";
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossY(matrix<T,N,M> localValue);
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -17743,6 +17821,7 @@ T QuadReadAcrossDiagonal(T localValue)
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 3)";
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -17769,6 +17848,7 @@ vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 3)";
     }
 }
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
 
 // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
@@ -17778,6 +17858,7 @@ const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "Bitwi
 for (auto opName : kWaveActiveBitOpEntries) {
 $}
 /// @category wave Wave and quad functions
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -17801,6 +17882,7 @@ T WaveActive$(opName.hlslName)(T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -17824,6 +17906,7 @@ vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
 matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
@@ -17853,6 +17936,7 @@ const WaveActiveMinMaxEntry kWaveActiveMinMaxNames[] = {{"Min", "min"}, {"Max", 
 for (const auto opName : kWaveActiveMinMaxNames) {
 $}
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -17881,6 +17965,7 @@ T WaveActive$(opName.name)(T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -17909,6 +17994,7 @@ vector<T, N> WaveActive$(opName.name)(vector<T, N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
 matrix<T, N, M> WaveActive$(opName.name)(matrix<T, N, M> expr)
@@ -17939,6 +18025,7 @@ const WaveActiveProductSumEntry kWaveActivProductSumNames[] = {{"Product", "Mul"
 for (auto opName : kWaveActivProductSumNames) {
 $}
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -17974,6 +18061,7 @@ T WaveActive$(opName.hlslName)(T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18009,6 +18097,7 @@ vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
 matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
@@ -18032,6 +18121,7 @@ ${
 $}
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
@@ -18055,6 +18145,7 @@ bool WaveActiveAllEqual(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
@@ -18078,6 +18169,7 @@ bool WaveActiveAllEqual(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_hlsl, subgroup_vote)]
 bool WaveActiveAllEqual(matrix<T, N, M> value)
@@ -18091,6 +18183,7 @@ bool WaveActiveAllEqual(matrix<T, N, M> value)
 }
 
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
@@ -18118,6 +18211,7 @@ bool WaveActiveAllTrue(bool condition)
 }
 
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
@@ -18161,6 +18255,7 @@ uint4 __metal_simd_vote_mask_to_uint4(uint64_t mask)
 //@public:
 
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
@@ -18188,6 +18283,7 @@ uint4 WaveActiveBallot(bool condition)
 }
 
 /// @category wave
+[__removableIfUnused]
 [require(cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
 uint WaveActiveCountBits(bool value)
 {
@@ -18204,6 +18300,7 @@ uint WaveActiveCountBits(bool value)
 }
 
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
@@ -18231,6 +18328,7 @@ uint WaveGetLaneCount()
 }
 
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
@@ -18264,6 +18362,7 @@ uint WaveGetLaneIndex()
 /// which are restricted to compute-class execution models (compute, mesh,
 /// amplification); using it from any other stage is a capability error.
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_workgroup_index)]
@@ -18304,6 +18403,7 @@ uint WaveGetNumWaves()
 /// which are restricted to compute-class execution models (compute, mesh,
 /// amplification); using it from any other stage is a capability error.
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
@@ -18359,6 +18459,7 @@ uint WaveGetWaveIndex()
 /// Returns a mask with only the current lane's bit set.
 /// Equivalent to GLSL gl_SubgroupEqMask.
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [ForceInline]
@@ -18392,6 +18493,7 @@ uint4 WaveGetLaneEqMask()
 /// Returns a mask with bits set for lanes >= current lane.
 /// Equivalent to GLSL gl_SubgroupGeMask.
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [ForceInline]
@@ -18439,6 +18541,7 @@ uint4 WaveGetLaneGeMask()
 /// Returns a mask with bits set for lanes > current lane.
 /// Equivalent to GLSL gl_SubgroupGtMask.
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [ForceInline]
@@ -18487,6 +18590,7 @@ uint4 WaveGetLaneGtMask()
 /// Returns a mask with bits set for lanes <= current lane.
 /// Equivalent to GLSL gl_SubgroupLeMask.
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [ForceInline]
@@ -18523,6 +18627,7 @@ uint4 WaveGetLaneLeMask()
 /// Returns a mask with bits set for lanes < current lane.
 /// Equivalent to GLSL gl_SubgroupLtMask.
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [ForceInline]
@@ -18557,6 +18662,7 @@ uint4 WaveGetLaneLtMask()
 }
 
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
@@ -18585,6 +18691,7 @@ bool WaveIsFirstLane()
 // It's useful to have a wave uint4 version of countbits, because some wave functions return uint4.
 // This implementation tries to limit the amount of work required by the actual lane count.
 /// @category wave
+[__removableIfUnused]
 __spirv_version(1.3)
 [require(cpp_cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
 uint _WaveCountBits(uint4 value)
@@ -18613,6 +18720,7 @@ uint _WaveCountBits(uint4 value)
 
 // Prefix
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18649,6 +18757,7 @@ T WavePrefixProduct(T expr)
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18681,6 +18790,7 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
     }
 }
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
@@ -18697,6 +18807,7 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18729,6 +18840,7 @@ T WavePrefixSum(T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18761,6 +18873,7 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
 matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
@@ -18780,6 +18893,7 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
 /// Returns the minimum of all values from lanes with a lower index.
 /// Lane 0 gets the identity value (type max), lane i gets min(val[0], ..., val[i-1]).
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18804,6 +18918,7 @@ T WavePrefixMin(T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18828,6 +18943,7 @@ vector<T,N> WavePrefixMin(vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_spirv, subgroup_arithmetic)]
 matrix<T,N,M> WavePrefixMin(matrix<T,N,M> expr)
@@ -18845,6 +18961,7 @@ matrix<T,N,M> WavePrefixMin(matrix<T,N,M> expr)
 /// Returns the maximum of all values from lanes with a lower index.
 /// Lane 0 gets the identity value (type min), lane i gets max(val[0], ..., val[i-1]).
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18869,6 +18986,7 @@ T WavePrefixMax(T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18893,6 +19011,7 @@ vector<T,N> WavePrefixMax(vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_spirv, subgroup_arithmetic)]
 matrix<T,N,M> WavePrefixMax(matrix<T,N,M> expr)
@@ -18909,6 +19028,7 @@ matrix<T,N,M> WavePrefixMax(matrix<T,N,M> expr)
 /// WavePrefixBitAnd - Exclusive prefix bitwise AND (equivalent to GLSL subgroupExclusiveAnd)
 /// Note: CUDA/HLSL require subgroup_partitioned capability (SM 6.5 for HLSL)
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18932,6 +19052,7 @@ T WavePrefixBitAnd(T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18955,6 +19076,7 @@ vector<T,N> WavePrefixBitAnd(vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(glsl_spirv, subgroup_arithmetic)]
 [require(cuda_hlsl, subgroup_partitioned)]
@@ -18974,6 +19096,7 @@ matrix<T,N,M> WavePrefixBitAnd(matrix<T,N,M> expr)
 /// WavePrefixBitOr - Exclusive prefix bitwise OR (equivalent to GLSL subgroupExclusiveOr)
 /// Note: CUDA/HLSL require subgroup_partitioned capability (SM 6.5 for HLSL)
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -18997,6 +19120,7 @@ T WavePrefixBitOr(T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -19020,6 +19144,7 @@ vector<T,N> WavePrefixBitOr(vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(glsl_spirv, subgroup_arithmetic)]
 [require(cuda_hlsl, subgroup_partitioned)]
@@ -19039,6 +19164,7 @@ matrix<T,N,M> WavePrefixBitOr(matrix<T,N,M> expr)
 /// WavePrefixBitXor - Exclusive prefix bitwise XOR (equivalent to GLSL subgroupExclusiveXor)
 /// Note: CUDA/HLSL require subgroup_partitioned capability (SM 6.5 for HLSL)
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -19062,6 +19188,7 @@ T WavePrefixBitXor(T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -19085,6 +19212,7 @@ vector<T,N> WavePrefixBitXor(vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(glsl_spirv, subgroup_arithmetic)]
 [require(cuda_hlsl, subgroup_partitioned)]
@@ -19102,6 +19230,7 @@ matrix<T,N,M> WavePrefixBitXor(matrix<T,N,M> expr)
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -19125,6 +19254,7 @@ T WaveReadLaneFirst(T expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -19148,6 +19278,7 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
 [KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
@@ -19173,6 +19304,7 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 // Versions SPIR-V greater than 1.4 loosen this restriction, and allow 'dynamic uniform' index
 // If that's the behavior required then client code should use WaveReadLaneAt which works this way.
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -19197,6 +19329,7 @@ T WaveBroadcastLaneAt(T value, constexpr int lane)
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -19220,6 +19353,7 @@ vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
 matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
@@ -19239,6 +19373,7 @@ matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
 // TODO(JS): If it can be determines that the `laneId` is constExpr, then subgroupBroadcast
 // could be used on GLSL. For now we just use subgroupShuffle
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
@@ -19262,6 +19397,7 @@ T WaveReadLaneAt(T value, int lane)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
@@ -19285,6 +19421,7 @@ vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_shuffle)]
 matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
@@ -19305,6 +19442,7 @@ matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
 // which means it will only work on hardware which allows arbitrary laneIds which is not true
 // in general because it breaks the HLSL standard, which requires it's 'dynamically uniform' across the Wave.
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
@@ -19329,6 +19467,7 @@ T WaveShuffle(T value, int lane)
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
@@ -19352,6 +19491,7 @@ vector<T,N> WaveShuffle(vector<T,N> value, int lane)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_hlsl, subgroup_shuffle)]
 matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
@@ -19365,6 +19505,7 @@ matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
 }
 
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
@@ -19388,6 +19529,7 @@ uint WavePrefixCountBits(bool value)
 }
 
 /// @category wave
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
@@ -19413,6 +19555,7 @@ uint4 WaveGetConvergedMulti()
 }
 
 /// @category wave
+[__removableIfUnused]
 [ForceInline]
 uint4 WaveGetActiveMulti()
 {
@@ -19423,6 +19566,7 @@ uint4 WaveGetActiveMulti()
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 uint4 WaveMatch(T value)
@@ -19443,6 +19587,7 @@ uint4 WaveMatch(T value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 uint4 WaveMatch(vector<T,N> value)
@@ -19463,6 +19608,7 @@ uint4 WaveMatch(vector<T,N> value)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 uint4 WaveMatch(matrix<T,N,M> value)
@@ -19484,6 +19630,7 @@ uint4 WaveMatch(matrix<T,N,M> value)
 }
 
 /// @category wave
+[__removableIfUnused]
 [require(cuda_hlsl, subgroup_partitioned)]
 uint WaveMultiPrefixCountBits(bool value, uint4 mask)
 {
@@ -19578,6 +19725,7 @@ void shader_subgroup_preamble()
 // These are Slang specific intrinsics to rotate values within a subgroup.
 //
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_rotate)
 [require(cuda_glsl_metal_spirv, subgroup_rotate)]
@@ -19602,6 +19750,7 @@ T WaveRotate(T value, uint delta)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_rotate)
 [require(cuda_glsl_metal_spirv, subgroup_rotate)]
@@ -19626,6 +19775,7 @@ vector<T, N> WaveRotate(vector<T, N> value, uint delta)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_rotate)
 [require(cuda_glsl_spirv, subgroup_rotate)]
@@ -19648,6 +19798,7 @@ T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_rotate)
 [require(cuda_glsl_spirv, subgroup_rotate)]
@@ -19709,6 +19860,7 @@ const WaveMultiSumProductEntry kWaveMultiSumProductNames[] = { {"Sum", "Add"}, {
 for (auto opName : kWaveMultiSumProductNames) {
 $}
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 [ForceInline]
@@ -19732,6 +19884,7 @@ T WaveMulti$(opName.name)(T value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 [ForceInline]
@@ -19755,6 +19908,7 @@ vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMulti$(opName.name)(matrix<T,N,M> value, uint4 mask)
@@ -19814,6 +19968,7 @@ const WaveMultiPrefixSumProductEntry kWaveMultiPrefixSumProductNames[] =
 for (auto opName : kWaveMultiPrefixSumProductNames) {
 $}
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 [ForceInline]
@@ -19839,6 +19994,7 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 [ForceInline]
@@ -19864,6 +20020,7 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
@@ -19899,6 +20056,7 @@ const WaveMultiMinMaxEntry kWaveMultiMinMaxNames[] = { {"Min"}, {"Max"} };
 for (auto opName : kWaveMultiMinMaxNames) {
 $}
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 [ForceInline]
@@ -19924,6 +20082,7 @@ T WaveMulti$(opName.name)(T value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 [ForceInline]
@@ -19949,6 +20108,7 @@ vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_spirv, subgroup_partitioned)]
 matrix<T, N, M> WaveMulti$(opName.name)(matrix<T, N, M> value, uint4 mask)
@@ -19996,6 +20156,7 @@ const WaveMultiPrefixMinMaxEntry kWaveMultiPrefixMinMaxNames[] =
 for (auto opName : kWaveMultiPrefixMinMaxNames) {
 $}
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 [ForceInline]
@@ -20021,6 +20182,7 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 [ForceInline]
@@ -20046,6 +20208,7 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(glsl_spirv, subgroup_partitioned)]
 matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
@@ -20073,6 +20236,7 @@ const WaveMultiBitsEntry kWaveMultiBitsNames[] = { {"And"}, {"Or"} , {"Xor"} };
 for (auto opName : kWaveMultiBitsNames) {
 $}
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 [ForceInline]
@@ -20094,6 +20258,7 @@ T WaveMultiBit$(opName.name)(T value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 [ForceInline]
@@ -20115,6 +20280,7 @@ vector<T, N> WaveMultiBit$(opName.name)(vector<T, N> value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_spirv, subgroup_partitioned)]
 matrix<T, N, M> WaveMultiBit$(opName.name)(matrix<T, N, M> value, uint4 mask)
@@ -20174,6 +20340,7 @@ const WaveMultiPrefixBitwiseEntry kWaveMultiPrefixBitwiseNames[] =
 for (auto opName : kWaveMultiPrefixBitwiseNames) {
 $}
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 [ForceInline]
@@ -20197,6 +20364,7 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 [ForceInline]
@@ -20220,6 +20388,7 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
@@ -20256,6 +20425,7 @@ $}
 // These are Slang specific intrinsics corresponding to GL_KHR_shader_subgroup_clustered.
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20277,6 +20447,7 @@ public T WaveClusteredSum(T value, constexpr uint clusterSize)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20300,6 +20471,7 @@ public vector<T,N> WaveClusteredSum(vector<T,N> value, constexpr uint clusterSiz
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20321,6 +20493,7 @@ public T WaveClusteredProduct(T value, constexpr uint clusterSize)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20343,6 +20516,7 @@ public vector<T,N> WaveClusteredProduct(vector<T,N> value, constexpr uint cluste
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20366,6 +20540,7 @@ public T WaveClusteredMin(T value, constexpr uint clusterSize)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20390,6 +20565,7 @@ public vector<T,N> WaveClusteredMin(vector<T,N> value, constexpr uint clusterSiz
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20413,6 +20589,7 @@ public T WaveClusteredMax(T value, constexpr uint clusterSize)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20437,6 +20614,7 @@ public vector<T,N> WaveClusteredMax(vector<T,N> value, constexpr uint clusterSiz
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20455,6 +20633,7 @@ public T WaveClusteredBitAnd(T value, constexpr uint clusterSize)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20474,6 +20653,7 @@ public vector<T,N> WaveClusteredBitAnd(vector<T,N> value, constexpr uint cluster
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20492,6 +20672,7 @@ public T WaveClusteredBitOr(T value, constexpr uint clusterSize)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20511,6 +20692,7 @@ public vector<T,N> WaveClusteredBitOr(vector<T,N> value, constexpr uint clusterS
 }
 
 /// @category wave
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20529,6 +20711,7 @@ public T WaveClusteredBitXor(T value, constexpr uint clusterSize)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_clustered)
@@ -20558,6 +20741,7 @@ public vector<T,N> WaveClusteredBitXor(vector<T,N> value, constexpr uint cluster
 
 //@public:
 /// Returns true if `expr` is true in any lane of the current quad.
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
@@ -20584,6 +20768,7 @@ bool QuadAny(bool expr)
 
 //@public:
 /// Returns true if `expr` is true in all lanes of the current quad.
+[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)

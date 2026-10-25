@@ -2192,6 +2192,15 @@ local insts = {
 					struct_name = "NoSideEffectDecoration",
 				},
 			},
+			{
+				removableIfUnused = {
+					-- A `[__removableIfUnused]` decoration marks a callee whose call can be removed
+					-- when its result is unused. Unlike `[NoSideEffect]`, it does not make the call
+					-- side-effect free, so it is honored only by dead-code elimination and a call
+					-- is never moved. See `RemovableIfUnusedAttribute`.
+					struct_name = "RemovableIfUnusedDecoration",
+				},
+			},
 			{ bindExistentialSlots = { struct_name = "BindExistentialSlotsDecoration" } },
 			{
 				format = {

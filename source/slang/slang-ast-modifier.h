@@ -2152,6 +2152,19 @@ class NoSideEffectAttribute : public Attribute
     FIDDLE(...)
 };
 
+/// A `[__removableIfUnused]` attribute marks a function whose call can be removed when its result
+/// is unused, but which must not be treated as side-effect free (`[__NoSideEffect]`) or pure
+/// (`[__readNone]`), because the call must not be moved. Wave and subgroup operations are like
+/// this: they have no side effects, but they are convergent, since their result depends on
+/// which invocations execute them together. Moving one into or out of a branch, or merging it
+/// with an identical call elsewhere, changes that set, while removing an unused one changes
+/// nothing. Only dead-code elimination reads this attribute.
+FIDDLE()
+class RemovableIfUnusedAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 /// A `[KnownBuiltin(name)]` attribute allows the compiler to
 /// identify this declaration during compilation, despite obfuscation or
 /// linkage removing optimizations

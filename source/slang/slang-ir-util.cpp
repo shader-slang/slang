@@ -2012,6 +2012,17 @@ bool isPureFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
     return false;
 }
 
+bool isRemovableIfUnusedCall(IRInst* inst, SideEffectAnalysisOptions options)
+{
+    auto call = as<IRCall>(inst);
+    if (!call)
+        return false;
+    auto callee = getResolvedInstForDecorations(call->getCallee());
+    if (!callee || !callee->findDecoration<IRRemovableIfUnusedDecoration>())
+        return false;
+    return areCallArgumentsSideEffectFree(call, options);
+}
+
 bool isSideEffectFreeFunctionalCall(
     IRCall* call,
     SideEffectAnalysisOptions options,
