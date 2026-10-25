@@ -332,10 +332,11 @@ static SlangResult _findVersionsWithVSWhere(
 
     // Add other args
     {
-        // TODO(JS):
-        // For arm targets will probably need something different for tooling
-        // Without `-products *`, vswhere only lists Community, Professional and Enterprise, so an
-        // install of the Build Tools alone (which has the same VC tools) would not be found.
+        // We pass `-products *` because vswhere otherwise lists only Community, Professional and
+        // Enterprise, which misses a Build Tools install. The `-requires` filter still limits the
+        // results to installs that have the VC tools.
+        //
+        // TODO(JS): For arm targets the `-requires` component will probably need to be different.
         String args[] = {
             "-products",
             "*",
