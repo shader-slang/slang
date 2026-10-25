@@ -184,6 +184,23 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
         }
     }
 
+    // A uniform buffer with an explicit std430 or scalar layout has the layout WGSL gives every
+    // other host-shareable buffer (16-byte array strides and struct alignment are not required),
+    // which `var<uniform>` allows under the `uniform_buffer_standard_layout` language extension.
+    // https://www.w3.org/TR/WGSL/#language_extension-uniform_buffer_standard_layout
+    if (auto dataLayout = type->getDataLayout())
+    {
+        switch (dataLayout->getOp())
+        {
+        case kIROp_Std430BufferLayoutType:
+        case kIROp_ScalarBufferLayoutType:
+            m_requiresUniformBufferStandardLayout = true;
+            break;
+        default:
+            break;
+        }
+    }
+
     auto elementType = type->getElementType();
     m_writer->emit("var<uniform> ");
     m_writer->emit(getName(varDecl));
@@ -1858,6 +1875,11 @@ void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
     if (m_requiresImmediateAddressSpace)
     {
         m_writer->emit("requires immediate_address_space;\n");
+    }
+
+    if (m_requiresUniformBufferStandardLayout)
+    {
+        m_writer->emit("requires uniform_buffer_standard_layout;\n");
     }
 }
 

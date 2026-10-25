@@ -2585,6 +2585,12 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto defaultTypeOp =
                 isCPUTarget(targetReq) ? IRTypeLayoutRuleName::C : IRTypeLayoutRuleName::Std140;
 
+            // WGSL has no scalar layout: a uniform buffer declared with `ScalarDataLayout`
+            // gets WGSL's standard layout, std430 (as its reflection does).
+            if (targetReq->getTarget() == CodeGenTarget::WGSL &&
+                layoutTypeOp == kIROp_ScalarBufferLayoutType)
+                return IRTypeLayoutRuleName::Std430;
+
             return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, defaultTypeOp);
         }
     case kIROp_GLSLShaderStorageBufferType:

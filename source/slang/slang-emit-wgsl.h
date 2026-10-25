@@ -99,6 +99,10 @@ private:
     // Set when a push-constant buffer is emitted as `var<immediate>`.
     bool m_requiresImmediateAddressSpace = false;
 
+    // Set when a `var<uniform>` is laid out by WGSL's standard (std430) rules rather than std140:
+    // a `ConstantBuffer<T, Std430DataLayout>` or `ConstantBuffer<T, ScalarDataLayout>`.
+    bool m_requiresUniformBufferStandardLayout = false;
+
     RefPtr<ShaderExtensionTracker> m_extensionTracker;
 };
 
