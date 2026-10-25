@@ -1647,13 +1647,17 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::HLSLUniformModifier:
         return ASTNodeType::HLSLStaticModifier;
 
+    // An interpolation mode and a sampling location combine (HLSL `noperspective centroid`,
+    // `linear sample`), so they are two conflict groups.
     case ASTNodeType::HLSLNoInterpolationModifier:
     case ASTNodeType::HLSLNoPerspectiveModifier:
     case ASTNodeType::HLSLLinearModifier:
-    case ASTNodeType::HLSLSampleModifier:
-    case ASTNodeType::HLSLCentroidModifier:
     case ASTNodeType::PerVertexModifier:
         return ASTNodeType::InterpolationModeModifier;
+
+    case ASTNodeType::HLSLSampleModifier:
+    case ASTNodeType::HLSLCentroidModifier:
+        return ASTNodeType::HLSLSampleModifier;
 
     case ASTNodeType::PrefixModifier:
     case ASTNodeType::PostfixModifier:
