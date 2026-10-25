@@ -9,6 +9,10 @@
 //TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry quadReadLaneAtMain -stage compute
 //TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry quadReadLaneAtMatrixMain -stage compute
 //TEST:SIMPLE(filecheck=QUADMATSPV): -target spirv-asm -entry quadReadLaneAtMatrixMain -stage compute
+//TEST:SIMPLE(filecheck=QUADMATHLSL): -target hlsl -entry quadReadLaneAtMatrixMain -stage compute -profile cs_6_0
+//TEST:SIMPLE(filecheck=QUADMATGLSL): -target glsl -entry quadReadLaneAtMatrixMain -stage compute
+//TEST:SIMPLE(filecheck=QUADMATMETAL): -target metal -entry quadReadLaneAtMatrixMain -stage compute
+//TEST:SIMPLE(filecheck=QUADMATCUDA): -target cuda -entry quadReadLaneAtMatrixMain -stage compute
 
 // WGSL lowering of WaveActiveCountBits, WavePrefixCountBits, WaveActiveAllEqual and
 // QuadReadLaneAt through WGSL subgroup and quad built-ins (#9972).
@@ -19,11 +23,14 @@
 RWStructuredBuffer<uint> outputBuffer;
 RWStructuredBuffer<float4> floatBuffer;
 
-// All four words of the ballot are counted.
+// All four words of the ballot are counted (`_WaveCountBits`), without reading the subgroup size.
 // COUNT: enable subgroups;
+// COUNT: fn [[COUNTBITS:_WaveCountBits_[0-9]+]]( [[W:value_[0-9]+]] : vec4<u32>) -> u32
+// COUNT: return countOneBits([[W]].x) + countOneBits([[W]].y) + countOneBits([[W]].z) + countOneBits([[W]].w);
 // COUNT: fn WaveActiveCountBits_{{[0-9]+}}( [[V:value_[0-9]+]] : bool
-// COUNT: var [[B:ballot_[0-9]+]] : vec4<u32> = subgroupBallot([[V]]);
-// COUNT: return countOneBits([[B]].x) + countOneBits([[B]].y) + countOneBits([[B]].z) + countOneBits([[B]].w);
+// COUNT: = subgroupBallot([[V]]);
+// COUNT: [[COUNTBITS]](
+// COUNT-NOT: subgroup_size
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void countBitsMain(uint3 tid: SV_DispatchThreadID)
@@ -34,13 +41,15 @@ void countBitsMain(uint3 tid: SV_DispatchThreadID)
 // The ballot is masked with WaveGetLaneLtMask (the lanes below the invocation's own, so the count
 // is exclusive), and all four words are counted.
 // PREFIX: enable subgroups;
+// PREFIX: fn [[COUNTBITS:_WaveCountBits_[0-9]+]]( [[W:value_[0-9]+]] : vec4<u32>) -> u32
+// PREFIX: return countOneBits([[W]].x) + countOneBits([[W]].y) + countOneBits([[W]].z) + countOneBits([[W]].w);
 // PREFIX: fn WavePrefixCountBits_{{[0-9]+}}( [[V:value_[0-9]+]] : bool
 // PREFIX: = subgroupBallot([[V]]);
 // PREFIX: >> (u32(5))
 // PREFIX: = ((u32(1) << ((({{.*}} & (u32(31))))))) - u32(1);
-// PREFIX: var [[BELOW:below_[0-9]+]] : vec4<u32> =
-// PREFIX: return countOneBits([[BELOW]].x) + countOneBits([[BELOW]].y) + countOneBits([[BELOW]].z) + countOneBits([[BELOW]].w);
+// PREFIX: [[COUNTBITS]](
 // PREFIX: @builtin(subgroup_invocation_id)
+// PREFIX-NOT: subgroup_size
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void prefixCountBitsMain(uint3 tid: SV_DispatchThreadID)
@@ -114,8 +123,12 @@ void quadReadLaneAtMain(uint3 tid: SV_DispatchThreadID)
     floatBuffer[tid.x] = QuadReadLaneAt(floatBuffer[tid.x], 2);
 }
 
-// A matrix is read row by row through the vector overload (`MATRIX_MAP_BINARY`), on WGSL and the
-// other targets. Every row reads the same lane.
+// A matrix is read row by row through the vector overload (`MATRIX_MAP_BINARY`) on every target
+// except HLSL, which has a matrix QuadReadLaneAt. Every row reads the same lane.
+// QUADMATHLSL: float2x2 {{.*}} = QuadReadLaneAt(
+// QUADMATGLSL: subgroupQuadBroadcast(sourceValue_{{[0-9]+}}[i_{{[0-9]+}}],
+// QUADMATMETAL: quad_shuffle((sourceValue_{{[0-9]+}}[i_{{[0-9]+}}]),
+// QUADMATCUDA: _waveShuffleMultiple(0xFFFFFFFF, (sourceValue_{{[0-9]+}}.rows[i_{{[0-9]+}}]),
 // QUADMATSPV: OpGroupNonUniformQuadBroadcast %v2float
 // QUADMAT: fn [[VEC:QuadReadLaneAt_[0-9]+]]( sourceValue_{{[0-9]+}} : vec2<f32>,  quadLaneID_{{[0-9]+}} : u32) -> vec2<f32>
 // QUADMAT: quadBroadcast(
