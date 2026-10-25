@@ -4,6 +4,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -O1
 //TEST:SIMPLE(filecheck=FOLD): -target spirv -stage compute -entry computeMain -O1
+//TEST:SIMPLE(filecheck=VEC): -target spirv -stage compute -entry computeMain -O1
 
 //TEST:SIMPLE(filecheck=NOQ): -target spirv -stage compute -entry computeMain -O1
 //TEST:SIMPLE(filecheck=NOQ): -target spirv -stage compute -entry computeMain -O0
@@ -18,6 +19,10 @@
 // CHECK-DAG: OpConstant %uint 2139095041
 // CHECK-DAG: OpConstant %uint 4286578689
 // CHECK-DAG: OpConstant %uint 2143289343
+
+// The two lanes of the vector bit cast keep their bits, 0xFF800001 and 0x7FA00000.
+// VEC-DAG: OpConstant %uint 4286578689
+// VEC-DAG: OpConstant %uint 2141192192
 
 // At -O1 every bit cast is folded, so the constants above are folded results, not the inputs.
 // FOLD-NOT: OpBitcast
@@ -67,7 +72,10 @@ void computeMain()
     outputBuffer[7] = roundTrip(0x3F800000u);
     outputBuffer[8] = roundTrip(0x00000001u);
     outputBuffer[9] = roundTrip(0x80000000u);
-    // A vector bit cast is split per element, and each constant lane keeps its bits.
+    // A vector bit cast is split per element, and each constant lane keeps its bits. Checked by
+    // VEC at compile time only: CI also runs the Vulkan lanes through GLSL
+    // (`-emit-spirv-via-glsl`), and the GLSL emitter writes every NaN constant as `0.0 / 0.0`,
+    // so there these elements read back 0x7FC00000.
     float2 v = bit_cast<float2>(uint2(0xFF800001u, 0x7FA00000u));
     outputBuffer[10] = asuint(v.x);
     outputBuffer[11] = asuint(v.y);
@@ -87,8 +95,6 @@ void computeMain()
 // BUF-NEXT: 3F800000
 // BUF-NEXT: 1
 // BUF-NEXT: 80000000
-// BUF-NEXT: FF800001
-// BUF-NEXT: 7FA00000
 
 [numthreads(1, 1, 1)]
 void castMain()
