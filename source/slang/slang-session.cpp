@@ -187,12 +187,21 @@ void Linkage::addTarget(slang::TargetDesc const& desc)
     auto& optionSet = target->getOptionSet();
     optionSet.inheritFrom(m_optionSet);
 
-    optionSet.set(CompilerOptionName::FloatingPointMode, FloatingPointMode(desc.floatingPointMode));
+    // A field of the target description left at its default does not override a value the
+    // session's options set: the target inherits it, as it inherits every other session option.
+    if (desc.floatingPointMode != SLANG_FLOATING_POINT_MODE_DEFAULT)
+        optionSet.set(
+            CompilerOptionName::FloatingPointMode,
+            FloatingPointMode(desc.floatingPointMode));
     optionSet.addTargetFlags(desc.flags);
     optionSet.setProfile(Profile(desc.profile));
 
-    optionSet.set(CompilerOptionName::LineDirectiveMode, LineDirectiveMode(desc.lineDirectiveMode));
-    optionSet.set(CompilerOptionName::GLSLForceScalarLayout, desc.forceGLSLScalarBufferLayout);
+    if (desc.lineDirectiveMode != SLANG_LINE_DIRECTIVE_MODE_DEFAULT)
+        optionSet.set(
+            CompilerOptionName::LineDirectiveMode,
+            LineDirectiveMode(desc.lineDirectiveMode));
+    if (desc.forceGLSLScalarBufferLayout)
+        optionSet.set(CompilerOptionName::GLSLForceScalarLayout, true);
 
     CompilerOptionSet targetOptions;
     targetOptions.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
