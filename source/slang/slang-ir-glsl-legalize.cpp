@@ -337,6 +337,13 @@ struct GLSLLegalizationContext
     // Currently only used for special cases of semantics which map to global variables
     Dictionary<UnownedStringSlice, SystemSemanticGlobal> systemNameToGlobalMap;
 
+    // The first element of `gl_ClipDistance` / `gl_CullDistance` used by each non-arrayed
+    // `SV_ClipDistanceN` / `SV_CullDistanceN` varying, keyed by semantic index. They are
+    // computed by `computeClipCullDistanceOffsets` before any varying is legalized, because
+    // the offset of one value depends on the widths of all values with a lower index.
+    Dictionary<Index, Index> clipDistanceOffsets;
+    Dictionary<Index, Index> cullDistanceOffsets;
+
     // Map from a input parameter in fragment shader to its corresponding per-vertex array
     // to support the `GetAttributeAtVertex` intrinsic.
     Dictionary<IRInst*, IRInst*> mapVertexInputToPerVertexArray;
@@ -444,6 +451,151 @@ struct OuterParamInfoLink
     OuterParamInfoLink* next;
 };
 
+// The number of distances (1 for `float`, N for `floatN`) held by each non-arrayed
+// `SV_ClipDistanceN` / `SV_CullDistanceN` value of one varying signature, keyed by N.
+struct ClipCullDistanceWidths
+{
+    Dictionary<Index, Count> clip;
+    Dictionary<Index, Count> cull;
+};
+
+// Record in `widths` every non-arrayed `SV_ClipDistanceN` / `SV_CullDistanceN` leaf of a
+// varying of type `type`. The walk mirrors `createGLSLGlobalVaryingsImpl`; leaves under an
+// array or a mesh output are skipped because they are legalized as arrayed varyings of their
+// own.
+static void collectClipCullDistanceWidths(
+    IRType* type,
+    IRVarLayout* varLayout,
+    IRTypeLayout* typeLayout,
+    ClipCullDistanceWidths& widths)
+{
+    if (as<IRVoidType>(type) || as<IRArrayType>(type) || as<IRMeshOutputType>(type))
+        return;
+
+    if (auto streamType = as<IRHLSLStreamOutputType>(type))
+    {
+        auto streamLayout = as<IRStreamOutputTypeLayout>(typeLayout);
+        SLANG_ASSERT(streamLayout);
+        collectClipCullDistanceWidths(
+            streamType->getElementType(),
+            varLayout,
+            streamLayout->getElementTypeLayout(),
+            widths);
+        return;
+    }
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        auto structTypeLayout = as<IRStructTypeLayout>(typeLayout);
+        SLANG_ASSERT(structTypeLayout);
+        UInt fieldIndex = 0;
+        for (auto field : structType->getFields())
+        {
+            auto fieldLayout = structTypeLayout->getFieldLayout(fieldIndex++);
+            collectClipCullDistanceWidths(
+                field->getFieldType(),
+                fieldLayout,
+                fieldLayout->getTypeLayout(),
+                widths);
+        }
+        return;
+    }
+
+    auto semantic = varLayout->findSystemValueSemanticAttr();
+    if (!semantic)
+        return;
+    Dictionary<Index, Count>* semanticWidths = nullptr;
+    if (semantic->getName().caseInsensitiveEquals(toSlice("sv_clipdistance")))
+        semanticWidths = &widths.clip;
+    else if (semantic->getName().caseInsensitiveEquals(toSlice("sv_culldistance")))
+        semanticWidths = &widths.cull;
+    else
+        return;
+
+    // Values that repeat a semantic index share its elements, so the widest one decides how
+    // many elements the index takes.
+    Count width = getIRVectorElementSize(type);
+    auto& recordedWidth = semanticWidths->getOrAddValue(Index(semantic->getIndex()), width);
+    recordedWidth = Math::Max(recordedWidth, width);
+}
+
+// Assign each semantic index in `widths` the first array element it occupies. Following DXC,
+// the values are packed in ascending semantic-index order, each taking as many elements as it
+// has components: a `float4` at index 0 and a `float2` at index 1 take elements 0-3 and 4-5.
+// A signature of only scalar values instead places each value at the element named by its
+// semantic index, so that another stage can read any subset of those scalars by index.
+static void packClipCullDistanceOffsets(
+    Dictionary<Index, Count> const& widths,
+    Dictionary<Index, Index>& outOffsets)
+{
+    List<Index> semanticIndices;
+    bool allScalar = true;
+    for (const auto& [semanticIndex, width] : widths)
+    {
+        semanticIndices.add(semanticIndex);
+        allScalar = allScalar && width == 1;
+    }
+    semanticIndices.sort();
+
+    outOffsets.clear();
+    Index offset = 0;
+    for (auto semanticIndex : semanticIndices)
+    {
+        outOffsets[semanticIndex] = allScalar ? semanticIndex : offset;
+        offset += widths.getValue(semanticIndex);
+    }
+}
+
+// The offsets in the context describe one varying signature at a time: that of the entry
+// point, or, while they are legalized, that of a hull shader's patch-constant outputs.
+static void setClipCullDistanceOffsets(
+    GLSLLegalizationContext* context,
+    ClipCullDistanceWidths const& widths)
+{
+    packClipCullDistanceOffsets(widths.clip, context->clipDistanceOffsets);
+    packClipCullDistanceOffsets(widths.cull, context->cullDistanceOffsets);
+}
+
+// Compute `context->clipDistanceOffsets` and `context->cullDistanceOffsets` from the result
+// and parameters of the entry point `func`. All non-arrayed `SV_ClipDistanceN` values of the
+// entry point share one `gl_ClipDistance` array (likewise for cull distances), so their
+// offsets must be known before the first of them is legalized.
+static void computeClipCullDistanceOffsets(
+    GLSLLegalizationContext* context,
+    IRFunc* func,
+    IREntryPointLayout* entryPointLayout)
+{
+    ClipCullDistanceWidths widths;
+
+    if (auto resultLayout = entryPointLayout->getResultLayout())
+    {
+        collectClipCullDistanceWidths(
+            func->getResultType(),
+            resultLayout,
+            resultLayout->getTypeLayout(),
+            widths);
+    }
+
+    if (auto firstBlock = func->getFirstBlock())
+    {
+        for (auto param : firstBlock->getParams())
+        {
+            auto paramLayout = findVarLayout(param);
+            SLANG_ASSERT(paramLayout);
+            IRType* valueType = param->getDataType();
+            if (auto ptrType = as<IRPtrTypeBase>(valueType))
+                valueType = ptrType->getValueType();
+            collectClipCullDistanceWidths(
+                valueType,
+                paramLayout,
+                paramLayout->getTypeLayout(),
+                widths);
+        }
+    }
+
+    setClipCullDistanceOffsets(context, widths);
+}
+
 GLSLSystemValueInfo* getGLSLSystemValueInfo(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
@@ -544,7 +696,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_ClipDistance";
         requiredType = builder->getBasicType(BaseType::Float);
 
-        arrayIndex = int(semanticInst->getIndex());
+        if (!declarator)
+            arrayIndex = int(context->clipDistanceOffsets.getValue(semanticInst->getIndex()));
     }
     else if (semanticName == "sv_culldistance")
     {
@@ -556,6 +709,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // TODO: type conversion is required here.
         name = "gl_CullDistance";
         requiredType = builder->getBasicType(BaseType::Float);
+        if (!declarator)
+            arrayIndex = int(context->cullDistanceOffsets.getValue(semanticInst->getIndex()));
     }
     else if (semanticName == "sv_coverage")
     {
@@ -1452,6 +1607,20 @@ void invokePatchConstantFuncInHullShader(
         }
     }
 
+    auto resultVarLayout = resultVarLayoutBuilder.build();
+
+    // The patch-constant outputs form a varying signature of their own, so their clip and
+    // cull distances are placed independently of the control-point outputs.
+    auto entryPointClipDistanceOffsets = context->clipDistanceOffsets;
+    auto entryPointCullDistanceOffsets = context->cullDistanceOffsets;
+    ClipCullDistanceWidths patchConstantWidths;
+    collectClipCullDistanceWidths(
+        constantOutputType,
+        resultVarLayout,
+        constantOutputLayout,
+        patchConstantWidths);
+    setClipCullDistanceOffsets(context, patchConstantWidths);
+
     context->entryPointFunc = constantFunc;
     context->stage = Stage::Unknown;
     auto patchConstantFuncOutputVal = legalizeEntryPointReturnValueForGLSL(
@@ -1459,7 +1628,9 @@ void invokePatchConstantFuncInHullShader(
         codeGenContext,
         builder,
         constantFunc,
-        resultVarLayoutBuilder.build());
+        resultVarLayout);
+    context->clipDistanceOffsets = entryPointClipDistanceOffsets;
+    context->cullDistanceOffsets = entryPointCullDistanceOffsets;
     context->entryPointFunc = entryPoint;
     context->stage = Stage::Hull;
 
@@ -1833,12 +2004,9 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // of the logic above that tried to construct the `actualParamType` in a way that can
     // work for the general case.
     //
-    // TODO: In principle, the right way to handle this stuff would be to have a pre-pass
-    // over the varying shader parameters that computes which system-value semantics are used,
-    // and the maximum semantic index for each of them. We could then allocate the global parameters
-    // for these special-case system values up front with full knowledge of their required
-    // element counts. Such a change would also mean that we could robustly handle entry
-    // points that declare `SV_ClipDistance` as an array, or not.
+    // TODO: The pre-pass in `computeClipCullDistanceOffsets` could also compute the element
+    // count of each of these special-case globals, so that we could allocate them up front and
+    // robustly handle entry points that declare `SV_ClipDistance` as an array, or not.
     //
     if (systemValueInfo && systemValueInfo->arrayIndex >= 0 && declarator == nullptr)
     {
@@ -5006,6 +5174,8 @@ void legalizeEntryPointForGLSL(
     {
         entryPointDecor->setName(builder.getStringValue(UnownedStringSlice("main")));
     }
+
+    computeClipCullDistanceOffsets(&context, func, entryPointLayout);
 
     // We will start by looking at the return type of the
     // function, because that will enable us to do an
