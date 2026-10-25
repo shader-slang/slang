@@ -1498,8 +1498,13 @@ struct LoweredElementTypeContext
                                 // The load takes `user`'s type instead of the one deduced from
                                 // `gep`. When `user` is a pointer or buffer whose element type
                                 // needs lowering, `processModule` has already retyped it to the
-                                // storage type, but struct field and array element types keep the
-                                // logical type until the end of this pass.
+                                // storage type and placed a `CastStorageToLogical` after it. A
+                                // load with the deduced logical type would turn that cast into an
+                                // identity cast, which the call loop below rejects. The load's type
+                                // differs from `gep`'s pointee until the final
+                                // `bufferType->replaceUsesWith(loweredBufferType)` in
+                                // `processModule` lowers struct field and array element types. For
+                                // any other `user`, the two types are equal.
                                 auto load = builder.emitLoad(user->getDataType(), gep);
                                 user->replaceUsesWith(load);
                                 user->removeAndDeallocate();
@@ -1564,10 +1569,13 @@ struct LoweredElementTypeContext
                     auto arg = call->getArg(i);
                     if (auto castArg = as<IRCastStorageToLogical>(arg))
                     {
-                        // `emitCastStorageToLogical` folds a cast between equal types, so an
-                        // identity cast means a rewrite replaced its storage-typed operand with
-                        // a logical-typed value. Specializing on it would cast the callee's
-                        // parameter in the wrong direction.
+                        // A `CastStorageToLogical` operand stays storage-typed when a rewrite
+                        // replaces it, and `emitCastStorageToLogical` folds a cast between equal
+                        // types, so a call argument is never an identity cast. Specializing on
+                        // one would miscompile: `processModule` has already retyped the callee's
+                        // parameter to the storage type, so
+                        // `createSpecializedFuncThatUseStorageType` would give the clone's
+                        // parameter the logical type and cast it from logical to storage.
                         SLANG_RELEASE_ASSERT(
                             castArg->getDataType() != castArg->getOperand(0)->getDataType());
                         auto oldParamPtrType = oldParamTypes[i];
