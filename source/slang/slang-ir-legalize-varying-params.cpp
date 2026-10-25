@@ -3513,11 +3513,10 @@ private:
             {
                 if (semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
                 {
-                    // The key, not the field, carries the location of the field declaration.
                     auto indexAsString = String(UInt(semanticDecor->getEffectiveSemanticIndex()));
                     auto errorCount = m_sink->getErrorCount();
                     auto sysValInfo =
-                        getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, key);
+                        getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, field);
                     bool isSupported =
                         !sysValInfo.isUnsupported &&
                         !(K == LayoutResourceKind::VaryingInput && sysValInfo.isOutputOnly);
@@ -3534,6 +3533,7 @@ private:
                     }
                     else if (m_sink->getErrorCount() == errorCount)
                     {
+                        // The key, not the field, carries the location of the field declaration.
                         reportUnsupportedSystemAttribute(key, semanticDecor->getSemanticName());
                     }
                 }

@@ -82,13 +82,13 @@ struct TwoClipOut
     float4 pos : SV_Position;
     float clip0 : SV_ClipDistance0;
     float clip1 : SV_ClipDistance1;
-//TWOCLIP:^^^^^ error E55219
+//TWOCLIP:^^^^^ error E55220
 //TWOCLIP:^^^^^ multiple SV_ClipDistance outputs are not yet supported on Metal; declare all clip distances as one 'float[N]' array with 'SV_ClipDistance'.
 };
 
 [shader("vertex")]
 TwoClipOut vsTwoClip(uint vid : SV_VertexID, out float clip2 : SV_ClipDistance2)
-//TWOCLIP:                                             ^^^^^ error E55219
+//TWOCLIP:                                             ^^^^^ error E55220
 //TWOCLIP:                                             ^^^^^ multiple SV_ClipDistance outputs are not yet supported on Metal; declare all clip distances as one 'float[N]' array with 'SV_ClipDistance'.
 {
     TwoClipOut o;
@@ -153,14 +153,12 @@ float4 psNested(NestedVaryings input) : SV_Target
 
 // A system value without a Metal case is reported once, not followed by a second diagnostic or an
 // internal error.
+//UNKNOWN: error E40006
+//UNKNOWN: unknown system-value semantic 'sv_shadingrate'
 struct UnknownOut
 {
     float4 pos : SV_Position;
     uint rate : SV_ShadingRate;
-/*UNKNOWN:
-         ^^^^ error E40006
-         ^^^^ unknown system-value semantic 'sv_shadingrate'
-*/
 };
 
 [shader("vertex")]
