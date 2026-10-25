@@ -1,5 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
 //TEST:REFLECTION(filecheck=REFLECT):-stage compute -entry computeMain -target wgsl -no-codegen
+// The explicit layout wins over the D3D layout option, as it does in reflection.
+//TEST:SIMPLE(filecheck=DX): -target wgsl -entry computeMain -stage compute -fvk-use-dx-layout
+// An array of std430 constant buffers needs the extension too.
+//TEST:SIMPLE(filecheck=ARR): -target wgsl -entry arrayMain -stage compute
+// The WGSL-to-SPIR-V targets use the WGSL layout rules: the default std140 buffer is valid for Tint.
+//TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm -entry defaultMain -stage compute
 
 // A ConstantBuffer with an explicit Std430DataLayout or ScalarDataLayout is a `var<uniform>` laid
 // out by WGSL's standard rules (std430: no 16-byte array stride), which needs the
@@ -15,6 +21,19 @@
 // CHECK: var<uniform> cscalar_{{[0-9]+}} : U_std430_{{[0-9]+}};
 // CHECK: struct _Array_std140_float4_{{[0-9]+}}
 // CHECK: var<uniform> cdefault_{{[0-9]+}} : U_std140_{{[0-9]+}};
+
+// DX: requires uniform_buffer_standard_layout;
+// DX: struct U_std430_{{[0-9]+}}
+// DX-NEXT: {
+// DX-NEXT: a_{{[0-9]+}} : array<f32, i32(4)>,
+// DX: var<uniform> c430_{{[0-9]+}} : U_std430_{{[0-9]+}};
+// DX: var<uniform> cscalar_{{[0-9]+}} : U_std430_{{[0-9]+}};
+
+// ARR: requires uniform_buffer_standard_layout;
+// ARR: var<uniform> carray_{{[0-9]+}} : array<U_std430_{{[0-9]+}}, i32(2)>;
+
+// SPV: OpEntryPoint
+// SPV: OpDecorate %{{.*}} ArrayStride 16
 
 // REFLECT: "name": "c430",
 // REFLECT: "name": "a",
@@ -44,6 +63,7 @@ struct U
 ConstantBuffer<U, Std430DataLayout> c430;
 ConstantBuffer<U, ScalarDataLayout> cscalar;
 ConstantBuffer<U> cdefault;
+ConstantBuffer<U, Std430DataLayout> carray[2];
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
@@ -52,4 +72,16 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     uint i = tid.x;
     outputBuffer[i] = c430.a[i] + c430.b.y + c430.c + cscalar.a[i] + cscalar.b.z + cdefault.a[i] +
                       cdefault.b.x;
+}
+
+[numthreads(4, 1, 1)]
+void arrayMain(uint3 tid: SV_DispatchThreadID)
+{
+    outputBuffer[tid.x] = carray[tid.y].a[tid.x] + carray[1].c;
+}
+
+[numthreads(4, 1, 1)]
+void defaultMain(uint3 tid: SV_DispatchThreadID)
+{
+    outputBuffer[tid.x] = cdefault.a[tid.x] + cdefault.b.x;
 }
