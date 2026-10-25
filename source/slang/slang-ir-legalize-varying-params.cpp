@@ -3174,6 +3174,7 @@ private:
             for (auto field : structType->getFields())
             {
                 auto fieldParam = builder.emitParam(field->getFieldType());
+                fieldParam->sourceLoc = field->getKey()->sourceLoc;
                 IRCloneEnv cloneEnv;
                 cloneInstDecorationsAndChildren(
                     &cloneEnv,
@@ -3507,12 +3508,13 @@ private:
             {
                 if (semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
                 {
+                    // The key, not the field, carries the location of the field declaration.
                     auto indexAsString = String(UInt(semanticDecor->getEffectiveSemanticIndex()));
                     auto sysValInfo =
-                        getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, field);
+                        getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, key);
                     if (sysValInfo.isUnsupported)
                     {
-                        reportUnsupportedSystemAttribute(field, semanticDecor->getSemanticName());
+                        reportUnsupportedSystemAttribute(key, semanticDecor->getSemanticName());
                     }
                     else
                     {
@@ -3789,6 +3791,7 @@ private:
 
             // step 3a
             auto newKey = builder.createStructKey();
+            newKey->sourceLoc = oldKey->sourceLoc;
             flattenNestedStructsTransferKeyDecorations(newKey, oldKey);
 
             auto newField = builder.createStructField(dst, newKey, oldField->getFieldType());

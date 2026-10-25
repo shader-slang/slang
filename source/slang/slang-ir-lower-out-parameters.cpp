@@ -138,6 +138,7 @@ List<LoweredOutParamInfo> collectParameterInfo(
                 fieldName = String(nameHint->getName());
 
             auto fieldKey = builder.createStructKey();
+            fieldKey->sourceLoc = param->sourceLoc;
             builder.addNameHintDecoration(fieldKey, UnownedStringSlice(fieldName.getBuffer()));
 
             // Transfer semantic decorations
