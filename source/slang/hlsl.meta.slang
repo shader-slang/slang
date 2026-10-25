@@ -35604,6 +35604,22 @@ T workgroupUniformLoad<T>(__ref T v)
     }
 }
 
+/// Load a workgroup atomic as a workgroup-uniform value.
+/// @param v The workgroup (groupshared) atomic to load.
+/// @return The value of `v`, the same for every invocation of the workgroup.
+/// @remarks Maps to `workgroupUniformLoad` on an `atomic<T>` when targeting WGSL (a workgroup
+/// barrier, then the load); on other targets it is an atomic load.
+T workgroupUniformLoad<T : IAtomicable>(__ref Atomic<T> v)
+{
+    __target_switch
+    {
+    case wgsl:
+        __intrinsic_asm "workgroupUniformLoad(&($0))";
+    default:
+        return v.load();
+    }
+}
+
 //
 // HLSL Pack/Unpack Math Intrinsics
 //
