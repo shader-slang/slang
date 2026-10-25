@@ -10209,6 +10209,15 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                             Diagnostics::MisplacedResultIdMarker{.location = operand.token.loc});
                         getSink()->diagnose(Diagnostics::ConsiderOpCopyObject{});
                     }
+                    // It names the result of this instruction, so it can only stand where the
+                    // instruction defines its result: not in an instruction without a result id
+                    // (such as `OpExecutionMode`), and not as an ordinary operand.
+                    else if (opInfo && operandIndex != resultIdIndex)
+                    {
+                        getSink()->diagnose(Diagnostics::SpirvResultIdMarkerNotResultIdOperand{
+                            .opcode = inst.opcode.token.getContent(),
+                            .location = operand.token.loc});
+                    }
                 }
                 else if (operand.flavor == SPIRVAsmOperand::NamedValue)
                 {
