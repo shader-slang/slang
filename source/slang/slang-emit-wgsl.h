@@ -103,6 +103,9 @@ private:
     // a `ConstantBuffer<T, Std430DataLayout>` or `ConstantBuffer<T, ScalarDataLayout>`.
     bool m_requiresUniformBufferStandardLayout = false;
 
+    // Sets m_requiresUniformBufferStandardLayout if `type` has an explicit std430 or scalar layout.
+    void noteUniformBufferLayout(IRUniformParameterGroupType* type);
+
     RefPtr<ShaderExtensionTracker> m_extensionTracker;
 };
 

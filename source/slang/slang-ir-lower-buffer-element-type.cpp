@@ -2496,7 +2496,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
     auto targetReq = target->getTargetReq();
-    if (targetReq->getTarget() != CodeGenTarget::WGSL)
+    if (!isWGPUTarget(targetReq))
     {
         if (!isKhronosTarget(target->getTargetReq()) && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
@@ -2542,7 +2542,23 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             return IRTypeLayoutRuleName::Natural;
     }
 
-    if (target->getOptionSet().shouldUseDXLayout())
+    // On WGSL, an explicit std430 or scalar layout on a uniform buffer takes precedence over the
+    // D3D layout option, as it does in reflection (WGSLLayoutRulesFamilyImpl).
+    bool hasExplicitWGSLStandardLayout = false;
+    if (isWGPUTarget(targetReq))
+    {
+        if (auto paramGroupType = as<IRUniformParameterGroupType>(bufferType))
+        {
+            if (auto dataLayout = paramGroupType->getDataLayout())
+            {
+                hasExplicitWGSLStandardLayout =
+                    dataLayout->getOp() == kIROp_Std430BufferLayoutType ||
+                    dataLayout->getOp() == kIROp_ScalarBufferLayoutType;
+            }
+        }
+    }
+
+    if (target->getOptionSet().shouldUseDXLayout() && !hasExplicitWGSLStandardLayout)
     {
         if (as<IRUniformParameterGroupType>(bufferType))
         {
@@ -2587,8 +2603,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
 
             // WGSL has no scalar layout: a uniform buffer declared with `ScalarDataLayout`
             // gets WGSL's standard layout, std430 (as its reflection does).
-            if (targetReq->getTarget() == CodeGenTarget::WGSL &&
-                layoutTypeOp == kIROp_ScalarBufferLayoutType)
+            if (isWGPUTarget(targetReq) && layoutTypeOp == kIROp_ScalarBufferLayoutType)
                 return IRTypeLayoutRuleName::Std430;
 
             return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, defaultTypeOp);
