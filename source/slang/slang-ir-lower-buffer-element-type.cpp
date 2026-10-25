@@ -1564,6 +1564,12 @@ struct LoweredElementTypeContext
                     auto arg = call->getArg(i);
                     if (auto castArg = as<IRCastStorageToLogical>(arg))
                     {
+                        // `emitCastStorageToLogical` folds a cast between equal types, so an
+                        // identity cast means a rewrite replaced its storage-typed operand with
+                        // a logical-typed value. Specializing on it would cast the callee's
+                        // parameter in the wrong direction.
+                        SLANG_RELEASE_ASSERT(
+                            castArg->getDataType() != castArg->getOperand(0)->getDataType());
                         auto oldParamPtrType = oldParamTypes[i];
                         auto storageValueType = tryGetPointedToOrBufferElementType(
                             &builder,
