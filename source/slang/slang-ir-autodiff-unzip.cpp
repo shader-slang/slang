@@ -222,7 +222,7 @@ struct UnzippingContext
     }
 
     /// Splits a call without a backward derivative into the primal call and zero differentials.
-    /// Both out and inout outputs stop carrying the incoming tangent.
+    /// Both out and inout outputs get a zero tangent, since the callee may overwrite them.
     InstPair splitCallWithoutBackwardDerivative(
         IRBuilder* primalBuilder,
         IRBuilder* diffBuilder,
@@ -260,8 +260,7 @@ struct UnzippingContext
                 continue;
             auto pairType = as<IRDifferentialPairType>(argPtrType->getValueType());
             // Pointer-pair outputs bypass mixed-call splitting in forward transcription.
-            if (!pairType)
-                continue;
+            SLANG_RELEASE_ASSERT(pairType);
             auto primalValueType = pairType->getValueType();
             auto zero = diffTypeContext.emitDZeroOfDiffInstType(diffBuilder, primalValueType);
             diffBuilder->markInstAsDifferential(zero, primalValueType);
