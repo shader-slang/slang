@@ -18,6 +18,7 @@
 //TEST:SIMPLE(filecheck=GAP): -target glsl -stage vertex -entry vsGap
 //TEST:SIMPLE(filecheck=VECGAP): -target glsl -stage vertex -entry vsVectorGap
 //TEST:SIMPLE(filecheck=FRAGHALF): -target spirv-asm -stage fragment -entry fsHalfDynamicIndex
+//TEST:SIMPLE(filecheck=FRAGHALFGLSL): -target glsl -stage fragment -entry fsHalfDynamicIndex
 //TEST:SIMPLE(filecheck=GS): -target glsl -stage geometry -entry gsVector
 //TEST:SIMPLE(filecheck=PATCH): -target glsl -stage hull -entry hsMain
 //TEST:SIMPLE(filecheck=NVX): -target glsl -stage vertex -entry vsPerView
@@ -25,6 +26,9 @@
 //TEST:SIMPLE(filecheck=FRAGCULLSPV): -target spirv-asm -stage fragment -entry fsCull
 //TEST:SIMPLE(filecheck=HALFOUT): -target glsl -stage vertex -entry vsHalf
 //TEST:SIMPLE(filecheck=HALFIN): -target glsl -stage fragment -entry fsHalf
+//TEST:SIMPLE(filecheck=GS2): -target spirv-asm -stage geometry -entry gsTwoStreamArray
+//TEST:SIMPLE(filecheck=DS): -target glsl -stage domain -entry dsVector
+//TEST:SIMPLE(filecheck=FRAGSTRUCT): -target glsl -stage fragment -entry fsStruct
 
 // float4 at index 0 takes elements 0-3; float2 at index 1 takes elements 4-5.
 struct VSVectorOut
@@ -180,16 +184,19 @@ VSVectorGapOut vsVectorGap(uint vid: SV_VertexID)
     return o;
 }
 
-// A vector whose type differs from floatN is converted, and a dynamic component index selects
-// the matching element.
+// A vector whose type differs from floatN is converted as a whole, and a dynamic component
+// index then selects from that copy, because GLSL indexes an unsized builtin array only with
+// constants.
 cbuffer Constants
 {
     int componentIndex;
 }
 
 //FRAGHALF: %gl_ClipDistance = OpVariable %_ptr_Input__arr_float_int_6 Input
-//FRAGHALF: %[[ELEMENT:[0-9]+]] = OpIAdd %int %int_4
-//FRAGHALF: OpAccessChain %_ptr_Input_float %gl_ClipDistance %[[ELEMENT]]
+//FRAGHALF-DAG: OpAccessChain %_ptr_Input_float %gl_ClipDistance %int_4
+//FRAGHALF-DAG: OpAccessChain %_ptr_Input_float %gl_ClipDistance %int_5
+
+//FRAGHALFGLSL: vec2(gl_ClipDistance[4], gl_ClipDistance[5]))[{{.*}}componentIndex
 
 float4 fsHalfDynamicIndex(float4 clip0: SV_ClipDistance0, half2 clip1: SV_ClipDistance1) : SV_Target
 {
@@ -301,8 +308,8 @@ struct VSHalfOut
 };
 
 //HALFOUT: out float gl_ClipDistance[6];
-//HALFOUT-DAG: gl_ClipDistance[4] =
-//HALFOUT-DAG: gl_ClipDistance[5] =
+//HALFOUT-DAG: gl_ClipDistance[4] = {{.*}}[0];
+//HALFOUT-DAG: gl_ClipDistance[5] = {{.*}}[1];
 
 VSHalfOut vsHalf(uint vid: SV_VertexID)
 {
@@ -319,4 +326,66 @@ VSHalfOut vsHalf(uint vid: SV_VertexID)
 float4 fsHalf(float4 clip0: SV_ClipDistance0, half2 clip1: SV_ClipDistance1) : SV_Target
 {
     return float4(clip1, clip0.x, 1);
+}
+
+// A geometry shader may append one struct to two streams; its `float` array is still one value.
+struct GSArrayOut
+{
+    float4 position : SV_Position;
+    float clip[2] : SV_ClipDistance0;
+};
+
+//GS2-NOT: E55220
+//GS2: %gl_ClipDistance = OpVariable %_ptr_Output__arr_float_int_2 Output
+
+[maxvertexcount(1)]
+void gsTwoStreamArray(
+    point GSIn input[1],
+    inout PointStream<GSArrayOut> stream0,
+    inout PointStream<GSArrayOut> stream1)
+{
+    GSArrayOut o;
+    o.position = input[0].position;
+    o.clip[0] = 1;
+    o.clip[1] = 2;
+    stream0.Append(o);
+    stream1.Append(o);
+}
+
+// Domain-shader outputs use the same placement as vertex-shader outputs.
+struct DSControlPoint
+{
+    float4 position : SV_Position;
+};
+
+struct DSPatchConstants
+{
+    float edges[3] : SV_TessFactor;
+    float inside : SV_InsideTessFactor;
+};
+
+//DS: out float gl_ClipDistance[6];
+//DS-DAG: gl_ClipDistance[3] = {{.*}}clip0{{.*}}[3];
+//DS-DAG: gl_ClipDistance[4] = {{.*}}clip1{{.*}}[0];
+//DS-DAG: gl_ClipDistance[5] = {{.*}}clip1{{.*}}[1];
+
+[domain("tri")]
+VSVectorOut dsVector(
+    DSPatchConstants patchConstants,
+    float3 location: SV_DomainLocation,
+    const OutputPatch<DSControlPoint, 3> patch)
+{
+    VSVectorOut o;
+    o.position = patch[0].position * location.x;
+    o.clip0 = float4(1, 2, 3, 4);
+    o.clip1 = float2(5, 6);
+    return o;
+}
+
+// A fragment shader commonly takes the vertex shader's output struct as its input.
+//FRAGSTRUCT: vec4(gl_ClipDistance[3], gl_ClipDistance[5], 0.0, 1.0)
+
+float4 fsStruct(VSVectorOut input) : SV_Target
+{
+    return float4(input.clip0.w, input.clip1.y, 0, 1);
 }

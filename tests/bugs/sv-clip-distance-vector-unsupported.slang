@@ -10,6 +10,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=WGSL): -target wgsl -stage vertex -entry vsMain
 //DIAGNOSTIC_TEST:SIMPLE(diag=HULL): -target spirv -stage hull -entry hsMain
 //DIAGNOSTIC_TEST:SIMPLE(diag=GSIN): -target spirv -stage geometry -entry gsMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=DSIN): -target spirv -stage domain -entry dsMain
 //DIAGNOSTIC_TEST:SIMPLE(diag=ARRAYMIX): -target spirv -stage vertex -entry vsArrayMix
 //DIAGNOSTIC_TEST:SIMPLE(diag=ARRAYMIX): -target glsl -stage vertex -entry vsArrayMix
 
@@ -161,5 +162,30 @@ VSArrayMixOut vsArrayMix(uint vid: SV_VertexID)
     o.cull[0] = 5;
     o.cull[1] = 6;
     o.cull2 = 7;
+    return o;
+}
+
+// Domain-shader control-point inputs are arrayed per control point of the patch.
+struct DSControlPointIn
+{
+    float4 position : SV_Position;
+    float2 clip0 : SV_ClipDistance0;
+//DSIN:    ^^^^^ vector clip or cull distance in an arrayed varying
+//DSIN:    ^^^^^ system value semantic 'SV_ClipDistance' cannot have type 'vector<float,2>' here: when targeting SPIR-V or GLSL, vector-typed clip and cull distances are not supported in arrayed varyings (mesh-shader vertex outputs, hull-shader control points, and geometry or tessellation inputs). Declare it as 'float' or as a 'float' array instead.
+};
+
+struct DSOut
+{
+    float4 position : SV_Position;
+};
+
+[domain("tri")]
+DSOut dsMain(
+    HSPatchConstants patchConstants,
+    float3 location: SV_DomainLocation,
+    const OutputPatch<DSControlPointIn, 3> patch)
+{
+    DSOut o;
+    o.position = patch[0].position * location.x + patch[1].clip0.x;
     return o;
 }
