@@ -8021,6 +8021,10 @@ struct TriangleStream
 //@public:
 
 /// Try to terminate the current draw or dispatch call (HLSL SM 4.0)
+/// @remarks Only HLSL and C++ have this zero-argument form; other targets report it as
+/// unavailable instead of emitting an undefined `abort()` call. On Vulkan targets, use
+/// `abort(format, args...)` (VK_KHR_shader_abort).
+[require(cpp_hlsl)]
 void abort();
 
 /// The abs function returns the absolute value of x.
