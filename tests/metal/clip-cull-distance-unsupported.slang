@@ -87,13 +87,13 @@ struct TwoClipOut
     float4 pos : SV_Position;
     float clip0 : SV_ClipDistance0;
     float clip1 : SV_ClipDistance1;
-//TWOCLIP:^^^^^ error E55220
+//TWOCLIP:^^^^^ error E55221
 //TWOCLIP:^^^^^ multiple SV_ClipDistance outputs are not yet supported on Metal; declare all clip distances as one 'float[N]' array with 'SV_ClipDistance'.
 };
 
 [shader("vertex")]
 TwoClipOut vsTwoClip(uint vid : SV_VertexID, out float clip2 : SV_ClipDistance2)
-//TWOCLIP:                                             ^^^^^ error E55220
+//TWOCLIP:                                             ^^^^^ error E55221
 //TWOCLIP:                                             ^^^^^ multiple SV_ClipDistance outputs are not yet supported on Metal; declare all clip distances as one 'float[N]' array with 'SV_ClipDistance'.
 {
     TwoClipOut o;
@@ -231,7 +231,7 @@ struct TwoClipMeshVertex
     float clip0 : SV_ClipDistance0;
     float clip1 : SV_ClipDistance1;
 /*MESHTWOCLIP:
-          ^^^^^ error E55220
+          ^^^^^ error E55221
           ^^^^^ multiple SV_ClipDistance outputs are not yet supported on Metal; declare all clip distances as one 'float[N]' array with 'SV_ClipDistance'.
 */
 };

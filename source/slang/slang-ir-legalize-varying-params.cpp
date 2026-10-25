@@ -5272,7 +5272,7 @@ private:
     /// array field and only the copy carries the attribute. The first call for `vertStruct`
     /// therefore also rewrites every `MetalSetVertex` of a `vertStruct` value in the module to
     /// copy the value into the new struct field by field, and reports a second clip-distance
-    /// field (E55220). Later calls, from other mesh entry points sharing `vertStruct`, return the
+    /// field (E55221). Later calls, from other mesh entry points sharing `vertStruct`, return the
     /// cached copy; that is sufficient because every `MetalSetVertex` exists before this pass
     /// and the first call rewrote them all.
     IRStructType* getOrCreateMeshVertexOutputType(

@@ -61,7 +61,7 @@ The system-value semantics are translated to the following Metal attributes:
 _Note_ that MSL allows one `[[clip_distance]]` output, of type `float` or `float[N]`, and only on
 vertex and mesh outputs. Slang does not yet pack several `SV_ClipDistance<N>` outputs into one array
 for Metal, so declare all clip distances as one `float` or `float[N]` field with `SV_ClipDistance`.
-Otherwise Slang reports E55220 for a second clip-distance output, and E55202 for a clip distance of
+Otherwise Slang reports E55221 for a second clip-distance output, and E55202 for a clip distance of
 another type, a fragment-input clip distance, or `SV_CullDistance`.
 
 _Note_ that `SV_InstanceID` counts from zero within a draw call, as in D3D, while Metal's
