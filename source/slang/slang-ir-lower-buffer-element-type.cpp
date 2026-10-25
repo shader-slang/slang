@@ -1495,7 +1495,12 @@ struct LoweredElementTypeContext
                                     gep = builder.emitElementAddress(castAddr, user->getOperand(1));
                                 else
                                     gep = builder.emitFieldAddress(castAddr, user->getOperand(1));
-                                auto load = builder.emitLoad(gep);
+                                // The load takes `user`'s type instead of the one deduced from
+                                // `gep`. When `user` is a pointer or buffer whose element type
+                                // needs lowering, `processModule` has already retyped it to the
+                                // storage type, but struct field and array element types keep the
+                                // logical type until the end of this pass.
+                                auto load = builder.emitLoad(user->getDataType(), gep);
                                 user->replaceUsesWith(load);
                                 user->removeAndDeallocate();
                                 if (auto castStorage = as<IRCastStorageToLogical>(castAddr))
