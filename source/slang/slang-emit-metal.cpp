@@ -5,6 +5,7 @@
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
@@ -1775,6 +1776,26 @@ void MetalSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
     Super::emitSimpleFuncParamImpl(param);
     emitFuncParamLayoutImpl(param);
+}
+
+void MetalSourceEmitter::emitStructFieldTypeAndSemantics(
+    IRStructField* field,
+    bool allowOffsetLayout)
+{
+    // A clip-distance array is a native array rather than the `metal::array<T, N>` used elsewhere,
+    // and its attribute goes between the name and the bound (`float d [[clip_distance]] [2];`),
+    // because an attribute after the bound applies to the array type.
+    auto key = field->getKey();
+    if (auto arrayType = getMetalClipDistanceArrayType(field))
+    {
+        emitType(arrayType->getElementType(), getName(key));
+        emitSemantics(key, allowOffsetLayout);
+        m_writer->emit(" [");
+        m_writer->emit(getIntVal(arrayType->getElementCount()));
+        m_writer->emit("]");
+        return;
+    }
+    Super::emitStructFieldTypeAndSemantics(field, allowOffsetLayout);
 }
 
 void MetalSourceEmitter::emitPostDeclarationAttributesForType(IRInst* type)

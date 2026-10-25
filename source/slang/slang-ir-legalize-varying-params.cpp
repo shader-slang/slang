@@ -4339,6 +4339,14 @@ private:
 // MSL's clip-distance attribute, which MSL types as `float` or a native `float[n]`.
 static const UnownedStringSlice kMetalClipDistanceAttribute = toSlice("clip_distance");
 
+IRArrayType* getMetalClipDistanceArrayType(IRStructField* field)
+{
+    auto systemValue = field->getKey()->findDecoration<IRTargetSystemValueDecoration>();
+    if (!systemValue || systemValue->getSemantic() != kMetalClipDistanceAttribute)
+        return nullptr;
+    return as<IRArrayType>(field->getFieldType());
+}
+
 class LegalizeMetalEntryPointContext : public LegalizeShaderEntryPointContext
 {
 public:
@@ -5090,10 +5098,110 @@ protected:
         }
     }
 
+public:
+    /// Rewrite each whole-array write into a clip-distance array field of `entryPoint`'s result
+    /// struct, a store to the field or a `makeStruct` operand, into one store per element. The
+    /// Metal emitter declares such a field, for example a `float clip[2] : SV_ClipDistance`
+    /// output, as a native array (see `MetalSourceEmitter::emitStructFieldTypeAndSemantics`), and
+    /// a native array cannot be assigned as a whole.
+    void writeClipDistanceOutputsByElement(const EntryPointInfo& entryPoint)
+    {
+        auto resultStruct = as<IRStructType>(entryPoint.entryPointFunc->getResultType());
+        if (!resultStruct)
+            return;
+
+        Dictionary<IRStructKey*, IRArrayType*> arrayFields;
+        for (auto field : resultStruct->getFields())
+        {
+            if (auto arrayType = getMetalClipDistanceArrayType(field))
+                arrayFields[field->getKey()] = arrayType;
+        }
+        if (arrayFields.getCount() == 0)
+            return;
+
+        IRBuilder builder(m_module);
+
+        List<IRMakeStruct*> makeStructs;
+        traverseUses(
+            resultStruct,
+            [&](IRUse* use)
+            {
+                auto makeStruct = as<IRMakeStruct>(use->getUser());
+                if (makeStruct && makeStruct->getDataType() == resultStruct)
+                    makeStructs.add(makeStruct);
+            });
+        for (auto makeStruct : makeStructs)
+        {
+            builder.setInsertBefore(makeStruct);
+            auto var = builder.emitVar(resultStruct);
+            UInt operandIndex = 0;
+            for (auto field : resultStruct->getFields())
+            {
+                auto fieldPtr = builder.emitFieldAddress(var, field->getKey());
+                auto fieldVal = makeStruct->getOperand(operandIndex++);
+                if (auto arrayType = getMetalClipDistanceArrayType(field))
+                    storeArrayByElement(builder, arrayType, fieldPtr, fieldVal);
+                else
+                    builder.emitStore(fieldPtr, fieldVal);
+            }
+            makeStruct->replaceUsesWith(builder.emitLoad(var));
+            makeStruct->removeAndDeallocate();
+        }
+
+        // The field stores come from copying into the flattened result struct, whose field
+        // accesses do not carry the field's own type, so the array type is taken from the field.
+        List<KeyValuePair<IRStore*, IRArrayType*>> stores;
+        for (const auto& [key, arrayType] : arrayFields)
+        {
+            traverseUses(
+                key,
+                [&](IRUse* keyUse)
+                {
+                    auto fieldPtr = as<IRFieldAddress>(keyUse->getUser());
+                    if (!fieldPtr || fieldPtr->getField() != key)
+                        return;
+                    traverseUses(
+                        fieldPtr,
+                        [&](IRUse* ptrUse)
+                        {
+                            auto store = as<IRStore>(ptrUse->getUser());
+                            if (store && store->getPtr() == fieldPtr)
+                                stores.add(KeyValuePair<IRStore*, IRArrayType*>(store, arrayType));
+                        });
+                });
+        }
+        for (const auto& [store, arrayType] : stores)
+        {
+            builder.setInsertBefore(store);
+            storeArrayByElement(builder, arrayType, store->getPtr(), store->getVal());
+            store->removeAndDeallocate();
+        }
+    }
+
 private:
     ShortList<IRType*> permittedTypes_sv_target;
     Dictionary<IRFunc*, IRInst*> entryPointToGroupThreadId;
     const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
+
+    /// Store each element of `arrayVal`, of type `arrayType`, through `arrayPtr` separately,
+    /// since a native MSL array cannot be assigned as a whole.
+    static void storeArrayByElement(
+        IRBuilder& builder,
+        IRArrayType* arrayType,
+        IRInst* arrayPtr,
+        IRInst* arrayVal)
+    {
+        auto elementType = arrayType->getElementType();
+        auto elementPtrType = builder.getPtrType(elementType);
+        auto elementCount = getIntVal(arrayType->getElementCount());
+        for (IRIntegerValue i = 0; i < elementCount; i++)
+        {
+            auto index = builder.getIntValue(builder.getIntType(), i);
+            builder.emitStore(
+                builder.emitElementAddress(elementPtrType, arrayPtr, index),
+                builder.emitElementExtract(elementType, arrayVal, index));
+        }
+    }
 
     static IRType* getGroupThreadIdType(IRBuilder& builder)
     {
@@ -5515,6 +5623,8 @@ void legalizeEntryPointVaryingParamsForMetal(
     }
     LegalizeMetalEntryPointContext context(module, sink);
     context.legalizeEntryPoints(entryPoints);
+    for (auto& e : entryPoints)
+        context.writeClipDistanceOutputsByElement(e);
 }
 
 void legalizeEntryPointVaryingParamsForWGSL(
