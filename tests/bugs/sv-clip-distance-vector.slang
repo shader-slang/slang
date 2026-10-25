@@ -21,6 +21,10 @@
 //TEST:SIMPLE(filecheck=GS): -target glsl -stage geometry -entry gsVector
 //TEST:SIMPLE(filecheck=PATCH): -target glsl -stage hull -entry hsMain
 //TEST:SIMPLE(filecheck=NVX): -target glsl -stage vertex -entry vsPerView
+//TEST:SIMPLE(filecheck=FRAGCULL): -target glsl -stage fragment -entry fsCull
+//TEST:SIMPLE(filecheck=FRAGCULLSPV): -target spirv-asm -stage fragment -entry fsCull
+//TEST:SIMPLE(filecheck=HALFOUT): -target glsl -stage vertex -entry vsHalf
+//TEST:SIMPLE(filecheck=HALFIN): -target glsl -stage fragment -entry fsHalf
 
 // float4 at index 0 takes elements 0-3; float2 at index 1 takes elements 4-5.
 struct VSVectorOut
@@ -221,7 +225,8 @@ void gsVector(point GSIn input[1], inout PointStream<GSVectorOut> stream)
     stream.Append(o);
 }
 
-// The outputs of a hull shader's patch-constant function are placed on their own.
+// Patch-constant outputs need their own placement table; otherwise the clip offset
+// getValue lookup fails internally. This test does not validate the emitted GLSL.
 struct HSControlPoint
 {
     float4 position : SV_Position;
@@ -273,4 +278,45 @@ VSPerViewOut vsPerView(float4 left: A, float4 right: B)
     o.left = left;
     o.right = right;
     return o;
+}
+
+// Fragment-shader cull-distance inputs use the same placement as clip-distance inputs.
+//FRAGCULL-NOT: #extension {{.*}}cull_distance
+//FRAGCULL: vec4(vec2(gl_CullDistance[0], gl_CullDistance[1]), gl_CullDistance[2], 1.0)
+
+//FRAGCULLSPV-DAG: OpDecorate %gl_CullDistance BuiltIn CullDistance
+//FRAGCULLSPV-DAG: %gl_CullDistance = OpVariable %_ptr_Input__arr_float_int_3 Input
+
+float4 fsCull(float2 cull0: SV_CullDistance0, float cull1: SV_CullDistance1) : SV_Target
+{
+    return float4(cull0, cull1, 1);
+}
+
+// A vector whose type differs from floatN is converted as a whole on the way out and in.
+struct VSHalfOut
+{
+    float4 position : SV_Position;
+    float4 clip0 : SV_ClipDistance0;
+    half2 clip1 : SV_ClipDistance1;
+};
+
+//HALFOUT: out float gl_ClipDistance[6];
+//HALFOUT-DAG: gl_ClipDistance[4] =
+//HALFOUT-DAG: gl_ClipDistance[5] =
+
+VSHalfOut vsHalf(uint vid: SV_VertexID)
+{
+    VSHalfOut o;
+    o.position = float4(vid, 0, 0, 1);
+    o.clip0 = float4(1, 2, 3, 4);
+    o.clip1 = half2(5, 6);
+    return o;
+}
+
+//HALFIN: gl_ClipDistance[4]
+//HALFIN: gl_ClipDistance[5]
+
+float4 fsHalf(float4 clip0: SV_ClipDistance0, half2 clip1: SV_ClipDistance1) : SV_Target
+{
+    return float4(clip1, clip0.x, 1);
 }
