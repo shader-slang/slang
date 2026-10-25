@@ -7,6 +7,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CULLIN): -target metal -stage fragment -entry psCullInput
 //TEST:SIMPLE(filecheck=SHAREDVS): -target metal -stage vertex -entry vsShared
 //DIAGNOSTIC_TEST:SIMPLE(diag=SHAREDPS): -target metal -stage fragment -entry psShared
+//DIAGNOSTIC_TEST:SIMPLE(diag=TWOCLIP): -target metal -stage vertex -entry vsTwoClip
 //DIAGNOSTIC_TEST:SIMPLE(diag=NESTED): -target metal -stage fragment -entry psNested
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNKNOWN): -target metal -stage vertex -entry vsUnknown
 
@@ -70,6 +71,31 @@ SharedVaryings vsShared(uint vid : SV_VertexID)
 float4 psShared(SharedVaryings input) : SV_Target
 {
     return input.pos;
+}
+
+// MSL allows one [[clip_distance]] member and Slang does not yet pack several clip-distance outputs
+// into one array for Metal, so a second clip-distance output is reported rather than emitted as a
+// second attribute, which the Metal compiler rejects.
+struct TwoClipOut
+{
+    float4 pos : SV_Position;
+    float clip0 : SV_ClipDistance0;
+    float clip1 : SV_ClipDistance1;
+//TWOCLIP:^^^^^ error E55219
+//TWOCLIP:^^^^^ multiple SV_ClipDistance outputs are not yet supported on Metal; declare all clip distances as one 'float[N]' array with 'SV_ClipDistance'.
+};
+
+[shader("vertex")]
+TwoClipOut vsTwoClip(uint vid : SV_VertexID, out float clip2 : SV_ClipDistance2)
+//TWOCLIP:                                             ^^^^^ error E55219
+//TWOCLIP:                                             ^^^^^ multiple SV_ClipDistance outputs are not yet supported on Metal; declare all clip distances as one 'float[N]' array with 'SV_ClipDistance'.
+{
+    TwoClipOut o;
+    o.pos = float4(float(vid), 0, 0, 1);
+    o.clip0 = 1.0;
+    o.clip1 = -1.0;
+    clip2 = 0.5;
+    return o;
 }
 
 // A clip distance in a nested input struct reaches legalization as a stage_in struct member

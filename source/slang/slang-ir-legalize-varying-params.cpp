@@ -5099,6 +5099,15 @@ protected:
     }
 
 public:
+    /// Report every clip-distance field of `entryPoint`'s result struct after the first. MSL
+    /// allows one [[clip_distance]] member, and Metal does not yet pack several clip-distance
+    /// outputs such as `SV_ClipDistance0` and `SV_ClipDistance1` into one array, as GLSL does.
+    void diagnoseRepeatedClipDistanceOutputs(const EntryPointInfo& entryPoint)
+    {
+        if (auto resultStruct = as<IRStructType>(entryPoint.entryPointFunc->getResultType()))
+            diagnoseRepeatedClipDistanceFields(resultStruct);
+    }
+
     /// Rewrite each whole-array write into a clip-distance array field of `entryPoint`'s result
     /// struct, a store to the field or a `makeStruct` operand, into one store per element. The
     /// Metal emitter declares such a field, for example a `float clip[2] : SV_ClipDistance`
@@ -5182,6 +5191,24 @@ private:
     ShortList<IRType*> permittedTypes_sv_target;
     Dictionary<IRFunc*, IRInst*> entryPointToGroupThreadId;
     const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
+
+    void diagnoseRepeatedClipDistanceFields(IRStructType* structType)
+    {
+        bool foundClipDistance = false;
+        for (auto field : structType->getFields())
+        {
+            auto key = field->getKey();
+            auto systemValue = key->findDecoration<IRTargetSystemValueDecoration>();
+            if (!systemValue || systemValue->getSemantic() != kMetalClipDistanceAttribute)
+                continue;
+            if (foundClipDistance)
+            {
+                m_sink->diagnose(
+                    Diagnostics::MetalMultipleClipDistanceOutputs{.location = key->sourceLoc});
+            }
+            foundClipDistance = true;
+        }
+    }
 
     /// Store each element of `arrayVal`, of type `arrayType`, through `arrayPtr` separately,
     /// since a native MSL array cannot be assigned as a whole.
@@ -5624,7 +5651,10 @@ void legalizeEntryPointVaryingParamsForMetal(
     LegalizeMetalEntryPointContext context(module, sink);
     context.legalizeEntryPoints(entryPoints);
     for (auto& e : entryPoints)
+    {
+        context.diagnoseRepeatedClipDistanceOutputs(e);
         context.writeClipDistanceOutputsByElement(e);
+    }
 }
 
 void legalizeEntryPointVaryingParamsForWGSL(
