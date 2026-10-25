@@ -5,15 +5,21 @@
 // (`$computeD`) is emitted as written, for that entry point only, even when other entry points
 // call the helper. See https://github.com/shader-slang/slang/issues/13438.
 //
-// Helpers that hold only a `spirv_asm` block are inlined into their callers, so
-// `computeA`..`computeD` see the block in their own body. `computeE`..`computeG` use helpers
-// with other code too, which stay separate functions: there the mode goes to every entry point
-// that reaches the helper, directly or through another helper.
+// `IntrinsicFunctionInliningPass` inlines a helper whose body is a `spirv_asm` block (plain
+// stores next to it are allowed), so `computeA`..`computeD` see the block in their own body.
+// The helpers of `computeE`..`computeG` also index `outputBuffer`, which keeps them separate
+// functions: there the mode goes to every entry point that reaches the helper, directly or
+// through another helper. The INL checks below confirm both shapes.
+//
+// When a compile requests only some of the entry points, a mode that names an entry point that
+// is not requested is dropped: the named function is not an entry point of that program.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -profile spirv_1_6
 //TEST:SIMPLE(filecheck=COUNT): -target spirv -profile spirv_1_6
 //TEST:SIMPLE(filecheck=SZ): -target spirv -profile spirv_1_6
 //TEST:SIMPLE(filecheck=DP): -target spirv -profile spirv_1_6
+//TEST:SIMPLE(filecheck=INL): -target spirv -profile spirv_1_6
+//TEST:SIMPLE(filecheck=ONE): -target spirv -profile spirv_1_6 -entry computeA -stage compute
 
 // CHECK-DAG: OpCapability RayTracingOpacityMicromapExecutionModeKHR
 // CHECK-DAG: OpExtension "SPV_KHR_opacity_micromap"
@@ -56,6 +62,23 @@
 // SZ-NOT: SignedZeroInfNanPreserve 32
 // DP-COUNT-1: DenormPreserve 32
 // DP-NOT: DenormPreserve 32
+
+// The helpers with only a `spirv_asm` block are inlined; the two that index `outputBuffer` are
+// not.
+// INL-NOT: OpName {{.*}}"enableOpacityMicromapFromSpecConstant
+// INL-NOT: OpName {{.*}}"enableOpacityMicromap{{(_[0-9]+)?}}"
+// INL-NOT: OpName {{.*}}"preserveSignedZeroInfNan
+// INL-NOT: OpName {{.*}}"setModesOnComputeD
+// INL-DAG: OpName {{.*}}"enableFromSharedHelper
+// INL-DAG: OpName {{.*}}"setModeOnComputeGFromSharedHelper
+
+// Compiling `computeA` alone: its own mode is emitted, and the modes that name `computeD` are
+// dropped, because `computeD` is not an entry point of this program.
+// ONE: OpEntryPoint GLCompute %[[ONEA:[A-Za-z0-9_]+]] "main"
+// ONE-NOT: OpEntryPoint
+// ONE: OpExecutionModeId %[[ONEA]] OpacityMicromapIdKHR
+// ONE-NOT: OpExecutionModeId
+// ONE-NOT: DenormPreserve 32
 
 [vk::constant_id(2)]
 const bool kEnableOpacityMicromap = false;
@@ -111,7 +134,8 @@ void setModesOnComputeD()
     };
 }
 
-// Not inlined (it also stores), so it stays one function that several entry points call.
+// Not inlined (it indexes `outputBuffer`), so it stays one function that several entry points
+// call.
 void enableFromSharedHelper(uint i)
 {
     outputBuffer[i] = 5;
