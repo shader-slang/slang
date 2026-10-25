@@ -3286,6 +3286,49 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 actualOutputSB << "\ncontent:\n" << hover.contents.value << "\n";
             }
         }
+        else if (line.startsWith("DEFINITION:"))
+        {
+            // Report the existing definition request's target count, document identity and ranges.
+            auto argument = line.tail(UnownedStringSlice("DEFINITION:").getLength());
+            Int linePosition, columnPosition;
+            parseLocation(argument, 0, linePosition, columnPosition);
+
+            LanguageServerProtocol::DefinitionParams definitionParams;
+            definitionParams.position.line = int(linePosition - 1);
+            definitionParams.position.character = int(columnPosition - 1);
+            definitionParams.textDocument.uri = openDocParams.textDocument.uri;
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::DefinitionParams::methodName,
+                    &definitionParams,
+                    JSONValue::makeInt(callId++))) ||
+                SLANG_FAILED(waitForResponse()))
+            {
+                return TestResult::Fail;
+            }
+            actualOutputSB << "--------\n";
+            if (receivedNullResult(connection))
+            {
+                actualOutputSB << "null\n";
+            }
+            else
+            {
+                List<LanguageServerProtocol::Location> definitions;
+                if (SLANG_FAILED(connection->getMessage(&definitions)))
+                    return TestResult::Fail;
+                actualOutputSB << "definitions: " << definitions.getCount() << "\n";
+                for (auto& definition : definitions)
+                {
+                    actualOutputSB
+                        << "same document: "
+                        << (definition.uri == openDocParams.textDocument.uri ? "true" : "false")
+                        << "\n";
+                    actualOutputSB << "range: " << definition.range.start.line << ","
+                                   << definition.range.start.character << " - "
+                                   << definition.range.end.line << ","
+                                   << definition.range.end.character << "\n";
+                }
+            }
+        }
         else if (line.startsWith("RESOLVE"))
         {
             // Drive completionItem/resolve for an item that carries a textEdit but no `data`
