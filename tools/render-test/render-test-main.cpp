@@ -1175,21 +1175,15 @@ void RenderTestApp::_initializeRenderPass()
 
 void RenderTestApp::_initializeAccelerationStructure()
 {
-    if (!m_device->hasFeature("ray-tracing"))
+    // Inline ray queries need the acceleration structure too. Metal supports them without
+    // ray-tracing pipelines.
+    if (!m_device->hasFeature("ray-tracing") && !m_device->hasFeature("ray-query"))
         return;
     BufferDesc vertexBufferDesc = {};
     vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
     vertexBufferDesc.usage = BufferUsage::AccelerationStructureBuildInput;
     vertexBufferDesc.defaultState = ResourceState::AccelerationStructureBuildInput;
     ComPtr<IBuffer> vertexBuffer = m_device->createBuffer(vertexBufferDesc, &kVertexData[0]);
-
-    BufferDesc transformBufferDesc = {};
-    transformBufferDesc.size = sizeof(float) * 12;
-    transformBufferDesc.usage = BufferUsage::AccelerationStructureBuildInput;
-    transformBufferDesc.defaultState = ResourceState::AccelerationStructureBuildInput;
-    float transformData[12] =
-        {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-    ComPtr<IBuffer> transformBuffer = m_device->createBuffer(transformBufferDesc, &transformData);
 
     // Build bottom level acceleration structure.
     {
@@ -1200,7 +1194,6 @@ void RenderTestApp::_initializeAccelerationStructure()
         buildInput.triangles.vertexFormat = Format::RGB32Float;
         buildInput.triangles.vertexCount = kVertexCount;
         buildInput.triangles.vertexStride = sizeof(Vertex);
-        buildInput.triangles.preTransformBuffer = transformBuffer;
         buildInput.triangles.flags = AccelerationStructureGeometryFlags::Opaque;
         AccelerationStructureBuildDesc buildDesc = {};
         buildDesc.inputs = &buildInput;
@@ -1217,11 +1210,14 @@ void RenderTestApp::_initializeAccelerationStructure()
         scratchBufferDesc.size = accelerationStructureSizes.scratchSize;
         ComPtr<IBuffer> scratchBuffer = m_device->createBuffer(scratchBufferDesc);
 
+        // Compact the acceleration structure where the device can report its compacted size.
+        // Metal can't, so there the acceleration structure is used as built.
         ComPtr<IQueryPool> compactedSizeQuery;
         QueryPoolDesc queryPoolDesc = {};
         queryPoolDesc.count = 1;
         queryPoolDesc.type = QueryType::AccelerationStructureCompactedSize;
-        m_device->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef());
+        if (SLANG_FAILED(m_device->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef())))
+            compactedSizeQuery = nullptr;
 
         // Build acceleration structure.
         ComPtr<IAccelerationStructure> draftAS;
@@ -1229,37 +1225,54 @@ void RenderTestApp::_initializeAccelerationStructure()
         draftDesc.size = accelerationStructureSizes.accelerationStructureSize;
         m_device->createAccelerationStructure(draftDesc, draftAS.writeRef());
 
-        compactedSizeQuery->reset();
+        if (!compactedSizeQuery)
+        {
+            auto encoder = m_queue->createCommandEncoder();
+            encoder->buildAccelerationStructure(
+                buildDesc,
+                draftAS,
+                nullptr,
+                scratchBuffer,
+                0,
+                nullptr);
+            m_queue->submit(encoder->finish());
+            m_queue->waitOnHost();
+            m_bottomLevelAccelerationStructure = draftAS;
+        }
+        else
+        {
+            compactedSizeQuery->reset();
 
-        auto encoder = m_queue->createCommandEncoder();
-        AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
-        compactedSizeQueryDesc.queryPool = compactedSizeQuery;
-        compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
-        encoder->buildAccelerationStructure(
-            buildDesc,
-            draftAS,
-            nullptr,
-            scratchBuffer,
-            1,
-            &compactedSizeQueryDesc);
-        m_queue->submit(encoder->finish());
-        m_queue->waitOnHost();
+            auto encoder = m_queue->createCommandEncoder();
+            AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
+            compactedSizeQueryDesc.queryPool = compactedSizeQuery;
+            compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
+            encoder->buildAccelerationStructure(
+                buildDesc,
+                draftAS,
+                nullptr,
+                scratchBuffer,
+                1,
+                &compactedSizeQueryDesc);
+            m_queue->submit(encoder->finish());
+            m_queue->waitOnHost();
 
-        uint64_t compactedSize = 0;
-        compactedSizeQuery->getResult(0, 1, &compactedSize);
-        AccelerationStructureDesc finalDesc;
-        finalDesc.size = compactedSize;
-        m_device->createAccelerationStructure(
-            finalDesc,
-            m_bottomLevelAccelerationStructure.writeRef());
+            uint64_t compactedSize = 0;
+            compactedSizeQuery->getResult(0, 1, &compactedSize);
+            AccelerationStructureDesc finalDesc;
+            finalDesc.size = compactedSize;
+            m_device->createAccelerationStructure(
+                finalDesc,
+                m_bottomLevelAccelerationStructure.writeRef());
 
-        encoder = m_queue->createCommandEncoder();
-        encoder->copyAccelerationStructure(
-            m_bottomLevelAccelerationStructure,
-            draftAS,
-            AccelerationStructureCopyMode::Compact);
-        m_queue->submit(encoder->finish());
-        m_queue->waitOnHost();
+            encoder = m_queue->createCommandEncoder();
+            encoder->copyAccelerationStructure(
+                m_bottomLevelAccelerationStructure,
+                draftAS,
+                AccelerationStructureCopyMode::Compact);
+            m_queue->submit(encoder->finish());
+            m_queue->waitOnHost();
+        }
     }
 
     // Build top level acceleration structure.
@@ -2049,9 +2062,19 @@ static SlangResult _innerMain(
         RenderTestApp app;
         renderDocBeginFrame();
         SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
-        app.update();
+        // A failure reported by `update` (binding the parameters or writing the output) means the
+        // test output was not produced or cannot be trusted. We return it only after the frame-end
+        // cleanup, so that the RenderDoc frame opened above is closed on this path as well.
+        //
+        // SLANG_E_NOT_AVAILABLE is turned into a failure because the test harness reads it as
+        // "ignore this test", and that outcome is reserved for the device and feature gating
+        // earlier in this function.
+        SlangResult updateResult = app.update();
         renderDocEndFrame();
         app.finalize();
+        if (updateResult == SLANG_E_NOT_AVAILABLE)
+            updateResult = SLANG_FAIL;
+        SLANG_RETURN_ON_FAIL(updateResult);
     }
 
     return SLANG_OK;
