@@ -1,5 +1,5 @@
 //TEST_CATEGORY(wave, compute)
-//TEST:COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgpu -compute -shaderobj -output-using-type
 
 // WaveActiveAllEqual on bool and bool vectors. WGSL's subgroupBroadcastFirst takes no bool, so
 // the WGSL lowering compares the values as 0/1.
@@ -21,3 +21,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     outputBuffer[idx] = value;
 }
+
+// 1 | 4 on every lane.
+// CHECK: 5
+// CHECK-NEXT: 5
+// CHECK-NEXT: 5
+// CHECK-NEXT: 5
