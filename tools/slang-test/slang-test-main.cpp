@@ -3300,8 +3300,11 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             if (SLANG_FAILED(connection->sendCall(
                     LanguageServerProtocol::DefinitionParams::methodName,
                     &definitionParams,
-                    JSONValue::makeInt(callId++))) ||
-                SLANG_FAILED(waitForResponse()))
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForResponse()))
             {
                 return TestResult::Fail;
             }
