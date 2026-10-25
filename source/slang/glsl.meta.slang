@@ -8624,6 +8624,7 @@ public uint subgroupBallotFindMSB(uvec4 value)
 
 // GL_KHR_shader_subgroup_shuffle
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
@@ -8635,6 +8636,7 @@ public T subgroupShuffle(T value, uint index)
     return WaveShuffle(value, index);
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
@@ -8658,6 +8660,7 @@ __wgsl_extension(subgroups)
     }
 }
 
+[__removableIfUnused]
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
