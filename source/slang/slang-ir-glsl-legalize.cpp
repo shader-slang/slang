@@ -704,7 +704,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // float in hlsl & glsl.
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_CullDistance.xhtml
 
-        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("ARB_cull_distance"));
+        // gl_CullDistance is core since GLSL 4.50.
+        context->requireGLSLVersion(ProfileVersion::GLSL_450);
 
         // TODO: type conversion is required here.
         name = "gl_CullDistance";
