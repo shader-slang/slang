@@ -10,13 +10,18 @@
 //TEST:SIMPLE(filecheck=OUTARRAY): -target metal -stage vertex -entry vsOutArray
 //TEST:SIMPLE(filecheck=MESH): -target metal -stage mesh -entry msArray
 //TEST:SIMPLE(filecheck=MESH2): -target metal -entry msArray -stage mesh -entry msArray2 -stage mesh
+//TEST:SIMPLE(filecheck=MESHSCALAR): -target metal -stage mesh -entry msScalar
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage vertex -entry vsScalar
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage vertex -entry vsArray
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage vertex -entry vsOutArray
 //TEST:SIMPLE(filecheck=METALLIB_MESH): -target metallib -stage mesh -entry msArray
+//TEST:SIMPLE(filecheck=METALLIB_MESH2): -target metallib -entry msArray -stage mesh -entry msArray2 -stage mesh
+//TEST:SIMPLE(filecheck=METALLIB_MESHSCALAR): -target metallib -stage mesh -entry msScalar
 
 // METALLIB: @vs
 // METALLIB_MESH: @msArray
+// METALLIB_MESH2: @msArray
+// METALLIB_MESHSCALAR: @msScalar
 
 struct ScalarOut
 {
@@ -41,11 +46,13 @@ struct ArrayOut
     float clip[3] : SV_ClipDistance;
 };
 
-// ARRAY: float clip{{[_0-9]*}} {{\[\[}}clip_distance{{\]\]}} [3];
+// ARRAY: float [[CLIP:clip_[0-9]+]] {{\[\[}}clip_distance{{\]\]}} [3];
 // ARRAY-NOT: {{\[\[}}{{\]\]}}
-// ARRAY: clip{{[_0-9]*}}[int(0)] =
-// ARRAY: clip{{[_0-9]*}}[int(1)] =
-// ARRAY: clip{{[_0-9]*}}[int(2)] =
+// ARRAY-NOT: ->[[CLIP]] =
+// ARRAY: ->[[CLIP]][int(0)] =
+// ARRAY: ->[[CLIP]][int(1)] =
+// ARRAY: ->[[CLIP]][int(2)] =
+// ARRAY-NOT: ->[[CLIP]] =
 [shader("vertex")]
 ArrayOut vsArray(uint vid : SV_VertexID)
 {
@@ -59,10 +66,12 @@ ArrayOut vsArray(uint vid : SV_VertexID)
 
 // An `out` parameter is moved into the result struct, which is built in one aggregate here, so
 // this checks the aggregate case as well as the field-store case above.
-// OUTARRAY: float c{{[_0-9]*}} {{\[\[}}clip_distance{{\]\]}} [2];
+// OUTARRAY: float [[CLIP:c_[0-9]+]] {{\[\[}}clip_distance{{\]\]}} [2];
 // OUTARRAY-NOT: {{\[\[}}{{\]\]}}
-// OUTARRAY: c{{[_0-9]*}}[int(0)] =
-// OUTARRAY: c{{[_0-9]*}}[int(1)] =
+// OUTARRAY-NOT: ->[[CLIP]] =
+// OUTARRAY: ->[[CLIP]][int(0)] =
+// OUTARRAY: ->[[CLIP]][int(1)] =
+// OUTARRAY-NOT: ->[[CLIP]] =
 [shader("vertex")]
 float4 vsOutArray(uint vid : SV_VertexID, out float c[2] : SV_ClipDistance) : SV_Position
 {
@@ -81,10 +90,12 @@ struct MeshVertex
 // struct that carries the attribute.
 // MESH: array<float, int(2)> clip
 // MESH: float4 position{{[_0-9]*}} {{\[\[}}position{{\]\]}};
-// MESH-NEXT: float clip{{[_0-9]*}} {{\[\[}}clip_distance{{\]\]}} [2];
+// MESH-NEXT: float [[CLIP:clip_[0-9]+]] {{\[\[}}clip_distance{{\]\]}} [2];
 // MESH: metal::mesh<
-// MESH: clip{{[_0-9]*}}[int(0)] =
-// MESH: clip{{[_0-9]*}}[int(1)] =
+// MESH-NOT: ->[[CLIP]] =
+// MESH: ->[[CLIP]][int(0)] =
+// MESH: ->[[CLIP]][int(1)] =
+// MESH-NOT: ->[[CLIP]] =
 // MESH: set_vertex(
 [shader("mesh")]
 [numthreads(3, 1, 1)]
@@ -105,8 +116,13 @@ void msArray(
 }
 
 // A second mesh entry point that shares the vertex struct declares its mesh over the same output
-// struct that its `set_vertex` call receives.
-// MESH2-COUNT-2: metal::mesh<MeshVertexOutput_0,
+// struct, and its `set_vertex` call receives a value of that struct.
+// MESH2: metal::mesh<MeshVertexOutput_0,
+// MESH2: thread MeshVertexOutput_0 [[V1:_S[0-9]+]];
+// MESH2: set_vertex({{.*}},[[V1]])
+// MESH2: metal::mesh<MeshVertexOutput_0,
+// MESH2: thread MeshVertexOutput_0 [[V2:_S[0-9]+]];
+// MESH2: set_vertex({{.*}},[[V2]])
 // MESH2-NOT: MeshVertexOutput_1
 [shader("mesh")]
 [numthreads(3, 1, 1)]
@@ -121,6 +137,35 @@ void msArray2(
     v.position = float4(0, float(tid), 0, 1);
     v.clip[0] = -1.0;
     v.clip[1] = float(tid);
+    verts[tid] = v;
+    if (tid == 0)
+        indices[0] = uint3(0, 1, 2);
+}
+
+struct ScalarMeshVertex
+{
+    float4 position : SV_Position;
+    float clip : SV_ClipDistance0;
+};
+
+// A scalar clip distance is copied with an ordinary store.
+// MESHSCALAR: float clip{{[_0-9]*}} {{\[\[}}clip_distance{{\]\]}};
+// MESHSCALAR: metal::mesh<ScalarMeshVertexOutput_0,
+// MESHSCALAR: thread ScalarMeshVertexOutput_0 [[V:_S[0-9]+]];
+// MESHSCALAR: ->clip{{[_0-9]*}} =
+// MESHSCALAR: set_vertex({{.*}},[[V]])
+[shader("mesh")]
+[numthreads(3, 1, 1)]
+[outputtopology("triangle")]
+void msScalar(
+    uint tid : SV_GroupThreadID,
+    OutputVertices<ScalarMeshVertex, 3> verts,
+    OutputIndices<uint3, 1> indices)
+{
+    SetMeshOutputCounts(3, 1);
+    ScalarMeshVertex v;
+    v.position = float4(float(tid), 0, 0, 1);
+    v.clip = 1.0 - float(tid);
     verts[tid] = v;
     if (tid == 0)
         indices[0] = uint3(0, 1, 2);

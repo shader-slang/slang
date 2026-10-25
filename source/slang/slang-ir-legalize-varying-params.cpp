@@ -3008,12 +3008,15 @@ protected:
 
         auto indexAsString = String(workItem.attrIndex);
         SystemValueInfo info = getSystemValueInfo(semanticName, &indexAsString, var);
+
+        // An `inout` parameter is read, so only an `out` parameter is purely an output. This is
+        // read before handleSpecialSystemValue, which can remove `var`.
+        bool isInput = !as<IROutParamType>(var->getDataType());
         if (info.isSpecial)
         {
             handleSpecialSystemValue(entryPoint, workItem, info, builder);
         }
 
-        bool isInput = !as<IROutParamType>(var->getDataType());
         if (info.isUnsupported || (info.isOutputOnly && isInput))
         {
             reportUnsupportedSystemAttribute(var, semanticName);
@@ -3072,6 +3075,21 @@ protected:
                 }
             }
         }
+    }
+
+    void reportUnsupportedSystemAttribute(IRInst* param, String semanticName)
+    {
+        m_sink->diagnose(Diagnostics::SystemValueAttributeNotSupported{
+            .semanticName = semanticName,
+            .location = param->sourceLoc});
+    }
+
+    /// Return whether an error was reported since the sink had `errorCountBefore` errors. The
+    /// targets' getSystemValueInfo reports an unknown semantic itself (E40006) and returns an empty
+    /// result, so a caller uses this to avoid reporting the same value a second time.
+    bool isAlreadyDiagnosed(Index errorCountBefore) const
+    {
+        return m_sink->getErrorCount() != errorCountBefore;
     }
 
 private:
@@ -3489,15 +3507,6 @@ private:
     }
 
 
-protected:
-    void reportUnsupportedSystemAttribute(IRInst* param, String semanticName)
-    {
-        m_sink->diagnose(Diagnostics::SystemValueAttributeNotSupported{
-            .semanticName = semanticName,
-            .location = param->sourceLoc});
-    }
-
-private:
     template<LayoutResourceKind K>
     void ensureStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
     {
@@ -3531,7 +3540,7 @@ private:
                             sysValInfo.systemValueName.getUnownedSlice());
                         semanticDecor->removeAndDeallocate();
                     }
-                    else if (m_sink->getErrorCount() == errorCount)
+                    else if (!isAlreadyDiagnosed(errorCount))
                     {
                         // The key, not the field, carries the location of the field declaration.
                         reportUnsupportedSystemAttribute(key, semanticDecor->getSemanticName());
@@ -4341,6 +4350,20 @@ private:
 // MSL's clip-distance attribute, which MSL types as `float` or a native `float[n]`.
 static const UnownedStringSlice kMetalClipDistanceAttribute = toSlice("clip_distance");
 
+// Return whether `var`, an entry-point parameter or a field of an entry-point struct, has a type
+// that MSL accepts for [[clip_distance]]: `float` or an array of `float`.
+static bool isMetalClipDistanceType(IRInst* var)
+{
+    auto field = as<IRStructField>(var);
+    IRType* type = field ? field->getFieldType() : var->getDataType();
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+        type = ptrType->getValueType();
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        type = arrayType->getElementType();
+    auto basicType = as<IRBasicType>(type);
+    return basicType && basicType->getBaseType() == BaseType::Float;
+}
+
 IRArrayType* getMetalClipDistanceArrayType(IRStructField* field)
 {
     auto systemValue = field->getKey()->findDecoration<IRTargetSystemValueDecoration>();
@@ -4392,6 +4415,7 @@ protected:
                 // in a fragment function is undefined.
                 result.systemValueName = kMetalClipDistanceAttribute;
                 result.isOutputOnly = true;
+                result.isUnsupported = !isMetalClipDistanceType(parentVar);
                 break;
             }
         case SystemValueSemanticName::CullDistance:
@@ -5025,29 +5049,34 @@ protected:
                 // Neither an input nor the result, so nothing else canonicalizes the semantics;
                 // the case-insensitive sv_position match below still holds afterwards.
                 fixFieldSemanticsOfFlatStruct(vertStruct);
-                bool hasClipDistance = false;
+                HashSet<IRStructKey*> clipDistanceKeys;
                 for (auto field : vertStruct->getFields())
                 {
                     auto key = field->getKey();
                     if (auto deco = key->findDecoration<IRSemanticDecoration>())
                     {
                         auto semanticName = deco->getSemanticName();
+                        auto systemValue = convertSystemValueSemanticNameToEnum(semanticName);
                         if (semanticName.caseInsensitiveEquals(toSlice("sv_position")))
                         {
                             builder.addTargetSystemValueDecoration(key, toSlice("position"));
                         }
-                        else if (semanticName.caseInsensitiveEquals(toSlice("sv_clipdistance")))
+                        else if (
+                            systemValue == SystemValueSemanticName::ClipDistance ||
+                            systemValue == SystemValueSemanticName::CullDistance)
                         {
-                            hasClipDistance = true;
-                        }
-                        else if (semanticName.caseInsensitiveEquals(toSlice("sv_culldistance")))
-                        {
-                            reportUnsupportedSystemAttribute(key, semanticName);
+                            // getSystemValueInfo decides support, as it does for vertex outputs.
+                            if (getSystemValueInfo(semanticName, nullptr, field).isUnsupported)
+                                reportUnsupportedSystemAttribute(key, semanticName);
+                            else
+                                clipDistanceKeys.add(key);
                         }
                     }
                 }
-                if (hasClipDistance)
-                    vertexType = createMeshVertexOutputType(vertStruct);
+                if (clipDistanceKeys.getCount() != 0)
+                {
+                    vertexType = getOrCreateMeshVertexOutputType(vertStruct, clipDistanceKeys);
+                }
             }
             if (param->findDecorationImpl(kIROp_IndicesDecoration))
             {
@@ -5114,8 +5143,9 @@ protected:
 
 public:
     /// Report every clip-distance field of `entryPoint`'s result struct after the first. MSL
-    /// allows one [[clip_distance]] member, and Metal does not yet pack several clip-distance
-    /// outputs such as `SV_ClipDistance0` and `SV_ClipDistance1` into one array, as GLSL does.
+    /// allows one [[clip_distance]] member, and Slang does not yet pack several clip-distance
+    /// outputs such as `SV_ClipDistance0` and `SV_ClipDistance1` into one array for Metal, as it
+    /// does for GLSL.
     void diagnoseRepeatedClipDistanceOutputs(const EntryPointInfo& entryPoint)
     {
         if (auto resultStruct = as<IRStructType>(entryPoint.entryPointFunc->getResultType()))
@@ -5127,6 +5157,13 @@ public:
     /// Metal emitter declares such a field, for example a `float clip[2] : SV_ClipDistance`
     /// output, as a native array (see `MetalSourceEmitter::emitStructFieldTypeAndSemantics`), and
     /// a native array cannot be assigned as a whole.
+    ///
+    /// Those two forms are the only writes because the result struct is never the user's type:
+    /// legalizeShaderOutputParamsForMetal always gives a vertex entry point a fresh result struct
+    /// (lowerOutParameters with `alwaysUseReturnStruct`), and wrapReturnValueInStruct flattens it
+    /// into fresh keys. So it is written only by the out-parameter `makeStruct` and by the field
+    /// stores of the flattening copy, and nothing reads a clip-distance field back. The mesh path
+    /// gets the same guarantee from getOrCreateMeshVertexOutputType's copy.
     void writeClipDistanceOutputsByElement(const EntryPointInfo& entryPoint)
     {
         auto resultStruct = as<IRStructType>(entryPoint.entryPointFunc->getResultType());
@@ -5171,8 +5208,9 @@ public:
             makeStruct->removeAndDeallocate();
         }
 
-        // The field stores come from copying into the flattened result struct, whose field
-        // accesses do not carry the field's own type, so the array type is taken from the field.
+        // The stores come from MapStructToFlatStruct::_emitCopy, which types its field accesses
+        // with the enclosing struct instead of the field (an existing inconsistency), so the array
+        // type is taken from the field declaration rather than from the stored value.
         List<KeyValuePair<IRStore*, IRArrayType*>> stores;
         for (const auto& [key, arrayType] : arrayFields)
         {
@@ -5225,13 +5263,21 @@ private:
         }
     }
 
-    /// Return a copy of the mesh vertex struct `vertStruct` in which each clip-distance field
-    /// carries [[clip_distance]], and make every `MetalSetVertex` of a `vertStruct` value copy it
-    /// into the new struct first. The emitter declares a clip-distance array as a native array,
-    /// which cannot be assigned as a whole, so the user's struct keeps its ordinary array field
-    /// and only the struct passed to `set_vertex` carries the attribute. Mesh entry points that
-    /// share `vertStruct` share the copy.
-    IRStructType* createMeshVertexOutputType(IRStructType* vertStruct)
+    /// Return the struct a Metal mesh is declared over when its vertex struct `vertStruct` has the
+    /// clip-distance fields keyed by `clipDistanceKeys`: a copy of `vertStruct` whose clip-distance
+    /// keys carry [[clip_distance]].
+    ///
+    /// The emitter declares a clip-distance array as a native array, which cannot be assigned as a
+    /// whole, and `vertStruct` is the user's own type, so the user's struct keeps its ordinary
+    /// array field and only the copy carries the attribute. The first call for `vertStruct`
+    /// therefore also rewrites every `MetalSetVertex` of a `vertStruct` value in the module to
+    /// copy the value into the new struct field by field, and reports a second clip-distance
+    /// field (E55220). Later calls, from other mesh entry points sharing `vertStruct`, return the
+    /// cached copy; that is sufficient because every `MetalSetVertex` exists before this pass
+    /// and the first call rewrote them all.
+    IRStructType* getOrCreateMeshVertexOutputType(
+        IRStructType* vertStruct,
+        const HashSet<IRStructKey*>& clipDistanceKeys)
     {
         if (auto outputStruct = mapMeshVertexToOutputType.tryGetValue(vertStruct))
             return *outputStruct;
@@ -5245,20 +5291,17 @@ private:
                 outputStruct,
                 (String(nameHint->getName()) + "Output").getUnownedSlice());
         }
-        List<IRStructField*> outputFields;
+        Dictionary<IRStructKey*, IRStructField*> outputFieldForKey;
         for (auto field : vertStruct->getFields())
         {
             auto key = builder.createStructKey();
             key->sourceLoc = field->getKey()->sourceLoc;
             IRCloneEnv cloneEnv;
             cloneInstDecorationsAndChildren(&cloneEnv, m_module, field->getKey(), key);
-            auto semantic = key->findDecoration<IRSemanticDecoration>();
-            if (semantic &&
-                semantic->getSemanticName().caseInsensitiveEquals(toSlice("sv_clipdistance")))
-            {
+            if (clipDistanceKeys.contains(field->getKey()))
                 builder.addTargetSystemValueDecoration(key, kMetalClipDistanceAttribute);
-            }
-            outputFields.add(builder.createStructField(outputStruct, key, field->getFieldType()));
+            outputFieldForKey[field->getKey()] =
+                builder.createStructField(outputStruct, key, field->getFieldType());
         }
         mapMeshVertexToOutputType[vertStruct] = outputStruct;
         diagnoseRepeatedClipDistanceFields(outputStruct);
@@ -5285,10 +5328,9 @@ private:
             builder.setInsertBefore(setVertex);
             auto vertex = setVertex->getElementValue();
             auto outputVertex = builder.emitVar(outputStruct);
-            Index fieldIndex = 0;
             for (auto field : vertStruct->getFields())
             {
-                auto outputField = outputFields[fieldIndex++];
+                auto outputField = outputFieldForKey.getValue(field->getKey());
                 auto fieldVal =
                     builder.emitFieldExtract(field->getFieldType(), vertex, field->getKey());
                 auto fieldPtr = builder.emitFieldAddress(outputVertex, outputField->getKey());
@@ -5743,6 +5785,9 @@ void legalizeEntryPointVaryingParamsForMetal(
     }
     LegalizeMetalEntryPointContext context(module, sink);
     context.legalizeEntryPoints(entryPoints);
+    // The result struct gets its clip-distance decoration and its copy-in stores while
+    // wrapReturnValueInStruct builds it, and the shared per-entry-point legalization has no Metal
+    // hook after that step, so these run once every entry point is legalized.
     for (auto& e : entryPoints)
     {
         context.diagnoseRepeatedClipDistanceOutputs(e);

@@ -58,10 +58,11 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_VulkanSamplePosition`   | `(Not supported)`                                    |
 | `SV_VulkanVertexID`         | `[[vertex_id]]`                                      |
 
-_Note_ that Metal allows one `[[clip_distance]]` output, of type `float` or `float[N]`, and Slang
-does not yet pack several `SV_ClipDistance<N>` outputs into one array for Metal, so declare all clip
-distances as one `float[N]` array with `SV_ClipDistance`. Slang emits that array as a native array,
-`float clip [[clip_distance]] [N]`.
+_Note_ that MSL allows one `[[clip_distance]]` output, of type `float` or `float[N]`, and only on
+vertex and mesh outputs. Slang does not yet pack several `SV_ClipDistance<N>` outputs into one array
+for Metal, so declare all clip distances as one `float` or `float[N]` field with `SV_ClipDistance`.
+Otherwise Slang reports E55220 for a second clip-distance output, and E55202 for a clip distance of
+another type, a fragment-input clip distance, or `SV_CullDistance`.
 
 _Note_ that `SV_InstanceID` counts from zero within a draw call, as in D3D, while Metal's
 `[[instance_id]]` includes the base instance, so the two are not the same value. Use

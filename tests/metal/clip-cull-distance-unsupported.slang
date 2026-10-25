@@ -1,6 +1,7 @@
-// MSL has no cull-distance attribute, and defines [[clip_distance]] only for vertex and mesh
-// outputs (reading it in a fragment function is undefined), so Metal reports these system values
-// as unsupported instead of emitting an empty `[[]]` attribute or an unattributed parameter.
+// MSL has no cull-distance attribute, and defines [[clip_distance]] only for `float` or `float[n]`
+// vertex and mesh outputs (reading it in a fragment function is undefined), so Slang reports these
+// system values as unsupported for Metal instead of emitting an empty `[[]]` attribute, an
+// unattributed parameter or an invalid declaration.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CULL): -target metal -stage vertex -entry vsCull
 //DIAGNOSTIC_TEST:SIMPLE(diag=CLIPIN): -target metal -stage fragment -entry psClipInput
@@ -11,6 +12,10 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=MESHCULL): -target metal -stage mesh -entry msCull
 //DIAGNOSTIC_TEST:SIMPLE(diag=NESTED): -target metal -stage fragment -entry psNested
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNKNOWN): -target metal -stage vertex -entry vsUnknown
+//DIAGNOSTIC_TEST:SIMPLE(diag=HALFVS): -target metal -stage vertex -entry vsHalf
+//DIAGNOSTIC_TEST:SIMPLE(diag=HALFMESH): -target metal -stage mesh -entry msHalf
+//DIAGNOSTIC_TEST:SIMPLE(diag=MESHTWOCLIP): -target metal -stage mesh -entry msTwoClip
+//DIAGNOSTIC_TEST:SIMPLE(diag=INNERCOV): -target metal -stage fragment -entry psNestedInnerCoverage
 
 struct CullOut
 {
@@ -168,4 +173,108 @@ UnknownOut vsUnknown(uint vid : SV_VertexID)
     o.pos = float4(float(vid), 0, 0, 1);
     o.rate = 0;
     return o;
+}
+
+// MSL takes only `float` or `float[n]` for [[clip_distance]], so a `half` clip distance, which the
+// front end accepts, is reported rather than emitted as an invalid declaration.
+struct HalfClipOut
+{
+    float4 pos : SV_Position;
+    half clip : SV_ClipDistance0;
+/*HALFVS:
+         ^^^^ error E55202
+         ^^^^ system value semantic 'sv_clipdistance' is not supported for the current target.
+*/
+};
+
+[shader("vertex")]
+HalfClipOut vsHalf(uint vid : SV_VertexID)
+{
+    HalfClipOut o;
+    o.pos = float4(float(vid), 0, 0, 1);
+    o.clip = half(1.0);
+    return o;
+}
+
+struct HalfClipMeshVertex
+{
+    float4 position : SV_Position;
+    half clip[2] : SV_ClipDistance;
+/*HALFMESH:
+         ^^^^ error E55202
+         ^^^^ system value semantic 'sv_clipdistance' is not supported for the current target.
+*/
+};
+
+[shader("mesh")]
+[numthreads(3, 1, 1)]
+[outputtopology("triangle")]
+void msHalf(
+    uint tid : SV_GroupThreadID,
+    OutputVertices<HalfClipMeshVertex, 3> verts,
+    OutputIndices<uint3, 1> indices)
+{
+    SetMeshOutputCounts(3, 1);
+    HalfClipMeshVertex v;
+    v.position = float4(float(tid), 0, 0, 1);
+    v.clip[0] = half(1.0);
+    v.clip[1] = half(-1.0);
+    verts[tid] = v;
+    if (tid == 0)
+        indices[0] = uint3(0, 1, 2);
+}
+
+// The mesh vertex type takes each attribute once, so a second mesh clip distance is reported too.
+struct TwoClipMeshVertex
+{
+    float4 position : SV_Position;
+    float clip0 : SV_ClipDistance0;
+    float clip1 : SV_ClipDistance1;
+/*MESHTWOCLIP:
+          ^^^^^ error E55220
+          ^^^^^ multiple SV_ClipDistance outputs are not yet supported on Metal; declare all clip distances as one 'float[N]' array with 'SV_ClipDistance'.
+*/
+};
+
+[shader("mesh")]
+[numthreads(3, 1, 1)]
+[outputtopology("triangle")]
+void msTwoClip(
+    uint tid : SV_GroupThreadID,
+    OutputVertices<TwoClipMeshVertex, 3> verts,
+    OutputIndices<uint3, 1> indices)
+{
+    SetMeshOutputCounts(3, 1);
+    TwoClipMeshVertex v;
+    v.position = float4(float(tid), 0, 0, 1);
+    v.clip0 = 1.0;
+    v.clip1 = -1.0;
+    verts[tid] = v;
+    if (tid == 0)
+        indices[0] = uint3(0, 1, 2);
+}
+
+// A system value that Metal provides only for an entry-point parameter has no attribute to put
+// on a stage_in member, so a nested SV_InnerCoverage is reported instead of being emitted as
+// `[[]]`. The parameter form (`uint ic : SV_InnerCoverage`) still compiles.
+struct NestedInnerCoverage
+{
+    float2 uv : TEXCOORD0;
+    uint ic : SV_InnerCoverage;
+/*INNERCOV:
+         ^^ error E55202
+         ^^ system value semantic 'sv_innercoverage' is not supported for the current target.
+*/
+};
+
+struct InnerCoverageVaryings
+{
+    float4 pos : SV_Position;
+    NestedInnerCoverage inner;
+};
+
+[shader("fragment")]
+float4 psNestedInnerCoverage(InnerCoverageVaryings input) : SV_Target
+{
+    return float4(input.inner.uv, float(input.inner.ic), 1);
 }
