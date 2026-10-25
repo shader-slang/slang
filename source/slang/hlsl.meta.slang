@@ -10308,7 +10308,9 @@ T dd$(xOrY)_coarse(T p)
     case hlsl: __intrinsic_asm "dd$(xOrY)_coarse";
     case glsl: __intrinsic_asm "dFd$(xOrY)Coarse";
     case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$T = OpDPd$(xOrY)Coarse $p};
-    case wgsl: __intrinsic_asm "dpd$(xOrY)Coarse";
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
+        __intrinsic_asm "dpd$(xOrY)Coarse";
     }
 }
 
@@ -10324,7 +10326,9 @@ vector<T, N> dd$(xOrY)_coarse(vector<T, N> p)
     case hlsl: __intrinsic_asm "dd$(xOrY)_coarse";
     case glsl: __intrinsic_asm "dFd$(xOrY)Coarse";
     case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$vector<T,N> = OpDPd$(xOrY)Coarse $p};
-    case wgsl: __intrinsic_asm "dpd$(xOrY)Coarse";
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
+        __intrinsic_asm "dpd$(xOrY)Coarse";
     }
 }
 
@@ -10360,7 +10364,9 @@ T dd$(xOrY)_fine(T p)
     case hlsl: __intrinsic_asm "dd$(xOrY)_fine";
     case glsl: __intrinsic_asm "dFd$(xOrY)Fine";
     case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$T = OpDPd$(xOrY)Fine $p};
-    case wgsl: __intrinsic_asm "dpd$(xOrY)Fine";
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
+        __intrinsic_asm "dpd$(xOrY)Fine";
     }
 }
 
@@ -10376,7 +10382,9 @@ vector<T, N> dd$(xOrY)_fine(vector<T, N> p)
     case hlsl: __intrinsic_asm "dd$(xOrY)_fine";
     case glsl: __intrinsic_asm "dFd$(xOrY)Fine";
     case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$vector<T,N> = OpDPd$(xOrY)Fine $p};
-    case wgsl: __intrinsic_asm "dpd$(xOrY)Fine";
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
+        __intrinsic_asm "dpd$(xOrY)Fine";
     }
 }
 
@@ -12329,6 +12337,7 @@ T fwidth_coarse(T p)
     case glsl:
         __intrinsic_asm "fwidthCoarse($0)";
     case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
         __intrinsic_asm "fwidthCoarse($0)";
     case spirv:
         return spirv_asm
@@ -12352,6 +12361,7 @@ vector<T, N> fwidth_coarse(vector<T, N> x)
     case glsl:
         __intrinsic_asm "fwidthCoarse($0)";
     case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
         __intrinsic_asm "fwidthCoarse($0)";
     case spirv:
         return spirv_asm
@@ -12395,6 +12405,7 @@ T fwidth_fine(T p)
     case glsl:
         __intrinsic_asm "fwidthFine($0)";
     case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
         __intrinsic_asm "fwidthFine($0)";
     case spirv:
         return spirv_asm
@@ -12418,6 +12429,7 @@ vector<T, N> fwidth_fine(vector<T, N> x)
     case glsl:
         __intrinsic_asm "fwidthFine($0)";
     case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
         __intrinsic_asm "fwidthFine($0)";
     case spirv:
         return spirv_asm
