@@ -17610,10 +17610,12 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
             if (__isBool<T>())
                 return __wgslUIntToBool<T>(QuadReadLaneAt(__wgslBoolToUInt(sourceValue), quadLaneID));
             // `quadBroadcast` needs a const-expression lane, and `quadLaneID` may differ between
-            // invocations. None of the four broadcasts depends on `quadLaneID`, so every
-            // invocation of the quad that reaches this call runs all four, and then selects. This
-            // costs four broadcasts even for a constant lane. `& 3u` wraps an out-of-range lane
-            // as the CUDA case does (HLSL leaves it undefined).
+            // invocations. WGSL's uniformity analysis also requires `quadBroadcast` to run in
+            // uniform control flow, so branching on the lane and broadcasting once per branch is
+            // rejected. Instead every invocation runs all four broadcasts, none of which depends
+            // on `quadLaneID`, and then selects the value. This costs four broadcasts even for a
+            // constant lane. `& 3u` wraps an out-of-range lane as the CUDA case does (HLSL leaves
+            // it undefined).
             const uint lane = quadLaneID & 3u;
             const T q0 = __wgslQuadBroadcast(sourceValue, 0);
             const T q1 = __wgslQuadBroadcast(sourceValue, 1);
@@ -17652,10 +17654,12 @@ vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
                 return __wgslUIntToBool<T, N>(
                     QuadReadLaneAt(__wgslBoolToUInt(sourceValue), quadLaneID));
             // `quadBroadcast` needs a const-expression lane, and `quadLaneID` may differ between
-            // invocations. None of the four broadcasts depends on `quadLaneID`, so every
-            // invocation of the quad that reaches this call runs all four, and then selects. This
-            // costs four broadcasts even for a constant lane. `& 3u` wraps an out-of-range lane
-            // as the CUDA case does (HLSL leaves it undefined).
+            // invocations. WGSL's uniformity analysis also requires `quadBroadcast` to run in
+            // uniform control flow, so branching on the lane and broadcasting once per branch is
+            // rejected. Instead every invocation runs all four broadcasts, none of which depends
+            // on `quadLaneID`, and then selects the value. This costs four broadcasts even for a
+            // constant lane. `& 3u` wraps an out-of-range lane as the CUDA case does (HLSL leaves
+            // it undefined).
             const uint lane = quadLaneID & 3u;
             const vector<T, N> q0 = __wgslQuadBroadcast(sourceValue, 0);
             const vector<T, N> q1 = __wgslQuadBroadcast(sourceValue, 1);
@@ -17680,7 +17684,9 @@ matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID)
         __intrinsic_asm "QuadReadLaneAt";
     default:
         {
-            // Row by row through the vector overload; every row reads the same lane.
+            // Every target except HLSL reads a matrix row by row through the vector overload;
+            // every row reads the same lane. Before, the matrix overload had no body, so only
+            // HLSL accepted it.
             const vector<uint, N> quadLaneIDs = quadLaneID;
             MATRIX_MAP_BINARY(T, N, M, QuadReadLaneAt, sourceValue, quadLaneIDs);
         }
@@ -18346,16 +18352,8 @@ uint WaveActiveCountBits(bool value)
     case glsl:
     case spirv:
     case metal:
-        return _WaveCountBits(WaveActiveBallot(value));
     case wgsl:
-        {
-            // A WGSL ballot has 0 for inactive invocations and for lanes past the subgroup size, so
-            // all four words can be summed. `_WaveCountBits` would instead read the subgroup size
-            // (a `subgroup_size` input) to skip words, which this does not need.
-            const uint4 ballot = WaveActiveBallot(value);
-            return countbits(ballot.x) + countbits(ballot.y) + countbits(ballot.z) +
-                   countbits(ballot.w);
-        }
+        return _WaveCountBits(WaveActiveBallot(value));
     default:
         return WaveMaskCountBits(WaveGetActiveMask(), value);
     }
@@ -18742,13 +18740,19 @@ bool WaveIsFirstLane()
 
 // It's useful to have a wave uint4 version of countbits, because some wave functions return uint4.
 // This implementation tries to limit the amount of work required by the actual lane count.
+// `value` is a ballot (`WaveActiveBallot`), possibly ANDed with a lane mask.
 /// @category wave
 __spirv_version(1.3)
-[require(cpp_cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic_ballot)]
 uint _WaveCountBits(uint4 value)
 {
     __target_switch
     {
+    case wgsl:
+        // A WGSL ballot has 0 for inactive invocations and for lanes past the subgroup size, so
+        // all four words can be summed without reading the subgroup size (a `subgroup_size`
+        // input), as the default case does.
+        return countbits(value.x) + countbits(value.y) + countbits(value.z) + countbits(value.w);
     case spirv:
         return spirv_asm
         {
@@ -19535,12 +19539,8 @@ uint WavePrefixCountBits(bool value)
         __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
     case wgsl:
-        {
-            // The bits of the ballot set for the lanes below the current one.
-            const uint4 below = WaveActiveBallot(value) & WaveGetLaneLtMask();
-            return countbits(below.x) + countbits(below.y) + countbits(below.z) +
-                   countbits(below.w);
-        }
+        // The bits of the ballot set for the lanes below the current one.
+        return _WaveCountBits(WaveActiveBallot(value) & WaveGetLaneLtMask());
     case spirv:
         return spirv_asm
         {

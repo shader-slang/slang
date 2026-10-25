@@ -90,12 +90,15 @@ With the WGSL `subgroups` extension, these wave and quad intrinsics are supporte
 and `QuadReadLaneAt`.
 
 Matrix overloads are supported for `WaveActiveSum`, `WaveActiveProduct`, `WaveActiveMin`,
-`WaveActiveMax`, `WavePrefixSum`, `WavePrefixProduct`, `WaveReadLaneAt`, `WaveReadLaneFirst`,
-`WaveBroadcastLaneAt` and `QuadReadLaneAt`. `WaveActiveAllEqual`, `WaveShuffle` and
+`WaveActiveMax`, `WaveActiveBitAnd`, `WaveActiveBitOr`, `WaveActiveBitXor`, `WavePrefixSum`,
+`WavePrefixProduct`, `WaveReadLaneAt`, `WaveReadLaneFirst`, `WaveBroadcastLaneAt` and
+`QuadReadLaneAt`. `WaveActiveAllEqual`, `WaveShuffle` and
 `QuadReadAcrossX`/`Y`/`Diagonal` take scalars and vectors only.
 
-These are not supported on WGSL: `WaveMatch`, the `WaveMulti*` and `WaveMask*` intrinsics,
-`WavePrefixMin`/`WavePrefixMax` and the clustered operations.
+All other wave and quad intrinsics are not supported on WGSL, including `WaveMatch`, the
+`WaveMulti*` and `WaveMask*` intrinsics, `WavePrefixMin`/`WavePrefixMax`,
+`WavePrefixBitAnd`/`BitOr`/`BitXor`, `WaveRotate`, `QuadAny`/`QuadAll`, `WaveGetActiveMask`,
+`WaveGetConvergedMask` and the clustered operations.
 
 ### Switch Fall-Through
 
