@@ -3489,6 +3489,7 @@ private:
     }
 
 
+protected:
     void reportUnsupportedSystemAttribute(IRInst* param, String semanticName)
     {
         m_sink->diagnose(Diagnostics::SystemValueAttributeNotSupported{
@@ -3496,6 +3497,7 @@ private:
             .location = param->sourceLoc});
     }
 
+private:
     template<LayoutResourceKind K>
     void ensureStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
     {
@@ -5023,17 +5025,29 @@ protected:
                 // Neither an input nor the result, so nothing else canonicalizes the semantics;
                 // the case-insensitive sv_position match below still holds afterwards.
                 fixFieldSemanticsOfFlatStruct(vertStruct);
+                bool hasClipDistance = false;
                 for (auto field : vertStruct->getFields())
                 {
                     auto key = field->getKey();
                     if (auto deco = key->findDecoration<IRSemanticDecoration>())
                     {
-                        if (deco->getSemanticName().caseInsensitiveEquals(toSlice("sv_position")))
+                        auto semanticName = deco->getSemanticName();
+                        if (semanticName.caseInsensitiveEquals(toSlice("sv_position")))
                         {
                             builder.addTargetSystemValueDecoration(key, toSlice("position"));
                         }
+                        else if (semanticName.caseInsensitiveEquals(toSlice("sv_clipdistance")))
+                        {
+                            hasClipDistance = true;
+                        }
+                        else if (semanticName.caseInsensitiveEquals(toSlice("sv_culldistance")))
+                        {
+                            reportUnsupportedSystemAttribute(key, semanticName);
+                        }
                     }
                 }
+                if (hasClipDistance)
+                    vertexType = createMeshVertexOutputType(vertStruct);
             }
             if (param->findDecorationImpl(kIROp_IndicesDecoration))
             {
@@ -5190,6 +5204,7 @@ public:
 private:
     ShortList<IRType*> permittedTypes_sv_target;
     Dictionary<IRFunc*, IRInst*> entryPointToGroupThreadId;
+    Dictionary<IRStructType*, IRStructType*> mapMeshVertexToOutputType;
     const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
 
     void diagnoseRepeatedClipDistanceFields(IRStructType* structType)
@@ -5208,6 +5223,84 @@ private:
             }
             foundClipDistance = true;
         }
+    }
+
+    /// Return a copy of the mesh vertex struct `vertStruct` in which each clip-distance field
+    /// carries [[clip_distance]], and make every `MetalSetVertex` of a `vertStruct` value copy it
+    /// into the new struct first. The emitter declares a clip-distance array as a native array,
+    /// which cannot be assigned as a whole, so the user's struct keeps its ordinary array field
+    /// and only the struct passed to `set_vertex` carries the attribute. Mesh entry points that
+    /// share `vertStruct` share the copy.
+    IRStructType* createMeshVertexOutputType(IRStructType* vertStruct)
+    {
+        if (auto outputStruct = mapMeshVertexToOutputType.tryGetValue(vertStruct))
+            return *outputStruct;
+
+        IRBuilder builder(m_module);
+        builder.setInsertBefore(vertStruct);
+        auto outputStruct = builder.createStructType();
+        if (auto nameHint = vertStruct->findDecoration<IRNameHintDecoration>())
+        {
+            builder.addNameHintDecoration(
+                outputStruct,
+                (String(nameHint->getName()) + "Output").getUnownedSlice());
+        }
+        List<IRStructField*> outputFields;
+        for (auto field : vertStruct->getFields())
+        {
+            auto key = builder.createStructKey();
+            key->sourceLoc = field->getKey()->sourceLoc;
+            IRCloneEnv cloneEnv;
+            cloneInstDecorationsAndChildren(&cloneEnv, m_module, field->getKey(), key);
+            auto semantic = key->findDecoration<IRSemanticDecoration>();
+            if (semantic &&
+                semantic->getSemanticName().caseInsensitiveEquals(toSlice("sv_clipdistance")))
+            {
+                builder.addTargetSystemValueDecoration(key, kMetalClipDistanceAttribute);
+            }
+            outputFields.add(builder.createStructField(outputStruct, key, field->getFieldType()));
+        }
+        mapMeshVertexToOutputType[vertStruct] = outputStruct;
+        diagnoseRepeatedClipDistanceFields(outputStruct);
+
+        List<IRMetalSetVertex*> setVertices;
+        traverseUses(
+            vertStruct,
+            [&](IRUse* typeUse)
+            {
+                auto vertex = typeUse->getUser();
+                if (vertex->getDataType() != vertStruct)
+                    return;
+                traverseUses(
+                    vertex,
+                    [&](IRUse* use)
+                    {
+                        auto setVertex = as<IRMetalSetVertex>(use->getUser());
+                        if (setVertex && setVertex->getElementValue() == vertex)
+                            setVertices.add(setVertex);
+                    });
+            });
+        for (auto setVertex : setVertices)
+        {
+            builder.setInsertBefore(setVertex);
+            auto vertex = setVertex->getElementValue();
+            auto outputVertex = builder.emitVar(outputStruct);
+            Index fieldIndex = 0;
+            for (auto field : vertStruct->getFields())
+            {
+                auto outputField = outputFields[fieldIndex++];
+                auto fieldVal =
+                    builder.emitFieldExtract(field->getFieldType(), vertex, field->getKey());
+                auto fieldPtr = builder.emitFieldAddress(outputVertex, outputField->getKey());
+                if (auto arrayType = getMetalClipDistanceArrayType(outputField))
+                    storeArrayByElement(builder, arrayType, fieldPtr, fieldVal);
+                else
+                    builder.emitStore(fieldPtr, fieldVal);
+            }
+            builder.emitMetalSetVertex(setVertex->getIndex(), builder.emitLoad(outputVertex));
+            setVertex->removeAndDeallocate();
+        }
+        return outputStruct;
     }
 
     /// Store each element of `arrayVal`, of type `arrayType`, through `arrayPtr` separately,

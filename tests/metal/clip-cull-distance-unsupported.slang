@@ -8,6 +8,7 @@
 //TEST:SIMPLE(filecheck=SHAREDVS): -target metal -stage vertex -entry vsShared
 //DIAGNOSTIC_TEST:SIMPLE(diag=SHAREDPS): -target metal -stage fragment -entry psShared
 //DIAGNOSTIC_TEST:SIMPLE(diag=TWOCLIP): -target metal -stage vertex -entry vsTwoClip
+//DIAGNOSTIC_TEST:SIMPLE(diag=MESHCULL): -target metal -stage mesh -entry msCull
 //DIAGNOSTIC_TEST:SIMPLE(diag=NESTED): -target metal -stage fragment -entry psNested
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNKNOWN): -target metal -stage vertex -entry vsUnknown
 
@@ -96,6 +97,34 @@ TwoClipOut vsTwoClip(uint vid : SV_VertexID, out float clip2 : SV_ClipDistance2)
     o.clip1 = -1.0;
     clip2 = 0.5;
     return o;
+}
+
+struct CullMeshVertex
+{
+    float4 position : SV_Position;
+    float cull[2] : SV_CullDistance;
+/*MESHCULL:
+          ^^^^ error E55202
+          ^^^^ system value semantic 'sv_culldistance' is not supported for the current target.
+*/
+};
+
+[shader("mesh")]
+[numthreads(3, 1, 1)]
+[outputtopology("triangle")]
+void msCull(
+    uint tid : SV_GroupThreadID,
+    OutputVertices<CullMeshVertex, 3> verts,
+    OutputIndices<uint3, 1> indices)
+{
+    SetMeshOutputCounts(3, 1);
+    CullMeshVertex v;
+    v.position = float4(float(tid), 0, 0, 1);
+    v.cull[0] = 1.0;
+    v.cull[1] = -1.0;
+    verts[tid] = v;
+    if (tid == 0)
+        indices[0] = uint3(0, 1, 2);
 }
 
 // A clip distance in a nested input struct reaches legalization as a stage_in struct member
