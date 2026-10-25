@@ -1446,8 +1446,33 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
             case IRConstant::FloatKind::Nan:
                 {
-                    _emitSpecialFloatImpl(type, "0.0 / 0.0");
-                    return;
+                    // `0.0 / 0.0` would lose the NaN's sign and payload, so rebuild a `float` or
+                    // `double` NaN from its bits. glslang does not fold `uintBitsToFloat` or
+                    // `packDouble2x32` in the constant expression that a module-scope `const`
+                    // initializer needs, so a NaN there keeps `0.0 / 0.0`. A `half` NaN does too:
+                    // its bit cast needs 16-bit integer types.
+                    const IRFloatingPointValue value = constantInst->value.floatVal;
+                    switch (m_isEmittingFunctionBody ? type->getOp() : kIROp_Invalid)
+                    {
+                    case kIROp_FloatType:
+                        m_writer->emit("uintBitsToFloat(");
+                        emitHexLiteral(DoubleToFloatBits(value), 8);
+                        m_writer->emit("u)");
+                        return;
+                    case kIROp_DoubleType:
+                        {
+                            const uint64_t bits = uint64_t(DoubleAsInt64(value));
+                            m_writer->emit("packDouble2x32(uvec2(");
+                            emitHexLiteral(uint32_t(bits), 8);
+                            m_writer->emit("u, ");
+                            emitHexLiteral(uint32_t(bits >> 32), 8);
+                            m_writer->emit("u))");
+                            return;
+                        }
+                    default:
+                        _emitSpecialFloatImpl(type, "0.0 / 0.0");
+                        return;
+                    }
                 }
             case IRConstant::FloatKind::PositiveInfinity:
                 {
