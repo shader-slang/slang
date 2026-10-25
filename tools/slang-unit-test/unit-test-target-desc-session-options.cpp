@@ -115,3 +115,28 @@ SLANG_UNIT_TEST(targetDescDefaultKeepsSessionLineDirectiveMode)
     SLANG_CHECK_ABORT(withDefault.getLength() != 0);
     SLANG_CHECK(withDefault.indexOf(toSlice("#line")) != -1);
 }
+
+// `GLSLForceScalarLayout` in the session options reaches a target whose TargetDesc leaves
+// `forceGLSLScalarBufferLayout` false: the GLSL buffers use the scalar layout.
+SLANG_UNIT_TEST(targetDescDefaultKeepsSessionGLSLScalarLayout)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_GLSL;
+    targetDesc.profile = globalSession->findProfile("glsl_450");
+
+    slang::CompilerOptionEntry scalar = {};
+    scalar.name = slang::CompilerOptionName::GLSLForceScalarLayout;
+    scalar.value.kind = slang::CompilerOptionValueKind::Int;
+    scalar.value.intValue0 = 1;
+
+    String withScalar = compileWithSessionOptions(globalSession, targetDesc, &scalar, 1);
+    SLANG_CHECK_ABORT(withScalar.getLength() != 0);
+    SLANG_CHECK(withScalar.indexOf(toSlice("layout(scalar")) != -1);
+
+    // Control: without the session option the buffers keep std430/std140.
+    String withDefault = compileWithSessionOptions(globalSession, targetDesc, nullptr, 0);
+    SLANG_CHECK_ABORT(withDefault.getLength() != 0);
+    SLANG_CHECK(withDefault.indexOf(toSlice("layout(scalar")) == -1);
+}
