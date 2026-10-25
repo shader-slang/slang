@@ -323,15 +323,52 @@ static IRVarOffsetAttr* getVaryingOutputOffset(IRInst* inst)
     return varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput);
 }
 
+// The layout offset of a fragment output that takes part in dual-source blending: one of the two
+// fields of `structType` at one location, with blend sources (offset spaces) 0 and 1.
+// Legalization has checked that every location with a non-zero source has exactly that pair.
+static IRVarOffsetAttr* getDualSourceBlendOffset(IRStructType* structType, IRInst* fieldKey)
+{
+    auto offset = getVaryingOutputOffset(fieldKey);
+    if (!offset)
+        return nullptr;
+    for (auto other : structType->getFields())
+    {
+        auto otherOffset = getVaryingOutputOffset(other->getKey());
+        if (otherOffset && otherOffset->getOffset() == offset->getOffset() &&
+            otherOffset->getSpace() != offset->getSpace() &&
+            (otherOffset->getSpace() == 0 || offset->getSpace() == 0))
+            return offset;
+    }
+    return nullptr;
+}
+
+// The struct a field key belongs to, if exactly one struct type uses it.
+static IRStructType* getStructOfFieldKey(IRInst* fieldKey)
+{
+    IRStructType* result = nullptr;
+    for (auto use = fieldKey->firstUse; use; use = use->nextUse)
+    {
+        auto field = as<IRStructField>(use->getUser());
+        if (!field || field->getKey() != fieldKey)
+            continue;
+        auto structType = as<IRStructType>(field->getParent());
+        if (!structType || (result && result != structType))
+            return nullptr;
+        result = structType;
+    }
+    return result;
+}
+
 void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
 {
     if (!maybeEmitSystemSemantic(inst))
     {
-        // The second output of dual-source blending (`[[vk::location(0), vk::index(1)]]`)
-        // shares the location of the first: take it from the layout, not from the semantic
-        // index (which legalization made unique). emitStructFieldAttributes adds @blend_src.
-        auto offset = getVaryingOutputOffset(inst);
-        if (offset && offset->getSpace() != 0)
+        // Both outputs of dual-source blending (`[[vk::location(0), vk::index(0 or 1)]]`)
+        // share one location: take it from the layout, not from the semantic index (which
+        // legalization may have changed to keep semantics unique). emitStructFieldAttributes
+        // adds @blend_src.
+        auto structType = getStructOfFieldKey(inst);
+        if (auto offset = structType ? getDualSourceBlendOffset(structType, inst) : nullptr)
         {
             m_writer->emit("@location(");
             m_writer->emit(offset->getOffset());
@@ -358,26 +395,12 @@ void WGSLSourceEmitter::emitStructFieldAttributes(
     // Dual-source blending: a fragment output struct with a `vk::index` (non-zero blend index)
     // on a color output. Both outputs at that location take @blend_src(index), under
     // `enable dual_source_blending;`.
-    if (auto fieldOffset = getVaryingOutputOffset(field->getKey()))
+    if (auto fieldOffset = getDualSourceBlendOffset(structType, field->getKey()))
     {
-        bool isDualSource = false;
-        for (auto other : structType->getFields())
-        {
-            auto otherOffset = getVaryingOutputOffset(other->getKey());
-            if (otherOffset && otherOffset->getSpace() != 0 &&
-                otherOffset->getOffset() == fieldOffset->getOffset())
-            {
-                isDualSource = true;
-                break;
-            }
-        }
-        if (isDualSource)
-        {
-            m_requiresDualSourceBlending = true;
-            m_writer->emit(" @blend_src(");
-            m_writer->emit(fieldOffset->getSpace());
-            m_writer->emit(")");
-        }
+        m_requiresDualSourceBlending = true;
+        m_writer->emit(" @blend_src(");
+        m_writer->emit(fieldOffset->getSpace());
+        m_writer->emit(")");
     }
 
     // If the struct type is not used for physical storage, then we don't need to

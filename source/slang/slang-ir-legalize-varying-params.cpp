@@ -2973,10 +2973,35 @@ protected:
         SLANG_UNUSED(index);
     }
 
+    // Report a `vk::index` on a field of a struct nested in the fragment output struct: the
+    // flattened output does not keep the blend index of a nested field.
+    bool reportNestedDualSourceBlendOutputs(IRStructTypeLayout* structLayout, bool isNested) const
+    {
+        bool found = false;
+        for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
+        {
+            auto fieldLayout = fieldAttr->getLayout();
+            if (auto nestedLayout = as<IRStructTypeLayout>(fieldLayout->getTypeLayout()))
+            {
+                found |= reportNestedDualSourceBlendOutputs(nestedLayout, true);
+                continue;
+            }
+            auto offset = fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+            if (isNested && offset && offset->getSpace() != 0)
+            {
+                m_sink->diagnose(Diagnostics::DualSourceBlendOutputNested{
+                    .location = fieldAttr->getFieldKey()->sourceLoc});
+                found = true;
+            }
+        }
+        return found;
+    }
+
     // Dual-source blending: when a fragment output struct has a color output with a non-zero
     // `vk::index`, the front-end layout puts both outputs at one location (the index in the
-    // VaryingOutput offset's space). Hand every output at such a location to
-    // markDualSourceBlendOutput, so the target does not turn them into two render targets.
+    // VaryingOutput offset's space). A location used this way must have exactly one output with
+    // index 0 and one with index 1. Hand both to markDualSourceBlendOutput, with the location and
+    // index from the result layout, so the target does not turn them into two render targets.
     void markDualSourceBlendOutputs(
         IRBuilder& builder,
         IRStructType* structType,
@@ -2986,31 +3011,69 @@ protected:
             resultLayout ? as<IRStructTypeLayout>(resultLayout->getTypeLayout()) : nullptr;
         if (!structLayout)
             return;
-        HashSet<UInt> dualSourceLocations;
+        if (reportNestedDualSourceBlendOutputs(structLayout, false))
+            return;
+
+        // For each location with a non-zero index: the outputs at that location.
+        Dictionary<UInt, List<IRStructFieldLayoutAttr*>> dualSourceOutputs;
         for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
         {
             auto offset = fieldAttr->getLayout()->findOffsetAttr(LayoutResourceKind::VaryingOutput);
             if (offset && offset->getSpace() != 0)
-                dualSourceLocations.add(offset->getOffset());
+                dualSourceOutputs[offset->getOffset()] = List<IRStructFieldLayoutAttr*>();
         }
-        if (dualSourceLocations.getCount() == 0)
+        if (dualSourceOutputs.getCount() == 0)
             return;
+        for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
+        {
+            auto offset = fieldAttr->getLayout()->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+            if (!offset)
+                continue;
+            if (auto outputs = dualSourceOutputs.tryGetValue(offset->getOffset()))
+                outputs->add(fieldAttr);
+        }
+
         HashSet<IRInst*> structKeys;
         for (auto field : structType->getFields())
             structKeys.add(field->getKey());
-        for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
+        for (auto& [location, outputs] : dualSourceOutputs)
         {
-            auto key = fieldAttr->getFieldKey();
-            auto offset = fieldAttr->getLayout()->findOffsetAttr(LayoutResourceKind::VaryingOutput);
-            if (!offset || !dualSourceLocations.contains(offset->getOffset()) ||
-                !structKeys.contains(key))
+            UInt sourceCount[2] = {0, 0};
+            IRStructFieldLayoutAttr* reportAt = nullptr;
+            bool isValid = outputs.getCount() == 2;
+            for (auto fieldAttr : outputs)
+            {
+                auto space = fieldAttr->getLayout()
+                                 ->findOffsetAttr(LayoutResourceKind::VaryingOutput)
+                                 ->getSpace();
+                if (space > 1)
+                    isValid = false;
+                else
+                    sourceCount[space]++;
+                if (space != 0 && !reportAt)
+                    reportAt = fieldAttr;
+            }
+            if (!isValid || sourceCount[0] != 1 || sourceCount[1] != 1)
+            {
+                m_sink->diagnose(Diagnostics::DualSourceBlendOutputUnpaired{
+                    .blendLocation = Int(location),
+                    .location = reportAt->getFieldKey()->sourceLoc});
                 continue;
-            markDualSourceBlendOutput(
-                builder,
-                key,
-                fieldAttr->getLayout(),
-                offset->getOffset(),
-                offset->getSpace());
+            }
+            for (auto fieldAttr : outputs)
+            {
+                auto key = fieldAttr->getFieldKey();
+                if (!structKeys.contains(key))
+                    continue;
+                markDualSourceBlendOutput(
+                    builder,
+                    key,
+                    fieldAttr->getLayout(),
+                    location,
+                    fieldAttr->getLayout()
+                        ->findOffsetAttr(LayoutResourceKind::VaryingOutput)
+                        ->getSpace());
+            }
         }
     }
 
@@ -5197,11 +5260,13 @@ public:
         UInt index) const SLANG_OVERRIDE
     {
         // The WGSL emitter reads the location and blend source from this layout
-        // (@location(location) @blend_src(index)).
+        // (@location(location) @blend_src(index)). It replaces any layout the key already has:
+        // fixFieldSemanticsOfFlatStruct may have moved that one to another location.
         SLANG_UNUSED(location);
         SLANG_UNUSED(index);
-        if (!fieldKey->findDecoration<IRLayoutDecoration>())
-            builder.addLayoutDecoration(fieldKey, fieldLayout);
+        if (auto layoutDecoration = fieldKey->findDecoration<IRLayoutDecoration>())
+            layoutDecoration->removeAndDeallocate();
+        builder.addLayoutDecoration(fieldKey, fieldLayout);
     }
 
 protected:
