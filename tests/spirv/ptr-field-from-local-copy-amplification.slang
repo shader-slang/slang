@@ -3,7 +3,11 @@
 
 // Regression test for #13948, using the reporter's amplification shader. `inside`
 // receives `r.view`, a pointer field of the local copy `r`, and `View` needs a
-// storage layout type because of its array field.
+// storage layout type because of its array field. Compared with
+// ptr-field-from-local-copy.slang, this file adds the task stage, a copy through
+// the push-constant dereference `*push.root`, and both -O0 and -O2. The check
+// passes once SPIR-V is produced, so it guards the `emitFieldAddress` assert;
+// SLANG_RUN_SPIRV_VALIDATION=1 also validates the output.
 
 // CHECK: OpEntryPoint TaskEXT
 
