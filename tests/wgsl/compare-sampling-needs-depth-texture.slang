@@ -15,7 +15,7 @@ RWStructuredBuffer<float4> outputBuffer;
 void sampleCmpMain()
 {
     // CMP: error[E41400]: static assertion failed
-    // CMP: WGSL comparison sampling (SampleCmp, GatherCmp) needs a depth texture
+    // CMP: WGSL comparison sampling (SampleCmp, GatherCmp) needs a depth texture: declare the texture as DepthTexture2D, DepthTexture2DArray, DepthTextureCube or DepthTextureCubeArray
     // CMP: colorTex.SampleCmpLevelZero
     outputBuffer[0].x = colorTex.SampleCmpLevelZero(cmpSampler, float2(0.5, 0.5), 0.5);
 }
@@ -24,7 +24,7 @@ void sampleCmpMain()
 void gatherCmpMain()
 {
     // GATHER: error[E41400]: static assertion failed
-    // GATHER: WGSL comparison sampling (SampleCmp, GatherCmp) needs a depth texture
+    // GATHER: WGSL comparison sampling (SampleCmp, GatherCmp) needs a depth texture: declare the texture as DepthTexture2D, DepthTexture2DArray, DepthTextureCube or DepthTextureCubeArray
     // GATHER: colorTex.GatherCmp
     outputBuffer[0] = colorTex.GatherCmp(cmpSampler, float2(0.5, 0.5), 0.5);
 }
