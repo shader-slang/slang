@@ -1880,11 +1880,21 @@ void WGSLSourceEmitter::emitIntrinsicCallExprImpl(
         inOuterPrec);
 }
 
+static bool isIntegerScalarOrVectorType(IRType* type)
+{
+    if (auto vectorType = as<IRVectorType>(type))
+        type = vectorType->getElementType();
+    return type && isIntegralType(type);
+}
+
 void WGSLSourceEmitter::emitInterpolationModifiersImpl(
     IRInst* varInst,
-    IRType* /* valueType */,
+    IRType* valueType,
     IRVarLayout* /* layout */)
 {
+    // https://www.w3.org/TR/WGSL/#interpolation
+    // WGSL interpolation types: perspective (the default), linear (no perspective correction),
+    // flat. Sampling: center (the default), centroid, sample.
     char const* interpolationType = nullptr;
     char const* interpolationSampling = nullptr;
     for (auto dd : varInst->getDecorations())
@@ -1899,8 +1909,13 @@ void WGSLSourceEmitter::emitInterpolationModifiersImpl(
             interpolationType = "flat";
             break;
         case IRInterpolationMode::NoPerspective:
-        case IRInterpolationMode::Linear:
             interpolationType = "linear";
+            break;
+        case IRInterpolationMode::Linear:
+            // HLSL `linear` is perspective-correct interpolation, WGSL's `perspective`
+            // (not WGSL's `linear`, which is HLSL `noperspective`).
+            if (!interpolationType)
+                interpolationType = "perspective";
             break;
         case IRInterpolationMode::Sample:
             interpolationSampling = "sample";
@@ -1908,25 +1923,38 @@ void WGSLSourceEmitter::emitInterpolationModifiersImpl(
         case IRInterpolationMode::Centroid:
             interpolationSampling = "centroid";
             break;
+        default:
+            break;
         }
     }
 
-    if (interpolationType)
+    // "User-defined vertex outputs and fragment inputs of scalar or vector integer type must
+    // always be specified with interpolation type flat." A user-defined varying is one with a
+    // semantic (emitted as @location), not a system value (@builtin).
+    const bool isUserVarying = varInst->findDecoration<IRSemanticDecoration>() &&
+                               !varInst->findDecoration<IRTargetSystemValueDecoration>();
+    if (isUserVarying && isIntegerScalarOrVectorType(valueType))
+        interpolationType = "flat";
+
+    // A sampling mode needs an interpolation type; flat takes no centroid/sample sampling.
+    if (interpolationSampling && !interpolationType)
+        interpolationType = "perspective";
+    if (interpolationType && strcmp(interpolationType, "flat") == 0)
+        interpolationSampling = nullptr;
+
+    // perspective with center sampling is the default.
+    if (!interpolationType ||
+        (strcmp(interpolationType, "perspective") == 0 && !interpolationSampling))
+        return;
+
+    m_writer->emit("@interpolate(");
+    m_writer->emit(interpolationType);
+    if (interpolationSampling)
     {
-        m_writer->emit("@interpolate(");
-        m_writer->emit(interpolationType);
-        if (interpolationSampling)
-        {
-            m_writer->emit(", ");
-            m_writer->emit(interpolationSampling);
-        }
-        m_writer->emit(") ");
+        m_writer->emit(", ");
+        m_writer->emit(interpolationSampling);
     }
-
-    // TODO: Check the following:
-    // "User-defined vertex outputs and fragment inputs of scalar or vector
-    //  integer type must always be specified with interpolation type flat."
-    // https://www.w3.org/TR/WGSL/#interpolation
+    m_writer->emit(") ");
 }
 
 void WGSLSourceEmitter::_requireExtension(const UnownedStringSlice& name)
