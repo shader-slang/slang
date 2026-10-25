@@ -112,6 +112,14 @@ bool Test_Vector()
         // WGSL-NOT: pow(
         && zero == pow<T>(zero, one)
 
+        // WGSL: inverseSqrt(
+        // WGSL-NOT: inverseSqrt(
+        && one == rsqrt<T>(one)
+
+        // WGSL: ) % (
+        // WGSL-NOT: ) % (
+        && zero == fmod<T>(zero, one)
+
         // WGSL: round(
         // WGSL-NOT: round(
         && zero == round<T>(zero)

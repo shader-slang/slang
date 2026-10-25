@@ -15,8 +15,37 @@ EMSCRIPTEN_BINDINGS(slang)
 
     function("getCompileTargets", &slang::wgsl::getCompileTargets);
 
+    // TypeScript types for the descriptors that GlobalSession.createSession reads. They mirror
+    // the C++ structs of the same names in include/slang.h. The fields must match the list on
+    // GlobalSession::createSession in slang-wasm.h. Enum fields are the integer values from
+    // include/slang.h; `profile` comes from findProfile().
+    register_type<slang::wgsl::js::CompilerOptionValue>(
+        "CompilerOptionValue",
+        "{ kind: number; intValue0?: number; intValue1?: number; stringValue0?: string; "
+        "stringValue1?: string }");
+    register_type<slang::wgsl::js::CompilerOptionEntry>(
+        "CompilerOptionEntry",
+        "{ name: number; value: CompilerOptionValue }");
+    register_type<slang::wgsl::js::PreprocessorMacroDesc>(
+        "PreprocessorMacroDesc",
+        "{ name: string; value?: string }");
+    register_type<slang::wgsl::js::TargetDesc>(
+        "TargetDesc",
+        "{ format: number; profile?: number; flags?: number; floatingPointMode?: number; "
+        "lineDirectiveMode?: number; forceGLSLScalarBufferLayout?: boolean; "
+        "compilerOptionEntries?: CompilerOptionEntry[] }");
+    register_type<slang::wgsl::js::SessionDesc>(
+        "SessionDesc",
+        "{ targets?: TargetDesc[]; defaultMatrixLayoutMode?: number; searchPaths?: string[]; "
+        "preprocessorMacros?: PreprocessorMacroDesc[]; "
+        "compilerOptionEntries?: CompilerOptionEntry[] }");
+    register_type<slang::wgsl::js::SessionDescOrTarget>(
+        "SessionDescOrTarget",
+        "SessionDesc | number");
+
     class_<slang::wgsl::GlobalSession>("GlobalSession")
         .function("createSession", &slang::wgsl::GlobalSession::createSession, allow_raw_pointers())
+        .function("findProfile", &slang::wgsl::GlobalSession::findProfile)
         .function("getBuiltinModuleSource", &slang::wgsl::GlobalSession::getBuiltinModuleSource);
 
     function("createGlobalSession", &slang::wgsl::createGlobalSession, allow_raw_pointers());
