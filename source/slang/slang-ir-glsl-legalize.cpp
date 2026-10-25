@@ -70,8 +70,7 @@ struct ScalarizedVal
         // or write.
         typeAdapter,
 
-        // Array index to the irValue. The actual index is stored in impl as
-        // ScalarizedArrayIndexValImpl
+        // One or more consecutive elements of an array; see ScalarizedArrayIndexValImpl.
         arrayIndex,
 
         // A `FakeIndirectionValImpl` that wraps another `ScalarizedVal`
@@ -159,15 +158,18 @@ struct ScalarizedTypeAdapterValImpl : ScalarizedValImpl
     IRType* pretendType; // the type this value pretends to have
 };
 
-// A value stored in element `index` of `arrayVal`. When `elementCount` is greater than one,
-// the value is instead a vector of `elementCount` components of `elementType`, stored one
-// component per element in the consecutive elements starting at `index`.
+// A value stored in element `index` of `arrayVal`, of type `elementType`. When
+// `componentCount` is greater than one, the value is instead a vector of `componentCount`
+// components of type `elementType`, stored one component per element in the consecutive
+// elements starting at `index` (a vector `SV_ClipDistance` in `gl_ClipDistance`). Such a
+// value supports being loaded, stored, type-adapted as a whole and subscripted by component;
+// it has no single address.
 struct ScalarizedArrayIndexValImpl : ScalarizedValImpl
 {
     ScalarizedVal arrayVal;
     Index index;
     IRType* elementType;
-    Count elementCount = 1;
+    Count componentCount = 1;
 };
 
 struct FakeIndirectionValImpl : ScalarizedValImpl
@@ -243,16 +245,20 @@ struct GLSLSystemValueInfo
     // the variable, in the case of a GS input
     char const* outerArrayName;
 
-    // The required type of the built-in variable
+    // The required type of the built-in variable, or, when `arrayIndex` is used, of the value
+    // stored at `arrayIndex` (e.g. `float4` for a `float4 : SV_ClipDistance0`, whose builtin
+    // is a `float` array).
     IRType* requiredType;
 
-    // If the built in GLSL variable is an array, holds the index into the array.
+    // If the built in GLSL variable is an array, holds the index into the array of the
+    // (first) element that holds this value.
     // If < 0, then there is no array indexing
     Index arrayIndex;
 
     // If true, a vector-typed value is stored one component per array element, in the
-    // consecutive elements starting at `arrayIndex`, as `SV_ClipDistance` is. Otherwise the
-    // whole value is stored in element `arrayIndex`.
+    // consecutive elements starting at `arrayIndex`, as `SV_ClipDistance` and
+    // `SV_CullDistance` are. Otherwise the whole value is stored in element `arrayIndex`.
+    // It has no effect when `arrayIndex` is not used.
     bool storesVectorAsElements = false;
 
     // The kind of the system value that requires special treatment.
@@ -347,9 +353,11 @@ struct GLSLLegalizationContext
     Dictionary<UnownedStringSlice, SystemSemanticGlobal> systemNameToGlobalMap;
 
     // The first element of `gl_ClipDistance` / `gl_CullDistance` used by each non-arrayed
-    // `SV_ClipDistanceN` / `SV_CullDistanceN` varying, keyed by semantic index. They are
-    // computed by `computeClipCullDistanceOffsets` before any varying is legalized, because
-    // the offset of one value depends on the widths of all values with a lower index.
+    // `SV_ClipDistanceN` / `SV_CullDistanceN` varying of the signature being legalized, keyed
+    // by semantic index. `computeClipCullDistanceOffsets` fills them in before any varying of
+    // the entry point is legalized, because one value's offset depends on the component
+    // counts of the values with lower indices; a hull shader's patch-constant outputs
+    // temporarily replace them (see `invokePatchConstantFuncInHullShader`).
     Dictionary<Index, Index> clipDistanceOffsets;
     Dictionary<Index, Index> cullDistanceOffsets;
 
@@ -461,7 +469,8 @@ struct OuterParamInfoLink
 };
 
 // Return the location of the innermost declaration on the access chain `outerParamInfo`
-// that has one. IR struct fields carry no location, so a field is represented by its key.
+// that has one. Var layouts and IR struct fields carry no source location, so a field is
+// represented by its key, which does.
 static SourceLoc findVaryingSourceLoc(OuterParamInfoLink* outerParamInfo)
 {
     for (auto paramInfo = outerParamInfo; paramInfo; paramInfo = paramInfo->next)
@@ -477,9 +486,15 @@ static SourceLoc findVaryingSourceLoc(OuterParamInfoLink* outerParamInfo)
 
 // Return the type that an `SV_ClipDistance` / `SV_CullDistance` varying of type `type` takes
 // in GLSL: `float` for a scalar, or a `float` vector whose components occupy consecutive
-// elements of `gl_ClipDistance` / `gl_CullDistance`. An arrayed varying (non-null
-// `declarator`, e.g. a mesh-shader vertex output) gets no such packing, so a vector there is
-// diagnosed rather than reduced to its first component.
+// elements of `gl_ClipDistance` / `gl_CullDistance`.
+//
+// An arrayed varying (non-null `declarator`: a mesh-shader vertex output, a hull-shader
+// control point, or a geometry or tessellation input) is legalized as a builtin array of its
+// own rather than as elements of the shared array, so a vector there is reported, and `float`
+// is returned only so that legalization can continue after the error.
+//
+// TODO: Vectors in arrayed varyings could be stored in the per-vertex `gl_ClipDistance[]`
+// arrays too, once scalar `SV_ClipDistanceN` values are given element indices there.
 static IRType* getClipOrCullDistanceRequiredType(
     GLSLLegalizationContext* context,
     IRType* type,
@@ -503,36 +518,76 @@ static IRType* getClipOrCullDistanceRequiredType(
     return builder->getVectorType(floatType, componentCount);
 }
 
-// The number of distances (1 for `float`, N for `floatN`) held by each non-arrayed
-// `SV_ClipDistanceN` / `SV_CullDistanceN` value of one varying signature, keyed by N.
-struct ClipCullDistanceWidths
+// Placement of clip and cull distances on GLSL/SPIR-V
+// ---------------------------------------------------
+//
+// GLSL and SPIR-V have a single `gl_ClipDistance` (and `gl_CullDistance`) array of floats per
+// direction, while HLSL names each value by a semantic and lets it be a `float`, a vector with
+// one distance per component, or a `float` array. Consider:
+//
+//     struct VSOut
+//     {
+//         float4 pos   : SV_Position;
+//         float4 clip0 : SV_ClipDistance0;
+//         float2 clip1 : SV_ClipDistance1;
+//     };
+//
+// Before any varying of an entry point is legalized, `computeClipCullDistanceOffsets` records
+// the component count of every non-arrayed clip and cull distance (here {0: 4, 1: 2}) and
+// assigns each semantic index the first array element it occupies (here {0: 0, 1: 4}).
+// `getGLSLSystemValueInfo` then gives each leaf that element as its `arrayIndex`, and
+// `createSimpleGLSLGlobalVarying` represents it as `componentCount` consecutive elements of
+// the shared global, which is sized at the end of `legalizeEntryPointForGLSL` (here
+// `float gl_ClipDistance[6]`).
+//
+// The placement depends only on the signature being compiled, so every stage that shares a
+// signature containing a vector must declare the same clip and cull distances, as with DXC.
+// A `float` array keeps its own builtin array and must be the only clip (or cull) distance of
+// its signature.
+
+// The `SV_ClipDistanceN` (or `SV_CullDistanceN`) values of one varying signature.
+struct ClipOrCullDistanceValues
 {
-    Dictionary<Index, Count> clip;
-    Dictionary<Index, Count> cull;
+    // The number of distances held by each non-arrayed value (1 for `float`, the component
+    // count for a vector), keyed by its semantic index.
+    Dictionary<Index, Count> componentCounts;
+
+    // How many values are declared as a `float` array, and where one of them is declared.
+    Count arrayValueCount = 0;
+    SourceLoc arrayValueLoc;
 };
 
-// Record in `widths` every non-arrayed `SV_ClipDistanceN` / `SV_CullDistanceN` leaf of a
-// varying of type `type`. The walk mirrors `createGLSLGlobalVaryingsImpl`; leaves under an
-// array or a mesh output are skipped because they are legalized as arrayed varyings of their
-// own.
-static void collectClipCullDistanceWidths(
+struct ClipCullDistanceSignature
+{
+    ClipOrCullDistanceValues clip;
+    ClipOrCullDistanceValues cull;
+};
+
+// Record in `signature` every `SV_ClipDistanceN` / `SV_CullDistanceN` leaf of a varying of
+// type `type` declared by `decl`. The walk follows `createGLSLGlobalVaryingsImpl`, so every
+// leaf that `getGLSLSystemValueInfo` later sees without a declarator is recorded. Leaves
+// inside an array of structs or a mesh output are skipped, because they are legalized as
+// arrayed varyings and never use the recorded placement.
+static void collectClipCullDistances(
     IRType* type,
     IRVarLayout* varLayout,
     IRTypeLayout* typeLayout,
-    ClipCullDistanceWidths& widths)
+    IRInst* decl,
+    ClipCullDistanceSignature& signature)
 {
-    if (as<IRVoidType>(type) || as<IRArrayType>(type) || as<IRMeshOutputType>(type))
+    if (as<IRVoidType>(type) || as<IRMeshOutputType>(type))
         return;
 
     if (auto streamType = as<IRHLSLStreamOutputType>(type))
     {
         auto streamLayout = as<IRStreamOutputTypeLayout>(typeLayout);
         SLANG_ASSERT(streamLayout);
-        collectClipCullDistanceWidths(
+        collectClipCullDistances(
             streamType->getElementType(),
             varLayout,
             streamLayout->getElementTypeLayout(),
-            widths);
+            decl,
+            signature);
         return;
     }
 
@@ -544,11 +599,12 @@ static void collectClipCullDistanceWidths(
         for (auto field : structType->getFields())
         {
             auto fieldLayout = structTypeLayout->getFieldLayout(fieldIndex++);
-            collectClipCullDistanceWidths(
+            collectClipCullDistances(
                 field->getFieldType(),
                 fieldLayout,
                 fieldLayout->getTypeLayout(),
-                widths);
+                field->getKey(),
+                signature);
         }
         return;
     }
@@ -556,36 +612,59 @@ static void collectClipCullDistanceWidths(
     auto semantic = varLayout->findSystemValueSemanticAttr();
     if (!semantic)
         return;
-    Dictionary<Index, Count>* semanticWidths = nullptr;
+    ClipOrCullDistanceValues* values = nullptr;
     if (semantic->getName().caseInsensitiveEquals(toSlice("sv_clipdistance")))
-        semanticWidths = &widths.clip;
+        values = &signature.clip;
     else if (semantic->getName().caseInsensitiveEquals(toSlice("sv_culldistance")))
-        semanticWidths = &widths.cull;
+        values = &signature.cull;
     else
         return;
 
-    // Values that repeat a semantic index share its elements, so the widest one decides how
-    // many elements the index takes.
-    Count width = getIRVectorElementSize(type);
-    auto& recordedWidth = semanticWidths->getOrAddValue(Index(semantic->getIndex()), width);
-    recordedWidth = Math::Max(recordedWidth, width);
+    if (as<IRArrayType>(type))
+    {
+        values->arrayValueCount++;
+        values->arrayValueLoc = decl->sourceLoc;
+        return;
+    }
+
+    // A semantic index can legitimately repeat in one signature, e.g. in the element types
+    // of two output streams of a geometry shader. Such values share the index's elements, so
+    // the widest one decides how many elements the index takes.
+    Count componentCount = getIRVectorElementSize(type);
+    auto& recordedCount =
+        values->componentCounts.getOrAddValue(Index(semantic->getIndex()), componentCount);
+    recordedCount = Math::Max(recordedCount, componentCount);
 }
 
-// Assign each semantic index in `widths` the first array element it occupies. Following DXC,
-// the values are packed in ascending semantic-index order, each taking as many elements as it
-// has components: a `float4` at index 0 and a `float2` at index 1 take elements 0-3 and 4-5.
-// A signature of only scalar values instead places each value at the element named by its
-// semantic index, so that another stage can read any subset of those scalars by index.
-static void packClipCullDistanceOffsets(
-    Dictionary<Index, Count> const& widths,
+// Assign each semantic index in `values` the first array element it occupies, and report a
+// `float` array that shares its signature with other values of the same semantic.
+//
+// A signature containing a vector is packed as DXC packs it: in ascending semantic-index
+// order, each value taking as many elements as it has components, so a `float4` at index 0
+// and a `float2` at index 1 take elements 0-3 and 4-5. A signature of only scalars keeps each
+// scalar at the element named by its semantic index, which is the layout earlier versions of
+// Slang produced, so existing shaders keep their layout even across stages that declare
+// different subsets of the scalars.
+static void assignClipOrCullDistanceOffsets(
+    GLSLLegalizationContext* context,
+    ClipOrCullDistanceValues const& values,
+    UnownedStringSlice semanticName,
     Dictionary<Index, Index>& outOffsets)
 {
+    if (values.arrayValueCount > 0 &&
+        values.arrayValueCount + values.componentCounts.getCount() > 1)
+    {
+        context->getSink()->diagnose(Diagnostics::ClipCullDistanceArrayMixedWithOtherValues{
+            .semanticName = semanticName,
+            .location = values.arrayValueLoc});
+    }
+
     List<Index> semanticIndices;
     bool allScalar = true;
-    for (const auto& [semanticIndex, width] : widths)
+    for (const auto& [semanticIndex, componentCount] : values.componentCounts)
     {
         semanticIndices.add(semanticIndex);
-        allScalar = allScalar && width == 1;
+        allScalar = allScalar && componentCount == 1;
     }
     semanticIndices.sort();
 
@@ -594,38 +673,45 @@ static void packClipCullDistanceOffsets(
     for (auto semanticIndex : semanticIndices)
     {
         outOffsets[semanticIndex] = allScalar ? semanticIndex : offset;
-        offset += widths.getValue(semanticIndex);
+        offset += values.componentCounts.getValue(semanticIndex);
     }
 }
 
-// The offsets in the context describe one varying signature at a time: that of the entry
-// point, or, while they are legalized, that of a hull shader's patch-constant outputs.
 static void setClipCullDistanceOffsets(
     GLSLLegalizationContext* context,
-    ClipCullDistanceWidths const& widths)
+    ClipCullDistanceSignature const& signature)
 {
-    packClipCullDistanceOffsets(widths.clip, context->clipDistanceOffsets);
-    packClipCullDistanceOffsets(widths.cull, context->cullDistanceOffsets);
+    assignClipOrCullDistanceOffsets(
+        context,
+        signature.clip,
+        toSlice("SV_ClipDistance"),
+        context->clipDistanceOffsets);
+    assignClipOrCullDistanceOffsets(
+        context,
+        signature.cull,
+        toSlice("SV_CullDistance"),
+        context->cullDistanceOffsets);
 }
 
 // Compute `context->clipDistanceOffsets` and `context->cullDistanceOffsets` from the result
-// and parameters of the entry point `func`. All non-arrayed `SV_ClipDistanceN` values of the
-// entry point share one `gl_ClipDistance` array (likewise for cull distances), so their
-// offsets must be known before the first of them is legalized.
+// and parameters of the entry point `func`. Inputs and outputs are recorded together because
+// no stage has non-arrayed clip or cull distances in both directions: only fragment shaders
+// read them, and fragment shaders cannot write them.
 static void computeClipCullDistanceOffsets(
     GLSLLegalizationContext* context,
     IRFunc* func,
     IREntryPointLayout* entryPointLayout)
 {
-    ClipCullDistanceWidths widths;
+    ClipCullDistanceSignature signature;
 
     if (auto resultLayout = entryPointLayout->getResultLayout())
     {
-        collectClipCullDistanceWidths(
+        collectClipCullDistances(
             func->getResultType(),
             resultLayout,
             resultLayout->getTypeLayout(),
-            widths);
+            func,
+            signature);
     }
 
     if (auto firstBlock = func->getFirstBlock())
@@ -637,15 +723,16 @@ static void computeClipCullDistanceOffsets(
             IRType* valueType = param->getDataType();
             if (auto ptrType = as<IRPtrTypeBase>(valueType))
                 valueType = ptrType->getValueType();
-            collectClipCullDistanceWidths(
+            collectClipCullDistances(
                 valueType,
                 paramLayout,
                 paramLayout->getTypeLayout(),
-                widths);
+                param,
+                signature);
         }
     }
 
-    setClipCullDistanceOffsets(context, widths);
+    setClipCullDistanceOffsets(context, signature);
 }
 
 GLSLSystemValueInfo* getGLSLSystemValueInfo(
@@ -1672,17 +1759,21 @@ void invokePatchConstantFuncInHullShader(
 
     auto resultVarLayout = resultVarLayoutBuilder.build();
 
-    // The patch-constant outputs form a varying signature of their own, so their clip and
-    // cull distances are placed independently of the control-point outputs.
+    // The patch-constant outputs are legalized like the result of a second entry point, which
+    // `computeClipCullDistanceOffsets` did not see, so their clip and cull distances get a
+    // placement of their own for the duration of their legalization. The control-point
+    // outputs are arrayed and never use the shared `gl_ClipDistance` global, so the
+    // patch-constant values are its only users.
     auto entryPointClipDistanceOffsets = context->clipDistanceOffsets;
     auto entryPointCullDistanceOffsets = context->cullDistanceOffsets;
-    ClipCullDistanceWidths patchConstantWidths;
-    collectClipCullDistanceWidths(
+    ClipCullDistanceSignature patchConstantSignature;
+    collectClipCullDistances(
         constantOutputType,
         resultVarLayout,
         constantOutputLayout,
-        patchConstantWidths);
-    setClipCullDistanceOffsets(context, patchConstantWidths);
+        constantFunc,
+        patchConstantSignature);
+    setClipCullDistanceOffsets(context, patchConstantSignature);
 
     context->entryPointFunc = constantFunc;
     context->stage = Stage::Unknown;
@@ -2101,13 +2192,13 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             context->systemNameToGlobalMap.tryGetValue(systemValueName);
 
         IRType* arrayElementType = legalizedParamType;
-        Count arrayElementCount = 1;
+        Count componentCount = 1;
         if (systemValueInfo->storesVectorAsElements)
         {
             arrayElementType = getIRVectorBaseType(legalizedParamType);
-            arrayElementCount = getIRVectorElementSize(legalizedParamType);
+            componentCount = getIRVectorElementSize(legalizedParamType);
         }
-        Index lastArrayIndex = systemValueInfo->arrayIndex + arrayElementCount - 1;
+        Index lastArrayIndex = systemValueInfo->arrayIndex + componentCount - 1;
 
         if (sharedGlobalArrayInfoForSystemValue == nullptr)
         {
@@ -2199,7 +2290,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             indexingInfo->arrayVal = sharedGlobalArrayVal;
             indexingInfo->index = systemValueInfo->arrayIndex;
             indexingInfo->elementType = arrayElementType;
-            indexingInfo->elementCount = arrayElementCount;
+            indexingInfo->componentCount = componentCount;
             legalizedParamVal = ScalarizedVal::scalarizedArrayIndex(indexingInfo);
         }
     }
@@ -2814,33 +2905,33 @@ IRInst* convertMaterializedValue(IRBuilder* builder, IRInst* val, IRType* toType
 }
 
 // Load the value held by `impl`: a single array element, or a vector assembled from
-// `impl->elementCount` consecutive elements.
+// `impl->componentCount` consecutive elements.
 static IRInst* materializeArrayIndexVal(IRBuilder* builder, ScalarizedArrayIndexValImpl* impl)
 {
     List<IRInst*> components;
-    for (Index i = 0; i < impl->elementCount; ++i)
+    for (Index i = 0; i < impl->componentCount; ++i)
     {
         auto elementVal =
             getSubscriptVal(builder, impl->elementType, impl->arrayVal, impl->index + i);
         components.add(materializeValue(builder, elementVal));
     }
-    if (impl->elementCount == 1)
+    if (impl->componentCount == 1)
         return components[0];
     return builder->emitMakeVector(
-        builder->getVectorType(impl->elementType, impl->elementCount),
+        builder->getVectorType(impl->elementType, impl->componentCount),
         components);
 }
 
 // Store `val` into the array element(s) that `impl` refers to, one component per element
-// when `impl->elementCount` is greater than one.
+// when `impl->componentCount` is greater than one.
 static void storeArrayIndexVal(IRBuilder* builder, ScalarizedArrayIndexValImpl* impl, IRInst* val)
 {
-    for (Index i = 0; i < impl->elementCount; ++i)
+    for (Index i = 0; i < impl->componentCount; ++i)
     {
         auto elementVal =
             getSubscriptVal(builder, impl->elementType, impl->arrayVal, impl->index + i);
         auto component = val;
-        if (impl->elementCount > 1)
+        if (impl->componentCount > 1)
         {
             component = builder->emitElementExtract(
                 impl->elementType,
@@ -2885,16 +2976,9 @@ ScalarizedVal adaptType(
     case ScalarizedVal::Flavor::arrayIndex:
         {
             auto arrayImpl = as<ScalarizedArrayIndexValImpl>(val.impl);
-            // The components of a vector-typed value are spread over several elements, so it
-            // has no single address to adapt and is loaded instead.
-            if (arrayImpl->elementCount > 1)
-            {
-                return adaptType(
-                    builder,
-                    materializeArrayIndexVal(builder, arrayImpl),
-                    toType,
-                    fromType);
-            }
+            // A vector spread over several elements has no single address to adapt. Its
+            // adapters are created around it in `createSimpleGLSLGlobalVarying` instead.
+            SLANG_RELEASE_ASSERT(arrayImpl->componentCount == 1);
             auto elementVal =
                 getSubscriptVal(builder, fromType, arrayImpl->arrayVal, arrayImpl->index);
             return adaptType(builder, elementVal, toType, fromType);
@@ -3076,13 +3160,18 @@ ScalarizedVal getSubscriptVal(
             // Component `indexVal` of a vector stored one component per element is element
             // `index + indexVal` of the array.
             auto arrayIndexImpl = val.impl.as<ScalarizedArrayIndexValImpl>();
-            SLANG_ASSERT(arrayIndexImpl->elementCount > 1);
+            SLANG_RELEASE_ASSERT(arrayIndexImpl->componentCount > 1);
+            SLANG_RELEASE_ASSERT(elementType == arrayIndexImpl->elementType);
             auto indexType = indexVal->getDataType();
             auto elementIndex = builder->emitAdd(
                 indexType,
                 builder->getIntValue(indexType, arrayIndexImpl->index),
                 indexVal);
-            return getSubscriptVal(builder, elementType, arrayIndexImpl->arrayVal, elementIndex);
+            return getSubscriptVal(
+                builder,
+                arrayIndexImpl->elementType,
+                arrayIndexImpl->arrayVal,
+                elementIndex);
         }
     case ScalarizedVal::Flavor::fakeIndirection:
         {

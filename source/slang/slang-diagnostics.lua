@@ -6027,7 +6027,14 @@ err(
     "clip-cull-distance-vector-in-arrayed-varying",
     55219,
     "vector clip or cull distance in an arrayed varying",
-    span { loc = "location", message = "system value semantic '~semanticName' cannot have type '~type:IRInst' here: vector-typed clip and cull distances are only supported for varyings that are not arrays, such as vertex-shader outputs, on this target. Declare it as 'float' or as a 'float' array instead." }
+    span { loc = "location", message = "system value semantic '~semanticName' cannot have type '~type:IRInst' here: when targeting SPIR-V or GLSL, vector-typed clip and cull distances are not supported in arrayed varyings (mesh-shader vertex outputs, hull-shader control points, and geometry or tessellation inputs). Declare it as 'float' or as a 'float' array instead." }
+)
+
+err(
+    "clip-cull-distance-array-mixed-with-other-values",
+    55220,
+    "clip or cull distance array mixed with other values",
+    span { loc = "location", message = "a '~semanticName' declared as an array must be the only '~semanticName' value of its entry point when targeting SPIR-V or GLSL. Declare all of them as one 'float' array, or none of them as an array." }
 )
 
 err(
