@@ -905,13 +905,11 @@ LoweredValInfo emitCallToVal(
                 }
                 else
                 {
-                    auto call = builder->emitCallInst(type, callee, argCount, args);
-                    if (auto forwardDiff =
-                            as<IRForwardDifferentiate>(getResolvedInstForDecorations(callee)))
-                        builder->addAutoDiffOriginalValueDecoration(
-                            call,
-                            forwardDiff->getOperand(0));
-                    return LoweredValInfo::simple(call);
+                    return LoweredValInfo::simple(builder->emitCallInst(
+                        type,
+                        getSimpleVal(context, funcVal),
+                        argCount,
+                        args));
                 }
             }
 
