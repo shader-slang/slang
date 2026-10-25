@@ -5163,9 +5163,10 @@ semantic sv_depthlessequal
     set : float;
 }
 
-// As in HLSL, a clip or cull distance may also be declared as a `float2`, `float3` or `float4`.
-// Such a vector holds that many distances; targets with a single distance array place all
-// the distances in ascending semantic-index order.
+// As in HLSL, a clip or cull distance may also be declared as a `float2`, `float3` or `float4`
+// that holds one distance per component. Each backend decides how it lays these values out
+// (for SPIR-V and GLSL see `computeClipCullDistanceOffsets` in slang-ir-glsl-legalize.cpp) and
+// reports the shapes it cannot represent.
 semantic sv_clipdistance
 {
     [require(fragment)]

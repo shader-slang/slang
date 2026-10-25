@@ -4378,8 +4378,9 @@ protected:
         case SystemValueSemanticName::CullDistance:
             {
                 result.isSpecial = true;
-                // Metal has no counterpart to the HLSL packing of vector-typed clip and cull
-                // distances, so we report them instead of emitting an invalid declaration.
+                // Slang does not yet map clip and cull distances to Metal's `[[clip_distance]]`
+                // array (#13934); a vector-typed one is reported rather than declared, so that
+                // its components cannot be silently dropped once scalars are mapped.
                 result.isUnsupported = isVectorTypedVarying(parentVar);
                 break;
             }
