@@ -552,9 +552,10 @@ struct ClipOrCullDistanceValues
     // count for a vector), keyed by its semantic index.
     Dictionary<Index, Count> componentCounts;
 
-    // How many values are declared as a `float` array, and where one of them is declared.
-    Count arrayValueCount = 0;
-    SourceLoc arrayValueLoc;
+    // The declarations of the values that are declared as a `float` array. A declaration
+    // is recorded once even when it is reached more than once, as the field of a struct
+    // used by two output streams of a geometry shader is.
+    List<IRInst*> arrayValueDecls;
 };
 
 struct ClipCullDistanceSignature
@@ -622,8 +623,8 @@ static void collectClipCullDistances(
 
     if (as<IRArrayType>(type))
     {
-        values->arrayValueCount++;
-        values->arrayValueLoc = decl->sourceLoc;
+        if (!values->arrayValueDecls.contains(decl))
+            values->arrayValueDecls.add(decl);
         return;
     }
 
@@ -651,12 +652,12 @@ static void assignClipOrCullDistanceOffsets(
     UnownedStringSlice semanticName,
     Dictionary<Index, Index>& outOffsets)
 {
-    if (values.arrayValueCount > 0 &&
-        values.arrayValueCount + values.componentCounts.getCount() > 1)
+    if (values.arrayValueDecls.getCount() > 0 &&
+        values.arrayValueDecls.getCount() + values.componentCounts.getCount() > 1)
     {
         context->getSink()->diagnose(Diagnostics::ClipCullDistanceArrayMixedWithOtherValues{
             .semanticName = semanticName,
-            .location = values.arrayValueLoc});
+            .location = values.arrayValueDecls[0]->sourceLoc});
     }
 
     List<Index> semanticIndices;
