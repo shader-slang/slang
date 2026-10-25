@@ -2893,8 +2893,32 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getAnyValueRules()
     return &kGLSLAnyValueLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet&, Type*)
+// A `ConstantBuffer<T, Std430DataLayout>` or `ConstantBuffer<T, ScalarDataLayout>` is emitted as a
+// `var<uniform>` laid out by WGSL's own rules for host-shareable types (the
+// `uniform_buffer_standard_layout` language extension), which are std430's. WGSL has no scalar
+// layout (a `vec3` is always 16-byte aligned), so `ScalarDataLayout` gets std430 offsets as well,
+// matching the struct that is emitted.
+LayoutRulesImpl kWGSLStd430ConstantBufferLayoutRulesImpl_ = {
+    &kWGSLLayoutRulesFamilyImpl,
+    &kStd430LayoutRulesImpl,
+    &kWGSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getConstantBufferRules(
+    CompilerOptionSet&,
+    Type* containerType)
 {
+    if (auto cbufferType = as<ConstantBufferType>(containerType))
+    {
+        switch (cbufferType->getLayoutType()->astNodeType)
+        {
+        case ASTNodeType::Std430DataLayoutType:
+        case ASTNodeType::ScalarDataLayoutType:
+            return &kWGSLStd430ConstantBufferLayoutRulesImpl_;
+        default:
+            break;
+        }
+    }
     return &kWGSLConstantBufferLayoutRulesImpl_;
 }
 
