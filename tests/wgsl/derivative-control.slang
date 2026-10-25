@@ -20,14 +20,14 @@ struct FSInput
 // WGSL-NEXT: }
 // WGSL: @fragment
 // WGSL: clip_{{[0-9]+}}({{.*}} - 0.25f);
-// WGSL-DAG: dpdxFine(
-// WGSL-DAG: dpdyFine(
-// WGSL-DAG: dpdxCoarse(
-// WGSL-DAG: dpdyCoarse(
-// WGSL-DAG: fwidthFine(
-// WGSL-DAG: fwidthCoarse(
+// WGSL: dpdxFine(
+// WGSL: dpdyFine(
+// WGSL: dpdxCoarse(
+// WGSL: dpdyCoarse(
+// WGSL: fwidthFine(
+// WGSL: fwidthCoarse(
 // The matrix overload runs per row, through a helper.
-// WGSL-DAG: ddx_fine_{{[0-9]+}}(mat2x2<f32>(
+// WGSL: ddx_fine_{{[0-9]+}}(mat2x2<f32>(
 [shader("fragment")]
 float4 fragMain(FSInput input) : SV_Target
 {
