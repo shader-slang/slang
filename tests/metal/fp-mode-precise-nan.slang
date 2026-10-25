@@ -6,7 +6,8 @@
 //TEST:SIMPLE(filecheck=PRECISE): -target metallib-asm -entry computeMain -stage compute -fp-mode precise
 //TEST:SIMPLE(filecheck=FAST): -target metallib-asm -entry computeMain -stage compute -fp-mode fast
 
-// With inputs (0, 0, 1), x is NaN and inf is +Inf at run time. Expected output: 1, 1, 1, 0, 1.
+// With inputs (0, 0, 0x3f800000), zero is 0.0, one is 1.0, x is NaN and inf is +Inf at run time.
+// Expected output: 1, 1, 1, 0, 1.
 StructuredBuffer<uint> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
 
