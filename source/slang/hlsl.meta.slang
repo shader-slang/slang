@@ -1362,6 +1362,16 @@ void __wgsl_check_texture_type()
         , "WGSL: unhandled texture access type");
 }
 
+// WGSL's comparison sampling builtins (textureSampleCompare*, textureGatherCompare) take only
+// texture_depth_* textures, so the texture must be declared as a depth texture.
+[require(wgsl)]
+__generic<let isShadow:int>
+void __wgsl_check_compare_texture()
+{
+    static_assert(isShadow == 1,
+        "WGSL comparison sampling (SampleCmp, GatherCmp) needs a depth texture: declare the texture as DepthTexture2D, DepthTexture2DArray, DepthTextureCube or DepthTextureCubeArray");
+}
+
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 void __wgsl_check_texture_type_texel_offset()
 {
@@ -3443,6 +3453,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             };
         case wgsl:
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -3474,6 +3485,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpLevelZero";
         case wgsl:
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -3526,6 +3538,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             };
         case wgsl:
             __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -3586,6 +3599,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpLevelZero";
         case wgsl:
             __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -4747,6 +4761,7 @@ vector<T.Element,4> __texture_gatherCmp(
         };
     case wgsl:
         __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        __wgsl_check_compare_texture<isShadow>();
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
             , "WGSL texture gather is supported only on 2D and Cube textures");
 
@@ -4821,6 +4836,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
         };
     case wgsl:
         __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        __wgsl_check_compare_texture<isShadow>();
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
             , "WGSL texture gather with offset is supported only on 2D textures");
 
