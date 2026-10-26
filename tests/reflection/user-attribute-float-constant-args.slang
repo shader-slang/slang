@@ -27,6 +27,13 @@ struct doubleProbeAttribute
 };
 
 [__AttributeUsage(_AttributeTargets.Function)]
+struct pairProbeAttribute
+{
+    float first;
+    float second;
+};
+
+[__AttributeUsage(_AttributeTargets.Function)]
 struct halfProbeAttribute
 {
     int index;
@@ -52,6 +59,8 @@ struct Scaled<let N : int>
 // defaults and must not be reflected as values.
 [SpecializationConstant]
 const float SPEC_VALUE = 2.0;
+[vk::constant_id(1)]
+const float VK_CONSTANT_ID_VALUE = 5.0;
 extern static const float EXTERN_VALUE = 3.0;
 
 // CHECK: "name": "floatProbe"
@@ -155,7 +164,8 @@ extern static const float EXTERN_VALUE = 3.0;
 // CHECK-NEXT: {{^ *}}18,{{$}}
 // CHECK-NEXT: {{^ *}}0.099976{{$}}
 [halfProbe(18, 0.1)]
-// Integer operands wrap to the width of their own type before the conversion.
+// An integer operand is narrowed to its own type before the conversion: `0u - 1u` is
+// 0xFFFFFFFF, which rounds to 4294967296 in `float`.
 // CHECK: "name": "floatProbe"
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}19,{{$}}
@@ -192,14 +202,16 @@ extern static const float EXTERN_VALUE = 3.0;
 // CHECK-NEXT: {{^ *}}25,{{$}}
 // CHECK-NEXT: {{^ *}}1.500000{{$}}
 [floatProbe(25, Scaled<3>.kValue)]
-// An unsigned 64-bit operand converts as unsigned.
+// An unsigned 64-bit operand converts as unsigned; 2^64 - 1 rounds to 2^64 in `float`.
 // CHECK: "name": "floatProbe"
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}26,{{$}}
 // CHECK-NEXT: {{^ *}}18446744073709551616.000000{{$}}
 [floatProbe(26, 0xFFFFFFFFFFFFFFFFull)]
-// Integer operands fold with the integer folder, which does not narrow the intermediate
-// `2147483647 + 1` to `int` (#13954); a `float` parameter reflects the same value as an `int` one.
+// Probes 27 and 28 pin a value known to be wrong. The integer folder does not narrow the
+// intermediate `2147483647 + 1` to `int` (#13954), so both reflect 1073741824 instead of
+// -1073741824; a `float` parameter reflects the same value as an `int` one, and both change
+// once #13954 is fixed.
 // CHECK: "name": "intProbe"
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}27,{{$}}
@@ -210,6 +222,43 @@ extern static const float EXTERN_VALUE = 3.0;
 // CHECK-NEXT: {{^ *}}28,{{$}}
 // CHECK-NEXT: {{^ *}}1073741824.000000{{$}}
 [floatProbe(28, (2147483647 + 1) / 2)]
+// A 64-bit integer converts to `float` directly: 2^60 + 2^36 + 1 rounds up to 2^60 + 2^37, while
+// converting through `double` would land on a tie and round to 2^60.
+// CHECK: "name": "floatProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}29,{{$}}
+// CHECK-NEXT: {{^ *}}1152921642045800448.000000{{$}}
+[floatProbe(29, 0x1000001000000001ll)]
+// CHECK: "name": "floatProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}30,{{$}}
+// CHECK-NEXT: {{^ *}}1.000000{{$}}
+[floatProbe(30, true)]
+// `__slang_noop_cast` is a no-op intrinsic like unary `+`, but it changes the type, so it is
+// not folded as the identity.
+// CHECK: "name": "floatProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}31,{{$}}
+// CHECK-NEXT: "invalid value"
+[floatProbe(31, __slang_noop_cast<float>(1.0h))]
+// CHECK: "name": "floatProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}32,{{$}}
+// CHECK-NEXT: "invalid value"
+[floatProbe(32, VK_CONSTANT_ID_VALUE)]
+// An argument that does not fold leaves an empty entry before one that does.
+// CHECK: "name": "pairProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: "invalid value",
+// CHECK-NEXT: {{^ *}}6.000000{{$}}
+[pairProbe(NON_CONST_VALUE, 2.0 * 3.0)]
+// Folding for reflection reports no integer diagnostics, so this argument has no value and
+// compiles as before.
+// CHECK: "name": "floatProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}33,{{$}}
+// CHECK-NEXT: "invalid value"
+[floatProbe(33, 1 / 0)]
 [numthreads(1, 1, 1)]
 void main()
 {

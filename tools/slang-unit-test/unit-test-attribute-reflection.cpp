@@ -99,9 +99,9 @@ SLANG_UNIT_TEST(attributeReflection)
 
     // Constant expressions passed to floating-point parameters are folded during checking.
     auto scaleType = reflection->findTypeByName("TScale");
-    SLANG_CHECK(scaleType != nullptr);
+    SLANG_CHECK_ABORT(scaleType != nullptr);
     auto scaleAttribute = scaleType->findAttributeByName("Scale");
-    SLANG_CHECK(scaleAttribute != nullptr);
+    SLANG_CHECK_ABORT(scaleAttribute != nullptr);
     fvalue = 0;
     SLANG_CHECK(SLANG_SUCCEEDED(scaleAttribute->getArgumentValueFloat(0, &fvalue)));
     SLANG_CHECK(fvalue == 1.5f);
@@ -112,9 +112,9 @@ SLANG_UNIT_TEST(attributeReflection)
     // Builtin attributes are also visible through `findAttributeByName`, and their literal
     // floating-point arguments are readable even though they are not folded during checking.
     auto hullHelper = reflection->findFunctionByName("hullHelper");
-    SLANG_CHECK(hullHelper != nullptr);
+    SLANG_CHECK_ABORT(hullHelper != nullptr);
     auto maxTessFactorAttribute = hullHelper->findAttributeByName(globalSession, "maxtessfactor");
-    SLANG_CHECK(maxTessFactorAttribute != nullptr);
+    SLANG_CHECK_ABORT(maxTessFactorAttribute != nullptr);
     fvalue = 0;
     SLANG_CHECK(SLANG_SUCCEEDED(maxTessFactorAttribute->getArgumentValueFloat(0, &fvalue)));
     SLANG_CHECK(fvalue == 64.0f);
@@ -138,4 +138,15 @@ SLANG_UNIT_TEST(attributeReflection)
     fvalue = 0;
     SLANG_CHECK(SLANG_SUCCEEDED(reloadedScaleAttribute->getArgumentValueFloat(0, &fvalue)));
     SLANG_CHECK(fvalue == 1.5f);
+
+    // `[NormalTexture(E.V1, 6)]` stores an empty entry for its enum argument before the folded
+    // `float` one, so this also checks that an empty entry survives serialization.
+    auto reloadedTextureType = reloadedModule->getLayout()->findTypeByName("TS");
+    SLANG_CHECK_ABORT(reloadedTextureType != nullptr);
+    auto reloadedTextureAttribute = reloadedTextureType->findAttributeByName("NormalTexture");
+    SLANG_CHECK_ABORT(reloadedTextureAttribute != nullptr);
+    fvalue = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(reloadedTextureAttribute->getArgumentValueFloat(1, &fvalue)));
+    SLANG_CHECK(fvalue == 6.0f);
+    SLANG_CHECK(SLANG_FAILED(reloadedTextureAttribute->getArgumentValueFloat(0, &fvalue)));
 }
