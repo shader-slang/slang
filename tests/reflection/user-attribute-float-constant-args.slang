@@ -199,7 +199,7 @@ extern static const float EXTERN_VALUE = 3.0;
 // CHECK-NEXT: {{^ *}}18446744073709551616.000000{{$}}
 [floatProbe(26, 0xFFFFFFFFFFFFFFFFull)]
 // Integer operands fold with the integer folder, which does not narrow the intermediate
-// `2147483647 + 1` to `int`; a `float` parameter reflects the same value as an `int` one.
+// `2147483647 + 1` to `int` (#13954); a `float` parameter reflects the same value as an `int` one.
 // CHECK: "name": "intProbe"
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}27,{{$}}

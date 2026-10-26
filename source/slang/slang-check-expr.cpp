@@ -3470,7 +3470,8 @@ std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatC
     // `tryConstantFoldExpr` computes integer operations in 64 bits and does not narrow their
     // results to their type, so we narrow the folded operand here: `0u - 1u` converts as
     // `0xFFFFFFFFu`. Only the outermost result is narrowed, so the `0u - 1u` inside
-    // `(0u - 1u) / 2u` keeps its 64-bit value, exactly as it does for an integer parameter.
+    // `(0u - 1u) / 2u` keeps its 64-bit value, exactly as it does for an integer parameter
+    // (#13954).
     auto intVal = as<ConstantIntVal>(
         tryConstantFoldExpr(operand, ConstantFoldingKind::CompileTime, circularityInfo));
     if (!intVal)
