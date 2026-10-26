@@ -34,6 +34,21 @@ SLANG_UNIT_TEST(attributeReflection)
 
         [NormalTexture(E.V1, 6)]
         struct TS {};
+
+        [__AttributeUsage(_AttributeTargets.Struct)]
+        public struct ScaleAttribute
+        {
+            public float value;
+            public double precise;
+        };
+
+        static const float kHalf = 1.0 / 2.0;
+
+        [Scale(kHalf * 3.0, -kHalf)]
+        struct TScale {};
+
+        [maxtessfactor(64.0)]
+        public void hullHelper() {}
         )";
     String userSource = userSourceBody;
     ComPtr<slang::IGlobalSession> globalSession;
@@ -81,4 +96,26 @@ SLANG_UNIT_TEST(attributeReflection)
     float fvalue = 0;
     normalTextureAttribute->getArgumentValueFloat(1, &fvalue);
     SLANG_CHECK(fvalue == 6.0);
+
+    // Constant expressions passed to floating-point parameters are folded during checking.
+    auto scaleType = reflection->findTypeByName("TScale");
+    SLANG_CHECK(scaleType != nullptr);
+    auto scaleAttribute = scaleType->findAttributeByName("Scale");
+    SLANG_CHECK(scaleAttribute != nullptr);
+    fvalue = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(scaleAttribute->getArgumentValueFloat(0, &fvalue)));
+    SLANG_CHECK(fvalue == 1.5f);
+    fvalue = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(scaleAttribute->getArgumentValueFloat(1, &fvalue)));
+    SLANG_CHECK(fvalue == -0.5f);
+
+    // Builtin attributes are also visible through `findAttributeByName`, and their literal
+    // floating-point arguments are readable even though they are not folded during checking.
+    auto hullHelper = reflection->findFunctionByName("hullHelper");
+    SLANG_CHECK(hullHelper != nullptr);
+    auto maxTessFactorAttribute = hullHelper->findAttributeByName(globalSession, "maxtessfactor");
+    SLANG_CHECK(maxTessFactorAttribute != nullptr);
+    fvalue = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(maxTessFactorAttribute->getArgumentValueFloat(0, &fvalue)));
+    SLANG_CHECK(fvalue == 64.0f);
 }

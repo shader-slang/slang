@@ -3209,6 +3209,31 @@ public:
         ConstantFoldingKind kind,
         ConstantFoldingCircularityInfo* circularityInfo);
 
+    /// Try to fold `expr`, a `half`, `float` or `double` scalar expression, to its compile-time
+    /// value, rounded to the precision of its type. The front-end has no floating-point `Val`,
+    /// so the value is a plain number. We fold literals, parentheses, conversions from scalar
+    /// types, the builtin `-x`, `+`, `-`, `*`, `/` and `%` operators, and references to `const`
+    /// variables; any other expression, constant or not, yields an empty value. Integer and bool
+    /// operands of a conversion fold through `tryConstantFoldExpr`, so `INT_VALUE / 4 + 1.5`
+    /// with `INT_VALUE == 6` divides in integer arithmetic and folds to `2.5`.
+    std::optional<FloatingPointLiteralValue> tryConstantFoldFloatExpr(
+        SubstExpr<Expr> expr,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
+    /// Try to fold the scalar `operand` of a conversion to the floating-point type
+    /// `toBaseType`, returning the converted value or an empty value if `operand` does not fold.
+    std::optional<FloatingPointLiteralValue> tryConstantFoldFloatConversion(
+        SubstExpr<Expr> operand,
+        BaseType toBaseType,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
+    /// Try to fold a reference to the variable `declRef` to its compile-time floating-point
+    /// value, which is the folded value of its initializer when the variable is a compile-time
+    /// constant.
+    std::optional<FloatingPointLiteralValue> tryConstantFoldFloatDeclRef(
+        DeclRef<VarDeclBase> const& declRef,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
     // Enforce that an expression resolves to an integer constant, and get its value
     enum class IntegerConstantExpressionCoercionType
     {

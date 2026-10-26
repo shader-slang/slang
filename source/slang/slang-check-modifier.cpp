@@ -1021,6 +1021,16 @@ Modifier* SemanticsVisitor::validateAttribute(
                 {
                     arg = CheckTerm(arg);
                     arg = coerce(CoercionSite::Argument, paramDecl->getType(), arg, getSink());
+
+                    // Floating-point parameters fail `isValidCompileTimeConstantType`, so we
+                    // record their folded value here, beside the checked argument, the way
+                    // `intArgVals` records the value of an integer argument.
+                    if (auto floatVal = tryConstantFoldFloatExpr(arg, nullptr))
+                    {
+                        for (Index ci = attr->floatArgVals.getCount(); ci < paramIndex + 1; ci++)
+                            attr->floatArgVals.add(std::nullopt);
+                        attr->floatArgVals[paramIndex] = floatVal;
+                    }
                 }
             }
             paramIndex++;

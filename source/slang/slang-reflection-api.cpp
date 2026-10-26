@@ -382,6 +382,20 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueFloat(
         return SLANG_E_INVALID_ARG;
     if (index >= (unsigned int)userAttr->args.getCount())
         return SLANG_E_INVALID_ARG;
+
+    if (userAttr->floatArgVals.getCount() > (Index)index)
+    {
+        if (auto floatVal = userAttr->floatArgVals[index])
+        {
+            *rs = (float)*floatVal;
+            return 0;
+        }
+    }
+
+    // Checking folds only the arguments of a user-defined attribute's scalar floating-point
+    // parameters. `findUserAttributeByName` also returns builtin attributes such as
+    // `[maxtessfactor(64.0)]`, whose arguments are never type-checked, so for an argument
+    // without a folded value we still read a literal directly.
     if (auto cexpr = as<FloatingPointLiteralExpr>(userAttr->args[index]))
     {
         *rs = (float)cexpr->value;
