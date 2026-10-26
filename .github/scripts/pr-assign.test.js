@@ -125,11 +125,11 @@ test("author shepherd is not auto-requested; top collaborator is suggested", () 
 test("ignored shepherd is not auto-requested; suggestion uses null baseline", () => {
   const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
     [], ["dev2"], {
-      maintainer: "bmillsNV",
-      ignoredReviewers: new Set(["bmillsNV"]),
+      maintainer: "defaultReviewer",
+      ignoredReviewers: new Set(["defaultReviewer"]),
     });
   // No owners in ranking → maintainer fallback, but ignored → no auto-request.
-  assert.strictEqual(assignee, "bmillsNV");
+  assert.strictEqual(assignee, "defaultReviewer");
   assert.strictEqual(autoRequestedReviewer, null);
   assert.strictEqual(suggestedReviewer, "dev2");
 });
@@ -137,7 +137,7 @@ test("ignored shepherd is not auto-requested; suggestion uses null baseline", ()
 test("real existing reviewer clears auto-request but still may suggest", () => {
   const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
     [], ["dev2", "owner1"], {
-      existingReviewers: ["dave"], ignoredReviewers: new Set(["bmillsNV"]),
+      existingReviewers: ["realReviewer"], ignoredReviewers: new Set(["defaultReviewer"]),
     });
   assert.strictEqual(assignee, "owner1");
   assert.strictEqual(autoRequestedReviewer, null);
@@ -148,8 +148,8 @@ test("real existing reviewer clears auto-request but still may suggest", () => {
 test("ignored and bot reviewers do not count as existing", () => {
   const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
     [], ["dev2", "owner1"], {
-      existingReviewers: ["bmillsNV", "copilot[bot]"],
-      botAuthors: ["nv-slang-bot"], ignoredReviewers: new Set(["bmillsNV"]),
+      existingReviewers: ["defaultReviewer", "copilot[bot]"],
+      botAuthors: ["nv-slang-bot"], ignoredReviewers: new Set(["defaultReviewer"]),
     });
   assert.strictEqual(assignee, "owner1");
   assert.strictEqual(autoRequestedReviewer, "owner1");

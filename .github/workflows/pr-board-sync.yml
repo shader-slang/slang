@@ -15,7 +15,8 @@ name: PR Board Sync (reusable)
 #   - when a PR has an owner, assigns any still-unassigned linked (closing)
 #     issues to that same owner (the PR's primary assignee, not the co-assigned
 #     community author), and
-#   - unrequests auto-assigned reviewers that cannot approve (e.g. bmillsNV).
+#   - unrequests the auto-requested default reviewer (default_reviewer_team)
+#     so the chosen shepherd is requested instead.
 #
 # Status state machine (two variants that differ ONLY on a CI failure):
 #   - In Review  - default for an open PR; also re-set whenever a new commit
@@ -163,10 +164,14 @@ on:
         description: "Comma-separated logins always treated as bots."
         type: string
         default: "nv-slang-bot,slang-coworker-nanoclaw,Copilot,copilot-swe-agent"
-      ignored_reviewers:
-        description: "Comma-separated auto-assigned reviewers that cannot approve; unrequested on the PR."
+      default_reviewer_team:
+        description: "org/team-slug holding the default PR reviewer that GitHub auto-requests on new PRs. Its members are ignored reviewers: unrequested on the PR and never auto-requested, so the chosen shepherd is requested instead. Its (sorted-first) member is also the last-resort assignee when maintainer_team yields nobody."
         type: string
-        default: "bmillsNV"
+        default: "shader-slang/default-reviewer"
+      ignored_reviewers:
+        description: "Comma-separated logins treated as ignored reviewers in addition to the default_reviewer_team members."
+        type: string
+        default: ""
       owners_team:
         description: "org/team-slug whose members may be chosen as a Community PR's assignee/reviewer from the committer-signal ranking (not used for linked-issue inheritance; that uses source_internal_team)."
         type: string
@@ -180,9 +185,9 @@ on:
         type: string
         default: "shader-slang/slang-maintainer"
       fallback_assignee:
-        description: "Last-resort assignee for a non-Internal PR when maintainer_team is empty/unset/unreadable and no linked-issue or committer-signal owner is found, so PRs are never left unassigned. Never requested as a reviewer (it is typically an ignored non-approver). Empty disables this fallback (the PR is left to the sweep)."
+        description: "Last-resort assignee for a non-Internal PR when neither maintainer_team nor default_reviewer_team yields anyone and no linked-issue or committer-signal owner is found. Empty (the default) disables this fallback (the PR is left to the sweep)."
         type: string
-        default: "bmillsNV"
+        default: ""
     secrets:
       SLANG_PR_BOT_TOKEN:
         description: "Dedicated bot PAT used for org Projects RW + Members read, repo reads, and as a compatibility fallback for repo writes while callers grant GITHUB_TOKEN Issues/Pull requests write."
@@ -544,6 +549,7 @@ jobs:
           SOURCE_BOT: ${{ inputs.source_bot }}
           SOURCE_INTERNAL_TEAM: ${{ inputs.source_internal_team }}
           BOT_AUTHORS: ${{ inputs.bot_authors }}
+          DEFAULT_REVIEWER_TEAM: ${{ inputs.default_reviewer_team }}
           IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
           OWNERS_TEAM: ${{ inputs.owners_team }}
           BOT_OWNERS_TEAM: ${{ inputs.bot_owners_team }}
@@ -573,8 +579,9 @@ jobs:
             const SWEEP = process.env.MODE === "sweep";
             const BOT_AUTHORS = (process.env.BOT_AUTHORS || "")
               .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
-            const IGNORED = new Set((process.env.IGNORED_REVIEWERS || "")
-              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean));
+            const DEFAULT_REVIEWER_TEAM = process.env.DEFAULT_REVIEWER_TEAM || "";
+            const EXTRA_IGNORED = (process.env.IGNORED_REVIEWERS || "")
+              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
             const OWNERS_TEAM = process.env.OWNERS_TEAM || "";
             const BOT_OWNERS_TEAM = process.env.BOT_OWNERS_TEAM || "";
             const MAINTAINER_TEAM = process.env.MAINTAINER_TEAM || "";
@@ -1480,10 +1487,11 @@ jobs:
 
             // The fallback assignee for a non-Internal PR that has no linked-issue
             // or committer-signal owner: the (sorted-first) member of the
-            // maintainer team, else FALLBACK_ASSIGNEE (e.g. bmillsNV) when that
-            // team is unset/empty/unreadable, so a PR is never left unassigned.
-            // Only "" if both are unset, in which case selectAssigneeAndReviewers
-            // yields no pick and we leave it to the sweep. Cached per run.
+            // maintainer team, else of the default-reviewer team, else
+            // FALLBACK_ASSIGNEE, so a PR is never left unassigned while either
+            // team is readable. Only "" if all three yield nobody, in which case
+            // selectAssigneeAndReviewers yields no pick and we leave it to the
+            // sweep. Cached per run.
             let _maintainer;
             async function resolveMaintainer() {
               if (_maintainer !== undefined) return _maintainer;
@@ -1491,8 +1499,38 @@ jobs:
               if (members.length > 1)
                 core.warning(
                   `maintainer team ${MAINTAINER_TEAM} has ${members.length} members; using ${members[0]}`);
-              _maintainer = members[0] || FALLBACK_ASSIGNEE;
+              const defaultReviewers = [...await listTeamMembers(DEFAULT_REVIEWER_TEAM)].sort();
+              _maintainer = members[0] || defaultReviewers[0] || FALLBACK_ASSIGNEE;
               return _maintainer;
+            }
+
+            // The lowercased logins we unrequest and never auto-request: the
+            // default-reviewer team plus any explicit IGNORED_REVIEWERS. GitHub
+            // auto-requests the default reviewer on every new PR, and
+            // selectAssigneeAndReviewers would otherwise count that request as a
+            // real reviewer and skip requesting the shepherd, leaving the PR
+            // waiting on the default reviewer. An unreadable team leaves only the
+            // explicit list; the team-read cache logs the failure.
+            async function resolveIgnoredReviewers() {
+              const members = await listTeamMembers(DEFAULT_REVIEWER_TEAM);
+              return new Set([...EXTRA_IGNORED, ...[...members].map(m => m.toLowerCase())]);
+            }
+
+            // Unrequest every ignored reviewer among `requestedReviewers` (logins)
+            // on PR `number`, as github-actions[bot] via actionsWrite.
+            async function unrequestIgnoredReviewers(number, requestedReviewers) {
+              const ignored = await resolveIgnoredReviewers();
+              const toRemove = requestedReviewers.filter(r => ignored.has(r.toLowerCase()));
+              if (!toRemove.length) return;
+              const args = {
+                owner: context.repo.owner, repo: context.repo.repo,
+                pull_number: number, reviewers: toRemove,
+              };
+              await actionsWrite(
+                "DELETE", repoApiPath(`/pulls/${number}/requested_reviewers`),
+                { reviewers: toRemove },
+                () => github.rest.pulls.removeRequestedReviewers(args));
+              console.log(`unrequested: ${toRemove.join(", ")}`);
             }
 
             // The PR's primary owner assignee when it is already assigned. For a
@@ -1637,10 +1675,11 @@ jobs:
                 // relevant owners pool; maintainer is the final fallback.
                 const ownersTeam =
                   (source === process.env.SOURCE_BOT) ? BOT_OWNERS_TEAM : OWNERS_TEAM;
-                const [owners, collaborators, maintainer, internalMembers] = await Promise.all([
+                const [owners, collaborators, maintainer, ignored, internalMembers] = await Promise.all([
                   listTeamMembers(ownersTeam),
                   repoCollaborators(),
                   resolveMaintainer(),
+                  resolveIgnoredReviewers(),
                   loadSourceInternalIndex({
                     teamSpec: SOURCE_INTERNAL_TEAM,
                     listOrgTeams,
@@ -1675,7 +1714,7 @@ jobs:
                     maintainer,
                     existingReviewers: info.requestedReviewers,
                     botAuthors: BOT_AUTHORS,
-                    ignoredReviewers: [...IGNORED],
+                    ignoredReviewers: ignored,
                   }));
               }
               if (!assignee) return;                    // no owner and no maintainer
@@ -1717,20 +1756,9 @@ jobs:
                 }
               }
 
-              // Unrequest auto-assigned non-approvers (e.g. bmillsNV), coupled to
-              // assignment exactly as the sweep does.
-              const toRemove =
-                info.requestedReviewers.filter(r => IGNORED.has(r.toLowerCase()));
-              if (toRemove.length) {
-                const args = {
-                  owner: context.repo.owner, repo: context.repo.repo,
-                  pull_number: number, reviewers: toRemove,
-                };
-                await actionsWrite(
-                  "DELETE", repoApiPath(`/pulls/${number}/requested_reviewers`),
-                  { reviewers: toRemove },
-                  () => github.rest.pulls.removeRequestedReviewers(args));
-              }
+              // Unrequest the default reviewer, coupled to assignment exactly as
+              // the sweep does.
+              await unrequestIgnoredReviewers(number, info.requestedReviewers);
 
               // autoRequestedReviewer is already filtered (not author, not ignored,
               // no real existing reviewer) — request that login only.
@@ -2047,6 +2075,25 @@ jobs:
               }
             } else if (ev === "pull_request_target") {
               const pr = context.payload.pull_request;
+              if (action === "opened" || action === "reopened") {
+                // Strip the auto-requested default reviewer at onboarding even
+                // when reconcileAssignment will skip the PR (Source not yet known,
+                // a human draft, merge-queued, or no maintainer resolved). It runs
+                // only here, not on review_requested, so a maintainer manually
+                // requesting that reviewer is never undone. reconcileAssignment
+                // also unrequests them, but only when it freshly assigns an owner,
+                // so already-assigned PRs are not re-scanned on later events or
+                // the sweep. Best-effort, like assignment: a failure must not
+                // block the board writes below.
+                try {
+                  await unrequestIgnoredReviewers(
+                    pr.number, (pr.requested_reviewers || []).map(r => r.login));
+                } catch (error) {
+                  core.warning(
+                    `could not unrequest ignored reviewers on #${pr.number}: ` +
+                    `${error.message || error}`);
+                }
+              }
               const itemId = await ensureItem(pr.node_id);
               if (!itemId) { core.warning("could not add PR to board"); return; }
 
@@ -2121,65 +2168,3 @@ jobs:
               // the only signal. It is commit-scoped, so resolve the PR(s) by SHA.
               await reconcileByCommit(context.payload.sha, null);
             }
-
-      # --- Unrequest auto-assigned non-approver reviewers --------------------
-      # Runs only at onboarding (opened/reopened) to strip an auto-assigned
-      # non-approver (e.g. bmillsNV) that repo automation requests on a new PR. It
-      # deliberately does NOT run on review_requested, so a maintainer manually
-      # requesting that reviewer is never undone. reconcileAssignment also unrequests
-      # these when it freshly assigns an owner; this onboarding step covers PRs
-      # assignment skips (Source not yet known, a human draft, merge-queued, or no
-      # maintainer resolved). Already-assigned PRs are not re-scanned on sweep.
-      - name: Unrequest ignored reviewers
-        if: >-
-          env.HAS_TOKEN == 'true' &&
-          github.event_name == 'pull_request_target' &&
-          (github.event.action == 'opened' || github.event.action == 'reopened')
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        env:
-          IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
-          # Compatibility fallback for cross-repo callers that have not yet
-          # granted pull-requests: write to their GITHUB_TOKEN.
-          PAT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const ignored = (process.env.IGNORED_REVIEWERS || "")
-              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
-            if (!ignored.length) return;
-            const pr = context.payload.pull_request;
-            if (!pr) return;
-            const requested = (pr.requested_reviewers || []).map(r => r.login);
-            const toRemove = requested.filter(l => ignored.includes((l || "").toLowerCase()));
-            if (!toRemove.length) return;
-            const args = {
-              owner: context.repo.owner, repo: context.repo.repo,
-              pull_number: pr.number, reviewers: toRemove,
-            };
-            try {
-              await github.rest.pulls.removeRequestedReviewers(args);
-            } catch (error) {
-              if (error.status !== 403) throw error;
-              core.warning(
-                `GITHUB_TOKEN cannot unrequest reviewers; using the PAT fallback. ` +
-                `Update the calling job's pull-requests permission.`);
-              const api = process.env.GITHUB_API_URL || "https://api.github.com";
-              const response = await fetch(
-                `${api}/repos/${context.repo.owner}/${context.repo.repo}` +
-                `/pulls/${pr.number}/requested_reviewers`,
-                {
-                  method: "DELETE",
-                  headers: {
-                    authorization: `Bearer ${process.env.PAT_TOKEN}`,
-                    accept: "application/vnd.github+json",
-                    "x-github-api-version": "2022-11-28",
-                    "content-type": "application/json",
-                  },
-                  body: JSON.stringify({ reviewers: toRemove }),
-                });
-              if (!response.ok) {
-                throw new Error(
-                  `${response.status} ${(await response.text()).slice(0, 200)}`);
-              }
-            }
-            console.log(`unrequested: ${toRemove.join(", ")}`);
