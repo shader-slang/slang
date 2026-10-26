@@ -32,8 +32,8 @@ namespace Slang
 /// and conformance must use the original type.
 static DeclRefType* getDeclRefTypeForReflection(Type* type)
 {
-    if (auto existentialType = as<ExistentialType>(type))
-        type = existentialType->getInterfaceType();
+    if (auto boxType = as<ExistentialBoxType>(type))
+        type = boxType->getInterfaceType();
     return as<DeclRefType>(type);
 }
 
@@ -524,7 +524,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_ARRAY;
     }
-    else if (as<ExistentialType>(type))
+    else if (as<ExistentialBoxType>(type))
     {
         return SLANG_TYPE_KIND_INTERFACE;
     }
@@ -1051,7 +1051,7 @@ SLANG_API SlangReflectionFunction* spReflection_FindFunctionByName(
     {
         return tryConvertExprToFunctionReflection(
             astBuilder,
-            program->findDeclFromString(name, &sink));
+            program->findDeclFromString(name, ComponentType::DeclLookupPurpose::Reflection, &sink));
     }
 #if SLANG_HAS_EXCEPTIONS
     catch (...) {}
@@ -2412,7 +2412,7 @@ struct ExtendedTypeLayoutContext
             m_extendedInfo->m_subObjectRanges.add(subObjectRange);
             return;
         }
-        else if (as<ExistentialType>(typeLayout->type))
+        else if (as<ExistentialBoxType>(typeLayout->type))
         {
             // We add a binding range and a matching sub-object range for an existential box.
             //
@@ -2743,11 +2743,11 @@ SLANG_API SlangInt spReflectionTypeLayout_isBindingRangeSpecializable(
         return SLANG_BINDING_TYPE_UNKNOWN;
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
     auto type = bindingRange.leafTypeLayout->getType();
-    if (as<ExistentialType>(type))
+    if (as<ExistentialBoxType>(type))
         return 1;
     if (auto parameterGroupType = as<ParameterGroupType>(type))
     {
-        if (as<ExistentialType>(parameterGroupType->getElementType()))
+        if (as<ExistentialBoxType>(parameterGroupType->getElementType()))
             return 1;
     }
     return 0;

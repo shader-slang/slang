@@ -2750,7 +2750,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             }
             return structLayout;
         }
-        else if (as<ExistentialType>(type))
+        else if (as<ExistentialBoxType>(type))
         {
             // A box has no fixed set of varying registers until its concrete type is selected.
             return nullptr;

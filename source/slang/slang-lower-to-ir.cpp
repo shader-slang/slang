@@ -2454,8 +2454,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     }
 
     /// Lower box differentiability metadata through its interface refinement proof.
-    LoweredValInfo visitExistentialDifferentiabilityWitness(
-        ExistentialDifferentiabilityWitness* witness)
+    LoweredValInfo visitExistentialBoxDifferentiabilityWitness(
+        ExistentialBoxDifferentiabilityWitness* witness)
     {
         return lowerVal(context, witness->getInterfaceWitness());
     }
@@ -2737,7 +2737,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitDifferentialPairType(DifferentialPairType* pairType)
     {
         IRType* primalType = lowerType(context, pairType->getPrimalType());
-        if (as<ExistentialType>(pairType->getPrimalType()))
+        if (as<ExistentialBoxType>(pairType->getPrimalType()))
         {
             // Existential differential pairs are handled specially later in autodiff lowering:
             // their differential type is modeled as `IDifferentiable`, and the witness operand
@@ -2863,8 +2863,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return (IRType*)getSimpleVal(context, loweredDeclRef);
     }
 
-    /// Lower a box to the existing IR interface type used for existential values.
-    IRType* visitExistentialType(ExistentialType* type)
+    /// Lower an existential box type to the existing IR interface type used for existential values.
+    IRType* visitExistentialBoxType(ExistentialBoxType* type)
     {
         return lowerType(context, type->getInterfaceType());
     }
@@ -6236,7 +6236,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             // An empty initializer cannot supply the concrete value and conformance that a box
             // requires. We diagnose the empty box according to the selected language version.
-            if (as<ExistentialType>(type))
+            if (as<ExistentialBoxType>(type))
             {
                 auto moduleDecl = context->getMainModuleDecl();
 
@@ -6841,7 +6841,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         // A conversion to a box packages a concrete value with its conformance witness.
         // The witness proves conformance to the boxed interface, not to the box itself.
-        if (as<ExistentialType>(expr->type))
+        if (as<ExistentialBoxType>(expr->type))
         {
             auto concreteValue = getSimpleVal(context, value);
             auto builder = getBuilder();
@@ -6850,7 +6850,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // follow the interface inheritance proof to obtain the packed value's `IBase` table.
             // An interface inheritance declaration lowers to a requirement key, so lowering that
             // declaration directly would not produce the concrete witness table needed by the box.
-            if (as<ExistentialType>(expr->valueArg->type))
+            if (as<ExistentialBoxType>(expr->valueArg->type))
             {
                 auto extractedType = builder->emitExtractExistentialType(concreteValue);
                 auto extractedValue =
@@ -6958,7 +6958,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 return LoweredValInfo::simple(irVal);
             }
             else
-            { // This is a run-time type check from for an existential type.
+            { // This is a runtime type check of an existential box value.
                 auto value = lowerLValueExpr(context, expr->value);
                 auto existentialInfo = value.getExtractedExistentialValInfo();
                 auto irVal = builder->emitIsType(
@@ -7124,7 +7124,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo visitExistentialTypeExpr(ExistentialTypeExpr* /*expr*/)
+    LoweredValInfo visitExistentialBoxTypeExpr(ExistentialBoxTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("'dyn' type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
@@ -10279,7 +10279,7 @@ top:
 
             // The `right` value must be of the same concrete type as
             // the opened value, but the new destination is of the
-            // original existential type, so we need to wrap it up
+            // original existential box type, so we need to wrap it up
             // appropriately.
             //
             right = LoweredValInfo::simple(builder->emitMakeExistential(
@@ -15299,7 +15299,7 @@ static void lowerProgramEntryPointToIR(
             getMangledName(context->astBuilder, entryPointFuncDeclRef).getUnownedSlice());
     }
 
-    // We may have shader parameters of interface/existential type,
+    // We may have shader parameters of existential box type,
     // which need us to supply concrete type information for specialization.
     //
     if (specializationInfo && specializationInfo->existentialSpecializationArgs.getCount() != 0)

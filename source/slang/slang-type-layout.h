@@ -1103,27 +1103,28 @@ public:
 ///
 /// For a type such as `dyn IThing`, the layout records the storage consumed by the packed value,
 /// RTTI, and witness table, along with any pending data for static specialization.
-/// Canonicalizing `type` yields an `ExistentialType`; an interface constraint has no data layout.
+/// Canonicalizing `type` yields an `ExistentialBoxType`; an interface constraint has no data
+/// layout.
 ///
 class ExistentialTypeLayout : public TypeLayout
 {
 public:
 };
 
-/// Layout information for a type with existential (sub-)field types specialized.
+/// Layout information for a type with existential box fields specialized.
 ///
 /// This class is used to represent a type like `SomeStruct` that
-/// contains nested existential-type fields, and which has been explicitly
+/// contains nested existential box fields, and which has been explicitly
 /// specialized with concrete type information for those fields.
 ///
 /// Note that the front-end language should not ever produce types that
 /// make use of layouts like this. The only way such a type layout can
-/// arise is if a user explicitly specialized a type with existential-type
+/// arise is if a user explicitly specialized a type with existential box
 /// fields using the Slang API, and then used that specialized type as
 /// a type argument for a shader. This type layout class serves to remember
 /// the specialization information (and resulting layout) for the type.
 ///
-/// TODO: Given our changes to how layout for existential types is being
+/// TODO: Given our changes to how layout for existential box types is being
 /// handled, the details of this type probably need to be re-thought.
 ///
 class ExistentialSpecializedTypeLayout : public TypeLayout

@@ -380,11 +380,11 @@ static Type* getDifferentialValueTypeFromWitness(
 {
     if (witness && (witness->getSup() == astBuilder->getDifferentiableInterfaceType()))
     {
-        if (as<ExistentialType>(primalType))
+        if (as<ExistentialBoxType>(primalType))
         {
             // Differentiating a boxed value produces another box because its concrete
             // differential type is determined by the packed value's conformance.
-            return astBuilder->getExistentialType(witness->getSup());
+            return astBuilder->getExistentialBoxType(witness->getSup());
         }
 
         if (auto concretePack = as<ConcreteTypePack>(primalType))
@@ -1977,19 +1977,19 @@ Val* ValuePackType::_substituteImplOverride(
     return astBuilder->getOrCreate<ValuePackType>(newElementType);
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExistentialType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExistentialBoxType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void ExistentialType::_toTextOverride(StringBuilder& out)
+void ExistentialBoxType::_toTextOverride(StringBuilder& out)
 {
     out << "dyn " << getInterfaceType();
 }
 
-Type* ExistentialType::_createCanonicalTypeOverride()
+Type* ExistentialBoxType::_createCanonicalTypeOverride()
 {
-    return getCurrentASTBuilder()->getExistentialType(getInterfaceType());
+    return getCurrentASTBuilder()->getExistentialBoxType(getInterfaceType()->getCanonicalType());
 }
 
-Val* ExistentialType::_substituteImplOverride(
+Val* ExistentialBoxType::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -2002,7 +2002,7 @@ Val* ExistentialType::_substituteImplOverride(
 
     // Substituting `dyn IFoo<T>` changes the interface argument, but the result is still a box.
     (*ioDiff)++;
-    return astBuilder->getExistentialType(substitutedInterfaceType);
+    return astBuilder->getExistentialBoxType(substitutedInterfaceType);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

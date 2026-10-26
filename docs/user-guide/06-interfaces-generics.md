@@ -74,7 +74,8 @@ struct MyType2 : IFoo
 ### Existential Box Types
 
 An interface names a contract.
-The type `dyn IFoo` is an _existential box_: a value of an unknown concrete type that conforms to `IFoo`, packaged with the information needed to dispatch its requirements.
+`dyn IFoo` denotes an _existential box type_.
+A value of this type packages a value of an unknown concrete type that conforms to `IFoo`, together with the information needed to dispatch `IFoo`'s requirements.
 For example:
 
 ```slang
@@ -104,6 +105,26 @@ Thus `dyn IFoo*` is a pointer to a box, and `dyn IFoo[4]` is an array of four bo
 
 A box does not itself conform to its interface.
 An implicitly opened box can supply its hidden payload to a constrained generic function, but explicitly using `dyn IFoo` as a type argument constrained by `IFoo` is an error.
+
+For example, this explicit type argument is rejected even when the interface has no requirements:
+
+```slang
+interface ITag {}
+struct Tag : ITag {}
+
+T identity<T : ITag>(T value)
+{
+    return value;
+}
+
+void demonstrate()
+{
+    dyn ITag value = Tag();
+    identity(value);             // Opens the box and infers its payload type.
+    identity<dyn ITag>(value);   // Error: the box type does not conform to `ITag`.
+}
+```
+
 Calling a static requirement through a bare interface, such as `IFoo.required()`, also has no concrete conformance to dispatch and is rejected.
 Existential box types are currently not supported as the right-hand operand of `is` or `as`.
 
@@ -676,6 +697,9 @@ void test()
 ```
 
 ## Interface-typed Values
+
+The bare-interface value-type spellings in this section use implicit boxing, which is accepted in legacy Slang, Slang 2025, and Slang 2026.
+In Slang 202c, write `dyn ITransform` for these parameter, return, and local-variable types; see [Existential Box Types](#existential-box-types).
 
 So far we have been using interfaces as constraints to generic type parameters. For example, the following listing defines a generic function with a type parameter `TTransform` constrained by interface `ITransform`:
 
