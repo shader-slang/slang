@@ -31,9 +31,26 @@ void check(Foo value)
     let eleventh = IFoo is Foo;
 }
 
-// CHECK-COUNT-4: error[E30322]
-// CHECK-COUNT-4: error[E30326]
+// CHECK-NOT: internal error
+// CHECK: error[E30322]
+// CHECK-NOT: internal error
+// CHECK: error[E30322]
+// CHECK-NOT: internal error
+// CHECK: error[E30322]
+// CHECK-NOT: internal error
+// CHECK: error[E30322]
+// CHECK-NOT: internal error
+// CHECK: error[E30326]
+// CHECK-NOT: internal error
+// CHECK: error[E30326]
+// CHECK-NOT: internal error
+// CHECK: error[E30326]
+// CHECK-NOT: internal error
+// CHECK: error[E30326]
+// CHECK-NOT: internal error
 // CHECK: error[E30301]
+// CHECK-NOT: internal error
 // CHECK: error[E30304]
+// CHECK-NOT: internal error
 // CHECK: error[E30300]
 // CHECK-NOT: internal error

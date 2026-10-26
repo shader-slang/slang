@@ -310,11 +310,11 @@ void emitType(ManglingContext* context, Type* type)
         for (Index i = 0; i < n; ++i)
             emitVal(context, modifiedType->getModifier(i));
     }
-    else if (auto existentialType = as<ExistentialType>(type))
+    else if (auto boxType = as<ExistentialBoxType>(type))
     {
         // `IFoo` and `dyn IFoo` denote different types, even though they name the same interface.
         emitRaw(context, "Ti");
-        emitType(context, existentialType->getInterfaceType());
+        emitType(context, boxType->getInterfaceType());
     }
     else if (auto andType = as<AndType>(type))
     {

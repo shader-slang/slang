@@ -26,5 +26,10 @@ struct Holder<T>
 }
 Holder<Both> nestedBox;
 
-// CHECK-COUNT-3: error[E30325]
+// CHECK-NOT: internal error
+// CHECK: error[E30325]
+// CHECK-NOT: internal error
+// CHECK: error[E30325]
+// CHECK-NOT: internal error
+// CHECK: error[E30325]
 // CHECK-NOT: internal error

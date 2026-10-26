@@ -268,7 +268,22 @@ public:
     ///
     Type* getTypeFromString(String const& typeStr, DiagnosticSink* sink);
     Expr* parseExprFromString(String expr, DiagnosticSink* sink);
-    Expr* findDeclFromString(String const& name, DiagnosticSink* sink);
+
+    /// The purpose of a component's declaration lookup.
+    enum class DeclLookupPurpose
+    {
+        EntryPoint,
+        Reflection,
+    };
+
+    /// Check an expression that names a declaration for entry-point discovery or reflection.
+    ///
+    /// Reflection may retrieve interface requirements without a concrete `This`. Entry-point
+    /// discovery still rejects callable requirements referenced through the interface itself.
+    /// Results are cached separately for each purpose.
+    /// Returns the checked expression after overload simplification. Resolution failures may
+    /// return null or an error expression; callers validate the result kind.
+    Expr* findDeclFromString(String const& name, DeclLookupPurpose purpose, DiagnosticSink* sink);
     Expr* tryResolveOverloadedExpr(Expr* exprIn);
 
     Expr* findDeclFromStringInType(
@@ -428,8 +443,8 @@ protected:
     //
     Dictionary<String, Type*> m_types;
 
-    // Any decls looked up dynamically using `findDeclFromString`.
-    Dictionary<String, Expr*> m_decls;
+    // Lookup results are keyed by purpose and name so metadata cannot bypass entry-point checks.
+    Dictionary<KeyValuePair<DeclLookupPurpose, String>, Expr*> m_decls;
 
     Scope* m_lookupScope = nullptr;
     std::unique_ptr<Dictionary<String, IntVal*>> m_mapMangledNameToIntVal;

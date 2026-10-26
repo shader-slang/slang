@@ -13,11 +13,11 @@
 namespace Slang
 {
 
-/// Check whether box packing loses the storage required by a reference-qualified parameter.
+/// Check whether existential box packing loses storage required by a reference-qualified parameter.
 ///
 /// Both read-only and writable reference modes require actual box-typed storage; a concrete
 /// argument's storage cannot serve as a reference to the temporary box produced by packing it.
-static bool doesBoxPackingLoseRequiredReferenceStorage(
+static bool doesExistentialBoxPackingLoseRequiredReferenceStorage(
     Expr* coercedArgument,
     QualType argumentType,
     QualType parameterType)
@@ -33,9 +33,9 @@ static bool doesBoxPackingLoseRequiredReferenceStorage(
 
     // Passing an existing box does not pack a concrete value. A concrete argument instead
     // needs a conversion that creates a box, so its original storage has the wrong type.
-    if (as<ExistentialType>(argumentType))
+    if (as<ExistentialBoxType>(argumentType))
         return false;
-    return as<ExistentialType>(parameterType) != nullptr;
+    return as<ExistentialBoxType>(parameterType) != nullptr;
 }
 
 bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* paramDecl)
@@ -947,7 +947,10 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         {
             Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
-            if (doesBoxPackingLoseRequiredReferenceStorage(coercedExpr, arg.type, paramType))
+            if (doesExistentialBoxPackingLoseRequiredReferenceStorage(
+                    coercedExpr,
+                    arg.type,
+                    paramType))
             {
                 if (context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
@@ -961,12 +964,12 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                         name.append(paramIndex, 10);
 
                     getSink()->diagnose(
-                        Diagnostics::ConcreteArgumentToExistentialReferenceParameter{
+                        Diagnostics::ConcreteArgumentToExistentialBoxReferenceParameter{
                             .paramName = name,
                             .paramType = paramType.type,
                             .argType = arg.type,
                             .constraintInterface =
-                                as<ExistentialType>(paramType)->getInterfaceType(),
+                                as<ExistentialBoxType>(paramType)->getInterfaceType(),
                             .location = context.loc});
                 }
                 return {nullptr, nullptr};

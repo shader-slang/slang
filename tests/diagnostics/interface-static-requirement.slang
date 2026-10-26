@@ -21,5 +21,8 @@ int missingConcreteThis()
     return IFoo.withDefault();
 }
 
-// CHECK-COUNT-2: error[E30323]
+// CHECK-NOT: internal error
+// CHECK: error[E30323]
+// CHECK-NOT: internal error
+// CHECK: error[E30323]
 // CHECK-NOT: internal error

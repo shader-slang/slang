@@ -958,16 +958,15 @@ Type* ASTBuilder::getAndType(Type* left, Type* right)
     return type;
 }
 
-ExistentialType* ASTBuilder::getExistentialType(Type* interfaceType)
+ExistentialBoxType* ASTBuilder::getExistentialBoxType(Type* interfaceType)
 {
     SLANG_RELEASE_ASSERT(interfaceType);
-    interfaceType = interfaceType->getCanonicalType();
-    SLANG_RELEASE_ASSERT(isDeclRefTypeOf<InterfaceDecl>(interfaceType));
-    return getOrCreate<ExistentialType>(interfaceType);
+    SLANG_RELEASE_ASSERT(isDeclRefTypeOf<InterfaceDecl>(interfaceType->getCanonicalType()));
+    return getOrCreate<ExistentialBoxType>(interfaceType);
 }
 
-ExistentialDifferentiabilityWitness* ASTBuilder::getExistentialDifferentiabilityWitness(
-    ExistentialType* boxType,
+ExistentialBoxDifferentiabilityWitness* ASTBuilder::getExistentialBoxDifferentiabilityWitness(
+    ExistentialBoxType* boxType,
     SubtypeWitness* interfaceWitness)
 {
     // The proof starts at the interface inside the box. We derive the metadata's supertype from
@@ -980,7 +979,7 @@ ExistentialDifferentiabilityWitness* ASTBuilder::getExistentialDifferentiability
         SLANG_RELEASE_ASSERT(
             differentiabilityInterface->equals(getDifferentiableRefInterfaceType()));
 
-    return getOrCreate<ExistentialDifferentiabilityWitness>(
+    return getOrCreate<ExistentialBoxDifferentiabilityWitness>(
         boxType,
         differentiabilityInterface,
         interfaceWitness);

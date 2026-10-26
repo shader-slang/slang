@@ -444,7 +444,7 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
     ctx().reset();
 }
 
-SLANG_UNIT_TEST(replayContextTypeReflectionExistential)
+SLANG_UNIT_TEST(replayContextTypeReflectionExistentialBox)
 {
     REPLAY_TEST;
     ctx().enable();
@@ -475,8 +475,8 @@ SLANG_UNIT_TEST(replayContextTypeReflectionExistential)
     )";
     ComPtr<slang::IBlob> diagnostics;
     auto module = session->loadModuleFromSourceString(
-        "existential-replay",
-        "existential-replay.slang",
+        "existential-box-replay",
+        "existential-box-replay.slang",
         source,
         diagnostics.writeRef());
     SLANG_CHECK_ABORT(module != nullptr);

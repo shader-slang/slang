@@ -38,9 +38,10 @@ struct MyFoo: IFoo
 
 int helper<T: IFoo>(T t)
 {
+    T localValue = t;
     do
     {
-        return try t.dosomething<int>();
+        return try localValue.dosomething<int>();
     }
     catch
     {

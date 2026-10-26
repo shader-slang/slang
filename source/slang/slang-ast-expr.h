@@ -974,7 +974,7 @@ class AndTypeExpr : public Expr
 /// The `interfaceType` operand names the interface to be boxed. Semantic checking rejects operands
 /// that do not denote a single interface, including conjunctions and existential box types.
 FIDDLE()
-class ExistentialTypeExpr : public Expr
+class ExistentialBoxTypeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() TypeExp interfaceType;
