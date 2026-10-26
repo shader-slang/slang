@@ -269,9 +269,13 @@ test("ignoredReviewerSet lowercases team members and extra logins", () => {
   assert.deepStrictEqual([...ignored].sort(), ["defaultreviewer", "extra1", "extra2"]);
 });
 
-test("ignoredReviewerSet keeps the extra logins when the team is unreadable", () => {
+test("ignoredReviewerSet keeps the extra logins when the team is empty or unset", () => {
   assert.deepStrictEqual([...ignoredReviewerSet(new Set(), ["extra1"])], ["extra1"]);
-  assert.deepStrictEqual([...ignoredReviewerSet(null, null)], []);
+  assert.deepStrictEqual([...ignoredReviewerSet(undefined, undefined)], []);
+});
+
+test("ignoredReviewerSet is unknown when the team read failed", () => {
+  assert.strictEqual(ignoredReviewerSet(null, ["extra1"]), null);
 });
 
 test("ignoredReviewersToRemove matches case-insensitively and keeps PR spelling", () => {
