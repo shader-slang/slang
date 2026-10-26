@@ -43,6 +43,17 @@ struct Constants
     static const float kScale = 4.0;
 };
 
+struct Scaled<let N : int>
+{
+    static const float kValue = N * 0.5;
+};
+
+// Specialization and `extern` constants get their values later, so their initializers are only
+// defaults and must not be reflected as values.
+[SpecializationConstant]
+const float SPEC_VALUE = 2.0;
+extern static const float EXTERN_VALUE = 3.0;
+
 // CHECK: "name": "floatProbe"
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}0,{{$}}
@@ -97,6 +108,7 @@ struct Constants
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}10,{{$}}
 // CHECK-NEXT: {{^ *}}2.500000{{$}}
+// `INT_VALUE / 4` divides as integers (6 / 4 == 1) before the conversion to `float`.
 [floatProbe(10, INT_VALUE / 4 + 1.5 * (2 - 1))]
 // CHECK: "name": "doubleProbe"
 // CHECK-NEXT: "arguments": [
@@ -124,17 +136,20 @@ struct Constants
 // CHECK-NEXT: {{^ *}}15,{{$}}
 // CHECK-NEXT: {{^ *}}-1.500000{{$}}
 [floatProbe(15, -5.5 % 2.0)]
-// Each operand rounds to `float` before the subtraction, so 16777217.0 becomes 16777216.0.
+// Each intermediate result rounds to its type: 16777216 + 1 rounds back to 16777216 in `float`,
+// so the result is 0, not 1.
 // CHECK: "name": "floatProbe"
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}16,{{$}}
 // CHECK-NEXT: {{^ *}}0.000000{{$}}
-[floatProbe(16, 16777217.0 - 16777216.0)]
+[floatProbe(16, 16777216.0 + 1.0 - 16777216.0)]
+// The `double` counterpart of probe 16 keeps the 1.
 // CHECK: "name": "doubleProbe"
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}17,{{$}}
 // CHECK-NEXT: {{^ *}}1.000000{{$}}
-[doubleProbe(17, 16777217.0l - 16777216.0l)]
+[doubleProbe(17, 16777216.0l + 1.0l - 16777216.0l)]
+// 0.1 rounded to `half` is 0.0999755859375.
 // CHECK: "name": "halfProbe"
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}18,{{$}}
@@ -156,6 +171,45 @@ struct Constants
 // CHECK-NEXT: {{^ *}}21,{{$}}
 // CHECK-NEXT: {{^ *}}1.500000{{$}}
 [floatProbe(21, +FLOAT_VALUE)]
+// 2048 + 1 rounds back to 2048 in `half`, so the result is 0, not 1.
+// CHECK: "name": "halfProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}22,{{$}}
+// CHECK-NEXT: {{^ *}}0.000000{{$}}
+[halfProbe(22, 2048.0h + 1.0h - 2048.0h)]
+// CHECK: "name": "floatProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}23,{{$}}
+// CHECK-NEXT: "invalid value"
+[floatProbe(23, SPEC_VALUE)]
+// CHECK: "name": "floatProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}24,{{$}}
+// CHECK-NEXT: "invalid value"
+[floatProbe(24, EXTERN_VALUE)]
+// CHECK: "name": "floatProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}25,{{$}}
+// CHECK-NEXT: {{^ *}}1.500000{{$}}
+[floatProbe(25, Scaled<3>.kValue)]
+// An unsigned 64-bit operand converts as unsigned.
+// CHECK: "name": "floatProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}26,{{$}}
+// CHECK-NEXT: {{^ *}}18446744073709551616.000000{{$}}
+[floatProbe(26, 0xFFFFFFFFFFFFFFFFull)]
+// Integer operands fold with the integer folder, which does not narrow the intermediate
+// `2147483647 + 1` to `int`; a `float` parameter reflects the same value as an `int` one.
+// CHECK: "name": "intProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}27,{{$}}
+// CHECK-NEXT: {{^ *}}1073741824{{$}}
+[intProbe(27, (2147483647 + 1) / 2)]
+// CHECK: "name": "floatProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}28,{{$}}
+// CHECK-NEXT: {{^ *}}1073741824.000000{{$}}
+[floatProbe(28, (2147483647 + 1) / 2)]
 [numthreads(1, 1, 1)]
 void main()
 {

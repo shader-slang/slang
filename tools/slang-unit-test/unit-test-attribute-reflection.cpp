@@ -118,4 +118,24 @@ SLANG_UNIT_TEST(attributeReflection)
     fvalue = 0;
     SLANG_CHECK(SLANG_SUCCEEDED(maxTessFactorAttribute->getArgumentValueFloat(0, &fvalue)));
     SLANG_CHECK(fvalue == 64.0f);
+
+    // Folded values are serialized with the module, so they survive a round trip through a
+    // binary module loaded into a fresh session.
+    ComPtr<ISlangBlob> moduleBlob;
+    SLANG_CHECK_ABORT(module->serialize(moduleBlob.writeRef()) == SLANG_OK);
+    ComPtr<slang::ISession> reloadSession;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, reloadSession.writeRef()) == SLANG_OK);
+    auto reloadedModule = reloadSession->loadModuleFromIRBlob(
+        "m",
+        "m.slang-module",
+        moduleBlob,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(reloadedModule != nullptr);
+    auto reloadedScaleType = reloadedModule->getLayout()->findTypeByName("TScale");
+    SLANG_CHECK_ABORT(reloadedScaleType != nullptr);
+    auto reloadedScaleAttribute = reloadedScaleType->findAttributeByName("Scale");
+    SLANG_CHECK_ABORT(reloadedScaleAttribute != nullptr);
+    fvalue = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(reloadedScaleAttribute->getArgumentValueFloat(0, &fvalue)));
+    SLANG_CHECK(fvalue == 1.5f);
 }
