@@ -2,6 +2,7 @@
 
 #include "core/slang-io.h"
 #include "core/slang-process.h"
+#include "core/slang-string-util.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
@@ -595,6 +596,125 @@ SLANG_UNIT_TEST(genericEntryPointSpecializationCapabilities)
                 SLANG_CHECK(code->getBufferSize() != 0);
             }
         }
+    }
+}
+
+SLANG_UNIT_TEST(genericEntryPointSpecializationExecutionModes)
+{
+    const char* source = R"(
+        [require(spvShader64BitIndexingEXT)]
+        struct NeedsIndexing { uint value; }
+        struct Plain { uint value; }
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void genericMain<T>() {}
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const char* selections[] = {"genericMain<NeedsIndexing>", "genericMain<Plain>"};
+    const char* exportedNames[] = {"indexingMain", "plainMain"};
+    for (Index firstSelection = 0; firstSelection < 2; firstSelection++)
+    {
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV_ASM;
+        targetDesc.profile = globalSession->findProfile("spirv_1_5");
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        // Select both specializations before lowering the shared generic function body, as
+        // slangc does. Loading a module first would miss capability leakage during source lowering.
+        ComPtr<slang::ICompileRequest> request;
+        SLANG_ALLOW_DEPRECATED_BEGIN
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompileRequest(request.writeRef())));
+        int translationUnit = request->addTranslationUnit(
+            SLANG_SOURCE_LANGUAGE_SLANG,
+            "specializationExecutionModes");
+        request->addTranslationUnitSourceString(
+            translationUnit,
+            "specializationExecutionModes.slang",
+            source);
+        for (Index i = 0; i < 2; i++)
+        {
+            Index selectionIndex = (firstSelection + i) % 2;
+            SLANG_CHECK_ABORT(
+                request->addEntryPoint(
+                    translationUnit,
+                    selections[selectionIndex],
+                    SLANG_STAGE_COMPUTE) == i);
+        }
+        request->setCompileFlags(SLANG_COMPILE_FLAG_NO_CODEGEN);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(request->compile()));
+        SLANG_ALLOW_DEPRECATED_END
+
+        // SPIR-V requires distinct exported names for entry points with the same stage. Rename
+        // the selected components before emitting them together, preserving their original order.
+        ComPtr<slang::IModule> module;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(request->getModule(translationUnit, module.writeRef())));
+        ComPtr<slang::IComponentType> entries[2];
+        for (Index i = 0; i < 2; i++)
+        {
+            Index selectionIndex = (firstSelection + i) % 2;
+            ComPtr<slang::IComponentType> entry;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(request->getEntryPoint(i, entry.writeRef())));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                entry->renameEntryPoint(exportedNames[selectionIndex], entries[i].writeRef())));
+        }
+
+        ComPtr<slang::IBlob> diagnostics;
+        slang::IComponentType* components[] = {module.get(), entries[0].get(), entries[1].get()};
+        ComPtr<slang::IComponentType> composite;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+            components,
+            SLANG_COUNT_OF(components),
+            composite.writeRef(),
+            diagnostics.writeRef())));
+        ComPtr<slang::IComponentType> program;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(composite->link(program.writeRef(), diagnostics.writeRef())));
+        ComPtr<slang::IBlob> code;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(program->getTargetCode(0, code.writeRef(), diagnostics.writeRef())));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        // Find the emitted function IDs by exported name, independently of disassembler naming.
+        String output = _blobToString(code);
+        List<UnownedStringSlice> lines;
+        StringUtil::calcLines(output.getUnownedSlice(), lines);
+        String indexingId;
+        String plainId;
+        Index entryCount = 0;
+        for (auto line : lines)
+        {
+            List<UnownedStringSlice> operands;
+            StringUtil::splitOnWhitespace(line, operands);
+            if (operands.getCount() < 4 || operands[0] != toSlice("OpEntryPoint"))
+                continue;
+            SLANG_CHECK(operands[1] == toSlice("GLCompute"));
+            if (operands[3] == toSlice("\"indexingMain\""))
+                indexingId = operands[2];
+            if (operands[3] == toSlice("\"plainMain\""))
+                plainId = operands[2];
+            entryCount++;
+        }
+        SLANG_CHECK(entryCount == 2);
+        SLANG_CHECK_ABORT(indexingId.getLength() != 0);
+        SLANG_CHECK_ABORT(plainId.getLength() != 0);
+        SLANG_CHECK(indexingId != plainId);
+
+        StringBuilder indexingMode;
+        indexingMode << "OpExecutionMode " << indexingId << " Shader64BitIndexingEXT";
+        StringBuilder plainMode;
+        plainMode << "OpExecutionMode " << plainId << " Shader64BitIndexingEXT";
+        SLANG_CHECK(output.getUnownedSlice().indexOf(indexingMode.getUnownedSlice()) != -1);
+        SLANG_CHECK(output.getUnownedSlice().indexOf(plainMode.getUnownedSlice()) == -1);
     }
 }
 

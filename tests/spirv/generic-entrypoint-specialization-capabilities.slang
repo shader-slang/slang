@@ -5,8 +5,6 @@
 //TEST:SIMPLE(filecheck=VERSION): -target spirv-asm -entry genericMain -specialize NeedsSpirv16 -profile spirv_1_5
 //TEST:SIMPLE(filecheck=PLAIN): -target spirv-asm -entry genericMain<Plain> -profile spirv_1_5
 //TEST:SIMPLE(filecheck=PLAIN): -target spirv-asm -entry genericMain -specialize Plain -profile spirv_1_5
-//TEST:SIMPLE(filecheck=INDEX_FIRST): -target spirv-asm -entry genericMain<NeedsIndexing> -entry genericMain<Plain>
-//TEST:SIMPLE(filecheck=PLAIN_FIRST): -target spirv-asm -entry genericMain<Plain> -entry genericMain<NeedsIndexing>
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESTRICTIVE,non-exhaustive): -target spirv-asm -entry genericMain<NeedsSpirv16> -profile spirv_1_5 -restrictive-capability-check
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESTRICTIVE,non-exhaustive): -target spirv-asm -entry genericMain -specialize NeedsSpirv16 -profile spirv_1_5 -restrictive-capability-check
 
@@ -18,18 +16,6 @@
 //PLAIN-NOT: Shader64BitIndexingEXT
 //PLAIN: OpFunctionEnd
 //RESTRICTIVE: E41013
-
-// The two specializations share a function declaration, but only one needs the execution mode.
-//INDEX_FIRST: OpEntryPoint GLCompute [[EXTENDED:%[^ ]+]]
-//INDEX_FIRST: OpEntryPoint GLCompute [[ORDINARY:%[^ ]+]]
-//INDEX_FIRST-NOT: OpExecutionMode [[ORDINARY]] Shader64BitIndexingEXT
-//INDEX_FIRST: OpExecutionMode [[EXTENDED]] Shader64BitIndexingEXT
-//INDEX_FIRST-NOT: OpExecutionMode [[ORDINARY]] Shader64BitIndexingEXT
-//PLAIN_FIRST: OpEntryPoint GLCompute [[ORDINARY:%[^ ]+]]
-//PLAIN_FIRST: OpEntryPoint GLCompute [[EXTENDED:%[^ ]+]]
-//PLAIN_FIRST-NOT: OpExecutionMode [[ORDINARY]] Shader64BitIndexingEXT
-//PLAIN_FIRST: OpExecutionMode [[EXTENDED]] Shader64BitIndexingEXT
-//PLAIN_FIRST-NOT: OpExecutionMode [[ORDINARY]] Shader64BitIndexingEXT
 
 [require(spvShader64BitIndexingEXT)]
 struct NeedsIndexing
