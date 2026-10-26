@@ -3323,11 +3323,12 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
 // The front end folds floating-point constants only so that reflection can report the
 // floating-point arguments of user-defined attributes, which `validateAttribute` records in
-// `Attribute::floatArgVals`; those arguments are never lowered to IR. Each node folds to a
-// `double` that is then rounded once, to the node's own type. Because `double` has more than
-// twice the significand bits of `float` and `half`, rounding an exact `+`, `-`, `*` or `/` result
-// to `double` first does not change its final rounding, so the folded value matches what the
-// operation produces in the narrower type.
+// `Attribute::floatArgVals`; those arguments are never lowered to IR. Each node computes a
+// `double` from operands that are already exact values of the node's type, then rounds it to that
+// type. If a format has p significand bits, rounding an exact `+`, `-`, `*` or `/` result first to
+// a format with at least 2p + 2 bits and then to p bits gives the correctly rounded result, so
+// `double` (53 bits) is exact enough for `float` (24 bits), and `float` for `half` (11 bits).
+// We round to `half` through `float`, as `IRBuilder::getFloatValue` does for a `half` constant.
 
 /// Return `value` rounded to the precision of the floating-point type `baseType`. For example,
 /// `16777217.0` rounds to `16777216.0` as a `float` but is unchanged as a `double`.
@@ -3370,48 +3371,51 @@ std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatE
     {
         // Every operand of a floating-point arithmetic node has the node's type:
         // `coerceOperandsOfBuiltinBinaryExpr` converts binary operands, and unary `-` keeps its
-        // operand's type. Like `BuiltinOperationIntVal::tryFoldImpl`, we reject a node whose
-        // operand count does not match its operator rather than read a missing operand.
+        // operand's type. `convertToBuiltinArithmeticOp` gives `Neg` one operand and every other
+        // operator two, and only the operators below can give a floating-point result:
+        // comparisons give `bool`, and bitwise operators reject floating-point operands. A node
+        // that breaks either rule asserts, and declines to fold when assertions are disabled.
         auto opExpr = builtinOpExpr.getExpr();
-        const Index argCount = opExpr->arguments.getCount();
-        if (argCount != (opExpr->op == BuiltinOperationKind::Neg ? 1 : 2))
-            return std::nullopt;
-        FloatingPointLiteralValue args[2];
-        for (Index a = 0; a < argCount; ++a)
+        const Index operandCount = opExpr->arguments.getCount();
+        if (operandCount != (opExpr->op == BuiltinOperationKind::Neg ? 1 : 2))
         {
-            auto argValue = tryConstantFoldFloatExpr(
-                SubstExpr<Expr>(opExpr->arguments[a], expr.getSubsts()),
+            SLANG_ASSERT_FAILURE("operand count does not match the builtin operator");
+            return std::nullopt;
+        }
+        FloatingPointLiteralValue operands[2];
+        for (Index i = 0; i < operandCount; ++i)
+        {
+            auto operandValue = tryConstantFoldFloatExpr(
+                SubstExpr<Expr>(opExpr->arguments[i], expr.getSubsts()),
                 circularityInfo);
-            if (!argValue)
+            if (!operandValue)
                 return std::nullopt;
-            args[a] = *argValue;
+            operands[i] = *operandValue;
         }
         switch (opExpr->op)
         {
         case BuiltinOperationKind::Neg:
-            value = -args[0];
+            value = -operands[0];
             break;
         case BuiltinOperationKind::Add:
-            value = args[0] + args[1];
+            value = operands[0] + operands[1];
             break;
         case BuiltinOperationKind::Sub:
-            value = args[0] - args[1];
+            value = operands[0] - operands[1];
             break;
         case BuiltinOperationKind::Mul:
-            value = args[0] * args[1];
+            value = operands[0] * operands[1];
             break;
         case BuiltinOperationKind::Div:
-            value = args[0] / args[1];
+            value = operands[0] / operands[1];
             break;
         case BuiltinOperationKind::Mod:
             // Floating-point `%` lowers to `FRem`, whose result takes the sign of the dividend.
-            value = std::fmod(args[0], args[1]);
+            value = std::fmod(operands[0], operands[1]);
             break;
         default:
-            // Only the arithmetic operators above give a floating-point result: comparisons
-            // give `bool`, and bitwise operators reject floating-point operands.
             SLANG_ASSERT_FAILURE("unexpected operator with a floating-point result");
-            break;
+            return std::nullopt;
         }
     }
     else if (auto invokeExpr = expr.as<InvokeExpr>())
@@ -3423,16 +3427,15 @@ std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatE
         // the type, so a no-op intrinsic is the identity only when its operand has the result
         // type.
         auto calleeExpr = getBaseExpr(invokeExpr).as<DeclRefExpr>();
-        if (calleeExpr && getArgCount(invokeExpr) == 1)
+        auto calleeDecl = calleeExpr ? getDeclRef(m_astBuilder, calleeExpr).getDecl() : nullptr;
+        if (calleeDecl && getArgCount(invokeExpr) == 1)
         {
-            auto calleeDecl = getDeclRef(m_astBuilder, calleeExpr).getDecl();
             auto arg = getArg(invokeExpr, 0);
-            auto intrinsicOp =
-                calleeDecl ? calleeDecl->findModifier<IntrinsicOpModifier>() : nullptr;
-            if (calleeDecl && calleeDecl->hasModifier<ImplicitConversionModifier>())
+            auto intrinsicMod = calleeDecl->findModifier<IntrinsicOpModifier>();
+            if (calleeDecl->hasModifier<ImplicitConversionModifier>())
                 value = tryConstantFoldFloatConversion(arg, baseType, circularityInfo);
             else if (
-                intrinsicOp && IROp(intrinsicOp->op) == kIROp_Nop &&
+                intrinsicMod && IROp(intrinsicMod->op) == kIROp_Nop &&
                 basicType->equals(getType(m_astBuilder, arg)))
                 value = tryConstantFoldFloatExpr(arg, circularityInfo);
         }
@@ -3467,13 +3470,21 @@ std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatC
     if (!isValidCompileTimeConstantType(operandType))
         return std::nullopt;
 
+    // The integer folder reports problems such as a division by zero itself, and the integer
+    // contexts that own those diagnostics already fold this operand where it matters: `coerce`
+    // folds an integer converted to `half` to check its range. Folding for reflection therefore
+    // runs on a scratch sink and never adds an integer diagnostic.
+    DiagnosticSink scratchSink(getSourceManager(), nullptr, getSink());
+    SemanticsVisitor scratchVisitor(withSink(&scratchSink));
     // `tryConstantFoldExpr` computes integer operations in 64 bits and does not narrow their
     // results to their type, so we narrow the folded operand here: `0u - 1u` converts as
     // `0xFFFFFFFFu`. Only the outermost result is narrowed, so the `0u - 1u` inside
     // `(0u - 1u) / 2u` keeps its 64-bit value, exactly as it does for an integer parameter
     // (#13954).
-    auto intVal = as<ConstantIntVal>(
-        tryConstantFoldExpr(operand, ConstantFoldingKind::CompileTime, circularityInfo));
+    auto intVal = as<ConstantIntVal>(scratchVisitor.tryConstantFoldExpr(
+        operand,
+        ConstantFoldingKind::CompileTime,
+        circularityInfo));
     if (!intVal)
         return std::nullopt;
     intVal =
