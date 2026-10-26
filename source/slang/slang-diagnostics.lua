@@ -1744,9 +1744,9 @@ err(
 )
 
 err(
-    "concrete-argument-to-existential-reference-parameter",
+    "concrete-argument-to-existential-box-reference-parameter",
     30077,
-    "concrete type passed to an existential reference parameter",
+    "concrete type passed to an existential box reference parameter",
     span { loc = "location", message = "parameter '~paramName' requires storage of type '~paramType:Type', but argument has concrete type '~argType:QualType'. To accept concrete storage, use a generic 'T ~paramName' with a 'where T : ~constraintInterface:Type' constraint." }
 )
 
@@ -1864,7 +1864,7 @@ err(
 )
 
 err(
-    "existential-conjunction-not-supported",
+    "existential-box-conjunction-not-supported",
     30325,
     "existential boxes over interface conjunctions are not supported",
     span { loc = "location" }
@@ -1878,7 +1878,7 @@ err(
 )
 
 err(
-    "existential-is-as-not-supported",
+    "existential-box-is-as-not-supported",
     30322,
     "existential box types are not supported on the right-hand side of 'is' or 'as'",
     span { loc = "expr:Expr" }
@@ -1894,7 +1894,7 @@ err(
 err(
     "expected-proper-type-for-specialization-arg",
     30327,
-    "existential specialization requires a value type, got '~type:Type'",
+    "existential box specialization requires a value type, got '~type:Type'",
     span { loc = "location" }
 )
 

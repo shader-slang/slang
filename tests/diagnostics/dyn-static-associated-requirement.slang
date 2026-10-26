@@ -25,6 +25,8 @@ void throughGeneric()
     let value = makeZero<dyn IV>();
 }
 
+// CHECK-NOT: internal error
 // CHECK: error[E30323]
+// CHECK-NOT: internal error
 // CHECK: error[E38029]
 // CHECK-NOT: internal error

@@ -22,5 +22,14 @@ struct Holder<T>
 Holder<IFoo> genericArgument;
 IFoo arrayValue[2];
 
-// CHECK-COUNT-5: error[E30324]
+// CHECK-NOT: internal error
+// CHECK: error[E30324]
+// CHECK-NOT: internal error
+// CHECK: error[E30324]
+// CHECK-NOT: internal error
+// CHECK: error[E30324]
+// CHECK-NOT: internal error
+// CHECK: error[E30324]
+// CHECK-NOT: internal error
+// CHECK: error[E30324]
 // CHECK-NOT: internal error

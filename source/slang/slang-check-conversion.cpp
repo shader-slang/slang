@@ -570,7 +570,7 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
     if (isSlang2026OrLater(this))
     {
         // TODO: some/dyn types are also not C-style.
-        if (as<ExistentialType>(type))
+        if (as<ExistentialBoxType>(type))
             return cacheResult(false);
     }
 
@@ -2402,8 +2402,8 @@ bool SemanticsVisitor::_coerce(
     // Packing a box requires a witness for its payload, rather than a conformance to the box.
     // A box-to-box upcast reuses the interface refinement witness; lowering projects the stored
     // witness table along that path without claiming that either box conforms to an interface.
-    auto fromBoxType = as<ExistentialType>(fromType);
-    auto toBoxType = as<ExistentialType>(toType);
+    auto fromBoxType = as<ExistentialBoxType>(fromType);
+    auto toBoxType = as<ExistentialBoxType>(toType);
     auto witnessSubType = fromType.type;
     if (toBoxType)
     {
@@ -2964,13 +2964,13 @@ bool SemanticsVisitor::_coerce(
                         {
                             auto fromVal = fromPtrType->getValueType();
                             auto toVal = toPtrType->getValueType();
-                            if (auto toBoxType = as<ExistentialType>(toVal))
+                            if (auto toPointeeBoxType = as<ExistentialBoxType>(toVal))
                             {
-                                if (!as<ExistentialType>(fromVal))
+                                if (!as<ExistentialBoxType>(fromVal))
                                 {
                                     if (tryGetSubtypeWitness(
                                             fromVal,
-                                            toBoxType->getInterfaceType()))
+                                            toPointeeBoxType->getInterfaceType()))
                                     {
                                         sink->diagnose(
                                             Diagnostics::NoteConcreteToInterfacePtrUnsafe{

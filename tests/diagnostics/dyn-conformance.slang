@@ -19,6 +19,8 @@ int invalidConformance()
     return constrained<Box>();
 }
 
+// CHECK-NOT: internal error
 // CHECK: error[E38029]
+// CHECK-NOT: internal error
 // CHECK: type argument 'dyn IFoo' does not conform to the required interface 'IFoo'
 // CHECK-NOT: internal error

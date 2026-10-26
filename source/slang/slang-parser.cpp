@@ -2233,7 +2233,7 @@ public:
         if (expr->base.exp)
             dispatch(expr->base.exp);
     }
-    void visitExistentialTypeExpr(ExistentialTypeExpr* expr)
+    void visitExistentialBoxTypeExpr(ExistentialBoxTypeExpr* expr)
     {
         if (expr->interfaceType.exp)
             dispatch(expr->interfaceType.exp);
@@ -8097,9 +8097,9 @@ static Expr* _parseAtomicTypeExpr(Parser* parser, bool allowDecl)
 /// Consider `typealias P = dyn N::IFoo<int>*;`. We parse `N::IFoo<int>` as the operand and leave
 /// the `*` for the enclosing type parser, which forms a pointer to the existential box. Parentheses
 /// can group a complete operand, as in `dyn (IFoo & IBar)`; semantic checking then validates it.
-static NodeBase* parseExistentialTypeExpr(Parser* parser, void* /* unused */)
+static NodeBase* parseExistentialBoxTypeExpr(Parser* parser, void* /* unused */)
 {
-    auto expr = parser->astBuilder->create<ExistentialTypeExpr>();
+    auto expr = parser->astBuilder->create<ExistentialBoxTypeExpr>();
     expr->interfaceType = TypeExp(_parseAtomicTypeExpr(parser, false));
     return expr;
 }
@@ -8762,7 +8762,7 @@ static bool _isCast(Parser* parser, Expr* expr)
             // A `dyn` type expression cannot be a value operand of these binary operators.
             // We parse `(dyn IFoo)*value` as a cast of `*value`. Before a delimiter, parentheses
             // instead group a type, as in the generic argument `Holder<(dyn IFoo)>`.
-            if (as<ExistentialTypeExpr>(expr))
+            if (as<ExistentialBoxTypeExpr>(expr))
             {
                 return true;
             }
@@ -11286,7 +11286,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     // !!!!!!!!!!!!!!!!!!!!!!! Expr !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     _makeParseExpr("this", parseThisExpr),
-    _makeParseExpr("dyn", parseExistentialTypeExpr),
+    _makeParseExpr("dyn", parseExistentialBoxTypeExpr),
     _makeParseExpr("true", parseTrueExpr),
     _makeParseExpr("false", parseFalseExpr),
     _makeParseExpr("__return_val", parseReturnValExpr),

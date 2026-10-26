@@ -47,7 +47,7 @@ void entry()
     h(concrete); // No error
     f(concrete); // ERROR!
 /*diag:
-     ^ concrete type passed to an existential reference parameter
+     ^ concrete type passed to an existential box reference parameter
      ^ parameter 'x' requires storage of type 'dyn IThing', but argument has concrete type 'MyThing'. To accept concrete storage, use a generic 'T x' with a 'where T : IThing' constraint.
 */
 }

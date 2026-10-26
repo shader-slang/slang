@@ -261,7 +261,7 @@ Type* SemanticsVisitor::InstantiateGenericType(
 
 bool isManagedType(Type* type)
 {
-    if (auto boxType = as<ExistentialType>(type))
+    if (auto boxType = as<ExistentialBoxType>(type))
         type = boxType->getInterfaceType();
     if (auto declRefValueType = as<DeclRefType>(type))
     {
@@ -458,18 +458,20 @@ TypeExp SemanticsVisitor::checkInterfaceType(TypeExp typeExp)
     return result;
 }
 
-Type* SemanticsVisitor::formExistentialType(TypeExp const& interfaceType, DiagnosticSink* diagSink)
+Type* SemanticsVisitor::formExistentialBoxType(
+    TypeExp const& interfaceType,
+    DiagnosticSink* diagSink)
 {
     if (as<ErrorType>(interfaceType.type))
         return interfaceType.type;
     if (as<AndType>(interfaceType.type))
     {
         if (diagSink)
-            diagSink->diagnose(Diagnostics::ExistentialConjunctionNotSupported{
+            diagSink->diagnose(Diagnostics::ExistentialBoxConjunctionNotSupported{
                 .location = interfaceType.exp ? interfaceType.exp->loc : SourceLoc()});
         return m_astBuilder->getErrorType();
     }
-    return m_astBuilder->getExistentialType(interfaceType.type);
+    return m_astBuilder->getExistentialBoxType(interfaceType.type);
 }
 
 bool SemanticsVisitor::CoerceToProperTypeImpl(
@@ -488,7 +490,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
     // could defer the failure to lowering, including when the box type is only aliased.
     if (as<AndType>(type))
     {
-        *outProperType = formExistentialType(TypeExp(typeExp.exp, type), diagSink);
+        *outProperType = formExistentialBoxType(TypeExp(typeExp.exp, type), diagSink);
         return false;
     }
     if (isSlang202cOrLater(this))
@@ -500,7 +502,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         *outProperType = m_astBuilder->getErrorType();
         return false;
     }
-    *outProperType = m_astBuilder->getExistentialType(type);
+    *outProperType = m_astBuilder->getExistentialBoxType(type);
     return true;
 }
 

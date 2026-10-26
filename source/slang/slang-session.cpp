@@ -807,6 +807,10 @@ Linkage::getTypeRTTIMangledName(slang::TypeReflection* type, ISlangBlob** outNam
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     auto internalType = asInternal(type);
+    // `visitExistentialBoxType` lowers through the enclosed interface, so RTTI lookup uses
+    // the same declaration name.
+    if (auto boxType = as<ExistentialBoxType>(internalType))
+        internalType = boxType->getInterfaceType();
     if (auto declRefType = as<DeclRefType>(internalType))
     {
         auto name = getMangledName(m_astBuilder, declRefType->getDeclRef());
@@ -826,6 +830,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessMangled
 
     auto subType = asInternal(type);
     auto supType = asInternal(interfaceType);
+    // These names identify the payload's conformance, including when the target comes from
+    // a boxed shader-parameter layout.
+    if (auto boxType = as<ExistentialBoxType>(supType))
+        supType = boxType->getInterfaceType();
     auto name = getMangledNameForConformanceWitness(m_astBuilder, subType, supType);
     Slang::ComPtr<ISlangBlob> blob = Slang::StringUtil::createStringBlob(name);
     *outNameBlob = blob.detach();
@@ -844,6 +852,11 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
 
     if (!subType || !supType)
         return SLANG_FAIL;
+
+    // Shader-object layouts expose the box type. Its witness IDs describe the enclosed
+    // interface's conformances and must share the keys used by IR witness-table lowering.
+    if (auto boxType = as<ExistentialBoxType>(supType))
+        supType = boxType->getInterfaceType();
 
     auto name = getMangledNameForConformanceWitness(m_astBuilder, subType, supType);
     auto interfaceName = getMangledTypeName(m_astBuilder, supType);

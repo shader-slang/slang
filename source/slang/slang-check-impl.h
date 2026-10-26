@@ -1689,6 +1689,19 @@ public:
         return result;
     }
 
+    /// Designate a declaration lookup that retrieves metadata for reflection.
+    ///
+    /// Requires a nonnull lookup used only for declaration metadata. It may name an interface
+    /// requirement with an unknown `This`. Nested expressions receive no exemption from the
+    /// interface-requirement check.
+    SemanticsContext withDeclarationReflectionLookup(DeclRefExpr* lookupExpr)
+    {
+        SLANG_RELEASE_ASSERT(lookupExpr);
+        SemanticsContext result(*this);
+        result.m_declarationReflectionLookupExpr = lookupExpr;
+        return result;
+    }
+
     SemanticsContext withDeclToExcludeFromLookup(Decl* decl)
     {
         SemanticsContext result(*this);
@@ -1746,6 +1759,9 @@ protected:
     /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
     /// is considered valid in the current context.
     bool m_allowStaticReferenceToNonStaticMember = false;
+
+    /// The specific lookup for reflection metadata, or null when none is designated.
+    DeclRefExpr* m_declarationReflectionLookupExpr = nullptr;
 
     bool m_allowDroppingDerivatives = false;
 
@@ -1942,33 +1958,25 @@ public:
     template<typename F>
     Expr* maybeMoveTemp(Expr* const& expr, F const& func);
 
-    /// Return an expression that represents "opening" the existential `expr`.
+    /// Open an existential box expression and return an expression for its stored payload.
     ///
-    /// The type of `expr` must be an interface type, matching `interfaceDeclRef`.
+    /// Requires `expr` to have an existential box type for `interfaceDeclRef`, possibly wrapped
+    /// in modifiers such as `no_diff`. A value `e : dyn IMover` contains:
     ///
-    /// If we scope down the PL theory to just the case that Slang cares about,
-    /// a value of an existential type like `IMover` is a tuple of:
+    ///  * a hidden concrete type `X`,
+    ///  * a witness `w` that `X` conforms to `IMover`, and
+    ///  * a payload value `v` of type `X`.
     ///
-    ///  * a concrete type `X`
-    ///  * a witness `w` of the fact that `X` implements `IMover`
-    ///  * a value `v` of type `X`
-    ///
-    /// "Opening" an existential value is the process of decomposing a single
-    /// value `e : IMover` into the pieces `X`, `w`, and `v`.
-    ///
-    /// Rather than return all those pieces individually, this operation
-    /// returns an expression that logically corresponds to `v`: an expression
-    /// of type `X`, where the type carries the knowledge that `X` implements `IMover`.
+    /// Opening the box binds `X`, `w`, and `v`. The returned expression represents `v`.
+    /// Its hidden type `X` is known to conform to `IMover`.
     ///
     Expr* openExistential(Expr* expr, DeclRef<InterfaceDecl> interfaceDeclRef);
 
-    /// If `expr` has existential type, then open it.
+    /// Open `expr` if it has an existential box type.
     ///
-    /// Returns an expression that opens `expr` if it had existential type.
-    /// Otherwise returns `expr` itself.
-    ///
-    /// See `openExistential` for a discussion of what "opening" an
-    /// existential-type value means.
+    /// Returns an expression for the hidden payload when `expr` has an existential box type,
+    /// including a box wrapped in modifiers. Otherwise returns `expr` unchanged.
+    /// See `openExistential` for the payload and witness produced by opening a box.
     ///
     Expr* maybeOpenExistential(Expr* expr);
 
@@ -2234,11 +2242,12 @@ public:
     /// The result is the checked type expression, with `ErrorType` on failure.
     TypeExp checkInterfaceType(TypeExp typeExp);
 
-    /// Form a box from a checked interface, conjunction, or `ErrorType`.
+    /// Form an existential box type from a checked interface, conjunction, or `ErrorType`.
     ///
-    /// The result is the canonical single-interface box, an existing error, or `ErrorType` for
-    /// an unsupported conjunction. A null `diagSink` suppresses the conjunction diagnostic.
-    Type* formExistentialType(TypeExp const& interfaceType, DiagnosticSink* diagSink);
+    /// Returns a box retaining the checked interface operand, propagates an existing error, or
+    /// returns `ErrorType` for an unsupported conjunction. A null `diagSink` suppresses the
+    /// conjunction diagnostic.
+    Type* formExistentialBoxType(TypeExp const& interfaceType, DiagnosticSink* diagSink);
 
     /// Coerce a type expression to a type that can have values, including `void`.
     ///
@@ -3650,6 +3659,11 @@ public:
         IsSubTypeOptions isSubTypeOptions);
 
     Witness* getDiffTypeInfoWitness(Type* type);
+
+    /// Get the metadata used to form a checked callable's derivative types.
+    ///
+    /// Differentiability entries for boxed parameters and results use scoped payload metadata,
+    /// without establishing an ordinary conformance of the box.
     Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
 
     bool isValidGenericConstraintType(Type* type);
@@ -3698,7 +3712,7 @@ public:
     ///
     /// `interfaceType` must be `IDifferentiable` or `IDifferentiablePtrType`. For an ordinary
     /// type, the result is its subtype witness. For a box, the result is an
-    /// `ExistentialDifferentiabilityWitness` if the enclosed interface refines `interfaceType`.
+    /// `ExistentialBoxDifferentiabilityWitness` if the enclosed interface refines `interfaceType`.
     /// Otherwise the result is null. Box metadata does not establish an ordinary conformance.
     SubtypeWitness* tryGetDifferentiabilityWitness(Type* type, Type* interfaceType);
 
@@ -4481,7 +4495,7 @@ public:
     Expr* visitReturnValExpr(ReturnValExpr* expr);
     Expr* visitAndTypeExpr(AndTypeExpr* expr);
 
-    Expr* visitExistentialTypeExpr(ExistentialTypeExpr* expr);
+    Expr* visitExistentialBoxTypeExpr(ExistentialBoxTypeExpr* expr);
     Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
     Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
     Expr* visitFuncTypeExpr(FuncTypeExpr* expr);

@@ -1023,13 +1023,16 @@ static Expr* maybeSimplifyExprForReflectionAPIUsage(Expr* originalExpr, ASTBuild
     return nullptr;
 }
 
-Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink)
+Expr* ComponentType::findDeclFromString(
+    String const& name,
+    DeclLookupPurpose purpose,
+    DiagnosticSink* sink)
 {
-    // If we've looked up this type name before,
-    // then we can re-use it.
-    //
+    // A metadata query may retain an interface requirement with an unknown `This`, while
+    // entry-point discovery must reject it. We cache the purpose as well as the name.
+    KeyValuePair<DeclLookupPurpose, String> lookupKey(purpose, name);
     Expr* result = nullptr;
-    if (m_decls.tryGetValue(name, result))
+    if (m_decls.tryGetValue(lookupKey, result))
         return result;
 
 
@@ -1058,6 +1061,17 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
     SemanticsContext context(sharedSemanticsContext);
     context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
+    if (purpose == DeclLookupPurpose::Reflection)
+    {
+        // For a generic application, we designate only its function lookup as reflection
+        // metadata. Argument expressions receive no interface-requirement exemption.
+        auto lookupExpr = expr;
+        if (auto genericApp = as<GenericAppExpr>(expr))
+            lookupExpr = genericApp->functionExpr;
+        if (auto declRefExpr = as<DeclRefExpr>(lookupExpr))
+            context = context.withDeclarationReflectionLookup(declRefExpr);
+    }
+
     SemanticsVisitor visitor(context);
 
     auto checkedExpr = visitor.CheckTerm(expr);
@@ -1069,7 +1083,7 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
     }
     result = maybeSimplifyExprForReflectionAPIUsage(checkedExpr, astBuilder);
 
-    m_decls[name] = result;
+    m_decls[lookupKey] = result;
     return result;
 }
 
@@ -1090,8 +1104,8 @@ Expr* ComponentType::findDeclFromStringInType(
     DiagnosticSink* sink)
 {
     // Reflection queries on a box inspect the declarations of its interface.
-    if (auto existentialType = as<ExistentialType>(type))
-        type = existentialType->getInterfaceType();
+    if (auto boxType = as<ExistentialBoxType>(type))
+        type = boxType->getInterfaceType();
 
     // Only look up in the type if it is a DeclRefType
     if (!as<DeclRefType>(type))
@@ -1152,6 +1166,10 @@ Expr* ComponentType::findDeclFromStringInType(
     typeExpr->type = typetype;
     rs->baseExpression = typeExpr;
     rs->name = as<VarExpr>(expr)->name;
+
+    // The outer member lookup retrieves metadata, even for an interface requirement without
+    // a conforming type. Nested arguments receive no interface-requirement exemption.
+    visitor = visitor.withDeclarationReflectionLookup(rs);
 
     expr = rs;
 

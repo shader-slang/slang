@@ -714,7 +714,7 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         // A box belongs to the module declaring its interface. We unwrap only for that module
         // query; `typeName` contains the complete boxed type name for lookup during replay.
         auto owningType = Slang::asInternal(type);
-        if (auto boxType = Slang::as<Slang::ExistentialType>(owningType))
+        if (auto boxType = Slang::as<Slang::ExistentialBoxType>(owningType))
             owningType = boxType->getInterfaceType();
         Slang::DeclRefType* declRefType = Slang::as<Slang::DeclRefType>(owningType);
         if (!declRefType)

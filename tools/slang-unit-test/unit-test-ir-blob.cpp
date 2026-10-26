@@ -477,7 +477,7 @@ SLANG_UNIT_TEST(irBlob)
     }
 }
 
-// Check current existential-type serialization and rejection before incompatible AST decoding.
+// Check existential box type serialization and rejection before incompatible AST decoding.
 //
 // The serialized module distinguishes an interface alias from an explicit existential box alias.
 // We first import and use the current module, then mark copies as versions 36 and 37 and make their
@@ -500,7 +500,7 @@ SLANG_UNIT_TEST(irBlobRejectsIncompatibleASTVersions)
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     // We use Slang 202c so semantic checking cannot implicitly box a bare interface if
-    // serialization loses the existential wrapper.
+    // serialization loses the existential box wrapper.
     slang::CompilerOptionEntry languageVersionEntry = {};
     languageVersionEntry.name = slang::CompilerOptionName::LanguageVersion;
     languageVersionEntry.value.kind = slang::CompilerOptionValueKind::Int;

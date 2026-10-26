@@ -1008,16 +1008,16 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     ConversionCost _getOverloadResolutionCostOverride();
 };
 
-/// An `ExistentialDifferentiabilityWitness` records differentiability metadata for a box.
+/// Differentiability metadata for an existential box.
 ///
 /// `SemanticsVisitor::tryGetDifferentiabilityWitness` may return this metadata for a box.
-/// Ordinary subtype queries do not return this witness. The subtype is an `ExistentialType`,
+/// Ordinary subtype queries do not return this witness. The subtype is an `ExistentialBoxType`,
 /// and the supertype is `IDifferentiable` or `IDifferentiablePtrType`.
 /// The interface witness proves that the boxed interface refines that differentiability interface.
 /// This metadata does not establish an ordinary conformance of the box itself.
-/// Instances are constructed through `ASTBuilder::getExistentialDifferentiabilityWitness`.
+/// Instances are constructed through `ASTBuilder::getExistentialBoxDifferentiabilityWitness`.
 FIDDLE()
-class ExistentialDifferentiabilityWitness : public SubtypeWitness
+class ExistentialBoxDifferentiabilityWitness : public SubtypeWitness
 {
     FIDDLE(...)
     SubtypeWitness* getInterfaceWitness() { return as<SubtypeWitness>(getOperand(2)); }

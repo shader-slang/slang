@@ -6041,9 +6041,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             return _createTypeLayout(context, enumDeclRef.getDecl()->tagType);
         }
     }
-    else if (auto existentialType = as<ExistentialType>(type))
+    else if (auto boxType = as<ExistentialBoxType>(type))
     {
-        auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(existentialType->getInterfaceType());
+        auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(boxType->getInterfaceType());
         RefPtr<ExistentialTypeLayout> typeLayout = new ExistentialTypeLayout();
         typeLayout->type = type;
         typeLayout->rules = rules;
@@ -6078,7 +6078,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         //
         // The default reservation will be 16 bytes (and this number
         // becomes part of our ABI contract), but the `interface`
-        // that is being used to bound the existential can have
+        // that is being used to bound the existential box can have
         // an attribute that specifies a different size to use for
         // its instances.
         //
@@ -6101,7 +6101,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // pieces of information:
         //
         // * Some kind of run-time type information (RTTI) that can identify
-        //   the actual type stored in the existential, and which can therefore
+        //   the actual type stored in the existential box, and which can therefore
         //   be used to allocate/copy/release the value stored.
         //
         // * A value that "witnesses" the fact that the above type actually
@@ -6113,14 +6113,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // We reserve 16 bytes to accomodate the RTTI and witness table information,
         // which should be enough space to store a pointer for each on 64-bit
         // platforms. Note that we don't try to vary this size based on platform-specific
-        // information, because we prefer to keep the encoding of existentials as
+        // information, because we prefer to keep the encoding of existential boxes as
         // simple as we can get away with.
         //
         // TODO: This layout logic does *not* accomodate the case where an
-        // existential type is formed from a conjuction of interfaces (e.g.,
-        // a type like `IReadable & IWritable`). In such a case we'd have
+        // existential box type is formed from a conjunction of interfaces (e.g.,
+        // a type like `dyn (IReadable & IWritable)`). In such a case we'd have
         // to change the layout to accomodate N >= 0 witness tables, either
-        // stored directly in the existential value, or pointed to indirectly
+        // stored directly in the existential box, or pointed to indirectly
         // to keep the size independent of N.
         //
         LayoutSize uniformSlotSize = fixedExistentialValueSize + 16;
@@ -6132,13 +6132,13 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // of existential-type parameters in case they want to perform
         // specialization.
         //
-        // Each leaf parameter of existential type introduces a potential
+        // Each leaf parameter of existential box type introduces a potential
         // specialization parameter into the program, so we add the
         // parameter to represent that here.
         //
         typeLayout->addResourceUsage(LayoutResourceKind::ExistentialTypeParam, 1);
 
-        // A leaf parameter of existential type also introduces a conceptual
+        // A leaf parameter of existential box type also introduces a conceptual
         // "sub-object" that needs to be tracked by an application building
         // a shader object or parameter block abstraction.
         //
@@ -6159,7 +6159,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // Keeping the `LayoutResourceKind`s separate allows us to scale them
         // differently when a type gets used as part of an array or buffer.
 
-        // At this point we have determined the layout of the existential
+        // At this point we have determined the layout of the existential box
         // type itself, but there are additional steps we need to take
         // if we are on a platform that doesn't support general-purpose
         // pointers and addressing *and* we also know of a concrete
@@ -6179,7 +6179,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             SLANG_ASSERT(concreteType);
 
             // Our first job here is to figure out how `concreteType` will
-            // be laid out when stored into this existential.
+            // be laid out when stored into this existential box.
             //
             // We know that *if* the value fits in the "any value" storage,
             // then that is where it will be stored. We start by computing
@@ -6215,7 +6215,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                     // beyond ordinary uniform data, then it also
                     // does not fit.
                     //
-                    // TODO: Make sure this is okay with nested existentials.
+                    // TODO: Make sure this is okay with nested existential boxes.
                     //
                     fits = false;
                     break;

@@ -745,7 +745,7 @@ static bool _collectExistentialSpecializationParamsRec(
             recursionDepth + 1);
     }
 
-    if (as<ExistentialType>(type))
+    if (as<ExistentialBoxType>(type))
     {
         // We add a specialization parameter to select the concrete type stored in this box.
         SpecializationParam specializationParam;
@@ -927,7 +927,10 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
 {
     DeclRef<FuncDecl> entryPointFuncDeclRef;
 
-    auto expr = translationUnit->findDeclFromString(getText(name), sink);
+    auto expr = translationUnit->findDeclFromString(
+        getText(name),
+        ComponentType::DeclLookupPurpose::EntryPoint,
+        sink);
     if (auto declRefExpr = as<DeclRefExpr>(expr))
     {
         entryPointFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
@@ -3416,15 +3419,15 @@ RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
     }
 }
 
-/// Check a box specialization argument and return its payload's interface conformance.
+/// Check an existential box specialization argument and return its payload's interface conformance.
 ///
 /// Interface constraints and conjunctions cannot supply stored data, even when a reflexive subtype
 /// query would succeed. The argument must name a proper type conforming to the boxed interface.
 /// This function diagnoses invalid arguments to `sink` and returns null.
 /// This function uses `parameterLoc` for API type arguments without expressions.
-static SubtypeWitness* checkExistentialSpecializationArg(
+static SubtypeWitness* checkExistentialBoxSpecializationArg(
     SemanticsVisitor& visitor,
-    ExistentialType* boxType,
+    ExistentialBoxType* boxType,
     SpecializationArg const& argument,
     SourceLoc parameterLoc,
     DiagnosticSink* sink)
@@ -3459,7 +3462,8 @@ static SubtypeWitness* checkExistentialSpecializationArg(
     {
         sink->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
             .typeArg = argumentType,
-            .interface = interfaceType});
+            .interface = interfaceType,
+            .location = argumentLoc});
     }
     return witness;
 }
@@ -3603,14 +3607,10 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
 
         case SpecializationParam::Flavor::ExistentialType:
             {
-                auto existentialType = as<ExistentialType>(param.object);
-                SLANG_RELEASE_ASSERT(existentialType);
-                auto witness = checkExistentialSpecializationArg(
-                    visitor,
-                    existentialType,
-                    arg,
-                    param.loc,
-                    sink);
+                auto boxType = as<ExistentialBoxType>(param.object);
+                SLANG_RELEASE_ASSERT(boxType);
+                auto witness =
+                    checkExistentialBoxSpecializationArg(visitor, boxType, arg, param.loc, sink);
                 if (!witness)
                     continue;
 
@@ -3878,10 +3878,14 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
         // TODO: We need to handle all the cases of "flavor" for the `param`s (not just types)
 
-        auto boxType = as<ExistentialType>(param.object);
+        auto boxType = as<ExistentialBoxType>(param.object);
         SLANG_RELEASE_ASSERT(boxType);
-        auto witness =
-            checkExistentialSpecializationArg(visitor, boxType, specializationArg, param.loc, sink);
+        auto witness = checkExistentialBoxSpecializationArg(
+            visitor,
+            boxType,
+            specializationArg,
+            param.loc,
+            sink);
         if (!witness)
             continue;
 
@@ -4049,12 +4053,25 @@ Type* Linkage::specializeType(
     ExpandedSpecializationArgs specializationArgs;
     for (Int aa = 0; aa < argCount; ++aa)
     {
-        auto paramType = as<Type>(specializationParams[aa].object);
-        auto argType = args[aa];
+        // The collector records boxes. We check each payload against the enclosed interface
+        // before storing its conformance witness in the specialized type.
+        auto& param = specializationParams[aa];
+        auto boxType = as<ExistentialBoxType>(param.object);
+        SLANG_RELEASE_ASSERT(boxType);
+        SpecializationArg specializationArg;
+        specializationArg.val = args[aa];
+        auto witness = checkExistentialBoxSpecializationArg(
+            visitor,
+            boxType,
+            specializationArg,
+            param.loc,
+            sink);
+        if (!witness)
+            return nullptr;
 
         ExpandedSpecializationArg arg;
-        arg.val = argType;
-        arg.witness = visitor.isSubtype(argType, paramType, IsSubTypeOptions::None);
+        arg.val = specializationArg.val;
+        arg.witness = witness;
         specializationArgs.add(arg);
     }
 

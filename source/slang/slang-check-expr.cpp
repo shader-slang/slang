@@ -158,24 +158,6 @@ Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
     return moveTemp(expr, func);
 }
 
-/// Return an expression that represents "opening" the existential `expr`.
-///
-/// The type of `expr` must be an existential box for `interfaceDeclRef`.
-///
-/// If we scope down the PL theory to just the case that Slang cares about,
-/// a value of an existential type like `dyn IMover` is a tuple of:
-///
-///  * a concrete type `X`
-///  * a witness `w` of the fact that `X` implements `IMover`
-///  * a value `v` of type `X`
-///
-/// "Opening" an existential value is the process of decomposing a single
-/// value `e : dyn IMover` into the pieces `X`, `w`, and `v`.
-///
-/// Rather than return all those pieces individually, this operation
-/// returns an expression that logically corresponds to `v`: an expression
-/// of type `X`, where the type carries the knowledge that `X` implements `IMover`.
-///
 Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> interfaceDeclRef)
 {
     // If `expr` refers to an immutable binding,
@@ -192,7 +174,7 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
             // The opened type records the interface constraining its hidden payload type.
             // The binding named by `varDeclRef` still has the box type, possibly wrapped in
             // `no_diff`, whether it is the original variable or a temporary from `maybeMoveTemp`.
-            auto boxType = as<ExistentialType>(unwrapModifiedType(expr->type.type));
+            auto boxType = as<ExistentialBoxType>(unwrapModifiedType(expr->type.type));
             SLANG_RELEASE_ASSERT(boxType);
             ExtractExistentialType* openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
                 varDeclRef,
@@ -229,14 +211,6 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
         });
 }
 
-/// If `expr` has existential type, then open it.
-///
-/// Returns an expression that opens `expr` if it had existential type.
-/// Otherwise returns `expr` itself.
-///
-/// See `openExistential` for a discussion of what "opening" an
-/// existential-type value means.
-///
 Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
 {
     // We look through `ModifiedType` before testing for a box, including `no_diff`
@@ -244,7 +218,7 @@ Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
     // `ExtractExistentialValueExpr` that lowering needs for existential dispatch.
     auto exprType = unwrapModifiedType(expr->type.type);
 
-    if (auto boxType = as<ExistentialType>(exprType))
+    if (auto boxType = as<ExistentialBoxType>(exprType))
     {
         auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(boxType->getInterfaceType());
         SLANG_RELEASE_ASSERT(interfaceDeclRef);
@@ -977,7 +951,11 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                     // abstract `This` type; an interface is not a value type to cast it to.
                     // Concrete base classes still require an explicit field projection.
                     if (isValidGenericConstraintType(witness->getSup()))
-                        break;
+                    {
+                        // We created no breadcrumb expression, so we also skip clearing its
+                        // location below. The original receiver needs its location for hover.
+                        continue;
+                    }
                     auto expr = createCastToSuperTypeExpr(witness->getSup(), bb, witness);
 
                     // Note that we allow a cast of an l-value to
@@ -1653,10 +1631,10 @@ Expr* SemanticsVisitor::resolveOverloadedExpr(
 
 Type* SemanticsVisitor::tryGetDifferentialValueType(ASTBuilder* builder, Type* type)
 {
-    if (as<ExistentialType>(type))
+    if (as<ExistentialBoxType>(type))
     {
         auto witness = tryGetDifferentiabilityWitness(type, builder->getDiffInterfaceType());
-        return witness ? builder->getExistentialType(witness->getSup()) : nullptr;
+        return witness ? builder->getExistentialBoxType(witness->getSup()) : nullptr;
     }
     if (auto declRefType = as<DeclRefType>(type))
     {
@@ -1734,10 +1712,10 @@ Type* SemanticsVisitor::tryGetDifferentialValueType(ASTBuilder* builder, Type* t
 
 Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
 {
-    if (as<ExistentialType>(type))
+    if (as<ExistentialBoxType>(type))
     {
         auto witness = isTypeDifferentiable(type);
-        return witness ? builder->getExistentialType(witness->getSup()) : nullptr;
+        return witness ? builder->getExistentialBoxType(witness->getSup()) : nullptr;
     }
     if (auto ptrType = as<PtrTypeBase>(type))
     {
@@ -2160,7 +2138,7 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
     }
 
     bool hasDiffValueConformance = false;
-    if (as<ExistentialType>(type))
+    if (as<ExistentialBoxType>(type))
     {
         // For `dyn IFoo` where `IFoo : IDifferentiable`, autodiff stores the primal and its
         // differential as separate boxes. The pair metadata carries the scoped compatibility
@@ -2177,7 +2155,7 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
             this->getParentDifferentiableAttribute()->addAssocVal(
                 type,
                 (SlangInt)AnnotationKind::DifferentialType,
-                getCurrentASTBuilder()->getExistentialType(
+                getCurrentASTBuilder()->getExistentialBoxType(
                     getCurrentASTBuilder()->getDifferentiableInterfaceType()));
             // Leave the rest unregistered for now. The backend will take care of it.
         }
@@ -5365,7 +5343,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     }
 
     auto calleeType = expr->functionExpr->type.type;
-    if (as<DeclRefType>(calleeType) || as<ExistentialType>(calleeType))
+    if (as<DeclRefType>(calleeType) || as<ExistentialBoxType>(calleeType))
     {
         // A nominal or boxed value is callable through its `operator()` member. Boxed
         // receivers are opened by `maybeInsertImplicitOpForMemberBase` before member lookup,
@@ -7997,9 +7975,9 @@ static bool _isTypeParametric(Type* type)
 Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
 {
     expr->typeExpr = checkAliasableType(expr->typeExpr);
-    if (as<ExistentialType>(unwrapModifiedType(expr->typeExpr.type)))
+    if (as<ExistentialBoxType>(unwrapModifiedType(expr->typeExpr.type)))
     {
-        getSink()->diagnose(Diagnostics::ExistentialIsAsNotSupported{.expr = expr});
+        getSink()->diagnose(Diagnostics::ExistentialBoxIsAsNotSupported{.expr = expr});
         return CreateErrorExpr(expr);
     }
     if (as<AndType>(unwrapModifiedType(expr->typeExpr.type)))
@@ -8017,7 +7995,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // For a boxed value, `is` tests its payload: `value is IFoo` is always true when the
     // enclosed interface refines `IFoo`. For a type-level operand, the query concerns the type
     // itself, so `dyn IFoo is IFoo` must not acquire an ordinary conformance of the box.
-    auto valueBoxType = as<ExistentialType>(unwrapModifiedType(originalVal->type.type));
+    auto valueBoxType = as<ExistentialBoxType>(unwrapModifiedType(originalVal->type.type));
     auto subjectType = valueBoxType ? valueBoxType->getInterfaceType() : valueType;
     auto witness = isSubtype(subjectType, expr->typeExpr.type, IsSubTypeOptions::None);
     auto declWitness = as<DeclaredSubtypeWitness>(witness);
@@ -8078,9 +8056,9 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     typeExpr.exp = expr->typeExpr;
     typeExpr = checkAliasableType(typeExpr);
 
-    if (as<ExistentialType>(unwrapModifiedType(typeExpr.type)))
+    if (as<ExistentialBoxType>(unwrapModifiedType(typeExpr.type)))
     {
-        getSink()->diagnose(Diagnostics::ExistentialIsAsNotSupported{.expr = expr});
+        getSink()->diagnose(Diagnostics::ExistentialBoxIsAsNotSupported{.expr = expr});
         return CreateErrorExpr(expr);
     }
     if (as<AndType>(unwrapModifiedType(typeExpr.type)))
@@ -8100,7 +8078,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     expr->value = CheckTerm(expr->value);
     auto valueType = expr->value->type.type;
     auto unwrappedValueType = unwrapModifiedType(valueType);
-    auto boxType = as<ExistentialType>(unwrappedValueType);
+    auto boxType = as<ExistentialBoxType>(unwrappedValueType);
     auto valueInterfaceType = boxType ? boxType->getInterfaceType() : valueType;
 
     // Reject `expr as OpaqueType` (and structs containing opaque fields) because
@@ -8973,6 +8951,13 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                     auto memberDecl = item.declRef.getDecl();
                     if (isInterfaceType(type) && isInterfaceRequirement(memberDecl))
                     {
+                        if (expr == m_declarationReflectionLookupExpr)
+                        {
+                            // Reflection needs the requirement declaration without invoking it.
+                            // Only the designated lookup may retain the unknown `This` type.
+                            staticItems.add(item);
+                            continue;
+                        }
                         auto innerDecl = memberDecl;
                         if (auto genericDecl = as<GenericDecl>(innerDecl))
                             innerDecl = genericDecl->inner;
@@ -9131,11 +9116,8 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     // Not sure this is needed -> but guess someone could do
     expr->baseExpression = maybeDereference(expr->baseExpression, CheckBaseContext::Member);
 
-    // If the base of the member lookup has an interface type
-    // *without* a suitable this-type substitution, then we are
-    // trying to perform lookup on a value of existential type,
-    // and we should "open" the existential here so that we
-    // can expose its structure.
+    // Member lookup on an existential box needs the hidden payload type and its conformance
+    // witness. We open the box before looking up its members.
     //
 
     expr->baseExpression = maybeOpenExistential(expr->baseExpression);
@@ -9405,11 +9387,8 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
         outNeedDeref = true;
     baseExpr = derefExpr;
 
-    // If the base of the member lookup has an interface type
-    // *without* a suitable this-type substitution, then we are
-    // trying to perform lookup on a value of existential type,
-    // and we should "open" the existential here so that we
-    // can expose its structure.
+    // Member lookup on an existential box needs the hidden payload type and its conformance
+    // witness. We open the box before looking up its members.
     //
     baseExpr = maybeOpenExistential(baseExpr);
 
@@ -9852,10 +9831,10 @@ Expr* SemanticsExprVisitor::visitAndTypeExpr(AndTypeExpr* expr)
     return expr;
 }
 
-Expr* SemanticsExprVisitor::visitExistentialTypeExpr(ExistentialTypeExpr* expr)
+Expr* SemanticsExprVisitor::visitExistentialBoxTypeExpr(ExistentialBoxTypeExpr* expr)
 {
     expr->interfaceType = checkInterfaceType(expr->interfaceType);
-    auto boxType = formExistentialType(expr->interfaceType, getSink());
+    auto boxType = formExistentialBoxType(expr->interfaceType, getSink());
     expr->type = m_astBuilder->getTypeType(boxType);
     return expr;
 }

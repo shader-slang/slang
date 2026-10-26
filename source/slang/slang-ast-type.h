@@ -1265,14 +1265,16 @@ class NamespaceType : public Type
     Type* _createCanonicalTypeOverride();
 };
 
-/// An `ExistentialType` is the proper type of a box for one interface.
+/// An `ExistentialBoxType` is the proper type of a box for one interface.
 ///
 /// A box holds a value of an unknown concrete type that conforms to the interface.
 /// For `interface IFoo {}`, `dyn IFoo` denotes this type, while the `DeclRefType` naming
-/// `IFoo` denotes the interface itself. The operand names a single `InterfaceDecl`, including
-/// any generic arguments. Instances are constructed through `ASTBuilder::getExistentialType`.
+/// `IFoo` denotes the interface itself. The operand denotes a single interface, including any
+/// generic arguments, and retains alias spelling for diagnostics. Canonicalization forms a box
+/// over the canonical interface type. Instances are constructed through
+/// `ASTBuilder::getExistentialBoxType`.
 FIDDLE()
-class ExistentialType : public Type
+class ExistentialBoxType : public Type
 {
     FIDDLE(...)
     Type* getInterfaceType() const { return as<Type>(getOperand(0)); }

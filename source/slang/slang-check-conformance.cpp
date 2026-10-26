@@ -160,21 +160,14 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         return nullptr;
     }
 
-    auto getDiffWitness = [&](Type* type) -> SubtypeWitness*
-    {
-        auto witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableInterfaceType());
-
-        if (!witness)
-            witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableRefInterfaceType());
-
-        return witness;
-    };
-
+    // Callable derivative signatures need the same boxed-payload metadata as differential pairs.
+    // Ordinary subtype queries intentionally do not provide that metadata for boxes.
     for (auto paramType : funcType->getParamTypes())
     {
         auto paramInfo = getParamInfoFromTypeWithModeWrapper(paramType);
-        auto witness =
-            doesTypeHaveNoDiffModifier(paramInfo.type) ? nullptr : getDiffWitness(paramInfo.type);
+        auto witness = doesTypeHaveNoDiffModifier(paramInfo.type)
+                           ? nullptr
+                           : isTypeDifferentiable(paramInfo.type);
         paramWitnesses.add(witness);
     }
 
@@ -182,7 +175,7 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         doesTypeHaveNoDiffModifier(funcType->getResultType()) ||
                 callableDeclRef.getDecl()->findModifier<NoDiffModifier>()
             ? nullptr
-            : getDiffWitness(funcType->getResultType());
+            : isTypeDifferentiable(funcType->getResultType());
 
     Type* thisParamType = nullptr;
     SubtypeWitness* thisWitness = nullptr;
@@ -194,7 +187,7 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         // specialization and the differentiated value type must not reselect the mode.
         thisParamType = getParamTypeWithModeWrapper(astBuilder, *thisParamInfo);
         if (!doesTypeHaveNoDiffModifier(thisParamInfo->type))
-            thisWitness = getDiffWitness(thisParamInfo->type);
+            thisWitness = isTypeDifferentiable(thisParamInfo->type);
     }
 
     return astBuilder->getOrCreate<DiffTypeInfoWitness>(
@@ -213,7 +206,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     // itself conform to the stored interface, and conformance cannot target a box type.
     if (subType->equals(superType))
         return m_astBuilder->getTypeEqualityWitness(subType);
-    if (as<ExistentialType>(subType) || as<ExistentialType>(superType))
+    if (as<ExistentialBoxType>(subType) || as<ExistentialBoxType>(superType))
         return nullptr;
 
     // This query serves concrete inheritance, interface refinement, and conformance. For
@@ -397,7 +390,7 @@ SubtypeWitness* SemanticsVisitor::tryGetDifferentiabilityWitness(Type* type, Typ
         interfaceType->equals(m_astBuilder->getDifferentiableRefInterfaceType());
     SLANG_RELEASE_ASSERT(isValueDifferentiability || isPointerDifferentiability);
 
-    if (auto boxType = as<ExistentialType>(type))
+    if (auto boxType = as<ExistentialBoxType>(type))
     {
         // Autodiff represents the derivative of `dyn IFoo` by a boxed differential when
         // `IFoo` refines a differentiability interface. We expose that convention through a
@@ -405,7 +398,7 @@ SubtypeWitness* SemanticsVisitor::tryGetDifferentiabilityWitness(Type* type, Typ
         auto interfaceWitness = tryGetSubtypeWitness(boxType->getInterfaceType(), interfaceType);
         if (!interfaceWitness)
             return nullptr;
-        return m_astBuilder->getExistentialDifferentiabilityWitness(boxType, interfaceWitness);
+        return m_astBuilder->getExistentialBoxDifferentiabilityWitness(boxType, interfaceWitness);
     }
     return tryGetSubtypeWitness(type, interfaceType);
 }

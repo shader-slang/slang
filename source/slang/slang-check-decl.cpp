@@ -1238,7 +1238,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->left.type);
         dispatchIfNotNull(expr->right.type);
     }
-    void visitExistentialTypeExpr(ExistentialTypeExpr* expr)
+    void visitExistentialBoxTypeExpr(ExistentialBoxTypeExpr* expr)
     {
         dispatchIfNotNull(expr->interfaceType.type);
     }
@@ -2234,7 +2234,7 @@ bool doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(Type* 
 {
     if (as<PtrTypeBase>(type))
         return true;
-    if (as<ExistentialType>(type))
+    if (as<ExistentialBoxType>(type))
         return true;
     if (isDeclRefTypeOf<ClassDecl>(type))
         return true;
@@ -18178,7 +18178,7 @@ static bool _astTypeIncludesDynamicDispatch(
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
 
-    if (auto boxType = as<ExistentialType>(type))
+    if (auto boxType = as<ExistentialBoxType>(type))
     {
         auto interfaceDecl = isDeclRefTypeOf<InterfaceDecl>(boxType->getInterfaceType()).getDecl();
         SLANG_RELEASE_ASSERT(interfaceDecl);
