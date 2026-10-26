@@ -3321,6 +3321,14 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     return nullptr;
 }
 
+// The front end folds floating-point constants only so that reflection can report the
+// floating-point arguments of user-defined attributes, which `validateAttribute` records in
+// `Attribute::floatArgVals`; those arguments are never lowered to IR. Each node folds to a
+// `double` that is then rounded once, to the node's own type. Because `double` has more than
+// twice the significand bits of `float` and `half`, rounding an exact `+`, `-`, `*` or `/` result
+// to `double` first does not change its final rounding, so the folded value matches what the
+// operation produces in the narrower type.
+
 /// Return `value` rounded to the precision of the floating-point type `baseType`. For example,
 /// `16777217.0` rounds to `16777216.0` as a `float` but is unchanged as a `double`.
 static FloatingPointLiteralValue roundToFloatingPointType(
@@ -3358,21 +3366,16 @@ std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatE
     {
         value = floatLitExpr.getExpr()->value;
     }
-    else if (auto typeCastExpr = expr.as<TypeCastExpr>())
-    {
-        // An implicit cast created by `CreateImplicitCastExpr` has a `SharedTypeExpr` callee
-        // rather than a conversion declaration, so we recognize the cast by its node kind.
-        if (getArgCount(typeCastExpr) == 1)
-            value =
-                tryConstantFoldFloatConversion(getArg(typeCastExpr, 0), baseType, circularityInfo);
-    }
     else if (auto builtinOpExpr = expr.as<BuiltinOperatorExpr>())
     {
-        // The arithmetic fast path coerces every operand to the result type, so each operand
-        // folds as a value of `baseType`.
+        // Every operand of a floating-point arithmetic node has the node's type:
+        // `coerceOperandsOfBuiltinBinaryExpr` converts binary operands, and unary `-` keeps its
+        // operand's type. Like `BuiltinOperationIntVal::tryFoldImpl`, we reject a node whose
+        // operand count does not match its operator rather than read a missing operand.
         auto opExpr = builtinOpExpr.getExpr();
         const Index argCount = opExpr->arguments.getCount();
-        SLANG_ASSERT(argCount == 1 || argCount == 2);
+        if (argCount != (opExpr->op == BuiltinOperationKind::Neg ? 1 : 2))
+            return std::nullopt;
         FloatingPointLiteralValue args[2];
         for (Index a = 0; a < argCount; ++a)
         {
@@ -3405,16 +3408,20 @@ std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatE
             value = std::fmod(args[0], args[1]);
             break;
         default:
+            // Only the arithmetic operators above give a floating-point result: comparisons
+            // give `bool`, and bitwise operators reject floating-point operands.
+            SLANG_ASSERT_FAILURE("unexpected operator with a floating-point result");
             break;
         }
     }
     else if (auto invokeExpr = expr.as<InvokeExpr>())
     {
-        // A constructor-style conversion such as `float(2)` calls one of the builtin scalar
-        // `__init` conversions, which carry `ImplicitConversionModifier`. Unary `+` calls an
-        // `__intrinsic_op(kIROp_Nop)` operator; other no-op intrinsics such as
-        // `__slang_noop_cast` change the type, so we treat one as the identity only when its
-        // operand already has the result type.
+        // Implicit (`INT_VALUE` passed to a `float` parameter), explicit (`(float)x`) and
+        // constructor-style (`float(2)`) conversions all resolve to one of the builtin scalar
+        // `__init`s, which carry `ImplicitConversionModifier`. Unary `+` calls an
+        // `__intrinsic_op(kIROp_Nop)` operator; `__slang_noop_cast` shares that op but changes
+        // the type, so a no-op intrinsic is the identity only when its operand has the result
+        // type.
         auto calleeExpr = getBaseExpr(invokeExpr).as<DeclRefExpr>();
         if (calleeExpr && getArgCount(invokeExpr) == 1)
         {
@@ -3451,12 +3458,19 @@ std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatC
         return std::nullopt;
     const auto& operandInfo = BaseTypeInfo::getInfo(operandType->getBaseType());
     if (operandInfo.flags & BaseTypeInfo::Flag::FloatingPoint)
-        return tryConstantFoldFloatExpr(operand, circularityInfo);
+    {
+        auto operandValue = tryConstantFoldFloatExpr(operand, circularityInfo);
+        if (!operandValue)
+            return std::nullopt;
+        return roundToFloatingPointType(*operandValue, toBaseType);
+    }
     if (!isValidCompileTimeConstantType(operandType))
         return std::nullopt;
 
-    // `tryConstantFoldExpr` computes integer arithmetic in 64 bits without wrapping, so we
-    // truncate the result to the width of the operand type: `0u - 1u` converts as `0xFFFFFFFFu`.
+    // `tryConstantFoldExpr` computes integer operations in 64 bits and does not narrow their
+    // results to their type, so we narrow the folded operand here: `0u - 1u` converts as
+    // `0xFFFFFFFFu`. Only the outermost result is narrowed, so the `0u - 1u` inside
+    // `(0u - 1u) / 2u` keeps its 64-bit value, exactly as it does for an integer parameter.
     auto intVal = as<ConstantIntVal>(
         tryConstantFoldExpr(operand, ConstantFoldingKind::CompileTime, circularityInfo));
     if (!intVal)
@@ -3466,15 +3480,19 @@ std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatC
     if (!intVal)
         return std::nullopt;
 
-    // We convert the integer straight to the target precision, because converting a 64-bit
-    // integer to `double` first and then to `float` can round twice.
+    // Converting a 64-bit integer to `double` and then to `float` can round twice, so a `float`
+    // or `half` target converts through `float` directly. Every integer in the finite range of
+    // `half` is exact in `float`, so the `half` rounding that follows is the only one.
     const auto value = intVal->getValue();
     const bool isSigned = (operandInfo.flags & BaseTypeInfo::Flag::Signed) != 0;
+    FloatingPointLiteralValue converted;
     if (toBaseType == BaseType::Double)
-        return isSigned ? FloatingPointLiteralValue(value)
-                        : FloatingPointLiteralValue(UInt64(value));
-    return isSigned ? FloatingPointLiteralValue(float(value))
-                    : FloatingPointLiteralValue(float(UInt64(value)));
+        converted =
+            isSigned ? FloatingPointLiteralValue(value) : FloatingPointLiteralValue(UInt64(value));
+    else
+        converted = isSigned ? FloatingPointLiteralValue(float(value))
+                             : FloatingPointLiteralValue(float(UInt64(value)));
+    return roundToFloatingPointType(converted, toBaseType);
 }
 
 std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatDeclRef(
@@ -3486,14 +3504,16 @@ std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatD
     if (_checkForCircularityInConstantFolding(declRef, circularityInfo))
         return std::nullopt;
 
-    // These are the compile-time cases of `tryConstantFoldDeclRef`: only a `const` variable has
-    // its initializer as its value, and specialization constants, `extern` constants and
-    // interface requirements are `const` but get their values later.
+    // Only a `const` variable has its initializer as its value. Specialization constants and
+    // `extern` constants are `const` too, but they receive their values at pipeline creation and
+    // link time, so their initializers are only defaults; `tryConstantFoldDeclRef` declines them
+    // for `ConstantFoldingKind::CompileTime` for the same reason. Interface requirements need no
+    // check here, because a `static const` requirement must have an integer or bool type
+    // (E30306) and so reaches the integer folder instead.
     if (!decl->hasModifier<ConstModifier>())
         return std::nullopt;
     if (decl->hasModifier<SpecializationConstantAttribute>() ||
-        decl->hasModifier<VkConstantIdAttribute>() || decl->hasModifier<ExternModifier>() ||
-        isInterfaceRequirement(decl))
+        decl->hasModifier<VkConstantIdAttribute>() || decl->hasModifier<ExternModifier>())
         return std::nullopt;
 
     if (!getInitExpr(m_astBuilder, declRef))

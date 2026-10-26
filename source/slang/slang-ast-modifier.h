@@ -905,9 +905,11 @@ class Attribute : public AttributeBase
     FIDDLE(...)
     FIDDLE() List<Val*> intArgVals;
 
-    // The compile-time values of floating-point arguments, indexed like `args`. The front-end
-    // has no floating-point `Val`, so we store a folded value as a plain number; an entry is
-    // empty when its argument does not fold to a constant.
+    // The compile-time values of the floating-point arguments of a user-defined attribute:
+    // entry `i` holds the folded value of `args[i]`. The list ends after the last argument that
+    // folded, so an index past its end, like an empty entry, means "no folded value". Integer
+    // arguments use `intArgVals` instead. The front-end has no floating-point `Val`, so we store
+    // a folded value as a plain number.
     FIDDLE() List<std::optional<FloatingPointLiteralValue>> floatArgVals;
 };
 

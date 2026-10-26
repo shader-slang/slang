@@ -3212,16 +3212,19 @@ public:
     /// Try to fold `expr`, a `half`, `float` or `double` scalar expression, to its compile-time
     /// value, rounded to the precision of its type. The front-end has no floating-point `Val`,
     /// so the value is a plain number. We fold literals, parentheses, conversions from scalar
-    /// types, the builtin `-x`, `+`, `-`, `*`, `/` and `%` operators, and references to `const`
-    /// variables; any other expression, constant or not, yields an empty value. Integer and bool
-    /// operands of a conversion fold through `tryConstantFoldExpr`, so `INT_VALUE / 4 + 1.5`
-    /// with `INT_VALUE == 6` divides in integer arithmetic and folds to `2.5`.
+    /// types, the builtin unary `-` and `+`, the builtin `+`, `-`, `*`, `/` and `%` operators, and
+    /// references to `const` variables other than specialization and `extern` constants; any
+    /// other expression, constant or not, yields an empty value. Integer and bool operands of a
+    /// conversion fold through `tryConstantFoldExpr`, so `INT_VALUE / 4 + 1.5` with
+    /// `INT_VALUE == 6` divides in integer arithmetic and folds to `2.5`. Folding may check the
+    /// referenced declarations and can report the diagnostics the integer folder reports, such
+    /// as a circular definition or an integer division by zero.
     std::optional<FloatingPointLiteralValue> tryConstantFoldFloatExpr(
         SubstExpr<Expr> expr,
         ConstantFoldingCircularityInfo* circularityInfo);
 
-    /// Try to fold the scalar `operand` of a conversion to the floating-point type
-    /// `toBaseType`, returning the converted value or an empty value if `operand` does not fold.
+    /// Try to fold the scalar `operand` of a conversion, returning its value converted and
+    /// rounded to the floating-point type `toBaseType`, or an empty value if it does not fold.
     std::optional<FloatingPointLiteralValue> tryConstantFoldFloatConversion(
         SubstExpr<Expr> operand,
         BaseType toBaseType,
