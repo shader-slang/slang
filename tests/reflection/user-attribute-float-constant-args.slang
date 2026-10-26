@@ -258,15 +258,15 @@ extern static const float EXTERN_VALUE = 3.0;
 // CHECK-NEXT: "invalid value",
 // CHECK-NEXT: {{^ *}}6.000000{{$}}
 [pairProbe(NON_CONST_VALUE, 2.0 * 3.0)]
-// Folding for reflection reports no integer diagnostics, so this argument has no value and
-// compiles as before.
+// Folding for reflection reports no integer diagnostics; a division by zero folds to no value,
+// so this argument has no reflected value.
 // CHECK: "name": "floatProbe"
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}33,{{$}}
 // CHECK-NEXT: "invalid value"
 [floatProbe(33, 1 / 0)]
-// A non-scalar parameter is not folded, but an integer literal passed to it still reads back
-// through the literal fallback of `getArgumentValueFloat`, as it always has.
+// A non-scalar parameter has no folded value, so an integer literal passed to it reads back
+// through the literal fallback of `getArgumentValueFloat`.
 // CHECK: "name": "vectorProbe"
 // CHECK-NEXT: "arguments": [
 // CHECK-NEXT: {{^ *}}1.000000{{$}}
