@@ -1114,6 +1114,33 @@ jobs:
                 suggestedReviewer,
               };
             }
+
+            // Return the lowercased set of ignored reviewers: the default-reviewer
+            // team members plus the explicit extra logins. Both inputs are
+            // iterables of logins in any case; an unreadable team arrives as an
+            // empty iterable and leaves only the explicit logins.
+            function ignoredReviewerSet(teamMembers, extraLogins) {
+              return new Set(
+                [...(teamMembers || []), ...(extraLogins || [])]
+                  .map((login) => login.trim().toLowerCase())
+                  .filter(Boolean));
+            }
+
+            // Return the logins in `requested` (as spelled on the PR) that are in
+            // the lowercased `ignored` set, i.e. the reviewers to unrequest.
+            function ignoredReviewersToRemove(requested, ignored) {
+              return (requested || []).filter(
+                (login) => login && ignored.has(login.toLowerCase()));
+            }
+
+            // Return the last-resort assignee: the sorted-first maintainer, else
+            // the sorted-first default reviewer, else `fallbackLogin`. Sorting
+            // makes the pick deterministic across runs, since team listings have
+            // no guaranteed order. "" when all three are empty.
+            function pickFallbackAssignee(maintainers, defaultReviewers, fallbackLogin) {
+              const first = (logins) => [...(logins || [])].sort()[0];
+              return first(maintainers) || first(defaultReviewers) || fallbackLogin || "";
+            }
             // ----- extract-js:assignment:end -----
 
             // Committer-signal weighting defaults (file multipliers, top-files,
@@ -1486,41 +1513,39 @@ jobs:
             }
 
             // The fallback assignee for a non-Internal PR that has no linked-issue
-            // or committer-signal owner: the (sorted-first) member of the
-            // maintainer team, else of the default-reviewer team, else
-            // FALLBACK_ASSIGNEE, so a PR is never left unassigned while either
-            // team is readable. Only "" if all three yield nobody, in which case
+            // or committer-signal owner (see pickFallbackAssignee for the order),
+            // so a PR is never left unassigned while either team is readable.
+            // Only "" if all three yield nobody, in which case
             // selectAssigneeAndReviewers yields no pick and we leave it to the
             // sweep. Cached per run.
             let _maintainer;
             async function resolveMaintainer() {
               if (_maintainer !== undefined) return _maintainer;
-              const members = [...await listTeamMembers(MAINTAINER_TEAM)].sort();
-              if (members.length > 1)
+              const members = await listTeamMembers(MAINTAINER_TEAM);
+              _maintainer = pickFallbackAssignee(
+                members, await listTeamMembers(DEFAULT_REVIEWER_TEAM), FALLBACK_ASSIGNEE);
+              if (members.size > 1)
                 core.warning(
-                  `maintainer team ${MAINTAINER_TEAM} has ${members.length} members; using ${members[0]}`);
-              const defaultReviewers = [...await listTeamMembers(DEFAULT_REVIEWER_TEAM)].sort();
-              _maintainer = members[0] || defaultReviewers[0] || FALLBACK_ASSIGNEE;
+                  `maintainer team ${MAINTAINER_TEAM} has ${members.size} members; using ${_maintainer}`);
               return _maintainer;
             }
 
-            // The lowercased logins we unrequest and never auto-request: the
-            // default-reviewer team plus any explicit IGNORED_REVIEWERS. GitHub
-            // auto-requests the default reviewer on every new PR, and
-            // selectAssigneeAndReviewers would otherwise count that request as a
-            // real reviewer and skip requesting the shepherd, leaving the PR
-            // waiting on the default reviewer. An unreadable team leaves only the
-            // explicit list; the team-read cache logs the failure.
+            // The lowercased logins we unrequest and never auto-request (see
+            // ignoredReviewerSet). GitHub auto-requests the default reviewer on
+            // every new PR, and selectAssigneeAndReviewers would otherwise count
+            // that request as a real reviewer and skip requesting the shepherd,
+            // leaving the PR waiting on the default reviewer. An unreadable team
+            // leaves only the explicit list; the team-read cache logs the failure.
             async function resolveIgnoredReviewers() {
-              const members = await listTeamMembers(DEFAULT_REVIEWER_TEAM);
-              return new Set([...EXTRA_IGNORED, ...[...members].map(m => m.toLowerCase())]);
+              return ignoredReviewerSet(
+                await listTeamMembers(DEFAULT_REVIEWER_TEAM), EXTRA_IGNORED);
             }
 
             // Unrequest every ignored reviewer among `requestedReviewers` (logins)
             // on PR `number`, as github-actions[bot] via actionsWrite.
             async function unrequestIgnoredReviewers(number, requestedReviewers) {
-              const ignored = await resolveIgnoredReviewers();
-              const toRemove = requestedReviewers.filter(r => ignored.has(r.toLowerCase()));
+              const toRemove = ignoredReviewersToRemove(
+                requestedReviewers, await resolveIgnoredReviewers());
               if (!toRemove.length) return;
               const args = {
                 owner: context.repo.owner, repo: context.repo.repo,
