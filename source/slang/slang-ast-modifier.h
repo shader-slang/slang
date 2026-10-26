@@ -903,13 +903,15 @@ FIDDLE()
 class Attribute : public AttributeBase
 {
     FIDDLE(...)
+    // `intArgVals` and `floatArgVals` hold the compile-time values of an attribute's arguments,
+    // classified by parameter type: entry `i` is the folded value of `args[i]` for an integer,
+    // bool or enum parameter in `intArgVals`, and for a `half`, `float` or `double` parameter in
+    // `floatArgVals`. Each list ends after the last argument it holds, so an index past its end,
+    // like a null or empty entry, means "no folded value". Only `validateAttribute` fills
+    // `floatArgVals`, for user-defined attributes, but the field is on every attribute and is
+    // serialized with it. The front-end has no floating-point `Val`, so a folded floating-point
+    // value is a plain number.
     FIDDLE() List<Val*> intArgVals;
-
-    // The compile-time values of the floating-point arguments of a user-defined attribute:
-    // entry `i` holds the folded value of `args[i]`. The list ends after the last argument that
-    // folded, so an index past its end, like an empty entry, means "no folded value". Integer
-    // arguments use `intArgVals` instead. The front-end has no floating-point `Val`, so we store
-    // a folded value as a plain number.
     FIDDLE() List<std::optional<FloatingPointLiteralValue>> floatArgVals;
 };
 

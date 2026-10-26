@@ -3209,16 +3209,17 @@ public:
         ConstantFoldingKind kind,
         ConstantFoldingCircularityInfo* circularityInfo);
 
-    /// Try to fold `expr`, a `half`, `float` or `double` scalar expression, to its compile-time
-    /// value, rounded to the precision of its type. The front-end has no floating-point `Val`,
-    /// so the value is a plain number. We fold literals, parentheses, conversions from scalar
-    /// types, the builtin unary `-` and `+`, the builtin `+`, `-`, `*`, `/` and `%` operators, and
-    /// references to `const` variables other than specialization and `extern` constants; any
-    /// other expression, constant or not, yields an empty value. Integer and bool operands of a
-    /// conversion fold through `tryConstantFoldExpr`, so `INT_VALUE / 4 + 1.5` with
-    /// `INT_VALUE == 6` divides in integer arithmetic and folds to `2.5`. Folding may check the
-    /// referenced declarations and can report the diagnostics the integer folder reports, such
-    /// as a circular definition or an integer division by zero.
+    /// Try to fold `expr` to its compile-time value if it is a `half`, `float` or `double` scalar
+    /// expression, rounded to the precision of its type; any other expression yields an empty
+    /// value. The front-end has no floating-point `Val`, so the value is a plain number. We fold
+    /// literals, parentheses, conversions from scalar types, the builtin unary `-` and `+`, the
+    /// builtin `+`, `-`, `*`, `/` and `%` operators, and references to `const` variables other
+    /// than specialization and `extern` constants; any other floating-point expression, constant
+    /// or not, also yields an empty value. Integer and bool operands of a conversion fold through
+    /// `tryConstantFoldExpr` without reporting its diagnostics, so `INT_VALUE / 4 + 1.5` with
+    /// `INT_VALUE == 6` divides in integer arithmetic and folds to `2.5`. Folding checks the
+    /// referenced declarations and reports a floating-point constant whose definition depends
+    /// on itself.
     std::optional<FloatingPointLiteralValue> tryConstantFoldFloatExpr(
         SubstExpr<Expr> expr,
         ConstantFoldingCircularityInfo* circularityInfo);
