@@ -34,6 +34,12 @@ struct pairProbeAttribute
 };
 
 [__AttributeUsage(_AttributeTargets.Function)]
+struct vectorProbeAttribute
+{
+    float2 value;
+};
+
+[__AttributeUsage(_AttributeTargets.Function)]
 struct halfProbeAttribute
 {
     int index;
@@ -259,6 +265,12 @@ extern static const float EXTERN_VALUE = 3.0;
 // CHECK-NEXT: {{^ *}}33,{{$}}
 // CHECK-NEXT: "invalid value"
 [floatProbe(33, 1 / 0)]
+// A non-scalar parameter is not folded, but an integer literal passed to it still reads back
+// through the literal fallback of `getArgumentValueFloat`, as it always has.
+// CHECK: "name": "vectorProbe"
+// CHECK-NEXT: "arguments": [
+// CHECK-NEXT: {{^ *}}1.000000{{$}}
+[vectorProbe(1)]
 [numthreads(1, 1, 1)]
 void main()
 {
