@@ -143,6 +143,10 @@ public:
     Modifiers* pendingModifiers = nullptr;
     int genericDepth = 0;
 
+    // glsl `layout(row_major) uniform;` / `buffer;` defaults, applied to later blocks.
+    MatrixLayoutModifier* glslDefaultUniformMatrixLayout = nullptr;
+    MatrixLayoutModifier* glslDefaultBufferMatrixLayout = nullptr;
+
     // Is the parser in a "recovering" state?
     // During recovery we don't emit additional errors, until we find
     // a token that we expected, when we exit recovery.
@@ -3438,6 +3442,23 @@ static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers
     }
 }
 
+/// drops `layout(` markers left bracketing nothing, as in `layout(row_major) mat2x3 m;` once the
+/// qualifier moved to the type, so the markers do not trip the decl's modifier checks.
+static void _removeEmptyGLSLLayoutGroups(Modifiers& ioModifiers)
+{
+    Modifier** link = &ioModifiers.first;
+    while (auto modifier = *link)
+    {
+        if (as<GLSLLayoutModifierGroupBegin>(modifier) &&
+            as<GLSLLayoutModifierGroupEnd>(modifier->next))
+        {
+            *link = modifier->next->next;
+            continue;
+        }
+        link = &modifier->next;
+    }
+}
+
 /// Move any type modifier in `ioBaseModifiers` to the given `typeExpr`.
 ///
 /// If any type modifiers were present, `ioBaseModifiers` will be updated
@@ -3515,6 +3536,9 @@ static Expr* _moveTypeModifiersToTypeExpr(
             // we want to visit.
         }
     }
+
+    if (typeModifiers.first)
+        _removeEmptyGLSLLayoutGroups(ioBaseModifiers);
 
     // If we ended up finding any type modifiers, we want to apply them
     // to the type expression.
@@ -4256,6 +4280,36 @@ static void _parseOptSemantics(Parser* parser, Decl* decl)
     _addModifiers(decl, _parseOptSemantics(parser));
 }
 
+/// gives each glsl block field the block's (or global default) matrix layout as a decl modifier.
+/// field types are unknown here, so `maybeApplyLayoutModifier` skips matrices with a layout.
+static void _applyGLSLBlockMatrixLayout(
+    Parser* parser,
+    StructDecl* bufferDataTypeDecl,
+    String const& bufferWrapperTypeName)
+{
+    MatrixLayoutModifier* blockLayout = nullptr;
+    if (parser->pendingModifiers)
+        blockLayout = parser->pendingModifiers->findModifier<MatrixLayoutModifier>();
+    if (!blockLayout)
+    {
+        if (bufferWrapperTypeName == "ConstantBuffer")
+            blockLayout = parser->glslDefaultUniformMatrixLayout;
+        else if (bufferWrapperTypeName == "GLSLShaderStorageBuffer")
+            blockLayout = parser->glslDefaultBufferMatrixLayout;
+    }
+    if (!blockLayout)
+        return;
+
+    for (auto field : bufferDataTypeDecl->getMembersOfType<VarDecl>())
+    {
+        auto fieldLayout =
+            (MatrixLayoutModifier*)parser->astBuilder->createByNodeType(blockLayout->astNodeType);
+        fieldLayout->keywordName = blockLayout->keywordName;
+        fieldLayout->loc = blockLayout->loc;
+        addModifier(field, fieldLayout);
+    }
+}
+
 static Decl* ParseBufferBlockDecl(
     Parser* parser,
     String bufferWrapperTypeName,
@@ -4364,6 +4418,9 @@ static Decl* ParseBufferBlockDecl(
 
     // The declarations in the body belong to the data type.
     parseDeclBody(parser, bufferDataTypeDecl);
+
+    if (parser->getSourceLanguage() == SourceLanguage::GLSL)
+        _applyGLSLBlockMatrixLayout(parser, bufferDataTypeDecl, bufferWrapperTypeName);
 
     if (parser->LookAheadToken(TokenType::Identifier) &&
         parser->LookAheadToken(TokenType::Semicolon, 1))
@@ -6216,6 +6273,18 @@ static DeclBase* ParseDeclWithModifiers(
                     }
                     return defaultLayout;
                 };
+                if (parser->LookAheadToken("buffer") &&
+                    parser->LookAheadToken(TokenType::Semicolon, 1))
+                {
+                    // `layout(row_major) buffer;` sets the default for later buffer blocks.
+                    advanceToken(parser);
+                    advanceToken(parser);
+                    if (auto layout = modifiers.findModifier<MatrixLayoutModifier>())
+                        parser->glslDefaultBufferMatrixLayout = layout;
+                    decl = parser->astBuilder->create<EmptyDecl>();
+                    decl->loc = loc;
+                    break;
+                }
                 if (AdvanceIf(parser, "buffer"))
                 {
                     decl = as<Decl>(parseGLSLShaderStorageBufferDecl(
@@ -6269,6 +6338,14 @@ static DeclBase* ParseDeclWithModifiers(
     case TokenType::Semicolon:
         {
             advanceToken(parser);
+
+            // `layout(row_major) uniform;` sets the default for later uniform blocks.
+            if (parser->getSourceLanguage() == SourceLanguage::GLSL &&
+                modifiers.hasModifier<HLSLUniformModifier>())
+            {
+                if (auto layout = modifiers.findModifier<MatrixLayoutModifier>())
+                    parser->glslDefaultUniformMatrixLayout = layout;
+            }
 
             decl = parser->astBuilder->create<EmptyDecl>();
             decl->loc = loc;
@@ -10853,6 +10930,8 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
             CASE(std140, GLSLStd140Modifier)
             CASE(std430, GLSLStd430Modifier)
             CASE(scalar, GLSLScalarModifier)
+            CASE(row_major, GLSLRowMajorLayoutModifier)
+            CASE(column_major, GLSLColumnMajorLayoutModifier)
             {
                 modifier = parseUncheckedGLSLLayoutAttribute(parser, nameAndLoc);
             }

@@ -1746,6 +1746,11 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
                                      as<GLSLInterfaceBlockDecl>(decl));
 
         // Allowed only on parameters, struct fields and global variables.
+    case ASTNodeType::HLSLUniformModifier:
+        // glsl `layout(row_major) uniform;` sets the default for later blocks.
+        if (isGLSLInput && as<EmptyDecl>(decl) && isGlobalDecl(decl))
+            return true;
+        [[fallthrough]];
     case ASTNodeType::InterpolationModeModifier:
     case ASTNodeType::HLSLNoInterpolationModifier:
     case ASTNodeType::HLSLNoPerspectiveModifier:
@@ -1753,7 +1758,6 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::HLSLSampleModifier:
     case ASTNodeType::HLSLCentroidModifier:
     case ASTNodeType::PerVertexModifier:
-    case ASTNodeType::HLSLUniformModifier:
     case ASTNodeType::DynamicUniformModifier:
         return (as<VarDeclBase>(decl) &&
                 (isGlobalDecl(decl) || as<StructDecl>(getParentDecl(decl)))) ||
@@ -1804,7 +1808,6 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::PreciseModifier:
         return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
 
-    case ASTNodeType::ActualGlobalModifier:
     case ASTNodeType::MatrixLayoutModifier:
     case ASTNodeType::RowMajorLayoutModifier:
     case ASTNodeType::HLSLRowMajorLayoutModifier:
@@ -1812,6 +1815,11 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::ColumnMajorLayoutModifier:
     case ASTNodeType::HLSLColumnMajorLayoutModifier:
     case ASTNodeType::GLSLRowMajorLayoutModifier:
+        // glsl `layout(row_major) uniform;` sets the default for later blocks.
+        if (isGLSLInput && as<EmptyDecl>(decl) && isGlobalDecl(decl))
+            return true;
+        [[fallthrough]];
+    case ASTNodeType::ActualGlobalModifier:
     case ASTNodeType::HLSLEffectSharedModifier:
         return as<VarDeclBase>(decl) || as<GLSLInterfaceBlockDecl>(decl);
 

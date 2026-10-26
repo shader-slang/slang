@@ -2585,26 +2585,45 @@ ImageFormat inferImageFormatFromTextureType(
     return format;
 }
 
+/// returns `type` with `layout` on each matrix lacking an explicit one, looking through arrays:
+/// `float2x3[4]` becomes `matrix<float,2,3,layout>[4]`, `row_major float2x3` is unchanged.
+static Type* applyDefaultMatrixLayout(ASTBuilder* astBuilder, Type* type, MatrixLayoutMode layout)
+{
+    if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        return astBuilder->getArrayType(
+            applyDefaultMatrixLayout(astBuilder, arrayType->getElementType(), layout),
+            arrayType->getElementCount());
+    }
+    auto matrixType = as<MatrixExpressionType>(type);
+    SLANG_RELEASE_ASSERT(matrixType);
+    auto currentLayout = as<ConstantIntVal>(matrixType->getLayout());
+    if (currentLayout && currentLayout->getValue() != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+        return matrixType;
+    return astBuilder->getMatrixType(
+        matrixType->getElementType(),
+        matrixType->getRowCount(),
+        matrixType->getColumnCount(),
+        astBuilder->getIntVal(matrixType->getLayout()->getType(), layout));
+}
+
 void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
 {
     // Matrix layout modifiers are `TypeModifier`s, so for ordinary declarators the parser
     // moves them onto the type expression and `visitModifiedTypeExpr` bakes in the layout.
     // A traditional-style function parameter (leading-modifier syntax), however, parses its
     // modifiers before its type and keeps them on the decl, so this decl-side branch remains
-    // the applier for that path.
-    if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
+    // the applier for that path. Fields of a GLSL block also carry the block's layout here as a
+    // default (see `_applyGLSLBlockMatrixLayout`), which a field's own qualifier overrides.
+    if (as<MatrixExpressionType>(unwrapArrayType(varDecl->type.type)))
     {
         if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
         {
             auto matrixLayout = as<ColumnMajorLayoutModifier>(matrixLayoutModifier)
-                                    ? SLANG_MATRIX_LAYOUT_COLUMN_MAJOR
-                                    : SLANG_MATRIX_LAYOUT_ROW_MAJOR;
-            auto newMatrixType = getASTBuilder()->getMatrixType(
-                matrixType->getElementType(),
-                matrixType->getRowCount(),
-                matrixType->getColumnCount(),
-                getASTBuilder()->getIntVal(matrixType->getLayout()->getType(), matrixLayout));
-            varDecl->type.type = newMatrixType;
+                                    ? kMatrixLayoutMode_ColumnMajor
+                                    : kMatrixLayoutMode_RowMajor;
+            varDecl->type.type =
+                applyDefaultMatrixLayout(getASTBuilder(), varDecl->type.type, matrixLayout);
         }
     }
     else if (auto textureType = as<TextureTypeBase>(unwrapArrayType(varDecl->type.type)))

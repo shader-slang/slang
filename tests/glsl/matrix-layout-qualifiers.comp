@@ -1,0 +1,60 @@
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry main -matrix-layout-row-major
+//TEST:SIMPLE(filecheck=COLDEFAULT): -target spirv-asm -stage compute -entry main -matrix-layout-column-major
+
+// GLSL `layout(row_major)` / `layout(column_major)` apply to a block member, to every matrix
+// member of a block (arrays included), and as a global default for later blocks. A member's own
+// qualifier overrides the block's, and non-matrix members are unaffected. Qualifiers hold whatever
+// the default (`-matrix-layout-*`, given in Slang's transposed terms) is.
+
+#version 450
+layout(local_size_x = 1) in;
+
+layout(std140, binding = 0) uniform MemberBlock
+{
+    layout(row_major) mat2x3 memberRow;
+    mat2x3 memberDefault;
+};
+
+layout(std140, row_major, binding = 1) uniform RowBlock
+{
+    mat2x3 blockRow;
+    layout(column_major) mat2x3 blockColumn;
+    float scalar;
+    mat2x3 blockArray[2];
+};
+
+layout(row_major) buffer;
+layout(std430, binding = 2) buffer GlobalDefault
+{
+    mat2x3 globalRow;
+    vec3 result;
+};
+
+void main()
+{
+    result = memberRow[0] + memberDefault[0] + blockRow[0] + blockColumn[0] + scalar +
+             blockArray[1][0] + globalRow[0];
+}
+
+// In std140 a row-major mat2x3 is three 16-byte rows (48 bytes); a column-major one is two (32
+// bytes). In std430 a row-major mat2x3 has 8-byte rows, a column-major one 16-byte columns.
+
+// CHECK-DAG: OpMemberDecorate %SLANG_ParameterGroup_MemberBlock_std140 0 RowMajor
+// CHECK-DAG: OpMemberDecorate %SLANG_ParameterGroup_MemberBlock_std140 1 Offset 48
+// CHECK-DAG: OpMemberDecorate %SLANG_ParameterGroup_MemberBlock_std140 1 ColMajor
+
+// CHECK-DAG: OpMemberDecorate %SLANG_ParameterGroup_RowBlock_std140 0 RowMajor
+// CHECK-DAG: OpMemberDecorate %SLANG_ParameterGroup_RowBlock_std140 1 Offset 48
+// CHECK-DAG: OpMemberDecorate %SLANG_ParameterGroup_RowBlock_std140 1 ColMajor
+// CHECK-DAG: OpMemberDecorate %SLANG_ParameterGroup_RowBlock_std140 2 Offset 80
+// CHECK-DAG: OpMemberDecorate %SLANG_ParameterGroup_RowBlock_std140 3 Offset 96
+// CHECK-DAG: OpMemberDecorate %_Array_std140_matrix_float_2_3_2 0 RowMajor
+
+// CHECK-DAG: OpMemberDecorate %SLANG_ParameterGroup_GlobalDefault_std430 0 RowMajor
+// CHECK-DAG: OpMemberDecorate %SLANG_ParameterGroup_GlobalDefault_std430 0 MatrixStride 8
+
+// COLDEFAULT-DAG: OpMemberDecorate %SLANG_ParameterGroup_MemberBlock_std140 0 RowMajor
+// COLDEFAULT-DAG: OpMemberDecorate %SLANG_ParameterGroup_MemberBlock_std140 1 RowMajor
+// COLDEFAULT-DAG: OpMemberDecorate %SLANG_ParameterGroup_RowBlock_std140 0 RowMajor
+// COLDEFAULT-DAG: OpMemberDecorate %SLANG_ParameterGroup_RowBlock_std140 1 ColMajor
+// COLDEFAULT-DAG: OpMemberDecorate %SLANG_ParameterGroup_GlobalDefault_std430 0 RowMajor

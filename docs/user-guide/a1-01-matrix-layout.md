@@ -10,7 +10,7 @@ The differences in default matrix layout or storage conventions between GLSL (Op
 A high-level summary:
 
 * Default matrix **layout** in memory for Slang is `row-major`. 
-  * Except when running the compiler through the `slangc` tool, in which case the default is `col-major`. This default is for *legacy* reasons and may change in the future.
+  * Except when running the compiler through the `slangc` tool, in which case the default is `col-major`. This default is for *legacy* reasons and may change in the future. It also applies to GLSL input (see [GLSL input](#glsl-input)).
 * Row-major layout is the only *portable* layout to use across targets (with significant caveats for non-4x4 matrices)
 * Use `setMatrixLayoutMode`/`spSetMatrixLayoutMode`/`createSession` to set the default
 * Use `-matrix-layout-row-major` or `-matrix-layout-column-major` for the command line 
@@ -155,4 +155,23 @@ Alternatively the default layout can be set by
 * Including a `CompilerOptionName::MatrixLayoutColumn` or `CompilerOptionName::MatrixLayoutRow` entry in `SessionDesc::compilerOptionEntries`.
 * Setting `-matrix-layout-row-major` or `-matrix-layout-column-major` command line options to `slangc`.
 
+GLSL input
+----------
 
+Slang maps a GLSL `matCxR` onto `matrix<float, C, R>`, so what GLSL calls a column is a *row* in Slang's terms. The same applies to layout: GLSL's native `column_major` storage is Slang `row-major`, and GLSL `row_major` is Slang `column-major`.
+
+The API default (Slang `row-major`) therefore gives GLSL input its standard `column_major` storage. The legacy `slangc` default (Slang `col-major`) gives GLSL `row_major` storage instead, so pass `-matrix-layout-row-major` when compiling GLSL with `slangc`. The `-matrix-layout-row-major` and `-matrix-layout-column-major` options keep their Slang meaning for GLSL input.
+
+GLSL source can also choose the layout with the standard qualifiers, which Slang interprets with their GLSL meaning:
+
+```glsl
+layout(row_major) uniform;                       // default for later uniform blocks
+layout(row_major) buffer;                        // default for later buffer blocks
+layout(std140, row_major) uniform Block          // default for this block's matrices
+{
+    mat2x3 a;                                    // row_major
+    layout(column_major) mat2x3 b;               // a member's own qualifier wins
+};
+```
+
+A block-level or global qualifier applies to matrix and array-of-matrix members, but not to matrices nested inside a struct member.
