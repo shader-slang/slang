@@ -388,15 +388,22 @@ SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlag
 
 void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName)
 {
+    // Without SLANG_EMBED_CORE_MODULE_SOURCE the library code getters return null; there is no
+    // source to append then, and the result is empty.
+    auto append = [&](ComPtr<ISlangBlob> code)
+    {
+        if (code)
+            sb << (const char*)code->getBufferPointer();
+    };
     switch (moduleName)
     {
     case slang::BuiltinModuleName::Core:
-        sb << (const char*)getCoreLibraryCode()->getBufferPointer()
-           << (const char*)getHLSLLibraryCode()->getBufferPointer()
-           << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+        append(getCoreLibraryCode());
+        append(getHLSLLibraryCode());
+        append(getAutodiffLibraryCode());
         break;
     case slang::BuiltinModuleName::GLSL:
-        sb << (const char*)getGLSLLibraryCode()->getBufferPointer();
+        append(getGLSLLibraryCode());
         break;
     }
 }
