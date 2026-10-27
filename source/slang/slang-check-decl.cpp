@@ -2122,7 +2122,8 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
         if (nextState < DeclCheckState::ReadyForReference &&
             decl->checkState.getState() >= DeclCheckState::ReadyForReference)
         {
-            SemanticsDeclRedeclarationVisitor(subContext, RedeclarationSeverity::Warning).dispatch(decl);
+            SemanticsDeclRedeclarationVisitor(subContext, RedeclarationSeverity::Warning)
+                .dispatch(decl);
         }
 
         // In the common case, the visitor will have done the necessary
