@@ -73,10 +73,9 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
     SLANG_CHECK(code->getBufferSize() != 0);
 }
 
-// Loading the structural ray-tracing module in one compilation must not reinterpret declarations
-// from an independent module in the same session. The trusted-declaration registry is
-// linkage-wide, but structural entry-point lookup is valid only in a module whose dependency graph
-// contains `slang.raytracing`.
+// Loading the structural ray-tracing module elsewhere in the session must not make an unrelated
+// ordinary struct an entry point. Lookup finds Plain in the requested module, but it must still
+// reject that struct because Plain has no executable stage conformance.
 SLANG_UNIT_TEST(structuralRayTracingEntryPointLookupIsModuleLocal)
 {
     ComPtr<slang::IGlobalSession> globalSession;
@@ -125,9 +124,8 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointLookupIsModuleLocal)
         (const char*)diagnostics->getBufferPointer(),
         diagnostics->getBufferSize());
     SLANG_CHECK(
-        diagnosticText.indexOf(toSlice("no function found matching entry point name 'Plain'")) !=
-        -1);
-    SLANG_CHECK(diagnosticText.indexOf(toSlice("structural ray-tracing")) == -1);
+        diagnosticText.indexOf(toSlice("struct 'Plain' does not implement an executable structural "
+                                       "ray-tracing stage interface")) != -1);
 }
 
 // Selecting two stages implemented by the same struct must give them distinct target names.
@@ -237,6 +235,73 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
         SLANG_CHECK(internalGenericEntry->getName()->text == genericEntryNames[i]);
         ComponentType* genericComponent = internalGenericEntry;
         SLANG_CHECK(genericComponent->getEntryPointNameOverride(0) == genericTargetNames[i]);
+    }
+}
+
+// Structural and native selections can refer to the same function declaration. The input rule
+// belongs to the selected EntryPoint, so a previous lookup must not change the next lookup's
+// result.
+SLANG_UNIT_TEST(structuralRayTracingInputValidationDependsOnEntrySelection)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalFeature = {};
+    experimentalFeature.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalFeature.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalFeature.value.intValue0 = 1;
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalFeature;
+
+    const char* sourcePath =
+        "tests/ray-tracing-2/compatibility/mixed-api/native-entry-input-signature.slang";
+    String source;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(sourcePath, source)));
+
+    const char* moduleNames[] = {"StructuralSelectionFirst", "NativeSelectionFirst"};
+    for (Index order = 0; order < SLANG_COUNT_OF(moduleNames); ++order)
+    {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = session->loadModuleFromSourceString(
+            moduleNames[order],
+            sourcePath,
+            source.getBuffer(),
+            diagnostics.writeRef());
+        SLANG_CHECK_ABORT(module != nullptr);
+
+        for (Index selection = 0; selection < 2; ++selection)
+        {
+            const bool structural = selection == order;
+            diagnostics.setNull();
+            ComPtr<slang::IEntryPoint> entryPoint;
+            auto result = module->findAndCheckEntryPoint(
+                structural ? "Stage" : "Stage.invoke",
+                SLANG_STAGE_CLOSEST_HIT,
+                entryPoint.writeRef(),
+                diagnostics.writeRef());
+            if (structural)
+            {
+                SLANG_CHECK(SLANG_SUCCEEDED(result));
+                SLANG_CHECK(entryPoint != nullptr);
+            }
+            else
+            {
+                SLANG_CHECK(SLANG_FAILED(result));
+                SLANG_CHECK(entryPoint == nullptr);
+                SLANG_CHECK_ABORT(diagnostics != nullptr);
+                auto diagnosticText = UnownedStringSlice(
+                    (const char*)diagnostics->getBufferPointer(),
+                    diagnostics->getBufferSize());
+                SLANG_CHECK(
+                    diagnosticText.indexOf(
+                        toSlice("cannot be used in a native entry point signature")) != -1);
+            }
+        }
     }
 }
 

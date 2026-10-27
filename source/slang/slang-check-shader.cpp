@@ -2074,7 +2074,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto entryPointName = entryPointFuncDecl->getName();
 
     auto module = getModule(entryPointFuncDecl);
-    diagnoseMixedRayTracingAPIUse(entryPoint, sink);
 
     // An entry point is invoked by the pipeline, which has no channel for returning an error, so
     // it cannot declare `throws`. `getErrorCodeType` is used rather than reading `errorType`
@@ -2874,6 +2873,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         referencedDecls,
         signatureStructUses,
         sink);
+
+    // Preserve ordinary signature errors, including their type-nesting diagnostic locations.
+    if (!sink->getErrorCount())
+        diagnoseStructuralRayTracingInputInNativeEntryPoint(entryPoint, sink);
 }
 
 bool resolveStageOfProfileWithEntryPoint(

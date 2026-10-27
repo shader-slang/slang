@@ -4368,7 +4368,9 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     DiagnosticSink* sink,
     bool* outFoundStruct,
     Type** outStageType);
-void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink);
+void diagnoseStructuralRayTracingInputInNativeEntryPoint(
+    EntryPoint* entryPoint,
+    DiagnosticSink* sink);
 
 
 inline void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)

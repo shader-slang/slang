@@ -13,8 +13,8 @@ namespace Slang
 // This file owns the structural ray-tracing rules and their declaration identities.
 // Ordinary interfaces, associated-type constraints, overload resolution, and capability inference
 // remain in the normal checker. Their call sites delegate here only for the additional rules:
-// stage types and inputs, stage selection, schema entry uniqueness, and API mixing. Each rule
-// below states its example and the representation or API contract it preserves.
+// stage types and inputs, stage selection, schema entry uniqueness, and native entry signatures.
+// Each rule below states its example and the representation or API contract it preserves.
 //
 // Schemas, lists, and hit groups are ordinary values. Empty payloads are ordinary payloads.
 // Concrete stage structs are ordinary values too; input generic uses retain the restriction below.
@@ -91,45 +91,6 @@ static void _checkStructuralRayTracingStageImplementationType(
     }
 }
 
-// Rejects a module that uses both pipeline APIs under the current interoperability contract.
-// For example, an rt::IMissShader implementation conflicts with a legacy miss entry point
-// selected or discovered in the same module. Dispatch calls do not select the module's API family:
-// a library wrapper such as rt::RayTracer.trace may call TraceRay in its native target branch.
-// The compiler handles the resulting intrinsic operation without treating that implementation
-// detail as a legacy shader declaration.
-// This is an explicit compatibility policy, not a consequence of ordinary interface conformance.
-static void _checkRayTracingAPIUse(
-    Module* module,
-    RayTracingAPIFamily family,
-    Decl* decl,
-    DiagnosticSink* sink)
-{
-    if (!module || !decl)
-        return;
-    auto moduleDecl = module->getModuleDecl();
-    auto& currentDecl = family == RayTracingAPIFamily::Structural
-                            ? moduleDecl->structuralRayTracingUse
-                            : moduleDecl->legacyRayTracingUse;
-    // Only the first use of the second family diagnoses the conflict. Keeping these checked
-    // declarations on the module also covers a later, explicitly selected native entry point.
-    if (currentDecl)
-        return;
-    currentDecl = decl;
-    auto otherDecl = family == RayTracingAPIFamily::Structural
-                         ? moduleDecl->legacyRayTracingUse
-                         : moduleDecl->structuralRayTracingUse;
-    if (!otherDecl)
-        return;
-
-    auto currentAPI = family == RayTracingAPIFamily::Structural ? "structural" : "legacy";
-    auto otherAPI = family == RayTracingAPIFamily::Structural ? "legacy" : "structural";
-    sink->diagnose(Diagnostics::MixedRayTracingApis{
-        .currentAPI = currentAPI,
-        .otherAPI = otherAPI,
-        .currentDecl = decl,
-        .otherDecl = otherDecl});
-}
-
 // Returns the section name for a structural schema requirement used in duplicate-entry diagnostics,
 // or null for other associated-type requirements.
 static const char* _getStructuralRayTracingSchemaSectionName(AssocTypeDecl* requirement)
@@ -146,21 +107,6 @@ static const char* _getStructuralRayTracingSchemaSectionName(AssocTypeDecl* requ
         break;
     }
     return nullptr;
-}
-
-static bool _isLegacyRayTracingStage(Stage stage)
-{
-    switch (stage)
-    {
-    case Stage::ClosestHit:
-    case Stage::AnyHit:
-    case Stage::Intersection:
-    case Stage::Miss:
-    case Stage::Callable:
-        return true;
-    default:
-        return false;
-    }
 }
 
 // Returns the native stage that constrains a function accepting a structural stage input.
@@ -216,11 +162,6 @@ static void _diagnoseStructuralStageInputParameters(
         if (inputStage == Stage::Unknown)
             continue;
 
-        _checkRayTracingAPIUse(
-            getModule(functionDecl),
-            RayTracingAPIFamily::Structural,
-            functionDecl,
-            visitor->getSink());
         if (functionStage == Stage::Unknown)
         {
             functionStage = inputStage;
@@ -610,22 +551,120 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     return result;
 }
 
-// Checks the module's API family when a native entry point is validated. Explicit native entry
-// selection and automatic discovery call validateEntryPoint, including for a serialized module.
-// For example, `-entry ordinaryMiss -stage miss` selects a legacy entry even without [shader].
-// With no explicit entry request, discovery finds [shader("miss")] functions instead. Reusing
-// that validation covers both paths without a separate walk over the module's declarations.
-void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink)
+// Rejects a logical RT input anywhere in one native entry parameter or result type.
+// Consider `struct Args { Optional<rt::MissInput<C>> input; }`. That field is legal in ordinary
+// code, but selecting `void main(Args args)` as a native entry cannot supply the logical input.
+// Inspect checked container elements and substituted instance fields, not generic arguments:
+// `struct Phantom<T> { uint value; }` does not store T. Ordinary Type identity stops pointer
+// cycles; the normal nesting limit also bounds generic types that grow at every recursive step.
+static bool _diagnoseNativeEntryPointInputType(
+    ASTBuilder* astBuilder,
+    Type* type,
+    SourceLoc location,
+    DiagnosticSink* sink,
+    HashSet<Type*>& visited,
+    UInt depth = 0)
 {
-    if (!_isLegacyRayTracingStage(entryPoint->getStage()))
-        return;
+    type = unwrapModifiedType(type);
+    if (!visited.add(type))
+        return false;
+    if (_getDirectStageInputKind(type) != Stage::Unknown)
+    {
+        sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
+            .type = type,
+            .location = location});
+        return true;
+    }
+    if (depth >= kMaxTypeNestingDepth)
+    {
+        sink->diagnose(Diagnostics::MaximumTypeNestingLevelExceeded{.location = location});
+        return true;
+    }
+    // ConstantBuffer<Args> and StructuredBuffer<Args> store their element type in the checked
+    // builtin type, not in the builtin declaration's fields. The same applies to stage-output
+    // wrappers derived from BuiltinGenericType.
+    if (auto builtinType = as<BuiltinGenericType>(type))
+    {
+        return _diagnoseNativeEntryPointInputType(
+            astBuilder,
+            builtinType->getElementType(),
+            location,
+            sink,
+            visited,
+            depth + 1);
+    }
+    if (unwrapTypeElements(
+            type,
+            [&](Type* elementType)
+            {
+                return _diagnoseNativeEntryPointInputType(
+                    astBuilder,
+                    elementType,
+                    location,
+                    sink,
+                    visited,
+                    depth + 1);
+            }))
+        return true;
 
-    auto entryPointDecl = entryPoint->getFuncDecl();
-    _checkRayTracingAPIUse(
-        getModule(entryPointDecl),
-        RayTracingAPIFamily::Legacy,
-        entryPointDecl,
-        sink);
+    if (auto structDeclRef = isDeclRefTypeOf<StructDecl>(type))
+    {
+        for (auto field : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+        {
+            if (_diagnoseNativeEntryPointInputType(
+                    astBuilder,
+                    getType(astBuilder, field),
+                    location,
+                    sink,
+                    visited,
+                    depth + 1))
+                return true;
+        }
+        if (auto baseType = findBaseStructType(astBuilder, structDeclRef))
+        {
+            return _diagnoseNativeEntryPointInputType(
+                astBuilder,
+                baseType,
+                location,
+                sink,
+                visited,
+                depth + 1);
+        }
+    }
+    return false;
+}
+
+// Checks the selected native entry signature, including aliases and closed generic arguments.
+// A helper may accept MissInput<C>, but selecting that helper with -entry requires this check.
+// Source imports and saved modules use the same checked function reference. Types revealed only
+// by later, separate specialization still need validation at that specialization boundary.
+void diagnoseStructuralRayTracingInputInNativeEntryPoint(
+    EntryPoint* entryPoint,
+    DiagnosticSink* sink)
+{
+    SLANG_RELEASE_ASSERT(!entryPoint->isStructuralRayTracingEntryPoint());
+    auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
+    auto function = entryPoint->getFuncDeclRef();
+    HashSet<Type*> visited;
+    for (auto parameter : getParameters(astBuilder, function))
+    {
+        auto parameterDecl = parameter.getDecl();
+        auto location = parameterDecl->type.exp ? parameterDecl->type.exp->loc : parameterDecl->loc;
+        _diagnoseNativeEntryPointInputType(
+            astBuilder,
+            getType(astBuilder, parameter),
+            location,
+            sink,
+            visited);
+        visited.clear();
+    }
+    auto resultType = function.getDecl()->returnType;
+    _diagnoseNativeEntryPointInputType(
+        astBuilder,
+        getResultType(astBuilder, function),
+        resultType.exp ? resultType.exp->loc : function.getDecl()->loc,
+        sink,
+        visited);
 }
 
 // Selects one executable conformance for a source struct named by -entry.
@@ -781,10 +820,10 @@ void initializeStructuralRayTracingEntryPoint(
 // =============================================================================
 
 // Checks the extra RT API restrictions after ordinary interface conformance checking succeeds.
-// For example, `struct Miss : rt::IMissShader` must be a user-defined struct and cannot share a
-// module with legacy ray-tracing stages. Ordinary conformance checking has already verified its
-// required members, such as Context and invoke. Applying these restrictions at that point also
-// covers a Miss listed in a schema without being selected directly with `-entry Miss`.
+// For example, `struct Miss : rt::IMissShader` must be a user-defined struct.
+// Ordinary conformance checking has already verified its required members, such as Context and
+// invoke. Applying these restrictions at that point also covers a Miss listed in a schema
+// without being selected directly with `-entry Miss`.
 // A conformance to an ordinary interface, such as ITraceProgramSchema, needs no stage restrictions.
 void SemanticsVisitor::checkStructuralRayTracingStageRestrictions(
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
@@ -795,20 +834,10 @@ void SemanticsVisitor::checkStructuralRayTracingStageRestrictions(
     if (stageKind == Stage::Unknown || !witnessTable)
         return;
 
-    auto witnessedType = witnessTable->witnessedType;
-    auto witnessedDeclRef =
-        isDeclRefTypeOf<AggTypeDecl>(witnessedType ? as<Type>(witnessedType->resolve()) : nullptr);
-    auto witnessedDecl = witnessedDeclRef ? witnessedDeclRef.getDecl() : nullptr;
-    if (witnessedDecl)
-    {
-        _checkRayTracingAPIUse(
-            getModule(witnessedDecl),
-            RayTracingAPIFamily::Structural,
-            witnessedDecl,
-            getSink());
-    }
-
-    _checkStructuralRayTracingStageImplementationType(this, witnessedType, conformanceLoc);
+    _checkStructuralRayTracingStageImplementationType(
+        this,
+        witnessTable->witnessedType,
+        conformanceLoc);
 }
 
 void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(

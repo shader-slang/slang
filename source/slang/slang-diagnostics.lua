@@ -4628,11 +4628,10 @@ err(
 )
 
 err(
-    "mixed-ray-tracing-apis",
+    "structural-ray-tracing-input-in-native-entry-point",
     38057,
-    "cannot mix legacy and structural ray-tracing APIs in one module",
-    span { loc = "currentDecl:Decl", message = "this declaration uses the ~currentAPI API" },
-    note { message = "the same module also uses the ~otherAPI API", span { loc = "otherDecl:Decl" } }
+    "invalid native entry point signature",
+    span { loc = "location", message = "structural ray-tracing input type '~type:Type' cannot be used in a native entry point signature" }
 )
 
 err(

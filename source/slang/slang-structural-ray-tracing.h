@@ -27,17 +27,6 @@ class MagicTypeModifier;
 /// declarations.
 bool isRayTracingBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl);
 
-/// Distinguishes structural shader declarations from legacy shader entry points.
-///
-/// The frontend records the first shader declaration or stage-input use of each family per module
-/// so it can diagnose mixing the two shader models once. Ordinary dispatch calls do not select
-/// either family.
-enum class RayTracingAPIFamily
-{
-    Structural,
-    Legacy,
-};
-
 /// Names the concrete entries and matching subtype witnesses encoded by a section-list type.
 ///
 /// Concrete lists keep the two packs index-aligned, including two zero-length packs for an empty

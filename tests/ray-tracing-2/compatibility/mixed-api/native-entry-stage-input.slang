@@ -1,5 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry nativeClosestHit -stage closesthit -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry nativeClosestHit -stage closesthit -no-codegen -DUNANNOTATED
+//TEST:COMPILE: tests/ray-tracing-2/compatibility/mixed-api/native-entry-stage-input.slang -experimental-feature -DUNANNOTATED -o tests/ray-tracing-2/compatibility/mixed-api/native-entry-stage-input-cache.slang-module
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=SERIALIZED): -experimental-feature tests/ray-tracing-2/compatibility/mixed-api/native-entry-stage-input-cache.slang-module -entry nativeClosestHit -stage closesthit -no-codegen
 
 import slang.raytracing;
 
@@ -20,14 +23,16 @@ struct HitContext : rt::IHitContext
 }
 
 // A matching native stage does not make a structural stage-input view into a native ABI
-// parameter. Naming this function as a legacy entry point and using ClosestHitInput in its
-// signature therefore mixes the two pipeline models in one module, with or without [shader].
+// parameter. Reject the input in this selected native signature, with or without [shader],
+// rather than rejecting unrelated native and structural entries in the same module.
 #ifndef UNANNOTATED
 [shader("closesthit")]
 #endif
 void nativeClosestHit(in rt::ClosestHitInput<HitContext> input) {}
 /*CHECK:
-     ^^^^^^^^^^^^^^^^ cannot mix legacy and structural ray-tracing APIs in one module
-     ^^^^^^^^^^^^^^^^ this declaration uses the legacy API
-     ^^^^^^^^^^^^^^^^ the same module also uses the structural API
+                             ^^^^^^^^^^^^^^^ invalid native entry point signature
+                             ^^^^^^^^^^^^^^^ cannot be used in a native entry point signature
 */
+// The saved module has no source locations; its checks still belong beside this parameter.
+//SERIALIZED: invalid native entry point signature
+//SERIALIZED: cannot be used in a native entry point signature

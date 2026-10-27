@@ -1,11 +1,11 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry legacyMiss -stage miss -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry legacyMiss -stage miss -no-codegen
+//TEST:SIMPLE: -experimental-feature -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry StructuralClosestHit -stage closesthit -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry legacyMiss -stage miss -entry StructuralClosestHit -stage closesthit -no-codegen
 
 // StructuralClosestHit implements the structural stage interface, while legacyMiss declares a
-// native [shader("miss")] entry point in the same module. Selecting legacyMiss explicitly or
-// discovering it without -entry must diagnose the conflict and identify both declarations.
-// Selecting only StructuralClosestHit does not discover legacyMiss, so that request is allowed.
+// native [shader("miss")] entry point in the same module. Each has its own valid signature.
+// Explicit native selection, automatic discovery, and structural selection must all succeed.
 
 import slang.raytracing;
 
@@ -27,9 +27,6 @@ struct HitContext : rt::IHitContext
 }
 
 struct StructuralClosestHit : rt::IClosestHitShader
-/*CHECK:
-       ^^^^^^^^^^^^^^^^^^^^ the same module also uses the structural API
-*/
 {
     typealias Context = HitContext;
     static void invoke(rt::ClosestHitInput<HitContext> input) {}
@@ -37,7 +34,3 @@ struct StructuralClosestHit : rt::IClosestHitShader
 
 [shader("miss")]
 void legacyMiss() {}
-/*CHECK:
-     ^^^^^^^^^^ cannot mix legacy and structural ray-tracing APIs in one module
-     ^^^^^^^^^^ this declaration uses the legacy API
-*/

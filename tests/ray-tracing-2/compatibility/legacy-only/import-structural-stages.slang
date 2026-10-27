@@ -2,6 +2,6 @@
 
 import refined_miss_library;
 
-// The imported module defines structural stages, but this module only selects a native stage.
-// The two modules must not share the bookkeeping that rejects mixing both APIs in one module.
+// The imported module defines structural stages. Its declarations must not prevent selecting
+// this native entry, whose signature has no structural stage-input view.
 void legacyMiss() {}

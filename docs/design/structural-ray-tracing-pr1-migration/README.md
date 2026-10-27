@@ -223,9 +223,9 @@ capabilities and input parameters through the completed conformance witnesses. F
 interface, its checked inheritance facets already identify the stage-interface path. The check
 applies ordinary `This` substitution with the completed conformance to that facet witness before
 reading `invoke`; it does not perform a second search for a conformance path.
-Representation diagnostics use the semantic checker's existing duplicate suppression. The first
-structural and legacy shader declarations are retained on the module declaration so later
-entry-point selection can enforce the same-module mixing restriction, including after serialization.
+Representation diagnostics use the semantic checker's existing duplicate suppression. Native
+entry-point validation checks the selected signature for logical RT inputs, including inputs
+hidden behind aliases or concrete aggregate fields.
 
 ## 8. Centralize special rules and allow ordinary metadata/payload values
 
@@ -441,8 +441,10 @@ The generic restriction prevents a generic body such as
 broader type-only uses would require validating the eventual specialized body. An associated type
 can hide the input from this direct argument check: an ordinary `Carrier` can define
 `typealias Item = MissInput<C>`, while a generic function constructs `T.Item()` or a generic struct
-stores a `T.Item` field. Those uses need checking once T becomes Carrier. The compiler does not
-inspect ordinary structs' fields recursively to discover such specializations. This limitation is
+stores a `T.Item` field. Those ordinary storage and construction uses need checking once T becomes
+Carrier. The direct use checks do not inspect ordinary structs' fields recursively to discover
+such specializations.
+Native entry signatures have a separate check described below. This broader limitation is
 tracked in [#13686](https://github.com/shader-slang/slang/issues/13686).
 
 `Optional<MissInput<C>>` can hold an alias to an existing invocation's input, or `none`:
@@ -491,22 +493,19 @@ Post-link lowering must normalize the internal empty value with the reached stag
 empty payload types. The frontend neither selects a unique application empty type nor inserts an
 argument. That normalization and native adapters remain work for the full implementation.
 
-Only shader declarations choose the module's API family; dispatch calls do not. A structural stage
-conformance or a function parameter using a structural stage input records structural use. A
-native hit, miss, intersection or callable entry records legacy use when normal entry-point
-validation selects or discovers it. Both families recorded in one module remain an error.
-Explicit entry requests validate the named entries; without them, normal discovery validates
-attributed entries. For example, selecting only a structural stage allows an unselected
-`[shader("miss")]` function beside it. Selecting that function, or discovering it when no entry
-is requested, reports the conflict. Reuse `validateEntryPoint` for this check instead of adding
-another traversal of the module's declarations. This also covers serialized modules.
+A native entry point cannot accept or return a logical RT input. This applies to all five input
+types and every native shader stage, including a miss function that directly takes
+`MissInput<Context>`. A type alias, array, `Optional` or concrete struct field does not turn the
+input into a native shader parameter. After ordinary native validation succeeds, entry-point
+validation checks the resolved signature for these types. Explicit selection, automatic entry
+discovery and selection from serialized modules use the same check. It uses the types known during entry
+validation; rechecking types supplied only by later API specialization remains follow-up work.
 
-Remove the call-level API bookkeeping, including name recognition for core `TraceRay`,
-`TraceMotionRay` and `CallShader`. A structural shader may call a native tracing function, and
-a native shader may call an ordinary structural trace wrapper, without the call itself recording
-a second family. Imports and helper layers therefore do not change the family classification.
-Keep the independent stage/input rules and capability checks. Native stage adapters, descriptor
-layout and Metal dispatch remain backend work for a later PR.
+Native and structural shaders may coexist in one module. Ordinary helpers may forward an existing
+input. Imports and calls to `TraceRay`, `TraceMotionRay`, `CallShader` or structural trace wrappers
+do not impose an API-family restriction. The independent input-use, stage and capability checks
+still apply. Native stage adapters, descriptor layout and Metal dispatch remain backend work for
+a later PR.
 
 ## 9. Load RT as an optional builtin module
 
@@ -594,8 +593,8 @@ types. The payload operand is an ordinary typed `inout` pointer. Later Metal low
 those types directly without reconstructing generic arguments from a callee or a second schema
 operand.
 
-Shader declarations choose the API family, so the library's native `TraceRay` calls need no
-annotation-based exemption. The serialized name for `metalTraceRay` has stable ID 912.
+The library's native `TraceRay` calls need no annotation-based exemption. The serialized name
+for `metalTraceRay` has stable ID 912.
 
 The Metal operation remains in the target-selected function body for later backend lowering.
 That implementation must generate Metal intersector dispatch, shared tables, adapters and

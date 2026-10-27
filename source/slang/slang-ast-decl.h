@@ -874,13 +874,6 @@ class ModuleDecl : public NamespaceDeclBase
     //
     Module* module = nullptr;
 
-    /// First checked use of each ray-tracing pipeline API in this module. A native entry point
-    /// may be selected after body checking (or after loading the serialized module), so that
-    /// later check must still see an earlier structural shader conformance or stage-input use,
-    /// and vice versa. Ordinary dispatch calls do not select an API family.
-    FIDDLE() Decl* structuralRayTracingUse = nullptr;
-    FIDDLE() Decl* legacyRayTracingUse = nullptr;
-
     /// Map a decl to the list of its associated decls.
     ///
     /// This mapping is filled in during semantic checking, as the decl declarations get checked or
@@ -1179,9 +1172,6 @@ inline bool isGenericParam(DeclRef<T> declRef)
     return isGenericParam(declRef.getDecl());
 }
 
-/// Returns the ordinary-argument index assigned to a generic parameter, or `-1` for other decls.
-Index getGenericParamIndex(Decl* genericParamDecl);
-
 // Returns true for declarations that encode generic `where`-clause constraints.
 //
 // This is the broad syntactic set of constraint declarations. Use
@@ -1252,19 +1242,6 @@ InterfaceDecl* findParentInterfaceDecl(Decl* decl);
 /// The generic's `inner` declaration is its result, not one of its signature
 /// operands, even if that inner declaration is itself a constraint.
 bool isGenericConstraintParameterDecl(Decl* decl);
-
-/// Returns the number of operands serialized in an application of `genericDecl`.
-///
-/// The count includes ordinary type/value arguments followed by hidden constraint witnesses. A
-/// standalone generic constraint whose declaration is the generic's result is not an operand.
-Index getGenericArgumentCount(GenericDecl* genericDecl);
-
-/// Returns the serialized argument index for a parameter or hidden constraint witness.
-///
-/// Generic applications place ordinary type/value arguments first and source-constraint
-/// witnesses afterward. Keeping this mapping with the AST declarations gives every producer and
-/// consumer one definition of that ordering.
-Index getGenericArgumentIndex(GenericDecl* genericDecl, Decl* argumentDecl);
 
 bool isLocalVar(const Decl* decl);
 
