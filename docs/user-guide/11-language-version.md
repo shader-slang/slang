@@ -98,3 +98,10 @@ Slang language version 202c brings these changes on top of Slang 2026:
   targets that require a return value (SPIR-V, GLSL and WGSL). To migrate, add an explicit `return` at the end
   of the function where required. See GitHub issue
   [#12264](https://github.com/shader-slang/slang/issues/12264) for details.
+- Two declarations of the same name in one scope conflict even when the later one has an inferred type (an
+  untyped `let` or `var`, an unsized array with an initializer, or the alias that an `[UnscopedEnum]` case adds
+  to the enclosing scope), or when one of them is a member of a `cbuffer`, `tbuffer` or GLSL block without an
+  instance name. Earlier compiler releases accepted these conflicts. Slang 202c reports them as error 30200, and
+  earlier versions report warning 30204. A case named like its own unscoped enum, such as `Mode` in
+  `[UnscopedEnum] enum Mode { Mode }`, gets warning 30203 in every version. See GitHub issue
+  [#13876](https://github.com/shader-slang/slang/issues/13876) for details.
