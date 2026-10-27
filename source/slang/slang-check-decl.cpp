@@ -15022,6 +15022,21 @@ static bool isTransparentBufferBlockVariable(Decl* decl)
     return decl->hasModifier<ImplicitParameterGroupVariableModifier>();
 }
 
+/// Return whether `decl` has an earlier declaration of the same name in `containerDecl` other
+/// than the module's own `module` declaration. `checkForRedeclaration` compares `decl` with
+/// each such declaration.
+///
+static bool hasEarlierSameNameNonModuleSibling(ContainerDecl* containerDecl, Decl* decl)
+{
+    for (auto prevDecl = containerDecl->getPrevDirectMemberDeclWithSameName(decl); prevDecl;
+         prevDecl = containerDecl->getPrevDirectMemberDeclWithSameName(prevDecl))
+    {
+        if (!as<ModuleDeclarationDecl>(prevDecl))
+            return true;
+    }
+    return false;
+}
+
 /// Check the members of the `cbuffer`, `tbuffer` and GLSL interface blocks without an instance
 /// name in `containerDecl` against the other declarations that lookup finds in that scope.
 ///
@@ -15048,7 +15063,9 @@ static bool isTransparentBufferBlockVariable(Decl* decl)
 ///
 /// As in `checkForRedeclaration`, the later declaration gets the diagnostic, and a declaration
 /// that has an earlier same-name sibling in its own container is left to
-/// `checkForRedeclaration`, so each declaration gets at most one conflict diagnostic. Every other
+/// `checkForRedeclaration`, so each declaration gets at most one conflict diagnostic. The
+/// module's own `module` declaration takes no part, because `checkRedeclaration` allows a
+/// declaration with the module's name. Every other
 /// declaration is compared with the nearest earlier declaration of its name only, so we do not
 /// need the result of `checkRedeclaration`, which tells a caller when to stop comparing.
 /// Buffer members are variables, which ordinary lookup always finds, so only direct members go
@@ -15089,10 +15106,11 @@ void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMember
         }
 
         auto name = memberDecl->getName();
-        if (!name || !DeclPassesLookupMask(memberDecl, LookupMask::Default))
+        if (!name || as<ModuleDeclarationDecl>(memberDecl) ||
+            !DeclPassesLookupMask(memberDecl, LookupMask::Default))
             continue;
         Decl* prevDecl = nullptr;
-        if (!containerDecl->getPrevDirectMemberDeclWithSameName(memberDecl) &&
+        if (!hasEarlierSameNameNonModuleSibling(containerDecl, memberDecl) &&
             visibleDecls.tryGetValue(name, prevDecl))
         {
             checkRedeclaration(memberDecl, prevDecl, RedeclarationSeverity::Warning);
