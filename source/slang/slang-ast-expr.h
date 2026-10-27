@@ -470,34 +470,45 @@ class InOutImplicitCastExpr : public LValueImplicitCastExpr
     }
 };
 
-/// An implicit conversion justified by a subtype witness.
+/// A cast of a value to a supertype of its type.
 ///
-/// This represents a concrete base projection or equality cast, or packing/upcasting an
-/// existential box. Box conversions carry a proof about the payload's interface rather than
-/// a conformance to the box type itself. The result type is this expression's `type`.
+/// The result type is stored in this expression's `type`.
 ///
 FIDDLE()
 class CastToSuperTypeExpr : public Expr
 {
     FIDDLE(...)
-    /// The value being converted.
+    /// The value being cast.
     ///
     /// The type being cast from is `valueArg->type`.
     ///
     FIDDLE() Expr* valueArg = nullptr;
 
-    /// The proof justifying the conversion.
-    ///
-    /// For concrete base or equality casts, its endpoints are `valueArg->type` and `type`.
-    /// For box packing, the target endpoint is the interface inside the result box.
-    /// For a box-to-box upcast, both endpoints are the interfaces inside the two boxes.
+    /// A proof that the source type is equal to or a subtype of the result type.
     FIDDLE() Val* witnessArg = nullptr;
 };
 
-/// A `value is Type` expression that tests a value's type or a type-level subtype relation.
+/// Construction of an existential box containing a value and its conformance witness.
 ///
-/// For a boxed value, the test concerns its hidden payload. A type-level operand denotes the
-/// type being tested directly, without opening it.
+/// The result type is an existential box type. The witness relates the contained value's type
+/// to the interface constraining that box.
+FIDDLE()
+class MakeExistentialBoxExpr : public Expr
+{
+    FIDDLE(...)
+
+    /// The contained value, whose type is the witness's source type.
+    FIDDLE() Expr* valueExpr = nullptr;
+
+    /// The contained value's conformance to the interface of the result box.
+    FIDDLE() SubtypeWitness* witnessVal = nullptr;
+};
+
+/// A parsed `value is Type` test or a checked proof test or static type comparison.
+///
+/// A checked instance has a constant result, tests an optional constraint, or compares the
+/// static type of `value` with `typeExpr.type`. A type-valued `value` denotes the type itself.
+/// Runtime tests that compare conformance identities use `OpenedExistentialTypeTestExpr` instead.
 FIDDLE()
 class IsTypeExpr : public Expr
 {
@@ -505,27 +516,64 @@ class IsTypeExpr : public Expr
     FIDDLE() Expr* value = nullptr;
     FIDDLE() TypeExp typeExpr;
 
-    // For a runtime payload test, this proves that `typeExpr.type` conforms to the interface
-    // constraining the opened `value`. For an optional-constraint test, this is instead the
-    // forward proof from the tested type or payload constraint to `typeExpr.type`.
+    /// An optional declared conformance from the tested type to `typeExpr.type`, or null.
     FIDDLE() Val* witnessArg = nullptr;
 
-    // non-null if evaluates to a constant.
+    /// A known result that does not evaluate `value`, or null when the result is not known.
     FIDDLE() BoolLiteralExpr* constantVal = nullptr;
 };
 
-/// A `value as Type` expression that casts `value` to `Type` within type hierarchy.
-/// The result is undefined if `value` is not `Type`.
+/// A parsed `value as Type` expression or a checked optional cast by static type equality.
+///
+/// A checked instance compares the static type of `value` with the target type.
+/// The result is `Optional<Type>`.
+/// Casts that compare conformance identities use `OpenedExistentialTypeCastExpr` instead.
 FIDDLE()
 class AsTypeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() Expr* value = nullptr;
     FIDDLE() Expr* typeExpr = nullptr;
+};
 
-    // For a runtime payload cast, this proves that the target type conforms to the interface
-    // constraining the opened `value`. A statically proven cast uses `MakeOptionalExpr` instead.
-    FIDDLE() Val* witnessArg = nullptr;
+/// A runtime test of whether an opened existential payload has a specified type.
+///
+/// The result is `bool`. The opened value and the target conformance refer to the same
+/// interface, so their conformance witnesses can identify the concrete payload type.
+FIDDLE()
+class OpenedExistentialTypeTestExpr : public Expr
+{
+    FIDDLE(...)
+
+    /// The opened payload value, whose type is `ExtractExistentialType`.
+    FIDDLE() Expr* value = nullptr;
+
+    /// The proper type to test against.
+    FIDDLE() TypeExp targetType;
+
+    /// The target type's conformance to the interface in `value`'s `ExtractExistentialType`.
+    /// This conformance may be optional.
+    FIDDLE() Val* targetWitness = nullptr;
+};
+
+/// An optional cast of an opened existential payload.
+///
+/// The result is `Optional<targetType>`, containing the payload when its concrete type matches
+/// `targetType` and containing no value otherwise.
+FIDDLE()
+class OpenedExistentialTypeCastExpr : public Expr
+{
+    FIDDLE(...)
+
+    /// The opened payload value, whose type is `ExtractExistentialType`.
+    FIDDLE() Expr* value = nullptr;
+
+    /// The proper type to cast to.
+    FIDDLE() TypeExp targetType;
+
+    /// The target type's conformance to the interface in `value`'s `ExtractExistentialType`.
+    /// This conformance may be optional.
+    FIDDLE() Val* targetWitness = nullptr;
 };
 
 FIDDLE(abstract)
@@ -785,7 +833,10 @@ class ReturnValExpr : public Expr
     Scope* scope = nullptr;
 };
 
-// An expression that binds a temporary variable in a local expression context
+/// An expression that binds a temporary declaration while evaluating its body.
+///
+/// A `LetDecl` binds the initializer's value once. An ordinary `VarDecl` aliases an l-value
+/// initializer, or binds the value of an r-value initializer.
 FIDDLE()
 class LetExpr : public Expr
 {
@@ -971,8 +1022,7 @@ class AndTypeExpr : public Expr
 
 /// A type expression of the form `dyn IFoo` that denotes an existential box type.
 ///
-/// The `interfaceType` operand names the interface to be boxed. Semantic checking rejects operands
-/// that do not denote a single interface, including conjunctions and existential box types.
+/// The `interfaceType` operand denotes the interface constraining the box's payload.
 FIDDLE()
 class ExistentialBoxTypeExpr : public Expr
 {

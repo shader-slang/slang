@@ -75,13 +75,13 @@ struct MyType2 : IFoo
 
 An interface names a contract.
 `dyn IFoo` denotes an _existential box type_.
-A value of this type packages a value of an unknown concrete type that conforms to `IFoo`, together with the information needed to dispatch `IFoo`'s requirements.
+A value of this type packages a value of an unknown type that conforms to `IFoo`, together with the information needed to dispatch `IFoo`'s requirements.
 For example:
 
 ```slang
 int evaluate(dyn IFoo value)
 {
-    return value.myMethod(1.0);
+    return value.getVal();
 }
 ```
 

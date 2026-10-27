@@ -226,6 +226,11 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->valueArg);
         }
+        void visitMakeExistentialBoxExpr(MakeExistentialBoxExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->valueExpr);
+        }
         void visitModifierCastExpr(ModifierCastExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -289,6 +294,11 @@ struct ASTIterator
             dispatchIfNotNull(expr->left.exp);
             dispatchIfNotNull(expr->right.exp);
         }
+        void visitExistentialBoxTypeExpr(ExistentialBoxTypeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->interfaceType.exp);
+        }
         void visitModifiedTypeExpr(ModifiedTypeExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -323,6 +333,18 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->value);
             dispatchIfNotNull(expr->typeExpr.exp);
+        }
+        void visitOpenedExistentialTypeTestExpr(OpenedExistentialTypeTestExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->value);
+            dispatchIfNotNull(expr->targetType.exp);
+        }
+        void visitOpenedExistentialTypeCastExpr(OpenedExistentialTypeCastExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->value);
+            dispatchIfNotNull(expr->targetType.exp);
         }
         void visitMakeOptionalExpr(MakeOptionalExpr* expr)
         {

@@ -750,16 +750,17 @@ public:
 
     Type* getAndType(Type* left, Type* right);
 
-    /// Get the existential box type for `interfaceType`, preserving its alias spelling.
+    /// Get the existential box type retaining the supplied `interfaceType` operand.
     ///
     /// Requires a checked type naming one `InterfaceDecl`, with any generic arguments applied.
     /// The box's canonicalization routine canonicalizes the interface operand when needed.
     ExistentialBoxType* getExistentialBoxType(Type* interfaceType);
 
-    /// Get differentiability metadata for an existential box from its interface's refinement proof.
+    /// Get the compatibility conformance witness for a differentiable existential box.
     ///
     /// Requires `interfaceWitness` to start at the boxed interface and end at `IDifferentiable`
-    /// or `IDifferentiablePtrType`. The metadata's supertype is derived from that proof.
+    /// or `IDifferentiablePtrType`. The result relates `boxType` to that same built-in interface,
+    /// as described by `ExistentialBoxDifferentiabilityWitness`.
     ExistentialBoxDifferentiabilityWitness* getExistentialBoxDifferentiabilityWitness(
         ExistentialBoxType* boxType,
         SubtypeWitness* interfaceWitness);

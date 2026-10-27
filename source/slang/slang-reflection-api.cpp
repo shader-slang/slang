@@ -28,8 +28,8 @@ namespace Slang
 /// Get the declaration-bearing type for reflection queries about declaration metadata.
 ///
 /// For a box, this function returns the enclosed interface type for name, attribute, and generic
-/// container queries. Returns null for types without a declaration. Queries about type identity
-/// and conformance must use the original type.
+/// container queries. Returns null for types without a declaration. Checks of a box's own identity
+/// or conformance must use the original box type.
 static DeclRefType* getDeclRefTypeForReflection(Type* type)
 {
     if (auto boxType = as<ExistentialBoxType>(type))

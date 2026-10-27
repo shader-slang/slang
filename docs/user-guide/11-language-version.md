@@ -52,8 +52,9 @@ Slang language version 2025 brings these changes on top of the legacy language:
 Slang language version 2026 brings these changes on top of Slang 2025:
 
 - Comma expression is removed when it is used inside a parenthesis. The expression `(a, b)` no longer evaluates to have `b`'s type as in C/C++. Instead, `(a,b)` means `makeTuple(a,b)` and returns a tuple consisting of `a` and `b`. See [SP#027](https://github.com/shader-slang/spec/blob/main/proposals/027-tuple-syntax.md) for details.
-- Dynamic dispatch has additional validation in this version.
-  The `-enable-experimental-dynamic-dispatch` option enables experimental dynamic-dispatch support.
+- Interfaces marked `[anyValueSize]` cannot be generic or contain associated types, generic methods, mutating methods, or differentiable methods.
+  Their base interfaces must also have `[anyValueSize]`, and generic types and extensions cannot declare conformances to them.
+  The `-enable-experimental-dynamic-dispatch` option bypasses these restrictions.
 - Modifier `volatile` has been removed from Slang. See GitHub issue
   [#10614](https://github.com/shader-slang/slang/issues/10614) for details. The modifier is still accepted
   in GLSL source code for compatibility reasons.
