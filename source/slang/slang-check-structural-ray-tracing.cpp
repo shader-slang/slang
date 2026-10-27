@@ -543,19 +543,6 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     return result;
 }
 
-// Rejects a logical RT input in a selected native entry signature. Ordinary declaration checks
-// already reject storing known inputs in fields or containers. Reuse the same type recognition here
-// for the signature after applying the selected function's generic arguments.
-static void _diagnoseNativeEntryPointInputType(Type* type, SourceLoc location, DiagnosticSink* sink)
-{
-    if (_getRestrictedRayTracingTypeKind(type) == RestrictedRayTracingTypeKind::StageInput)
-    {
-        sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
-            .type = type,
-            .location = location});
-    }
-}
-
 // Checks the selected native entry signature, including aliases and closed generic arguments.
 // A helper may accept MissInput<C>, but selecting that helper with -entry requires this check.
 // Source imports and saved modules use the same checked function reference. Types revealed only
@@ -569,15 +556,25 @@ void diagnoseStructuralRayTracingInputInNativeEntryPoint(
     auto function = entryPoint->getFuncDeclRef();
     for (auto parameter : getParameters(astBuilder, function))
     {
-        auto parameterDecl = parameter.getDecl();
-        auto location = parameterDecl->type.exp ? parameterDecl->type.exp->loc : parameterDecl->loc;
-        _diagnoseNativeEntryPointInputType(getType(astBuilder, parameter), location, sink);
+        auto parameterType = getType(astBuilder, parameter);
+        if (_getRestrictedRayTracingTypeKind(parameterType) ==
+            RestrictedRayTracingTypeKind::StageInput)
+        {
+            auto parameterDecl = parameter.getDecl();
+            sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
+                .type = parameterType,
+                .location =
+                    parameterDecl->type.exp ? parameterDecl->type.exp->loc : parameterDecl->loc});
+        }
     }
-    auto resultType = function.getDecl()->returnType;
-    _diagnoseNativeEntryPointInputType(
-        getResultType(astBuilder, function),
-        resultType.exp ? resultType.exp->loc : function.getDecl()->loc,
-        sink);
+    auto resultType = getResultType(astBuilder, function);
+    if (_getRestrictedRayTracingTypeKind(resultType) == RestrictedRayTracingTypeKind::StageInput)
+    {
+        auto resultTypeExpr = function.getDecl()->returnType.exp;
+        sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
+            .type = resultType,
+            .location = resultTypeExpr ? resultTypeExpr->loc : function.getDecl()->loc});
+    }
 }
 
 // Selects one executable conformance for a source struct named by -entry.
