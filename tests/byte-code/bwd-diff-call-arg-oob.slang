@@ -49,8 +49,9 @@ int main()
 // The reverse-mode wrapper for `square` (`s_bwdProp_square`) is called with a 4-byte float as its
 // first argument (a `copy.4` destination), the narrow-argument shape that over-read the padded
 // callee slot; keep it present so the CHECK gradients stay meaningful. Anchor on the forward-apply
-// wrapper (`s_apply_square`), which precedes the call in the same caller, so the captured register
-// is the one this call actually passes.
+// wrapper (`s_apply_square`), then follow the parameter context into the full context. Both SSA
+// struct constructors emit a copy; the full context is the argument passed to backward propagation.
 // BC: {{.*}}, s_apply_square
-// BC: copy.4 [[ARG0:ws:[0-9A-Fa-f]+]], {{.*}}
+// BC: copy.4 [[PARAM_CONTEXT:ws:[0-9A-Fa-f]+]], {{.*}}
+// BC: copy.4 [[ARG0:ws:[0-9A-Fa-f]+]], [[PARAM_CONTEXT]]
 // BC: call {{.*}}, s_bwdProp_square, [[ARG0]],

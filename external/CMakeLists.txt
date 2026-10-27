@@ -209,9 +209,9 @@ target_include_directories(
     INTERFACE "${_fast_float_include}"
 )
 
-# Slang and SPIRV-Tools share one mimalloc target. Resolve the checkout before either consumer is
-# configured so slang-compiler can use mimalloc even when SPIRV-Tools is disabled or provided by
-# the system.
+# Slang and SPIRV-Tools share one mimalloc target. Resolve the checkout and the shared mimalloc
+# build options before either consumer is configured so slang-compiler can use mimalloc even when
+# SPIRV-Tools is disabled or provided by the system.
 set(SLANG_BUILD_MIMALLOC OFF)
 if(SLANG_ENABLE_MIMALLOC)
     set(SLANG_BUILD_MIMALLOC ON)
@@ -244,6 +244,26 @@ if(SLANG_BUILD_MIMALLOC)
 
     set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
     set(SLANG_MIMALLOC_AVAILABLE ON)
+
+    # Slang and SPIRV-Tools replace the C++ allocation operators in their own sources, so
+    # mimalloc-static must not override allocation as well. We set it here, before
+    # add_subdirectory(spirv-tools), so that it applies whether SPIRV-Tools or the fallback below
+    # creates mimalloc-static.
+    set(MI_OVERRIDE OFF)
+
+    # mimalloc otherwise compiles itself for armv8.1 on arm64, which would raise the minimum CPU
+    # that Slang's arm64 binaries run on.
+    set(MI_NO_OPT_ARCH ON)
+
+    # In a single-config Debug build mimalloc defines MI_DEBUG=2 itself, which overrides the
+    # MI_DEBUG=1 that we add to mimalloc-static below. Requesting level 1 makes the two agree.
+    if(
+        SLANG_ENABLE_MIMALLOC
+        AND CMAKE_BUILD_TYPE MATCHES "Debug"
+        AND NOT MI_DEBUG_FULL
+    )
+        set(MI_DEBUG ON)
+    endif()
 endif()
 
 # SPIRV-Headers
@@ -324,6 +344,33 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
                 EXCLUDE_FROM_ALL
             )
         endif()
+
+        # SPIRV-Tools' source/mimalloc.cpp includes mimalloc-new-delete.h, so on MSVC it needs
+        # /Zc:__cplusplus for the same reason as source/slang/slang-mimalloc.cpp. With SPIRV-Tools
+        # built static, these are the targets that compile the file. A source property on a target
+        # that does not compile it is silently ignored, so we check that each listed target still
+        # compiles it; a new target that starts compiling it would not be caught.
+        if(SLANG_MIMALLOC_AVAILABLE AND SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
+            set(_spvtools_mimalloc_cpp
+                "${spirv-tools_SOURCE_DIR}/source/mimalloc.cpp"
+            )
+            set(_spvtools_mimalloc_targets SPIRV-Tools-opt SPIRV-Tools-diff)
+            foreach(_target IN LISTS _spvtools_mimalloc_targets)
+                get_target_property(_sources ${_target} SOURCES)
+                if(NOT _spvtools_mimalloc_cpp IN_LIST _sources)
+                    message(
+                        FATAL_ERROR
+                        "${_target} no longer compiles ${_spvtools_mimalloc_cpp}; update the /Zc:__cplusplus setting in external/CMakeLists.txt"
+                    )
+                endif()
+            endforeach()
+            set_source_files_properties(
+                "${_spvtools_mimalloc_cpp}"
+                TARGET_DIRECTORY ${_spvtools_mimalloc_targets}
+                PROPERTIES
+                    COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>"
+            )
+        endif()
     endif()
 
     if(NOT ${SLANG_USE_SYSTEM_GLSLANG})
@@ -346,10 +393,10 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
 endif()
 
 # SPIRV-Tools normally creates mimalloc-static. Create it here when slang-compiler needs it and
-# SPIRV-Tools did not, while keeping the global allocation override in Slang-owned source code.
+# SPIRV-Tools did not. MI_OVERRIDE is inherited from the if(SLANG_BUILD_MIMALLOC) block above, so
+# the global allocation override stays in Slang-owned source code.
 if(SLANG_ENABLE_MIMALLOC AND NOT TARGET mimalloc-static)
     function(_slang_add_mimalloc_target)
-        set(MI_OVERRIDE OFF)
         set(MI_BUILD_SHARED OFF)
         set(MI_BUILD_STATIC ON)
         set(MI_BUILD_OBJECT OFF)
@@ -360,8 +407,10 @@ if(SLANG_ENABLE_MIMALLOC AND NOT TARGET mimalloc-static)
     _slang_add_mimalloc_target()
 endif()
 
-# Mimalloc defaults to level 2 in Debug builds, which enables additional internal assertions.
-# Reduce this to level 1 to retain basic heap diagnostics while improving Debug execution time.
+# We build mimalloc-static at assertion level 1 in Debug, which keeps basic heap diagnostics without
+# the cost of mimalloc's internal invariant checks. On its own, mimalloc would use level 2 in a
+# single-config Debug build and level 0 under a multi-config generator, where it normally treats
+# every configuration as a release build.
 if(SLANG_ENABLE_MIMALLOC AND TARGET mimalloc-static AND NOT MI_DEBUG_FULL)
     target_compile_definitions(
         mimalloc-static
