@@ -952,7 +952,7 @@ static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_3& request)
 // the explanation and host contract there apply unchanged. The function-local static
 // `g_processInitializer` in `glslang_compile_1_3`, whose destructor calls
 // `glslang::FinalizeProcess()`, is registered with `atexit` after mimalloc, so it is destroyed
-// before `mi_process_done` runs.
+// before mimalloc's shutdown runs.
 extern "C" BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID reserved)
 {
     if (reason == DLL_PROCESS_DETACH && reserved == nullptr)

@@ -36,20 +36,23 @@
 // running, after the DLL is gone, so a host that repeatedly loads and unloads Slang grows on every
 // cycle (#13828).
 //
-// The hook only sets `mi_option_destroy_on_exit`; mimalloc v2.1.7's `mi_process_done` reads it
-// and then frees the OS memory of every arena it owns (external/mimalloc/src/init.c,
-// `mi_process_done`). That happens late
-// enough because of two facts we rely on:
+// The hook only sets `mi_option_destroy_on_exit` to 1 (a value above 1 makes mimalloc skip its
+// shutdown). In mimalloc v2.5.2 that shutdown is `mi_crt_done`, which calls `mi_process_done`
+// (external/mimalloc/src/init.c), and with the option set it frees the OS memory of every arena
+// it owns. That happens late enough because of two facts we rely on:
 // - On `DLL_PROCESS_DETACH`, the MSVC CRT's `_DllMainCRTStartup` calls this `DllMain` before it
 //   runs the DLL's static destructors and `atexit` functions.
-// - mimalloc's static MSVC build registers `atexit(&mi_process_done)` from a `.CRT$XIU` C
-//   initializer, which runs before any C++ static is constructed, so `mi_process_done` is the
-//   last `atexit` function to run, after every static of this DLL has freed its allocations.
+// - In its default MSVC mode, mimalloc registers `atexit(&mi_crt_done)` for a DLL from a
+//   `.CRT$XIB` C initializer (external/mimalloc/src/prim/windows/prim.c), which runs before any
+//   C++ static is constructed, so `mi_crt_done` is the last `atexit` function to run, after every
+//   static of this DLL has freed its allocations. Its TLS callback ignores process detach in a
+//   DLL, so nothing tears mimalloc down earlier.
 // Both are specific to the MSVC CRT and to this mimalloc version, which is why the hooks are
 // limited to `_MSC_VER` and must be re-checked when mimalloc is upgraded. A MinGW build is left as
-// before: there mimalloc registers `mi_process_done` from an `__attribute__((constructor))`, which
-// is not ordered before the C++ static constructors, so a static destructor could run after the
-// arenas were freed.
+// before: unless it targets UCRT64 (`MI_MINGW_UCRT64`, which uses the CRT/TLS path above),
+// mimalloc runs its shutdown from an `__attribute__((destructor))`
+// (external/mimalloc/src/prim/prim.c), and neither MinGW path's order relative to the C++ static
+// destructors is established, so a static destructor could run after the arenas were freed.
 //
 // Destroying the arenas also destroys every block still allocated in them, including pages of
 // other live threads and buffers a host got from this DLL and has not freed. Those are already
