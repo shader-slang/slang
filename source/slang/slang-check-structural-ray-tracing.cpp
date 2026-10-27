@@ -552,29 +552,28 @@ void diagnoseStructuralRayTracingInputInNativeEntryPoint(
     DiagnosticSink* sink)
 {
     SLANG_RELEASE_ASSERT(!entryPoint->isStructuralRayTracingEntryPoint());
+    auto diagnoseInputType = [sink](Type* type, SourceLoc location)
+    {
+        if (_getRestrictedRayTracingTypeKind(type) == RestrictedRayTracingTypeKind::StageInput)
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
+                .type = type,
+                .location = location});
+        }
+    };
+
     auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
     auto function = entryPoint->getFuncDeclRef();
     for (auto parameter : getParameters(astBuilder, function))
     {
-        auto parameterType = getType(astBuilder, parameter);
-        if (_getRestrictedRayTracingTypeKind(parameterType) ==
-            RestrictedRayTracingTypeKind::StageInput)
-        {
-            auto parameterDecl = parameter.getDecl();
-            sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
-                .type = parameterType,
-                .location =
-                    parameterDecl->type.exp ? parameterDecl->type.exp->loc : parameterDecl->loc});
-        }
+        auto parameterDecl = parameter.getDecl();
+        auto location = parameterDecl->type.exp ? parameterDecl->type.exp->loc : parameterDecl->loc;
+        diagnoseInputType(getType(astBuilder, parameter), location);
     }
-    auto resultType = getResultType(astBuilder, function);
-    if (_getRestrictedRayTracingTypeKind(resultType) == RestrictedRayTracingTypeKind::StageInput)
-    {
-        auto resultTypeExpr = function.getDecl()->returnType.exp;
-        sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
-            .type = resultType,
-            .location = resultTypeExpr ? resultTypeExpr->loc : function.getDecl()->loc});
-    }
+    auto resultTypeExpr = function.getDecl()->returnType.exp;
+    diagnoseInputType(
+        getResultType(astBuilder, function),
+        resultTypeExpr ? resultTypeExpr->loc : function.getDecl()->loc);
 }
 
 // Selects one executable conformance for a source struct named by -entry.
