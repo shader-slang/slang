@@ -51,7 +51,6 @@ By submitting a Contribution to this repository, you additionally represent that
 Navigate to the [Shader-Slang repository](https://github.com/shader-slang/slang).
 Click on the "Fork" button in the top right corner to create a copy of the repository in your GitHub account.
 This document will assume that the name of your forked repository is "slang".
-Make sure your "Actions" are enabled. Visit your forked repository, click on the "Actions" tab, and enable the actions.
 
 ### Cloning Your Fork
 
