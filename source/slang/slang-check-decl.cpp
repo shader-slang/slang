@@ -15052,8 +15052,8 @@ static bool isTransparentBufferBlockVariable(Decl* decl)
 /// need the result of `checkRedeclaration`, which tells a caller when to stop comparing.
 /// Buffer members are variables, which ordinary lookup always finds, so only direct members go
 /// through the lookup-mask filter, which skips declarations such as attributes. Every pair that
-/// we compare involves a buffer member, which earlier Slang versions never compared, so each
-/// conflict is a warning before Slang 202c.
+/// we compare involves a buffer member, which earlier Slang versions never compared, so we report
+/// each conflict with `WarningBefore202c` rather than the visitor's `m_severity`.
 ///
 void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMembers(
     ContainerDecl* containerDecl)
