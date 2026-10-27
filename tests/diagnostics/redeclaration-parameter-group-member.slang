@@ -214,6 +214,59 @@ cbuffer BufferAfterOtherKinds
 */
 }
 
+// An untyped `let`, whose own comparison runs in the replayed step, after a buffer member.
+
+cbuffer BufferBeforeLet
+{
+    int letAfterBuffer;
+/*CHECK:
+        ^^^^^^^^^^^^^^ see previous declaration of 'letAfterBuffer'
+*/
+}
+
+let letAfterBuffer = 1;
+/*CHECK:
+    ^^^^^^^^^^^^^^ warning E30204
+    ^^^^^^^^^^^^^^ declaration of 'letAfterBuffer' conflicts with existing declaration
+*/
+
+// A generic function declared before a buffer member.
+
+int genericFirst<T>(T value)
+/*CHECK:
+    ^^^^^^^^^^^^ see previous declaration of 'genericFirst'
+*/
+{
+    return 0;
+}
+
+cbuffer BufferAfterGeneric
+{
+    int genericFirst;
+/*CHECK:
+        ^^^^^^^^^^^^ warning E30204
+        ^^^^^^^^^^^^ declaration of 'genericFirst' conflicts with existing declaration
+*/
+}
+
+// A buffer inside a struct conflicts with the other members of that struct.
+
+struct BufferOwner
+{
+    static const int structScoped = 1;
+/*CHECK:
+                     ^^^^^^^^^^^^ see previous declaration of 'structScoped'
+*/
+    cbuffer BufferInStruct
+    {
+        int structScoped;
+/*CHECK:
+            ^^^^^^^^^^^^ warning E30204
+            ^^^^^^^^^^^^ declaration of 'structScoped' conflicts with existing declaration
+*/
+    }
+}
+
 // A buffer in a namespace conflicts with the other declarations of that namespace.
 
 namespace BufferNamespace

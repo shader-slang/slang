@@ -4,6 +4,8 @@
 
 // In every language version, a conflict that earlier compiler releases accepted is a warning,
 // and a conflict that they reported stays an error (shader-slang/slang#13876).
+// The three runs pin the decision to treat Slang 202c the same as 2018–2026 for now; the
+// redesign of name lookup for 202c (shader-slang/slang#13956) may change the 202c run.
 
 // The reproducer from the issue: the alias of an `[UnscopedEnum]` case follows a
 // `static const` of the same name.
