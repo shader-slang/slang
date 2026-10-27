@@ -388,10 +388,11 @@ specialization semantics. Section 5.1 of the review walkthrough remains incomple
 Ordinary conformance checking already validates the selected `invoke` signature.
 `validateEntryPoint(entryPoint, sink)` reads the entry's structural classification flag to skip
 native parameter classification because conformance has already checked its compiler-supplied
-input. Ordinary function entries keep the flag unset and still receive native validation even if
-their signature includes an RT input. The structural branch passes the
-annotated input declaration's source-stage requirements to `_validateEntryPointTargetCapabilities`,
-including synthesized stages on Metal; the native branch passes its ordinary stage profile.
+input. Ordinary function entries keep the flag unset. Their signatures are checked for logical RT
+inputs before native parameter and capability validation; an invalid signature stops validation.
+The structural branch passes the annotated input declaration's source-stage requirements to
+`_validateEntryPointTargetCapabilities`, including synthesized stages on Metal; the native branch
+passes its ordinary stage profile.
 For example, a correctly typed `invoke` that calls a Metal-only helper must still be rejected for
 HLSL. Capability diagnostics use the ordinary function location at `invoke`; the public entry
 name remains the selected struct name.
@@ -497,13 +498,15 @@ A native entry point cannot accept or return a logical RT input. This applies to
 types and every native shader stage, including a miss function that directly takes
 `MissInput<Context>`. A type alias still names that same input. Known input storage is rejected
 when its declaration is checked, and `Optional<Input>` is invalid as described above. After
-ordinary native validation succeeds, entry-point validation applies the shared RT type classifier
-to the substituted parameter and result types. It follows builtin container elements without
-inspecting ordinary struct fields. Explicit selection, automatic entry discovery and selection
-from serialized modules use the same check. A concrete aggregate can
-still hide an input behind a generic field such as `T.Item`; that case remains deferred under
-#13686 because the native check does not traverse fields. Rechecking entry types supplied only
-by later API specialization is also follow-up work.
+handling structural entries, entry-point validation applies the shared RT type classifier to
+the substituted native parameter and result types before native parameter and capability rules.
+The check runs only when no earlier errors were reported. A forbidden input produces its own
+diagnostic and stops validation, avoiding unrelated uniform warnings or capability diagnostics.
+The classifier follows builtin container elements without inspecting ordinary struct fields.
+Explicit selection, automatic entry discovery and selection from serialized modules use the same
+check. A concrete aggregate can still hide an input behind a generic field such as `T.Item`; that
+case remains deferred under #13686 because the native check does not traverse fields. Rechecking
+entry types supplied only by later API specialization is also follow-up work.
 
 Native and structural shaders may coexist in one module. Ordinary helpers may forward an existing
 input. Imports and calls to `TraceRay`, `TraceMotionRay`, `CallShader` or structural trace wrappers

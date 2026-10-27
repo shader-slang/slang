@@ -35,8 +35,6 @@ void nativeAlias(in HitInput input) {}
 /*COMPUTE:
                     ^^^^^^^^ invalid native entry point signature
                     ^^^^^^^^ cannot be used in a native entry point signature
-                             ^^^^^ entry point parameter treated as uniform
-                             ^^^^^ parameter 'input' is treated as 'uniform'
 */
 
 interface IInputCarrier

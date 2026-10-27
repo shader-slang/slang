@@ -2044,6 +2044,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         return;
     }
 
+    // Reject logical inputs before applying native parameter rules.
+    if (!sink->getErrorCount())
+    {
+        diagnoseStructuralRayTracingInputInNativeEntryPoint(entryPoint, sink);
+        if (sink->getErrorCount())
+            return;
+    }
+
     auto stage = entryPoint->getStage();
 
     // TODO: We currently do minimal checking here, but this is the
@@ -2873,10 +2881,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         referencedDecls,
         signatureStructUses,
         sink);
-
-    // Preserve ordinary signature errors, including their type-nesting diagnostic locations.
-    if (!sink->getErrorCount())
-        diagnoseStructuralRayTracingInputInNativeEntryPoint(entryPoint, sink);
 }
 
 bool resolveStageOfProfileWithEntryPoint(
