@@ -1051,7 +1051,23 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    auto sharedSemanticsContext = linkage->getSemanticsForReflection();
+    RefPtr<SharedSemanticsContext> sharedSemanticsContext;
+    if (auto module = as<Module>(this))
+    {
+        // The primary command-line module is not in loadedModulesList. Use its dependencies
+        // (including itself) so lookup also sees static methods declared in local extensions.
+        sharedSemanticsContext = new SharedSemanticsContext(linkage, module, sink);
+        for (auto dependency : module->getModuleDependencies())
+        {
+            auto moduleDecl = dependency->getModuleDecl();
+            if (sharedSemanticsContext->importedModulesSet.add(moduleDecl))
+                sharedSemanticsContext->importedModulesList.add(moduleDecl);
+        }
+    }
+    else
+    {
+        sharedSemanticsContext = linkage->getSemanticsForReflection();
+    }
     SemanticsContext context(sharedSemanticsContext);
     context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 

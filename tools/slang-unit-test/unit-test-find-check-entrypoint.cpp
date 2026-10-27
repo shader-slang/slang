@@ -189,6 +189,29 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
     SLANG_CHECK(internalProgram->getEntryPointNameOverride(0) == "MultiStage_closesthit");
     SLANG_CHECK(internalProgram->getEntryPointNameOverride(1) == "MultiStage_anyhit");
 
+    // Selecting the overloaded method uses the stage conformance to choose the same function.
+    slang::IEntryPoint* stageEntries[] = {closestHit.get(), anyHit.get()};
+    SlangStage stages[] = {SLANG_STAGE_CLOSEST_HIT, SLANG_STAGE_ANY_HIT};
+    for (Index i = 0; i < SLANG_COUNT_OF(stageEntries); ++i)
+    {
+        ComPtr<slang::IEntryPoint> methodEntry;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+            "MultiStage.invoke",
+            stages[i],
+            methodEntry.writeRef(),
+            diagnostics.writeRef())));
+        auto internalMethodEntry = static_cast<EntryPoint*>(methodEntry.get());
+        SLANG_CHECK(internalMethodEntry->isStructuralRayTracingEntryPoint());
+        SLANG_CHECK(internalMethodEntry->getName()->text == "MultiStage.invoke");
+        SLANG_CHECK(
+            internalMethodEntry->getFuncDeclRef() ==
+            static_cast<EntryPoint*>(stageEntries[i])->getFuncDeclRef());
+        ComponentType* methodComponent = internalMethodEntry;
+        SLANG_CHECK(
+            methodComponent->getEntryPointNameOverride(0) ==
+            internalProgram->getEntryPointNameOverride(i));
+    }
+
     const char* qualifiedSourcePath = "tests/ray-tracing-2/frontend/entry-point/struct-entry.slang";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(qualifiedSourcePath, source)));
     auto qualifiedModule = session->loadModuleFromSourceString(
@@ -207,6 +230,19 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
     SLANG_CHECK(internalEntry->getName()->text == "Stages.main");
     ComponentType* qualifiedComponent = internalEntry;
     SLANG_CHECK(qualifiedComponent->getEntryPointNameOverride(0) == "Stages_main_closesthit");
+
+    ComPtr<slang::IEntryPoint> qualifiedMethodEntry;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(qualifiedModule->findAndCheckEntryPoint(
+        "Stages.main.invoke",
+        SLANG_STAGE_CLOSEST_HIT,
+        qualifiedMethodEntry.writeRef(),
+        diagnostics.writeRef())));
+    auto internalQualifiedMethodEntry = static_cast<EntryPoint*>(qualifiedMethodEntry.get());
+    SLANG_CHECK(internalQualifiedMethodEntry->isStructuralRayTracingEntryPoint());
+    SLANG_CHECK(internalQualifiedMethodEntry->getName()->text == "Stages.main.invoke");
+    SLANG_CHECK(internalQualifiedMethodEntry->getFuncDeclRef() == internalEntry->getFuncDeclRef());
+    ComponentType* qualifiedMethodComponent = internalQualifiedMethodEntry;
+    SLANG_CHECK(qualifiedMethodComponent->getEntryPointNameOverride(0) == "Stages_main_closesthit");
 
     const char* genericSourcePath =
         "tests/ray-tracing-2/frontend/entry-point/struct-entry-generic.slang";
@@ -235,13 +271,27 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointNamesIncludeStage)
         SLANG_CHECK(internalGenericEntry->getName()->text == genericEntryNames[i]);
         ComponentType* genericComponent = internalGenericEntry;
         SLANG_CHECK(genericComponent->getEntryPointNameOverride(0) == genericTargetNames[i]);
+
+        auto methodName = String(genericEntryNames[i]) + ".invoke";
+        ComPtr<slang::IEntryPoint> genericMethodEntry;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(genericModule->findAndCheckEntryPoint(
+            methodName.getBuffer(),
+            SLANG_STAGE_MISS,
+            genericMethodEntry.writeRef(),
+            diagnostics.writeRef())));
+        auto internalGenericMethodEntry = static_cast<EntryPoint*>(genericMethodEntry.get());
+        SLANG_CHECK(internalGenericMethodEntry->isStructuralRayTracingEntryPoint());
+        SLANG_CHECK(internalGenericMethodEntry->getName()->text == methodName);
+        SLANG_CHECK(
+            internalGenericMethodEntry->getFuncDeclRef() == internalGenericEntry->getFuncDeclRef());
+        ComponentType* genericMethodComponent = internalGenericMethodEntry;
+        SLANG_CHECK(genericMethodComponent->getEntryPointNameOverride(0) == genericTargetNames[i]);
     }
 }
 
-// Structural and native selections can refer to the same function declaration. The input rule
-// belongs to the selected EntryPoint, so a previous lookup must not change the next lookup's
-// result.
-SLANG_UNIT_TEST(structuralRayTracingInputValidationDependsOnEntrySelection)
+// Selecting Stage.invoke is another spelling of the structural entry selected by Stage. Both
+// spellings allow the logical input and select the same checked function and target name.
+SLANG_UNIT_TEST(structuralRayTracingEntryPointAcceptsMethodSelection)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -260,49 +310,40 @@ SLANG_UNIT_TEST(structuralRayTracingInputValidationDependsOnEntrySelection)
     String source;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(sourcePath, source)));
 
-    const char* moduleNames[] = {"StructuralSelectionFirst", "NativeSelectionFirst"};
-    for (Index order = 0; order < SLANG_COUNT_OF(moduleNames); ++order)
-    {
-        ComPtr<slang::ISession> session;
-        SLANG_CHECK_ABORT(
-            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
-        ComPtr<slang::IBlob> diagnostics;
-        auto module = session->loadModuleFromSourceString(
-            moduleNames[order],
-            sourcePath,
-            source.getBuffer(),
-            diagnostics.writeRef());
-        SLANG_CHECK_ABORT(module != nullptr);
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "StructuralMethodSelection",
+        sourcePath,
+        source.getBuffer(),
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
 
-        for (Index selection = 0; selection < 2; ++selection)
-        {
-            const bool structural = selection == order;
-            diagnostics.setNull();
-            ComPtr<slang::IEntryPoint> entryPoint;
-            auto result = module->findAndCheckEntryPoint(
-                structural ? "Stage" : "Stage.invoke",
-                SLANG_STAGE_CLOSEST_HIT,
-                entryPoint.writeRef(),
-                diagnostics.writeRef());
-            if (structural)
-            {
-                SLANG_CHECK(SLANG_SUCCEEDED(result));
-                SLANG_CHECK(entryPoint != nullptr);
-            }
-            else
-            {
-                SLANG_CHECK(SLANG_FAILED(result));
-                SLANG_CHECK(entryPoint == nullptr);
-                SLANG_CHECK_ABORT(diagnostics != nullptr);
-                auto diagnosticText = UnownedStringSlice(
-                    (const char*)diagnostics->getBufferPointer(),
-                    diagnostics->getBufferSize());
-                SLANG_CHECK(
-                    diagnosticText.indexOf(
-                        toSlice("cannot be used in a native entry point signature")) != -1);
-            }
-        }
-    }
+    ComPtr<slang::IEntryPoint> typeEntry;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+        "Stage",
+        SLANG_STAGE_CLOSEST_HIT,
+        typeEntry.writeRef(),
+        diagnostics.writeRef())));
+    ComPtr<slang::IEntryPoint> methodEntry;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+        "Stage.invoke",
+        SLANG_STAGE_CLOSEST_HIT,
+        methodEntry.writeRef(),
+        diagnostics.writeRef())));
+
+    auto internalTypeEntry = static_cast<EntryPoint*>(typeEntry.get());
+    auto internalMethodEntry = static_cast<EntryPoint*>(methodEntry.get());
+    SLANG_CHECK(internalTypeEntry->isStructuralRayTracingEntryPoint());
+    SLANG_CHECK(internalMethodEntry->isStructuralRayTracingEntryPoint());
+    SLANG_CHECK(internalTypeEntry->getFuncDeclRef() == internalMethodEntry->getFuncDeclRef());
+    SLANG_CHECK(internalTypeEntry->getName()->text == "Stage");
+    SLANG_CHECK(internalMethodEntry->getName()->text == "Stage.invoke");
+    ComponentType* typeComponent = internalTypeEntry;
+    ComponentType* methodComponent = internalMethodEntry;
+    SLANG_CHECK(typeComponent->getEntryPointNameOverride(0) == "Stage_closesthit");
+    SLANG_CHECK(methodComponent->getEntryPointNameOverride(0) == "Stage_closesthit");
 }
 
 // This test reproduces issue #6507, where it was noticed that compilation of

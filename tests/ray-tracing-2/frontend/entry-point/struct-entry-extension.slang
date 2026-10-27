@@ -1,4 +1,7 @@
 //TEST:SIMPLE: -experimental-feature -entry ClosestHit -stage closesthit -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry ClosestHit.invoke -stage closesthit -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry DefaultClosestHit -stage closesthit -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry DefaultClosestHit.invoke -stage closesthit -no-codegen
 
 import slang.raytracing;
 
@@ -30,4 +33,18 @@ extension ClosestHit : rt::IClosestHitShader
     {
         outputBuffer[0] = 7;
     }
+}
+
+interface IDefaultClosestHit : rt::IClosestHitShader {}
+
+// A generic extension can supply the checked implementation inherited by a concrete stage.
+// Both selection names must retain that stage as the receiver of the member lookup.
+extension<T : IDefaultClosestHit> T
+{
+    static void invoke(in rt::ClosestHitInput<Context> input) {}
+}
+
+struct DefaultClosestHit : IDefaultClosestHit
+{
+    typealias Context = HitContext;
 }

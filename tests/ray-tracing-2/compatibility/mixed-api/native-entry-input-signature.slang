@@ -1,7 +1,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=ALIAS): -experimental-feature -entry nativeAlias -stage closesthit -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=COMPUTE): -experimental-feature -ignore-capabilities -entry nativeAlias -stage compute -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC): -experimental-feature -entry nativeGeneric<InputCarrier> -stage closesthit -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=METHOD): -experimental-feature -entry Stage.invoke -stage closesthit -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=HELPER): -experimental-feature -entry Stage.helper -stage closesthit -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=PLAIN): -experimental-feature -entry Plain.invoke -stage closesthit -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry Stage.invoke -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry Stage -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry nativePhantom -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry nativeStagePayload -stage closesthit -no-codegen
@@ -66,16 +68,28 @@ struct Stage : rt::IClosestHitShader
 {
     typealias Context = HitContext;
 
-    // Selecting Stage asks for a structural entry. Selecting Stage.invoke asks for this same
-    // function as an ordinary native entry, so only the second selection must be rejected.
+    // Both names select the same checked structural implementation and allow its logical input.
     static void invoke(in HitInput input)
-/*METHOD:
-                          ^^^^^^^^ invalid native entry point signature
-                          ^^^^^^^^ cannot be used in a native entry point signature
-*/
     {
         forwardInput(input);
     }
+
+    // Other methods remain native entries even when their containing type implements a stage.
+    static void helper(in HitInput input) {}
+/*HELPER:
+                          ^^^^^^^^ invalid native entry point signature
+                          ^^^^^^^^ cannot be used in a native entry point signature
+*/
+}
+
+struct Plain
+{
+    // The method name alone does not supply an executable stage conformance.
+    static void invoke(in HitInput input) {}
+/*PLAIN:
+                          ^^^^^^^^ invalid native entry point signature
+                          ^^^^^^^^ cannot be used in a native entry point signature
+*/
 }
 
 struct Phantom<T>

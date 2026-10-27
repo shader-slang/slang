@@ -324,9 +324,9 @@ has already selected the conformance paths used by the input type and its access
 requirements provided by extensions or inherited interfaces. Generic substitutions on the
 function reference apply through the ordinary parameter lookup.
 
-`initializeStructuralRayTracingEntryPoint` marks the entry as structural, sets the public name to
-the selected struct name, and derives the generated shader name. Creating an `EntryPoint`
-collects specialization parameters and function parameters through the ordinary path.
+`initializeStructuralRayTracingEntryPoint` marks the entry as structural, preserves the requested
+public name (`SkyMiss` or `SkyMiss.invoke`), and derives the generated shader name. Creating an
+`EntryPoint` collects specialization parameters and function parameters through the ordinary path.
 `markAsStructuralRayTracingEntryPoint` sets the classification flag and currently clears the
 shader parameter list to keep the logical stage input out of native parameter layout. As a
 result, entry-point layout reflection has an empty parameter scope; it does not yet describe the
@@ -336,7 +336,8 @@ reflection can still inspect the input in the AST function signature.
 The generated name includes both the selected type and shader stage. For a struct `MultiStage`
 that implements closest-hit and any-hit, the generated names are `MultiStage_closesthit` and
 `MultiStage_anyhit`; selecting `Miss` as a miss shader produces `Miss_miss`. The public entry name
-remains the selected source name. `getStructuralRayTracingSourceTypeName` reuses ordinary
+remains the requested source name: selecting `Miss.invoke` also generates `Miss_miss`, while its
+public name is `Miss.invoke`. `getStructuralRayTracingSourceTypeName` reuses ordinary
 type/declaration-reference formatting (`DeclRefType::toString()`) for a non-generic type's qualified
 name. For a generic specialization, it uses the canonical type's existing
 mangled name, which includes the selected type arguments.
@@ -363,11 +364,18 @@ Future adapter synthesis must consume the checked input contract before transfor
 information it needs. It can generate dependent operations for ordinary specialization to resolve,
 or wait for concrete types where the target ABI requires them. PR1 does not implement that adapter.
 
-Entry-point lookup first tries the ordinary function name. If that fails and
-`-experimental-feature` is enabled, it tries the structural stage type. A temporary diagnostic
-sink holds only the function-not-found diagnostic until the structural fallback has either
-recognized the type or failed, so selecting `SkyMiss` does not report a missing function. Other
-lookup diagnostics, including generic-argument conversion warnings, go directly to the real sink.
+With `-experimental-feature` enabled, entry-point lookup accepts both a stage type such as
+`SkyMiss` and its conforming method `SkyMiss.invoke` as structural selections. Both use the checked
+stage conformance to select the implementation. Other static methods such as `SkyMiss.helper`, or
+`Plain.invoke` on a type without a stage conformance, use ordinary function selection. A temporary
+diagnostic sink holds only the function-not-found diagnostic during structural lookup, so selecting
+`SkyMiss` does not report a missing function. Other lookup diagnostics, including generic-argument
+conversion warnings, go directly to the real sink.
+
+For an entry declared in an extension, `ComponentType::findDeclFromString` checks the member name
+in a semantic context containing the selected module and its dependencies, including the module
+itself. Ordinary extension lookup then resolves that member. The non-RT `Pixel.MyType.Main`
+regression selects a static extension method and generates SPIR-V without experimental features.
 
 Both lookup paths return a `DeclRef<FuncDecl>`. `findAndValidateEntryPoint` creates the entry
 once and calls `initializeStructuralRayTracingEntryPoint` in the RT checker to mark a structural
@@ -388,14 +396,14 @@ specialization semantics. Section 5.1 of the review walkthrough remains incomple
 Ordinary conformance checking already validates the selected `invoke` signature.
 `validateEntryPoint(entryPoint, sink)` reads the entry's structural classification flag to skip
 native parameter classification because conformance has already checked its compiler-supplied
-input. Ordinary function entries keep the flag unset. Their signatures are checked for logical RT
+input. Native entries keep the flag unset. Their signatures are checked for logical RT
 inputs before native parameter and capability validation; an invalid signature stops validation.
 The structural branch passes the annotated input declaration's source-stage requirements to
 `_validateEntryPointTargetCapabilities`, including synthesized stages on Metal; the native branch
 passes its ordinary stage profile.
 For example, a correctly typed `invoke` that calls a Metal-only helper must still be rejected for
 HLSL. Capability diagnostics use the ordinary function location at `invoke`; the public entry
-name remains the selected struct name.
+name remains the requested source name.
 
 Target validation uses the requirements that ordinary capability checking infers from the
 selected method's uses. The curve-data and curve-attribute tests exercise the restrictions where

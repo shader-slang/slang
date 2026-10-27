@@ -927,7 +927,7 @@ bool isPrimaryDecl(CallableDecl* decl)
 }
 
 // Finds a function by name, optionally sending only the not-found diagnostic to a separate sink.
-// Entry-point selection uses that sink while trying a structural stage type as a fallback.
+// Entry-point selection uses that sink while checking for a structural stage selection.
 DeclRef<FuncDecl> findFunctionDeclByName(
     Module* translationUnit,
     Name* name,
@@ -2953,19 +2953,20 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
 
     // Consider `-entry SkyMiss`, where SkyMiss implements rt::IMissShader. Ordinary function
     // lookup reports that no function has that name, but experimental lookup may still select
-    // the struct's checked invoke implementation. Hold only the not-found diagnostic until that
-    // fallback has had a chance to recognize the struct. Other lookup diagnostics must reach the
-    // real sink: `SkyMiss<1.5>` can warn when converting a generic argument to int, and the
-    // structural fallback reuses the cached lookup result without diagnosing that conversion again.
+    // the struct's checked invoke implementation. Hold only the not-found diagnostic until
+    // structural lookup has had a chance to recognize the struct. A name such as `SkyMiss.invoke`
+    // can already resolve to a function, but still selects that same structural conformance.
+    // Other lookup diagnostics must reach the real sink: `SkyMiss<1.5>` can warn when converting
+    // a generic argument to int, and structural lookup reuses the cached result without emitting
+    // that warning again.
     DiagnosticSink notFoundSink(linkage->getSourceManager(), sink->getSourceLocationLexer(), sink);
     DeclRef<FuncDecl> entryPointFuncDeclRef =
         findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink, &notFoundSink);
     bool foundStructuralStage = false;
     Type* structuralStageType = nullptr;
-    if (!entryPointFuncDeclRef &&
-        linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+    if (linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
     {
-        entryPointFuncDeclRef = findStructuralRayTracingEntryPointByName(
+        auto structuralEntryPointFuncDeclRef = findStructuralRayTracingEntryPointByName(
             linkage,
             translationUnit->getModule(),
             entryPointName,
@@ -2973,6 +2974,8 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
             sink,
             &foundStructuralStage,
             &structuralStageType);
+        if (foundStructuralStage)
+            entryPointFuncDeclRef = structuralEntryPointFuncDeclRef;
     }
 
     // A recognized structural type already supplies either the entry point or its own diagnostic.

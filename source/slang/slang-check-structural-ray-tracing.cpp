@@ -576,7 +576,7 @@ void diagnoseStructuralRayTracingInputInNativeEntryPoint(
         resultTypeExpr ? resultTypeExpr->loc : function.getDecl()->loc);
 }
 
-// Selects one executable conformance for a source struct named by -entry.
+// Selects one executable conformance for a source struct named by -entry Stage or Stage.invoke.
 // For example, a struct implementing both IMissShader and ICallableShader needs `-stage miss`
 // or `-stage callable`; a struct implementing only IMissShader can omit the explicit stage.
 // The selected witness supplies the exact invoke implementation and preserves dependent types.
@@ -592,29 +592,54 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     bool* outFoundStruct,
     Type** outStageType)
 {
-    // A structural entry request names a stage struct rather than its `invoke` method. Resolve the
-    // struct in the requested module, select exactly one structural stage conformance (or the
-    // `-stage`), and return the specialized witness method that ordinary entry-point lowering can
-    // compile. The public entry name remains the struct name and is stored separately on
-    // `EntryPoint`.
+    // Both `Stage` and `Stage.invoke` select the stage's checked conformance. Read the receiver
+    // type from member lookup so `GenericStage<Payload>.invoke` keeps its generic arguments.
+    // The selected conformance, rather than ordinary overload resolution, chooses the method
+    // when one struct implements several stages.
     *outFoundStruct = false;
     *outStageType = nullptr;
+    SharedSemanticsContext sharedContext(linkage, module, sink);
+    SemanticsVisitor visitor(&sharedContext);
     auto expr = module->findDeclFromString(getText(name), sink);
     auto declRefExpr = as<DeclRefExpr>(expr);
     auto stageTypeDeclRef =
         declRefExpr ? declRefExpr->declRef.as<AggTypeDecl>() : DeclRef<AggTypeDecl>();
+    bool selectedInvoke = false;
+    if (!stageTypeDeclRef)
+    {
+        auto overloadedExpr = as<OverloadedExpr>(expr);
+        auto memberName = declRefExpr      ? declRefExpr->declRef.getName()
+                          : overloadedExpr ? overloadedExpr->lookupResult2.getName()
+                                           : nullptr;
+        if (getText(memberName) != "invoke")
+            return DeclRef<FuncDecl>();
+        auto base = visitor.GetBaseExpr(expr);
+        auto typeType = base ? as<TypeType>(base->type) : nullptr;
+        if (!typeType)
+            return DeclRef<FuncDecl>();
+        auto stageType = typeType->getType();
+        if (declRefExpr)
+        {
+            // With a default implementation, `Stage.invoke` can reference the interface's
+            // requirement. Its This witness retains Stage even though the base is the interface.
+            if (auto thisWitness = findThisTypeWitness(
+                    SubstitutionSet(declRefExpr->declRef),
+                    isDeclRefTypeOf<InterfaceDecl>(stageType).getDecl()))
+                stageType = thisWitness->getSub();
+        }
+        stageTypeDeclRef = isDeclRefTypeOf<AggTypeDecl>(stageType);
+        selectedInvoke = true;
+    }
     if (!stageTypeDeclRef || getModule(stageTypeDeclRef.getDecl()) != module)
         return DeclRef<FuncDecl>();
 
-    *outFoundStruct = true;
-    SharedSemanticsContext sharedContext(linkage, module, sink);
+    *outFoundStruct = !selectedInvoke;
     for (auto dependency : module->getModuleDependencies())
     {
         auto moduleDecl = dependency->getModuleDecl();
         if (sharedContext.importedModulesSet.add(moduleDecl))
             sharedContext.importedModulesList.add(moduleDecl);
     }
-    SemanticsVisitor visitor(&sharedContext);
     visitor.ensureDecl(stageTypeDeclRef, DeclCheckState::ReadyForConformances);
 
     DeclRef<FuncDecl> stageImplementations[SLANG_STAGE_COUNT] = {};
@@ -659,10 +684,14 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
 
     if (implementedStageCount == 0)
     {
+        // An ordinary struct may also have a static method named invoke.
+        if (selectedInvoke)
+            return DeclRef<FuncDecl>();
         sink->diagnose(Diagnostics::StructuralRayTracingEntryPointNotStage{
             .stageType = stageTypeDeclRef.getDecl()});
         return DeclRef<FuncDecl>();
     }
+    *outFoundStruct = true;
 
     auto requestedStage = ioProfile.getStage();
     auto selectedStage = requestedStage;
@@ -708,8 +737,8 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
 }
 
 // Sets the names of an entry point selected through a checked stage conformance.
-// For `-entry Stages.Miss`, retain the selected type as the public name and derive a legal target
-// symbol. The function reference still names the checked invoke method selected by conformance.
+// Preserve the requested public name, such as Stages.Miss or Stages.Miss.invoke. Both spellings
+// derive the same target symbol from the stage type and select the same checked invoke method.
 void initializeStructuralRayTracingEntryPoint(
     EntryPoint* entryPoint,
     Name* entryPointName,

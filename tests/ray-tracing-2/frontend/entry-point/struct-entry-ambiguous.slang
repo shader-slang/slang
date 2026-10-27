@@ -1,6 +1,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry MultiStage -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry MultiStage.invoke -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry MultiStage -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry MultiStage -stage anyhit -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry MultiStage.invoke -stage closesthit -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry MultiStage.invoke -stage anyhit -no-codegen
 
 import slang.raytracing;
 
