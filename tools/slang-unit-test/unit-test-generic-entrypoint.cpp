@@ -599,6 +599,47 @@ SLANG_UNIT_TEST(genericEntryPointSpecializationCapabilities)
     }
 }
 
+SLANG_UNIT_TEST(genericEntryPointSpecializationUpgradeWarnings)
+{
+    const char* source = R"(
+        [require(sm_6_7)] struct Needs67 { uint value; }
+        [shader("compute")] [numthreads(1, 1, 1)]
+        void genericMain<T>() {}
+        )";
+    auto globalSession = unitTestContext->slangGlobalSession;
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_6_6");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+    ComPtr<slang::IBlob> diagnostics;
+    auto module =
+        session->loadModuleFromSourceString("m", "m.slang", source, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+        "genericMain",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnostics.writeRef())));
+
+    // Neither a warning nor a successful specialization may change the base requirements.
+    for (Index i = 0; i < 3; i++)
+    {
+        auto argument = slang::SpecializationArg::fromExpr(i == 1 ? "int" : "Needs67");
+        ComPtr<slang::IComponentType> specialized;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            entryPoint->specialize(&argument, 1, specialized.writeRef(), diagnostics.writeRef())));
+        bool hasUpgradeWarning =
+            _blobToString(diagnostics).getUnownedSlice().indexOf(toSlice("warning[E41012]")) != -1;
+        SLANG_CHECK(hasUpgradeWarning == (i != 1));
+    }
+}
+
 SLANG_UNIT_TEST(genericEntryPointSpecializationExecutionModes)
 {
     const char* source = R"(

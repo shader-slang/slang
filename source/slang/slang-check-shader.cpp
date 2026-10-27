@@ -1808,12 +1808,15 @@ static void collectGenericStructTypeUses(
 // Check a selected entry point's effective requirements against each requested target.
 // Both initial selection and later specialization use this check; the latter must not write
 // its requirements onto the base EntryPoint, which can have other independent specializations.
+// Previously checked requirements contribute to the profile baseline, so later specialization
+// reports only additional profile requirements. Target/stage compatibility uses the full set.
 static void validateEntryPointCapabilities(
     EntryPoint* entryPoint,
     const CapabilitySet& entryPointInferredCaps,
     const List<Decl*>& referencedDecls,
     const List<GenericStructTypeUse>& signatureStructUses,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    const CapabilitySetVal* previouslyCheckedCaps = nullptr)
 {
     auto linkage = entryPoint->getLinkage();
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
@@ -1922,6 +1925,11 @@ static void validateEntryPointCapabilities(
                 // there is an implicit upgrade.
                 targetCaps.nonDestructiveJoin(declaredCapsMod->declaredCapabilityRequirements);
             }
+
+            // For a body requiring sm_6_6 and requested profile sm_6_0, initial validation has
+            // already reported the upgrade to sm_6_6. Specializing with int needs no further
+            // upgrade, while an argument requiring sm_6_7 must still produce a diagnostic.
+            targetCaps.join(previouslyCheckedCaps);
 
             // Only attempt to error if a specific profile or capability is requested
             if ((specificCapabilityRequested || specificProfileRequested) &&
@@ -3871,7 +3879,13 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     specializedCaps.join(
         getDeclRefCapabilityRequirements(&visitor, specializedFuncDeclRef, referencedDecls));
     info->inferredCapabilityRequirements = specializedCaps.freeze(getLinkage()->getASTBuilder());
-    validateEntryPointCapabilities(this, specializedCaps, referencedDecls, {}, sink);
+    validateEntryPointCapabilities(
+        this,
+        specializedCaps,
+        referencedDecls,
+        {},
+        sink,
+        getInferredCapabilityRequirements());
 
     // Once the generic parameters (if any) have been dealt with,
     // any remaining specialization arguments are for existential/interface
