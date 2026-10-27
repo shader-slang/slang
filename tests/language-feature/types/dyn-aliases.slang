@@ -114,7 +114,8 @@ void computeMain()
     outputBuffer[3] = uint(readGenericBox<int>(genericValue));
 }
 
-// VALUE: 1
-// VALUE: 1
-// VALUE: 1
-// VALUE: 11
+// VALUE: type: uint32_t
+// VALUE-NEXT: {{^1$}}
+// VALUE-NEXT: {{^1$}}
+// VALUE-NEXT: {{^1$}}
+// VALUE-NEXT: {{^11$}}

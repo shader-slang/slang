@@ -561,6 +561,17 @@ void ASTPrinter::addExpr(Expr* expr)
 
         sb << ")";
     }
+    else if (const auto makeBoxExpr = as<MakeExistentialBoxExpr>(expr))
+    {
+        sb << "((";
+        addType(expr->type);
+        sb << ")";
+        if (makeBoxExpr->valueExpr)
+        {
+            addExpr(makeBoxExpr->valueExpr);
+        }
+        sb << ")";
+    }
     else if (const auto isTypeExpr = as<IsTypeExpr>(expr))
     {
         if (isTypeExpr->value)
@@ -596,6 +607,21 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             sb << "<unknown-type>";
         }
+    }
+    else if (const auto testExpr = as<OpenedExistentialTypeTestExpr>(expr))
+    {
+        addExpr(testExpr->value);
+        sb << " is ";
+        addType(testExpr->targetType.type);
+    }
+    else if (const auto castExpr = as<OpenedExistentialTypeCastExpr>(expr))
+    {
+        addExpr(castExpr->value);
+        sb << " as ";
+        if (castExpr->targetType.exp)
+            addExpr(castExpr->targetType.exp);
+        else
+            addType(castExpr->targetType.type);
     }
     else if (const auto sizeOfExpr = as<SizeOfExpr>(expr))
     {

@@ -444,6 +444,8 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
     ctx().reset();
 }
 
+// A 202c replay must recover `dyn IFoo` separately from bare `IFoo` metadata. We record their
+// owning module and full names, then replay their lookup and compare the recovered types.
 SLANG_UNIT_TEST(replayContextTypeReflectionExistentialBox)
 {
     REPLAY_TEST;
@@ -483,8 +485,6 @@ SLANG_UNIT_TEST(replayContextTypeReflectionExistentialBox)
     auto layout = module->getLayout();
     SLANG_CHECK_ABORT(layout != nullptr);
 
-    // Recording a box needs its interface's owning module and the box's complete type name.
-    // In 202c, replaying the bare interface name would recover different semantic metadata.
     auto boxType = layout->findTypeByName("dyn IFoo");
     auto interfaceType = layout->findTypeByName("IFoo");
     SLANG_CHECK_ABORT(boxType != nullptr);
