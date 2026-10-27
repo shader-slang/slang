@@ -15043,7 +15043,8 @@ static bool isTransparentBufferBlockVariable(Decl* decl)
 /// variable. A struct that no such variable follows (the parser drops the variable of a GLSL
 /// `gl_PerVertex` redeclaration) exposes nothing. Other transparent variables, such as the one
 /// that the `synthesizedDeclarationRegistryDrainsNewRoots` unit test builds, are treated as
-/// ordinary direct members.
+/// ordinary direct members. So is a buffer block variable that no marked struct precedes, which
+/// only user code that attaches the internal modifiers itself through `syntax` can create.
 ///
 /// As in `checkForRedeclaration`, the later declaration gets the diagnostic, and a declaration
 /// that has an earlier same-name sibling in its own container is left to
@@ -15070,9 +15071,8 @@ void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMember
             continue;
         }
 
-        if (isTransparentBufferBlockVariable(memberDecl))
+        if (elementTypeDecl && isTransparentBufferBlockVariable(memberDecl))
         {
-            SLANG_RELEASE_ASSERT(elementTypeDecl);
             for (auto bufferMemberDecl : elementTypeDecl->getDirectMemberDeclsOfType<VarDeclBase>())
             {
                 auto name = bufferMemberDecl->getName();
