@@ -1088,7 +1088,10 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     //
     if (auto thisParamInfo = findEffectiveThisParamInfo(funcDeclRef))
     {
-        if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
+        // A method that accepts a copy of an immutable receiver needs neither a mutable receiver
+        // nor a warning that its writes to an `in` parameter stay in the callee.
+        if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode) &&
+            !doesEffectiveThisParamAcceptImmutableReceiverCopy(funcDeclRef))
         {
             if (context.baseExpr && !context.baseExpr->type.isLeftValue)
             {

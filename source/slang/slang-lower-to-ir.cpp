@@ -3663,6 +3663,22 @@ void addArg(
     }
 }
 
+static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo const& val);
+
+/// Add an argument that passes a fresh copy of the immutable receiver `receiverExpr` to a writable
+/// `this` parameter.
+///
+/// The copy is never written back, so the callee's writes to `this` stay in the copy rather than
+/// reaching read-only storage such as a constant buffer.
+void addImmutableReceiverCopyArg(IRGenContext* context, Expr* receiverExpr, List<IRInst*>* ioArgs)
+{
+    LoweredValInfo tempVar = moveIntoMutableTemp(context, lowerRValueExpr(context, receiverExpr));
+    addSimpleArg(
+        context,
+        ioArgs,
+        LoweredValInfo::simple(getAddress(context, tempVar, receiverExpr->loc)));
+}
+
 /// Add argument(s) corresponding to one parameter to a call
 ///
 /// The `argExpr` is the AST-level expression being passed as an argument to the call.
@@ -5093,7 +5109,15 @@ struct ExprLoweringContext
                     }
                 }
 
-                if (baseExpr)
+                if (baseExpr && !baseExpr->type.isLeftValue &&
+                    doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
+                {
+                    // Semantic checking accepts a writable receiver on an immutable base only for
+                    // a method that accepts a copy of that receiver (see
+                    // `ThisParamInfoAttribute::acceptsImmutableReceiverCopy`).
+                    addImmutableReceiverCopyArg(context, baseExpr, &irArgs);
+                }
+                else if (baseExpr)
                 {
                     addCallArgsForParam(
                         context,
