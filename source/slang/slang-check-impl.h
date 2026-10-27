@@ -4186,8 +4186,7 @@ public:
         List<DeclRef<ParamDecl>> const& paramDeclRefs);
     void checkGroupSharedArgumentsCopiedByDifferentiableCall(
         InvokeExpr* invoke,
-        FuncType* funcType,
-        List<DeclRef<ParamDecl>> const& paramDeclRefs);
+        FuncType* funcType);
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,

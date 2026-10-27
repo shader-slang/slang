@@ -4844,8 +4844,8 @@ warning(
 warning(
     "groupshared-argument-copied-by-differentiable-call",
     38049,
-    "argument names thread-group-shared memory, which other invocations can access during the call, but a differentiable function passes a reference argument to '~param' by copy-in/copy-out",
-    span { loc = "arg:Expr", message = "the callee works on a private copy, so it misses other invocations' writes during the call, and copying back can overwrite them" }
+    "passing thread-group-shared memory by reference introduces a race condition when this function is differentiated",
+    span { loc = "arg:Expr", message = "~suggestion" }
 )
 
 err(

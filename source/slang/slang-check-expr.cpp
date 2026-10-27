@@ -4612,7 +4612,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 funcType,
                 callableDeclRef,
                 paramDeclRefs);
-            checkGroupSharedArgumentsCopiedByDifferentiableCall(invoke, funcType, paramDeclRefs);
+            checkGroupSharedArgumentsCopiedByDifferentiableCall(invoke, funcType);
 
             if (!IsErrorExpr(invoke))
             {
@@ -7918,52 +7918,115 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
     }
 }
 
-// Autodiff passes a reference argument by copy-in/copy-out, so a callee given thread-group-shared
-// memory through a reference works on a private copy of it. We warn where the shared memory
-// enters the chain of reference parameters: a call inside a differentiable function, or a call
-// to `fwd_diff(f)` or `bwd_diff(f)`. An argument that forwards one of the enclosing function's
-// own parameters was already reported where that parameter's caller passed the shared memory.
+// Return whether autodiff generates a derivative of `func` from its body in forward or backward
+// mode, which happens when `func` is marked differentiable in that mode and has no custom
+// derivative for it. A custom derivative may be attached by an attribute on `func` or by a
+// `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute on the derivative; we only see
+// the latter when the derivative's module is visible from here.
+static bool isBodyDifferentiatedByAutodiff(SharedSemanticsContext* shared, FunctionDeclBase* func)
+{
+    if (!func)
+        return false;
+    bool isBackwardDifferentiable = func->hasModifier<BackwardDifferentiableAttribute>();
+    if (!isBackwardDifferentiable && !func->hasModifier<ForwardDifferentiableAttribute>())
+        return false;
+
+    bool hasCustomForward = func->hasModifier<ForwardDerivativeAttribute>() ||
+                            func->hasModifier<HasTrivialForwardDerivativeAttribute>();
+    bool hasCustomBackward = func->hasModifier<BackwardDerivativeAttribute>();
+    for (auto assoc : shared->getAssociatedDeclsForDecl(func))
+    {
+        if (assoc->kind == DeclAssociationKind::ForwardDerivativeFunc)
+            hasCustomForward = true;
+        else if (assoc->kind == DeclAssociationKind::BackwardDerivativeFunc)
+            hasCustomBackward = true;
+    }
+    return !hasCustomForward || (isBackwardDifferentiable && !hasCustomBackward);
+}
+
+// Autodiff prepares a function body for differentiation by replacing the addresses it computes
+// with values, so a reference argument that is such an address is copied into a temporary before
+// the call and stored back after it. For thread-group-shared memory, the callee then misses other
+// invocations' writes during the call, and the store back overwrites them. A reference argument
+// that names a whole `groupshared` variable keeps its address, but a callee that may write it can
+// itself be differentiated and write part of it, which autodiff widens into a write of the whole
+// variable.
 //
 // Consider this example:
 //
-//     [Differentiable] float mid(no_diff groupshared float a, float x) { return helper(a, x); }
-//     [Differentiable] float f(float x, uint j) { return mid(g[j], x); }
+//     groupshared float g[4];
+//     float readAll(__ref_readonly float a[4], uint i);
+//     float readOne(__ref_readonly float a);
+//     void writeAll(__ref float a[4], uint i);
 //
-// We warn on `g[j]` in `f`, but not on `a` in `mid`.
+//     [Differentiable]
+//     float f(float x, uint i)
+//     {
+//         no_diff(writeAll(g, i));
+//         return no_diff(readAll(g, i)) * no_diff(readOne(g[i])) * x;
+//     }
+//
+// In `f`, we warn on `g` passed to `writeAll` and on `g[i]` passed to `readOne`, but not on `g`
+// passed to `readAll`. We would also warn on any of `f`'s own `groupshared` parameters passed by
+// reference, since those are addresses too. At a `fwd_diff(f)` or `bwd_diff(f)` call outside a
+// differentiated body, no argument is copied, so we only warn on a whole `groupshared` variable
+// passed to a writable reference.
 void SemanticsVisitor::checkGroupSharedArgumentsCopiedByDifferentiableCall(
     InvokeExpr* invoke,
-    FuncType* funcType,
-    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+    FuncType* funcType)
 {
     auto differentiateExpr = as<DifferentiateExpr>(invoke->functionExpr);
-    if (!m_parentDifferentiableAttr && !differentiateExpr)
+    bool callerIsDifferentiated = isBodyDifferentiatedByAutodiff(getShared(), m_parentFunc);
+    if (!callerIsDifferentiated && !differentiateExpr)
         return;
+
+    // An intrinsic, such as an atomic, operates on the shared memory in place. A non-differentiable
+    // callee that is always inlined is inlined before autodiff, so no call remains to copy across.
+    if (auto calleeDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr))
+    {
+        if (auto callee = calleeDeclRefExpr->declRef.as<FunctionDeclBase>())
+        {
+            if (isCallAlwaysInlinedOrIntrinsic(callee.getDecl()) &&
+                getShared()->getFuncDifferentiableLevel(callee.getDecl()) ==
+                    FunctionDifferentiableLevel::None)
+                return;
+        }
+    }
 
     Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
     for (Index i = 0; i < checkCount; ++i)
     {
-        if (!isByReferenceParamPassingMode(funcType->getParamInfo(i).mode))
+        auto mode = funcType->getParamInfo(i).mode;
+        if (!isByReferenceParamPassingMode(mode))
             continue;
 
         auto argExpr = invoke->arguments[i];
         if (isArgumentOfFailedCheck(argExpr) || !argumentNamesGroupSharedStorage(argExpr))
             continue;
 
-        if (auto baseDeclRefExpr = as<DeclRefExpr>(getBaseObjectOfProjection(argExpr)))
+        Expr* wholeExpr = argExpr;
+        while (auto parenExpr = as<ParenExpr>(wholeExpr))
+            wholeExpr = parenExpr->base;
+        auto baseExpr = getBaseObjectOfProjection(argExpr);
+        bool isWholeVariable = baseExpr == wholeExpr;
+        auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
+        bool isOwnParam = baseDeclRefExpr && baseDeclRefExpr->declRef.as<ParamDecl>();
+
+        if (callerIsDifferentiated && (!isWholeVariable || isOwnParam))
         {
-            if (baseDeclRefExpr->declRef.as<ParamDecl>())
-                continue;
+            getSink()->diagnose(Diagnostics::GroupsharedArgumentCopiedByDifferentiableCall{
+                .suggestion = "access the groupshared variable directly as a global instead of "
+                              "passing it as an argument, or replace '[Differentiable]' with a "
+                              "custom derivative",
+                .arg = argExpr});
         }
-
-        String paramName;
-        if (i < paramDeclRefs.getCount())
-            paramName = getText(paramDeclRefs[i].getDecl()->getName());
-        else if (differentiateExpr && i < differentiateExpr->newParameterNames.getCount())
-            paramName = getText(differentiateExpr->newParameterNames[i]);
-
-        getSink()->diagnose(Diagnostics::GroupsharedArgumentCopiedByDifferentiableCall{
-            .param = paramName,
-            .arg = argExpr});
+        else if (isWholeVariable && mode != ParamPassingMode::RefReadOnly)
+        {
+            getSink()->diagnose(Diagnostics::GroupsharedArgumentCopiedByDifferentiableCall{
+                .suggestion = "pass it to a '__ref_readonly' parameter, or access it directly as "
+                              "a global in the callee",
+                .arg = argExpr});
+        }
     }
 }
 

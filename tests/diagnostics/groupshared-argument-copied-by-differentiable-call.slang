@@ -1,9 +1,9 @@
-// Autodiff passes a reference argument by copy-in/copy-out, so a callee given thread-group-shared
-// memory through a reference works on a private copy of it. We warn where the shared memory
-// enters the chain of reference parameters: a call inside a differentiable function, including
-// one under `no_diff`, or a call to `fwd_diff(f)` or `bwd_diff(f)`. A differentiable function
-// that forwards its own reference parameter is not warned, and neither is a call outside
-// differentiable code.
+// Autodiff prepares a function body for differentiation by replacing the addresses it computes
+// with values, so a reference argument that names part of thread-group-shared memory, or the
+// function's own `groupshared` parameter, is copied in before the call and stored back after it.
+// We warn on such arguments inside a differentiated body, including under `no_diff`. A
+// `fwd_diff`/`bwd_diff` call outside a differentiated body passes the address of an element
+// unchanged, and neither an atomic nor a call outside differentiated code is copied.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute
 
@@ -16,25 +16,36 @@ float helper(no_diff groupshared float a, float x)
     return a * x;
 }
 
-// Not warned: forwards its own parameter.
 [Differentiable]
 float mid(no_diff groupshared float a, float x)
 {
     return helper(a, x);
+//CHECK:          ^ passing thread-group-shared memory by reference introduces a race condition when this function is differentiated
+//CHECK:          ^ access the groupshared variable directly as a global instead of passing it as an argument, or replace '[Differentiable]' with a custom derivative
 }
 
 [Differentiable]
 float f(float x, uint j)
 {
     float r = mid(g[j], x);
-//CHECK:           ^ argument names thread-group-shared memory, which other invocations can access during the call, but a differentiable function passes a reference argument to 'a' by copy-in/copy-out
-//CHECK:           ^ the callee works on a private copy, so it misses other invocations' writes during the call, and copying back can overwrite them
+//CHECK:           ^ passing thread-group-shared memory by reference introduces a race condition when this function is differentiated
+//CHECK:           ^ access the groupshared variable directly as a global instead of passing it as an argument, or replace '[Differentiable]' with a custom derivative
     return r + no_diff(helper(g[0], x));
-//CHECK:                       ^ argument names thread-group-shared memory, which other invocations can access during the call, but a differentiable function passes a reference argument to 'a' by copy-in/copy-out
-//CHECK:                       ^ the callee works on a private copy, so it misses other invocations' writes during the call, and copying back can overwrite them
+//CHECK:                       ^ passing thread-group-shared memory by reference introduces a race condition when this function is differentiated
+//CHECK:                       ^ access the groupshared variable directly as a global instead of passing it as an argument, or replace '[Differentiable]' with a custom derivative
 }
 
-// Not warned: outside differentiable code.
+groupshared uint counter;
+
+// Not warned: an atomic operates on the shared memory in place.
+[Differentiable]
+float countCalls(float x)
+{
+    InterlockedAdd(counter, 1u);
+    return x;
+}
+
+// Not warned: outside differentiated code.
 float plain(uint j, float x)
 {
     return helper(g[j], x);
@@ -44,11 +55,8 @@ float plain(uint j, float x)
 void computeMain(uint i : SV_GroupIndex)
 {
     var x = diffPair(3.0);
+    // Not warned: the element's address is passed unchanged.
     bwd_diff(mid)(g[i], x, 1.0);
-//CHECK:           ^ argument names thread-group-shared memory, which other invocations can access during the call, but a differentiable function passes a reference argument to 'a' by copy-in/copy-out
-//CHECK:           ^ the callee works on a private copy, so it misses other invocations' writes during the call, and copying back can overwrite them
     float d = fwd_diff(helper)(g[i], diffPair(1.0, 1.0)).d;
-//CHECK:                        ^ argument names thread-group-shared memory, which other invocations can access during the call, but a differentiable function passes a reference argument to 'a' by copy-in/copy-out
-//CHECK:                        ^ the callee works on a private copy, so it misses other invocations' writes during the call, and copying back can overwrite them
-    outputBuffer[i] = x.d + d + plain(i, 1.0) + f(1.0, i);
+    outputBuffer[i] = x.d + d + plain(i, 1.0) + f(1.0, i) + countCalls(1.0);
 }
