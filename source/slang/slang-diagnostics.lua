@@ -4844,7 +4844,7 @@ warning(
 warning(
     "groupshared-argument-copied-by-differentiable-call",
     38049,
-    "passing thread-group-shared memory by reference introduces a race condition when this function is differentiated",
+    "passing thread-group-shared memory by reference introduces a race condition when ~subject is differentiated",
     span { loc = "arg:Expr", message = "~suggestion" }
 )
 

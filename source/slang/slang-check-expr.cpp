@@ -7918,18 +7918,30 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
     }
 }
 
-// Return whether autodiff generates a derivative of `func` from its body in forward or backward
-// mode, which happens when `func` is marked differentiable in that mode and has no custom
-// derivative for it. A custom derivative may be attached by an attribute on `func` or by a
-// `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute on the derivative; we only see
-// the latter when the derivative's module is visible from here.
-static bool isBodyDifferentiatedByAutodiff(SharedSemanticsContext* shared, FunctionDeclBase* func)
+// The modes in which autodiff generates a derivative of a function from its body.
+struct ModesDifferentiatedFromBody
 {
+    bool forward = false;
+    bool backward = false;
+
+    bool any() const { return forward || backward; }
+};
+
+// Return the modes in which autodiff generates a derivative of `func` from its body: those in
+// which `func` is marked differentiable and has no custom derivative. A custom derivative may be
+// attached by an attribute on `func` or by a `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]`
+// attribute on the derivative; we only see the latter when the derivative's module is visible
+// from here.
+static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
+    SharedSemanticsContext* shared,
+    FunctionDeclBase* func)
+{
+    ModesDifferentiatedFromBody modes;
     if (!func)
-        return false;
+        return modes;
     bool isBackwardDifferentiable = func->hasModifier<BackwardDifferentiableAttribute>();
     if (!isBackwardDifferentiable && !func->hasModifier<ForwardDifferentiableAttribute>())
-        return false;
+        return modes;
 
     bool hasCustomForward = func->hasModifier<ForwardDerivativeAttribute>() ||
                             func->hasModifier<HasTrivialForwardDerivativeAttribute>();
@@ -7941,7 +7953,9 @@ static bool isBodyDifferentiatedByAutodiff(SharedSemanticsContext* shared, Funct
         else if (assoc->kind == DeclAssociationKind::BackwardDerivativeFunc)
             hasCustomBackward = true;
     }
-    return !hasCustomForward || (isBackwardDifferentiable && !hasCustomBackward);
+    modes.forward = !hasCustomForward;
+    modes.backward = isBackwardDifferentiable && !hasCustomBackward;
+    return modes;
 }
 
 // Autodiff prepares a function body for differentiation by replacing the addresses it computes
@@ -7976,9 +7990,11 @@ void SemanticsVisitor::checkGroupSharedArgumentsCopiedByDifferentiableCall(
     FuncType* funcType)
 {
     auto differentiateExpr = as<DifferentiateExpr>(invoke->functionExpr);
-    bool callerIsDifferentiated = isBodyDifferentiatedByAutodiff(getShared(), m_parentFunc);
+    auto callerModes = getModesDifferentiatedFromBody(getShared(), m_parentFunc);
+    bool callerIsDifferentiated = callerModes.any();
     if (!callerIsDifferentiated && !differentiateExpr)
         return;
+    const char* subject = callerIsDifferentiated ? "this function" : "this call";
 
     // An intrinsic, such as an atomic, operates on the shared memory in place. A non-differentiable
     // callee that is always inlined is inlined before autodiff, so no call remains to copy across.
@@ -8014,17 +8030,25 @@ void SemanticsVisitor::checkGroupSharedArgumentsCopiedByDifferentiableCall(
 
         if (callerIsDifferentiated && (!isWholeVariable || isOwnParam))
         {
+            const char* modeNames = !callerModes.backward  ? "forward"
+                                    : !callerModes.forward ? "backward"
+                                                           : "forward or backward";
+            String suggestion = String("access the groupshared variable directly as a global "
+                                       "instead of passing it as an argument; if ") +
+                                modeNames +
+                                " differentiation of this function is needed, provide a custom "
+                                "derivative";
             getSink()->diagnose(Diagnostics::GroupsharedArgumentCopiedByDifferentiableCall{
-                .suggestion = "access the groupshared variable directly as a global instead of "
-                              "passing it as an argument, or replace '[Differentiable]' with a "
-                              "custom derivative",
+                .subject = subject,
+                .suggestion = suggestion,
                 .arg = argExpr});
         }
         else if (isWholeVariable && mode != ParamPassingMode::RefReadOnly)
         {
             getSink()->diagnose(Diagnostics::GroupsharedArgumentCopiedByDifferentiableCall{
-                .suggestion = "pass it to a '__ref_readonly' parameter, or access it directly as "
-                              "a global in the callee",
+                .subject = subject,
+                .suggestion = "access the groupshared variable directly as a global in the "
+                              "callee instead of passing it as an argument",
                 .arg = argExpr});
         }
     }

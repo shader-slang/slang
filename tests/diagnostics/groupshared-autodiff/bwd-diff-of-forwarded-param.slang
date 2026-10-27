@@ -19,8 +19,8 @@ float g(groupshared float a)
 {
     var x = diffPair(2.0);
     bwd_diff(f)(a, x, 1.0);
-//CHECK:        ^ passing thread-group-shared memory by reference introduces a race condition when this function is differentiated
-//CHECK:        ^ pass it to a '__ref_readonly' parameter, or access it directly as a global in the callee
+//CHECK:        ^ passing thread-group-shared memory by reference introduces a race condition when this call is differentiated
+//CHECK:        ^ access the groupshared variable directly as a global in the callee instead of passing it as an argument
     return x.d;
 }
 

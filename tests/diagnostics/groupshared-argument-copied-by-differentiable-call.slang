@@ -21,7 +21,7 @@ float mid(no_diff groupshared float a, float x)
 {
     return helper(a, x);
 //CHECK:          ^ passing thread-group-shared memory by reference introduces a race condition when this function is differentiated
-//CHECK:          ^ access the groupshared variable directly as a global instead of passing it as an argument, or replace '[Differentiable]' with a custom derivative
+//CHECK:          ^ access the groupshared variable directly as a global instead of passing it as an argument; if forward or backward differentiation of this function is needed, provide a custom derivative
 }
 
 [Differentiable]
@@ -29,10 +29,10 @@ float f(float x, uint j)
 {
     float r = mid(g[j], x);
 //CHECK:           ^ passing thread-group-shared memory by reference introduces a race condition when this function is differentiated
-//CHECK:           ^ access the groupshared variable directly as a global instead of passing it as an argument, or replace '[Differentiable]' with a custom derivative
+//CHECK:           ^ access the groupshared variable directly as a global instead of passing it as an argument; if forward or backward differentiation of this function is needed, provide a custom derivative
     return r + no_diff(helper(g[0], x));
 //CHECK:                       ^ passing thread-group-shared memory by reference introduces a race condition when this function is differentiated
-//CHECK:                       ^ access the groupshared variable directly as a global instead of passing it as an argument, or replace '[Differentiable]' with a custom derivative
+//CHECK:                       ^ access the groupshared variable directly as a global instead of passing it as an argument; if forward or backward differentiation of this function is needed, provide a custom derivative
 }
 
 groupshared uint counter;
