@@ -59,6 +59,7 @@ void computeMain()
     outputBuffer[2] = pair.d;
 }
 
-// CHECK: 3.0
-// CHECK: 1.0
-// CHECK: 1.0
+// CHECK: type: float
+// CHECK-NEXT: {{^3\.000000$}}
+// CHECK-NEXT: {{^1\.000000$}}
+// CHECK-NEXT: {{^1\.000000$}}

@@ -2416,7 +2416,30 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
     {
         if (as<ThisTypeConstraintDecl>(val->getDeclRef()))
-            return LoweredValInfo::simple(context->thisTypeWitness);
+        {
+            // We lower the `This` conformance in the current IR scope. Consider this example:
+            //
+            //     interface IStorage<T> { associatedtype Address; }
+            //     interface IParameterStorage<T> : IStorage<T>
+            //     {
+            //         void add(Address address, T value);
+            //     }
+            //
+            // `lowerFuncDeclInContext` gives the method its own IR parameters for the outer `T`.
+            // The context's abstract witness may still belong to the interface's sibling
+            // `IRGeneric`. We use the checked `This` type to obtain a visible witness before
+            // transitive proof lowering combines it with types that use the method's `T`. Concrete
+            // witness parameters already belong to their function scope.
+            auto witness = context->thisTypeWitness;
+            if (isAbstractWitnessTable(witness))
+            {
+                witness = ensureAbstractThisWitnessVisibleFromCurrentScope(
+                    context,
+                    witness,
+                    val->getSub());
+            }
+            return LoweredValInfo::simple(witness);
+        }
 
         auto declRef = val->getDeclRef();
         // A subtype witness is a proof term. Lower it to the witness value directly rather than
@@ -2440,7 +2463,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
     }
 
-    /// Lower box differentiability metadata through its interface refinement proof.
+    /// Lower an artificial box conformance through its enclosed interface's conformance proof.
     LoweredValInfo visitExistentialBoxDifferentiabilityWitness(
         ExistentialBoxDifferentiabilityWitness* witness)
     {
@@ -6779,30 +6802,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
-    /// Emit a chain of `lookupWitnessMethod` insts that walks an interface-to-interface
-    /// sub-type witness, starting from `currentWT` (a witness-table value extracted
-    /// from an existential of the witness's sub-type).  Structured as a mechanical
-    /// recursion over the witness tree, mirroring `emitCastToConcreteSuperTypeRec`.
-    IRInst* emitCastToInterfaceSuperTypeRec(IRInst* currentWT, SubtypeWitness* witness)
-    {
-        if (auto declared = as<DeclaredSubtypeWitness>(witness))
-        {
-            auto key = getInterfaceRequirementKey(context, declared->getDeclRef().getDecl());
-            auto supType = lowerType(context, declared->getSup());
-            return getBuilder()->emitLookupInterfaceMethodInst(
-                getBuilder()->getWitnessTableType(supType),
-                currentWT,
-                key);
-        }
-        if (auto transitive = as<TransitiveSubtypeWitness>(witness))
-        {
-            auto midWT = emitCastToInterfaceSuperTypeRec(currentWT, transitive->getSubToMid());
-            return emitCastToInterfaceSuperTypeRec(midWT, transitive->getMidToSup());
-        }
-        SLANG_UNEXPECTED("unsupported witness shape for interface-to-interface upcast");
-        UNREACHABLE_RETURN(nullptr);
-    }
-
     LoweredValInfo visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
     {
         auto superType = lowerType(context, expr->type);
@@ -6826,37 +6825,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         auto value = lowerRValueExpr(context, expr->valueArg);
 
-        // A conversion to a box packages a concrete value with its conformance witness.
-        // The witness proves conformance to the boxed interface, not to the box itself.
-        if (as<ExistentialBoxType>(expr->type))
-        {
-            auto concreteValue = getSimpleVal(context, value);
-            auto builder = getBuilder();
-
-            // For an upcast from `dyn IDerived` to `dyn IBase`, we open the original box and
-            // follow the interface inheritance proof to obtain the packed value's `IBase` table.
-            // An interface inheritance declaration lowers to a requirement key, so lowering that
-            // declaration directly would not produce the concrete witness table needed by the box.
-            if (as<ExistentialBoxType>(expr->valueArg->type))
-            {
-                auto extractedType = builder->emitExtractExistentialType(concreteValue);
-                auto extractedValue =
-                    builder->emitExtractExistentialValue(extractedType, concreteValue);
-                auto originalWitness = builder->emitExtractExistentialWitnessTable(concreteValue);
-
-                auto witness = as<SubtypeWitness>(expr->witnessArg);
-                SLANG_RELEASE_ASSERT(witness);
-                auto targetWitness = emitCastToInterfaceSuperTypeRec(originalWitness, witness);
-                return LoweredValInfo::simple(
-                    builder->emitMakeExistential(superType, extractedValue, targetWitness));
-            }
-
-            // For a concrete value, semantic checking supplies its conformance table directly.
-            auto witnessTable = lowerSimpleVal(context, expr->witnessArg);
-            return LoweredValInfo::simple(
-                builder->emitMakeExistential(superType, concreteValue, witnessTable));
-        }
-
         if (auto declRefType = as<DeclRefType>(expr->type))
         {
             if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>(); structDeclRef)
@@ -6871,59 +6839,100 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo visitAsTypeExpr(AsTypeExpr* expr)
+    LoweredValInfo visitMakeExistentialBoxExpr(MakeExistentialBoxExpr* expr)
     {
-        auto value = lowerLValueExpr(context, expr->value);
-        ExtractedExistentialValInfo* existentialInfo = nullptr;
-        auto optType = lowerType(context, expr->type);
+        auto value = getSimpleVal(context, lowerRValueExpr(context, expr->valueExpr));
+        auto witness = lowerSimpleVal(context, expr->witnessVal);
+        return LoweredValInfo::simple(
+            getBuilder()->emitMakeExistential(lowerType(context, expr->type), value, witness));
+    }
+
+    // We construct an optional cast result from a type test. When true, `doesTypeMatch` must
+    // prove that `value` has the element type of `optType`. The value may be an l-value whose
+    // read calls a getter, so we materialize it only in the success block.
+    LoweredValInfo emitOptionalTypeCast(
+        IRType* optType,
+        IRInst* doesTypeMatch,
+        LoweredValInfo value)
+    {
         SLANG_RELEASE_ASSERT(optType->getOp() == kIROp_OptionalType);
         auto targetType = optType->getOperand(0);
         auto builder = getBuilder();
         auto var = builder->emitVar(optType);
-        IRInst* isType = nullptr;
-        if (expr->witnessArg)
-        {
-            auto witness = lowerSimpleVal(context, expr->witnessArg);
-            existentialInfo = value.getExtractedExistentialValInfo();
-            isType = builder->emitIsType(
-                existentialInfo->extractedVal,
-                existentialInfo->witnessTable,
-                targetType,
-                witness);
-        }
-        else
-        {
-            SLANG_ASSERT(value.val);
-            auto leftType = lowerType(context, expr->value->type);
-            IRInst* args[] = {leftType, targetType};
-            isType = builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
-        }
+
+        // Each branch initializes the same optional variable before control flow rejoins.
         IRBlock* trueBlock;
         IRBlock* falseBlock;
         IRBlock* afterBlock;
-        builder->emitIfElseWithBlocks(isType, trueBlock, falseBlock, afterBlock);
+        builder->emitIfElseWithBlocks(doesTypeMatch, trueBlock, falseBlock, afterBlock);
+
+        // The successful test justifies interpreting the value as the optional's element type.
         builder->setInsertInto(trueBlock);
         emitCurrentDebugScope(context);
-        auto irVal = builder->emitReinterpret(
-            targetType,
-            existentialInfo ? existentialInfo->extractedVal : getSimpleVal(context, value));
+        auto irVal = builder->emitReinterpret(targetType, getSimpleVal(context, value));
         auto optionalVal = builder->emitMakeOptionalValue(optType, irVal);
         builder->emitStore(var, optionalVal);
         builder->emitBranch(afterBlock);
+
+        // A failed test constructs an empty optional without reading the value again.
         builder->setInsertInto(falseBlock);
         emitCurrentDebugScope(context);
-        // See `visitMakeOptionalExpr`: no longer need to pass a defaultVal.
         auto noneVal = builder->emitMakeOptionalNone(optType);
         builder->emitStore(var, noneVal);
         builder->emitBranch(afterBlock);
+
         builder->setInsertInto(afterBlock);
         emitCurrentDebugScope(context);
         auto result = builder->emitLoad(var);
         return LoweredValInfo::simple(result);
     }
 
+    LoweredValInfo visitAsTypeExpr(AsTypeExpr* expr)
+    {
+        // An ordinary cast compares the whole operand type with the target type. We preserve
+        // the l-value until the success block so a property read has the existing evaluation
+        // behavior even when the unresolved generic target specializes to the box type itself.
+        auto value = lowerLValueExpr(context, expr->value);
+        auto optType = lowerType(context, expr->type);
+        SLANG_RELEASE_ASSERT(optType->getOp() == kIROp_OptionalType);
+        auto targetType = optType->getOperand(0);
+        auto leftType = lowerType(context, expr->value->type);
+        auto builder = getBuilder();
+        IRInst* args[] = {leftType, targetType};
+        auto isType = builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
+        return emitOptionalTypeCast(optType, isType, value);
+    }
+
+    LoweredValInfo visitOpenedExistentialTypeCastExpr(OpenedExistentialTypeCastExpr* expr)
+    {
+        // The explicit opening supplies the payload and its conformance witness together.
+        // Lowering a separate conformance from the extracted type would read a getter-backed
+        // box again. We use the existing bundle to preserve the operand's evaluation behavior.
+        auto value = lowerLValueExpr(context, expr->value);
+        SLANG_RELEASE_ASSERT(value.flavor == LoweredValInfo::Flavor::ExtractedExistential);
+        auto existentialInfo = value.getExtractedExistentialValInfo();
+
+        // We compare the two conformance witnesses before reinterpreting the payload in the
+        // success block. Both conformances refer to the opened value's interface.
+        auto targetType = lowerType(context, expr->targetType.type);
+        auto witness = lowerSimpleVal(context, expr->targetWitness);
+        auto isType = getBuilder()->emitIsType(
+            existentialInfo->extractedVal,
+            existentialInfo->witnessTable,
+            targetType,
+            witness);
+        auto optType = lowerType(context, expr->type);
+        return emitOptionalTypeCast(
+            optType,
+            isType,
+            LoweredValInfo::simple(existentialInfo->extractedVal));
+    }
+
     LoweredValInfo visitIsTypeExpr(IsTypeExpr* expr)
     {
+        // We emit a known result, an optional-constraint guard, or a static type comparison.
+        // We do not lower the payload expression, but lowering an extracted type for the last
+        // case can still read the box through the declaration binding that type.
         auto builder = getBuilder();
         if (expr->constantVal)
         {
@@ -6931,32 +6940,21 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         if (expr->witnessArg)
         {
-            auto type = lowerType(context, expr->typeExpr.type);
-            auto witness = lowerSimpleVal(context, expr->witnessArg);
             auto declWitness = as<DeclaredSubtypeWitness>(expr->witnessArg);
+            SLANG_RELEASE_ASSERT(declWitness);
+            SLANG_RELEASE_ASSERT(declWitness->isOptional());
 
-            if (declWitness && declWitness->isOptional())
-            {
-                // Optional constraint check. NoneWitness lowers to a specific
-                // ID, so that we can check for that here.
-                auto witnessID = builder->emitGetSequentialIDInst(witness);
-                auto noneWitnessID = builder->getIntValue(builder->getUIntType(), -1);
-                auto irVal = builder->emitNeq(witnessID, noneWitnessID);
-                return LoweredValInfo::simple(irVal);
-            }
-            else
-            { // This is a runtime type check of an existential box value.
-                auto value = lowerLValueExpr(context, expr->value);
-                auto existentialInfo = value.getExtractedExistentialValInfo();
-                auto irVal = builder->emitIsType(
-                    existentialInfo->extractedVal,
-                    existentialInfo->witnessTable,
-                    type,
-                    witness);
-                return LoweredValInfo::simple(irVal);
-            }
+            // An absent optional conformance has the `NoneWitness` sequential ID of -1.
+            // We test only the forward proof recorded by semantic checking.
+            auto witness = lowerSimpleVal(context, expr->witnessArg);
+            auto witnessID = builder->emitGetSequentialIDInst(witness);
+            auto noneWitnessID = builder->getIntValue(builder->getUIntType(), -1);
+            auto irVal = builder->emitNeq(witnessID, noneWitnessID);
+            return LoweredValInfo::simple(irVal);
         }
-        // For all other cases, we map to a simple type equality check in the IR.
+
+        // A type-valued operand denotes its type directly. Every other operand contributes its
+        // checked static type, including an extracted type when semantic checking opened a box.
         IRType* leftType = nullptr;
         if (auto typeType = as<TypeType>(expr->value->type))
         {
@@ -6969,6 +6967,24 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto rightType = lowerType(context, expr->typeExpr.type);
         IRInst* args[] = {leftType, rightType};
         auto irVal = builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
+        return LoweredValInfo::simple(irVal);
+    }
+
+    LoweredValInfo visitOpenedExistentialTypeTestExpr(OpenedExistentialTypeTestExpr* expr)
+    {
+        // The explicit opening gives us the concrete payload and witness from the same box.
+        // The target conformance refers to that same interface, so `isType` compares the two
+        // conformance witnesses to identify whether the payload has the target type.
+        auto value = lowerLValueExpr(context, expr->value);
+        SLANG_RELEASE_ASSERT(value.flavor == LoweredValInfo::Flavor::ExtractedExistential);
+        auto existentialInfo = value.getExtractedExistentialValInfo();
+        auto targetType = lowerType(context, expr->targetType.type);
+        auto witness = lowerSimpleVal(context, expr->targetWitness);
+        auto irVal = getBuilder()->emitIsType(
+            existentialInfo->extractedVal,
+            existentialInfo->witnessTable,
+            targetType,
+            witness);
         return LoweredValInfo::simple(irVal);
     }
 
@@ -7172,22 +7188,20 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitLetExpr(LetExpr* expr)
     {
-        // Note: The semantics here are annoyingly subtle.
-        //
-        // If `expr->decl->initExpr` is an l-value, then we will set things up
-        // so that `expr->decl` is bound as an *alias* for that l-value.
-        //
-        // Otherwise, `expr->decl` will simply be bound to the r-value.
-        //
-        // The first case is necessary to make `maybeMoveTemp` operations that
-        // produce l-value results work correctly, but seems slippery.
-        //
-        // TODO: We should probably have two AST node types to cover the two
-        // different use cases of `LetExpr`: the definitely-immutable case that
-        // actually behaves like a `let`, and this other mutable-alias case that
-        // feels kind of messy and gross.
-
-        auto initVal = lowerLValueExpr(context, expr->decl->initExpr);
+        // For a `LetDecl`, we materialize the initializer as a value. Retaining property storage
+        // would call its getter for each use instead of capturing one value. For a `VarDecl`, we
+        // preserve an l-value initializer as an alias so writes through an opened value reach the
+        // original storage.
+        LoweredValInfo initVal;
+        if (as<LetDecl>(expr->decl))
+        {
+            initVal = LoweredValInfo::simple(
+                getSimpleVal(context, lowerRValueExpr(context, expr->decl->initExpr)));
+        }
+        else
+        {
+            initVal = lowerLValueExpr(context, expr->decl->initExpr);
+        }
         context->setGlobalValue(expr->decl, initVal);
         auto bodyVal = lowerSubExpr(expr->body);
         return bodyVal;

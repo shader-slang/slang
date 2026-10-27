@@ -796,31 +796,6 @@ struct SubtypeWitnessCacheEntry
     UInt superTypeGeneration = 0;
 };
 
-/// Key for the `_specializeInterfaceInheritanceWitness` result cache.
-///
-/// The three fields are exactly that function's parameters (see its declaration below), so this
-/// key captures its complete input.
-struct SpecializeInterfaceInheritanceWitnessKey
-{
-    InterfaceDecl* baseInterfaceDecl = nullptr;
-    SubtypeWitness* selfIsSubtypeOfBase = nullptr;
-    SubtypeWitness* baseIsSubtypeOfFacet = nullptr;
-
-    HashCode getHashCode() const
-    {
-        return combineHash(
-            Slang::getHashCode(baseInterfaceDecl),
-            Slang::getHashCode(selfIsSubtypeOfBase),
-            Slang::getHashCode(baseIsSubtypeOfFacet));
-    }
-    bool operator==(const SpecializeInterfaceInheritanceWitnessKey& other) const
-    {
-        return baseInterfaceDecl == other.baseInterfaceDecl &&
-               selfIsSubtypeOfBase == other.selfIsSubtypeOfBase &&
-               baseIsSubtypeOfFacet == other.baseIsSubtypeOfFacet;
-    }
-};
-
 /// Cached information about how to convert between two types.
 struct ImplicitCastMethod
 {
@@ -1378,57 +1353,10 @@ private:
         FacetList baseFacets,
         FacetList::Builder& ioMergedFacets);
 
-    /// Rewrite an interface inheritance witness that is still expressed in terms of the
-    /// base interface's abstract `This` lookup so it applies to a concrete/new subtype path.
-    ///
-    /// Inputs:
-    /// - `baseInterfaceDecl`: the interface that contributed the original `This` type.
-    /// - `selfIsSubtypeOfBase`: witness for `Self : Base`.
-    /// - `baseIsSubtypeOfFacet`: witness for `Base : Facet`, expressed using `Base.This`.
-    ///
-    /// Returns:
-    /// - A witness for `Self : Facet` produced by replacing the abstract `Base.This`
-    ///   lookup inside `baseIsSubtypeOfFacet` with
-    ///   `Lookup(selfIsSubtypeOfBase, baseInterfaceDecl.This)`.
-    ///
-    /// Examples:
-    /// - If `baseIsSubtypeOfFacet` proves `IBase.This : IFacet`, and
-    ///   `selfIsSubtypeOfBase` proves `Child : IBase`, the result proves `Child : IFacet`.
-    /// - If `baseIsSubtypeOfFacet` proves `IBase.This : IFacet`, and
-    ///   `selfIsSubtypeOfBase` proves `IDerived : IBase`, the result proves
-    ///   `IDerived : IFacet`.
-    ///
-    /// This is a centralized workaround until we have a first-class utility for substituting
-    /// an interface `This` type and its constraint with a concrete subtype witness.
-    SubtypeWitness* _specializeInterfaceInheritanceWitness(
-        InterfaceDecl* baseInterfaceDecl,
-        SubtypeWitness* selfIsSubtypeOfBase,
-        SubtypeWitness* baseIsSubtypeOfFacet);
-
     Dictionary<Type*, InheritanceInfoCacheEntry> m_mapTypeToInheritanceInfo;
     Dictionary<DeclRef<Decl>, InheritanceInfoCacheEntry> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitnessCacheEntry> m_mapTypePairToSubtypeWitness;
 
-    /// Cache for `_specializeInterfaceInheritanceWitness`, keyed on its full input.
-    ///
-    /// That function is a pure transformation of an already-resolved witness (a substitution,
-    /// not a conformance query), so unlike the caches above it needs no generation/epoch
-    /// tracking: the same three inputs always produce the same output regardless of what
-    /// extensions are registered later. `_calcInheritanceInfo` calls it once per inheritance
-    /// level while composing a type's transitive facets, so on a deep, non-diamond-shared
-    /// inheritance chain (e.g. `interface I64 : I63 : ... : I0`) the same
-    /// `(baseInterfaceDecl, selfIsSubtypeOfBase, baseIsSubtypeOfFacet)` triple recurs across many
-    /// separate `_calcInheritanceInfo` calls -- each one otherwise re-running a full `Val`
-    /// substitution from scratch. See #12139 (the `interface_depth` case left unresolved by that
-    /// issue's ShortDictionary fix).
-    ///
-    /// Unsynchronized, like every other cache on this type: front-end work including
-    /// specialization is documented as non-reentrant and requiring external synchronization when
-    /// a `SharedSemanticsContext` is shared across threads (docs/user-guide/08-compiling.md,
-    /// "Multithreading"), so this needs no lock any more than `m_mapDeclRefToInheritanceInfo`
-    /// above does.
-    Dictionary<SpecializeInterfaceInheritanceWitnessKey, SubtypeWitness*>
-        m_specializeInterfaceInheritanceWitnessCache;
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
     Dictionary<Type*, bool> m_isCStyleTypeCache;
     Dictionary<Decl*, UInt> m_mapDeclToExtensionEpoch;
@@ -1644,7 +1572,12 @@ public:
     public:
         void addBinding(LetExpr* binding);
 
-        LetExpr* getOuterMostBinding() const { return m_outerMostBinding; }
+        /// Enclose `body` in this scope's temporary bindings.
+        ///
+        /// Requires a non-null checked expression and an unfinished scope. Returns `body`
+        /// unchanged for an empty scope. Otherwise, this completes the binding chain around
+        /// `body`, with the same result type and source location.
+        Expr* complete(Expr* body);
 
     private:
         LetExpr* m_outerMostBinding = nullptr;
@@ -1941,10 +1874,30 @@ public:
     /// Is `item` usable as a static member?
     bool isUsableAsStaticMember(LookupResultItem const& item);
 
-    /// Move `expr` into a temporary variable and execute `func` on that variable.
+    /// Create a temporary binding for a checked expression using a fresh variable declaration.
     ///
-    /// Returns an expression that wraps both the creation and initialization of
-    /// the temporary, and the computation created by `func`.
+    /// Requires `decl` to be unattached and uninitialized. The result has no body yet.
+    /// The declaration's parent is the current lexical container, so generic references keep
+    /// their enclosing context. This does not add `decl` to that container's member list.
+    /// The caller must complete the binding's body and result type, usually through
+    /// `ExprLocalScope::complete`, and separately register the declaration as a container
+    /// member if required.
+    LetExpr* createTemporaryBinding(Expr* valueExpr, VarDecl* decl);
+
+    /// Move `expr` into a temporary binding and execute `func` on its declaration reference.
+    ///
+    /// Requires an expression-local scope. The binding is added to that scope, and the returned
+    /// expression is the callback's result. The temporary is also registered as a member of
+    /// the surrounding container. For example, opening `makeBox()` in this field initializer
+    /// can introduce an unnamed interface-valued field:
+    ///
+    ///     interface IValue { int get(); }
+    ///     IValue makeBox();
+    ///     struct Holder { int value = makeBox().get(); }
+    ///
+    /// Those implicit members are visible in reflection results and buffer element layouts.
+    ///
+    /// `ExprLocalScope::complete` encloses the callback's result in the recorded binding.
     ///
     template<typename F>
     Expr* moveTemp(Expr* const& expr, F const& func);
@@ -1963,7 +1916,7 @@ public:
     /// Requires `expr` to have an existential box type for `interfaceDeclRef`, possibly wrapped
     /// in modifiers such as `no_diff`. A value `e : dyn IMover` contains:
     ///
-    ///  * a hidden concrete type `X`,
+    ///  * a hidden proper type `X`,
     ///  * a witness `w` that `X` conforms to `IMover`, and
     ///  * a payload value `v` of type `X`.
     ///
@@ -3660,14 +3613,20 @@ public:
 
     Witness* getDiffTypeInfoWitness(Type* type);
 
-    /// Get the metadata used to form a checked callable's derivative types.
+    /// Get the differentiability witnesses used to form a checked callable's derivative types.
     ///
-    /// Differentiability entries for boxed parameters and results use scoped payload metadata,
-    /// without establishing an ordinary conformance of the box.
+    /// The result records a witness for each differentiable receiver, parameter, and result.
+    /// For box types, these are the artificial conformances described by
+    /// `ExistentialBoxDifferentiabilityWitness`, which ordinary subtype queries do not provide.
     Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
 
     bool isValidGenericConstraintType(Type* type);
 
+    /// Get a witness for value or pointer differentiability, or null for a non-differentiable type.
+    ///
+    /// A `no_diff` type is non-differentiable even when its underlying type is differentiable.
+    /// For existential boxes, the result uses the compatibility conformance described by
+    /// `ExistentialBoxDifferentiabilityWitness`.
     SubtypeWitness* isTypeDifferentiable(Type* type);
 
     /// Determine whether `type` has the storage property identified by `tag`.
@@ -3708,36 +3667,33 @@ public:
     ///
     SubtypeWitness* tryGetInterfaceConformanceWitness(Type* type, Type* interfaceType);
 
-    /// Find the differentiability proof or boxed-payload metadata for `type`.
+    /// Find a conformance witness for `type` to a built-in differentiability interface.
     ///
     /// `interfaceType` must be `IDifferentiable` or `IDifferentiablePtrType`. For an ordinary
     /// type, the result is its subtype witness. For a box, the result is an
     /// `ExistentialBoxDifferentiabilityWitness` if the enclosed interface refines `interfaceType`.
-    /// Otherwise the result is null. Box metadata does not establish an ordinary conformance.
+    /// This box conformance is an autodiff compatibility exception, as described by that witness
+    /// class. Otherwise the result is null, including when `type` has a `no_diff` modifier.
     SubtypeWitness* tryGetDifferentiabilityWitness(Type* type, Type* interfaceType);
 
     Expr* createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, Val* witness);
 
-    /// Expand a compressed interface-to-interface subtype witness into a
-    /// transitive chain rooted at `subType`.
+    /// Create a fresh existential box value from a checked payload and its conformance.
     ///
-    /// The facet merger (see `_specializeInterfaceInheritanceWitness`) may
-    /// produce a `DeclaredSubtypeWitness(sub, sup, declRef)` where
-    /// `declRef.parent` is an interface *different* from `sub` — i.e. the
-    /// witness is conceptually a composition of (sub : declRef.parent) and
-    /// (declRef.parent : sup) but stored as a single node.  That shape is
-    /// fine for facet-based lookup but malformed for IR lowering, because
-    /// `declRef`'s inheritance key only resolves against the witness table
-    /// of its declaring interface.
+    /// Requires `targetType` to denote a box, `valueExpr` to have the source type of `witness`,
+    /// and the witness's target to be the box's interface. The result is an r-value of the
+    /// supplied `targetType`, retaining its type aliases.
+    Expr* createMakeExistentialBoxExpr(Type* targetType, Expr* valueExpr, SubtypeWitness* witness);
+
+    /// Open a checked box value and repack its payload in a box for a base interface.
     ///
-    /// This helper walks the witness tree and splits any such compressed
-    /// step back into a `TransitiveSubtypeWitness`, so downstream lowering
-    /// can mechanically chain `lookupWitnessMethod` calls without doing
-    /// any inheritance-graph discovery itself.
-    SubtypeWitness* normalizeSubtypeWitnessForInterfaceUpcast(
-        Type* subType,
-        SubtypeWitness* witness,
-        int depth = 0);
+    /// Requires a box `targetType` and an `interfaceWitness` relating the source box's interface
+    /// to the target box's interface. The result evaluates `boxExpr` once and encloses the
+    /// payload, composed conformance proof, and fresh package in the same expression-local scope.
+    Expr* createExistentialBoxUpcastExpr(
+        Type* targetType,
+        Expr* boxExpr,
+        SubtypeWitness* interfaceWitness);
 
     // Handles special modifier cases. In general case, calls createModifierCastExpr.
     Expr* createModifierCast(Type* toType, Type* fromType, Expr* fromExpr);
@@ -4369,10 +4325,6 @@ public:
 
     CatchStmt* findMatchingCatchStmt(Type* errorType);
 
-    DeclaredSubtypeWitness* getThisTypeWitness(
-        ASTBuilder* astBuilder,
-        DeclRef<InterfaceDecl> interfaceDeclRef);
-
     // Differentiability of a function is represented by conformance of the function-as-type to
     // `IForwardDifferentiable`/`IBackwardDifferentiable`. Query that conformance directly instead
     // of probing for the `fwd_diff`/`bwd_diff` associated-function entries; those entries are
@@ -4473,6 +4425,9 @@ public:
     CASE(ModifierCastExpr)
     CASE(LetExpr)
     CASE(ExtractExistentialValueExpr)
+    CASE(MakeExistentialBoxExpr)
+    CASE(OpenedExistentialTypeTestExpr)
+    CASE(OpenedExistentialTypeCastExpr)
     CASE(OpenRefExpr)
     CASE(MakeOptionalExpr)
     CASE(CastOptionalExpr)

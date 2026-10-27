@@ -969,8 +969,8 @@ ExistentialBoxDifferentiabilityWitness* ASTBuilder::getExistentialBoxDifferentia
     ExistentialBoxType* boxType,
     SubtypeWitness* interfaceWitness)
 {
-    // The proof starts at the interface inside the box. We derive the metadata's supertype from
-    // the proof so callers cannot record a different differentiability interface.
+    // We use the refinement proof's target for the artificial box conformance, so callers
+    // cannot associate the box with a different differentiability interface.
     SLANG_RELEASE_ASSERT(boxType);
     SLANG_RELEASE_ASSERT(interfaceWitness);
     SLANG_RELEASE_ASSERT(boxType->getInterfaceType()->equals(interfaceWitness->getSub()));

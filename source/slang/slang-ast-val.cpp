@@ -928,6 +928,67 @@ void DeclaredSubtypeWitness::_toTextOverride(StringBuilder& out)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TransitiveSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+Val* TransitiveSubtypeWitness::_resolveImplOverride()
+{
+    // We resolve the two steps before consulting the inherited-interface requirement. Consider
+    // this example:
+    //
+    //     interface IBase {}
+    //     interface IDerived : IBase {}
+    //     struct Value : IBase, IDerived {}
+    //
+    // Inheritance linearization selects one canonical `Value : IBase` proof. When checking the
+    // other path, `ensureInheritedInterfaceRequirement` records that proof under the
+    // `IDerived : IBase` requirement key in the `Value : IDerived` witness table. The composition
+    // `Value : IDerived : IBase` must resolve to the stored proof so that requirement projections
+    // and generic arguments use the same canonical value as a direct conformance query.
+    auto astBuilder = getCurrentASTBuilder();
+    auto subToMid = as<SubtypeWitness>(getSubToMid()->resolve());
+    auto midToSup = as<SubtypeWitness>(getMidToSup()->resolve());
+
+    // A declared inheritance step supplies the requirement key. The passive lookup applies the
+    // conformance's substitutions without requesting new semantic checking or rebuilding a proof.
+    if (auto declaredStep = as<DeclaredSubtypeWitness>(midToSup))
+    {
+        if (auto inheritanceDeclRef = declaredStep->getDeclRef().as<InheritanceDecl>())
+        {
+            auto requirementWitness =
+                tryLookUpRequirementWitness(astBuilder, subToMid, inheritanceDeclRef.getDecl());
+            if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
+            {
+                // Only a non-canonical inheritance path stores a proof value under this key.
+                auto canonicalWitness = as<SubtypeWitness>(requirementWitness.getVal());
+                SLANG_RELEASE_ASSERT(canonicalWitness);
+
+                // A qualified generic argument can still use the proper type's witness table:
+                //
+                //     typealias InactiveValue = no_diff Value;
+                //     void consume<T : IDerived>(T value);
+                //     consume<InactiveValue>(Value());
+                //
+                // `checkAndConstructSubtypeWitness` adjusts declared witness endpoints to the
+                // requested annotated type while retaining the proper conformance declaration
+                // reference. For this call, the query constructs `InactiveValue : IDerived` with
+                // the declaration reference for `Value : IDerived`. Lookup in that table returns
+                // `Value : IBase`, which is not an answer for `InactiveValue : IBase`.
+                // We select a stored alias only when both endpoint types match the composition.
+                // Otherwise we retain the composition without changing modifier policy.
+                // TODO: Separate differentiation policy from proper value types before removing
+                // this compatibility with modified generic arguments.
+                if (canonicalWitness->getSub()->equals(subToMid->getSub()))
+                {
+                    if (canonicalWitness->getSup()->equals(midToSup->getSup()))
+                        return canonicalWitness;
+                }
+            }
+        }
+    }
+
+    // A canonical inheritance path owns a nested table rather than a proof alias. An absent entry
+    // likewise supplies no replacement, so we retain ordinary composition through the builder.
+    return astBuilder->getTransitiveSubtypeWitness(subToMid, midToSup);
+}
+
 Val* TransitiveSubtypeWitness::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,

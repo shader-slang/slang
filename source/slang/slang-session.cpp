@@ -744,7 +744,12 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
     slang::ContainerType containerType,
     ISlangBlob** outDiagnostics)
 {
+    // We form the requested container over a proper type and cache the result. `None` preserves
+    // metadata identity without introducing an element position that needs a value type.
     SLANG_AST_BUILDER_RAII(getASTBuilder());
+
+    if (containerType == slang::ContainerType::None)
+        return inType;
 
     auto type = asInternal(inType);
 
@@ -752,6 +757,14 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
     ContainerTypeKey key = {inType, containerType};
     if (!m_containerTypes.tryGetValue(key, containerTypeReflection))
     {
+        // Reflection lookup can return an interface contract. We apply the language version's
+        // boxing rule before constructing the container, so its element is a proper type.
+        DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+        type = checkProperType(this, TypeExp(type), &sink);
+        sink.getBlobIfNeeded(outDiagnostics);
+        if (sink.getErrorCount())
+            return nullptr;
+
         switch (containerType)
         {
         case slang::ContainerType::ConstantBuffer:
@@ -788,8 +801,6 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
 
         m_containerTypes.add(key, containerTypeReflection);
     }
-
-    SLANG_UNUSED(outDiagnostics);
 
     return asExternal(containerTypeReflection);
 }

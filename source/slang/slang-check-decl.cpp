@@ -460,7 +460,8 @@ static void validateSizedInterfaceUsage(
 /// Validate a checked inheritance clause whose base may specify `[anyValueSize]`.
 ///
 /// Generic and extension conformances have the same version/experimental gate as
-/// `validateSizedInterfaceUsage`. Conforming aggregate fields must be packable in every mode.
+/// `validateSizedInterfaceUsage`. In every mode, all direct variable members of a conforming
+/// aggregate, including static members, are checked for unsized, opaque, and non-copyable types.
 static void validateSizedInterfaceUseWithInheritanceDecl(
     SemanticsDeclVisitorBase* visitor,
     DiagnosticSink* sink,
@@ -494,8 +495,8 @@ static void validateSizedInterfaceUseWithInheritanceDecl(
     }
     if (auto aggTypeDeclParent = as<AggTypeDecl>(decl->parentDecl))
     {
-        // Conforming payloads must fit an ordinary byte representation. Unsized, opaque,
-        // and non-copyable fields cannot be packed into the interface's AnyValue storage.
+        // We apply the member-type restrictions to every direct variable member. The current
+        // restriction also covers static members, which do not contribute to the instance payload.
         for (auto varDecl : aggTypeDeclParent->getDirectMemberDeclsOfType<VarDecl>())
         {
             visitor->ensureDecl(varDecl, DeclCheckState::ReadyForLookup);
@@ -1194,6 +1195,10 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitOverloadedExpr2(OverloadedExpr2*) { return; }
     void visitAggTypeCtorExpr(AggTypeCtorExpr*) { return; }
     void visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr) { dispatchIfNotNull(expr->valueArg); }
+    void visitMakeExistentialBoxExpr(MakeExistentialBoxExpr* expr)
+    {
+        dispatchIfNotNull(expr->valueExpr);
+    }
     void visitModifierCastExpr(ModifierCastExpr* expr) { dispatchIfNotNull(expr->valueArg); }
     void visitLetExpr(LetExpr* expr) { dispatchIfNotNull(expr->body); }
     void visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
@@ -1243,15 +1248,23 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->interfaceType.type);
     }
     void visitPointerTypeExpr(PointerTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
-    void visitAsTypeExpr(AsTypeExpr* expr)
-    {
-        dispatchIfNotNull(expr->value);
-        dispatchIfNotNull(expr->witnessArg);
-    }
+    void visitAsTypeExpr(AsTypeExpr* expr) { dispatchIfNotNull(expr->value); }
     void visitIsTypeExpr(IsTypeExpr* expr)
     {
         dispatchIfNotNull(expr->value);
         dispatchIfNotNull(expr->witnessArg);
+    }
+    void visitOpenedExistentialTypeTestExpr(OpenedExistentialTypeTestExpr* expr)
+    {
+        dispatchIfNotNull(expr->value);
+        dispatchIfNotNull(expr->targetType.type);
+        dispatchIfNotNull(expr->targetWitness);
+    }
+    void visitOpenedExistentialTypeCastExpr(OpenedExistentialTypeCastExpr* expr)
+    {
+        dispatchIfNotNull(expr->value);
+        dispatchIfNotNull(expr->targetType.type);
+        dispatchIfNotNull(expr->targetWitness);
     }
     void visitMakeOptionalExpr(MakeOptionalExpr* expr)
     {
@@ -10486,28 +10499,35 @@ static String getDifferentiabilityConformanceKindText(DifferentiabilityConforman
     }
 }
 
-// Walk the witness chain to determine if `targetDecl` appears along the
-// canonical lookup path.  This handles `LookupDeclRef` chains as well as
-// `ExpandSubtypeWitness` / `EachSubtypeWitness` wrappers.
-//
+/// Return whether `targetDecl` occurs in the canonical inheritance proof `witness`.
+///
+/// An inherited-interface requirement on this path owns a nested witness table. Other requirements
+/// that reach the same interface store the canonical proof instead of another table.
 static bool doesWitnessLookupPathContainDecl(SubtypeWitness* witness, Decl* targetDecl)
 {
+    // Consider this example:
+    //
+    //     interface IBase { int read(); }
+    //     interface ILeft : IBase {}
+    //     interface IRight : IBase {}
+    //     struct Value : ILeft, IRight { int read() { return 7; } }
+    //
+    // If inheritance linearization selects `Value : ILeft : IBase`, the `ILeft : IBase`
+    // requirement owns the nested `Value : IBase` table. `ensureInheritedInterfaceRequirement`
+    // records that proof for `IRight : IBase` instead of checking a second table. We inspect
+    // the declared steps in the selected proof to distinguish those two requirement keys.
     auto currentWitness = witness;
     for (;;)
     {
         if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(currentWitness))
         {
+            // We compare the declaration key independently of how the declaration reference
+            // stores substitutions, including when a non-generic base has a direct reference.
+            auto witnessDeclRef = declaredSubtypeWitness->getDeclRef();
+            if (witnessDeclRef.getDecl() == targetDecl)
+                return true;
 
-            if (auto memberDeclRef =
-                    as<MemberDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
-            {
-                if (memberDeclRef->getDecl() == targetDecl)
-                    return true;
-            }
-
-            if (auto lookupDeclRef =
-                    SubstitutionSet(declaredSubtypeWitness->getDeclRef().declRefBase)
-                        .findLookupDeclRef())
+            if (auto lookupDeclRef = SubstitutionSet(witnessDeclRef).findLookupDeclRef())
             {
                 if (lookupDeclRef->getDecl() == targetDecl)
                     return true;
@@ -10518,6 +10538,14 @@ static bool doesWitnessLookupPathContainDecl(SubtypeWitness* witness, Decl* targ
             {
                 break;
             }
+        }
+        else if (auto transitiveWitness = as<TransitiveSubtypeWitness>(currentWitness))
+        {
+            // Ordinary composition records both parts of the inheritance path explicitly.
+            // Either part can contain the requirement key we are looking for.
+            if (doesWitnessLookupPathContainDecl(transitiveWitness->getSubToMid(), targetDecl))
+                return true;
+            currentWitness = transitiveWitness->getMidToSup();
         }
         else if (auto expandWitness = as<ExpandSubtypeWitness>(currentWitness))
         {
@@ -15527,40 +15555,6 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
         addModifiersForParamPassingMode(m_astBuilder, param, paramDir);
         decl->addMember(param);
     }
-}
-
-DeclaredSubtypeWitness* SemanticsVisitor::getThisTypeWitness(
-    ASTBuilder* astBuilder,
-    DeclRef<InterfaceDecl> inDeclRef)
-{
-    //
-    // Find the this-type & this-type-witness for a given interface decl-ref.
-    // This is a bit hacky, but works.
-    //
-
-    auto interfaceDeclRef =
-        createDefaultSubstitutionsIfNeeded(astBuilder, this, inDeclRef.getDecl())
-            .as<InterfaceDecl>();
-    auto interfaceType = DeclRefType::create(astBuilder, interfaceDeclRef);
-    auto thisType = this->calcThisType(interfaceDeclRef);
-    auto thisTypeConstraint = as<DeclRefType>(thisType)
-                                  ->getDeclRef()
-                                  .as<ThisTypeDecl>()
-                                  .getDecl()
-                                  ->getMembersOfType<ThisTypeConstraintDecl>()
-                                  .getFirst();
-    auto thisTypeConstraintRef = createDefaultSubstitutionsIfNeeded(
-        astBuilder,
-        this,
-        thisTypeConstraint->getDefaultDeclRef());
-
-    auto declaredSubtypeWitness = astBuilder->getOrCreate<DeclaredSubtypeWitness>(
-        thisType,
-        interfaceType,
-        thisTypeConstraintRef);
-
-    return as<DeclaredSubtypeWitness>(
-        declaredSubtypeWitness->substitute(astBuilder, SubstitutionSet(inDeclRef)));
 }
 
 DeclRef<Decl> SemanticsVisitor::getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl)

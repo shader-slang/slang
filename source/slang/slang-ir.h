@@ -2246,12 +2246,11 @@ public:
     // Adding an IR instruction requires a new writer version. Earlier modules can remain
     // supported when their AST and IR representations are compatible with the reader.
     //
-    // `ExistentialBoxTypeExpr` and `ExistentialBoxType` change the sequential `ASTNodeType` values
-    // and distinguish interface declarations from existential box types. Version 38 is the earliest
-    // module version with those AST classes and semantics. We reject earlier modules before AST
-    // decoding, where their node tags would otherwise select the wrong classes.
-    const static UInt k_minSupportedModuleVersion = 38;
-    const static UInt k_maxSupportedModuleVersion = 38;
+    // The explicit existential-box AST classes, including `MakeExistentialBoxExpr`, change the
+    // sequential `ASTNodeType` values. Version 39 is the earliest compatible schema. We reject
+    // earlier modules before AST decoding, where their tags would select the wrong classes.
+    const static UInt k_minSupportedModuleVersion = 39;
+    const static UInt k_maxSupportedModuleVersion = 39;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

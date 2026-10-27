@@ -566,10 +566,10 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
         as<PtrType>(type))
         return cacheResult(true);
 
-    // Slang 2026 language fix: an interface type is not C-style.
+    // A box needs a conforming payload. Slang 2026 and later therefore require initialization
+    // from a value instead of C-style default initialization.
     if (isSlang2026OrLater(this))
     {
-        // TODO: some/dyn types are also not C-style.
         if (as<ExistentialBoxType>(type))
             return cacheResult(false);
     }
@@ -2400,8 +2400,8 @@ bool SemanticsVisitor::_coerce(
     }
 
     // Packing a box requires a witness for its payload, rather than a conformance to the box.
-    // A box-to-box upcast reuses the interface refinement witness; lowering projects the stored
-    // witness table along that path without claiming that either box conforms to an interface.
+    // For a box upcast, the interface refinement decides whether the conversion is possible;
+    // constructing the expression opens the box and composes the payload's conformance proof.
     auto fromBoxType = as<ExistentialBoxType>(fromType);
     auto toBoxType = as<ExistentialBoxType>(toType);
     auto witnessSubType = fromType.type;
@@ -2413,25 +2413,37 @@ bool SemanticsVisitor::_coerce(
     auto witnessSuperType = toBoxType ? toBoxType->getInterfaceType() : toType;
     if (auto witness = tryGetSubtypeWitness(witnessSubType, witnessSuperType))
     {
-        // A box-to-box upcast may receive a compressed witness whose `DeclRef` is rooted in an
-        // intermediate interface rather than `witnessSubType`. We expand it into a transitive
-        // chain so IR lowering can follow the inheritance proof without inspecting the graph.
-        if (fromBoxType && toBoxType)
-        {
-            witness = normalizeSubtypeWitnessForInterfaceUpcast(witnessSubType, witness);
-        }
-
         if (outToExpr)
         {
-            *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
-
-            // A concrete base projection can refer to the base fields in the original
-            // derived-struct storage, so an l-value argument still supplies an l-value result.
-            // Packing or upcasting a box instead creates a value with its own payload/table
-            // package; that result does not refer to the original argument's storage.
-            if (fromExpr && fromExpr->type.isLeftValue)
+            if (toBoxType)
             {
-                (*outToExpr)->type.isLeftValue = !toBoxType;
+                if (fromBoxType)
+                {
+                    *outToExpr = createExistentialBoxUpcastExpr(toType, fromExpr, witness);
+                }
+                else
+                {
+                    auto valueExpr = fromExpr;
+                    if (!valueExpr->type.type->equals(witness->getSub()))
+                    {
+                        // We record the modifier drop already approved by modifier coercion as
+                        // an explicit cast. Its result has the type named by the conformance
+                        // proof, and its operand retains the original checked expression.
+                        SLANG_RELEASE_ASSERT(as<ModifiedType>(valueExpr->type.type));
+                        SLANG_RELEASE_ASSERT(
+                            unwrapModifiedType(valueExpr->type.type)->equals(witness->getSub()));
+                        valueExpr = createModifierCastExpr(witness->getSub(), valueExpr);
+                    }
+                    *outToExpr = createMakeExistentialBoxExpr(toType, valueExpr, witness);
+                }
+            }
+            else
+            {
+                *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
+
+                // A concrete base projection refers to storage in the original derived value.
+                if (fromExpr && fromExpr->type.isLeftValue)
+                    (*outToExpr)->type.isLeftValue = true;
             }
         }
         if (outCost)
@@ -3347,65 +3359,82 @@ Expr* SemanticsVisitor::createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, 
     return expr;
 }
 
-SubtypeWitness* SemanticsVisitor::normalizeSubtypeWitnessForInterfaceUpcast(
-    Type* subType,
-    SubtypeWitness* witness,
-    int depth)
+Expr* SemanticsVisitor::createMakeExistentialBoxExpr(
+    Type* targetType,
+    Expr* valueExpr,
+    SubtypeWitness* witness)
 {
-    // Bound against a corrupt or cyclic inheritance graph.  Well-formed
-    // hierarchies are acyclic and extremely shallow in practice; 64 is a
-    // generous defensive limit.
-    static const int kMaxDepth = 64;
-    SLANG_RELEASE_ASSERT(depth < kMaxDepth);
+    auto boxType = as<ExistentialBoxType>(targetType);
+    SLANG_RELEASE_ASSERT(boxType);
+    SLANG_RELEASE_ASSERT(valueExpr);
+    SLANG_RELEASE_ASSERT(witness);
+    SLANG_RELEASE_ASSERT(valueExpr->type.type->equals(witness->getSub()));
+    SLANG_RELEASE_ASSERT(boxType->getInterfaceType()->equals(witness->getSup()));
 
-    if (!witness)
-        return witness;
+    auto expr = m_astBuilder->create<MakeExistentialBoxExpr>();
+    expr->loc = valueExpr->loc;
+    expr->type = QualType(targetType);
+    expr->valueExpr = valueExpr;
+    expr->witnessVal = witness;
+    return expr;
+}
 
-    if (auto transitive = as<TransitiveSubtypeWitness>(witness))
-    {
-        auto subToMid = normalizeSubtypeWitnessForInterfaceUpcast(
-            subType,
-            transitive->getSubToMid(),
-            depth + 1);
-        auto midType = subToMid->getSup();
-        auto midToSup = normalizeSubtypeWitnessForInterfaceUpcast(
-            midType,
-            transitive->getMidToSup(),
-            depth + 1);
-        if (subToMid == transitive->getSubToMid() && midToSup == transitive->getMidToSup())
-            return witness;
-        return m_astBuilder->getTransitiveSubtypeWitness(subToMid, midToSup);
-    }
+Expr* SemanticsVisitor::createExistentialBoxUpcastExpr(
+    Type* targetType,
+    Expr* boxExpr,
+    SubtypeWitness* interfaceWitness)
+{
+    auto boxType = as<ExistentialBoxType>(targetType);
+    SLANG_RELEASE_ASSERT(boxType);
+    SLANG_RELEASE_ASSERT(boxExpr);
+    auto originalBoxType = as<ExistentialBoxType>(unwrapModifiedType(boxExpr->type.type));
+    SLANG_RELEASE_ASSERT(originalBoxType);
+    SLANG_RELEASE_ASSERT(interfaceWitness);
+    SLANG_RELEASE_ASSERT(originalBoxType->getInterfaceType()->equals(interfaceWitness->getSub()));
+    SLANG_RELEASE_ASSERT(boxType->getInterfaceType()->equals(interfaceWitness->getSup()));
 
-    if (auto declared = as<DeclaredSubtypeWitness>(witness))
-    {
-        // Use `getParentDeclRef` so substitutions from the witness's DeclRef
-        // propagate to the parent (e.g. for `IDerived<float>: IBase<float>`
-        // we need the parent to be `IDerived<float>`, not the unspecialized
-        // `IDerived<T>`).
-        auto parentInterfaceDeclRef = getParentDeclRef(declared->getDeclRef()).as<InterfaceDecl>();
-        if (!parentInterfaceDeclRef)
-            return witness;
+    // Consider this example:
+    //
+    //     interface IBase {}
+    //     interface IDerived : IBase {}
+    //     dyn IDerived makeDerived();
+    //     dyn IBase base = makeDerived();
+    //
+    // Opening the call result needs a temporary so its payload and witness come from one
+    // evaluation. A fresh scope attaches these bindings at the conversion itself. Adding them
+    // to an enclosing expression's existing bindings would introduce additional hoisting.
+    // Initializer coercion can also run after expression checking has closed its temporary scope.
+    ExprLocalScope localScope;
+    SemanticsVisitor visitor = withExprLocalScope(&localScope);
 
-        auto parentInterfaceType = DeclRefType::create(m_astBuilder, parentInterfaceDeclRef);
-        if (parentInterfaceType->equals(subType))
-            return witness;
+    // This immutable binding belongs to the conversion's expression, rather than a containing
+    // declaration's member list. Opening its reference reuses this binding for the payload type,
+    // value, and witness, including in aggregate field initializers.
+    auto binding = visitor.createTemporaryBinding(boxExpr, m_astBuilder->create<LetDecl>());
+    localScope.addBinding(binding);
+    auto boxRef = visitor.ConstructDeclRefExpr(
+        makeDeclRef(binding->decl),
+        nullptr,
+        nullptr,
+        boxExpr->loc,
+        nullptr);
+    boxRef->checked = true;
+    auto openedValue = visitor.maybeOpenExistential(boxRef);
+    auto openedType = as<ExtractExistentialType>(openedValue->type.type);
+    SLANG_RELEASE_ASSERT(openedType);
 
-        // The declRef belongs to a different interface than `subType`.
-        // Split into (subType : parentInterfaceType) ∘ (parentInterfaceType : sup).
-        auto subToParent = tryGetSubtypeWitness(subType, parentInterfaceType);
-        SLANG_RELEASE_ASSERT(subToParent);
-        subToParent = normalizeSubtypeWitnessForInterfaceUpcast(subType, subToParent, depth + 1);
+    // The opening proves `T : IDerived` for this box's hidden payload type `T`. The interface
+    // refinement proves `IDerived : IBase`, including each specialized inheritance step.
+    // Composing these proofs gives `T : IBase`, which packs the payload rather than the box.
+    auto payloadWitness = m_astBuilder->getTransitiveSubtypeWitness(
+        openedType->getSubtypeWitness(),
+        interfaceWitness);
+    auto result = visitor.createMakeExistentialBoxExpr(targetType, openedValue, payloadWitness);
+    result->loc = boxExpr->loc;
 
-        auto parentToSup = m_astBuilder->getDeclaredSubtypeWitness(
-            parentInterfaceType,
-            declared->getSup(),
-            declared->getDeclRef());
-
-        return m_astBuilder->getTransitiveSubtypeWitness(subToParent, parentToSup);
-    }
-
-    return witness;
+    // The temporary bindings enclose the complete package, whose result retains the target box
+    // type. The hidden payload type is used only inside those bindings.
+    return localScope.complete(result);
 }
 
 Expr* SemanticsVisitor::createModifierCastExpr(Type* toType, Expr* fromExpr)

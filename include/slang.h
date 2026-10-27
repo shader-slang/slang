@@ -4748,12 +4748,12 @@ struct ISession : public ISlangUnknown
         For example, given the following shader:
 
         ```slang
-        [anyValueSize(32)] dyn interface IFoo { int eval(); }
+        [anyValueSize(32)] interface IFoo { int eval(); }
         struct Impl : IFoo { int eval() { return 1; } }
 
         ConstantBuffer<dyn IFoo> cb0;
 
-        [numthreads(1,1,1)
+        [numthreads(1,1,1)]
         void main()
         {
             cb0.eval();

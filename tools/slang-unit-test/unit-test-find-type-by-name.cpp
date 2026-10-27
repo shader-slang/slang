@@ -151,8 +151,8 @@ SLANG_UNIT_TEST(findTypeByNameExtensionTypeAlias)
         vectorAliasType->getScalarType() == slang::TypeReflection::ScalarType::UInt32);
 }
 
-// Full type names preserve existential box identity, while interface names remain declaration
-// metadata. Specializing an existential box's payload requires a data type, not interface metadata.
+// Reflection preserves box identity through full names and container elements, while interface
+// names remain declaration metadata. Payload specialization also requires a proper value type.
 SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
 {
     const char* source = R"(
@@ -253,6 +253,30 @@ SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
     SLANG_CHECK(!layout->isSubType(boxType, interfaceType));
     SLANG_CHECK(!layout->isSubType(interfaceType, boxType));
     SLANG_CHECK(layout->isSubType(boxType, boxType));
+
+    // A real container needs a value-type element. In 202c, callers must supply the explicit box;
+    // the `None` query still preserves bare interface metadata without constructing a container.
+    slang::ContainerType containerKinds[] = {
+        slang::ContainerType::UnsizedArray,
+        slang::ContainerType::StructuredBuffer,
+        slang::ContainerType::ConstantBuffer,
+        slang::ContainerType::ParameterBlock};
+    SLANG_CHECK(
+        session->getContainerType(interfaceType, slang::ContainerType::None) == interfaceType);
+    for (auto containerKind : containerKinds)
+    {
+        diagnostics = nullptr;
+        auto rejectedContainer =
+            session->getContainerType(interfaceType, containerKind, diagnostics.writeRef());
+        SLANG_CHECK(rejectedContainer == nullptr);
+        SLANG_CHECK_ABORT(diagnostics != nullptr);
+        SLANG_CHECK(strstr((const char*)diagnostics->getBufferPointer(), "dyn") != nullptr);
+
+        auto boxedContainer = session->getContainerType(boxType, containerKind);
+        SLANG_CHECK_ABORT(boxedContainer != nullptr);
+        SLANG_CHECK(boxedContainer->getElementType() == boxType);
+        SLANG_CHECK(session->getTypeLayout(boxedContainer) != nullptr);
+    }
 
     // We query a payload's conformance metadata through both the interface and its storage box.
     // Reversing the boxed query order detects a separate ID allocator for the same conformances.
@@ -461,6 +485,20 @@ SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
     SLANG_CHECK_ABORT(legacyInterface != nullptr);
     SLANG_CHECK_ABORT(legacyBox != nullptr);
     SLANG_CHECK(legacyInterface != legacyBox);
+    // Older versions box a bare interface at the element-construction boundary. The result must
+    // be the same canonical container as one explicitly constructed with `dyn IFoo`.
+    SLANG_CHECK(
+        legacySession->getContainerType(legacyInterface, slang::ContainerType::None) ==
+        legacyInterface);
+    for (auto containerKind : containerKinds)
+    {
+        auto implicitContainer = legacySession->getContainerType(legacyInterface, containerKind);
+        auto explicitContainer = legacySession->getContainerType(legacyBox, containerKind);
+        SLANG_CHECK_ABORT(implicitContainer != nullptr);
+        SLANG_CHECK(implicitContainer == explicitContainer);
+        SLANG_CHECK_ABORT(implicitContainer->getElementType() == legacyBox);
+        SLANG_CHECK(legacySession->getTypeLayout(implicitContainer) != nullptr);
+    }
     SLANG_CHECK(legacySession->getTypeLayout(legacyInterface) != nullptr);
     SLANG_CHECK(legacyLayout->getTypeLayout(legacyInterface) != nullptr);
 

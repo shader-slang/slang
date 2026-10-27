@@ -1265,14 +1265,14 @@ class NamespaceType : public Type
     Type* _createCanonicalTypeOverride();
 };
 
-/// An `ExistentialBoxType` is the proper type of a box for one interface.
+/// An existential box type, based on some interface: e.g., `dyn IFoo`.
 ///
-/// A box holds a value of an unknown concrete type that conforms to the interface.
-/// For `interface IFoo {}`, `dyn IFoo` denotes this type, while the `DeclRefType` naming
-/// `IFoo` denotes the interface itself. The operand denotes a single interface, including any
-/// generic arguments, and retains alias spelling for diagnostics. Canonicalization forms a box
-/// over the canonical interface type. Instances are constructed through
-/// `ASTBuilder::getExistentialBoxType`.
+/// An existential box of type `dyn IFoo` holds a value of some unknown proper type,
+/// along with a witness proving that that type conforms to `IFoo`.
+///
+/// An existential box type like `dyn IFoo` is a proper type, distinct from the interface
+/// type `IFoo`, which is a non-proper type representing the contract a conforming type
+/// must implement.
 FIDDLE()
 class ExistentialBoxType : public Type
 {

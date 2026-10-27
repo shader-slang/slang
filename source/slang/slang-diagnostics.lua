@@ -1988,22 +1988,22 @@ err(
 err(
     "cannot-have-unsized-member-when-inheriting-interface-with-any-value-size",
     33079,
-    "unsized field cannot be packed into AnyValue storage",
-    span { loc = "member:Decl", message = "unsized field '~member' cannot be packed into the AnyValue storage specified by interface '~interface:Decl'." }
+    "unsized member is not allowed with an explicitly sized interface",
+    span { loc = "member:Decl", message = "unsized member '~member' is not allowed in a type conforming to interface '~interface:Decl', which specifies [anyValueSize]." }
 )
 
 err(
     "cannot-have-opaque-member-when-inheriting-interface-with-any-value-size",
     33080,
-    "opaque field cannot be packed into AnyValue storage",
-    span { loc = "member:Decl", message = "opaque field '~member' cannot be packed into the AnyValue storage specified by interface '~interface:Decl'." }
+    "opaque member is not allowed with an explicitly sized interface",
+    span { loc = "member:Decl", message = "opaque member '~member' is not allowed in a type conforming to interface '~interface:Decl', which specifies [anyValueSize]." }
 )
 
 err(
     "cannot-have-non-copyable-member-when-inheriting-interface-with-any-value-size",
     33081,
-    "non-copyable field cannot be packed into AnyValue storage",
-    span { loc = "member:Decl", message = "non-copyable field '~member' cannot be packed into the AnyValue storage specified by interface '~interface:Decl'." }
+    "non-copyable member is not allowed with an explicitly sized interface",
+    span { loc = "member:Decl", message = "non-copyable member '~member' is not allowed in a type conforming to interface '~interface:Decl', which specifies [anyValueSize]." }
 )
 
 err(

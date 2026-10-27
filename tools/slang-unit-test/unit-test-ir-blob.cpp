@@ -480,20 +480,33 @@ SLANG_UNIT_TEST(irBlob)
 // Check existential box type serialization and rejection before incompatible AST decoding.
 //
 // The serialized module distinguishes an interface alias from an explicit existential box alias.
-// We first import and use the current module, then mark copies as versions 36 and 37 and make their
-// AST data unreadable. The specific version diagnostic proves rejection happens before AST decode.
+// Imported calls exercise generic packing and upcast IR. Runtime type tests and casts also
+// appear in default arguments, whose checked expression trees are serialized with the AST.
+// We first import and use the current module, then mark copies as versions 36, 37, and 38 and make
+// their AST data unreadable. The specific version diagnostic proves rejection happens before AST
+// decode.
 SLANG_UNIT_TEST(irBlobRejectsIncompatibleASTVersions)
 {
     const char* moduleText = R"(
         module version_guard;
         public interface IFoo { int read(); }
-        public struct Foo : IFoo
+        public interface IRefinedFoo<T> : IFoo {}
+        public struct Foo : IRefinedFoo<int>
         {
             int read() { return 7; }
         }
         public typealias InterfaceAlias = IFoo;
         public typealias Box = dyn InterfaceAlias;
         public Box makeFoo() { return Foo(); }
+        public Box boxValue<T : InterfaceAlias>(T value) { return value; }
+        public Box upcastBox<T>(dyn IRefinedFoo<T> value) { return value; }
+        public bool isFoo<T>(Box value) { return value is Foo; }
+        public Optional<Foo> asFoo<T>(Box value) { return value as Foo; }
+        public int readWhen(bool matched = makeFoo() is Foo) { return matched ? 7 : -1; }
+        public int castWhen(bool matched = (makeFoo() as Foo).hasValue)
+        {
+            return matched ? 7 : -1;
+        }
     )";
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -548,8 +561,10 @@ SLANG_UNIT_TEST(irBlobRejectsIncompatibleASTVersions)
         }
         public int readImportedBox()
         {
-            Box value = copyBox(makeFoo());
-            return value.read() + readThroughConstraint(Foo());
+            Box value = copyBox(boxValue(Foo()));
+            return value.read() + readThroughConstraint(Foo()) + upcastBox<int>(Foo()).read()
+                + (isFoo<int>(value) ? 1 : 0) + (asFoo<int>(value).hasValue ? 1 : 0)
+                + readWhen() + castWhen();
         }
     )";
     SLANG_CHECK_ABORT(currentSession->loadModuleFromSourceString(
@@ -615,7 +630,7 @@ SLANG_UNIT_TEST(irBlobRejectsIncompatibleASTVersions)
     SLANG_CHECK_ABORT(astChunk != nullptr);
     memset(const_cast<void*>(astChunk->getPayload()), 0, astChunk->getPayloadSize());
 
-    const UInt64 olderVersions[] = {36, 37};
+    const UInt64 olderVersions[] = {36, 37, 38};
     for (auto olderVersion : olderVersions)
     {
         memcpy(versionAddress, &olderVersion, sizeof(olderVersion));
