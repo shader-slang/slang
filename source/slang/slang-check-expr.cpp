@@ -3876,6 +3876,10 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
             getSink()->diagnose(Diagnostics::AssignNonLvalue{.expr = expr});
         }
     }
+    else
+    {
+        checkGroupSharedPartialWriteInDifferentiatedBody(expr->left);
+    }
     expr->type = type;
     return expr;
 }
@@ -4613,6 +4617,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 callableDeclRef,
                 paramDeclRefs);
             checkGroupSharedArgumentsCopiedByDifferentiableCall(invoke, funcType);
+            checkGroupSharedPartialWritesByInlinedCall(invoke, funcType, callableDeclRef);
 
             if (!IsErrorExpr(invoke))
             {
@@ -7925,6 +7930,11 @@ struct ModesDifferentiatedFromBody
     bool backward = false;
 
     bool any() const { return forward || backward; }
+
+    const char* getNames() const
+    {
+        return !backward ? "forward" : !forward ? "backward" : "forward or backward";
+    }
 };
 
 // Return the modes in which autodiff generates a derivative of `func` from its body: those in
@@ -8030,12 +8040,9 @@ void SemanticsVisitor::checkGroupSharedArgumentsCopiedByDifferentiableCall(
 
         if (callerIsDifferentiated && (!isWholeVariable || isOwnParam))
         {
-            const char* modeNames = !callerModes.backward  ? "forward"
-                                    : !callerModes.forward ? "backward"
-                                                           : "forward or backward";
             String suggestion = String("access the groupshared variable directly as a global "
                                        "instead of passing it as an argument; if ") +
-                                modeNames +
+                                callerModes.getNames() +
                                 " differentiation of this function is needed, provide a custom "
                                 "derivative";
             getSink()->diagnose(Diagnostics::GroupsharedArgumentCopiedByDifferentiableCall{
@@ -8051,6 +8058,81 @@ void SemanticsVisitor::checkGroupSharedArgumentsCopiedByDifferentiableCall(
                               "callee instead of passing it as an argument",
                 .arg = argExpr});
         }
+    }
+}
+
+// Autodiff prepares a function body for differentiation by replacing the addresses it computes
+// with values, so a write to part of a thread-group-shared variable becomes a read of the whole
+// variable, an update of the part, and a write of the whole variable. Each invocation then
+// stores back stale copies of the parts other invocations wrote. A write of the whole variable
+// stays a single store. A non-differentiable function called from the body keeps its own writes
+// in place, because autodiff does not rewrite it.
+//
+// Consider this example:
+//
+//     groupshared float g[4];
+//     groupshared float4 v;
+//
+//     [Differentiable]
+//     float f(uint i, float x)
+//     {
+//         g[i] = x;       // warns
+//         v.yz += 1.0;    // warns
+//         v = float4(0);  // does not warn
+//         return x;
+//     }
+void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target)
+{
+    if (!target || isArgumentOfFailedCheck(target))
+        return;
+    if (!getModesDifferentiatedFromBody(getShared(), m_parentFunc).any())
+        return;
+
+    Expr* wholeExpr = target;
+    while (auto parenExpr = as<ParenExpr>(wholeExpr))
+        wholeExpr = parenExpr->base;
+
+    // A multi-element swizzle has no address of its own, so we judge the object it selects from.
+    Expr* addressedExpr = wholeExpr;
+    if (auto swizzleExpr = as<SwizzleExpr>(wholeExpr))
+        addressedExpr = swizzleExpr->base;
+    else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(wholeExpr))
+        addressedExpr = matrixSwizzleExpr->base;
+
+    if (!argumentNamesGroupSharedStorage(addressedExpr))
+        return;
+    auto baseExpr = getBaseObjectOfProjection(addressedExpr);
+    if (baseExpr == wholeExpr)
+        return;
+    auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
+    if (!baseDeclRefExpr)
+        return;
+
+    getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
+        .var = baseDeclRefExpr->declRef.getDecl(),
+        .target = target});
+}
+
+// A call that is always inlined, or to an intrinsic, writes its `out` and `inout` arguments in
+// the calling body, so we check those arguments as writes. Compound assignments and increments,
+// such as `g[i] += 1` and `g[i]++`, are such calls. A call to any other function copies those
+// arguments, which `checkGroupSharedArgumentsOfCopiedParams` already reports.
+void SemanticsVisitor::checkGroupSharedPartialWritesByInlinedCall(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef)
+{
+    if (!calleeDeclRef || !isCallAlwaysInlinedOrIntrinsic(calleeDeclRef.getDecl()))
+        return;
+    Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
+    for (Index i = 0; i < checkCount; ++i)
+    {
+        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
+            continue;
+        auto argExpr = invoke->arguments[i];
+        if (as<LValueImplicitCastExpr>(argExpr))
+            continue;
+        checkGroupSharedPartialWriteInDifferentiatedBody(argExpr);
     }
 }
 

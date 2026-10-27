@@ -4187,6 +4187,11 @@ public:
     void checkGroupSharedArgumentsCopiedByDifferentiableCall(
         InvokeExpr* invoke,
         FuncType* funcType);
+    void checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target);
+    void checkGroupSharedPartialWritesByInlinedCall(
+        InvokeExpr* invoke,
+        FuncType* funcType,
+        DeclRef<CallableDecl> calleeDeclRef);
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,

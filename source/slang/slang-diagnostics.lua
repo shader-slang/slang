@@ -4848,6 +4848,13 @@ warning(
     span { loc = "arg:Expr", message = "~suggestion" }
 )
 
+warning(
+    "groupshared-partial-write-in-differentiated-body",
+    38039,
+    "writing part of thread-group-shared variable '~var:Decl' introduces a race condition when this function is differentiated",
+    span { loc = "target:Expr", message = "move the write into a function that is not differentiable or has custom derivatives" }
+)
+
 err(
     "cannot-use-constref-on-differentiable-member-method",
     38036,

@@ -5,10 +5,12 @@
 // The warning for the unmarked spelling is covered by
 // tests/diagnostics/reference-param-differentiable.slang, and the warning for passing shared
 // memory to a differentiated call by
-// tests/diagnostics/groupshared-argument-copied-by-differentiable-call.slang.
+// tests/diagnostics/groupshared-argument-copied-by-differentiable-call.slang. The warning for the
+// write to part of `s` is covered by tests/diagnostics/groupshared-autodiff/writes.slang; this
+// test runs a single invocation, so the write does not race.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -Xslang -warnings-disable -Xslang 38038,38049
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -Xslang -warnings-disable -Xslang 38038,38049
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -Xslang -warnings-disable -Xslang 38038,38039,38049
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -Xslang -warnings-disable -Xslang 38038,38039,38049
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

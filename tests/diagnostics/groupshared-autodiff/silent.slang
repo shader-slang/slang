@@ -1,6 +1,7 @@
 // Thread-group-shared memory used with autodiff in the ways that stay correct. A direct read in a
 // differentiable function saves its value for the backward pass, and an argument passed by value
-// is expected to be a copy. A write of a whole variable and an atomic both stay in place. A whole `groupshared` variable passed to a `__ref_readonly` parameter
+// is expected to be a copy. A write of a whole variable and an atomic both stay in place, and so
+// does a partial write in a non-differentiable function, which autodiff does not rewrite. A whole `groupshared` variable passed to a `__ref_readonly` parameter
 // keeps its address and is only read. A `fwd_diff`/`bwd_diff` call outside a differentiated body
 // passes its arguments' addresses unchanged, and a `__constref` argument may be a copy whether or
 // not autodiff is involved. A function with custom derivatives for both modes is called by
@@ -92,8 +93,21 @@ float atomicOnShared(float x)
     return x;
 }
 
+void writeElement(uint i, float v)
+{
+    g[i] = v;
+}
+
+[Differentiable]
+float writeInNonDifferentiableFunction(uint i, float x)
+{
+    no_diff(writeElement(i, 1.0));
+    return x;
+}
+
 float outsideDifferentiableCode(uint i, float x)
 {
+    g[i] = x;
     return scale(g[i], x);
 }
 
@@ -171,6 +185,7 @@ void computeMain(uint i : SV_GroupIndex)
     outputBuffer[i] = x.d + y.d + z.d + d + w.d + readShared(i, 1.0) + sharedByValue(i, 1.0) +
                       wholeArrayToReadOnly(1.0) + elementToBorrow(i, 1.0) +
                       wholeVariableWrite(1.0) + atomicOnShared(1.0) +
+                      writeInNonDifferentiableFunction(i, 1.0) +
                       outsideDifferentiableCode(i, 1.0) + customForBothModes(i, 1.0) +
                       customByDerivativeOf(i, 1.0);
 }
