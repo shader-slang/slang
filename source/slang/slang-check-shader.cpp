@@ -3879,6 +3879,9 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     specializedCaps.join(
         getDeclRefCapabilityRequirements(&visitor, specializedFuncDeclRef, referencedDecls));
     info->inferredCapabilityRequirements = specializedCaps.freeze(getLinkage()->getASTBuilder());
+    // validateEntryPoint already checked the base entry point's requirements. Pass them as the
+    // last argument so the profile check reports only requirements added by the concrete generic
+    // arguments, without repeating the base entry point's profile-upgrade warnings.
     validateEntryPointCapabilities(
         this,
         specializedCaps,
