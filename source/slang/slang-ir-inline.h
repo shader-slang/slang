@@ -23,6 +23,12 @@ bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedF
 /// Inline any call sites to functions marked `[ForceInline]`
 void performForceInlining(IRModule* module);
 
+/// Inline every function whose only use is the callee of one call in another function, and remove
+/// the inlined function. A chain of single-call wrappers collapses in one run. Each body moves to
+/// its only call site, so the output never grows. Entry points, `[noinline]` functions, functions
+/// that must stay visible outside the module, and functions whose address is used are left alone.
+void performSingleCallSiteInlining(IRModule* module);
+
 /// Inline any call sites to functions marked `[ForceInline]` inside `func`.
 bool performForceInlining(IRGlobalValueWithCode* func);
 
