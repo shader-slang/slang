@@ -1,9 +1,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-std 2018
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-std 2026
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-std 202c
 
-// Before Slang 202c, a conflict that earlier Slang versions accepted is a warning, and a
-// conflict that they reported stays an error (shader-slang/slang#13876). The same declarations
-// in Slang 202c are in redeclaration-language-version-202c.slang.
+// In every language version, a conflict that earlier compiler releases accepted is a warning,
+// and a conflict that they reported stays an error (shader-slang/slang#13876).
 
 // The reproducer from the issue: the alias of an `[UnscopedEnum]` case follows a
 // `static const` of the same name.
@@ -57,7 +57,7 @@ let Kind = Kind.KindCase;
     ^^^^ declaration of 'Kind' conflicts with existing declaration
 */
 
-// Earlier Slang versions report these conflicts already, so they are an error in every version.
+// Earlier compiler releases report these conflicts already, so they stay errors.
 
 [UnscopedEnum]
 enum EnumBeforeConst

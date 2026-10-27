@@ -2117,13 +2117,12 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
         // scope, so we still run that comparison. Without it, `int x; let x = 1;` would be
         // accepted while `let x = 1; int x;` is not. We run it here, rather than at each place
         // that advances a declaration, so that a new such place cannot skip the comparison.
-        // Earlier Slang versions skipped it, so a conflict it finds is a warning before 202c.
+        // Earlier compiler releases skipped it, so a conflict that it finds is a warning.
         //
         if (nextState < DeclCheckState::ReadyForReference &&
             decl->checkState.getState() >= DeclCheckState::ReadyForReference)
         {
-            SemanticsDeclRedeclarationVisitor(subContext, RedeclarationSeverity::WarningBefore202c)
-                .dispatch(decl);
+            SemanticsDeclRedeclarationVisitor(subContext, RedeclarationSeverity::Warning).dispatch(decl);
         }
 
         // In the common case, the visitor will have done the necessary
@@ -14943,7 +14942,7 @@ Result SemanticsVisitor::checkRedeclaration(
     // We will diagnose a redeclaration at the new declaration,
     // and point to the old declaration for context.
     //
-    if (severity == RedeclarationSeverity::WarningBefore202c && !isSlang202cOrLater(this))
+    if (severity == RedeclarationSeverity::Warning)
         getSink()->diagnose(Diagnostics::RedeclarationCompatibilityWarning{.decl = newDecl});
     else
         getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
@@ -15052,8 +15051,8 @@ static bool isTransparentBufferBlockVariable(Decl* decl)
 /// need the result of `checkRedeclaration`, which tells a caller when to stop comparing.
 /// Buffer members are variables, which ordinary lookup always finds, so only direct members go
 /// through the lookup-mask filter, which skips declarations such as attributes. Every pair that
-/// we compare involves a buffer member, which earlier Slang versions never compared, so we report
-/// each conflict with `WarningBefore202c` rather than the visitor's `m_severity`.
+/// we compare involves a buffer member, which earlier compiler releases never compared, so we
+/// report each conflict as a warning rather than with the visitor's `m_severity`.
 ///
 void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMembers(
     ContainerDecl* containerDecl)
@@ -15080,10 +15079,7 @@ void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMember
                 if (!elementTypeDecl->getPrevDirectMemberDeclWithSameName(bufferMemberDecl) &&
                     visibleDecls.tryGetValue(name, prevDecl))
                 {
-                    checkRedeclaration(
-                        bufferMemberDecl,
-                        prevDecl,
-                        RedeclarationSeverity::WarningBefore202c);
+                    checkRedeclaration(bufferMemberDecl, prevDecl, RedeclarationSeverity::Warning);
                 }
                 visibleDecls[name] = bufferMemberDecl;
             }
@@ -15098,7 +15094,7 @@ void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMember
         if (!containerDecl->getPrevDirectMemberDeclWithSameName(memberDecl) &&
             visibleDecls.tryGetValue(name, prevDecl))
         {
-            checkRedeclaration(memberDecl, prevDecl, RedeclarationSeverity::WarningBefore202c);
+            checkRedeclaration(memberDecl, prevDecl, RedeclarationSeverity::Warning);
         }
         visibleDecls[name] = memberDecl;
     }

@@ -64,10 +64,9 @@ enum class RedeclarationSeverity
 {
     /// An error in every language version.
     Error,
-    /// A warning before Slang 202c and an error from 202c on. Earlier Slang versions did not
-    /// diagnose these conflicts, so we keep code that they accepted compiling in the stable
-    /// language versions.
-    WarningBefore202c,
+    /// A warning in every language version. Earlier compiler releases did not diagnose these
+    /// conflicts, so we keep code that they accepted compiling.
+    Warning,
 };
 
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
