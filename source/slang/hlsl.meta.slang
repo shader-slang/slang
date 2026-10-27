@@ -13,6 +13,7 @@ in uint __builtinWaveLaneIndex : SV_WaveLaneIndex;
 in uint __builtinWaveLaneCount : SV_WaveLaneCount;
 in uint __builtinQuadLaneIndex : SV_QuadLaneIndex;
 in uint __builtinWaveIndex : SV_WaveIndex;
+in uint __builtinWaveCount : SV_WaveCount;
 in uint __builtinGroupIndex : SV_GroupIndex;
 
 //@public:
@@ -18279,8 +18280,19 @@ uint WaveGetNumWaves()
             OpCapability GroupNonUniform;
             result:$$uint = OpLoad builtin(NumSubgroups:uint)
         };
+    case wgsl:
+        // WGSL's num_subgroups built-in (with subgroup_id, as WaveGetWaveIndex uses).
+        __requireTargetExtension("subgroups");
+        __stage_switch
+        {
+        case compute:
+            return __builtinWaveCount;
+        default:
+            static_assert(false, "WaveGetNumWaves is only supported in compute shaders");
+            return 0;
+        }
     default:
-        // For HLSL/CUDA/Metal/WGSL: compute from workgroup size and wave size
+        // For HLSL/CUDA/Metal: compute from workgroup size and wave size
         __stage_switch
         {
         case compute:
