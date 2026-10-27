@@ -14,7 +14,7 @@ layout(binding = 0) uniform Block
 
 float blockMember;
 /*CHECK:
-      ^^^^^^^^^^^ conflicting declaration
+      ^^^^^^^^^^^ warning E30204
       ^^^^^^^^^^^ declaration of 'blockMember' conflicts with existing declaration
 */
 
@@ -28,7 +28,7 @@ layout(std430, binding = 1) buffer Storage
 
 float storageMember;
 /*CHECK:
-      ^^^^^^^^^^^^^ conflicting declaration
+      ^^^^^^^^^^^^^ warning E30204
       ^^^^^^^^^^^^^ declaration of 'storageMember' conflicts with existing declaration
 */
 
@@ -44,7 +44,7 @@ layout(location = 0) out VertexOut
 {
     vec3 sharedVarying;
 /*CHECK:
-         ^^^^^^^^^^^^^ conflicting declaration
+         ^^^^^^^^^^^^^ warning E30204
          ^^^^^^^^^^^^^ declaration of 'sharedVarying' conflicts with existing declaration
 */
 };

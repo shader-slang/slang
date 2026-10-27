@@ -59,6 +59,17 @@ bool isUniformParameterType(Type* type);
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
+/// How `checkRedeclaration` reports two declarations of the same name that cannot coexist.
+enum class RedeclarationSeverity
+{
+    /// An error in every language version.
+    Error,
+    /// A warning before Slang 202c and an error from 202c on. Earlier Slang versions did not
+    /// diagnose these conflicts, so we keep code that they accepted compiling in the stable
+    /// language versions.
+    WarningBefore202c,
+};
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -3120,9 +3131,9 @@ public:
     // of overload resolution.
     bool doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd);
 
-    Result checkRedeclaration(Decl* newDecl, Decl* oldDecl);
+    Result checkRedeclaration(Decl* newDecl, Decl* oldDecl, RedeclarationSeverity severity);
     Result checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* oldDecl);
-    void checkForRedeclaration(Decl* decl);
+    void checkForRedeclaration(Decl* decl, RedeclarationSeverity severity);
 
     Expr* checkPredicateExpr(Expr* expr);
 

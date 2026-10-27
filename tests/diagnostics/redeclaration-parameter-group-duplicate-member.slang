@@ -12,7 +12,7 @@ static const int repeatedMember = 1;
 
 cbuffer BufferWithRepeatedMember
 /*CHECK:
-        ^^^^^^^^^^^^^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^^^^^^^^^^^^^ error E30200
         ^^^^^^^^^^^^^^^^^^^^^^^^ declaration of 'repeatedMember' conflicts with existing declaration
         ^^^^^^^^^^^^^^^^^^^^^^^^ see previous declaration of 'repeatedMember'
         ^^^^^^^^^^^^^^^^^^^^^^^^ some of the above errors may have been produced while synthesizing method '$init'
@@ -20,7 +20,7 @@ cbuffer BufferWithRepeatedMember
 {
     int repeatedMember;
 /*CHECK:
-        ^^^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^^^ warning E30204
         ^^^^^^^^^^^^^^ declaration of 'repeatedMember' conflicts with existing declaration
         ^^^^^^^^^^^^^^ see previous declaration of 'repeatedMember'
         ^^^^^^^^^^^^^^ ambiguous reference to 'repeatedMember'
@@ -29,7 +29,7 @@ cbuffer BufferWithRepeatedMember
 */
     int repeatedMember;
 /*CHECK:
-        ^^^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^^^ error E30200
         ^^^^^^^^^^^^^^ declaration of 'repeatedMember' conflicts with existing declaration
         ^^^^^^^^^^^^^^ ambiguous reference to 'repeatedMember'
         ^^^^^^^^^^^^^^ candidate: int SLANG_ParameterGroup_BufferWithRepeatedMember.repeatedMember

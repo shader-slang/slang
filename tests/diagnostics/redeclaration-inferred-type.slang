@@ -17,7 +17,7 @@ enum EnumAfterConst
 {
     beforeEnum = 2,
 /*CHECK:
-    ^^^^^^^^^^ conflicting declaration
+    ^^^^^^^^^^ warning E30204
     ^^^^^^^^^^ declaration of 'beforeEnum' conflicts with existing declaration
 */
 };
@@ -33,7 +33,7 @@ enum EnumBeforeConst
 
 static const int afterEnum = 2;
 /*CHECK:
-                 ^^^^^^^^^ conflicting declaration
+                 ^^^^^^^^^ error E30200
                  ^^^^^^^^^ declaration of 'afterEnum' conflicts with existing declaration
 */
 
@@ -51,7 +51,7 @@ enum SecondEnum
 {
     sharedCase,
 /*CHECK:
-    ^^^^^^^^^^ conflicting declaration
+    ^^^^^^^^^^ warning E30204
     ^^^^^^^^^^ declaration of 'sharedCase' conflicts with existing declaration
 */
 };
@@ -68,7 +68,7 @@ enum RepeatedCase
 */
     repeatedCase,
 /*CHECK:
-    ^^^^^^^^^^^^ conflicting declaration
+    ^^^^^^^^^^^^ error E30200
     ^^^^^^^^^^^^ declaration of 'repeatedCase' conflicts with existing declaration
 */
 };
@@ -81,7 +81,7 @@ static const int sizedFirst = 1;
 */
 static const int sizedFirst[] = { 1, 2 };
 /*CHECK:
-                 ^^^^^^^^^^ conflicting declaration
+                 ^^^^^^^^^^ warning E30204
                  ^^^^^^^^^^ declaration of 'sizedFirst' conflicts with existing declaration
 */
 
@@ -91,7 +91,7 @@ static const int unsizedFirst[] = { 1, 2 };
 */
 static const int unsizedFirst = 1;
 /*CHECK:
-                 ^^^^^^^^^^^^ conflicting declaration
+                 ^^^^^^^^^^^^ error E30200
                  ^^^^^^^^^^^^ declaration of 'unsizedFirst' conflicts with existing declaration
 */
 
@@ -103,7 +103,7 @@ static const int typedThenLet = 1;
 */
 let typedThenLet = 2;
 /*CHECK:
-    ^^^^^^^^^^^^ conflicting declaration
+    ^^^^^^^^^^^^ warning E30204
     ^^^^^^^^^^^^ declaration of 'typedThenLet' conflicts with existing declaration
 */
 
@@ -117,7 +117,7 @@ void testLocals()
 */
     let typedFirst = 2;
 /*CHECK:
-        ^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^ warning E30204
         ^^^^^^^^^^ declaration of 'typedFirst' conflicts with existing declaration
 */
 
@@ -127,7 +127,7 @@ void testLocals()
 */
     int inferredFirst = 2;
 /*CHECK:
-        ^^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^^ error E30200
         ^^^^^^^^^^^^^ declaration of 'inferredFirst' conflicts with existing declaration
 */
 
@@ -137,7 +137,7 @@ void testLocals()
 */
     let inferredVar = 2;
 /*CHECK:
-        ^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^ warning E30204
         ^^^^^^^^^^^ declaration of 'inferredVar' conflicts with existing declaration
 */
 

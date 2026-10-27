@@ -13,7 +13,7 @@ enum OptionEnum
 {
     optionCase = 2,
 /*CHECK:
-    ^^^^^^^^^^ conflicting declaration
+    ^^^^^^^^^^ warning E30204
     ^^^^^^^^^^ declaration of 'optionCase' conflicts with existing declaration
 */
 };

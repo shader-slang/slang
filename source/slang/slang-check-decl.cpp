@@ -799,8 +799,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
                                            public DeclVisitor<SemanticsDeclRedeclarationVisitor>
 {
-    SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer)
-        : SemanticsDeclVisitorBase(outer)
+    SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer, RedeclarationSeverity severity)
+        : SemanticsDeclVisitorBase(outer), m_severity(severity)
     {
     }
 
@@ -808,7 +808,7 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
 
 #define CASE(TYPE) \
-    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl); }
+    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl, m_severity); }
 
     CASE(EnumCaseDecl)
     CASE(FuncDecl)
@@ -819,7 +819,7 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
 
     void visitVarDeclBase(VarDeclBase* decl)
     {
-        checkForRedeclaration(decl);
+        checkForRedeclaration(decl, m_severity);
 
         // One ordered pass over the scope covers all of its transparent variables, so we run
         // it only for the first one; running it for each would report every conflict again.
@@ -834,6 +834,8 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
     }
 
     void checkForRedeclarationOfBufferBlockMembers(ContainerDecl* containerDecl);
+
+    RedeclarationSeverity m_severity;
 };
 
 
@@ -2003,8 +2005,7 @@ bool SemanticsVisitor::isUsableAsStaticMember(LookupResultItem const& item)
 
 /// Dispatch an appropriate visitor to check `decl` up to state `state`
 ///
-/// The current state of `decl` must be `state-1`. The one exception is that `ensureDecl`
-/// also dispatches `ReadyForReference` for a declaration that a visitor moved past it.
+/// The current state of `decl` must be `state-1`.
 /// This call does *not* handle updating the state of `decl`; the
 /// caller takes responsibility for doing so.
 ///
@@ -2113,14 +2114,16 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
         // the header visitor checks the initializer to infer the type of `x`, and then marks
         // `x` as `DefinitionChecked`. Such a visitor has checked `decl` itself, but the
         // `ReadyForReference` step also compares `decl` with the other declarations in its
-        // scope, so we still run that step. Without it, `int x; let x = 1;` would be accepted
-        // while `let x = 1; int x;` is not. We run the step here, rather than at each place
+        // scope, so we still run that comparison. Without it, `int x; let x = 1;` would be
+        // accepted while `let x = 1; int x;` is not. We run it here, rather than at each place
         // that advances a declaration, so that a new such place cannot skip the comparison.
+        // Earlier Slang versions skipped it, so a conflict it finds is a warning before 202c.
         //
         if (nextState < DeclCheckState::ReadyForReference &&
             decl->checkState.getState() >= DeclCheckState::ReadyForReference)
         {
-            _dispatchDeclCheckingVisitor(decl, DeclCheckState::ReadyForReference, subContext);
+            SemanticsDeclRedeclarationVisitor(subContext, RedeclarationSeverity::WarningBefore202c)
+                .dispatch(decl);
         }
 
         // In the common case, the visitor will have done the necessary
@@ -14872,7 +14875,10 @@ static bool isUnscopedEnumCaseAliasOfOwnEnum(Decl* decl, Decl* enumDecl)
            caseDecl->getNameLoc() == letDecl->getNameLoc();
 }
 
-Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
+Result SemanticsVisitor::checkRedeclaration(
+    Decl* newDecl,
+    Decl* oldDecl,
+    RedeclarationSeverity severity)
 {
     // If either of the declarations being looked at is generic, then
     // we want to consider the "inner" declaration instead when
@@ -14934,16 +14940,19 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     //   if their generic parameter lists are sufficient to
     //   tell them apart at a use site.
 
-    // We will diagnose a redeclaration error at the new declaration,
+    // We will diagnose a redeclaration at the new declaration,
     // and point to the old declaration for context.
     //
-    getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
+    if (severity == RedeclarationSeverity::WarningBefore202c && !isSlang202cOrLater(this))
+        getSink()->diagnose(Diagnostics::RedeclarationCompatibilityWarning{.decl = newDecl});
+    else
+        getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
     getSink()->diagnose(Diagnostics::SeePreviousDeclarationOf{.decl = oldDecl});
     return SLANG_FAIL;
 }
 
 
-void SemanticsVisitor::checkForRedeclaration(Decl* decl)
+void SemanticsVisitor::checkForRedeclaration(Decl* decl, RedeclarationSeverity severity)
 {
     // We want to consider a "new" declaration in the context
     // of some parent/container declaration, and compare it
@@ -14988,7 +14997,7 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         // whether the redeclaration should be allowed,
         // and emit an appropriate diagnostic if not.
         //
-        Result checkResult = checkRedeclaration(newDecl, oldDecl);
+        Result checkResult = checkRedeclaration(newDecl, oldDecl, severity);
 
         // The `checkRedeclaration` function will return a failure
         // status (whether or not it actually emitted a diagnostic)
@@ -15042,7 +15051,9 @@ static bool isTransparentBufferBlockVariable(Decl* decl)
 /// declaration is compared with the nearest earlier declaration of its name only, so we do not
 /// need the result of `checkRedeclaration`, which tells a caller when to stop comparing.
 /// Buffer members are variables, which ordinary lookup always finds, so only direct members go
-/// through the lookup-mask filter, which skips declarations such as attributes.
+/// through the lookup-mask filter, which skips declarations such as attributes. Every pair that
+/// we compare involves a buffer member, which earlier Slang versions never compared, so each
+/// conflict is a warning before Slang 202c.
 ///
 void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMembers(
     ContainerDecl* containerDecl)
@@ -15069,7 +15080,10 @@ void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMember
                 if (!elementTypeDecl->getPrevDirectMemberDeclWithSameName(bufferMemberDecl) &&
                     visibleDecls.tryGetValue(name, prevDecl))
                 {
-                    checkRedeclaration(bufferMemberDecl, prevDecl);
+                    checkRedeclaration(
+                        bufferMemberDecl,
+                        prevDecl,
+                        RedeclarationSeverity::WarningBefore202c);
                 }
                 visibleDecls[name] = bufferMemberDecl;
             }
@@ -15084,7 +15098,7 @@ void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMember
         if (!containerDecl->getPrevDirectMemberDeclWithSameName(memberDecl) &&
             visibleDecls.tryGetValue(name, prevDecl))
         {
-            checkRedeclaration(memberDecl, prevDecl);
+            checkRedeclaration(memberDecl, prevDecl, RedeclarationSeverity::WarningBefore202c);
         }
         visibleDecls[name] = memberDecl;
     }
@@ -19561,7 +19575,7 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
                 SemanticsDeclHeaderVisitor(shared).synthesizeDifferentiabilityRequirements(
                     functionDecl);
             }
-            SemanticsDeclRedeclarationVisitor(shared).dispatch(decl);
+            SemanticsDeclRedeclarationVisitor(shared, RedeclarationSeverity::Error).dispatch(decl);
         }
         break;
 

@@ -14,7 +14,7 @@ cbuffer CB
 {
     int globalUniform;
 /*CHECK:
-        ^^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^^ warning E30204
         ^^^^^^^^^^^^^ declaration of 'globalUniform' conflicts with existing declaration
 */
     int unique;
@@ -37,7 +37,7 @@ cbuffer LaterCB
 
 int laterUniform;
 /*CHECK:
-    ^^^^^^^^^^^^ conflicting declaration
+    ^^^^^^^^^^^^ warning E30204
     ^^^^^^^^^^^^ declaration of 'laterUniform' conflicts with existing declaration
 */
 
@@ -45,7 +45,7 @@ cbuffer SecondCB
 {
     int sharedMember;
 /*CHECK:
-        ^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^ warning E30204
         ^^^^^^^^^^^^ declaration of 'sharedMember' conflicts with existing declaration
 */
 }

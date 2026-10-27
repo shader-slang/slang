@@ -1835,6 +1835,13 @@ warning(
     span { loc = "decl:Decl", message = "case '~decl' has the same name as its unscoped enum; the name refers to the enum type or to the case depending on where it is used" }
 )
 
+warning(
+    "redeclaration-compatibility-warning",
+    30204,
+    "conflicting declaration",
+    span { loc = "decl:Decl", message = "declaration of '~decl' conflicts with existing declaration; earlier Slang versions accepted this declaration" }
+)
+
 err(
     "is-operator-value-must-be-interface-type",
     30300,

@@ -16,7 +16,7 @@ enum TestEnum
 {
     overloadedThing = 2,
 /*CHECK:
-    ^^^^^^^^^^^^^^^ conflicting declaration
+    ^^^^^^^^^^^^^^^ warning E30204
     ^^^^^^^^^^^^^^^ declaration of 'overloadedThing' conflicts with existing declaration
     ^^^^^^^^^^^^^^^ see previous declaration of 'overloadedThing'
 */
@@ -26,7 +26,7 @@ cbuffer CBUF
 {
     int overloadedThing;
 /*CHECK:
-        ^^^^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^^^^ warning E30204
         ^^^^^^^^^^^^^^^ declaration of 'overloadedThing' conflicts with existing declaration
         ^^^^^^^^^^^^^^^ see previous declaration of 'overloadedThing'
 */
@@ -36,7 +36,7 @@ tbuffer TBUF
 {
     int overloadedThing;
 /*CHECK:
-        ^^^^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^^^^ warning E30204
         ^^^^^^^^^^^^^^^ declaration of 'overloadedThing' conflicts with existing declaration
 */
 }
@@ -53,7 +53,7 @@ cbuffer BufferFirst
 
 static const int memberThenConst = 1;
 /*CHECK:
-                 ^^^^^^^^^^^^^^^ conflicting declaration
+                 ^^^^^^^^^^^^^^^ warning E30204
                  ^^^^^^^^^^^^^^^ declaration of 'memberThenConst' conflicts with existing declaration
 */
 
@@ -67,7 +67,7 @@ tbuffer TBufferFirst
 
 static const int tbufferMemberThenConst = 1;
 /*CHECK:
-                 ^^^^^^^^^^^^^^^^^^^^^^ conflicting declaration
+                 ^^^^^^^^^^^^^^^^^^^^^^ warning E30204
                  ^^^^^^^^^^^^^^^^^^^^^^ declaration of 'tbufferMemberThenConst' conflicts with existing declaration
 */
 
@@ -89,7 +89,7 @@ cbuffer SecondBuffer
 {
     float sharedMember;
 /*CHECK:
-          ^^^^^^^^^^^^ conflicting declaration
+          ^^^^^^^^^^^^ warning E30204
           ^^^^^^^^^^^^ declaration of 'sharedMember' conflicts with existing declaration
 */
 }
@@ -98,7 +98,7 @@ tbuffer ThirdBuffer
 {
     int otherMember;
 /*CHECK:
-        ^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^ warning E30204
         ^^^^^^^^^^^ declaration of 'otherMember' conflicts with existing declaration
 */
 }
@@ -119,7 +119,7 @@ cbuffer SecondOfTwo
 {
     int afterTwoBuffers;
 /*CHECK:
-        ^^^^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^^^^ warning E30204
         ^^^^^^^^^^^^^^^ declaration of 'afterTwoBuffers' conflicts with existing declaration
         ^^^^^^^^^^^^^^^ see previous declaration of 'afterTwoBuffers'
 */
@@ -127,7 +127,7 @@ cbuffer SecondOfTwo
 
 static const int afterTwoBuffers = 1;
 /*CHECK:
-                 ^^^^^^^^^^^^^^^ conflicting declaration
+                 ^^^^^^^^^^^^^^^ warning E30204
                  ^^^^^^^^^^^^^^^ declaration of 'afterTwoBuffers' conflicts with existing declaration
 */
 
@@ -141,14 +141,14 @@ cbuffer BufferBetweenConsts
 {
     int aroundBuffer;
 /*CHECK:
-        ^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^ warning E30204
         ^^^^^^^^^^^^ declaration of 'aroundBuffer' conflicts with existing declaration
 */
 }
 
 static const int aroundBuffer = 2;
 /*CHECK:
-                 ^^^^^^^^^^^^ conflicting declaration
+                 ^^^^^^^^^^^^ error E30200
                  ^^^^^^^^^^^^ declaration of 'aroundBuffer' conflicts with existing declaration
 */
 
@@ -168,7 +168,7 @@ cbuffer BufferWithOtherKinds
 
 int funcName()
 /*CHECK:
-    ^^^^^^^^ conflicting declaration
+    ^^^^^^^^ warning E30204
     ^^^^^^^^ declaration of 'funcName' conflicts with existing declaration
 */
 {
@@ -177,7 +177,7 @@ int funcName()
 
 struct typeName
 /*CHECK:
-       ^^^^^^^^ conflicting declaration
+       ^^^^^^^^ warning E30204
        ^^^^^^^^ declaration of 'typeName' conflicts with existing declaration
 */
 {
@@ -204,12 +204,12 @@ cbuffer BufferAfterOtherKinds
 {
     int funcFirst;
 /*CHECK:
-        ^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^ warning E30204
         ^^^^^^^^^ declaration of 'funcFirst' conflicts with existing declaration
 */
     int TypeFirst;
 /*CHECK:
-        ^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^ warning E30204
         ^^^^^^^^^ declaration of 'TypeFirst' conflicts with existing declaration
 */
 }
@@ -227,7 +227,7 @@ cbuffer BufferInNamespace
 {
     int namespaceName;
 /*CHECK:
-        ^^^^^^^^^^^^^ conflicting declaration
+        ^^^^^^^^^^^^^ warning E30204
         ^^^^^^^^^^^^^ declaration of 'namespaceName' conflicts with existing declaration
 */
 }

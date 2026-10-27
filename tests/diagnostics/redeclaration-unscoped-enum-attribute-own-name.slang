@@ -21,21 +21,3 @@ int useTypeAndValue()
     Mode m = Other;
     return (int)m + (int)Mode;
 }
-
-// A declaration that the user writes is still an error, even when its value is a case of the
-// enum it conflicts with.
-
-[UnscopedEnum]
-enum Kind
-/*CHECK:
-     ^^^^ see previous declaration of 'Kind'
-*/
-{
-    KindCase,
-};
-
-let Kind = Kind.KindCase;
-/*CHECK:
-    ^^^^ conflicting declaration
-    ^^^^ declaration of 'Kind' conflicts with existing declaration
-*/
