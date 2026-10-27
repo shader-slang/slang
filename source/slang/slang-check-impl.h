@@ -1253,7 +1253,9 @@ private:
     Index m_candidateExtensionListsBuiltForModuleCount = 0;
 
     /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`.
-    void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
+    void _addCandidateExtensionsFromModule(
+        ModuleDecl* moduleDecl,
+        bool onlyAttributeExtensions = false);
 
     /// Mapping from a decl to additional declarations of the same decl.
     /// The additional declarations provide a location to hold extra decorations.
