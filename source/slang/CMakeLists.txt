@@ -97,6 +97,18 @@ set_property(
     PROPERTY COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/bigobj>"
 )
 
+# mimalloc-new-delete.h defines the aligned operator new/delete overloads only when __cplusplus
+# reports C++17 or later, which MSVC does only with /Zc:__cplusplus. We set the option on this file
+# alone because it changes the __cplusplus checks in every header a file includes, such as
+# slang-common.h. The file also skips the precompiled header, which is built without the option,
+# because MSVC expects a file that uses a precompiled header to be compiled with consistent options.
+set_source_files_properties(
+    slang-mimalloc.cpp
+    PROPERTIES
+        SKIP_PRECOMPILE_HEADERS ON
+        COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>"
+)
+
 #
 # generate capability files
 #
