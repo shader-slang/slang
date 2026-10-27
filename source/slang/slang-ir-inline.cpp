@@ -1288,6 +1288,123 @@ bool performPreAutoDiffForceInlining(IRModule* module)
 bool isResourceType(IRType* type);
 bool isIllegalGLSLParameterType(IRType* type);
 
+/// An inlining pass that inlines each function that has exactly one call site.
+///
+/// Downstream compilers such as DXC inline every call bottom-up, so a chain of
+/// single-call wrappers around a large body makes them clone that body once per
+/// level. Inlining these functions here gives the same code without the copies.
+/// The body of the callee moves to its only call site and the callee is removed,
+/// so the code never grows.
+struct SingleCallSiteInliningPass : InliningPassBase
+{
+    typedef InliningPassBase Super;
+
+    SingleCallSiteInliningPass(IRModule* module)
+        : Super(module)
+    {
+    }
+
+    /// Does `func` have a decoration that requires it to stay a separate function?
+    static bool mustKeepAsFunction(IRFunc* func)
+    {
+        for (auto decor : func->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_EntryPointDecoration:
+            case kIROp_NoInlineDecoration:
+            case kIROp_KeepAliveDecoration:
+            case kIROp_HLSLExportDecoration:
+            case kIROp_DllExportDecoration:
+            case kIROp_PyExportDecoration:
+            case kIROp_CudaDeviceExportDecoration:
+            case kIROp_CudaKernelDecoration:
+            case kIROp_CudaHostDecoration:
+            case kIROp_TorchEntryPointDecoration:
+            case kIROp_AutoPyBindCudaDecoration:
+            case kIROp_ExternCDecoration:
+            case kIROp_ExternCppDecoration:
+            case kIROp_TargetIntrinsicDecoration:
+            case kIROp_IntrinsicOpDecoration:
+                return true;
+            default:
+                break;
+            }
+        }
+        return false;
+    }
+
+    /// If `func` should be inlined into its only call site, return that call.
+    static IRCall* findSingleCallSite(IRFunc* func)
+    {
+        if (!isDefinition(func) || mustKeepAsFunction(func))
+            return nullptr;
+
+        // The function must have exactly one use. Any other use (a witness
+        // table entry, a function pointer, a decoration on another
+        // instruction) means the function must stay.
+        auto use = func->firstUse;
+        if (!use || use->nextUse)
+            return nullptr;
+
+        // That use must be the callee of a call, not an argument.
+        auto call = as<IRCall>(use->getUser());
+        if (!call || call->getCallee() != func)
+            return nullptr;
+
+        // The call must be in another function, so a recursive function is
+        // never inlined into itself.
+        auto caller = getParentFunc(call);
+        if (!caller || caller == func)
+            return nullptr;
+
+        return call;
+    }
+
+    void run()
+    {
+        // Collect the candidates first, because inlining removes functions
+        // from the module.
+        List<IRFunc*> funcs;
+        for (auto inst : m_module->getGlobalInsts())
+        {
+            if (auto func = as<IRFunc>(inst))
+                funcs.add(func);
+        }
+
+        // Each function is visited once. Inlining a function moves the calls
+        // in its body to its caller, and removing it drops the original calls,
+        // so the use counts stay exact and the order of the visits does not
+        // matter: a chain of wrappers collapses in one run.
+        for (auto func : funcs)
+        {
+            auto call = findSingleCallSite(func);
+            if (!call)
+                continue;
+
+            CallSiteInfo callSite;
+            if (!canInline(call, callSite) || callSite.callee != func)
+                continue;
+
+            if (auto parentFunc = getParentFunc(call))
+                m_module->invalidateAnalysisForInst(parentFunc);
+            inlineCallSite(callSite);
+
+            // The call was the only use, so the function is now dead.
+            SLANG_ASSERT(!func->hasUses());
+            func->removeAndDeallocate();
+        }
+    }
+};
+
+void performSingleCallSiteInlining(IRModule* module)
+{
+    SLANG_PROFILE;
+
+    SingleCallSiteInliningPass pass(module);
+    pass.run();
+}
+
 /// An inlining pass that inlines calls functions that returns resources.
 /// This is needed for glsl targets.
 struct GLSLResourceReturnFunctionInliningPass : InliningPassBase

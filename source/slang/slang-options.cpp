@@ -527,6 +527,13 @@ void initCommandOptions(CommandOptions& options)
          "-minimum-slang-optimization",
          nullptr,
          "Perform minimum code optimization in Slang to favor compilation time."},
+        {OptionKind::InlineSingleCallFunctions,
+         "-inline-single-call-functions",
+         nullptr,
+         "Inline every function that has exactly one call site before emitting code. "
+         "The output does not grow, and downstream compilers such as DXC no longer clone a large "
+         "body once per wrapper function. Entry points and [noinline] functions stay separate. "
+         "Has no effect with -whole-program. Default is off."},
         {OptionKind::DisableNonEssentialValidations,
          "-disable-non-essential-validations",
          nullptr,
@@ -2971,6 +2978,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::NoHLSLBinding:
         case OptionKind::NoHLSLPackConstantBufferElements:
         case OptionKind::LoopInversion:
+        case OptionKind::InlineSingleCallFunctions:
         case OptionKind::UnscopedEnum:
         case OptionKind::PreserveParameters:
         case OptionKind::ExperimentalFeature:

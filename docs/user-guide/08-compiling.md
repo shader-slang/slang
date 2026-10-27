@@ -1160,6 +1160,7 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
+| InlineSingleCallFunctions | When set, inlines every function that has exactly one call site before emitting target code (`-inline-single-call-functions`). Each inlined body moves to its only call site, so the output does not grow. Entry points, `[noinline]` functions, and functions that must stay visible outside the module are kept. Downstream compilers such as DXC inline every call bottom-up, so this avoids cloning a large body once per wrapper function. Has no effect when `GenerateWholeProgram` is set. `intValue0` specifies a bool value for the setting. |
 | UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes. If both this option and `BitfieldPackingRules` are set, the `BitfieldPackingRules` option takes precedence. Use `BitfieldPackingRules` instead. |
 
 ### Downstream Arguments in the Compilation API

@@ -156,6 +156,11 @@ Do not warn or error if capabilities are violated
 Perform minimum code optimization in Slang to favor compilation time. 
 
 
+<a id="inline-single-call-functions"></a>
+### -inline-single-call-functions
+Inline every function that has exactly one call site before emitting code. The output does not grow, and downstream compilers such as DXC no longer clone a large body once per wrapper function. Entry points and \[noinline\] functions stay separate. Has no effect with [-whole-program](#whole-program). Default is off. 
+
+
 <a id="disable-non-essential-validations"></a>
 ### -disable-non-essential-validations
 Disable non-essential IR validations such as use of uninitialized variables. 

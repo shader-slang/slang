@@ -2723,6 +2723,16 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(performForceInlining);
 
+    // Optionally inline functions that have one call site. This runs after the
+    // last force-inlining so that it sees the final call graph. A whole-program
+    // (library) compile keeps its functions, because they are its interface.
+    if (targetProgram->getOptionSet().getBoolOption(
+            CompilerOptionName::InlineSingleCallFunctions) &&
+        !targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
+    {
+        SLANG_PASS(performSingleCallSiteInlining);
+    }
+
     if (emitSpirvDirectly)
     {
         SLANG_PASS(performIntrinsicFunctionInlining);
