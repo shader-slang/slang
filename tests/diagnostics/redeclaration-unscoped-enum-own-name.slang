@@ -10,7 +10,7 @@ enum Mode
 {
     Mode,
 /*CHECK:
-    ^^^^ warning
+    ^^^^ warning E30203
     ^^^^ case 'Mode' has the same name as its unscoped enum
 */
     Other,

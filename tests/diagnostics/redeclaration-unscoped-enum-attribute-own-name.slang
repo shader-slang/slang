@@ -10,7 +10,7 @@ enum Mode
 {
     Mode,
 /*CHECK:
-    ^^^^ warning
+    ^^^^ warning E30203
     ^^^^ case 'Mode' has the same name as its unscoped enum
 */
     Other,
@@ -21,3 +21,25 @@ int useTypeAndValue()
     Mode m = Other;
     return (int)m + (int)Mode;
 }
+
+// The warning ends the comparison of the case alias with earlier declarations, so an earlier
+// `static const` of the same name conflicts with the enum, not with the alias.
+
+static const int Level = 0;
+/*CHECK:
+                 ^^^^^ see previous declaration of 'Level'
+*/
+
+[UnscopedEnum]
+enum Level
+/*CHECK:
+     ^^^^^ error E30200
+     ^^^^^ declaration of 'Level' conflicts with existing declaration
+*/
+{
+    Level,
+/*CHECK:
+    ^^^^^ warning E30203
+    ^^^^^ case 'Level' has the same name as its unscoped enum
+*/
+};
