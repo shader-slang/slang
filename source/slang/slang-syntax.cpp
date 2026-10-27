@@ -1018,6 +1018,18 @@ ParamInfo getEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRe
     return *result;
 }
 
+bool doesEffectiveThisParamAcceptImmutableReceiverCopy(DeclRef<Decl> declRef)
+{
+    SLANG_RELEASE_ASSERT(declRef);
+
+    auto providerDeclRef = _findEffectiveThisParamInfoProvider(declRef);
+    if (!providerDeclRef)
+        return false;
+
+    auto attribute = providerDeclRef.getDecl()->findModifier<ThisParamInfoAttribute>();
+    return attribute->acceptsImmutableReceiverCopy;
+}
+
 bool isThisExprWritable(DeclRef<CallableDecl> callableDeclRef, ParamInfo const& thisParamInfo)
 {
     if (doesParamPassingModeIndicateWritableStorage(thisParamInfo.mode))

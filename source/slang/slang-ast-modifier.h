@@ -1500,7 +1500,8 @@ class RefAttribute : public ReceiverParamModeSpecifierAttribute
     FIDDLE(...)
 };
 
-/// Records the type and parameter-passing mode of a declaration's effective `this` parameter.
+/// Records the type and parameter-passing mode of a declaration's effective `this` parameter, and
+/// whether a call can pass that parameter a copy of an immutable receiver.
 ///
 /// Signature checking attaches this attribute if and only if the declaration has an effective
 /// `this` parameter. Later compiler stages consume this checked semantic information instead of
@@ -1510,6 +1511,14 @@ class ThisParamInfoAttribute : public Attribute
 {
     FIDDLE(...)
     FIDDLE() ParamInfo info;
+
+    /// Whether a call can pass a copy of an immutable receiver to the writable `this` parameter.
+    ///
+    /// An HLSL method without a receiver-mode specifier takes `this` as `inout`, so that it can
+    /// modify a mutable receiver. HLSL code also calls such methods on immutable receivers, such
+    /// as constant buffer members, which DXC accepts for methods that do not write `this`. Such a
+    /// call passes a copy of the receiver, so any writes to `this` remain in that copy.
+    FIDDLE() bool acceptsImmutableReceiverCopy = false;
 };
 
 // A `[__readNone]` attribute, which indicates that a function

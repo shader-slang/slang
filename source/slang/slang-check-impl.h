@@ -1846,6 +1846,16 @@ struct OperandTryCoverageRAII
         context,                                           \
         decl->ownedScope ? decl->ownedScope : context->getOuterScope())
 
+/// The effective `this` parameter information that signature checking computes for a declaration
+/// and publishes in its `ThisParamInfoAttribute`.
+struct CheckedThisParamInfo
+{
+    ParamInfo info;
+
+    /// See `ThisParamInfoAttribute::acceptsImmutableReceiverCopy`.
+    bool acceptsImmutableReceiverCopy = false;
+};
+
 struct RequirementSynthesisResult
 {
     bool suceeded = false;
@@ -3275,16 +3285,24 @@ public:
     /// below so that it reads the information attached to the declaration. A `this` expression in
     /// the declaration's own signature is the exception: it needs this computation before the
     /// transition can finish, but leaves diagnostics to the final call that publishes the result.
-    std::optional<ParamInfo> checkEffectiveThisParamInfo(
+    std::optional<CheckedThisParamInfo> checkEffectiveThisParamInfo(
         Decl* decl,
         bool shouldDiagnoseModeAttributes);
 
     /// Return the receiver parameter mode used for `decl` when no specifier is present.
     ///
-    /// Setters and non-synthesized HLSL methods default to `ParamPassingMode::BorrowInOut`;
-    /// other declarations use `ParamPassingMode::In`.
+    /// Setters and methods with an HLSL default receiver default to
+    /// `ParamPassingMode::BorrowInOut`; other declarations use `ParamPassingMode::In`.
     /// For a non-synthesized `FuncDecl`, requires the context for its owning translation unit.
     ParamPassingMode getDefaultReceiverParamMode(Decl* decl);
+
+    /// Return whether `decl` is a method whose receiver follows the HLSL dialect default when no
+    /// specifier is present.
+    ///
+    /// Such a receiver is `inout`, and a call can still pass it a copy of an immutable receiver
+    /// (see `ThisParamInfoAttribute::acceptsImmutableReceiverCopy`). For a non-synthesized
+    /// `FuncDecl`, requires the context for its owning translation unit.
+    bool isHLSLDefaultReceiverMethod(Decl* decl);
 
     /// Compute and attach the effective `this` parameter information owned by `decl`.
     void checkAndAttachEffectiveThisParamInfo(Decl* decl);

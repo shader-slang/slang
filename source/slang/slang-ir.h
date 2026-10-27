@@ -2251,8 +2251,10 @@ public:
     // nodes would be decoded as different classes.
     // Version 37 is the earliest module version with the updated AST node numbering, and with
     // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
-    const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 37;
+    // Version 38 adds the `ThisParamInfoAttribute::acceptsImmutableReceiverCopy` field, which
+    // shifts the serialized fields of that attribute.
+    const static UInt k_minSupportedModuleVersion = 38;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

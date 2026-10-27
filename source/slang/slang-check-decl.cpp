@@ -17711,23 +17711,27 @@ ParamPassingMode SemanticsVisitor::getDefaultReceiverParamMode(Decl* decl)
 {
     if (as<SetterDecl>(decl))
         return ParamPassingMode::BorrowInOut;
+    if (isHLSLDefaultReceiverMethod(decl))
+        return ParamPassingMode::BorrowInOut;
+    return ParamPassingMode::In;
+}
 
-    // Declarations other than `FuncDecl`s default to `in`.
+bool SemanticsVisitor::isHLSLDefaultReceiverMethod(Decl* decl)
+{
+    // Declarations other than `FuncDecl`s use the dialect-independent defaults.
     if (!as<FuncDecl>(decl))
-        return ParamPassingMode::In;
+        return false;
 
     // We default synthesized functions to `in` rather than adopting the surrounding HLSL default.
     // For example, `visitLambdaExpr` synthesizes an `operator()` that must satisfy core `IFunc`'s
     // `in` receiver requirement.
     if (decl->hasModifier<SynthesizedModifier>())
-        return ParamPassingMode::In;
+        return false;
 
     // Imported modules finish signature checking in their own semantic context before import.
     // Reflection and specialization read the attached mode, so this language query runs while
     // checking a written method in its owning translation unit.
-    if (getSourceLanguage() == SourceLanguage::HLSL)
-        return ParamPassingMode::BorrowInOut;
-    return ParamPassingMode::In;
+    return getSourceLanguage() == SourceLanguage::HLSL;
 }
 
 /// Return the mode specified by the outermost declaration in `policyDecls` that has a specifier.
@@ -17792,7 +17796,7 @@ static bool _shouldEffectiveThisParamTypeBeNoDiff(
            !semantics->isTypeDifferentiable(receiverType);
 }
 
-std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
+std::optional<CheckedThisParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
     Decl* decl,
     bool shouldDiagnoseModeAttributes)
 {
@@ -17807,7 +17811,8 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
     // default receiver mode, collected policy, and declared receiver type determine it. Declaration
     // ownership is what lets a synthesized wrapper retain a non-`In` mode even for a class
     // receiver; an ordinary class member instead diagnoses mode specifiers and defaults to `In`.
-    // Finally, encode `no_diff` in the parameter value type and return the `ParamInfo`.
+    // A receiver whose mode is the HLSL default also accepts a copy of an immutable receiver.
+    // Finally, encode `no_diff` in the parameter value type and return the checked information.
     List<Decl*> policyDecls;
     policyDecls.add(decl);
 
@@ -17868,6 +17873,7 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
 
     Type* receiverType = nullptr;
     ParamPassingMode mode = ParamPassingMode::In;
+    bool acceptsImmutableReceiverCopy = false;
     bool hasDeclarationOwnedMode = false;
     bool isClassMember = false;
 
@@ -17935,9 +17941,18 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
     else if (!hasDeclarationOwnedMode)
     {
         if (auto specifiedMode = _foldReceiverParamModeSpecifiers(policyDecls))
+        {
             mode = *specifiedMode;
+        }
         else
+        {
             mode = getDefaultReceiverParamMode(decl);
+
+            // A call passes an immutable receiver to such a method by copying it, which a
+            // non-copyable receiver type does not allow.
+            acceptsImmutableReceiverCopy = isHLSLDefaultReceiverMethod(decl) &&
+                                           isCopyableType(unwrapModifiedType(receiverType));
+        }
         mode = adjustParamPassingModeBasedOnParamType(mode, receiverType);
     }
 
@@ -17948,9 +17963,10 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
             m_astBuilder->getModifiedType(receiverType, m_astBuilder->getNoDiffModifierVal());
     }
 
-    ParamInfo result;
-    result.type = receiverType;
-    result.mode = mode;
+    CheckedThisParamInfo result;
+    result.info.type = receiverType;
+    result.info.mode = mode;
+    result.acceptsImmutableReceiverCopy = acceptsImmutableReceiverCopy;
     return result;
 }
 
@@ -17976,7 +17992,7 @@ void SemanticsVisitor::checkAndAttachEffectiveThisParamInfo(Decl* decl)
     // witnesses.
     if (auto callableDecl = as<CallableDecl>(decl);
         callableDecl && _callableHasDifferentiabilityHeaderModifier(callableDecl) &&
-        !decl->hasModifier<NoDiffThisAttribute>() && doesTypeHaveNoDiffModifier(info->type))
+        !decl->hasModifier<NoDiffThisAttribute>() && doesTypeHaveNoDiffModifier(info->info.type))
     {
         auto noDiffThisModifier = m_astBuilder->create<NoDiffThisAttribute>();
         noDiffThisModifier->isSynthesized = true;
@@ -17985,7 +18001,8 @@ void SemanticsVisitor::checkAndAttachEffectiveThisParamInfo(Decl* decl)
 
     auto attribute = m_astBuilder->create<ThisParamInfoAttribute>();
     attribute->loc = decl->loc;
-    attribute->info = *info;
+    attribute->info = info->info;
+    attribute->acceptsImmutableReceiverCopy = info->acceptsImmutableReceiverCopy;
     addModifier(decl, attribute);
 }
 
