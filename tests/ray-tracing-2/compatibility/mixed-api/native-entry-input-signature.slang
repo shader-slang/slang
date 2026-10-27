@@ -1,19 +1,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=ALIAS): -experimental-feature -entry nativeAlias -stage closesthit -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=COMPUTE): -experimental-feature -ignore-capabilities -entry nativeAlias -stage compute -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=OPTIONAL): -experimental-feature -entry nativeOptional -stage closesthit -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=UNIFORM): -experimental-feature -entry nativeUniform -stage closesthit -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=FIELD): -experimental-feature -entry nativeField -stage closesthit -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE): -experimental-feature -ignore-capabilities -entry nativeResource -stage compute -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=STRUCTURED_RESOURCE): -experimental-feature -ignore-capabilities -entry nativeStructuredResource -stage compute -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=RESULT): -experimental-feature -entry nativeResult -stage closesthit -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC): -experimental-feature -entry nativeGeneric<InputCarrier> -stage closesthit -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=METHOD): -experimental-feature -entry Stage.invoke -stage closesthit -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=INHERITED): -experimental-feature -DINHERITED -entry nativeInherited -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry Stage -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry nativePhantom -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry nativeStagePayload -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry nativeOrdinaryResource -stage closesthit -no-codegen
-//TEST:SIMPLE: -experimental-feature -ignore-capabilities -entry nativeRecursive -stage closesthit -no-codegen
 
 import slang.raytracing;
 
@@ -33,7 +25,7 @@ struct HitContext : rt::IHitContext
 
 typealias HitInput = rt::ClosestHitInput<HitContext>;
 
-// Type aliases and optional wrappers do not turn a logical input into a native parameter.
+// Type aliases do not turn a logical input into a native parameter.
 // The second alias run selects compute to check that this rule is not limited to native RT stages.
 void nativeAlias(in HitInput input) {}
 /*ALIAS:
@@ -47,58 +39,6 @@ void nativeAlias(in HitInput input) {}
                              ^^^^^ parameter 'input' is treated as 'uniform'
 */
 
-void nativeOptional(in Optional<Optional<HitInput>> input) {}
-/*OPTIONAL:
-                       ^^^^^^^^ invalid native entry point signature
-                       ^^^^^^^^ cannot be used in a native entry point signature
-*/
-
-// Optional wrappers must not make an input view available through a host uniform binding.
-void nativeUniform(uniform Optional<HitInput> input) {}
-/*UNIFORM:
-                           ^^^^^^^^ invalid native entry point signature
-                           ^^^^^^^^ cannot be used in a native entry point signature
-*/
-
-struct Packet
-{
-    Optional<HitInput> values[2];
-}
-
-struct OuterPacket
-{
-    Packet packet;
-}
-
-// Ordinary structs must be checked through their instance fields, including array elements.
-void nativeField(in OuterPacket input) {}
-/*FIELD:
-                    ^^^^^^^^^^^ invalid native entry point signature
-                    ^^^^^^^^^^^ cannot be used in a native entry point signature
-*/
-
-// The buffer's element type describes bound storage, so its nested input view is still invalid.
-void nativeResource(uniform ConstantBuffer<OuterPacket> input) {}
-/*RESOURCE:
-                            ^^^^^^^^^^^^^^ invalid native entry point signature
-                            ^^^^^^^^^^^^^^ cannot be used in a native entry point signature
-*/
-
-void nativeStructuredResource(uniform StructuredBuffer<OuterPacket> input) {}
-/*STRUCTURED_RESOURCE:
-                                      ^^^^^^^^^^^^^^^^ invalid native entry point signature
-                                      ^^^^^^^^^^^^^^^^ cannot be used in a native entry point signature
-*/
-
-Optional<HitInput> nativeResult()
-/*RESULT:
-^^^^^^^^ invalid native entry point signature
-^^^^^^^^ cannot be used in a native entry point signature
-*/
-{
-    return none;
-}
-
 interface IInputCarrier
 {
     associatedtype Item;
@@ -111,10 +51,10 @@ struct InputCarrier : IInputCarrier
 
 // This entry selection already supplies InputCarrier. Check the substituted signature; checking
 // only the original declaration would see T.Item instead of the concrete stage input.
-void nativeGeneric<T : IInputCarrier>(in Optional<T.Item> input) {}
+void nativeGeneric<T : IInputCarrier>(in T.Item input) {}
 /*GENERIC:
-                                         ^^^^^^^^ invalid native entry point signature
-                                         ^^^^^^^^ cannot be used in a native entry point signature
+                                           ^^^^ invalid native entry point signature
+                                           ^^^^ cannot be used in a native entry point signature
 */
 
 // Helpers may still copy and forward the input supplied by a structural invocation.
@@ -155,32 +95,3 @@ void nativeOrdinaryResource(uniform ConstantBuffer<Phantom<InputCarrier>> input)
 
 // A stage implementation is an ordinary user struct; its static invoke is not a payload field.
 void nativeStagePayload(inout Stage payload) {}
-
-struct RecursivePayload
-{
-    Ptr<RecursivePayload> next;
-    uint value;
-}
-
-// Check that following instance fields terminates for recursive pointer types. This run ignores
-// target capability restrictions so that it only tests the signature's structural-input rule.
-void nativeRecursive(inout RecursivePayload payload) {}
-
-#ifdef INHERITED
-struct BasePayload
-{
-    Optional<HitInput> input;
-}
-
-// Native payload validation must include instance storage inherited from a concrete base.
-struct DerivedPayload : BasePayload {}
-/*INHERITED:
-                        ^^^^^^^^^^^ support for inheritance is unstable
-*/
-
-void nativeInherited(inout DerivedPayload payload) {}
-/*INHERITED:
-                           ^^^^^^^^^^^^^^ invalid native entry point signature
-                           ^^^^^^^^^^^^^^ cannot be used in a native entry point signature
-*/
-#endif

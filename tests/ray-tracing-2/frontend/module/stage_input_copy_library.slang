@@ -23,12 +23,7 @@ public void updatePayload(in rt::MissInput<Context> input)
 {
     rt::MissInput<Context> local = input;
     let copiedAgain = local;
-    // Saving and reimporting this module must preserve wrapping and unwrapping the same view.
-    Optional<rt::MissInput<Context>> maybe = copiedAgain;
-    if (maybe.hasValue)
-    {
-        let unwrapped = maybe.value;
-        unwrapped.payload.value += unwrapped.record.value;
-    }
+    // Saving and reimporting this module must preserve copies of the same supplied view.
+    copiedAgain.payload.value += copiedAgain.record.value;
 }
 }

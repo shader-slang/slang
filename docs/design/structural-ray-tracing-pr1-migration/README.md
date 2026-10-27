@@ -224,8 +224,8 @@ interface, its checked inheritance facets already identify the stage-interface p
 applies ordinary `This` substitution with the completed conformance to that facet witness before
 reading `invoke`; it does not perform a second search for a conformance path.
 Representation diagnostics use the semantic checker's existing duplicate suppression. Native
-entry-point validation checks the selected signature for logical RT inputs, including inputs
-hidden behind aliases or concrete aggregate fields.
+entry-point validation checks the selected parameter and result types for logical RT inputs,
+using the same type classifier as ordinary input-use checking.
 
 ## 8. Centralize special rules and allow ordinary metadata/payload values
 
@@ -447,23 +447,23 @@ such specializations.
 Native entry signatures have a separate check described below. This broader limitation is
 tracked in [#13686](https://github.com/shader-slang/slang/issues/13686).
 
-`Optional<MissInput<C>>` can hold an alias to an existing invocation's input, or `none`:
+Stage inputs are opaque compiler-supplied shader IO, like patch and stream inputs. They cannot be
+the value type of `Optional`, including when the optional would contain an existing input:
 
 ```slang
 void inspect<C : rt::IPayloadContext>(in rt::MissInput<C> input)
 {
-    Optional<rt::MissInput<C>> absent = none;
-    let present = input as rt::MissInput<C>;
-    if (present.hasValue)
-    {
-        let alias = present.value;
-    }
+    Optional<rt::MissInput<C>> maybe = input; // Rejected.
+    let castResult = input as rt::MissInput<C>; // Rejected: produces Optional.
 }
 ```
 
-The optional does not allocate an invocation's payload or shader record. Creating a fresh
-`MissInput<C>()` or fresh `MissInput` initializer remains invalid. Direct global stage-input storage
-is also invalid.
+An explicit `Optional<Input>` is rejected by the input generic-argument rule. `isOpaqueHandleType`
+also recognizes the exact stage-input declarations so ordinary opaque-type validation rejects
+optional values produced by casts or conversions, including `none` converted to an optional input.
+This classification applies even when the input's context is still generic. Inputs hidden behind
+associated-type fields remain part of #13686. Direct local copies and `in` helper parameters
+retain the existing input-use rules.
 
 An empty struct is a valid explicit payload. Allow both `trace(..., emptyPayload)` and
 `input.payload` when its type is empty. Remove the old explicit-empty diagnostics and property
@@ -495,11 +495,15 @@ argument. That normalization and native adapters remain work for the full implem
 
 A native entry point cannot accept or return a logical RT input. This applies to all five input
 types and every native shader stage, including a miss function that directly takes
-`MissInput<Context>`. A type alias, array, `Optional` or concrete struct field does not turn the
-input into a native shader parameter. After ordinary native validation succeeds, entry-point
-validation checks the resolved signature for these types. Explicit selection, automatic entry
-discovery and selection from serialized modules use the same check. It uses the types known during entry
-validation; rechecking types supplied only by later API specialization remains follow-up work.
+`MissInput<Context>`. A type alias still names that same input. Known input storage is rejected
+when its declaration is checked, and `Optional<Input>` is invalid as described above. After
+ordinary native validation succeeds, entry-point validation applies the shared RT type classifier
+to the substituted parameter and result types. It follows builtin container elements without
+inspecting ordinary struct fields. Explicit selection, automatic entry discovery and selection
+from serialized modules use the same check. A concrete aggregate can
+still hide an input behind a generic field such as `T.Item`; that case remains deferred under
+#13686 because the native check does not traverse fields. Rechecking entry types supplied only
+by later API specialization is also follow-up work.
 
 Native and structural shaders may coexist in one module. Ordinary helpers may forward an existing
 input. Imports and calls to `TraceRay`, `TraceMotionRay`, `CallShader` or structural trace wrappers

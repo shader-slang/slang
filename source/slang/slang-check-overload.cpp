@@ -4054,7 +4054,7 @@ Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
 
     auto result = checkGenericAppWithCheckedArgs(genericAppExpr);
     if (!IsErrorExpr(result) && as<TypeType>(result->type) &&
-        diagnoseInvalidStructuralRayTracingGenericTypeApplication(genericAppExpr, result))
+        diagnoseInvalidStructuralRayTracingGenericTypeApplication(genericAppExpr))
     {
         return CreateErrorExpr(genericAppExpr);
     }

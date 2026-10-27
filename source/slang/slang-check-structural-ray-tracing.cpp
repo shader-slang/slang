@@ -309,23 +309,15 @@ static RestrictedRayTracingTypeKind _getDirectRestrictedRayTracingTypeKind(Type*
 // here would needlessly force unfinished field declarations, e.g. Node's own `Ptr<Node> next`.
 //
 // Arrays and pointers can name an input without a generic application in source, so follow their
-// already-checked element types. An Optional<Input> can hold an existing input or none and is
-// allowed. Generic fields such as T.Item need validation after specialization, just like T.Item()
-// construction; that separate limitation is tracked in shader-slang/slang#13686.
+// already-checked element types. Generic fields such as T.Item need validation after
+// specialization, just like T.Item() construction; that limitation is tracked in
+// shader-slang/slang#13686.
 static RestrictedRayTracingTypeKind _getRestrictedRayTracingTypeKind(Type* type)
 {
     type = unwrapModifiedType(type);
     auto kind = _getDirectRestrictedRayTracingTypeKind(type);
     if (kind != RestrictedRayTracingTypeKind::None)
         return kind;
-
-    // Optional can hold an existing input or none. Stop here instead of checking its input type
-    // as a standalone declaration; other containers still need their element types checked.
-    if (auto optionalType = as<OptionalType>(type))
-    {
-        if (_getDirectStageInputKind(optionalType->getValueType()) != Stage::Unknown)
-            return RestrictedRayTracingTypeKind::None;
-    }
 
     unwrapTypeElements(
         type,
@@ -361,7 +353,7 @@ static bool _diagnoseInvalidRTBuiltinTypeUse(
             Diagnostics::StructuralRayTracingInputStorage{.type = type, .location = location});
         return true;
     default:
-        // Ordinary types and Optional<Input> need no diagnostic from this check.
+        // Ordinary types need no diagnostic from this check.
         return false;
     }
 }
@@ -551,87 +543,17 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     return result;
 }
 
-// Rejects a logical RT input anywhere in one native entry parameter or result type.
-// Consider `struct Args { Optional<rt::MissInput<C>> input; }`. That field is legal in ordinary
-// code, but selecting `void main(Args args)` as a native entry cannot supply the logical input.
-// Inspect checked container elements and substituted instance fields, not generic arguments:
-// `struct Phantom<T> { uint value; }` does not store T. Ordinary Type identity stops pointer
-// cycles; the normal nesting limit also bounds generic types that grow at every recursive step.
-static bool _diagnoseNativeEntryPointInputType(
-    ASTBuilder* astBuilder,
-    Type* type,
-    SourceLoc location,
-    DiagnosticSink* sink,
-    HashSet<Type*>& visited,
-    UInt depth = 0)
+// Rejects a logical RT input in a selected native entry signature. Ordinary declaration checks
+// already reject storing known inputs in fields or containers. Reuse the same type recognition here
+// for the signature after applying the selected function's generic arguments.
+static void _diagnoseNativeEntryPointInputType(Type* type, SourceLoc location, DiagnosticSink* sink)
 {
-    type = unwrapModifiedType(type);
-    if (!visited.add(type))
-        return false;
-    if (_getDirectStageInputKind(type) != Stage::Unknown)
+    if (_getRestrictedRayTracingTypeKind(type) == RestrictedRayTracingTypeKind::StageInput)
     {
         sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
             .type = type,
             .location = location});
-        return true;
     }
-    if (depth >= kMaxTypeNestingDepth)
-    {
-        sink->diagnose(Diagnostics::MaximumTypeNestingLevelExceeded{.location = location});
-        return true;
-    }
-    // ConstantBuffer<Args> and StructuredBuffer<Args> store their element type in the checked
-    // builtin type, not in the builtin declaration's fields. The same applies to stage-output
-    // wrappers derived from BuiltinGenericType.
-    if (auto builtinType = as<BuiltinGenericType>(type))
-    {
-        return _diagnoseNativeEntryPointInputType(
-            astBuilder,
-            builtinType->getElementType(),
-            location,
-            sink,
-            visited,
-            depth + 1);
-    }
-    if (unwrapTypeElements(
-            type,
-            [&](Type* elementType)
-            {
-                return _diagnoseNativeEntryPointInputType(
-                    astBuilder,
-                    elementType,
-                    location,
-                    sink,
-                    visited,
-                    depth + 1);
-            }))
-        return true;
-
-    if (auto structDeclRef = isDeclRefTypeOf<StructDecl>(type))
-    {
-        for (auto field : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
-        {
-            if (_diagnoseNativeEntryPointInputType(
-                    astBuilder,
-                    getType(astBuilder, field),
-                    location,
-                    sink,
-                    visited,
-                    depth + 1))
-                return true;
-        }
-        if (auto baseType = findBaseStructType(astBuilder, structDeclRef))
-        {
-            return _diagnoseNativeEntryPointInputType(
-                astBuilder,
-                baseType,
-                location,
-                sink,
-                visited,
-                depth + 1);
-        }
-    }
-    return false;
 }
 
 // Checks the selected native entry signature, including aliases and closed generic arguments.
@@ -645,26 +567,17 @@ void diagnoseStructuralRayTracingInputInNativeEntryPoint(
     SLANG_RELEASE_ASSERT(!entryPoint->isStructuralRayTracingEntryPoint());
     auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
     auto function = entryPoint->getFuncDeclRef();
-    HashSet<Type*> visited;
     for (auto parameter : getParameters(astBuilder, function))
     {
         auto parameterDecl = parameter.getDecl();
         auto location = parameterDecl->type.exp ? parameterDecl->type.exp->loc : parameterDecl->loc;
-        _diagnoseNativeEntryPointInputType(
-            astBuilder,
-            getType(astBuilder, parameter),
-            location,
-            sink,
-            visited);
-        visited.clear();
+        _diagnoseNativeEntryPointInputType(getType(astBuilder, parameter), location, sink);
     }
     auto resultType = function.getDecl()->returnType;
     _diagnoseNativeEntryPointInputType(
-        astBuilder,
         getResultType(astBuilder, function),
         resultType.exp ? resultType.exp->loc : function.getDecl()->loc,
-        sink,
-        visited);
+        sink);
 }
 
 // Selects one executable conformance for a source struct named by -entry.
@@ -1029,12 +942,9 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(Invok
     bool diagnosed = false;
     SubstitutionSet(functionDeclRef->declRef)
         .forEachGenericSubstitution(
-            [&](GenericDecl* genericDecl, Val::OperandView<Val> arguments)
+            [&](GenericDecl*, Val::OperandView<Val> arguments)
             {
-                // Optional<Input>'s builtin constructors wrap an existing value or produce none.
-                // Exempt only Optional's substitution, not a user helper returning Optional<T>.
-                if (diagnosed ||
-                    _getMagicTypeClass(genericDecl->inner) == ASTNodeType::OptionalType)
+                if (diagnosed)
                     return;
                 for (auto argument : arguments)
                 {
@@ -1061,21 +971,15 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(Invok
 //     typealias InputFactory = Factory<rt::MissInput<C>>;
 //
 // This has the same unknown-T construction risk as a generic call. Check the written type
-// arguments once normal type resolution succeeds. Optional<Input> is allowed because wrapping
-// an existing input or none does not construct Input. A concrete stage struct is an ordinary
+// arguments once normal type resolution succeeds. A concrete stage struct is an ordinary
 // argument, so shader lists and generic helpers require no special exemption for those structs.
 bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericTypeApplication(
-    GenericAppExpr* genericApplication,
-    Expr* checkedResult)
+    GenericAppExpr* genericApplication)
 {
-    auto applicationTypeType = checkedResult ? as<TypeType>(checkedResult->type) : nullptr;
-    bool isOptional = applicationTypeType && as<OptionalType>(applicationTypeType->getType());
     for (auto argument : genericApplication->arguments)
     {
         if (auto argumentType = as<TypeType>(argument->type))
         {
-            if (isOptional && _getDirectStageInputKind(argumentType->getType()) != Stage::Unknown)
-                continue;
             if (_diagnoseRestrictedRayTracingGenericArgument(
                     this,
                     argumentType->getType(),

@@ -3057,8 +3057,7 @@ public:
     bool diagnoseInvalidStructuralRayTracingExpression(Expr* expr);
     bool diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke);
     bool diagnoseInvalidStructuralRayTracingGenericTypeApplication(
-        GenericAppExpr* genericApplication,
-        Expr* checkedResult);
+        GenericAppExpr* genericApplication);
 
     void _checkDifferentialConformance(
         ConformanceCheckingContext* context,

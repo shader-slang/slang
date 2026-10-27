@@ -21,6 +21,7 @@
 #include "slang-mangle.h"
 #include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-structural-ray-tracing.h"
 #include "slang-syntax.h"
 
 #include <limits>
@@ -23263,6 +23264,11 @@ bool isOpaqueHandleType(Type* type)
 {
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
+    // Logical RT inputs are supplied by the compiler, like patch and stream inputs/outputs.
+    // Include them in the ordinary opaque-type checks so Optional cannot store them either.
+    if (getStructuralRayTracingStageInputKind(isDeclRefTypeOf<AggTypeDecl>(type).getDecl()) !=
+        Stage::Unknown)
+        return true;
     if (as<TraceProgramDescriptorType>(type))
         return true;
     if (as<ResourceType>(type))
