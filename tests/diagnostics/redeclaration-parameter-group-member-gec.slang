@@ -49,3 +49,20 @@ cbuffer SecondCB
         ^^^^^^^^^^^^ declaration of 'sharedMember' conflicts with existing declaration
 */
 }
+
+// With `-Gec`, the shadow of a `tbuffer` keeps the `TextureBuffer` type, and lookup still sees
+// through it to the members.
+
+int gecTBufferName;
+/*CHECK:
+    ^^^^^^^^^^^^^^ see previous declaration of 'gecTBufferName'
+*/
+
+tbuffer TB
+{
+    int gecTBufferName;
+/*CHECK:
+        ^^^^^^^^^^^^^^ warning E30204
+        ^^^^^^^^^^^^^^ declaration of 'gecTBufferName' conflicts with existing declaration
+*/
+}
