@@ -1290,6 +1290,27 @@ Modifier* SemanticsVisitor::validateAttribute(
         removedSinceAttr->sinceVersion = int32_t(sinceVersion->getValue());
         removedSinceAttr->message = message;
     }
+    else if (auto constantFoldAsAttr = as<ConstantFoldAsAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 1);
+
+        auto op = checkConstantIntVal(attr->args[0]);
+        if (!op)
+            return nullptr;
+        // The attribute names a built-in function; operators fold through their intrinsic-op
+        // modifier instead.
+        switch (BuiltinOperationKind(op->getValue()))
+        {
+        case BuiltinOperationKind::Min:
+        case BuiltinOperationKind::Max:
+        case BuiltinOperationKind::Abs:
+        case BuiltinOperationKind::Clamp:
+            constantFoldAsAttr->op = BuiltinOperationKind(op->getValue());
+            break;
+        default:
+            return nullptr;
+        }
+    }
     else if (auto knownBuiltinAttr = as<KnownBuiltinAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);

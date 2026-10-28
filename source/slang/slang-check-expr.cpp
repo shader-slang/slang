@@ -2483,14 +2483,16 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
     // The builtin-operator fast path produces a `BuiltinOperatorExpr` (folded separately by
     // `tryConstantFoldBuiltinOperatorExpr`), so anything reaching here is an ordinary call:
-    // it must resolve to a decl carrying an intrinsic-op or implicit-conversion modifier.
+    // it must resolve to a decl carrying an intrinsic-op or implicit-conversion modifier, or a
+    // `[__constantFoldAs]` attribute.
     auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
     if (!funcDeclRef)
         return nullptr;
     auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
     ImplicitConversionModifier* implicitCast =
         funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
-    if (!intrinsicMod && !implicitCast)
+    auto constantFoldAs = funcDeclRef.getDecl()->findModifier<ConstantFoldAsAttribute>();
+    if (!intrinsicMod && !implicitCast && !constantFoldAs)
     {
         // We can't constant fold anything that doesn't map to a builtin
         // operation right now.
@@ -2528,6 +2530,24 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         {
             allConst = false;
         }
+    }
+
+    // A built-in function such as `max` names its operation by attribute, so it folds to the same
+    // `IntVal` as a builtin operator, whether its arguments are concrete or symbolic.
+    if (constantFoldAs)
+    {
+        auto resultType = as<Type>(
+            invokeExpr.getExpr()->type.type->substitute(m_astBuilder, invokeExpr.getSubsts()));
+        if (argCount != getBuiltinOperationArity(constantFoldAs->op) ||
+            !canConstantFoldBuiltinIntegerFunction(constantFoldAs->op, resultType))
+            return nullptr;
+        List<IntVal*> args;
+        args.addRange(argVals, argCount);
+        return getBuiltinOperationIntVal(
+            resultType,
+            constantFoldAs->op,
+            args,
+            invokeExpr.getExpr()->loc);
     }
 
     if (!allConst)

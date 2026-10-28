@@ -4838,6 +4838,12 @@ attribute_syntax [__ref] : RefAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__readNone] : ReadNoneAttribute;
 
+/// @internal
+/// Indicates that a function computes the builtin operation `op` (a `BuiltinOperationKind`) of its
+/// arguments, so a call on compile-time constant arguments is itself a compile-time constant.
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__constantFoldAs(op : int)] : ConstantFoldAsAttribute;
+
 /// Represents the applicable target for an attribute.
 enum _AttributeTargets
 {
