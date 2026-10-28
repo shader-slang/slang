@@ -600,15 +600,6 @@ std::optional<ParamInfo> findEffectiveThisParamInfo(ASTBuilder* astBuilder, Decl
 /// the declaration-derived mode is invariant under those substitutions.
 ParamInfo getEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
 
-/// Returns whether a call to `declRef` can pass a copy of an immutable receiver to its writable
-/// effective `this` parameter, as recorded by
-/// `ThisParamInfoAttribute::acceptsImmutableReceiverCopy`.
-///
-/// The declaration must have reached `DeclCheckState::SignatureChecked`. The result is false for a
-/// declaration without an effective `this` parameter, and it follows the same callable lookup
-/// source as `findEffectiveThisParamInfo`.
-bool doesEffectiveThisParamAcceptImmutableReceiverCopy(DeclRef<Decl> declRef);
-
 /// Returns whether a `this` expression in `callableDeclRef`'s body is writable.
 ///
 /// The effective parameter mode normally determines this property. A class setter is the one

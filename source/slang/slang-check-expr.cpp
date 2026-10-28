@@ -9627,10 +9627,9 @@ Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
                 // signature checking can reject unavailable receiver uses before requiring their
                 // mode:
                 // https://github.com/shader-slang/slang/issues/13674
-                if (auto checkedInfo = checkEffectiveThisParamInfo(
-                        funcDeclBase,
-                        /* shouldDiagnoseModeAttributes */ false))
-                    thisParamInfo = checkedInfo->info;
+                thisParamInfo = checkEffectiveThisParamInfo(
+                    funcDeclBase,
+                    /* shouldDiagnoseModeAttributes */ false);
             }
             else
             {

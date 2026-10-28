@@ -963,51 +963,39 @@ NamedExpressionType* getNamedType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> c
     return astBuilder->getOrCreate<NamedExpressionType>(specializedDeclRef);
 }
 
-/// Return the declaration reference whose `ThisParamInfoAttribute` describes `declRef`'s effective
-/// `this` parameter, or a null reference if `declRef` has no such parameter.
-///
-/// The provider is usually `declRef` itself. Consider `apply_bwd`, an interface requirement looked
-/// up through a function-as-type. Its declaration's receiver is the interface `This`, but its
-/// callable ABI follows the function used as the lookup source: a free function has no effective
-/// `this` parameter, while a method has the same one as its primal declaration. The provider is
-/// then that callable, which preserves both possibilities. A receiverless requirement has no
-/// attribute and remains receiverless regardless of the callable used as its lookup source.
-static DeclRef<Decl> _findEffectiveThisParamInfoProvider(DeclRef<Decl> declRef)
-{
-    for (;;)
-    {
-        auto decl = declRef.getDecl();
-        SLANG_RELEASE_ASSERT(decl->isChecked(DeclCheckState::SignatureChecked));
-
-        DeclRef<CallableDecl> callableDeclRef;
-        if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
-            callableDeclRef = isDeclRefTypeOf<CallableDecl>(lookupDeclRef->getLookupSource());
-        if (callableDeclRef)
-        {
-            SLANG_RELEASE_ASSERT(
-                callableDeclRef.getDecl()->isChecked(DeclCheckState::SignatureChecked));
-        }
-
-        if (!decl->hasModifier<ThisParamInfoAttribute>())
-            return DeclRef<Decl>();
-        if (!callableDeclRef)
-            return declRef;
-        declRef = callableDeclRef;
-    }
-}
-
 std::optional<ParamInfo> findEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
 {
     SLANG_RELEASE_ASSERT(astBuilder);
     SLANG_RELEASE_ASSERT(declRef);
 
-    auto providerDeclRef = _findEffectiveThisParamInfoProvider(declRef);
-    if (!providerDeclRef)
+    auto decl = declRef.getDecl();
+    SLANG_RELEASE_ASSERT(decl->isChecked(DeclCheckState::SignatureChecked));
+
+    auto attribute = decl->findModifier<ThisParamInfoAttribute>();
+    if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+    {
+        if (auto callableDeclRef = isDeclRefTypeOf<CallableDecl>(lookupDeclRef->getLookupSource()))
+        {
+            // Consider `apply_bwd`, an interface requirement looked up through a function-as-type.
+            // Its declaration's receiver is the interface `This`, but its callable ABI follows the
+            // function used as the lookup source: a free function has no effective `this`
+            // parameter, while a method has the same one as its primal declaration. Delegate to
+            // that callable's checked information so this query preserves both possibilities. A
+            // receiverless requirement has no attribute and remains receiverless regardless of
+            // the callable used as its lookup source.
+            SLANG_RELEASE_ASSERT(
+                callableDeclRef.getDecl()->isChecked(DeclCheckState::SignatureChecked));
+            if (attribute)
+                return findEffectiveThisParamInfo(astBuilder, DeclRef<Decl>(callableDeclRef));
+        }
+    }
+
+    if (!attribute)
         return std::nullopt;
 
-    ParamInfo result = providerDeclRef.getDecl()->findModifier<ThisParamInfoAttribute>()->info;
+    ParamInfo result = attribute->info;
     SLANG_RELEASE_ASSERT(result.type);
-    result.type = providerDeclRef.substitute(astBuilder, result.type);
+    result.type = declRef.substitute(astBuilder, result.type);
     return result;
 }
 
@@ -1016,18 +1004,6 @@ ParamInfo getEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRe
     auto result = findEffectiveThisParamInfo(astBuilder, declRef);
     SLANG_RELEASE_ASSERT(result.has_value());
     return *result;
-}
-
-bool doesEffectiveThisParamAcceptImmutableReceiverCopy(DeclRef<Decl> declRef)
-{
-    SLANG_RELEASE_ASSERT(declRef);
-
-    auto providerDeclRef = _findEffectiveThisParamInfoProvider(declRef);
-    if (!providerDeclRef)
-        return false;
-
-    auto attribute = providerDeclRef.getDecl()->findModifier<ThisParamInfoAttribute>();
-    return attribute->acceptsImmutableReceiverCopy;
 }
 
 bool isThisExprWritable(DeclRef<CallableDecl> callableDeclRef, ParamInfo const& thisParamInfo)
