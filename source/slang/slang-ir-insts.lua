@@ -3048,8 +3048,11 @@ local insts = {
 		},
 	},
 	{
+		-- The compilation unit of a source file that is not `#include`d. The operands after `source`
+		-- are the `#include`d files of the same translation unit, so that the compilation units of a
+		-- module name every file of that module, including files with no line-table entries.
 		DebugCompilationUnit = {
-			operands = { { "source" } },
+			operands = { { "source" }, { "includedSources", variadic = true } },
 			hoistable = true,
 		},
 	},

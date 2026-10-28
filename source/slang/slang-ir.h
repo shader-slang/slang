@@ -2256,9 +2256,16 @@ public:
     // nodes would be decoded as different classes.
     // Version 37 is the earliest module version with the updated AST node numbering, and with
     // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
+    //
+    // Version 38 gives each `DebugCompilationUnit` the `#include`d files of its translation unit
+    // as operands. A version-37 module is still compatible, but its compilation units do not name
+    // those files, so the linker clones all of its debug source records.
     const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 37;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
+
+    /// The first module version whose compilation units name their `#include`d files.
+    const static UInt k_firstModuleVersionWithCompilationUnitIncludes = 38;
 
     /// Returns whether `version` is in the inclusive range this compiler can load.
     static bool isModuleVersionSupported(UInt64 version)

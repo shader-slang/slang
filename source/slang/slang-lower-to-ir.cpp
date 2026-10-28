@@ -15495,6 +15495,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         const bool includeSource = linkage->m_optionSet.shouldIncludeSourceInDebugInfo();
 
         builder->setInsertInto(module->getModuleInst());
+        List<IRDebugSource*> topLevelSources;
+        List<IRInst*> includedSources;
         for (auto source : translationUnit->getSourceFiles())
         {
             // For Standard and Maximal level, include the source content, otherwise just the
@@ -15506,16 +15508,24 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                     : UnownedStringSlice(),
                 source->isIncludedFile()));
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
+            if (source->isIncludedFile())
+                includedSources.add(debugSource);
+            else
+                topLevelSources.add(debugSource);
+        }
 
-            // Minimal IR already contains DebugFunction records. Retain their compilation-unit
-            // ownership too: a module serialized at -g1 can later be compiled at -g2, where
-            // inline scopes need that parent. The emitter still omits extended debug info at -g1.
-            if (!source->isIncludedFile())
-            {
-                auto compilationUnit =
-                    cast<IRDebugCompilationUnit>(builder->emitDebugCompilationUnit(debugSource));
-                context->shared->mapDebugSourceToCompilationUnit[debugSource] = compilationUnit;
-            }
+        // Minimal IR already contains DebugFunction records. Retain their compilation-unit
+        // ownership too: a module serialized at -g1 can later be compiled at -g2, where
+        // inline scopes need that parent. The emitter still omits extended debug info at -g1.
+        //
+        // Each compilation unit also names the `#include`d files of this translation unit. The
+        // linker clones the compilation units of each module that contributes code, and with them
+        // the module's whole file list, including a header that has no line-table entries.
+        for (auto debugSource : topLevelSources)
+        {
+            auto compilationUnit = cast<IRDebugCompilationUnit>(
+                builder->emitDebugCompilationUnit(debugSource, includedSources.getArrayView()));
+            context->shared->mapDebugSourceToCompilationUnit[debugSource] = compilationUnit;
         }
     }
 
