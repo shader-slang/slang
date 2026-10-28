@@ -819,6 +819,42 @@ void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
     // Nothing to do
 }
 
+// Count the iterations of `for (i = initialValue; i compareOp finalValue; i += step)`, where the
+// step moves `i` towards `finalValue` by `absStep` per iteration and `i` does not wrap around.
+// Folded constants are held as a signed 64-bit `IntegerLiteralValue`, so a value of an unsigned
+// 64-bit type above INT64_MAX is held as a negative number, and we order the bounds as `UInt64`
+// when `isUnsigned64` is set. For example, in `for (uint64_t i = 0; i < 0xFFFFFFFFFFFFFFFFull;
+// i++)` the bound is held as -1 but lies above `initialValue`. The function returns false when the
+// count is above INT32_MAX, because `InferredMaxItersAttribute` stores the count as an `int32_t`.
+static bool _tryCountForLoopIterations(
+    IROp compareOp,
+    bool isUnsigned64,
+    IntegerLiteralValue initialValue,
+    IntegerLiteralValue finalValue,
+    UInt64 absStep,
+    int32_t& outIterations)
+{
+    const bool countsDown = compareOp == kIROp_Greater || compareOp == kIROp_Geq;
+    const bool isInclusive = compareOp == kIROp_Leq || compareOp == kIROp_Geq;
+    const IntegerLiteralValue low = countsDown ? finalValue : initialValue;
+    const IntegerLiteralValue high = countsDown ? initialValue : finalValue;
+    const bool highIsBelowLow = isUnsigned64 ? UInt64(high) < UInt64(low) : high < low;
+    if (highIsBelowLow || (high == low && !isInclusive))
+    {
+        outIterations = 0;
+        return true;
+    }
+
+    // The distance between two values of a type of at most 64 bits fits in a `UInt64`, and
+    // wrapping subtraction computes it exactly for signed and unsigned bounds alike.
+    const UInt64 distance = UInt64(high) - UInt64(low);
+    const UInt64 stepsAfterFirst = (isInclusive ? distance : distance - 1) / absStep;
+    if (stepsAfterFirst >= UInt64(INT32_MAX))
+        return false;
+    outIterations = int32_t(stepsAfterFirst + 1);
+    return true;
+}
+
 void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
 {
     // If a for loop is in the form of `for (var = initialVal; var $compareOp otherVal; var
@@ -1052,29 +1088,26 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     if (!initialLitVal || !finalVal)
         return;
 
-    auto absStepSize = abs(stepSize->getValue());
-    int adjustment = 0;
-    if (compareOp == kIROp_Geq || compareOp == kIROp_Leq)
-        adjustment = 1;
+    // The predicate compares in the type of its operands, one of which is the bare induction
+    // variable. Only an unsigned 64-bit type has values that do not fit in `IntegerLiteralValue`
+    // as a signed number.
+    auto compareType = as<BasicExpressionType>(cmpExpr->arguments[0]->type.type);
+    SLANG_ASSERT(compareType);
+    const auto& compareTypeInfo = BaseTypeInfo::getInfo(compareType->getBaseType());
+    const bool isUnsigned64 = !(compareTypeInfo.flags & BaseTypeInfo::Flag::Signed) &&
+                              compareTypeInfo.sizeInBytes == sizeof(UInt64);
 
-    auto iterations = (Math::Max(finalVal->getValue(), initialLitVal->getValue()) -
-                       Math::Min(finalVal->getValue(), initialLitVal->getValue()) + absStepSize -
-                       1 + adjustment) /
-                      absStepSize;
-    switch (compareOp)
-    {
-    case kIROp_Geq:
-    case kIROp_Greater:
-        // Expect final value to be less than initial value.
-        if (finalVal->getValue() > initialLitVal->getValue())
-            iterations = 0;
-        break;
-    case kIROp_Leq:
-    case kIROp_Less:
-        if (finalVal->getValue() < initialLitVal->getValue())
-            iterations = 0;
-        break;
-    }
+    const IntegerLiteralValue step = stepSize->getValue();
+    const UInt64 absStep = step < 0 ? UInt64(0) - UInt64(step) : UInt64(step);
+    int32_t iterations = 0;
+    if (!_tryCountForLoopIterations(
+            compareOp,
+            isUnsigned64,
+            initialLitVal->getValue(),
+            finalVal->getValue(),
+            absStep,
+            iterations))
+        return;
     if (iterations == 0)
     {
         getSink()->diagnose(Diagnostics::LoopRunsForZeroIterations{.stmt = stmt});
@@ -1091,7 +1124,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     litExpr->token.setName(getNamePool()->getName(String(iterations)));
     maxItersAttr->args.add(litExpr);
     maxItersAttr->intArgVals.add(m_astBuilder->getIntVal(m_astBuilder->getIntType(), iterations));
-    maxItersAttr->value = (int32_t)iterations;
+    maxItersAttr->value = iterations;
     maxItersAttr->inductionVar = initialVar;
     addModifier(stmt, maxItersAttr);
     return;
