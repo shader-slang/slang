@@ -41,16 +41,12 @@
 // covered anywhere yet: see that file for the full explanation and the tracking issue
 // (shader-slang/slang#13061).
 //
-// `veqF`/`vneqI` pin `vector<T,N> ==/!= vector<T,N>` on a generic `T`: it takes the fast path like
-// every other operator and yields a per-component `vector<bool,N>`, as for a concrete element type
-// (#13969; `gh-13969-generic-vector-equality.slang` covers the GPU backends).
-//
-// `notT` pins a THIRD case, on unary `!` specifically: `__BuiltinLogicalType` is implemented by
-// `bool` AND every builtin integer type (it also backs bitwise-operator codegen elsewhere), so a
-// `T : __BuiltinLogicalType` parameter may be instantiated with `int`, not just `bool` --
-// `notT<int>(5)` below is exactly that. Unary `!` must still decline the fast path for such a
-// `T`, because its result has to be `bool`-shaped: `classifyBuiltinArithmeticElementType` tracks
-// this with two separate flags, `isBool` (true only for a genuinely concrete `bool` element,
+// `notT` pins another negative case, on unary `!` specifically: `__BuiltinLogicalType` is
+// implemented by `bool` AND every builtin integer type (it also backs bitwise-operator codegen
+// elsewhere), so a `T : __BuiltinLogicalType` parameter may be instantiated with `int`, not just
+// `bool` -- `notT<int>(5)` below is exactly that. Unary `!` must still decline the fast path for
+// such a `T`, because its result has to be `bool`-shaped: `classifyBuiltinArithmeticElementType`
+// tracks this with two separate flags, `isBool` (true only for a genuinely concrete `bool` element,
 // never provable for a generic parameter) and `isLogical` (true for `__BuiltinLogicalType`
 // conformance broadly, safe for `==`/`eqT` above but NOT for `!`). `notT<int>(5)` verifies the
 // result is `0` (5 is truthy, so `!5` is `false`, via normal overload resolution's int-to-bool
@@ -62,6 +58,10 @@
 // now), and unary `~` (bitwise-not) on a constrained generic (the unary path was rewritten to
 // route `-`/`~`/`!` uniformly through `classifyBuiltinArithmeticElementType`, but `negF` above
 // only covers `-`).
+//
+// `veqF`/`vneqI` pin that, outside GLSL operator scope, `vector<T,N> ==/!= vector<T,N>` on a
+// generic `T` yields a per-component `vector<bool,N>` (#13969): `veqF`'s `.y` does not type-check
+// on a scalar `bool`, and `vneqI`'s `.x` would print `1` under a scalar `!all(a == b)` reduction.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

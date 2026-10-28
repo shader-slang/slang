@@ -12,7 +12,9 @@ import glsl;
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
 
-// The GLSL scalar-bool `vec == vec` also applies when the element type is a generic parameter.
+// Under `import glsl`, vector `==` on a generic element type still resolves to the glsl module's
+// scalar-`bool` `operator==` (true when all components are equal), because the GLSL-scope bail-out
+// in `convertToBuiltinArithmeticOp` runs before element-type classification.
 bool allEqT<T : __BuiltinFloatingPointType>(vector<T, 4> a, vector<T, 4> b)
 {
     return a == b;
