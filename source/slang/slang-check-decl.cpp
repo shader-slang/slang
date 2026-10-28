@@ -814,26 +814,9 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
     CASE(FuncDecl)
     CASE(SimpleTypeDecl)
     CASE(AggTypeDecl)
+    CASE(VarDeclBase)
 
 #undef CASE
-
-    void visitVarDeclBase(VarDeclBase* decl)
-    {
-        checkForRedeclaration(decl, m_severity);
-
-        // One ordered pass over the scope covers all of its transparent variables, so we run
-        // it only for the first one; running it for each would report every conflict again.
-        // The inner declaration of a `__generic` (a parse error that the language server still
-        // checks) is not in its parent's member list, so the list can be empty.
-        if (decl->hasModifier<TransparentModifier>())
-        {
-            auto& transparentDecls = decl->parentDecl->getTransparentDirectMemberDecls();
-            if (transparentDecls.getCount() != 0 && transparentDecls.getFirst() == decl)
-                checkForRedeclarationOfBufferBlockMembers(decl->parentDecl);
-        }
-    }
-
-    void checkForRedeclarationOfBufferBlockMembers(ContainerDecl* containerDecl);
 
     RedeclarationSeverity m_severity;
 };
@@ -15055,9 +15038,11 @@ static bool hasEarlierSameNameNonModuleSibling(ContainerDecl* containerDecl, Dec
 /// we compare involves a buffer member, which earlier compiler releases never compared, so we
 /// report each conflict as a warning rather than with the visitor's `m_severity`.
 ///
-void SemanticsDeclRedeclarationVisitor::checkForRedeclarationOfBufferBlockMembers(
-    ContainerDecl* containerDecl)
+void SemanticsVisitor::checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl)
 {
+    if (containerDecl->getTransparentDirectMemberDecls().getCount() == 0)
+        return;
+
     // For each name, the most recent declaration so far that lookup in `containerDecl` finds,
     // either a direct member or a member of a buffer block.
     Dictionary<Name*, Decl*> visibleDecls;
@@ -19596,6 +19581,11 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 
     case DeclCheckState::DefinitionChecked:
         SemanticsDeclBodyVisitor(shared).dispatch(decl);
+        // Lookup in a container also finds the members of its transparent variables, which
+        // `checkForRedeclaration` does not compare. We compare them once per container, after
+        // its own members are checked.
+        if (auto containerDecl = as<ContainerDecl>(decl))
+            SemanticsVisitor(shared).checkForRedeclarationOfTransparentMembers(containerDecl);
         break;
 
     case DeclCheckState::CapabilityChecked:

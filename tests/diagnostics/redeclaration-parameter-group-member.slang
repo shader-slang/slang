@@ -286,6 +286,29 @@ cbuffer BufferInNamespace
 }
 }
 
+// A reopened namespace is one scope, so a buffer member in one body conflicts with a declaration
+// in another body.
+
+namespace ReopenedNamespace
+{
+cbuffer BufferInFirstBody
+{
+    int reopenedName;
+/*CHECK:
+        ^^^^^^^^^^^^ see previous declaration of 'reopenedName'
+*/
+}
+}
+
+namespace ReopenedNamespace
+{
+static const int reopenedName = 1;
+/*CHECK:
+                 ^^^^^^^^^^^^ warning E30204
+                 ^^^^^^^^^^^^ declaration of 'reopenedName' conflicts with existing declaration
+*/
+}
+
 // These declarations are in different scopes, so they do not conflict with the members.
 
 cbuffer BufferForScopes

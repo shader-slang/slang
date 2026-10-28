@@ -319,46 +319,6 @@ SLANG_UNIT_TEST(synthesizedDeclarationRegistryDrainsNewRoots)
     SLANG_CHECK(sink.getErrorCount() == 0);
 }
 
-// A `cbuffer` inside `__generic` is a parse error, but the language server still checks the module.
-// Its transparent variable is the generic's inner declaration, which is not in the generic's member
-// list, so the generic's transparent-member list is empty. The redeclaration check that runs for
-// the variable must handle that empty list (shader-slang/slang#13876).
-SLANG_UNIT_TEST(redeclarationCheckToleratesTransparentGenericInner)
-{
-    StaticUnitTestEnv env(unitTestContext);
-
-    Module* module = env.checkModuleFromSource(
-        "redeclarationCheckToleratesTransparentGenericInner",
-        "struct Element { int x; }\n");
-    SLANG_CHECK_ABORT(module != nullptr);
-
-    auto astBuilder = env.getASTBuilder();
-    auto moduleDecl = module->getModuleDecl();
-    auto elementDecl = findMemberDecl<StructDecl>(moduleDecl, "Element");
-    SLANG_CHECK_ABORT(elementDecl != nullptr);
-
-    auto name = astBuilder->getNamePool()->getName("GenericBuffer");
-    auto genericDecl = astBuilder->create<GenericDecl>();
-    genericDecl->nameAndLoc.name = name;
-    genericDecl->parentDecl = moduleDecl;
-
-    auto bufferVarDecl = astBuilder->create<VarDecl>();
-    bufferVarDecl->nameAndLoc.name = name;
-    bufferVarDecl->type.type = DeclRefType::create(astBuilder, makeDeclRef(elementDecl));
-    addModifier(bufferVarDecl, astBuilder->create<TransparentModifier>());
-    bufferVarDecl->parentDecl = genericDecl;
-    genericDecl->inner = bufferVarDecl;
-    SLANG_CHECK_ABORT(genericDecl->getTransparentDirectMemberDecls().getCount() == 0);
-
-    DiagnosticSink sink(module->getLinkage()->getSourceManager(), nullptr);
-    SharedSemanticsContext shared(module->getLinkage(), module, &sink);
-    SemanticsVisitor visitor(&shared);
-    visitor.ensureDecl(bufferVarDecl, DeclCheckState::ReadyForReference);
-
-    SLANG_CHECK(bufferVarDecl->isChecked(DeclCheckState::ReadyForReference));
-    SLANG_CHECK(sink.getErrorCount() == 0);
-}
-
 // Moving mangling to the checked effective `this` parameter information must not change the
 // established names. In particular, only explicitly `[mutating]` and `[__ref]` ordinary methods
 // had mode suffixes; a borrowed method, a setter's writable default, and a direct function-type

@@ -3133,6 +3133,7 @@ public:
     Result checkRedeclaration(Decl* newDecl, Decl* oldDecl, RedeclarationSeverity severity);
     Result checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* oldDecl);
     void checkForRedeclaration(Decl* decl, RedeclarationSeverity severity);
+    void checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl);
 
     Expr* checkPredicateExpr(Expr* expr);
 
