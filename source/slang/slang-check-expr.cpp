@@ -2909,18 +2909,25 @@ IntVal* SemanticsVisitor::tryConstantFoldBuiltinOperatorExpr(
         argVals.add(argVal);
     }
     auto resultType = as<Type>(e->type.type->substitute(m_astBuilder, expr.getSubsts()));
-    auto op = e->op;
+    return getBuiltinOperationIntVal(resultType, e->op, argVals, e->loc);
+}
 
-    // If all operands are concrete, fold to a constant directly. Pass the operator expression's
-    // location so a divide-by-zero diagnostic points at the offending operator (`1 / 0`) rather
-    // than being location-less.
+IntVal* SemanticsVisitor::getBuiltinOperationIntVal(
+    Type* resultType,
+    BuiltinOperationKind op,
+    List<IntVal*>& argVals,
+    SourceLoc loc)
+{
+    // If all operands are concrete, fold to a constant directly. The location of the operation
+    // lets a divide-by-zero diagnostic point at the offending operator (`1 / 0`) rather than
+    // being location-less.
     if (auto folded = as<IntVal>(BuiltinOperationIntVal::tryFoldImpl(
             m_astBuilder,
             resultType,
             op,
             argVals,
             getSink(),
-            e->loc)))
+            loc)))
         return folded;
 
     // Otherwise the result is symbolic. `+`/`-`/`*`/unary-`-` use `PolynomialIntVal` so value
