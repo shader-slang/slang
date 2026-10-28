@@ -1326,6 +1326,7 @@ struct SingleCallSiteInliningPass : InliningPassBase
             case kIROp_ExternCppDecoration:
             case kIROp_TargetIntrinsicDecoration:
             case kIROp_IntrinsicOpDecoration:
+            case kIROp_DownstreamModuleExportDecoration:
                 return true;
             default:
                 break;
