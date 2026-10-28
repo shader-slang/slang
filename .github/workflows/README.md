@@ -274,14 +274,21 @@ issue, comment, and review events rather than to a PR's code.
 ## 5. Slash-command regenerators
 
 `slash-command-dispatch.yml` turns an allow-listed comment into a
-`repository_dispatch`. Each regenerator rebuilds its file and opens a follow-up
-PR against your branch, so a failed check can be fixed without a local checkout.
+`repository_dispatch`. Each regenerator rebuilds its file in a job that has no
+secrets and uploads the change as the `regen-patch` artifact. The shared
+`slash-regenerate-publish.yml` then pushes `<command>/pr-<N>` to this repository with the
+`GITHUB_TOKEN` and comments on the PR with a compare link. A maintainer opens
+the PR from that link, because `GITHUB_TOKEN` cannot push to a contributor's
+fork. If the PR changes `.github/workflows/`, the branch is not pushed, because
+`GITHUB_TOKEN` cannot push workflow files, and the comment points to the patch
+instead.
+`slash-cleanup.yml` deletes the pushed branches when the PR closes.
 
-| Workflow                     | Command                   | Regenerates                        |
-| ---------------------------- | ------------------------- | ---------------------------------- |
-| `regenerate-format.yml`      | `/format`                 | Formatting across the tree.        |
-| `regenerate-toc.yml`         | `/regenerate-toc`         | The user-guide table of contents.  |
-| `regenerate-cmdline-ref.yml` | `/regenerate-cmdline-ref` | The slangc command-line reference. |
+| Workflow                           | Command                   | Regenerates                        |
+| ---------------------------------- | ------------------------- | ---------------------------------- |
+| `slash-regenerate-format.yml`      | `/format`                 | Formatting across the tree.        |
+| `slash-regenerate-toc.yml`         | `/regenerate-toc`         | The user-guide table of contents.  |
+| `slash-regenerate-cmdline-ref.yml` | `/regenerate-cmdline-ref` | The slangc command-line reference. |
 
 ## 6. Release, tag, and publishing
 
