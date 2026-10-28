@@ -2204,6 +2204,53 @@ void cloneUsedWitnessTableEntries(IRSpecContext* context)
     }
 }
 
+/// Clone the debug source file list of each module in `modules` that the linked IR already
+/// refers to, and skip the list of every other module.
+///
+/// The linked IR reaches a module's `DebugSource` and `DebugCompilationUnit` records only through
+/// the debug info of code cloned from that module, so a module that contributes no such code gets
+/// no records. Consider an entry point whose file says `import Unused;` and that calls nothing
+/// from `Unused`: only the entry point's file is listed, so that the output does not depend on
+/// imports that change nothing.
+///
+/// Once the linked IR reaches any record of a module, we clone the module's compilation units.
+/// Their operands name every file of the module's translation unit, including a file with no
+/// line-table entries, such as an `#include`d header. A module can also hold a `DebugSource` for
+/// a file of another module, made for a location it refers to, such as the declaration of an
+/// imported function. No compilation unit of the module names that record, so it is cloned only
+/// when the linked IR refers to it.
+static void cloneDebugSourcesOfReferencedModules(
+    IRSpecContext* context,
+    ArrayView<IRModule*> modules)
+{
+    for (IRModule* irModule : modules)
+    {
+        auto records = irModule->_getLinkingInfo()->getDebugSourceRecords();
+
+        bool isReferenced = false;
+        for (auto record : records)
+        {
+            if (findClonedValue(context, record))
+            {
+                isReferenced = true;
+                break;
+            }
+        }
+        if (!isReferenced)
+            continue;
+
+        // The compilation units of a module written before version 38 do not name its
+        // `#include`d files, so we clone all of its records to keep those files listed.
+        const bool clonesAllRecords =
+            irModule->getVersion() < IRModule::k_firstModuleVersionWithCompilationUnitIncludes;
+        for (auto record : records)
+        {
+            if (clonesAllRecords || as<IRDebugCompilationUnit>(record))
+                cloneValue(context, record);
+        }
+    }
+}
+
 LinkedIR linkIR(CodeGenContext* codeGenContext)
 {
     SLANG_PROFILE;
@@ -2375,19 +2422,11 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 // to the relevant parameters and cloned via `cloneExtraDecorations`.
                 // In the long run we do not want to *ever* iterate over all the
                 // instructions in all the input modules.
-                [[fallthrough]];
-            case kIROp_DebugSource:
-                // Need to list all source files in the debug source file list,
-                // regardless if the source files participate in the line table or not.
                 cloneValue(context, inst);
                 break;
             case kIROp_DebugBuildIdentifier:
                 // The debug build identifier won't be referenced by anything,
                 // but we still need to keep it around if it is in the IR.
-                cloneValue(context, inst);
-                break;
-            case kIROp_DebugCompilationUnit:
-                // DebugCompilationUnit references a DebugSource; clone it along with source.
                 cloneValue(context, inst);
                 break;
             }
@@ -2439,6 +2478,10 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // for on-demand cloning. Now we will use the deferred keys to clone the witness table
     // entries that are referenced.
     cloneUsedWitnessTableEntries(context);
+
+    // The debug source records of a module are only reachable through the code cloned from it,
+    // so this step comes after every step that clones code.
+    cloneDebugSourcesOfReferencedModules(context, userModules);
 
     // It is possible that metadata has been attached to the input modules
     // themselves, which should be copied over to the output module.

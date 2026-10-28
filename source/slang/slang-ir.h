@@ -2267,6 +2267,10 @@ public:
     /// The first module version whose compilation units name their `#include`d files.
     const static UInt k_firstModuleVersionWithCompilationUnitIncludes = 38;
 
+    /// Returns the module version this module was written with, or the current version for a
+    /// module that was not loaded from a serialized blob.
+    UInt64 getVersion() const { return m_version; }
+
     /// Returns whether `version` is in the inclusive range this compiler can load.
     static bool isModuleVersionSupported(UInt64 version)
     {
