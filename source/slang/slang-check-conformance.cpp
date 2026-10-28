@@ -204,6 +204,41 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         paramWitnesses);
 }
 
+SubtypeWitness* SemanticsVisitor::getSubtypeWitnessForType(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* witness)
+{
+    // An inherited facet can describe a declaration in a different self-type context.
+    // For example, an interface declaration's facets use its `ThisType`, while a
+    // conformance query can use the interface's existential type. A modified type
+    // likewise inherits nominal conformances from its unqualified base.
+    //
+    // Preserve the declaration and its substitutions, but root the declared proof
+    // at the queried type. Consider this example:
+    //
+    //     struct FormatWitnessKey<T : ITexelFormat> {}
+    //     struct FormatKeyFromElement<T : ITexelElement>
+    //     { typealias Key = FormatWitnessKey<T>; }
+    //     typealias Qualified = unorm float4;
+    //
+    // `FormatKeyFromElement<Qualified>.Key` and `FormatWitnessKey<Qualified>` must
+    // have identical generic arguments, including their ITexelFormat witnesses.
+    // Direct discovery of the builtin identity adapter obtains its hidden
+    // `Qualified : ITexelElement` proof from provisional facets; generic specialization
+    // obtains that proof through an ordinary subtype query. Both paths must root the
+    // inherited nominal proof at `Qualified` before interning the adapter's arguments.
+    if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        if (declaredWitness->getSub() != subType || declaredWitness->getSup() != superType)
+            return m_astBuilder->getDeclaredSubtypeWitness(
+                subType,
+                superType,
+                declaredWitness->getDeclRef());
+    }
+    return witness;
+}
+
 SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     Type* subType,
     Type* superType,
@@ -292,22 +327,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // subtype relationship, which we can use here.
         auto witness = as<SubtypeWitness>(facet->subtypeWitness->resolve());
 
-        // `getInheritanceInfo` for an interface *type* roots its facet witnesses at the
-        // interface's `ThisType` (treating the type as a requirement template; see #11469).
-        // When the query `subType` is the interface (existential box) itself, the facet
-        // witness's `sub` is the standalone `ThisType`, not the box we were asked about.
-        // Re-root the witness onto the queried `subType` so the returned witness satisfies
-        // the invariant `result->getSub() == subType`; this yields a well-formed,
-        // box-rooted witness instead of one anchored at a free-floating `ThisType`.
-        if (auto boxWitness = as<DeclaredSubtypeWitness>(witness))
-        {
-            if (boxWitness->getSub() != subType || boxWitness->getSup() != superType)
-                return m_astBuilder->getDeclaredSubtypeWitness(
-                    subType,
-                    superType,
-                    boxWitness->getDeclRef());
-        }
-        return witness;
+        return getSubtypeWitnessForType(subType, superType, witness);
     }
 
     //

@@ -2427,9 +2427,10 @@ ImageFormat inferImageFormatFromTextureType(
 {
     outIsInferred = false;
     ImageFormat format = ImageFormat::unknown;
-    if (auto formatVal = as<ConstantIntVal>(textureType->getFormat()))
+    IntegerLiteralValue formatValue = 0;
+    if (tryGetConstantIntVal(textureType->getFormat(), formatValue))
     {
-        format = (ImageFormat)formatVal->getValue();
+        format = (ImageFormat)formatValue;
     }
     if (format != ImageFormat::unknown)
         return format;
@@ -2615,6 +2616,13 @@ void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
         // For texture types, we will ensure there is a [format] attribute declared on the decl,
         // if not, we will infer the format from the texture type if it is not specified.
         //
+        // Core-library signatures can mention a texture before `_Texture`'s static
+        // format constant has been checked. Finish that declaration before querying
+        // its semantic value; later AST consumers only substitute the checked value.
+        auto formatDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+            BuiltinRequirementKind::TextureFormat);
+        SLANG_RELEASE_ASSERT(formatDecl);
+        ensureDecl(formatDecl, DeclCheckState::DefinitionChecked);
         bool isInferred = false;
         auto format = inferImageFormatFromTextureType(varDecl, textureType, isInferred);
         if (format != ImageFormat::unknown && isInferred)
@@ -17506,6 +17514,15 @@ void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
     //
     decl->targetType = CheckProperType(decl->targetType);
 
+    if (isTexelFormatIdentityExtension(decl))
+    {
+        // The builtin adapter extends its own type parameter so inference can bind
+        // it to the complete modified type. This is a core-library invariant;
+        // user declarations cannot carry builtin requirement roles.
+        auto targetParam = isDeclRefTypeOf<GenericTypeParamDecl>(decl->targetType.type);
+        SLANG_RELEASE_ASSERT(targetParam && targetParam.getDecl()->parentDecl == decl->parentDecl);
+    }
+
     _validateExtensionDeclTargetType(decl);
 
     _validateExtensionDeclMembers(decl);
@@ -18940,7 +18957,7 @@ void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
 /// Note: this function creates an empty list of candidates for the given type if
 /// a matching entry doesn't exist already.
 ///
-static List<ExtensionDecl*>& _getCandidateExtensionList(
+static CandidateExtensionList& _getCandidateExtensionList(
     Decl* decl,
     Dictionary<Decl*, RefPtr<CandidateExtensionList>>& mapDeclToCandidateExtensions)
 {
@@ -18950,10 +18967,12 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
         entry = new CandidateExtensionList();
         mapDeclToCandidateExtensions.add(decl, entry);
     }
-    return entry->candidateExtensions;
+    return *entry;
 }
 
-List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTypeDecl(Decl* decl)
+List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTypeDecl(
+    Decl* decl,
+    bool* outHasModifierPreservingCandidate)
 {
     // We are caching the lists of candidate extensions on the shared
     // context, so we will only build the lists if they either have
@@ -19056,7 +19075,20 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
     // has been populated, we return to the user the entry they
     // asked for.
     //
-    return _getCandidateExtensionList(decl, m_mapDeclToCandidateExtensions);
+    auto& list = _getCandidateExtensionList(decl, m_mapDeclToCandidateExtensions);
+    if (outHasModifierPreservingCandidate)
+    {
+        // Candidate lists are append-only. Reuse nominal inheritance only when the
+        // builtin identity adapter, which binds the complete type, is absent.
+        while (!list.hasModifierPreservingCandidate &&
+               list.modifierClassifiedCount < list.candidateExtensions.getCount())
+        {
+            auto extension = list.candidateExtensions[list.modifierClassifiedCount++];
+            list.hasModifierPreservingCandidate = isTexelFormatIdentityExtension(extension);
+        }
+        *outHasModifierPreservingCandidate = list.hasModifierPreservingCandidate;
+    }
+    return list.candidateExtensions;
 }
 
 void SharedSemanticsContext::invalidateInheritanceInfo(Type* type)
@@ -19082,14 +19114,16 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     // code inside the module for the given `extDecl` to extend them.
     //
     auto moduleDecl = getModuleDecl(extDecl);
-    _getCandidateExtensionList(typeDecl, moduleDecl->mapDeclToCandidateExtensions).add(extDecl);
+    _getCandidateExtensionList(typeDecl, moduleDecl->mapDeclToCandidateExtensions)
+        .candidateExtensions.add(extDecl);
 
     // Because we've loaded a new extension, we need to invalidate whatever
     // information the `SharedSemanticsContext` had cached about loaded
     // extensions, and force it to rebuild its cache to include the
     // new extension we just added.
     //
-    _getCandidateExtensionList(typeDecl, m_mapDeclToCandidateExtensions).add(extDecl);
+    _getCandidateExtensionList(typeDecl, m_mapDeclToCandidateExtensions)
+        .candidateExtensions.add(extDecl);
 
     bool hasImplicitCastMember = false;
     for (auto member : extDecl->getDirectMemberDecls())
@@ -19153,7 +19187,7 @@ void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* modul
     for (auto& [entryKey, entryValue] : moduleDecl->mapDeclToCandidateExtensions)
     {
         auto& list = _getCandidateExtensionList(entryKey, m_mapDeclToCandidateExtensions);
-        list.addRange(entryValue->candidateExtensions);
+        list.candidateExtensions.addRange(entryValue->candidateExtensions);
     }
 }
 
@@ -19306,11 +19340,12 @@ FunctionDifferentiableLevel SharedSemanticsContext::_getFuncDifferentiableLevelI
 
 List<ExtensionDecl*> const& getCandidateExtensions(
     DeclRef<Decl> const& declRef,
-    SemanticsVisitor* semantics)
+    SemanticsVisitor* semantics,
+    bool* outHasModifierPreservingCandidate)
 {
     auto decl = declRef.getDecl();
     auto shared = semantics->getShared();
-    return shared->getCandidateExtensionsForTypeDecl(decl);
+    return shared->getCandidateExtensionsForTypeDecl(decl, outHasModifierPreservingCandidate);
 }
 
 void _foreachDirectOrExtensionMemberOfType(

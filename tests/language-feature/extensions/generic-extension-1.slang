@@ -21,6 +21,13 @@ extension MyInt : IFoo
     int getVal() { return v; }
 }
 
+// Checking this target establishes MyInt : IFoo before the following blanket
+// extension registers on IFoo. That registration must invalidate the cached
+// inheritance of MyInt through its IFoo dependency, so the later IBar and IBaz
+// methods are visible when the entry point is checked.
+struct RequireFoo<T : IFoo> {}
+extension RequireFoo<MyInt> {}
+
 // Since MyInt:IFoo, the following extension will make MyInt:IBar.
 extension<T: IFoo> T : IBar
 {

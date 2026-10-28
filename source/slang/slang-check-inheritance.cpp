@@ -8,6 +8,30 @@
 
 namespace Slang
 {
+// Keep provisional conformance facts subject to the same modifier exclusions as
+// the completed inheritance information. A no_diff type cannot supply either
+// differentiability witness while matching a modifier-preserving extension.
+static bool _isInterfaceExcludedByTypeModifiers(
+    ASTBuilder* astBuilder,
+    Type* type,
+    Type* interfaceType)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+    {
+        if (modifiedType->findModifier<NoDiffModifierVal>())
+        {
+            auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(interfaceType);
+            if (!interfaceDeclRef)
+                return false;
+            auto interfaceDecl = interfaceDeclRef.getDecl();
+            return interfaceDecl == astBuilder->getDifferentiableInterfaceDecl().getDecl() ||
+                   interfaceDecl == astBuilder->getDifferentiableRefInterfaceDecl().getDecl();
+        }
+        type = modifiedType->getBase();
+    }
+    return false;
+}
+
 UInt SharedSemanticsContext::getDeclExtensionEpoch(Decl* decl) const
 {
     if (!decl)
@@ -25,17 +49,29 @@ void SharedSemanticsContext::bumpDeclExtensionEpoch(Decl* decl)
         return;
 
     m_mapDeclToExtensionEpoch[decl] = getDeclExtensionEpoch(decl) + 1;
+    m_extensionEpoch++;
 }
 
 bool SharedSemanticsContext::_isInheritanceInfoCacheEntryUpToDate(
-    InheritanceInfoCacheEntry const& entry) const
+    InheritanceInfoCacheEntry& entry) const
 {
+    SLANG_ASSERT(!entry.isComputing);
+
+    // Repeated subtype queries commonly inspect the same inheritance entries while
+    // no extensions are being registered. Their dependencies cannot have changed,
+    // so avoid repeating a dictionary lookup for every transitive facet. After any
+    // registration, keep the existing per-declaration check: an unrelated extension
+    // need not invalidate this entry or its subtype-cache generation.
+    if (entry.lastValidatedExtensionEpoch == m_extensionEpoch)
+        return true;
+
     for (auto const& stamp : entry.dependencyEpochs)
     {
         if (getDeclExtensionEpoch(stamp.decl) != stamp.epoch)
             return false;
     }
 
+    entry.lastValidatedExtensionEpoch = m_extensionEpoch;
     return true;
 }
 
@@ -173,6 +209,7 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
         entry.dependencyEpochs.clear();
         entry.generation = 0;
         entry.isComputing = true;
+        entry.canReuseForModifiedType = false;
     }
 
     // Collect any in-progress ancestors that had to be skipped to break a
@@ -190,6 +227,7 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
         auto& entry = m_mapTypeToInheritanceInfo[type];
         entry.info = info;
         _collectInheritanceInfoDependencyEpochs(nullptr, info, entry.dependencyEpochs);
+        entry.lastValidatedExtensionEpoch = m_extensionEpoch;
         entry.generation = m_nextInheritanceInfoCacheGeneration++;
         entry.isComputing = false;
     }
@@ -294,6 +332,7 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
         entry.dependencyEpochs.clear();
         entry.generation = 0;
         entry.isComputing = true;
+        entry.canReuseForModifiedType = false;
     }
 
     // `_calcInheritanceInfo` accumulates into `frameSkipped` the set of
@@ -301,7 +340,13 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     // benevolent equality cycle (its own skips plus any propagated up from the
     // bases it recursed into).
     HashSet<DeclRef<Decl>> frameSkipped;
-    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo, &frameSkipped);
+    bool canReuseForModifiedType = false;
+    auto info = _calcInheritanceInfo(
+        declRef,
+        selfType,
+        circularityInfo,
+        &frameSkipped,
+        &canReuseForModifiedType);
 
     // This frame *supplies* its own facet, so it resolves any skip that named
     // it. Remove ourselves from the unresolved set; what remains are ancestors
@@ -329,8 +374,10 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
         auto& entry = m_mapDeclRefToInheritanceInfo[declRef];
         entry.info = info;
         _collectInheritanceInfoDependencyEpochs(declRef.getDecl(), info, entry.dependencyEpochs);
+        entry.lastValidatedExtensionEpoch = m_extensionEpoch;
         entry.generation = m_nextInheritanceInfoCacheGeneration++;
         entry.isComputing = false;
+        entry.canReuseForModifiedType = canReuseForModifiedType;
     }
     else
     {
@@ -622,7 +669,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
     InheritanceCircularityInfo* circularityInfo,
-    HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet)
+    HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet,
+    bool* outCanReuseForModifiedType)
 {
     // This method is the main engine for computing linearized inheritance
     // lists for types and `extension` declarations.
@@ -703,6 +751,15 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         selfType = extendedType;
         selfFacetKind = Facet::Kind::Extension;
     }
+
+    // Retain the complete type for extensions that explicitly preserve modifiers.
+    // All ordinary extensions and declared bases keep their nominal-type context.
+    auto extensionApplicationType = selfType;
+    if (!declRef.as<ExtensionDecl>())
+        selfType = unwrapModifiedType(selfType);
+    bool canReuseForModifiedType = outCanReuseForModifiedType && selfType &&
+                                   extensionApplicationType == selfType &&
+                                   !declRef.as<ExtensionDecl>();
 
     // Because we are dealing with entities that have declarations, the
     // first item in our linearization will always be a facet for
@@ -834,7 +891,14 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                                  Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitness)
     {
         bool result = false;
-        auto candidateExtensions = getCandidateExtensions(extensionTargetDeclRef, &visitor);
+        bool hasModifierPreservingCandidate = false;
+        auto candidateExtensions = getCandidateExtensions(
+            extensionTargetDeclRef,
+            &visitor,
+            canReuseForModifiedType ? &hasModifierPreservingCandidate : nullptr);
+        // The builtin identity adapter binds the complete type. Its presence in the
+        // candidate list prevents reusing a nominal result for a modified subject.
+        canReuseForModifiedType &= !hasModifierPreservingCandidate;
         for (auto extDecl : candidateExtensions)
         {
             // The list of *candidate* extensions is computed and
@@ -852,8 +916,54 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // the extension to the type and see if we succeed in
             // making a match.
             //
-            auto extDeclRef =
-                applyExtensionToType(&visitor, extDecl, selfType, additionalSubtypeWitness);
+            auto extensionTargetType = selfType;
+            const bool preservesModifiers =
+                extensionApplicationType != selfType && isTexelFormatIdentityExtension(extDecl);
+            if (preservesModifiers)
+            {
+                SLANG_ASSERT(isDeclRefTypeOf<GenericTypeParamDecl>(extDecl->targetType.type));
+                extensionTargetType = extensionApplicationType;
+            }
+
+            DeclRef<ExtensionDecl> extDeclRef;
+            if (preservesModifiers && additionalSubtypeWitness)
+            {
+                // A Dictionary allocates buckets even when empty. Keep this temporary
+                // inside the qualified adapter path so ordinary candidates do not pay
+                // for a witness view they never use.
+                Dictionary<Type*, SubtypeWitness*> modifiedTypeWitnesses;
+                // Consider an identity adapter on `unorm float4`. Its T must
+                // include the modifier, and its T : IElement witness must be
+                // rooted at that same type before the generic application is
+                // interned. Ordinary extensions still use the nominal facts.
+                // Filter no_diff exclusions before these facts reach inference;
+                // they are assumptions about the complete modified subject.
+                for (auto [interfaceType, witness] : *additionalSubtypeWitness)
+                {
+                    if (_isInterfaceExcludedByTypeModifiers(
+                            astBuilder,
+                            extensionTargetType,
+                            interfaceType))
+                        continue;
+                    modifiedTypeWitnesses.add(
+                        interfaceType,
+                        visitor
+                            .getSubtypeWitnessForType(extensionTargetType, interfaceType, witness));
+                }
+                extDeclRef = applyExtensionToType(
+                    &visitor,
+                    extDecl,
+                    extensionTargetType,
+                    &modifiedTypeWitnesses);
+            }
+            else
+            {
+                extDeclRef = applyExtensionToType(
+                    &visitor,
+                    extDecl,
+                    extensionTargetType,
+                    additionalSubtypeWitness);
+            }
             if (!extDeclRef)
                 continue;
 
@@ -867,8 +977,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 getInheritanceInfo(extDeclRef, circularityInfo, ioSkippedIncompleteFacet);
             addDirectBaseFacet(
                 Facet::Kind::Extension,
-                selfType,
-                selfIsSelf,
+                extensionTargetType,
+                extensionTargetType == selfType
+                    ? selfIsSelf
+                    : visitor.createTypeEqualityWitness(extensionTargetType),
                 extDeclRef,
                 extInheritanceInfo);
             result = true;
@@ -1586,6 +1698,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // the declaration in question.
     //
     _mergeFacetLists(directBases, directBaseFacets, allFacets);
+
+    if (outCanReuseForModifiedType)
+        *outCanReuseForModifiedType = canReuseForModifiedType;
 
     InheritanceInfo info;
     info.facets = allFacets;
@@ -2420,12 +2535,65 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
-        auto baseInheritanceInfo = _calcInheritanceInfo(
-            modifiedType->getBase(),
-            circularityInfo,
-            ioSkippedIncompleteFacet);
+        // Consider the builtin TexelFormatIdentityExtension conformance:
+        //
+        //     extension<T : ITexelElement> T : ITexelFormat { typealias DataType = T; }
+        //
+        // For `unorm float4`, reusing float4's completed facets would bind T to float4
+        // and lose the qualifier from DataType. Rediscover extensions unless nominal
+        // checking proved that no candidate preserves modifiers. Ordinary extensions
+        // continue to bind to the nominal base type, so their completed discovery can
+        // be reused without changing witnesses or associated types.
+        //
+        // Aliases can introduce nested modifier wrappers. Record no_diff at every level
+        // so its interface exclusions still apply after the single discovery pass.
+        Type* baseType = modifiedType;
+        bool excludesDifferentiability = false;
+        while (auto wrapper = as<ModifiedType>(baseType))
+        {
+            excludesDifferentiability |= wrapper->findModifier<NoDiffModifierVal>() != nullptr;
+            baseType = wrapper->getBase();
+        }
 
-        if (modifiedType->findModifier<NoDiffModifierVal>())
+        InheritanceInfo baseInheritanceInfo;
+        if (auto baseDeclRefType = as<DeclRefType>(baseType))
+        {
+            // Do not compute a nominal result speculatively: subjects with preserving
+            // candidates would then pay for both nominal and qualified discovery.
+            // Revalidate any existing proof through the ordinary dependency epochs.
+            // A newly registered extension may invalidate it, so re-read the cache
+            // after that query, which may also rehash the dictionary.
+            bool canReuseNominal = false;
+            auto declRef = baseDeclRefType->getDeclRef();
+            if (auto entry = m_mapDeclRefToInheritanceInfo.tryGetValue(declRef))
+            {
+                if (!entry->isComputing && entry->canReuseForModifiedType)
+                {
+                    baseInheritanceInfo =
+                        getInheritanceInfo(baseType, circularityInfo, ioSkippedIncompleteFacet);
+                    auto completedEntry = m_mapDeclRefToInheritanceInfo.tryGetValue(declRef);
+                    canReuseNominal = completedEntry && !completedEntry->isComputing &&
+                                      completedEntry->canReuseForModifiedType;
+                }
+            }
+            if (!canReuseNominal)
+            {
+                // The outer query caches this result under ModifiedType; the
+                // declaration-keyed cache must retain the nominal calculation.
+                baseInheritanceInfo = _calcInheritanceInfo(
+                    declRef,
+                    modifiedType,
+                    circularityInfo,
+                    ioSkippedIncompleteFacet);
+            }
+        }
+        else
+        {
+            baseInheritanceInfo =
+                _calcInheritanceInfo(baseType, circularityInfo, ioSkippedIncompleteFacet);
+        }
+
+        if (excludesDifferentiability)
         {
             // Create a filtered facet list that excludes facets whose
             // origin matches the `IDifferentiable` or `IDifferentiablePtrType`
@@ -2440,9 +2608,6 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 type,
                 visitor.createTypeEqualityWitness(type));
 
-            auto diffInterfaceDecl = astBuilder->getDifferentiableInterfaceDecl().getDecl();
-            auto diffRefInterfaceDecl = astBuilder->getDifferentiableRefInterfaceDecl().getDecl();
-
             Facet tail = directFacet;
             for (auto facet : baseInheritanceInfo.facets)
             {
@@ -2450,18 +2615,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 if (facet->directness == Facet::Directness::Self)
                     continue;
 
-                // Check if this facet corresponds to IDifferentiable or IDifferentiablePtrType
-                bool shouldExclude = false;
-                if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
-                {
-                    auto interfaceDecl = interfaceDeclRef.getDecl();
-                    if (interfaceDecl == diffInterfaceDecl || interfaceDecl == diffRefInterfaceDecl)
-                    {
-                        shouldExclude = true;
-                    }
-                }
-
-                if (shouldExclude)
+                if (_isInterfaceExcludedByTypeModifiers(astBuilder, type, facet->origin.type))
                     continue;
 
                 // Copy the facet with updated structure

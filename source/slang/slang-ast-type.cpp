@@ -2380,9 +2380,24 @@ Type* BuiltinGenericType::getElementType() const
     return as<Type>(_getGenericTypeArg(getDeclRefBase(), 0));
 }
 
-Type* ResourceType::getElementType()
+Type* ResourceType::getTexelType()
 {
     return as<Type>(_getGenericTypeArg(this, 0));
+}
+
+Type* ResourceType::getElementType()
+{
+    // Consider `Texture2D<RGBA16F>`. Its first generic argument remains `RGBA16F` so
+    // generic inference can recover the public type argument. The checked `_Texture.T`
+    // alias holds `Texel.DataType`; substituting it through this texture declaration
+    // resolves the payload to `float4` using the ordinary conformance witness.
+    auto astBuilder = getCurrentASTBuilder();
+    auto elementTypeDecl =
+        as<TypeDefDecl>(astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+            BuiltinRequirementKind::TextureElementType));
+    SLANG_RELEASE_ASSERT(elementTypeDecl && elementTypeDecl->type);
+    SLANG_RELEASE_ASSERT(elementTypeDecl->parentDecl == getDeclRef().getDecl());
+    return getType(astBuilder, astBuilder->getMemberDeclRef(getDeclRef(), elementTypeDecl));
 }
 
 void ResourceType::_toTextOverride(StringBuilder& out)
@@ -2454,11 +2469,11 @@ void ResourceType::_toTextOverride(StringBuilder& out)
             return false;
         if (isShadow())
             return false;
-        auto elementType = getElementType();
-        if (elementType)
+        auto texelType = getTexelType();
+        if (texelType)
         {
             resultSB << "<";
-            resultSB << elementType->toString();
+            resultSB << texelType->toString();
             auto sampleCount = _getGenericTypeArg(this, 4);
             if (auto constIntVal = as<ConstantIntVal>(sampleCount))
             {
@@ -2485,12 +2500,21 @@ void ResourceType::_toTextOverride(StringBuilder& out)
 
 Val* TextureTypeBase::getSampleCount()
 {
-    return as<Type>(_getGenericTypeArg(this, 4));
+    return _getGenericTypeArg(this, 4);
 }
 
 Val* TextureTypeBase::getFormat()
 {
-    return as<Type>(_getGenericTypeArg(this, 8));
+    // The explicit argument remains part of the AST type for generic inference.
+    // `_Texture.__effectiveFormat` selects that argument when nonzero, otherwise
+    // the descriptor's format. Substitute the checked value so reflection and IR
+    // lowering use the same selection, including for a generic descriptor.
+    auto astBuilder = getCurrentASTBuilder();
+    auto formatDecl = as<VarDecl>(astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+        BuiltinRequirementKind::TextureFormat));
+    SLANG_RELEASE_ASSERT(formatDecl && formatDecl->val);
+    SLANG_RELEASE_ASSERT(formatDecl->parentDecl == getDeclRef().getDecl());
+    return formatDecl->val->substitute(astBuilder, SubstitutionSet(getDeclRef()));
 }
 
 bool isCopyableType(Type* type)

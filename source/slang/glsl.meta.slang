@@ -1346,8 +1346,11 @@ public typealias sampler2DMSArray = Sampler2DMSArray<float4>;
 public typealias isampler2DMSArray = Sampler2DMSArray<int4>;
 public typealias usampler2DMSArray = Sampler2DMSArray<uint4>;
 
-__generic<T:ITexelElement=float4, let sampleCount:int=0, let format:int=0>
-public typealias Sampler2DRect = _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format>;
+public typealias Sampler2DRect<
+    T : ITexelFormat = float4,
+    let sampleCount : int = 0,
+    let format : int = 0> =
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format>;
 public typealias sampler2DRect = Sampler2DRect<float4>;
 public typealias isampler2DRect = Sampler2DRect<int4>;
 public typealias usampler2DRect = Sampler2DRect<uint4>;
@@ -1365,8 +1368,7 @@ public typealias sampler2DRectShadow = _Texture<
     format
 >;
 
-__generic<T:ITexelElement, let format:int=0>
-public typealias SamplerBuffer = _Texture<
+public typealias SamplerBuffer<T : ITexelFormat, let format : int = 0> = _Texture<
     T,
     __ShapeBuffer,
     0, // isArray
@@ -1386,10 +1388,10 @@ public typealias usamplerBuffer = SamplerBuffer<uint4>;
 // textureSize
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_size)]
-public int textureSize(Sampler1D<T> sampler, int lod)
+public int textureSize<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, int lod)
 {
     int result;
     int numberOfLevels;
@@ -1397,10 +1399,10 @@ public int textureSize(Sampler1D<T> sampler, int lod)
     return result;
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_size)]
-public ivec2 textureSize(Sampler2D<T> sampler, int lod)
+public ivec2 textureSize<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler, int lod)
 {
     vector<int,2> result;
     int numberOfLevels;
@@ -1408,10 +1410,10 @@ public ivec2 textureSize(Sampler2D<T> sampler, int lod)
     return result;
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_size)]
-public ivec3 textureSize(Sampler3D<T> sampler, int lod)
+public ivec3 textureSize<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler, int lod)
 {
     vector<int,3> result;
     int numberOfLevels;
@@ -1419,10 +1421,10 @@ public ivec3 textureSize(Sampler3D<T> sampler, int lod)
     return result;
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_size)]
-public ivec2 textureSize(SamplerCube<T> sampler, int lod)
+public ivec2 textureSize<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __ShapeCube, 0, 0, sampleCount, 0, 0, 1, format> sampler, int lod)
 {
     vector<int,2> result;
     int numberOfLevels;
@@ -1461,9 +1463,9 @@ public ivec2 textureSize(samplerCubeShadow sampler, int lod)
 }
 
 [require(glsl_hlsl_spirv, texture_size)]
-__generic<T:ITexelElement>
 [ForceInline]
-public ivec3 textureSize(SamplerCubeArray<T> sampler, int lod)
+public ivec3 textureSize<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __ShapeCube, 1, 0, sampleCount, 0, 0, 1, format> sampler, int lod)
 {
     vector<int,3> result;
     int numberOfLevels;
@@ -1482,9 +1484,9 @@ public ivec3 textureSize(samplerCubeArrayShadow sampler, int lod)
 }
 
 [require(glsl_hlsl_spirv, texture_size)]
-__generic<T:ITexelElement>
 [ForceInline]
-public ivec2 textureSize(Sampler2DRect<T> sampler)
+public ivec2 textureSize<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,2> result;
     int numberOfLevels;
@@ -1503,9 +1505,9 @@ public ivec2 textureSize(sampler2DRectShadow sampler)
 }
 
 [require(glsl_hlsl_spirv, texture_size)]
-__generic<T:ITexelElement>
 [ForceInline]
-public ivec2 textureSize(Sampler1DArray<T> sampler, int lod)
+public ivec2 textureSize<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> sampler, int lod)
 {
     vector<int,2> result;
     int numberOfLevels;
@@ -1524,9 +1526,9 @@ public ivec2 textureSize(sampler1DArrayShadow sampler, int lod)
 }
 
 [require(glsl_hlsl_spirv, texture_size)]
-__generic<T:ITexelElement>
 [ForceInline]
-public ivec3 textureSize(Sampler2DArray<T> sampler, int lod)
+public ivec3 textureSize<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> sampler, int lod)
 {
     vector<int,3> result;
     int numberOfLevels;
@@ -1545,19 +1547,29 @@ public ivec3 textureSize(sampler2DArrayShadow sampler, int lod)
 }
 
 [require(glsl_hlsl_spirv, texture_size)]
-__generic<T:ITexelElement, let format:int>
 [ForceInline]
-public int textureSize(SamplerBuffer<T,format> sampler)
+public int textureSize<T : ITexelFormat, let format : int>(
+    _Texture<T, __ShapeBuffer, 0, 0, 0, 0, 0, 1, format> sampler)
 {
     uint result;
-    sampler.GetDimensions(result);
+    sampler.__getTexture().GetDimensions(result);
+    return int(result);
+}
+
+[require(glsl_hlsl_spirv, image_size)]
+[ForceInline]
+public int textureSize<T : ITexelFormat, let format : int>(
+    _Texture<T, __ShapeBuffer, 0, 0, 0, 1, 0, 0, format> buffer)
+{
+    uint result;
+    buffer.GetDimensions(result);
     return int(result);
 }
 
 [require(glsl_hlsl_spirv, texture_size)]
-__generic<T:ITexelElement, let sampleCount:int>
 [ForceInline]
-public ivec2 textureSize(Sampler2DMS<T,sampleCount> sampler)
+public ivec2 textureSize<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape2D, 0, 1, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,2> result;
     int sampleCount;
@@ -1567,9 +1579,9 @@ public ivec2 textureSize(Sampler2DMS<T,sampleCount> sampler)
 }
 
 [require(glsl_hlsl_spirv, texture_size)]
-__generic<T:ITexelElement, let sampleCount:int>
 [ForceInline]
-public ivec3 textureSize(Sampler2DMSArray<T,sampleCount> sampler)
+public ivec3 textureSize<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape2D, 1, 1, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,3> result;
     int sampleCount;
@@ -1582,10 +1594,15 @@ public ivec3 textureSize(Sampler2DMSArray<T,sampleCount> sampler)
 // textureQueryLod
 // -------------------
 
-__generic<T:ITexelElement, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, texture_querylod)]
-public vec2 textureQueryLod(_Texture<
+public vec2 textureQueryLod<
+    T : ITexelFormat,
+    let isArray : int,
+    let sampleCount : int,
+    let isShadow : int,
+    let format : int>(
+    _Texture<
         T,
         __Shape1D,
         isArray,
@@ -1617,10 +1634,16 @@ public vec2 textureQueryLod(_Texture<
     }
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, texture_querylod)]
-public vec2 textureQueryLod(_Texture<
+public vec2 textureQueryLod<
+    T : ITexelFormat,
+    Shape : __ITextureShape,
+    let isArray : int,
+    let sampleCount : int,
+    let isShadow : int,
+    let format : int>(
+    _Texture<
         T,
         Shape,
         isArray,
@@ -1656,10 +1679,10 @@ public vec2 textureQueryLod(_Texture<
 // textureQueryLevels
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
-public int textureQueryLevels(Sampler1D<T> sampler)
+public int textureQueryLevels<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler)
 {
     int width;
     int numberOfLevels;
@@ -1667,10 +1690,10 @@ public int textureQueryLevels(Sampler1D<T> sampler)
     return numberOfLevels;
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
-public int textureQueryLevels(Sampler2D<T> sampler)
+public int textureQueryLevels<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,2> dim;
     int numberOfLevels;
@@ -1678,10 +1701,10 @@ public int textureQueryLevels(Sampler2D<T> sampler)
     return numberOfLevels;
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
-public int textureQueryLevels(Sampler3D<T> sampler)
+public int textureQueryLevels<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,3> dim;
     int numberOfLevels;
@@ -1689,10 +1712,10 @@ public int textureQueryLevels(Sampler3D<T> sampler)
     return numberOfLevels;
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
-public int textureQueryLevels(SamplerCube<T> sampler)
+public int textureQueryLevels<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __ShapeCube, 0, 0, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,2> dim;
     int numberOfLevels;
@@ -1700,10 +1723,10 @@ public int textureQueryLevels(SamplerCube<T> sampler)
     return numberOfLevels;
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
-public int textureQueryLevels(Sampler1DArray<T> sampler)
+public int textureQueryLevels<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,2> dim;
     int numberOfLevels;
@@ -1711,10 +1734,10 @@ public int textureQueryLevels(Sampler1DArray<T> sampler)
     return numberOfLevels;
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
-public int textureQueryLevels(Sampler2DArray<T> sampler)
+public int textureQueryLevels<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,3> dim;
     int numberOfLevels;
@@ -1722,10 +1745,10 @@ public int textureQueryLevels(Sampler2DArray<T> sampler)
     return numberOfLevels;
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_metal_spirv, texture_querylevels)]
-public int textureQueryLevels(SamplerCubeArray<T> sampler)
+public int textureQueryLevels<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __ShapeCube, 1, 0, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,3> dim;
     int numberOfLevels;
@@ -1797,10 +1820,10 @@ public int textureQueryLevels(samplerCubeArrayShadow sampler)
 // textureSamples
 // -------------------
 
-__generic<T:ITexelElement, let sampleCount:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, image_samples)]
-public int textureSamples(Sampler2DMS<T,sampleCount> sampler)
+public int textureSamples<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape2D, 0, 1, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,2> dim;
     int sampleCount;
@@ -1809,10 +1832,10 @@ public int textureSamples(Sampler2DMS<T,sampleCount> sampler)
     return sampleCount;
 }
 
-__generic<T:ITexelElement, let sampleCount:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, image_samples)]
-public int textureSamples(Sampler2DMSArray<T,sampleCount> sampler)
+public int textureSamples<T : ITexelFormat, let sampleCount : int, let format : int>(
+    _Texture<T, __Shape2D, 1, 1, sampleCount, 0, 0, 1, format> sampler)
 {
     vector<int,3> dim;
     int sampleCount;
@@ -1829,32 +1852,43 @@ public int textureSamples(Sampler2DMSArray<T,sampleCount> sampler)
 // texture
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> texture(Sampler1D<T> sampler, float p)
+public vector<T.DataType.Element,4> texture<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, float p)
 {
     if (__targetHasImplicitDerivatives())
-        return __vectorReshape2<T.Element, 4>(sampler.Sample(p));
+        return __vectorReshape2<T.DataType.Element, 4>(sampler.Sample(p));
     else
-        return __vectorReshape2<T.Element, 4>(sampler.SampleLevelZero(p));
+        return __vectorReshape2<T.DataType.Element, 4>(sampler.SampleLevelZero(p));
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> texture(Sampler1D<T> sampler, float p, float bias)
+public vector<T.DataType.Element,4> texture<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, float p, float bias)
 {
     if (__targetHasImplicitDerivatives())
-        return __vectorReshape2<T.Element, 4>(sampler.SampleBias(p, bias));
+        return __vectorReshape2<T.DataType.Element, 4>(sampler.SampleBias(p, bias));
     else
-        return __vectorReshape2<T.Element, 4>(sampler.SampleLevelZero(p));
+        return __vectorReshape2<T.DataType.Element, 4>(sampler.SampleLevelZero(p));
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> texture(_Texture<
+public vector<T.DataType.Element,4> texture<
+    T : ITexelFormat,
+    Shape : __ITextureShape,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         Shape,
         isArray,
@@ -1867,15 +1901,20 @@ public vector<T.Element,4> texture(_Texture<
     > sampler, vector<float,Shape.dimensions+isArray> p)
 {
     if (__targetHasImplicitDerivatives())
-        return __vectorReshape2<T.Element, 4>(sampler.Sample(p));
+        return __vectorReshape2<T.DataType.Element, 4>(sampler.Sample(p));
     else
-        return __vectorReshape2<T.Element, 4>(sampler.SampleLevelZero(p));
+        return __vectorReshape2<T.DataType.Element, 4>(sampler.SampleLevelZero(p));
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> texture(_Texture<
+public vector<T.DataType.Element,4> texture<
+    T : ITexelFormat,
+    Shape : __ITextureShape,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         Shape,
         isArray,
@@ -1888,9 +1927,9 @@ public vector<T.Element,4> texture(_Texture<
     > sampler, vector<float,Shape.dimensions+isArray> p, float bias)
 {
     if (__targetHasImplicitDerivatives())
-        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleBias(p, bias));
     else
-        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleLevelZero(p));
 }
 
 [ForceInline]
@@ -2094,203 +2133,233 @@ public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
 // textureProj
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec2 p)
+public vector<T.DataType.Element,4> textureProj<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec2 p)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLod(sampler, p, 0.0f);
+        return textureProjLod<T>(sampler, p, 0.0f);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProj";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p
     };
     default:
-        return texture(sampler, p.x / p.y);
+        return texture<T>(sampler, p.x / p.y);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec2 p, float bias)
+public vector<T.DataType.Element,4> textureProj<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec2 p, float bias)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLod(sampler, p, 0.0f);
+        return textureProjLod<T>(sampler, p, 0.0f);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProj";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
     };
     default:
-        return texture(sampler, p.x / p.y, bias);
+        return texture<T>(sampler, p.x / p.y, bias);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec4 p)
+public vector<T.DataType.Element,4> textureProj<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec4 p)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLod(sampler, p, 0.0f);
+        return textureProjLod<T>(sampler, p, 0.0f);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProj";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p
     };
     default:
-        return texture(sampler, p.x / p.w);
+        return texture<T>(sampler, p.x / p.w);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec4 p, float bias)
+public vector<T.DataType.Element,4> textureProj<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec4 p, float bias)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLod(sampler, p, 0.0f);
+        return textureProjLod<T>(sampler, p, 0.0f);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProj";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
     };
     default:
-        return texture(sampler, p.x / p.w, bias);
+        return texture<T>(sampler, p.x / p.w, bias);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec3 p)
+public vector<T.DataType.Element,4> textureProj<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec3 p)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLod(sampler, p, 0.0f);
+        return textureProjLod<T>(sampler, p, 0.0f);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProj";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p
     };
     default:
-        return texture(sampler, p.xy / p.z);
+        return texture<T>(sampler, p.xy / p.z);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec3 p, float bias)
+public vector<T.DataType.Element,4> textureProj<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec3 p, float bias)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLod(sampler, p, 0.0f);
+        return textureProjLod<T>(sampler, p, 0.0f);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProj";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
     };
     default:
-        return texture(sampler, p.xy / p.z, bias);
+        return texture<T>(sampler, p.xy / p.z, bias);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec4 p)
+public vector<T.DataType.Element,4> textureProj<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec4 p)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLod(sampler, p, 0.0f);
+        return textureProjLod<T>(sampler, p, 0.0f);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProj";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p
     };
     default:
-        return texture(sampler, p.xy / p.w);
+        return texture<T>(sampler, p.xy / p.w);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec4 p, float bias)
+public vector<T.DataType.Element,4> textureProj<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec4 p, float bias)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLod(sampler, p, 0.0f);
+        return textureProjLod<T>(sampler, p, 0.0f);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProj";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
     };
     default:
-        return texture(sampler, p.xy / p.w, bias);
+        return texture<T>(sampler, p.xy / p.w, bias);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProj(Sampler3D<T> sampler, vec4 p)
+public vector<T.DataType.Element,4> textureProj<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec4 p)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLod(sampler, p, 0.0f);
+        return textureProjLod<T>(sampler, p, 0.0f);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProj";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p
     };
     default:
-        return texture(sampler, p.xyz / p.w);
+        return texture<T>(sampler, p.xyz / p.w);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProj(Sampler3D<T> sampler, vec4 p, float bias)
+public vector<T.DataType.Element,4> textureProj<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec4 p, float bias)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLod(sampler, p, 0.0f);
+        return textureProjLod<T>(sampler, p, 0.0f);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProj";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
     };
     default:
-        return texture(sampler, p.xyz / p.w, bias);
+        return texture<T>(sampler, p.xyz / p.w, bias);
     }
 }
 
@@ -2394,18 +2463,26 @@ public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
 // textureLod
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureLod(Sampler1D<T> sampler, float p, float lod)
+public vector<T.DataType.Element,4> textureLod<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, float p, float lod)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleLevel(p, lod));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.SampleLevel(p, lod));
 }
 
-__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureLod(_Texture<
+public vector<T.DataType.Element,4> textureLod<
+    T : ITexelFormat,
+    Shape : __ITextureShape,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         Shape,
         isArray,
@@ -2417,7 +2494,7 @@ public vector<T.Element,4> textureLod(_Texture<
         format
     > sampler, vector<float,Shape.dimensions+isArray> p, float lod)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleLevel(p, lod));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.SampleLevel(p, lod));
 }
 
 [ForceInline]
@@ -2533,37 +2610,55 @@ public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
 // textureOffset
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureOffset(Sampler1D<T> sampler, float p, constexpr int offset, float bias = 0.0)
+public vector<T.DataType.Element,4> textureOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    float p,
+    constexpr int offset,
+    float bias = 0.0)
 {
     if (__targetHasImplicitDerivatives())
-        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleBias(p, bias, offset));
     else
-        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureOffset(Sampler2D<T> sampler, vec2 p, constexpr ivec2 offset, float bias = 0.0)
+public vector<T.DataType.Element,4> textureOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec2 p,
+    constexpr ivec2 offset,
+    float bias = 0.0)
 {
     if (__targetHasImplicitDerivatives())
-        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleBias(p, bias, offset));
     else
-        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureOffset(Sampler3D<T> sampler, vec3 p, constexpr ivec3 offset, float bias = 0.0)
+public vector<T.DataType.Element,4> textureOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec3 p,
+    constexpr ivec3 offset,
+    float bias = 0.0)
 {
     if (__targetHasImplicitDerivatives())
-        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleBias(p, bias, offset));
     else
-        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 // No-bias offset shadow sample. Kept as a distinct overload (not a `bias = 0.0` default on the
@@ -2669,27 +2764,39 @@ public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureOffset(Sampler1DArray<T> sampler, vec2 p, constexpr int offset, float bias = 0.0)
+public vector<T.DataType.Element,4> textureOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec2 p,
+    constexpr int offset,
+    float bias = 0.0)
 {
 
     if (__targetHasImplicitDerivatives())
-        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleBias(p, bias, offset));
     else
-        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureOffset(Sampler2DArray<T> sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
+public vector<T.DataType.Element,4> textureOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec3 p,
+    constexpr ivec2 offset,
+    float bias = 0.0)
 {
     if (__targetHasImplicitDerivatives())
-        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleBias(p, bias, offset));
     else
-        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 [ForceInline]
@@ -2766,29 +2873,34 @@ public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2
 // texelFetch
 // -------------------
 //
-// These `texelFetch` (and the `texelFetchOffset` below) overloads all take a *combined*
-// sampler -- `Sampler1D`/`Sampler2DRect`/`SamplerBuffer`, or an explicit `isCombined=1`
-// `_Texture`. On GLSL they lower to `texelFetch(sampler2D, ...)`, which never needs
-// `GL_EXT_samplerless_texture_functions` (that extension is only for texelFetch on a *bare*
-// texture). The static requirement is therefore plain `texture_sm_4_1`, not the
-// `texture_sm_4_1_samplerless` alias: carrying the samplerless atom on these combined-only
-// sites would spuriously fire `warning[E41012] profile implicitly upgraded` under an explicit
-// `-profile`, even though no `#extension` is emitted (see #11874). Where the samplerless
-// extension is genuinely needed (a bare-texture fetch) it is added at emit time by the
-// `isCombined`-gated `__requireTargetExtension` in `_Texture`'s `Load`.
+// These `texelFetch` (and the `texelFetchOffset` below) overloads use the plain `texture_sm_4_1`
+// static requirement, not the `texture_sm_4_1_samplerless` alias. The combined-sampler overloads
+// (an `isCombined=1` `_Texture`) lower on GLSL to `texelFetch` on a combined sampler, which never needs
+// `GL_EXT_samplerless_texture_functions`; carrying the samplerless atom there would spuriously
+// fire `warning[E41012] profile implicitly upgraded` under an explicit `-profile` (see #11874).
+// Bare-texture fetches and the non-combined `SamplerBuffer` overload (which lowers to
+// `imageLoad`) get the extension from `__requireTargetExtension` in their `_Texture` `Load`.
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> texelFetch(Sampler1D<T> sampler, int p, int lod)
+public vector<T.DataType.Element,4> texelFetch<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, int p, int lod)
 {
-    return __vectorReshape2<T.Element,4>(sampler.Load(int2(p, lod)));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.Load(int2(p, lod)));
 }
 
-__generic<T:ITexelElement, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> texelFetch(_Texture<
+public vector<T.DataType.Element,4> texelFetch<
+    T : ITexelFormat,
+    Shape : __ITextureShape,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         Shape,
         isArray,
@@ -2800,29 +2912,44 @@ public vector<T.Element,4> texelFetch(_Texture<
         format
     > sampler, vector<int,Shape.dimensions+isArray> p, int lod)
 {
-    return __vectorReshape2<T.Element,4>(sampler.Load(__makeVector(p,lod)));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.Load(__makeVector(p,lod)));
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> texelFetch(Sampler2DRect<T> sampler, ivec2 p)
+public vector<T.DataType.Element,4> texelFetch<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler, ivec2 p)
 {
-    return __vectorReshape2<T.Element,4>(sampler.Load(int3(p.xy,0)));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.Load(int3(p.xy,0)));
 }
 
-__generic<T:ITexelElement, let format:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> texelFetch(SamplerBuffer<T,format> sampler, int p)
+public vector<T.DataType.Element,4> texelFetch<T : ITexelFormat, let format : int>(
+    _Texture<T, __ShapeBuffer, 0, 0, 0, 0, 0, 1, format> sampler, int p)
 {
-    return __vectorReshape2<T.Element,4>(sampler.Load(p));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.Load(p));
 }
 
-__generic<T:ITexelElement, let isArray:int, let sampleCount:int, let format:int>
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
+public vector<T.DataType.Element,4> texelFetch<T : ITexelFormat, let format : int>(
+    _Texture<T, __ShapeBuffer, 0, 0, 0, 1, 0, 0, format> sampler, int p)
+{
+    return __vectorReshape2<T.DataType.Element,4>(sampler.Load(p));
+}
+
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> texelFetch(_Texture<
+public vector<T.DataType.Element,4> texelFetch<
+    T : ITexelFormat,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         __Shape2D,
         isArray,
@@ -2839,7 +2966,7 @@ public vector<T.Element,4> texelFetch(_Texture<
     case glsl: __intrinsic_asm "texelFetch";
     default:
         // TODO: Need to apply lod
-        return __vectorReshape2<T.Element,4>(sampler.Load(__makeVector(p, 0)));
+        return __vectorReshape2<T.DataType.Element,4>(sampler.Load(__makeVector(p, 0)));
     }
 }
 
@@ -2847,18 +2974,29 @@ public vector<T.Element,4> texelFetch(_Texture<
 // texelFetchOffset
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> texelFetchOffset(Sampler1D<T> sampler, int p, int lod, constexpr int offset)
+public vector<T.DataType.Element,4> texelFetchOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    int p,
+    int lod,
+    constexpr int offset)
 {
-    return __vectorReshape2<T.Element,4>(sampler.Load(int2(p, lod), offset));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.Load(int2(p, lod), offset));
 }
 
-__generic<T:ITexelElement, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> texelFetchOffset(_Texture<
+public vector<T.DataType.Element,4> texelFetchOffset<
+    T : ITexelFormat,
+    Shape : __ITextureShape,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         Shape,
         isArray,
@@ -2870,68 +3008,89 @@ public vector<T.Element,4> texelFetchOffset(_Texture<
         format
     > sampler, vector<int,Shape.dimensions+isArray> p, int lod, constexpr vector<int,Shape.planeDimensions> offset)
 {
-    return __vectorReshape2<T.Element,4>(sampler.Load(__makeVector(p,lod), offset));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.Load(__makeVector(p,lod), offset));
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> texelFetchOffset(Sampler2DRect<T> sampler, ivec2 p, constexpr ivec2 offset)
+public vector<T.DataType.Element,4> texelFetchOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    ivec2 p,
+    constexpr ivec2 offset)
 {
-    return __vectorReshape2<T.Element,4>(sampler.Load(__makeVector(p, 0), offset));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.Load(__makeVector(p, 0), offset));
 }
 
 // -------------------
 // textureProjOffset
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec2 p, constexpr int offset)
+public vector<T.DataType.Element,4> textureProjOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec2 p,
+    constexpr int offset)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLodOffset(sampler, p, 0.0f, offset);
+        return textureProjLodOffset<T>(sampler, p, 0.0f, offset);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjOffset";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p ConstOffset $offset
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p ConstOffset $offset
     };
     default:
-        return textureOffset(sampler, p.x / p.y, offset);
+        return textureOffset<T>(sampler, p.x / p.y, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec2 p, constexpr int offset, float bias)
+public vector<T.DataType.Element,4> textureProjOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec2 p,
+    constexpr int offset,
+    float bias)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLodOffset(sampler, p, 0.0f, offset);
+        return textureProjLodOffset<T>(sampler, p, 0.0f, offset);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjOffset";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias|ConstOffset $bias $offset
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias|ConstOffset $bias $offset
     };
     default:
-        return textureOffset(sampler, p.x / p.y, offset, bias);
+        return textureOffset<T>(sampler, p.x / p.y, offset, bias);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec4 p, constexpr int offset)
+public vector<T.DataType.Element,4> textureProjOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    constexpr int offset)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLodOffset(sampler, p, 0.0f, offset);
+        return textureProjLodOffset<T>(sampler, p, 0.0f, offset);
 
     __requireComputeDerivative();
     __target_switch
@@ -2941,21 +3100,27 @@ public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec4 p, const
     {
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $xw__ ConstOffset $offset
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $xw__ ConstOffset $offset
         };
     }
     default:
-        return textureOffset(sampler, p.x / p.w, offset);
+        return textureOffset<T>(sampler, p.x / p.w, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec4 p, constexpr int offset, float bias)
+public vector<T.DataType.Element,4> textureProjOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    constexpr int offset,
+    float bias)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLodOffset(sampler, p, 0.0f, offset);
+        return textureProjLodOffset<T>(sampler, p, 0.0f, offset);
 
     __requireComputeDerivative();
     __target_switch
@@ -2965,61 +3130,77 @@ public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec4 p, const
     {
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $xw__ Bias|ConstOffset $bias $offset
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $xw__ Bias|ConstOffset $bias $offset
         };
     }
     default:
-        return textureOffset(sampler, p.x / p.w, offset, bias);
+        return textureOffset<T>(sampler, p.x / p.w, offset, bias);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec3 p, constexpr ivec2 offset)
+public vector<T.DataType.Element,4> textureProjOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec3 p,
+    constexpr ivec2 offset)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLodOffset(sampler, p, 0.0f, offset);
+        return textureProjLodOffset<T>(sampler, p, 0.0f, offset);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjOffset";
     case spirv: return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p ConstOffset $offset
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p ConstOffset $offset
     };
     default:
-        return textureOffset(sampler, p.xy / p.z, offset);
+        return textureOffset<T>(sampler, p.xy / p.z, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec3 p, constexpr ivec2 offset, float bias)
+public vector<T.DataType.Element,4> textureProjOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec3 p,
+    constexpr ivec2 offset,
+    float bias)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLodOffset(sampler, p, 0.0f, offset);
+        return textureProjLodOffset<T>(sampler, p, 0.0f, offset);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjOffset";
     case spirv: return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias|ConstOffset $bias $offset
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias|ConstOffset $bias $offset
     };
     default:
-        return textureOffset(sampler, p.xy / p.z, offset, bias);
+        return textureOffset<T>(sampler, p.xy / p.z, offset, bias);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec4 p, constexpr ivec2 offset)
+public vector<T.DataType.Element,4> textureProjOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    constexpr ivec2 offset)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLodOffset(sampler, p, 0.0f, offset);
+        return textureProjLodOffset<T>(sampler, p, 0.0f, offset);
 
     __requireComputeDerivative();
     __target_switch
@@ -3029,21 +3210,27 @@ public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec4 p, const
     {
         vec4 xyw__ = p.xyww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $xyw__ ConstOffset $offset
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $xyw__ ConstOffset $offset
         };
     }
     default:
-        return textureOffset(sampler, p.xy / p.w, offset);
+        return textureOffset<T>(sampler, p.xy / p.w, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec4 p, constexpr ivec2 offset, float bias)
+public vector<T.DataType.Element,4> textureProjOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    constexpr ivec2 offset,
+    float bias)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLodOffset(sampler, p, 0.0f, offset);
+        return textureProjLodOffset<T>(sampler, p, 0.0f, offset);
 
     __requireComputeDerivative();
     __target_switch
@@ -3053,51 +3240,62 @@ public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec4 p, const
     {
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $xyw_ Bias|ConstOffset $bias $offset
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $xyw_ Bias|ConstOffset $bias $offset
         };
     }
     default:
-        return textureOffset(sampler, p.xy / p.w, offset, bias);
+        return textureOffset<T>(sampler, p.xy / p.w, offset, bias);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjOffset(Sampler3D<T> sampler, vec4 p, constexpr ivec3 offset)
+public vector<T.DataType.Element,4> textureProjOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    constexpr ivec3 offset)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLodOffset(sampler, p, 0.0f, offset);
+        return textureProjLodOffset<T>(sampler, p, 0.0f, offset);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjOffset";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p ConstOffset $offset
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p ConstOffset $offset
     };
     default:
-        return textureOffset(sampler, p.xyz / p.w, offset);
+        return textureOffset<T>(sampler, p.xyz / p.w, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjOffset(Sampler3D<T> sampler, vec4 p, constexpr ivec3 offset, float bias)
+public vector<T.DataType.Element,4> textureProjOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    constexpr ivec3 offset,
+    float bias)
 {
     if (!__targetHasImplicitDerivatives())
-        return textureProjLodOffset(sampler, p, 0.0f, offset);
+        return textureProjLodOffset<T>(sampler, p, 0.0f, offset);
 
     __requireComputeDerivative();
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjOffset";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias|ConstOffset $bias $offset
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias|ConstOffset $bias $offset
     };
     default:
-        return textureOffset(sampler, p.xyz / p.w, offset, bias);
+        return textureOffset<T>(sampler, p.xyz / p.w, offset, bias);
     }
 }
 
@@ -3201,18 +3399,29 @@ public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 
 // textureLodOffset
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0)]
-public vector<T.Element,4> textureLodOffset(Sampler1D<T> sampler, float p, float lod, constexpr int offset)
+public vector<T.DataType.Element,4> textureLodOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    float p,
+    float lod,
+    constexpr int offset)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleLevel(p, lod, offset));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.SampleLevel(p, lod, offset));
 }
 
-__generic<T:ITexelElement, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0)]
-public vector<T.Element,4> textureLodOffset(_Texture<
+public vector<T.DataType.Element,4> textureLodOffset<
+    T : ITexelFormat,
+    Shape : __ITextureShape,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         Shape,
         isArray,
@@ -3224,7 +3433,7 @@ public vector<T.Element,4> textureLodOffset(_Texture<
         format
     > sampler, vector<float,Shape.dimensions+isArray> p, float lod, constexpr vector<int,Shape.planeDimensions> offset)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleLevel(p, lod, offset));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.SampleLevel(p, lod, offset));
 }
 
 [ForceInline]
@@ -3299,26 +3508,32 @@ public float textureLodOffset(sampler2DArrayShadow sampler, vec4 p, float lod, c
 // textureProjLod
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjLod(Sampler1D<T> sampler, vec2 p, float lod)
+public vector<T.DataType.Element,4> textureProjLod<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec2 p, float lod)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLod";
     case spirv: return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod $lod
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod $lod
     };
     default:
-        return textureLod(sampler, p.x / p.y, lod);
+        return textureLod<T>(sampler, p.x / p.y, lod);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjLod(Sampler1D<T> sampler, vec4 p, float lod)
+public vector<T.DataType.Element,4> textureProjLod<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec4 p, float lod)
 {
     __target_switch
     {
@@ -3327,34 +3542,40 @@ public vector<T.Element,4> textureProjLod(Sampler1D<T> sampler, vec4 p, float lo
     {
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $xw__ Lod $lod
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $xw__ Lod $lod
         };
     }
     default:
-        return textureLod(sampler, p.x / p.w, lod);
+        return textureLod<T>(sampler, p.x / p.w, lod);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjLod(Sampler2D<T> sampler, vec3 p, float lod)
+public vector<T.DataType.Element,4> textureProjLod<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec3 p, float lod)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLod";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod $lod
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod $lod
     };
     default:
-        return textureLod(sampler, p.xy / p.z, lod);
+        return textureLod<T>(sampler, p.xy / p.z, lod);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjLod(Sampler2D<T> sampler, vec4 p, float lod)
+public vector<T.DataType.Element,4> textureProjLod<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec4 p, float lod)
 {
     __target_switch
     {
@@ -3363,27 +3584,30 @@ public vector<T.Element,4> textureProjLod(Sampler2D<T> sampler, vec4 p, float lo
     {
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $xyw_ Lod $lod
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $xyw_ Lod $lod
         };
     }
     default:
-        return textureLod(sampler, p.xy / p.w, lod);
+        return textureLod<T>(sampler, p.xy / p.w, lod);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjLod(Sampler3D<T> sampler, vec4 p, float lod)
+public vector<T.DataType.Element,4> textureProjLod<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler, vec4 p, float lod)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLod";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod $lod
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod $lod
     };
     default:
-        return textureLod(sampler, p.xyz / p.w, lod);
+        return textureLod<T>(sampler, p.xyz / p.w, lod);
     }
 }
 
@@ -3431,26 +3655,38 @@ public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
 // textureProjLodOffset
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec2 p, float lod, constexpr int offset)
+public vector<T.DataType.Element,4> textureProjLodOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec2 p,
+    float lod,
+    constexpr int offset)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLodOffset";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod|ConstOffset $lod $offset
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod|ConstOffset $lod $offset
     };
     default:
-        return textureLodOffset(sampler, p.x / p.y, lod, offset);
+        return textureLodOffset<T>(sampler, p.x / p.y, lod, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec4 p, float lod, constexpr int offset)
+public vector<T.DataType.Element,4> textureProjLodOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    float lod,
+    constexpr int offset)
 {
     __target_switch
     {
@@ -3459,34 +3695,46 @@ public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec4 p, fl
     {
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $xw__ Lod|ConstOffset $lod $offset
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $xw__ Lod|ConstOffset $lod $offset
         };
     }
     default:
-        return textureLodOffset(sampler, p.x / p.w, lod, offset);
+        return textureLodOffset<T>(sampler, p.x / p.w, lod, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec3 p, float lod, constexpr ivec2 offset)
+public vector<T.DataType.Element,4> textureProjLodOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec3 p,
+    float lod,
+    constexpr ivec2 offset)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLodOffset";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod|ConstOffset $lod $offset
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod|ConstOffset $lod $offset
     };
     default:
-        return textureLodOffset(sampler, p.xy / p.z, lod, offset);
+        return textureLodOffset<T>(sampler, p.xy / p.z, lod, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec4 p, float lod, constexpr ivec2 offset)
+public vector<T.DataType.Element,4> textureProjLodOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    float lod,
+    constexpr ivec2 offset)
 {
     __target_switch
     {
@@ -3495,27 +3743,33 @@ public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec4 p, fl
     {
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $xyw_ Lod|ConstOffset $lod $offset
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $xyw_ Lod|ConstOffset $lod $offset
         };
     }
     default:
-        return textureLodOffset(sampler, p.xy / p.w, lod, offset);
+        return textureLodOffset<T>(sampler, p.xy / p.w, lod, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> textureProjLodOffset(Sampler3D<T> sampler, vec4 p, float lod, constexpr ivec3 offset)
+public vector<T.DataType.Element,4> textureProjLodOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    float lod,
+    constexpr ivec3 offset)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjLodOffset";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod|ConstOffset $lod $offset
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Lod|ConstOffset $lod $offset
     };
     default:
-        return textureLodOffset(sampler, p.xyz / p.w, lod, offset);
+        return textureLodOffset<T>(sampler, p.xyz / p.w, lod, offset);
     }
 }
 
@@ -3564,18 +3818,29 @@ public float textureProjLodOffset(sampler2DShadow sampler, vec4 p, float lod, co
 // -------------------
 
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureGrad(Sampler1D<T> sampler, float p, float dPdx, float dPdy)
+public vector<T.DataType.Element,4> textureGrad<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    float p,
+    float dPdx,
+    float dPdy)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleGrad(p, dPdx, dPdy));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.SampleGrad(p, dPdx, dPdy));
 }
 
-__generic<T:ITexelElement, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureGrad(_Texture<
+public vector<T.DataType.Element,4> textureGrad<
+    T : ITexelFormat,
+    Shape : __ITextureShape,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         Shape,
         isArray,
@@ -3587,7 +3852,7 @@ public vector<T.Element,4> textureGrad(_Texture<
         format
     > sampler, vector<float,Shape.dimensions+isArray> p, vector<float,Shape.dimensions> dPdx, vector<float,Shape.dimensions> dPdy)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleGrad(p, dPdx, dPdy));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.SampleGrad(p, dPdx, dPdy));
 }
 
 [ForceInline]
@@ -3679,18 +3944,30 @@ public float textureGrad(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, vec2 d
 // textureGradOffset
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureGradOffset(Sampler1D<T> sampler, float p, float dPdx, float dPdy, constexpr int offset)
+public vector<T.DataType.Element,4> textureGradOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    float p,
+    float dPdx,
+    float dPdy,
+    constexpr int offset)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleGrad(p, dPdx, dPdy, offset));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.SampleGrad(p, dPdx, dPdy, offset));
 }
 
-__generic<T:ITexelElement, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 [ForceInline]
-public vector<T.Element,4> textureGradOffset(_Texture<
+public vector<T.DataType.Element,4> textureGradOffset<
+    T : ITexelFormat,
+    Shape : __ITextureShape,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         Shape,
         isArray,
@@ -3702,7 +3979,7 @@ public vector<T.Element,4> textureGradOffset(_Texture<
         format
     > sampler, vector<float,Shape.dimensions+isArray> p, vector<float,Shape.dimensions> dPdx, vector<float,Shape.dimensions> dPdy, constexpr vector<int,Shape.dimensions> offset)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleGrad(p, dPdx, dPdy, offset));
+    return __vectorReshape2<T.DataType.Element,4>(sampler.SampleGrad(p, dPdx, dPdy, offset));
 }
 
 [ForceInline]
@@ -3777,26 +4054,38 @@ public float textureGradOffset(sampler2DArrayShadow sampler, vec4 p, vec2 dPdx, 
 // textureProjGrad
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureProjGrad(Sampler1D<T> sampler, vec2 p, float dPdx, float dPdy)
+public vector<T.DataType.Element,4> textureProjGrad<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec2 p,
+    float dPdx,
+    float dPdy)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGrad";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad $dPdx $dPdy
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad $dPdx $dPdy
     };
     default:
-        return textureGrad(sampler, p.x / p.y, dPdx, dPdy);
+        return textureGrad<T>(sampler, p.x / p.y, dPdx, dPdy);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureProjGrad(Sampler1D<T> sampler, vec4 p, float dPdx, float dPdy)
+public vector<T.DataType.Element,4> textureProjGrad<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    float dPdx,
+    float dPdy)
 {
     __target_switch
     {
@@ -3805,34 +4094,46 @@ public vector<T.Element,4> textureProjGrad(Sampler1D<T> sampler, vec4 p, float d
     {
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $xw__ Grad $dPdx $dPdy
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $xw__ Grad $dPdx $dPdy
         };
     }
     default:
-        return textureGrad(sampler, p.x / p.w, dPdx, dPdy);
+        return textureGrad<T>(sampler, p.x / p.w, dPdx, dPdy);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureProjGrad(Sampler2D<T> sampler, vec3 p, vec2 dPdx, vec2 dPdy)
+public vector<T.DataType.Element,4> textureProjGrad<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec3 p,
+    vec2 dPdx,
+    vec2 dPdy)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGrad";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad $dPdx $dPdy
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad $dPdx $dPdy
     };
     default:
-        return textureGrad(sampler, p.xy / p.z, dPdx, dPdy);
+        return textureGrad<T>(sampler, p.xy / p.z, dPdx, dPdy);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureProjGrad(Sampler2D<T> sampler, vec4 p, vec2 dPdx, vec2 dPdy)
+public vector<T.DataType.Element,4> textureProjGrad<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    vec2 dPdx,
+    vec2 dPdy)
 {
     __target_switch
     {
@@ -3841,27 +4142,33 @@ public vector<T.Element,4> textureProjGrad(Sampler2D<T> sampler, vec4 p, vec2 dP
     {
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $xyw_ Grad $dPdx $dPdy
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $xyw_ Grad $dPdx $dPdy
         };
     }
     default:
-        return textureGrad(sampler, p.xy / p.w, dPdx, dPdy);
+        return textureGrad<T>(sampler, p.xy / p.w, dPdx, dPdy);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureProjGrad(Sampler3D<T> sampler, vec4 p, vec3 dPdx, vec3 dPdy)
+public vector<T.DataType.Element,4> textureProjGrad<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    vec3 dPdx,
+    vec3 dPdy)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGrad";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad $dPdx $dPdy
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad $dPdx $dPdy
     };
     default:
-        return textureGrad(sampler, p.xyz / p.w, dPdx, dPdy);
+        return textureGrad<T>(sampler, p.xyz / p.w, dPdx, dPdy);
     }
 }
 
@@ -3909,26 +4216,40 @@ public float textureProjGrad(sampler2DShadow sampler, vec4 p, vec2 dPdx, vec2 dP
 // textureProjGradOffset
 // -------------------
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureProjGradOffset(Sampler1D<T> sampler, vec2 p, float dPdx, float dPdy, constexpr int offset)
+public vector<T.DataType.Element,4> textureProjGradOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec2 p,
+    float dPdx,
+    float dPdy,
+    constexpr int offset)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGradOffset";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad|ConstOffset $dPdx $dPdy $offset
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad|ConstOffset $dPdx $dPdy $offset
     };
     default:
-        return textureGradOffset(sampler, p.x / p.y, dPdx, dPdy, offset);
+        return textureGradOffset<T>(sampler, p.x / p.y, dPdx, dPdy, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureProjGradOffset(Sampler1D<T> sampler, vec4 p, float dPdx, float dPdy, constexpr int offset)
+public vector<T.DataType.Element,4> textureProjGradOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    float dPdx,
+    float dPdy,
+    constexpr int offset)
 {
     __target_switch
     {
@@ -3937,34 +4258,48 @@ public vector<T.Element,4> textureProjGradOffset(Sampler1D<T> sampler, vec4 p, f
     {
         vec4 xw__ = p.xwww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $xw__ Grad|ConstOffset $dPdx $dPdy $offset
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $xw__ Grad|ConstOffset $dPdx $dPdy $offset
         };
     }
     default:
-        return textureGradOffset(sampler, p.x / p.w, dPdx, dPdy, offset);
+        return textureGradOffset<T>(sampler, p.x / p.w, dPdx, dPdy, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureProjGradOffset(Sampler2D<T> sampler, vec3 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+public vector<T.DataType.Element,4> textureProjGradOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec3 p,
+    vec2 dPdx,
+    vec2 dPdy,
+    constexpr ivec2 offset)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGradOffset";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad|ConstOffset $dPdx $dPdy $offset
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad|ConstOffset $dPdx $dPdy $offset
     };
     default:
-        return textureGradOffset(sampler, p.xy / p.z, dPdx, dPdy, offset);
+        return textureGradOffset<T>(sampler, p.xy / p.z, dPdx, dPdy, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureProjGradOffset(Sampler2D<T> sampler, vec4 p, vec2 dPdx, vec2 dPdy, constexpr ivec2 offset)
+public vector<T.DataType.Element,4> textureProjGradOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    vec2 dPdx,
+    vec2 dPdy,
+    constexpr ivec2 offset)
 {
     __target_switch
     {
@@ -3973,27 +4308,34 @@ public vector<T.Element,4> textureProjGradOffset(Sampler2D<T> sampler, vec4 p, v
     {
         vec4 xyw_ = p.xyww;
         return spirv_asm {
-            result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $xyw_ Grad|ConstOffset $dPdx $dPdy $offset
+            result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $xyw_ Grad|ConstOffset $dPdx $dPdy $offset
         };
     }
     default:
-        return textureGradOffset(sampler, p.xy / p.w, dPdx, dPdy, offset);
+        return textureGradOffset<T>(sampler, p.xy / p.w, dPdx, dPdy, offset);
     }
 }
 
-__generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T.Element,4> textureProjGradOffset(Sampler3D<T> sampler, vec4 p, vec3 dPdx, vec3 dPdy, constexpr ivec3 offset)
+public vector<T.DataType.Element,4> textureProjGradOffset<
+    T : ITexelFormat,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> sampler,
+    vec4 p,
+    vec3 dPdx,
+    vec3 dPdy,
+    constexpr ivec3 offset)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "textureProjGradOffset";
     case spirv: return spirv_asm {
-        result:$$vector<T.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad|ConstOffset $dPdx $dPdy $offset
+        result:$$vector<T.DataType.Element,4> = OpImageSampleProjExplicitLod $sampler $p Grad|ConstOffset $dPdx $dPdy $offset
     };
     default:
-        return textureGradOffset(sampler, p.xyz / p.w, dPdx, dPdy, offset);
+        return textureGradOffset<T>(sampler, p.xyz / p.w, dPdx, dPdy, offset);
     }
 }
 
@@ -4045,10 +4387,15 @@ public float textureProjGradOffset(sampler2DShadow sampler, vec4 p, vec2 dPdx, v
 // textureGather
 // -------------------
 
-__generic<T:ITexelElement, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_gather)]
-public vector<T.Element,4> textureGather(_Texture<
+public vector<T.DataType.Element,4> textureGather<
+    T : ITexelFormat,
+    Shape : __ITextureShape,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         Shape,
         isArray,
@@ -4091,10 +4438,14 @@ public vec4 textureGather(_Texture<
 // textureGatherOffset
 // -------------------
 
-__generic<T:ITexelElement, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_gather)]
-public vector<T.Element,4> textureGatherOffset(_Texture<
+public vector<T.DataType.Element,4> textureGatherOffset<
+    T : ITexelFormat,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         __Shape2D,
         isArray,
@@ -4138,10 +4489,14 @@ public vec4 textureGatherOffset(_Texture<
 // textureGatherOffsets
 // -------------------
 
-__generic<T:ITexelElement, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_gather)]
-public vector<T.Element,4> textureGatherOffsets(_Texture<
+public vector<T.DataType.Element,4> textureGatherOffsets<
+    T : ITexelFormat,
+    let isArray : int,
+    let sampleCount : int,
+    let format : int>(
+    _Texture<
         T,
         __Shape2D,
         isArray,
@@ -4191,163 +4546,163 @@ public vec4 textureGatherOffsets(_Texture<
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1D(sampler1D sampler, float coord)
 {
-    return texture(sampler, coord);
+    return texture<float4>(sampler, coord);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1D(sampler1D sampler, float coord, float bias)
 {
-    return texture(sampler, coord, bias);
+    return texture<float4>(sampler, coord, bias);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec2 coord)
 {
-    return textureProj(sampler, coord);
+    return textureProj<float4>(sampler, coord);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec2 coord, float bias)
 {
-    return textureProj(sampler, coord, bias);
+    return textureProj<float4>(sampler, coord, bias);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec4 coord)
 {
-    return textureProj(sampler, coord);
+    return textureProj<float4>(sampler, coord);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProj(sampler1D sampler, vec4 coord, float bias)
 {
-    return textureProj(sampler, coord, bias);
+    return textureProj<float4>(sampler, coord, bias);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DLod(sampler1D sampler, float coord, float lod)
 {
-    return textureLod(sampler, coord, lod);
+    return textureLod<float4>(sampler, coord, lod);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProjLod(sampler1D sampler, vec2 coord, float lod)
 {
-    return textureProjLod(sampler, coord, lod);
+    return textureProjLod<float4>(sampler, coord, lod);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1DProjLod(sampler1D sampler, vec4 coord, float lod)
 {
-    return textureProjLod(sampler, coord, lod);
+    return textureProjLod<float4>(sampler, coord, lod);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2D(sampler2D sampler, vec2 coord)
 {
-    return texture(sampler, coord);
+    return texture<float4>(sampler, coord);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2D(sampler2D sampler, vec2 coord, float bias)
 {
-    return texture(sampler, coord, bias);
+    return texture<float4>(sampler, coord, bias);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec3 coord)
 {
-    return textureProj(sampler, coord);
+    return textureProj<float4>(sampler, coord);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec3 coord, float bias)
 {
-    return textureProj(sampler, coord, bias);
+    return textureProj<float4>(sampler, coord, bias);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec4 coord)
 {
-    return textureProj(sampler, coord);
+    return textureProj<float4>(sampler, coord);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProj(sampler2D sampler, vec4 coord, float bias)
 {
-    return textureProj(sampler, coord, bias);
+    return textureProj<float4>(sampler, coord, bias);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DLod(sampler2D sampler, vec2 coord, float lod)
 {
-    return textureLod(sampler, coord, lod);
+    return textureLod<float4>(sampler, coord, lod);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProjLod(sampler2D sampler, vec3 coord, float lod)
 {
-    return textureProjLod(sampler, coord, lod);
+    return textureProjLod<float4>(sampler, coord, lod);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2DProjLod(sampler2D sampler, vec4 coord, float lod)
 {
-    return textureProjLod(sampler, coord, lod);
+    return textureProjLod<float4>(sampler, coord, lod);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3D(sampler3D sampler, vec3 coord)
 {
-    return texture(sampler, coord);
+    return texture<float4>(sampler, coord);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3D(sampler3D sampler, vec3 coord, float bias)
 {
-    return texture(sampler, coord, bias);
+    return texture<float4>(sampler, coord, bias);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3DProj(sampler3D sampler, vec4 coord)
 {
-    return textureProj(sampler, coord);
+    return textureProj<float4>(sampler, coord);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3DProj(sampler3D sampler, vec4 coord, float bias)
 {
-    return textureProj(sampler, coord, bias);
+    return textureProj<float4>(sampler, coord, bias);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3DLod(sampler3D sampler, vec3 coord, float lod)
 {
-    return textureLod(sampler, coord, lod);
+    return textureLod<float4>(sampler, coord, lod);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3DProjLod(sampler3D sampler, vec4 coord, float lod)
 {
-    return textureProjLod(sampler, coord, lod);
+    return textureProjLod<float4>(sampler, coord, lod);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 textureCube(samplerCube sampler, vec3 coord)
 {
-    return texture(sampler, coord);
+    return texture<float4>(sampler, coord);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 textureCube(samplerCube sampler, vec3 coord, float bias)
 {
-    return texture(sampler, coord, bias);
+    return texture<float4>(sampler, coord, bias);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 textureCubeLod(samplerCube sampler, vec3 coord, float lod)
 {
-    return textureLod(sampler, coord, lod);
+    return textureLod<float4>(sampler, coord, lod);
 }
 
 [require(glsl_spirv, texture_shadowlod)]

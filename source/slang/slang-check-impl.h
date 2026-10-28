@@ -52,6 +52,14 @@ bool isEffectivelyStatic(Decl* decl);
 
 bool isGlobalDecl(Decl* decl);
 
+/// Identifies the builtin identity adapter whose type argument retains modifiers.
+/// Its `DataType = T` must map `unorm float4` to the complete `unorm float4` type.
+inline bool isTexelFormatIdentityExtension(ExtensionDecl* decl)
+{
+    auto requirement = decl->findModifier<BuiltinRequirementModifier>();
+    return requirement && requirement->kind == BuiltinRequirementKind::TexelFormatIdentityExtension;
+}
+
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);
@@ -785,7 +793,16 @@ struct InheritanceInfoCacheEntry
     InheritanceInfo info;
     List<DeclExtensionEpochStamp> dependencyEpochs;
     UInt generation = 0;
+    // Once checked, this entry stays valid until an extension registration changes
+    // a declaration epoch. Keep the detailed stamps for selective revalidation.
+    UInt lastValidatedExtensionEpoch = 0;
     bool isComputing = false;
+
+    // Only a completed declaration-based calculation can prove that none of its
+    // candidates preserve modifiers. A modified subject then has the same facets
+    // before no_diff filtering. Partial and other reconstructed results leave this
+    // false: an unapplied candidate may match only the modified subject.
+    bool canReuseForModifiedType = false;
 };
 
 /// Cached subtype query plus the inheritance cache generations it depended on.
@@ -1141,7 +1158,9 @@ public:
         return false;
     }
     /// Get the list of extension declarations that appear to apply to `decl` in this context
-    List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(Decl* decl);
+    List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(
+        Decl* decl,
+        bool* outHasModifierPreservingCandidate = nullptr);
 
     /// Register a candidate extension `extDecl` for `typeDecl` encountered during checking.
     void registerCandidateExtension(Decl* typeDecl, ExtensionDecl* extDecl);
@@ -1282,7 +1301,8 @@ private:
         DeclRef<Decl> declRef,
         Type* selfType,
         InheritanceCircularityInfo* circularityInfo,
-        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet);
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet,
+        bool* outCanReuseForModifiedType = nullptr);
 
     /// True if inheritance info for `type` is currently being computed (its
     /// cache entry is marked in-progress) -- i.e. `type` is an ancestor on the
@@ -1292,7 +1312,7 @@ private:
     UInt getDeclExtensionEpoch(Decl* decl) const;
     void bumpDeclExtensionEpoch(Decl* decl);
 
-    bool _isInheritanceInfoCacheEntryUpToDate(InheritanceInfoCacheEntry const& entry) const;
+    bool _isInheritanceInfoCacheEntryUpToDate(InheritanceInfoCacheEntry& entry) const;
 
     void _collectInheritanceInfoDependencyEpochs(
         Decl* subjectDecl,
@@ -1432,6 +1452,8 @@ private:
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
     Dictionary<Type*, bool> m_isCStyleTypeCache;
     Dictionary<Decl*, UInt> m_mapDeclToExtensionEpoch;
+    // Advanced by the only writer of the declaration epochs, bumpDeclExtensionEpoch.
+    UInt m_extensionEpoch = 0;
     UInt m_nextInheritanceInfoCacheGeneration = 1;
 };
 
@@ -3629,6 +3651,14 @@ public:
         Type* subType,
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
+
+    /// Roots a declared facet witness at the type whose conformance is being queried.
+    /// Both ordinary subtype queries and provisional extension constraints use this path.
+    /// Other witness forms are returned unchanged.
+    SubtypeWitness* getSubtypeWitnessForType(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* witness);
 
     Witness* getDiffTypeInfoWitness(Type* type);
     Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);

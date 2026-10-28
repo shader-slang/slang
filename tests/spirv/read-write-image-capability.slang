@@ -7,6 +7,7 @@
 
 // CHECK-DAG: OpCapability StorageImageReadWithoutFormat
 // CHECK-DAG: OpCapability StorageImageWriteWithoutFormat
+// CHECK-DAG: OpTypeImage {{.*}} Unknown
 
 RWTexture2D<float4> rwTexture;
 

@@ -643,7 +643,7 @@ class MagicTypeModifier : public Modifier
     FIDDLE() uint32_t tag = uint32_t(0);
 };
 
-// A modifier that indicates a built-in associated type requirement (e.g., `Differential`)
+// A modifier that identifies a built-in declaration by its semantic role.
 FIDDLE()
 class BuiltinRequirementModifier : public Modifier
 {

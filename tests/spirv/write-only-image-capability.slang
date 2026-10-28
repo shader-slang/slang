@@ -12,6 +12,8 @@
 
 WTexture2D<float4> writeOnlyTexture;
 
+// CHECK: OpTypeImage {{.*}} Unknown
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()

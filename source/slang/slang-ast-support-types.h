@@ -1813,6 +1813,13 @@ FIDDLE() namespace Slang
     {
         FIDDLE(...)
         List<ExtensionDecl*> candidateExtensions;
+
+        // Classify only lists that inheritance checking actually queries, so importing
+        // a serialized module does not eagerly deserialize every extension. These
+        // runtime fields are not serialized; appended candidates are classified on
+        // the next query, and a loaded list starts unclassified.
+        Index modifierClassifiedCount = 0;
+        bool hasModifierPreservingCandidate = false;
     };
 
 
@@ -2052,7 +2059,7 @@ FIDDLE() namespace Slang
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 
-    /// The kind of a builtin interface requirement that can be automatically synthesized.
+    /// The role of a builtin declaration known to the compiler.
     enum class BuiltinRequirementKind
     {
         DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
@@ -2096,6 +2103,10 @@ FIDDLE() namespace Slang
         BwdCallableContextWitness, ///< The `IBackwardDifferentiable.BwdCallable : IBwdCallable`
                                    ///< conformance (witness that the backward-callable context type
                                    ///< conforms to `IBwdCallable`)
+
+        TextureElementType, ///< The `_Texture.T` alias for the loaded and stored texel data type.
+        TextureFormat,      ///< The `_Texture.__effectiveFormat` constant for its storage format.
+        TexelFormatIdentityExtension, ///< The `ITexelElement` to `ITexelFormat` identity adapter.
     };
 
     enum class FunctionDifferentiableLevel
