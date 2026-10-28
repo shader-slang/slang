@@ -52,11 +52,11 @@ bool isEffectivelyStatic(Decl* decl);
 
 bool isGlobalDecl(Decl* decl);
 
-/// Return true if `decl` carries `__magic_type` (`MagicTypeModifier`) or `__intrinsic_type`
-/// (`IntrinsicTypeModifier`), i.e. a type the compiler gives meaning to directly. A
-/// `__builtin_type` scalar such as `float` is not included, nor is a `[require]` type a standard
-/// module declares in plain Slang.
-bool isMagicOrIntrinsicTypeDecl(Decl* decl);
+/// Return true if `decl` is a core-module type declared with `__magic_type`
+/// (`MagicTypeModifier`) or `__intrinsic_type` (`IntrinsicTypeModifier`). An `__intrinsic_type`
+/// declared outside the core module, in a standard module or in user code, is not included, and
+/// neither is a `__builtin_type` scalar such as `float`.
+bool isCoreModuleIntrinsicTypeDecl(Decl* decl);
 
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 

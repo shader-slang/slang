@@ -1601,9 +1601,10 @@ bool isGlobalDecl(Decl* decl)
     return as<NamespaceDeclBase>(parentDecl) != nullptr || as<FileDecl>(parentDecl) != nullptr;
 }
 
-bool isMagicOrIntrinsicTypeDecl(Decl* decl)
+bool isCoreModuleIntrinsicTypeDecl(Decl* decl)
 {
-    return decl->hasModifier<MagicTypeModifier>() || decl->hasModifier<IntrinsicTypeModifier>();
+    return (decl->hasModifier<MagicTypeModifier>() || decl->hasModifier<IntrinsicTypeModifier>()) &&
+           isFromCoreModule(decl);
 }
 
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
@@ -22181,9 +22182,11 @@ struct CapabilityDeclReferenceVisitor
 
     // Contribute the requirements of the type declaration that `declRef` names, once per
     // `declRef`, then continue the usual operand walk. Every `AggTypeDecl` (struct, enum,
-    // interface, ...) contributes except a magic/intrinsic one such as `CoopVec<T, N>`, because
-    // the core-module functions that use those do not redeclare their requirements; a `[require]`
-    // generic type declared in plain Slang, including in a standard module, contributes.
+    // interface, ...) contributes except a core-module magic/intrinsic type such as
+    // `CoopVec<T, N>`: the core-module functions that take those types do not redeclare their
+    // requirements, so inferring them would make the core module fail its own capability checks.
+    // An `__intrinsic_type` declared elsewhere, such as `NodeOutput<T>` in the experimental
+    // workgraph module, contributes like any other type.
     //
     // A member function is not a type declaration and contributes nothing here, because the
     // core-module functions that call such members do not redeclare their requirements either.
@@ -22195,7 +22198,7 @@ struct CapabilityDeclReferenceVisitor
         // `visitedVals` is tested before `Base::visitVal` records `declRef`, so a repeated visit
         // contributes nothing.
         auto aggTypeDecl = as<AggTypeDecl>(declRef->getDecl());
-        if (aggTypeDecl && !isMagicOrIntrinsicTypeDecl(aggTypeDecl) &&
+        if (aggTypeDecl && !isCoreModuleIntrinsicTypeDecl(aggTypeDecl) &&
             !Base::visitedVals.contains(declRef))
         {
             // This walk runs only within some declaration's `CapabilityChecked` step, after the

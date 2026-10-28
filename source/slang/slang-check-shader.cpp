@@ -1728,8 +1728,8 @@ struct GenericStructTypeUse
 // struct (`Bar main()`, `struct W { Bar b; }`), a member type (`Outer<3>.In`) and an enum, and
 // this walk does not cover them.
 //
-// Builtin magic/intrinsic structs are excluded to match general inference (see
-// `isMagicOrIntrinsicTypeDecl`); those that appear in signatures, such as `LineStream<T>` and
+// Core-module magic/intrinsic structs are excluded to match general inference (see
+// `isCoreModuleIntrinsicTypeDecl`); those that appear in signatures, such as `LineStream<T>` and
 // `OutputPatch<T,N>`, already get more specific stage diagnostics. Builtin wrappers are still
 // recursed *through* so that a user-defined `Foo<int>` nested inside them is found.
 static void collectGenericStructTypeUses(
@@ -1757,7 +1757,7 @@ static void collectGenericStructTypeUses(
     {
         auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
         if (structDeclRef && as<GenericAppDeclRef>(declRefType->getDeclRefBase()) &&
-            !isMagicOrIntrinsicTypeDecl(structDeclRef.getDecl()))
+            !isCoreModuleIntrinsicTypeDecl(structDeclRef.getDecl()))
         {
             // Only contribute structs that actually carry a requirement; this keeps
             // both the aggregation and the diagnostic loop free of null/empty sets.
