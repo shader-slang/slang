@@ -29,6 +29,13 @@ struct ByteAddressBufferLegalizationOptions
     /// define `ByteAddressBuffer`/`StructuredBuffer` and introduce operations which prevent DCE
     /// from destroying old definitions of `ByteAddressBuffer` after variable replacement.
     bool treatGetEquivalentStructuredBufferAsGetThis = false;
+
+    /// The smallest scalar size, in bytes, that the target can store to a byte-address buffer
+    /// on its own. A store of a value with a smaller (non-`bool`) scalar is reported as an
+    /// error, because the target would have to read-modify-write the larger unit and could lose
+    /// a concurrent write to its other bytes. 0 means there is no minimum. WGSL uses 4, because
+    /// its byte-address buffers are arrays of 32-bit words.
+    int minimumStoreScalarSize = 0;
 };
 
 /// Legalize byte-address buffer `Load()` and `Store()` operations.

@@ -13,6 +13,7 @@ in uint __builtinWaveLaneIndex : SV_WaveLaneIndex;
 in uint __builtinWaveLaneCount : SV_WaveLaneCount;
 in uint __builtinQuadLaneIndex : SV_QuadLaneIndex;
 in uint __builtinWaveIndex : SV_WaveIndex;
+in uint __builtinWaveCount : SV_WaveCount;
 in uint __builtinGroupIndex : SV_GroupIndex;
 
 //@public:
@@ -452,8 +453,14 @@ struct ByteAddressBuffer
     ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
-    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
+    /// This overload takes no alignment guarantee from the caller, so a `location` known only at
+    /// run time may be lowered to scalar 4-byte loads. When `location` is a literal, the compiler
+    /// reads what it can from the address itself: on the targets `LoadAligned<T>` lists as loading
+    /// `float2` groups, a vector within `T` is loaded whole when its address is a multiple of its
+    /// size, and otherwise in the widest 4- or 2-component groups whose address is a multiple of
+    /// the group's size (a `bool` vector per component). For example, `Load<float3>(0)` is one
+    /// `float3` load, `Load<float4>(8)` is two `float2` loads, and `Load<float4>(4)` is a `float`,
+    /// a `float2` and a `float`. Use `LoadAligned<T>` when `location` has a known alignment.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
@@ -468,8 +475,18 @@ struct ByteAddressBuffer
     ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
-    /// On other targets, `alignment` is forwarded to the lowered load instruction.
+    /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
+    /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
+    /// for any remainder. The rule applies to each vector within `T`: a struct is loaded field by
+    /// field, a 3-component vector is always split because no power-of-two `alignment` is a
+    /// multiple of its size, and a partially covered `bool` vector is loaded per component. For
+    /// example, `LoadAligned<float4>(location, 8)` lowers as follows:
+    /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
+    ///   `asfloat`.
+    /// - HLSL with a Shader Model 5.1 or later profile, SPIR-V, GLSL, CUDA and C++: two `float2`
+    ///   loads.
+    /// - Metal, WGSL and LLVM-based CPU targets: four per-component loads, for any valid
+    ///   `alignment`.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
@@ -7015,8 +7032,14 @@ struct $(item.name)
     ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
-    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
+    /// This overload takes no alignment guarantee from the caller, so a `location` known only at
+    /// run time may be lowered to scalar 4-byte loads. When `location` is a literal, the compiler
+    /// reads what it can from the address itself: on the targets `LoadAligned<T>` lists as loading
+    /// `float2` groups, a vector within `T` is loaded whole when its address is a multiple of its
+    /// size, and otherwise in the widest 4- or 2-component groups whose address is a multiple of
+    /// the group's size (a `bool` vector per component). For example, `Load<float3>(0)` is one
+    /// `float3` load, `Load<float4>(8)` is two `float2` loads, and `Load<float4>(4)` is a `float`,
+    /// a `float2` and a `float`. Use `LoadAligned<T>` when `location` has a known alignment.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
@@ -7031,8 +7054,18 @@ struct $(item.name)
     ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
-    /// On other targets, `alignment` is forwarded to the lowered load instruction.
+    /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
+    /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
+    /// for any remainder. The rule applies to each vector within `T`: a struct is loaded field by
+    /// field, a 3-component vector is always split because no power-of-two `alignment` is a
+    /// multiple of its size, and a partially covered `bool` vector is loaded per component. For
+    /// example, `LoadAligned<float4>(location, 8)` lowers as follows:
+    /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
+    ///   `asfloat`.
+    /// - HLSL with a Shader Model 5.1 or later profile, SPIR-V, GLSL, CUDA and C++: two `float2`
+    ///   loads.
+    /// - Metal, WGSL and LLVM-based CPU targets: four per-component loads, for any valid
+    ///   `alignment`.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
@@ -7718,6 +7751,13 @@ $}
         }
     }
 
+    /// Store a value with type `T` to the buffer at the specified location.
+    ///@param T The type of the value to store.
+    ///@param address The output address in bytes, which must be a multiple of 4.
+    ///@param value The value to store.
+    ///@remarks
+    /// The access width is chosen as for `Load<T>(location)`; for example, on the same targets,
+    /// `Store<float4>(8, value)` is two `float2` stores.
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store<T>(uint address, T value)
@@ -7725,6 +7765,13 @@ $}
         __byteAddressBufferStore(this, address, 0, value);
     }
 
+    /// Store a value with type `T` to the buffer at the specified location with a known alignment.
+    ///@param T The type of the value to store.
+    ///@param address The output address in bytes, which must be a multiple of `alignment`.
+    ///@param value The value to store.
+    ///@param alignment The known alignment of `address` in bytes; a compile-time constant.
+    ///@remarks
+    /// `alignment` selects the access width as for `LoadAligned<T>(location, alignment)`.
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store<T>(uint address, T value, constexpr uint alignment)
@@ -7955,22 +8002,22 @@ struct TriangleStream
 };
 
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 #define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 //@public:
 
@@ -9777,7 +9824,7 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
 
 /// Clip (discard) fragment conditionally
 __generic<T : __BuiltinFloatingPointType>
-[require(cpp_cuda_glsl_hlsl_spirv, fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl, fragment)]
 void clip(T x)
 {
     __target_switch
@@ -9789,7 +9836,7 @@ void clip(T x)
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-[require(cpp_cuda_glsl_hlsl_spirv, fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl, fragment)]
 void clip(vector<T,N> x)
 {
     __target_switch
@@ -9801,7 +9848,7 @@ void clip(vector<T,N> x)
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-[require(cpp_cuda_glsl_hlsl_spirv, fragment)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl, fragment)]
 void clip(matrix<T,N,M> x)
 {
     __target_switch
@@ -10253,7 +10300,7 @@ matrix<T, N, M> dd$(xOrY)(matrix<T, N, M> p)
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 T dd$(xOrY)_coarse(T p)
 {
     __requireComputeDerivative();
@@ -10262,13 +10309,16 @@ T dd$(xOrY)_coarse(T p)
     case hlsl: __intrinsic_asm "dd$(xOrY)_coarse";
     case glsl: __intrinsic_asm "dFd$(xOrY)Coarse";
     case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$T = OpDPd$(xOrY)Coarse $p};
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
+        __intrinsic_asm "dpd$(xOrY)Coarse";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 vector<T, N> dd$(xOrY)_coarse(vector<T, N> p)
 {
     __requireComputeDerivative();
@@ -10277,12 +10327,15 @@ vector<T, N> dd$(xOrY)_coarse(vector<T, N> p)
     case hlsl: __intrinsic_asm "dd$(xOrY)_coarse";
     case glsl: __intrinsic_asm "dFd$(xOrY)Coarse";
     case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$vector<T,N> = OpDPd$(xOrY)Coarse $p};
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
+        __intrinsic_asm "dpd$(xOrY)Coarse";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 matrix<T, N, M> dd$(xOrY)_coarse(matrix<T, N, M> p)
 {
     __requireComputeDerivative();
@@ -10303,7 +10356,7 @@ matrix<T, N, M> dd$(xOrY)_coarse(matrix<T, N, M> p)
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 T dd$(xOrY)_fine(T p)
 {
     __requireComputeDerivative();
@@ -10312,13 +10365,16 @@ T dd$(xOrY)_fine(T p)
     case hlsl: __intrinsic_asm "dd$(xOrY)_fine";
     case glsl: __intrinsic_asm "dFd$(xOrY)Fine";
     case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$T = OpDPd$(xOrY)Fine $p};
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
+        __intrinsic_asm "dpd$(xOrY)Fine";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 vector<T, N> dd$(xOrY)_fine(vector<T, N> p)
 {
     __requireComputeDerivative();
@@ -10327,12 +10383,15 @@ vector<T, N> dd$(xOrY)_fine(vector<T, N> p)
     case hlsl: __intrinsic_asm "dd$(xOrY)_fine";
     case glsl: __intrinsic_asm "dFd$(xOrY)Fine";
     case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$vector<T,N> = OpDPd$(xOrY)Fine $p};
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
+        __intrinsic_asm "dpd$(xOrY)Fine";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 matrix<T, N, M> dd$(xOrY)_fine(matrix<T, N, M> p)
 {
     __requireComputeDerivative();
@@ -11339,7 +11398,8 @@ float f16tof32(uint value)
     case hlsl: __intrinsic_asm "f16tof32($0)";
     case cuda: __intrinsic_asm "__half2float(__ushort_as_half($0))";
     case cpp: __intrinsic_asm "f16tof32($0)";
-    case metal: __intrinsic_asm "as_type<half>((ushort)($0))";
+    // `as_type<half>` alone is a `half`; widen it so the result is a `float` as declared.
+    case metal: __intrinsic_asm "float(as_type<half>((ushort)($0)))";
     case spirv:
     {
         return spirv_asm {
@@ -11392,7 +11452,8 @@ uint f32tof16(float value)
     case hlsl: __intrinsic_asm "f32tof16($0)";
     case cuda: __intrinsic_asm "__half_as_ushort(__float2half($0))";
     case cpp: __intrinsic_asm "f32tof16($0)";
-    case metal: __intrinsic_asm "as_type<ushort>((half)($0))";
+    // `as_type<ushort>` alone is a `ushort`; widen it so the result is a `uint` as declared.
+    case metal: __intrinsic_asm "uint(as_type<ushort>((half)($0)))";
     case spirv:
     {
         return spirv_asm {
@@ -11472,6 +11533,7 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
     case spirv: return spirv_asm {
         OpFConvert $$vector<float, N> result $value
     };
+    case wgsl: __intrinsic_asm "$TR($0)";
     case llvm: __intrinsic_asm "%result = fpext $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, f16tof32, value);
@@ -11510,6 +11572,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
     case spirv: return spirv_asm {
         OpFConvert $$vector<float16_t, N> result $value
     };
+    case wgsl: __intrinsic_asm "$TR($0)";
     case llvm: __intrinsic_asm "%result = fptrunc $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float16_t, N, f32tof16_, value);
@@ -12000,6 +12063,9 @@ vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
     case spirv: return spirv_asm {
         result:$$vector<T,N> = OpFRem $x $y
     };
+    case wgsl:
+        // WGSL `%` on floats is the truncated remainder, as for the scalar overload.
+        __intrinsic_asm "(($0) % ($1))";
     default:
         VECTOR_MAP_BINARY(T, N, fmod, x, y);
     }
@@ -12261,7 +12327,7 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
 /// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 T fwidth_coarse(T p)
 {
     __requireComputeDerivative();
@@ -12270,6 +12336,9 @@ T fwidth_coarse(T p)
     case hlsl:
         __intrinsic_asm "abs(ddx_coarse($0)) + abs(ddy_coarse($0))";
     case glsl:
+        __intrinsic_asm "fwidthCoarse($0)";
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
         __intrinsic_asm "fwidthCoarse($0)";
     case spirv:
         return spirv_asm
@@ -12282,7 +12351,7 @@ T fwidth_coarse(T p)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 vector<T, N> fwidth_coarse(vector<T, N> x)
 {
     __requireComputeDerivative();
@@ -12291,6 +12360,9 @@ vector<T, N> fwidth_coarse(vector<T, N> x)
     case hlsl:
         __intrinsic_asm "abs(ddx_coarse($0)) + abs(ddy_coarse($0))";
     case glsl:
+        __intrinsic_asm "fwidthCoarse($0)";
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
         __intrinsic_asm "fwidthCoarse($0)";
     case spirv:
         return spirv_asm
@@ -12303,7 +12375,7 @@ vector<T, N> fwidth_coarse(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 matrix<T, N, M> fwidth_coarse(matrix<T, N, M> x)
 {
     __target_switch
@@ -12323,7 +12395,7 @@ matrix<T, N, M> fwidth_coarse(matrix<T, N, M> x)
 /// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 T fwidth_fine(T p)
 {
     __requireComputeDerivative();
@@ -12332,6 +12404,9 @@ T fwidth_fine(T p)
     case hlsl:
         __intrinsic_asm "abs(ddx_fine($0)) + abs(ddy_fine($0))";
     case glsl:
+        __intrinsic_asm "fwidthFine($0)";
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
         __intrinsic_asm "fwidthFine($0)";
     case spirv:
         return spirv_asm
@@ -12344,7 +12419,7 @@ T fwidth_fine(T p)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 vector<T, N> fwidth_fine(vector<T, N> x)
 {
     __requireComputeDerivative();
@@ -12353,6 +12428,9 @@ vector<T, N> fwidth_fine(vector<T, N> x)
     case hlsl:
         __intrinsic_asm "abs(ddx_fine($0)) + abs(ddy_fine($0))";
     case glsl:
+        __intrinsic_asm "fwidthFine($0)";
+    case wgsl:
+        static_assert(T is float, "WGSL derivative built-ins take only f32 values");
         __intrinsic_asm "fwidthFine($0)";
     case spirv:
         return spirv_asm
@@ -12365,7 +12443,7 @@ vector<T, N> fwidth_fine(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+[require(glsl_hlsl_spirv_wgsl, fragmentprocessing_derivativecontrol)]
 matrix<T, N, M> fwidth_fine(matrix<T, N, M> x)
 {
     __target_switch
@@ -12786,6 +12864,7 @@ vector<bool, N> isfinite(vector<T, N> x)
     case hlsl: __intrinsic_asm "isfinite";
     case glsl:
     case spirv:
+    case wgsl:
         return !(isinf(x) || isnan(x));
     case metal:
         __intrinsic_asm "isfinite";
@@ -12828,7 +12907,7 @@ bool isinf(T x)
     case spirv:
         return spirv_asm { result:$$bool = OpIsInf $x};
     case wgsl:
-        static_assert(T is float, "isnan is implemented only for float type");
+        static_assert(T is float, "isinf is implemented only for float type");
         if (let f = x as float)
         {
             let bits = asuint(f);
@@ -12854,6 +12933,12 @@ vector<bool, N> isinf(vector<T, N> x)
         __intrinsic_asm "isinf";
     case spirv:
         return spirv_asm { result:$$vector<bool,N> = OpIsInf $x};
+    case wgsl:
+        // The scalar bit test, on the whole vector.
+        static_assert(T is float, "isinf is implemented only for float type");
+        if (let f = x as vector<float, N>)
+            return (asuint(f) & 0x7fffffffu) == 0x7f800000u;
+        return vector<bool, N>(false);
     default:
         VECTOR_MAP_UNARY(bool, N, isinf, x);
     }
@@ -12919,6 +13004,12 @@ vector<bool, N> isnan(vector<T, N> x)
         __intrinsic_asm "isnan";
     case spirv:
         return spirv_asm { result:$$vector<bool, N> = OpIsNan $x};
+    case wgsl:
+        // The scalar bit test, on the whole vector.
+        static_assert(T is float, "isnan is implemented only for float type");
+        if (let f = x as vector<float, N>)
+            return (asuint(f) & 0x7fffffffu) > 0x7f800000u;
+        return vector<bool, N>(false);
     default:
         VECTOR_MAP_UNARY(bool, N, isnan, x);
     }
@@ -15547,6 +15638,7 @@ T rsqrt(T x)
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 InverseSqrt $x
     };
+    case wgsl: __intrinsic_asm "inverseSqrt";
     default:
         return T(1.0) / sqrt(x);
     }
@@ -15565,6 +15657,7 @@ vector<T, N> rsqrt(vector<T, N> x)
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 InverseSqrt $x
     };
+    case wgsl: __intrinsic_asm "inverseSqrt";
     case llvm:
         return vector<T, N>(1.0) / sqrt(x);
     default:
@@ -18211,8 +18304,19 @@ uint WaveGetNumWaves()
             OpCapability GroupNonUniform;
             result:$$uint = OpLoad builtin(NumSubgroups:uint)
         };
+    case wgsl:
+        // WGSL's num_subgroups built-in (with subgroup_id, as WaveGetWaveIndex uses).
+        __requireTargetExtension("subgroups");
+        __stage_switch
+        {
+        case compute:
+            return __builtinWaveCount;
+        default:
+            static_assert(false, "WaveGetNumWaves is only supported in compute shaders");
+            return 0;
+        }
     default:
-        // For HLSL/CUDA/Metal/WGSL: compute from workgroup size and wave size
+        // For HLSL/CUDA/Metal: compute from workgroup size and wave size
         __stage_switch
         {
         case compute:
@@ -35901,7 +36005,10 @@ uint packUint4x8Clamp(int32_t4 unpackedValue)
     __target_switch
     {
     case hlsl: __intrinsic_asm "pack_clamp_u8";
-    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>($0))";
+    // pack4xU8Clamp takes vec4<u32>, so the i32 -> u32 conversion happens before it clamps, and a
+    // negative lane would wrap and clamp to 255. Clamp the low end in i32 first; the builtin still
+    // clamps the high end.
+    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>(max($0, vec4<i32>(0))))";
     default:
         return packInt4x8(clamp(unpackedValue, 0, 255));
     }

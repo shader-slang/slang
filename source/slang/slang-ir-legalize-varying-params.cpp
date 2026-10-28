@@ -5308,6 +5308,13 @@ protected:
                 break;
             }
 
+        case SystemValueSemanticName::WaveCount:
+            {
+                result.systemValueName = toSlice("num_subgroups");
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+
         case SystemValueSemanticName::ViewID:
         case SystemValueSemanticName::ViewportArrayIndex:
         case SystemValueSemanticName::StartVertexLocation:
