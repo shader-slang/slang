@@ -33,13 +33,8 @@ bool performPreAutoDiffForceInlining(IRGlobalValueWithCode* func);
 bool performPreAutoDiffForceInlining(IRModule* module);
 
 /// Inline calls to functions that returns a resource/sampler via either return value or output
-/// parameter. When `groupSharedByRefOnly` is true, only functions with a `groupshared`
-/// by-reference parameter are inlined (used for WGSL, which handles resources fine but cannot take
-/// a `ptr<workgroup>` as a function parameter); otherwise the full GLSL fallback set is inlined.
-void performGLSLResourceReturnFunctionInlining(
-    IRModule* module,
-    TargetProgram* targetProgram,
-    bool groupSharedByRefOnly = false);
+/// parameter.
+void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* targetProgram);
 
 /// Inline simple intrinsic functions whose definition is a single asm block.
 void performIntrinsicFunctionInlining(IRModule* module);

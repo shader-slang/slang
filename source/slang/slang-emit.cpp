@@ -2444,18 +2444,6 @@ Result linkAndOptimizeIR(
         {
             // WGSL, like GLSL and SPIR-V, requires an integer `switch` selector.
             SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
-
-            // WGSL can represent resource parameters, but baseline WGSL cannot take a
-            // `ptr<workgroup, ...>` as a function parameter, so a `groupshared` value passed by
-            // reference (#10641) must be inlined away. This has to run *before*
-            // `legalizeIRForWGSL`: that pass's `legalizeCall` bridges an argument that names part
-            // of a composite (such as `go.inner.v`) through a `function`-space copy-in/out
-            // temporary, which would silently reintroduce the per-invocation copy that #10641
-            // exists to remove. Inlining first makes the callee and its parameter disappear, so
-            // the shared accesses land directly on the `workgroup` global. Reuse the GLSL
-            // resource-return fallback pass restricted to that single case.
-            SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram, true);
-
             SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
         break;
