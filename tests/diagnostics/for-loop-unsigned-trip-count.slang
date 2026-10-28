@@ -68,6 +68,16 @@ void inferredLoopCounts()
     {
     }
 
+    // `uintptr_t` (and so `size_t`) is ordered as unsigned 64-bit too.
+    [MaxIters(100)]
+/*diag:
+     ^^^^^^^^ MaxIters exceeds actual iterations
+     ^^^^^^^^ the for loop is statically determined to terminate within 4 iterations, which is less than what [MaxIters] specifies.
+*/
+    for (uintptr_t i = 0x7FFFFFFFFFFFFFFEuz; i < 0x8000000000000002uz; i++)
+    {
+    }
+
     // Signed bounds on both sides of zero keep their signed order.
     [MaxIters(100)]
 /*diag:
@@ -131,8 +141,8 @@ void inferredLoopCounts()
             break;
     }
 
-    // The count cap sits exactly at INT32_MAX: a count of 2^31 infers no bound, while a count
-    // just below the cap is still inferred.
+    // A count of 2^31, one above INT32_MAX, infers no bound, while a count of 2^31 - 2 is still
+    // inferred.
     [MaxIters(100)]
     for (int64_t i = 0; i < 0x80000000ll; i++)
     {
@@ -143,6 +153,16 @@ void inferredLoopCounts()
      ^^^^^^^^ the for loop is statically determined to terminate within 2147483646 iterations, which is less than what [MaxIters] specifies.
 */
     for (int64_t i = 1; i < 0x7FFFFFFFll; i++)
+    {
+    }
+
+    // A negative step added to the variable counts down by its magnitude.
+    [MaxIters(100)]
+/*diag:
+     ^^^^^^^^ MaxIters exceeds actual iterations
+     ^^^^^^^^ the for loop is statically determined to terminate within 5 iterations, which is less than what [MaxIters] specifies.
+*/
+    for (int i = 10; i > 0; i += -2)
     {
     }
 
