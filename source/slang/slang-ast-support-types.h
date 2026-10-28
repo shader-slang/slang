@@ -200,7 +200,7 @@ FIDDLE() namespace Slang
 
     enum class ImageFormat
     {
-#define SLANG_FORMAT(NAME, CODE_NAME, OTHER) NAME,
+#define SLANG_FORMAT(NAME, OTHER) NAME,
 #include "slang-image-format-defs.h"
 #undef SLANG_FORMAT
     };
@@ -633,7 +633,27 @@ FIDDLE() namespace Slang
         FIDDLE() Type* type = nullptr;
         FIDDLE() bool isLeftValue = false;
         FIDDLE() bool hasReadOnlyOnTarget = false;
+
+        /// The expression denotes storage declared with the GLSL `writeonly` memory qualifier.
         FIDDLE() bool isWriteOnly = false;
+
+        /// The expression denotes a memory location that it cannot write, such as a
+        /// `__ref_readonly` parameter, or a field or element of one. A `__constref` parameter is
+        /// not one, because a borrow may be a temporary holding the argument's value. It is never
+        /// set together with `isLeftValue`, which means a writable abstract storage location
+        /// (a property with a setter is one, but not a memory location). Together the two
+        /// flags play the role of C++'s modifiable and non-modifiable l-values, so an argument
+        /// for a `__ref_readonly` parameter may be either.
+        ///
+        /// TODO: This flag combines two properties of an expression that we want to record
+        /// independently: its value category (a pure value, an abstract storage location such
+        /// as a `property` reference, or a memory location) and the access it permits
+        /// (read-only, write-only, or read-write). `isLeftValue` and `isWriteOnly` each encode
+        /// part of the same two properties. We expect `QualType` to become an `ExprInfo` that
+        /// stores the value category and the access as separate fields. We added only this flag
+        /// because restructuring `QualType` is a larger change than adding `__ref_readonly`
+        /// needs.
+        FIDDLE() bool isReadOnlyMemoryLocation = false;
 
         QualType() = default;
 
@@ -1854,9 +1874,8 @@ FIDDLE() namespace Slang
 
         /// Pass a reference to a borrowed immutable value.
         ///
-        /// Indicated by using the `borrow` modifier on a parameter,
-        /// or the combination of `borrow` and `in` (while not also
-        /// using `out`).
+        /// Indicated by the `__borrow` modifier on a parameter, or by
+        /// its legacy alias `__constref`.
         ///
         /// May semantically be implemented by directly passing a
         /// reference to the argument, or a reference to a temporary
@@ -1908,8 +1927,44 @@ FIDDLE() namespace Slang
         /// This parameter-passing mode is more-or-less just syntactic
         /// sugar for a parameter of an explicit pointer type (`Ptr<T>`).
         ///
-        Ref,
+        RefReadWrite,
+
+        /// Pass a reference to a memory location that the callee may only read.
+        ///
+        /// Indicated by the `__ref_readonly` modifier on a parameter, or by
+        /// its legacy alias `const __ref` (or `__ref const`).
+        ///
+        /// The same rules as `RefReadWrite` apply to the argument and to
+        /// aliasing access paths; only the callee's access through the
+        /// parameter is restricted.
+        ///
+        RefReadOnly,
+
+        /// Pass a reference to a memory location that the callee may only write.
+        ///
+        /// Indicated by the `__ref_writeonly` modifier on a parameter.
+        ///
+        RefWriteOnly,
     };
+
+    /// Is `mode` one of the `Ref*` modes, which always pass the address of
+    /// the argument's memory location?
+    inline bool isByReferenceParamPassingMode(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /// Get the access qualifier that an `IRRefParamType` records for a `Ref*` mode.
+    ///
+    AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode);
 
     /// Combined semantic information about a parameter's type and parameter-passing mode.
     ///
@@ -1942,11 +1997,13 @@ FIDDLE() namespace Slang
         {
         case ParamPassingMode::Out:
         case ParamPassingMode::BorrowInOut:
-        case ParamPassingMode::Ref:
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefWriteOnly:
             return true;
 
         case ParamPassingMode::In:
         case ParamPassingMode::BorrowIn:
+        case ParamPassingMode::RefReadOnly:
             return false;
 
         default:
@@ -1955,9 +2012,47 @@ FIDDLE() namespace Slang
         }
     }
 
+    /// Get the keyword that the compiler prints to name `mode`, such as `"inout"`.
+    ///
+    /// Each keyword is the modifier that declares the mode, with any leading `__` removed, so a
+    /// `__ref_readonly` parameter prints as `ref_readonly`. A `__constref` parameter prints as
+    /// `borrow`, because `__constref` is the legacy alias of `__borrow`.
+    inline const char* getParamPassingModeKeyword(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::In:
+            return "in";
+        case ParamPassingMode::Out:
+            return "out";
+        case ParamPassingMode::BorrowInOut:
+            return "inout";
+        case ParamPassingMode::BorrowIn:
+            return "borrow";
+        case ParamPassingMode::RefReadWrite:
+            return "ref";
+        case ParamPassingMode::RefReadOnly:
+            return "ref_readonly";
+        case ParamPassingMode::RefWriteOnly:
+            return "ref_writeonly";
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN("");
+        }
+    }
+
+    /// Print the keyword for `mode` followed by a space, as it appears before a parameter in a
+    /// function signature or an inlay hint. An `in` parameter prints nothing, because `in` is
+    /// the default and labeling it would add noise to most signatures.
+    inline void printParamPassingModePrefix(StringBuilder & sb, ParamPassingMode mode)
+    {
+        if (mode != ParamPassingMode::In)
+            sb << getParamPassingModeKeyword(mode) << " ";
+    }
+
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 
-    /// The role of a builtin type member or interface requirement known to the compiler.
+    /// The kind of a builtin interface requirement that can be automatically synthesized.
     enum class BuiltinRequirementKind
     {
         DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
@@ -2001,8 +2096,6 @@ FIDDLE() namespace Slang
         BwdCallableContextWitness, ///< The `IBackwardDifferentiable.BwdCallable : IBwdCallable`
                                    ///< conformance (witness that the backward-callable context type
                                    ///< conforms to `IBwdCallable`)
-
-        TextureElementType, ///< The `_Texture.T` alias for the loaded and stored texel data type.
     };
 
     enum class FunctionDifferentiableLevel

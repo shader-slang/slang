@@ -3630,14 +3630,6 @@ public:
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
 
-    /// Roots a declared facet witness at the type whose conformance is being queried.
-    /// Both ordinary subtype queries and provisional extension constraints use this path.
-    /// Other witness forms are returned unchanged.
-    SubtypeWitness* getSubtypeWitnessForType(
-        Type* subType,
-        Type* superType,
-        SubtypeWitness* witness);
-
     Witness* getDiffTypeInfoWitness(Type* type);
     Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
 
@@ -4760,6 +4752,14 @@ bool getExtensionTargetDeclList(
     ShortList<AggTypeDecl*>& targetDecls);
 
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
+
+// Collect the requirements of a checked declaration reference, including its generic arguments.
+// Append contributing declarations to `outReferencedDecls` for use-site diagnostics without
+// changing the shared declaration's requirements or provenance.
+CapabilitySet getDeclRefCapabilityRequirements(
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef,
+    List<Decl*>& outReferencedDecls);
 
 RefPtr<ComponentType> createUnspecializedGlobalComponentType(
     FrontEndCompileRequest* compileRequest);

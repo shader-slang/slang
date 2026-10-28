@@ -1160,6 +1160,9 @@ public:
     // The corresponding function declaration
     DeclRef<FuncDecl> entryPoint;
 
+    // Requirements for this entry-point selection, including its specialization arguments.
+    CapabilitySetVal* inferredCapabilityRequirements = nullptr;
+
     ComponentType* program = nullptr;
 
     DeclRef<FuncDecl> getFuncDeclRef() { return entryPoint; }
@@ -1707,6 +1710,13 @@ enum
     kEntryPointParameterDirection_Output = 0x2,
 };
 
+
+void getMatrixLayoutAxisCounts(
+    size_t rowCount,
+    size_t columnCount,
+    MatrixLayoutMode matrixLayoutMode,
+    size_t& outLayoutMajorCount,
+    size_t& outLayoutMinorCount);
 
 /// Get layout information for a simple varying parameter type.
 ///

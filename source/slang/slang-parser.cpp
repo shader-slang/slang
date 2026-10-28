@@ -152,13 +152,29 @@ public:
 
     void resetLookupScope() { currentLookupScope = currentScope; }
 
+    // Push a new scope for the members of `containerDecl` and make it the scope that
+    // `containerDecl` owns, replacing any scope the container owned before.
     void PushScope(ContainerDecl* containerDecl)
+    {
+        pushLookupScope(containerDecl);
+        containerDecl->ownedScope = currentScope;
+    }
+
+    // Push a new scope that makes the members of `containerDecl` visible to lookup,
+    // without replacing the scope that `containerDecl` owns.
+    //
+    // A namespace gets one such scope per `{ ... }` body, and one more for each qualified
+    // declaration that names it, such as `A` in `namespace A::B`. We record all of them in
+    // `NamespaceDecl::lexicalScopes`, because the semantic checker attaches the imported
+    // namespaces of the same name to each one.
+    void pushLookupScope(ContainerDecl* containerDecl)
     {
         Scope* newScope = astBuilder->create<Scope>();
         newScope->containerDecl = containerDecl;
         newScope->parent = currentScope;
         currentScope = newScope;
-        containerDecl->ownedScope = newScope;
+        if (auto namespaceDecl = as<NamespaceDecl>(containerDecl))
+            namespaceDecl->lexicalScopes.add(newScope);
         resetLookupScope();
     }
 
@@ -4687,7 +4703,10 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
     SLANG_ASSERT(parentDecl);
     NamespaceDecl* result = nullptr;
     NamespaceDecl* namespaceDecl = nullptr;
+    // Each entry of `nestedNamespaceDecls`, and each count in `lookupScopeCount`, stands
+    // for one scope pushed below that we pop after the body.
     List<NamespaceDecl*> nestedNamespaceDecls;
+    Index lookupScopeCount = 0;
     do
     {
         namespaceDecl = nullptr;
@@ -4752,11 +4771,25 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
                 namespaceDecl->nameAndLoc = nameAndLoc;
                 namespaceDecl->loc = nameAndLoc.loc;
                 AddMember(parentDecl, namespaceDecl);
-                if (auto parentNamespace = as<NamespaceDecl>(parentDecl))
+                // We push a scope only for the parent of a later component, because the
+                // parent of the first component is the scope we are already in.
+                if (result)
                 {
-                    parser->PushScope(parentDecl);
+                    auto parentNamespace = as<NamespaceDecl>(parentDecl);
+                    SLANG_ASSERT(parentNamespace);
+                    parser->PushScope(parentNamespace);
                     nestedNamespaceDecls.add(parentNamespace);
                 }
+            }
+            else if (result)
+            {
+                // Consider `namespace A::B { ... }` where both `A` and `B` already
+                // exist. The body must see the members of `A`, as it does when the
+                // user writes `namespace A { namespace B { ... } }`, so we push a
+                // scope for `A`. `A` already owns the scope of one of its own bodies,
+                // so this scope serves lookup only.
+                parser->pushLookupScope(parentDecl);
+                lookupScopeCount++;
             }
         }
         if (!result)
@@ -4779,6 +4812,8 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
         ns->closingSourceLoc = namespaceDecl->closingSourceLoc;
         parser->PopScope();
     }
+    for (Index i = 0; i < lookupScopeCount; i++)
+        parser->PopScope();
     return result;
 }
 
@@ -11109,6 +11144,9 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("out", getSyntaxClass<OutModifier>()),
     _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
     _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
+    _makeParseModifier("__ref_readonly", getSyntaxClass<RefReadOnlyModifier>()),
+    _makeParseModifier("__ref_writeonly", getSyntaxClass<RefWriteOnlyModifier>()),
+    _makeParseModifier("__borrow", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),

@@ -204,7 +204,7 @@ other workload in the suite measures.
 > One axis per workload is not a stylistic preference here. A mixed
 > "kitchen sink" cross-target shader was tried first and **failed**: a shared
 > super-linear front-end cost dominated it and flattened a 21× cuda/spirv
-> divergence to 1.1×. See `COVERAGE-ANALYSIS.md`.
+> divergence to 1.1×.
 
 | Test                   | Targets                        | What it generates                                                  | Isolates                                                                                                                                                                                         | Primary timers                                     |
 | ---------------------- | ------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
@@ -421,9 +421,22 @@ via `--results <checkout-path>`.
 | `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
 | `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
 
+The publishing nightly also exports daily results and newly measured releases for
+BenchView; release exports include only active tests at their current default sizes.
+Runs with `sweep=true` skip BenchView and defer new-release discovery. Older suite
+checkouts defer release discovery when they lack release-export support.
+The benchmark host handles collection and delivery. Export failures do not block
+existing reports; an invalid release export also leaves the daily export intact.
+Skipped or failed release exports require a separate export of the archived results;
+they are not automatically retried after the release enters the tracked history.
+For local or historical exports, see `python3 benchview.py --help`.
+
 ---
 
 ## Notes / caveats
+
+Run the regression tests from the repository root with
+`python3 -m unittest discover -s tools/compile-perf/tests -t tools/compile-perf -p 'test_*.py'`.
 
 - **`parse` is sema-dominated:** `parseTranslationUnit` is cheap even for huge
   files; use that timer (not `frontEndExecute`) for the pure-parse signal.

@@ -474,7 +474,9 @@ static std::optional<ParamPassingMode> _getBackwardCallableParamMode(ParamPassin
     case ParamPassingMode::BorrowInOut:
         return ParamPassingMode::BorrowInOut;
     case ParamPassingMode::BorrowIn:
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         return std::nullopt;
     default:
         SLANG_UNEXPECTED("unhandled parameter-passing mode");
@@ -656,27 +658,8 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
                 auto ptrPairType =
                     astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
 
-                switch (paramInfo.mode)
-                {
-                case ParamPassingMode::Out:
-                    newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::In:
-                    newParamTypes.add(ptrPairType);
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::BorrowIn:
-                    newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::Ref:
-                    newParamTypes.add(astBuilder->getRefParamType(ptrPairType));
-                    break;
-                default:
-                    SLANG_ASSERT(!"Unknown parameter direction");
-                    break;
-                }
+                newParamTypes.add(
+                    getParamTypeWithModeWrapper(astBuilder, ptrPairType, paramInfo.mode));
             }
             else
             {
@@ -755,27 +738,8 @@ Val* RematFuncType::_resolveImplOverride()
                 auto ptrPairType =
                     astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
 
-                switch (paramInfo.mode)
-                {
-                case ParamPassingMode::Out:
-                    newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::In:
-                    newParamTypes.add(ptrPairType);
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::BorrowIn:
-                    newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::Ref:
-                    newParamTypes.add(astBuilder->getRefParamType(ptrPairType));
-                    break;
-                default:
-                    SLANG_ASSERT(!"Unknown parameter direction");
-                    break;
-                }
+                newParamTypes.add(
+                    getParamTypeWithModeWrapper(astBuilder, ptrPairType, paramInfo.mode));
             }
             else
             {
@@ -929,7 +893,9 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                     }
                     break;
                 }
-            case ParamPassingMode::Ref:
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefReadOnly:
+            case ParamPassingMode::RefWriteOnly:
                 {
                     // Ref parameters not allowed in backward diff.
                     SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
@@ -1050,10 +1016,15 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     }
                     break;
                 }
-            case ParamPassingMode::Ref:
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefReadOnly:
+            case ParamPassingMode::RefWriteOnly:
                 {
                     // do not differentiate ref params
-                    newParamTypes.add(getCurrentASTBuilder()->getRefParamType(paramInfo.type));
+                    newParamTypes.add(getParamTypeWithModeWrapper(
+                        getCurrentASTBuilder(),
+                        paramInfo.type,
+                        paramInfo.mode));
                     break;
                 }
             case ParamPassingMode::BorrowIn:
@@ -1381,22 +1352,38 @@ void ExplicitRefType::_toTextOverride(StringBuilder& out)
 
 void OutParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("out ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::Out);
+    out << getValueType();
 }
 
 void BorrowInOutParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("inout ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::BorrowInOut);
+    out << getValueType();
 }
 
 void RefParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("ref ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::RefReadWrite);
+    out << getValueType();
+}
+
+void RefReadOnlyParamType::_toTextOverride(StringBuilder& out)
+{
+    printParamPassingModePrefix(out, ParamPassingMode::RefReadOnly);
+    out << getValueType();
+}
+
+void RefWriteOnlyParamType::_toTextOverride(StringBuilder& out)
+{
+    printParamPassingModePrefix(out, ParamPassingMode::RefWriteOnly);
+    out << getValueType();
 }
 
 void BorrowInParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("borrow ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::BorrowIn);
+    out << getValueType();
 }
 
 
@@ -1456,7 +1443,7 @@ ParamPassingMode getDifferentiatedThisParamMode(ParamPassingMode effectiveMode)
     {
     case ParamPassingMode::BorrowIn:
         return ParamPassingMode::In;
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
         return ParamPassingMode::BorrowInOut;
     default:
         return effectiveMode;
@@ -1469,7 +1456,15 @@ ParamPassingMode getParamPassingModeFromPossiblyWrappedParamType(Type* paramType
 {
     if (as<RefParamType>(paramType))
     {
-        return ParamPassingMode::Ref;
+        return ParamPassingMode::RefReadWrite;
+    }
+    else if (as<RefReadOnlyParamType>(paramType))
+    {
+        return ParamPassingMode::RefReadOnly;
+    }
+    else if (as<RefWriteOnlyParamType>(paramType))
+    {
+        return ParamPassingMode::RefWriteOnly;
     }
     else if (as<BorrowInParamType>(paramType))
     {
@@ -2385,24 +2380,9 @@ Type* BuiltinGenericType::getElementType() const
     return as<Type>(_getGenericTypeArg(getDeclRefBase(), 0));
 }
 
-Type* ResourceType::getTexelType()
-{
-    return as<Type>(_getGenericTypeArg(this, 0));
-}
-
 Type* ResourceType::getElementType()
 {
-    // Consider `Texture2D<RGBA16F>`. Its first generic argument remains `RGBA16F` so
-    // generic inference can recover the public type argument. The checked `_Texture.T`
-    // alias holds `Texel.DataType`; substituting it through this texture declaration
-    // resolves the payload to `float4` using the ordinary conformance witness.
-    auto astBuilder = getCurrentASTBuilder();
-    auto elementTypeDecl =
-        as<TypeDefDecl>(astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
-            BuiltinRequirementKind::TextureElementType));
-    SLANG_RELEASE_ASSERT(elementTypeDecl && elementTypeDecl->type);
-    SLANG_RELEASE_ASSERT(elementTypeDecl->parentDecl == getDeclRef().getDecl());
-    return getType(astBuilder, astBuilder->getMemberDeclRef(getDeclRef(), elementTypeDecl));
+    return as<Type>(_getGenericTypeArg(this, 0));
 }
 
 void ResourceType::_toTextOverride(StringBuilder& out)
@@ -2474,11 +2454,11 @@ void ResourceType::_toTextOverride(StringBuilder& out)
             return false;
         if (isShadow())
             return false;
-        auto texelType = getTexelType();
-        if (texelType)
+        auto elementType = getElementType();
+        if (elementType)
         {
             resultSB << "<";
-            resultSB << texelType->toString();
+            resultSB << elementType->toString();
             auto sampleCount = _getGenericTypeArg(this, 4);
             if (auto constIntVal = as<ConstantIntVal>(sampleCount))
             {
@@ -2505,12 +2485,12 @@ void ResourceType::_toTextOverride(StringBuilder& out)
 
 Val* TextureTypeBase::getSampleCount()
 {
-    return _getGenericTypeArg(this, 4);
+    return as<Type>(_getGenericTypeArg(this, 4));
 }
 
 Val* TextureTypeBase::getFormat()
 {
-    return _getGenericTypeArg(this, 8);
+    return as<Type>(_getGenericTypeArg(this, 8));
 }
 
 bool isCopyableType(Type* type)

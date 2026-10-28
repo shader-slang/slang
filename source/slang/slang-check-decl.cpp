@@ -1701,6 +1701,44 @@ QualType getTypeForDeclRef(
         if (varDeclRef.getDecl()->findModifier<ConstModifier>())
             isLValue = false;
 
+        bool isReadOnlyMemoryLocation = false;
+        if (auto paramDecl = as<ParamDecl>(varDeclRef.getDecl()))
+        {
+            // Function parameters declared in the "modern" style
+            // are immutable unless their passing mode is meant to be written.
+            const bool isModernParam = as<ModernParamDecl>(paramDecl) != nullptr;
+
+            // The effective passing mode decides whether the body may write a parameter.
+            switch (getParamPassingMode(paramDecl))
+            {
+            case ParamPassingMode::In:
+                // A legacy (C-style) `in` parameter is a mutable local copy.
+                if (isModernParam)
+                    isLValue = false;
+                break;
+            case ParamPassingMode::BorrowIn:
+                // TODO(#13833): A borrow is an immutable borrow of its argument, so its body should
+                // not be able to write it, and code that does is already incorrect. Making it
+                // read-only is a bug fix that requires updating existing tests, so we leave it to a
+                // separate change. Until then, a borrow follows the rule for `in`.
+                if (isModernParam)
+                    isLValue = false;
+                break;
+            case ParamPassingMode::Out:
+            case ParamPassingMode::BorrowInOut:
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefWriteOnly:
+                // These parameters are meant to be written.
+                break;
+            case ParamPassingMode::RefReadOnly:
+                isLValue = false;
+                isReadOnlyMemoryLocation = true;
+                break;
+            default:
+                SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            }
+        }
+
         // Global-scope shader parameters should not be writable,
         // since they are effectively program inputs.
         //
@@ -1717,20 +1755,6 @@ QualType getTypeForDeclRef(
         // Generic value parameters are always immutable
         if (isGenericValueParam(varDeclRef))
             isLValue = false;
-
-        // Function parameters declared in the "modern" style
-        // are immutable unless they have an `out` or `inout` modifier.
-        if (varDeclRef.is<ModernParamDecl>())
-        {
-            // Note: the `inout` modifier AST class inherits from
-            // the class for the `out` modifier so that we can
-            // make simple checks like this.
-            //
-            if (!varDeclRef.getDecl()->hasModifier<OutModifier>())
-            {
-                isLValue = false;
-            }
-        }
 
         // An explicit `readonly` or `writeonly` qualifier still restricts parameter uses in
         // compatibility mode. The parser keeps these modifiers on the underlying parameter,
@@ -1752,6 +1776,7 @@ QualType getTypeForDeclRef(
         }
 
         qualType.isLeftValue = isLValue;
+        qualType.isReadOnlyMemoryLocation = isReadOnlyMemoryLocation;
         qualType.isWriteOnly = isWriteOnly;
         return qualType;
     }
@@ -2402,10 +2427,9 @@ ImageFormat inferImageFormatFromTextureType(
 {
     outIsInferred = false;
     ImageFormat format = ImageFormat::unknown;
-    IntegerLiteralValue formatValue = 0;
-    if (tryGetConstantIntVal(textureType->getFormat(), formatValue))
+    if (auto formatVal = as<ConstantIntVal>(textureType->getFormat()))
     {
-        format = (ImageFormat)formatValue;
+        format = (ImageFormat)formatVal->getValue();
     }
     if (format != ImageFormat::unknown)
         return format;
@@ -2437,29 +2461,6 @@ ImageFormat inferImageFormatFromTextureType(
         {
             switch (basicType->getBaseType())
             {
-            case BaseType::Float:
-                switch (textureType->getAccess())
-                {
-                case SLANG_RESOURCE_ACCESS_WRITE:
-                case SLANG_RESOURCE_ACCESS_READ_WRITE:
-                case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-                    switch (vectorWidth)
-                    {
-                    case 1:
-                        format = ImageFormat::r32f;
-                        break;
-                    case 2:
-                        format = ImageFormat::rg32f;
-                        break;
-                    case 4:
-                        format = ImageFormat::rgba32f;
-                        break;
-                    }
-                    break;
-                default:
-                    break;
-                }
-                break;
             case BaseType::UInt:
                 switch (vectorWidth)
                 {
@@ -7190,6 +7191,7 @@ static void populateParams(
         synArg->declRef = makeDeclRef(paramDecl);
         synArg->type.type = paramInfo.type;
         synArg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(paramInfo.mode);
+        synArg->type.isReadOnlyMemoryLocation = paramInfo.mode == ParamPassingMode::RefReadOnly;
         synArg->loc = synthesizedLoc;
         synArgs.add(synArg);
     }
@@ -7601,6 +7603,43 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         auto thisVisibility = getDeclVisibility(context->parentDecl);
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
         addVisibilityModifier(synthesized, visibility);
+    }
+}
+
+/// Add the modifiers that spell `mode` to `paramDecl`. A parameter built from a
+/// function type has only its effective mode, and several spellings can produce the
+/// same mode (for example, `__ref_readonly` and its legacy alias `const __ref`), so
+/// we spell each mode one canonical way.
+static void addModifiersForParamPassingMode(
+    ASTBuilder* astBuilder,
+    ParamDecl* paramDecl,
+    ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::In:
+        break;
+    case ParamPassingMode::Out:
+        addModifier(paramDecl, astBuilder->create<OutModifier>());
+        break;
+    case ParamPassingMode::BorrowInOut:
+        addModifier(paramDecl, astBuilder->create<InOutModifier>());
+        break;
+    case ParamPassingMode::BorrowIn:
+        addModifier(paramDecl, astBuilder->create<BorrowModifier>());
+        break;
+    case ParamPassingMode::RefReadWrite:
+        addModifier(paramDecl, astBuilder->create<RefModifier>());
+        break;
+    case ParamPassingMode::RefReadOnly:
+        addModifier(paramDecl, astBuilder->create<RefReadOnlyModifier>());
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        addModifier(paramDecl, astBuilder->create<RefWriteOnlyModifier>());
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        break;
     }
 }
 
@@ -14934,6 +14973,21 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         }
     }
 
+    // An `out` or `inout` parameter is meant to be written by its function, so `const` on one
+    // contradicts its passing mode. We reject it even though DXC accepts it. The check precedes
+    // the parameter-pack handling below, which adds `const` to every pack parameter.
+    if (auto constModifier = paramDecl->findModifier<ConstModifier>())
+    {
+        const auto mode = getParamPassingMode(paramDecl);
+        if (mode == ParamPassingMode::Out || mode == ParamPassingMode::BorrowInOut)
+        {
+            getSink()->diagnose(Diagnostics::ConstOnWritableParameter{
+                .mode = mode,
+                .param = paramDecl,
+                .modifier = constModifier});
+        }
+    }
+
     if (isTypePack(paramDecl->type.type))
     {
         // For now, we only allow parameter packs to be `const`.
@@ -14941,7 +14995,8 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         for (auto modifier : paramDecl->modifiers)
         {
             if (as<OutModifier>(modifier) || as<InOutModifier>(modifier) ||
-                as<RefModifier>(modifier) || as<BorrowModifier>(modifier))
+                as<RefModifier>(modifier) || as<RefReadOnlyModifier>(modifier) ||
+                as<RefWriteOnlyModifier>(modifier) || as<BorrowModifier>(modifier))
             {
                 // TODO(tfoley): The diagnostic in this case should probably not refer
                 // to the `const` modifier at all (since that is not actually what is
@@ -15454,23 +15509,7 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
 
         auto param = m_astBuilder->create<ParamDecl>();
         param->type.type = paramType;
-        switch (paramDir)
-        {
-        case ParamPassingMode::BorrowInOut:
-            addModifier(param, m_astBuilder->create<InOutModifier>());
-            break;
-        case ParamPassingMode::Out:
-            addModifier(param, m_astBuilder->create<OutModifier>());
-            break;
-        case ParamPassingMode::Ref:
-            addModifier(param, m_astBuilder->create<RefModifier>());
-            break;
-        case ParamPassingMode::BorrowIn:
-            addModifier(param, m_astBuilder->create<BorrowModifier>());
-            break;
-        default:
-            break;
-        }
+        addModifiersForParamPassingMode(m_astBuilder, param, paramDir);
         decl->addMember(param);
     }
 }
@@ -15994,6 +16033,22 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
     // extension __func_as_type(decl) : IBackwardDifferentiable<__func_as_type(decl)>
     // { /* ..empty.. */ }
     //
+    // For each mode, `__func_as_type(decl)` must have exactly one conformance to the derivative
+    // interface: either the synthesized extension here, or the one that
+    // `translateFwdDerivativeAttributeToAD2` / `translateBwdDerivativeAttributeToAD2` creates later
+    // (at `ReadyForLookup`) from a `[ForwardDerivative]` / `[BackwardDerivative]` on the decl.
+    // Two conformances of the same function type to the same interface get the same witness-table
+    // linkage name in `visitInheritanceDecl`, and the linker keeps only one of them, so calls
+    // through an interface requirement could silently use the synthesized derivative instead of the
+    // user's. We therefore skip the synthesized extension for a mode whose attribute is present.
+    // For the forward mode, that also skips the synthesized higher-order conformances of
+    // `fwd_diff`; a differentiable user derivative provides them instead.
+    //
+    // The guard only sees attributes on the decl itself. A derivative attached from the other side
+    // with `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]`, or one a `[Differentiable]` decl
+    // gets through `[PrimalSubstitute]`, is not visible here, so those spellings can still produce
+    // both conformances.
+    //
 
     if (decl->findModifier<DifferentiableAttribute>())
     {
@@ -16026,8 +16081,9 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
         };
         if (!isInterfaceRequirement(decl))
         {
-            if (decl->findModifier<ForwardDifferentiableAttribute>() ||
-                decl->findModifier<BackwardDifferentiableAttribute>())
+            if ((decl->findModifier<ForwardDifferentiableAttribute>() ||
+                 decl->findModifier<BackwardDifferentiableAttribute>()) &&
+                !decl->findModifier<ForwardDerivativeAttribute>())
             {
                 auto declsToExtend = ShortList<FunctionDeclBase*, 4>{as<FunctionDeclBase>(decl)};
                 for (auto _decl : getCurrentASTBuilder()->m_substituteMap[decl])
@@ -16103,7 +16159,8 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
                 }
             }
 
-            if (decl->findModifier<BackwardDifferentiableAttribute>())
+            if (decl->findModifier<BackwardDifferentiableAttribute>() &&
+                !decl->findModifier<BackwardDerivativeAttribute>())
             {
                 auto declsToExtend = ShortList<FunctionDeclBase*, 4>{as<FunctionDeclBase>(decl)};
                 for (auto _decl : getCurrentASTBuilder()->m_substituteMap[decl])
@@ -17326,7 +17383,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
         auto paramMode = getParamPassingMode(param);
         arg->type.isLeftValue = paramMode == ParamPassingMode::Out ||
                                 paramMode == ParamPassingMode::BorrowInOut ||
-                                paramMode == ParamPassingMode::Ref;
+                                isByReferenceParamPassingMode(paramMode);
         arg->type.type = param->getType();
         arg->loc = decl->loc;
         fakeArgs.add(arg);
@@ -17355,7 +17412,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
                 thisArg->type.type = thisArgType;
                 thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
                                             thisArgDirection == ParamPassingMode::BorrowInOut ||
-                                            thisArgDirection == ParamPassingMode::Ref;
+                                            isByReferenceParamPassingMode(thisArgDirection);
                 thisArg->loc = decl->loc;
                 fakeArgs.insert(0, thisArg);
             }
@@ -17642,7 +17699,7 @@ static std::optional<ParamPassingMode> _calcReceiverParamModeFromSpecifiers(Decl
     if (as<ConstRefAttribute>(specifier))
         return ParamPassingMode::BorrowIn;
     if (as<RefAttribute>(specifier))
-        return ParamPassingMode::Ref;
+        return ParamPassingMode::RefReadWrite;
     if (as<NonmutatingAttribute>(specifier))
         return ParamPassingMode::In;
     if (as<CppStyleTrailingReceiverParamConstModifier>(specifier))
@@ -18831,6 +18888,11 @@ void SemanticsDeclScopeWiringVisitor::visitUsingDecl(UsingDecl* decl)
 
 void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
 {
+    // Every scope that the parser creates for a namespace is in `lexicalScopes`, so wiring
+    // all of them covers `ownedScope` too. A namespace with no body, such as one that a
+    // `syntax` declaration creates, has no scopes and nothing to wire.
+    SLANG_ASSERT(!decl->ownedScope || decl->lexicalScopes.contains(decl->ownedScope));
+
     // We need to wire up the scope of namespaces with other namespace decls of the same name
     // that is accessible from the current context.
     auto parent = as<ContainerDecl>(getParentDecl(decl));
@@ -18856,7 +18918,11 @@ void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
                 {
                     ensureDecl(ns, DeclCheckState::ScopesWired);
                 }
-                addSiblingScopeForContainerDecl(getASTBuilder(), decl, otherNamespace);
+                // We attach the other namespace to every scope of `decl`, not only to
+                // `ownedScope`, because code in each body of a reopened namespace looks up
+                // names through the scope of that body.
+                for (auto lexicalScope : decl->lexicalScopes)
+                    addSiblingScopeForContainerDecl(getASTBuilder(), lexicalScope, otherNamespace);
             }
         }
         // For file decls, we need to continue searching up in the parent module scope.
@@ -22457,6 +22523,35 @@ void visitReferencedDecls(
         visitor.dispatchIfNotNull(expr);
     if (auto decl = as<Decl>(node))
         visitor.dispatchIfNotNull(decl);
+}
+
+CapabilitySet getDeclRefCapabilityRequirements(
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef,
+    List<Decl*>& outReferencedDecls)
+{
+    // Consider this example:
+    //     [require(metal)] struct MetalOnly {}
+    //     void main<T>() {}
+    // Selecting main<MetalOnly> retains MetalOnly in the checked reference even though the body
+    // never uses T. Use the ordinary reference walk so selection has the same requirements as
+    // calling main<MetalOnly>() in a function body. As in visitDeclRefExpr, include the selected
+    // declaration itself as well as its operands.
+    CapabilitySet requirements{declRef.getDecl()->inferredCapabilityRequirements};
+    visitReferencedDecls(
+        *visitor,
+        declRef.declRefBase,
+        declRef.getDecl()->loc,
+        nullptr,
+        [&](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc)
+        {
+            requirements.join(nodeCaps);
+            if (auto decl = as<Decl>(node);
+                decl && decl != declRef.getDecl() && nodeCaps && !nodeCaps->isEmpty())
+                outReferencedDecls.add(decl);
+        },
+        [](DiagnosticCategory) {});
+    return requirements;
 }
 
 CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)

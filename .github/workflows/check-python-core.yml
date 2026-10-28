@@ -113,7 +113,7 @@ jobs:
               perf_bisect"
 
       - name: Test compile-perf sampling, provenance and confirmation
-        run: python3 -m unittest discover -s tools/compile-perf -p 'test_*.py'
+        run: python3 -m unittest discover -s tools/compile-perf/tests -t tools/compile-perf -p 'test_*.py'
 
   # The compile-perf suite's only Windows consumer is the scheduled nightly,
   # so a Windows-only defect in an import-time self-check merges green and
@@ -158,4 +158,4 @@ jobs:
               perf_bisect"
 
       - name: Test compile-perf sampling, provenance and confirmation
-        run: python -m unittest discover -s tools/compile-perf -p 'test_*.py'
+        run: python -m unittest discover -s tools/compile-perf/tests -t tools/compile-perf -p 'test_*.py'
