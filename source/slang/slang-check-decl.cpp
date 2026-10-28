@@ -2094,13 +2094,11 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
         _dispatchDeclCheckingVisitor(decl, nextState, subContext);
 
         // A visitor can advance `decl` past several states at once. Consider `let x = 1;`:
-        // the header visitor checks the initializer to infer the type of `x`, and then marks
-        // `x` as `DefinitionChecked`. Such a visitor has checked `decl` itself, but the
-        // `ReadyForReference` step also compares `decl` with the other declarations in its
-        // scope, so we still run that comparison. Without it, `int x; let x = 1;` would be
-        // accepted while `let x = 1; int x;` is not. We run it here, rather than at each place
-        // that advances a declaration, so that a new such place cannot skip the comparison.
-        // Earlier compiler releases skipped it, so a conflict that it finds is a warning.
+        // the header visitor infers the type of `x` and marks `x` as `DefinitionChecked`. Of the
+        // skipped steps, only `ReadyForReference` compares `decl` with other declarations, so we
+        // still run it; without it, `int x; let x = 1;` would be accepted while
+        // `let x = 1; int x;` is not. Earlier compiler releases skipped it, so a conflict that it
+        // finds is a warning; Slang 202c may make it an error (shader-slang/slang#13956).
         //
         if (nextState < DeclCheckState::ReadyForReference &&
             decl->checkState.getState() >= DeclCheckState::ReadyForReference)

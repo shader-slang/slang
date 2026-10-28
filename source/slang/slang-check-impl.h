@@ -65,7 +65,8 @@ enum class RedeclarationSeverity
     /// An error in every language version.
     Error,
     /// A warning in every language version. Earlier compiler releases did not diagnose these
-    /// conflicts, so we keep code that they accepted compiling.
+    /// conflicts, so we keep code that they accepted compiling; Slang 202c may make them errors
+    /// (shader-slang/slang#13956).
     Warning,
 };
 
