@@ -86,17 +86,26 @@ SLANG_UNIT_TEST(targetIgnoreCapabilities)
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     const UnownedStringSlice unavailable = toSlice("E36107");
+    // The notes that follow E36107 (for example "see using of 'spirvOnly'") name the function that
+    // needs the capability; the error itself does not.
+    const UnownedStringSlice provenance = toSlice("spirvOnly");
     const TargetSpec hlsl = {SLANG_HLSL, false};
     const TargetSpec hlslIgnoring = {SLANG_HLSL, true};
 
-    // No option: the HLSL target reports the unavailable capability.
-    SLANG_CHECK(loadDiagnostics(globalSession, false, &hlsl, 1).indexOf(unavailable) != -1);
+    // No option: the HLSL target reports the unavailable capability and its provenance notes.
+    String none = loadDiagnostics(globalSession, false, &hlsl, 1);
+    SLANG_CHECK(none.indexOf(unavailable) != -1);
+    SLANG_CHECK(none.indexOf(provenance) != -1);
 
-    // Session-level option: no error.
-    SLANG_CHECK(loadDiagnostics(globalSession, true, &hlsl, 1).indexOf(unavailable) == -1);
+    // Session-level option: no error and no notes.
+    String session = loadDiagnostics(globalSession, true, &hlsl, 1);
+    SLANG_CHECK(session.indexOf(unavailable) == -1);
+    SLANG_CHECK(session.indexOf(provenance) == -1);
 
-    // Target-level option: no error.
-    SLANG_CHECK(loadDiagnostics(globalSession, false, &hlslIgnoring, 1).indexOf(unavailable) == -1);
+    // Target-level option: no error and no notes.
+    String target = loadDiagnostics(globalSession, false, &hlslIgnoring, 1);
+    SLANG_CHECK(target.indexOf(unavailable) == -1);
+    SLANG_CHECK(target.indexOf(provenance) == -1);
 
     // Target-level option on one target only: the other target still reports the error, and only
     // that target is named.
