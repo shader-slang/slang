@@ -56,8 +56,9 @@ RWStructuredBuffer<int> indices;
 
 // The index is read after the store, so it is not available where the table is loaded.
 // INDEX-LABEL: %Table_getAtStored = OpFunction
-// INDEX: OpLoad %{{[_a-zA-Z]*}}float{{[_a-z]*}}1024
-// INDEX: OpStore %[[COPY:[0-9]+]] %{{[0-9]+}}
+// INDEX: %[[LOAD:[0-9]+]] = OpLoad %{{[_a-zA-Z]*}}float{{[_a-z]*}}1024
+// INDEX: %[[LOGICAL:[0-9]+]] = OpCopyLogical %{{[_a-zA-Z0-9]+}} %[[LOAD]]
+// INDEX: OpStore %[[COPY:[0-9]+]] %[[LOGICAL]]
 // INDEX: OpStore %{{[0-9]+}} %int_100
 // INDEX: %[[I:[0-9]+]] = OpLoad %int
 // INDEX: %[[A:[0-9]+]] = OpAccessChain %{{[_a-zA-Z0-9]+}} %[[COPY]]
@@ -73,8 +74,9 @@ void indexAfterStore(uint3 tid: SV_DispatchThreadID)
 // The element is read only when `i < 16`, so it is not loaded before the check.
 // GUARD-LABEL: %Table_getChecked = OpFunction
 // GUARD: %[[I:[0-9]+]] = OpFunctionParameter %int
-// GUARD: OpLoad %{{[_a-zA-Z]*}}float{{[_a-z]*}}1024
-// GUARD: OpStore %[[COPY:[0-9]+]] %{{[0-9]+}}
+// GUARD: %[[LOAD:[0-9]+]] = OpLoad %{{[_a-zA-Z]*}}float{{[_a-z]*}}1024
+// GUARD: %[[LOGICAL:[0-9]+]] = OpCopyLogical %{{[_a-zA-Z0-9]+}} %[[LOAD]]
+// GUARD: OpStore %[[COPY:[0-9]+]] %[[LOGICAL]]
 // GUARD: OpStore %{{[0-9]+}} %int_100
 // GUARD-NOT: OpLoad %float
 // GUARD: OpBranchConditional
