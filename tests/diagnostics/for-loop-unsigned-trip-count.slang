@@ -6,10 +6,11 @@
 
 RWStructuredBuffer<uint> outBuf;
 
-void unsignedBounds()
+void inferredLoopCounts()
 {
     // A `uint64_t` bound above INT64_MAX is not read as a negative number, so neither loop
-    // reports running zero times.
+    // reports running zero times. These are the loops from the issue; inference reads only the
+    // loop header, and the `break` only keeps the loops finite at run time.
     for (uint64_t i = 0; i < 0xFFFFFFFFFFFFFFFFull; i++)
     {
         if (outBuf[0] == 0)
@@ -118,13 +119,65 @@ void unsignedBounds()
     for (uint i = 0; i < 0xFFFFFFFFu; i++)
     {
     }
+    // The distance between these signed bounds is above INT64_MAX.
     [MaxIters(100)]
     for (int64_t i = -0x7000000000000000ll; i < 0x7000000000000000ll; i++)
     {
     }
+    // The full `uint64_t` range has 2^64 values, one more than a `uint64_t` count can hold.
     for (uint64_t i = 0; i <= 0xFFFFFFFFFFFFFFFFull; i++)
     {
         if (outBuf[0] == 0)
             break;
     }
+
+    // The count cap sits exactly at INT32_MAX: a count of 2^31 infers no bound, while a count
+    // just below the cap is still inferred.
+    [MaxIters(100)]
+    for (int64_t i = 0; i < 0x80000000ll; i++)
+    {
+    }
+    [MaxIters(2147483647)]
+/*diag:
+     ^^^^^^^^ MaxIters exceeds actual iterations
+     ^^^^^^^^ the for loop is statically determined to terminate within 2147483646 iterations, which is less than what [MaxIters] specifies.
+*/
+    for (int64_t i = 1; i < 0x7FFFFFFFll; i++)
+    {
+    }
+
+    // An exclusive bound with a step that does not divide the distance rounds the count up.
+    [MaxIters(100)]
+/*diag:
+     ^^^^^^^^ MaxIters exceeds actual iterations
+     ^^^^^^^^ the for loop is statically determined to terminate within 4 iterations, which is less than what [MaxIters] specifies.
+*/
+    for (int i = 0; i < 10; i += 3)
+    {
+    }
+    [MaxIters(100)]
+/*diag:
+     ^^^^^^^^ MaxIters exceeds actual iterations
+     ^^^^^^^^ the for loop is statically determined to terminate within 5 iterations, which is less than what [MaxIters] specifies.
+*/
+    for (uint64_t i = 0x7FFFFFFFFFFFFFF0ull; i < 0x8000000000000010ull; i += 7)
+    {
+    }
+}
+
+// A differentiable loop whose count is above INT32_MAX gets no inferred bound, so it needs an
+// explicit `[MaxIters]` or `[ForceUnroll]`.
+[Differentiable]
+float sumAboveCap(float x)
+{
+    float r = 0.0;
+    for (int64_t i = 0; i < 0x100000000ll; i++)
+/*diag:
+    ^^^ loop in differentiable function needs attributes
+    ^^^ loops inside a differentiable function need to provide either '[MaxIters(n)]' or '[ForceUnroll]' attribute.
+*/
+    {
+        r += x;
+    }
+    return r;
 }
