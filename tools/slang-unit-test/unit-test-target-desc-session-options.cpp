@@ -104,6 +104,17 @@ SLANG_UNIT_TEST(targetDescDefaultKeepsSessionFloatingPointMode)
     String targetFast = compileWithSessionOptions(globalSession, targetDesc, &precise, 1);
     SLANG_CHECK_ABORT(targetFast.getLength() != 0);
     SLANG_CHECK(targetFast.indexOf(toSlice("NoContraction")) == -1);
+
+    // A `FloatingPointMode` entry of DEFAULT in the target's compilerOptionEntries resets the
+    // session's precise mode for that target, as slang.h documents for `floatingPointMode`.
+    slang::CompilerOptionEntry targetDefault = precise;
+    targetDefault.value.intValue0 = SLANG_FLOATING_POINT_MODE_DEFAULT;
+    targetDesc.floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
+    targetDesc.compilerOptionEntries = &targetDefault;
+    targetDesc.compilerOptionEntryCount = 1;
+    String targetEntryDefault = compileWithSessionOptions(globalSession, targetDesc, &precise, 1);
+    SLANG_CHECK_ABORT(targetEntryDefault.getLength() != 0);
+    SLANG_CHECK(targetEntryDefault.indexOf(toSlice("NoContraction")) == -1);
 }
 
 // `LineDirectiveMode` none in the session options reaches a target whose TargetDesc leaves
@@ -135,6 +146,17 @@ SLANG_UNIT_TEST(targetDescDefaultKeepsSessionLineDirectiveMode)
     String targetStandard = compileWithSessionOptions(globalSession, targetDesc, &noLines, 1);
     SLANG_CHECK_ABORT(targetStandard.getLength() != 0);
     SLANG_CHECK(targetStandard.indexOf(toSlice("#line")) != -1);
+
+    // A `LineDirectiveMode` entry of DEFAULT in the target's compilerOptionEntries resets the
+    // session's mode for that target, as slang.h documents for `lineDirectiveMode`.
+    slang::CompilerOptionEntry targetDefault = noLines;
+    targetDefault.value.intValue0 = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
+    targetDesc.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
+    targetDesc.compilerOptionEntries = &targetDefault;
+    targetDesc.compilerOptionEntryCount = 1;
+    String targetEntryDefault = compileWithSessionOptions(globalSession, targetDesc, &noLines, 1);
+    SLANG_CHECK_ABORT(targetEntryDefault.getLength() != 0);
+    SLANG_CHECK(targetEntryDefault.indexOf(toSlice("#line")) != -1);
 }
 
 // `GLSLForceScalarLayout` in the session options reaches a target whose TargetDesc leaves
