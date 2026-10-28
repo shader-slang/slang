@@ -34,6 +34,28 @@ endif()
 # Set install directory using the platform-specific library directory
 set(SLANG_STANDARD_MODULE_INSTALL_DIR "${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}" CACHE STRING "Installation directory for standard modules")
 
+# Build-tree location (relative to ${slang_BINARY_DIR}/$<CONFIG>) where the module
+# producers below actually write the .slang-module tree. This is deliberately
+# kept separate from SLANG_STANDARD_MODULE_INSTALL_DIR: that is the install
+# destination and is user-overridable, so it may point somewhere the build tree
+# never populates. The optional embedding library scans this build-tree root.
+set(SLANG_STANDARD_MODULE_BUILD_SUBDIR "${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}" CACHE INTERNAL "Build-tree subdir of the standard module files")
+
+# The loose slang-standard-module-<version>/ tree is always built below (it is the
+# input to the optional embedding library). When SLANG_EMBED_STANDARD_MODULES is
+# on, the module subdirectories below skip their install() rules (each guarded on
+# NOT SLANG_EMBED_STANDARD_MODULES), so the install/package contains only the
+# embedding library in place of the loose files. This affects install()/CPack
+# packaging only; consumers that copy straight from the build tree (e.g. CI
+# artifact staging) still see the loose tree.
+
+# Shared manifest of the serialized .slang-module files produced by the module
+# subdirectories below. The optional embedding library
+# (source/slang-standard-modules) DEPENDS on these actual outputs so that editing
+# a module regenerates its embedded payload. Cleared here each configure (INTERNAL
+# force-writes); each module subdirectory appends its own outputs.
+set(SLANG_STANDARD_MODULE_FILES "" CACHE INTERNAL "Built standard .slang-module files")
+
 #
 # Generate the standard module configuration header, this is used by the slang compiler to find the standard module
 #

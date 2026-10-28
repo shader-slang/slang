@@ -44,7 +44,16 @@ add_custom_command(
 add_custom_target(slang-functional-module ALL DEPENDS ${functional_module_file})
 set_target_properties(slang-functional-module PROPERTIES FOLDER generated)
 
-install(
-    FILES ${functional_module_file}
-    DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang
+# Record this module's serialized output in the shared manifest consumed by the
+# optional slang-standard-modules embedding library.
+list(APPEND SLANG_STANDARD_MODULE_FILES ${functional_module_file})
+set(SLANG_STANDARD_MODULE_FILES "${SLANG_STANDARD_MODULE_FILES}"
+    CACHE INTERNAL "Built standard .slang-module files"
 )
+
+if(NOT SLANG_EMBED_STANDARD_MODULES)
+    install(
+        FILES ${functional_module_file}
+        DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang
+    )
+endif()

@@ -197,14 +197,28 @@ add_custom_target(
 )
 set_target_properties(slang-numerics-modules PROPERTIES FOLDER generated)
 
-install(
-    FILES ${numerics_module_file}
-    DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang
+# Record these modules' serialized outputs in the shared manifest consumed by the
+# optional slang-standard-modules embedding library.
+list(APPEND SLANG_STANDARD_MODULE_FILES
+    ${numerics_builtin_module_file}
+    ${numerics_module_file}
+    ${numerics_differentiable_builtin_module_file}
+    ${numerics_differentiable_module_file}
 )
-install(
-    FILES
-        ${numerics_builtin_module_file}
-        ${numerics_differentiable_builtin_module_file}
-        ${numerics_differentiable_module_file}
-    DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang/numerics
+set(SLANG_STANDARD_MODULE_FILES "${SLANG_STANDARD_MODULE_FILES}"
+    CACHE INTERNAL "Built standard .slang-module files"
 )
+
+if(NOT SLANG_EMBED_STANDARD_MODULES)
+    install(
+        FILES ${numerics_module_file}
+        DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang
+    )
+    install(
+        FILES
+            ${numerics_builtin_module_file}
+            ${numerics_differentiable_builtin_module_file}
+            ${numerics_differentiable_module_file}
+        DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang/numerics
+    )
+endif()
