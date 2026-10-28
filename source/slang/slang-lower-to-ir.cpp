@@ -3663,15 +3663,25 @@ void addArg(
     }
 }
 
+// Defined with the other l-value helpers below.
 static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo const& val);
 
-/// Add an argument that passes a fresh copy of the immutable receiver `receiverExpr` to a writable
-/// `this` parameter.
+/// Add an argument that binds the immutable receiver argument `receiverExpr` to the `inout` `this`
+/// parameter described by `thisParamInfo`, by passing a fresh copy of it.
 ///
-/// The copy is never written back, so the callee's writes to `this` stay in the copy rather than
-/// reaching read-only storage such as a constant buffer.
-void addImmutableReceiverCopyArg(IRGenContext* context, Expr* receiverExpr, List<IRInst*>* ioArgs)
+/// Semantic checking accepts such a call only through `canPassCopyOfImmutableReceiver`. The copy
+/// is never written back, so the callee's writes to `this` stay in the copy. The argument does not
+/// go through `addArg`, because that tries `tryGetAddress` first, which can succeed for a constant
+/// buffer member or a `static const` and would hand the callee a pointer into read-only storage.
+static void addImmutableReceiverCopyArg(
+    IRGenContext* context,
+    ParamInfo const& thisParamInfo,
+    Expr* receiverExpr,
+    List<IRInst*>* ioArgs)
 {
+    SLANG_RELEASE_ASSERT(
+        thisParamInfo.mode == ParamPassingMode::BorrowInOut &&
+        isCopyableType(unwrapModifiedType(thisParamInfo.type)));
     LoweredValInfo tempVar = moveIntoMutableTemp(context, lowerRValueExpr(context, receiverExpr));
     addSimpleArg(
         context,
@@ -5112,10 +5122,7 @@ struct ExprLoweringContext
                 if (baseExpr && !baseExpr->type.isLeftValue &&
                     doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
                 {
-                    // Semantic checking accepts a writable receiver on an immutable base only for
-                    // a method that accepts a copy of that receiver (see
-                    // `ThisParamInfoAttribute::acceptsImmutableReceiverCopy`).
-                    addImmutableReceiverCopyArg(context, baseExpr, &irArgs);
+                    addImmutableReceiverCopyArg(context, *thisParamInfo, baseExpr, &irArgs);
                 }
                 else if (baseExpr)
                 {

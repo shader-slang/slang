@@ -4,11 +4,14 @@
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-asm -entry computeMain -profile cs_6_0
 
 // An HLSL method without a receiver specifier takes `this` as `inout`, so that it can modify a
-// mutable receiver. As DXC does for methods that do not write `this`, Slang also accepts calls to
-// such a method on an immutable receiver: a constant buffer member, a `StructuredBuffer` element,
-// a constant, or a temporary. The call then receives a copy of the receiver, so the method's
-// writes to `this` do not reach the immutable storage (issue #13964).
+// mutable receiver. In HLSL code, a call can also pass a copy of an immutable receiver argument to
+// an `inout` `this` parameter: a constant buffer member, a `StructuredBuffer` element, a constant,
+// a temporary or an existential value. DXC accepts such calls for methods that do not write
+// `this`. The callee's writes to `this` stay in the copy, so they do not reach the immutable
+// storage (issue #13964).
 
+// The DXIL run checks that DXC validates the HLSL that Slang emits for these calls, in particular
+// that a copied receiver does not store to a constant buffer or `StructuredBuffer`.
 // DXIL: define void @computeMain()
 
 import default_receiver_interface_lib;
@@ -27,8 +30,8 @@ struct Helper
 };
 
 // A default HLSL method also satisfies a requirement with an `in` receiver, such as those of the
-// core module's `IComparable` and of the Slang interface `IShape`, through a synthesized wrapper
-// that calls it on its immutable `this`.
+// core module's `IComparable` and of the Slang interface `IShape`. Conformance synthesizes a
+// wrapper that calls the method on its immutable `this`, and that call is checked as HLSL code.
 struct Key : IComparable
 {
     int key;
@@ -55,11 +58,11 @@ int areaOf<T : IShape>(T shape)
     return shape.area();
 }
 
-// The requirement of an interface written in HLSL has the HLSL default receiver, so a generic
-// call through it also accepts an immutable receiver.
+// A generic call through an `inout` requirement also accepts an immutable receiver argument.
 interface IValue
 {
     int getValue();
+    int addAndGetValue(int delta);
 };
 
 struct Value : IValue
@@ -67,6 +70,12 @@ struct Value : IValue
     int value;
 
     int getValue() { return value; }
+
+    int addAndGetValue(int delta)
+    {
+        value += delta;
+        return value;
+    }
 };
 
 int getValueOfConstant<T : IValue>(T value)
@@ -75,16 +84,39 @@ int getValueOfConstant<T : IValue>(T value)
     return constant.getValue();
 }
 
+int addAndGetValueOfConstant<T : IValue>(T value, int delta)
+{
+    const T constant = value;
+    return constant.addAndGetValue(delta);
+}
+
+IValue makeValue(int value)
+{
+    Value result = { value };
+    return result;
+}
+
+// On an immutable receiver argument, an overload whose `this` needs no copy is preferred.
+struct Overloaded
+{
+    int value;
+
+    int choose() { return 1; }
+};
+
+extension Overloaded
+{
+    [nonmutating]
+    int choose() { return 2; }
+};
+
+static const Overloaded kOverloaded = { 0 };
+
 Helper makeHelper(int value)
 {
     Helper helper;
     helper.value = value;
     return helper;
-}
-
-int getThroughParam(Helper helper)
-{
-    return helper.get();
 }
 
 static const Helper kHelper = { 50 };
@@ -104,7 +136,7 @@ StructuredBuffer<Helper> gHelpers;
 //TEST_INPUT: set gMutableHelpers = ubuffer(data=[40], stride=4)
 RWStructuredBuffer<Helper> gMutableHelpers;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -124,7 +156,7 @@ void computeMain()
     // CHECK: 70
     outputBuffer[5] = localHelper.get();
     // CHECK: 30
-    outputBuffer[6] = getThroughParam(gHelpers[0]);
+    outputBuffer[6] = gHelpers[0].get();
 
     // CHECK: 11
     outputBuffer[7] = gHelper.addAndGet(1);
@@ -150,4 +182,32 @@ void computeMain()
     Value value = { 80 };
     // CHECK: 80
     outputBuffer[14] = getValueOfConstant(value);
+
+    // Writes through other immutable receiver arguments also stay in the copy.
+    // CHECK: 51
+    outputBuffer[15] = kHelper.addAndGet(1);
+    // CHECK: 50
+    outputBuffer[16] = kHelper.get();
+    // CHECK: 71
+    outputBuffer[17] = localHelper.addAndGet(1);
+    // CHECK: 70
+    outputBuffer[18] = localHelper.get();
+    // CHECK: 61
+    outputBuffer[19] = makeHelper(60).addAndGet(1);
+    // CHECK: 81
+    outputBuffer[20] = addAndGetValueOfConstant(value, 1);
+
+    // An existential value is an immutable receiver argument too.
+    const IValue constantValue = makeValue(90);
+    // CHECK: 90
+    outputBuffer[21] = constantValue.getValue();
+    // CHECK: 91
+    outputBuffer[22] = constantValue.addAndGetValue(1);
+    // CHECK: 90
+    outputBuffer[23] = constantValue.getValue();
+    // CHECK: 80
+    outputBuffer[24] = value.getValue();
+
+    // CHECK: 2
+    outputBuffer[25] = kOverloaded.choose();
 }

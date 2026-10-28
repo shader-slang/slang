@@ -1068,9 +1068,24 @@ ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
     }
 }
 
+bool SemanticsVisitor::canPassCopyOfImmutableReceiver(DeclRef<CallableDecl> funcDeclRef)
+{
+    if (getSourceLanguage() != SourceLanguage::HLSL)
+        return false;
+
+    // Consider `gCounter.bump()`, where `Counter` conforms to an interface requirement `bump`.
+    // Lookup also finds the requirement, and a call through it on the concrete type runs the
+    // declaration it resolves to, as in lowering. That declaration's `this` parameter receives the
+    // copy, so its mode and type decide.
+    auto calledDeclRef = DeclRef<Decl>(as<DeclRefBase>(funcDeclRef.declRefBase->resolve()));
+    auto calledThisParamInfo = findEffectiveThisParamInfo(calledDeclRef);
+    return calledThisParamInfo && calledThisParamInfo->mode == ParamPassingMode::BorrowInOut &&
+           isCopyableType(unwrapModifiedType(calledThisParamInfo->type));
+}
+
 bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     OverloadResolveContext& context,
-    OverloadCandidate const& candidate)
+    OverloadCandidate& candidate)
 {
     if (candidate.flavor != OverloadCandidate::Flavor::Func)
         return true;
@@ -1088,13 +1103,19 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     //
     if (auto thisParamInfo = findEffectiveThisParamInfo(funcDeclRef))
     {
-        // A method that accepts a copy of an immutable receiver needs neither a mutable receiver
-        // nor a warning that its writes to an `in` parameter stay in the callee.
-        if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode) &&
-            !doesEffectiveThisParamAcceptImmutableReceiverCopy(funcDeclRef))
+        if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
         {
             if (context.baseExpr && !context.baseExpr->type.isLeftValue)
             {
+                // Copying the receiver argument costs a conversion, so that an overload whose
+                // receiver needs no copy, such as a `[nonmutating]` one, is preferred, as C++
+                // prefers a `const` overload for a `const` object.
+                if (canPassCopyOfImmutableReceiver(funcDeclRef))
+                {
+                    candidate.conversionCostSum += kConversionCost_ImmutableReceiverCopy;
+                    return true;
+                }
+
                 if (context.mode == OverloadResolveContext::Mode::ForReal)
                 {
                     getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValue{

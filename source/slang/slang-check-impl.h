@@ -3879,9 +3879,19 @@ public:
         OverloadResolveContext& context,
         OverloadCandidate& candidate);
 
+    /// Return whether a call in the code being checked can bind an immutable receiver argument to
+    /// the effective `this` parameter of `funcDeclRef` by passing a copy of it.
+    ///
+    /// HLSL code commonly calls methods on immutable receivers, such as constant buffer members,
+    /// and DXC accepts that. The language of the call site decides, not the language of the
+    /// callee: in HLSL code, a copy can bind to an `inout` `this` parameter of any callee, and its
+    /// writes to `this` then stay in the copy. A `[__ref]` `this` parameter promises the identity
+    /// of the storage, and a non-copyable receiver cannot be copied, so neither qualifies.
+    bool canPassCopyOfImmutableReceiver(DeclRef<CallableDecl> funcDeclRef);
+
     bool TryCheckOverloadCandidateDirections(
         OverloadResolveContext& /*context*/,
-        OverloadCandidate const& /*candidate*/
+        OverloadCandidate& /*candidate*/
     );
 
     /// Check if the given `expr` refers to an `in` function
