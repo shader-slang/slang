@@ -17514,17 +17514,13 @@ void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
     //
     decl->targetType = CheckProperType(decl->targetType);
 
-    if (auto modifier = decl->findModifier<PreserveTypeModifiersModifier>())
+    if (isTexelFormatIdentityExtension(decl))
     {
-        // A complete modified type can bind only a bare generic target. Validate
-        // that contract here, before extension discovery consumes the annotation.
+        // The builtin adapter extends its own type parameter so inference can bind
+        // it to the complete modified type. This is a core-library invariant;
+        // user declarations cannot carry builtin requirement roles.
         auto targetParam = isDeclRefTypeOf<GenericTypeParamDecl>(decl->targetType.type);
-        if (!targetParam || targetParam.getDecl()->parentDecl != decl->parentDecl)
-        {
-            if (!as<ErrorType>(decl->targetType.type))
-                getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
-            removeModifier(decl, modifier);
-        }
+        SLANG_RELEASE_ASSERT(targetParam && targetParam.getDecl()->parentDecl == decl->parentDecl);
     }
 
     _validateExtensionDeclTargetType(decl);
@@ -19082,14 +19078,13 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
     auto& list = _getCandidateExtensionList(decl, m_mapDeclToCandidateExtensions);
     if (outHasModifierPreservingCandidate)
     {
-        // Candidate lists are append-only. Inspect every declaration, including
-        // candidates that inference will reject for this particular specialization.
+        // Candidate lists are append-only. Reuse nominal inheritance only when the
+        // builtin identity adapter, which binds the complete type, is absent.
         while (!list.hasModifierPreservingCandidate &&
                list.modifierClassifiedCount < list.candidateExtensions.getCount())
         {
             auto extension = list.candidateExtensions[list.modifierClassifiedCount++];
-            list.hasModifierPreservingCandidate =
-                extension->hasModifier<PreserveTypeModifiersModifier>();
+            list.hasModifierPreservingCandidate = isTexelFormatIdentityExtension(extension);
         }
         *outHasModifierPreservingCandidate = list.hasModifierPreservingCandidate;
     }

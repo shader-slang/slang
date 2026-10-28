@@ -2059,7 +2059,7 @@ FIDDLE() namespace Slang
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 
-    /// The role of a builtin type member or interface requirement known to the compiler.
+    /// The role of a builtin declaration known to the compiler.
     enum class BuiltinRequirementKind
     {
         DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
@@ -2106,6 +2106,7 @@ FIDDLE() namespace Slang
 
         TextureElementType, ///< The `_Texture.T` alias for the loaded and stored texel data type.
         TextureFormat,      ///< The `_Texture.__effectiveFormat` constant for its storage format.
+        TexelFormatIdentityExtension, ///< The `ITexelElement` to `ITexelFormat` identity adapter.
     };
 
     enum class FunctionDifferentiableLevel

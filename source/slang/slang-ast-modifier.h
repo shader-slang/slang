@@ -131,14 +131,6 @@ class TransparentModifier : public Modifier
     FIDDLE(...)
 };
 
-// Opts a generic extension into binding its target to the complete modified type.
-// Ordinary extensions retain their historical binding to the nominal type.
-FIDDLE()
-class PreserveTypeModifiersModifier : public Modifier
-{
-    FIDDLE(...)
-};
-
 FIDDLE()
 class FromCoreModuleModifier : public Modifier
 {
@@ -651,7 +643,7 @@ class MagicTypeModifier : public Modifier
     FIDDLE() uint32_t tag = uint32_t(0);
 };
 
-// A modifier that identifies a built-in type member or requirement by its semantic role.
+// A modifier that identifies a built-in declaration by its semantic role.
 FIDDLE()
 class BuiltinRequirementModifier : public Modifier
 {

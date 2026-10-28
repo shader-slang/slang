@@ -696,10 +696,10 @@ extension vector<int64_t,2>:ITexelElement
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
 }
 
-// This generic conformance binds the complete payload type, including resource
-// format modifiers. It preserves the legacy texel-element interface and supplies
-// the identity mapping for ordinary scalar and vector texture arguments.
-__preserve_type_modifiers
+// The builtin role makes this identity adapter bind the complete payload type,
+// including unorm and snorm, so DataType retains resource format modifiers.
+// Ordinary generic extensions keep their existing nominal type binding.
+__builtin_requirement($((int)BuiltinRequirementKind::TexelFormatIdentityExtension))
 extension<T:ITexelElement> T : ITexelFormat
 {
     typealias DataType = T;

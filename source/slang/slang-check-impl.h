@@ -52,6 +52,14 @@ bool isEffectivelyStatic(Decl* decl);
 
 bool isGlobalDecl(Decl* decl);
 
+/// Identifies the builtin identity adapter whose type argument retains modifiers.
+/// Its `DataType = T` must map `unorm float4` to the complete `unorm float4` type.
+inline bool isTexelFormatIdentityExtension(ExtensionDecl* decl)
+{
+    auto requirement = decl->findModifier<BuiltinRequirementModifier>();
+    return requirement && requirement->kind == BuiltinRequirementKind::TexelFormatIdentityExtension;
+}
+
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);

@@ -896,9 +896,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             extensionTargetDeclRef,
             &visitor,
             canReuseForModifiedType ? &hasModifierPreservingCandidate : nullptr);
-        // A candidate can fail for the nominal subject and succeed for the modified
-        // one. Record its presence before inference, rather than inspecting only
-        // the facets of successfully applied extensions.
+        // The builtin identity adapter binds the complete type. Its presence in the
+        // candidate list prevents reusing a nominal result for a modified subject.
         canReuseForModifiedType &= !hasModifierPreservingCandidate;
         for (auto extDecl : candidateExtensions)
         {
@@ -918,8 +917,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // making a match.
             //
             auto extensionTargetType = selfType;
-            const bool preservesModifiers = extensionApplicationType != selfType &&
-                                            extDecl->hasModifier<PreserveTypeModifiersModifier>();
+            const bool preservesModifiers =
+                extensionApplicationType != selfType && isTexelFormatIdentityExtension(extDecl);
             if (preservesModifiers)
             {
                 SLANG_ASSERT(isDeclRefTypeOf<GenericTypeParamDecl>(extDecl->targetType.type));
@@ -2536,9 +2535,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
-        // Consider this identity conformance:
+        // Consider the builtin TexelFormatIdentityExtension conformance:
         //
-        //     __preserve_type_modifiers
         //     extension<T : ITexelElement> T : ITexelFormat { typealias DataType = T; }
         //
         // For `unorm float4`, reusing float4's completed facets would bind T to float4

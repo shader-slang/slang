@@ -217,17 +217,17 @@ SubtypeWitness* SemanticsVisitor::getSubtypeWitnessForType(
     // Preserve the declaration and its substitutions, but root the declared proof
     // at the queried type. Consider this example:
     //
-    //     struct WitnessKey<T : ITexelElement> {}
-    //     interface IKey { associatedtype Key; }
-    //     __preserve_type_modifiers
-    //     extension<T : ITexelElement> T : IKey { typealias Key = WitnessKey<T>; }
+    //     struct FormatWitnessKey<T : ITexelFormat> {}
+    //     struct FormatKeyFromElement<T : ITexelElement>
+    //     { typealias Key = FormatWitnessKey<T>; }
     //     typealias Qualified = unorm float4;
     //
-    // `Qualified.Key` and `WitnessKey<Qualified>` must have identical generic arguments,
-    // including the witness for `Qualified : ITexelElement`. The former obtains that witness
-    // from provisional facets during extension discovery; the latter uses an ordinary
-    // subtype query. Both paths must root the inherited nominal proof at `Qualified`
-    // before the canonical builder interns the generic application.
+    // `FormatKeyFromElement<Qualified>.Key` and `FormatWitnessKey<Qualified>` must
+    // have identical generic arguments, including their ITexelFormat witnesses.
+    // Direct discovery of the builtin identity adapter obtains its hidden
+    // `Qualified : ITexelElement` proof from provisional facets; generic specialization
+    // obtains that proof through an ordinary subtype query. Both paths must root the
+    // inherited nominal proof at `Qualified` before interning the adapter's arguments.
     if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
     {
         if (declaredWitness->getSub() != subType || declaredWitness->getSup() != superType)

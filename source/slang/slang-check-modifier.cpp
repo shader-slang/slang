@@ -1678,9 +1678,6 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
 {
     switch (modifierType)
     {
-    case ASTNodeType::PreserveTypeModifiersModifier:
-        return as<ExtensionDecl>(decl);
-
         // In addition to the above cases, these are also present on empty
         // global declarations, for instance
         // layout(local_size_x=1) in;

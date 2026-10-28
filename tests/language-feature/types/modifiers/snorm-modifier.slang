@@ -71,18 +71,30 @@ extension<T : __BuiltinArithmeticType> T : IPlainScalar
 }
 StructuredBuffer<vector<SNorm1.Scalar, 4>> legacyScalarPayload;
 
-// Extension inference and ordinary specialization must use the same conformance witness.
+// The built-in texel-format adapter must preserve payload qualifiers through
+// direct DataType lookup and late specialization.
 struct WitnessKey<T : ITexelElement> {}
-interface IQualifiedWitnessKey
-{
-    associatedtype Key;
-}
-__preserve_type_modifiers
-extension<T : ITexelElement> T : IQualifiedWitnessKey
-{
-    typealias Key = WitnessKey<T>;
-}
 void checkWitnessKey(WitnessKey<SNorm1> value) {}
+
+WitnessKey<T.DataType> getElementDataTypeKey<T : ITexelElement>()
+{
+    return {};
+}
+
+WitnessKey<T.DataType> getFormatDataTypeKey<T : ITexelFormat>()
+{
+    return {};
+}
+
+// Exact type equality also checks that generic specialization and direct lookup
+// use the same ITexelFormat witness. Passing values can ignore hidden witnesses.
+struct FormatWitnessKey<T : ITexelFormat> {}
+struct FormatKeyFromElement<T : ITexelElement>
+{
+    typealias Key = FormatWitnessKey<T>;
+}
+struct RequireSame<A, B> where A == B {}
+RequireSame<FormatKeyFromElement<SNorm1>.Key, FormatWitnessKey<SNorm1>> formatWitnessKey;
 
 // GENERIC-HLSL-DAG: Buffer<snorm float4 {{ *}}> signedResources_inputBuffer
 // GENERIC-HLSL-DAG: Texture2D<snorm float4 {{ *}}> signedResources_inputTexture
@@ -106,8 +118,10 @@ void copyTexture<T : ITexelElement>(Texture2D<T> input, RWTexture2D<T> output)
 [numthreads(1, 1, 1)]
 void genericMain()
 {
-    SNorm1.Key key = {};
+    WitnessKey<SNorm1.DataType> key = {};
     checkWitnessKey(key);
+    checkWitnessKey(getElementDataTypeKey<SNorm1>());
+    checkWitnessKey(getFormatDataTypeKey<SNorm1>());
     copyTexture(signedResources.inputTexture, signedResources.outputTexture);
     signedResources.outputBuffer[0] = signedResources.inputBuffer[0]
         + signedResources.projectedData[0] + formatPayload.buffer[0];

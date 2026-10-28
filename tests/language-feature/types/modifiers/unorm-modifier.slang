@@ -47,8 +47,9 @@ struct Resources<T : ITexelElement>
 
 // An outer no_diff modifier must not hide the normalization on the aliased type.
 typealias UNorm4 = unorm float4;
-Resources<no_diff UNorm4> unsignedResources;
-Buffer<no_diff UNorm4> nestedBuffer;
+typealias NonDifferentiableUNorm4 = no_diff UNorm4;
+Resources<NonDifferentiableUNorm4> unsignedResources;
+Buffer<NonDifferentiableUNorm4> nestedBuffer;
 
 // Looking up DataType through the format interface must retain the same qualifiers.
 struct FormatPayload<T : ITexelFormat>
@@ -97,47 +98,33 @@ typealias NonDifferentiable = no_diff float;
 struct RequiresDifferentiable<T : IDifferentiable> {}
 void checkLegacyIdentity(RequiresDifferentiable<NonDifferentiable.Payload> value) {}
 
-// Extension inference and ordinary specialization must use the same conformance witness.
+// The built-in texel-format adapter must preserve payload qualifiers through
+// direct DataType lookup and late specialization.
 struct WitnessKey<T : ITexelElement> {}
-interface IQualifiedWitnessKey
-{
-    associatedtype Key;
-}
-__preserve_type_modifiers
-extension<T : ITexelElement> T : IQualifiedWitnessKey
-{
-    typealias Key = WitnessKey<T>;
-}
 void checkWitnessKey(WitnessKey<UNorm4> value) {}
+void checkNoDiffWitnessKey(WitnessKey<NonDifferentiableUNorm4> value) {}
 
-// A preserving candidate can fail for Subject while applying to no_diff Subject.
-// Prime the nominal inheritance cache first: reuse must consider every candidate,
-// including this one whose constraint fails for the nominal type.
-interface ISubject {}
-struct Subject : ISubject {}
-typealias ModifiedSubject = no_diff Subject;
-interface IModifiedMarker {}
-struct Marker<T> {}
-extension Marker<ModifiedSubject> : IModifiedMarker {}
-interface IQualifiedOnly
+WitnessKey<T.DataType> getElementDataTypeKey<T : ITexelElement>()
 {
-    associatedtype Key;
+    return {};
 }
-__preserve_type_modifiers
-extension<T : ISubject> T : IQualifiedOnly
-    where Marker<T> : IModifiedMarker
+
+WitnessKey<T.DataType> getFormatDataTypeKey<T : ITexelFormat>()
 {
-    typealias Key = T;
+    return {};
 }
-void acceptSubject<T : ISubject>(T value) {}
-void checkNominal(Subject value) { acceptSubject(value); }
-struct SubjectKey<T> {}
-void checkQualifiedCandidate(SubjectKey<ModifiedSubject> value) {}
-void checkModifiedSubject()
+
+// Exact type equality also checks that generic specialization and direct lookup
+// use the same ITexelFormat witness. Passing values can ignore hidden witnesses.
+struct FormatWitnessKey<T : ITexelFormat> {}
+struct FormatKeyFromElement<T : ITexelElement>
 {
-    SubjectKey<ModifiedSubject.Key> key = {};
-    checkQualifiedCandidate(key);
+    typealias Key = FormatWitnessKey<T>;
 }
+struct RequireSame<A, B> where A == B {}
+RequireSame<FormatKeyFromElement<UNorm4>.Key, FormatWitnessKey<UNorm4>> formatWitnessKey;
+RequireSame<FormatKeyFromElement<NonDifferentiableUNorm4>.Key,
+    FormatWitnessKey<NonDifferentiableUNorm4>> noDiffFormatWitnessKey;
 
 // GENERIC-HLSL-DAG: Buffer<unorm float4 {{ *}}> unsignedResources_inputBuffer
 // GENERIC-HLSL-DAG: Texture2D<unorm float4 {{ *}}> unsignedResources_inputTexture
@@ -164,8 +151,14 @@ void copyTexture<T : ITexelElement>(Texture2D<T> input, RWTexture2D<T> output)
 [numthreads(1, 1, 1)]
 void genericMain()
 {
-    UNorm4.Key key = {};
+    WitnessKey<UNorm4.DataType> key = {};
     checkWitnessKey(key);
+    checkWitnessKey(getElementDataTypeKey<UNorm4>());
+    checkWitnessKey(getFormatDataTypeKey<UNorm4>());
+    WitnessKey<NonDifferentiableUNorm4.DataType> noDiffKey = {};
+    checkNoDiffWitnessKey(noDiffKey);
+    checkNoDiffWitnessKey(getElementDataTypeKey<NonDifferentiableUNorm4>());
+    checkNoDiffWitnessKey(getFormatDataTypeKey<NonDifferentiableUNorm4>());
     copyTexture(unsignedResources.inputTexture, unsignedResources.outputTexture);
     unsignedResources.outputBuffer[0] = unsignedResources.inputBuffer[0] + nestedBuffer[0]
         + unsignedResources.projectedData[0] + formatPayload.buffer[0];
