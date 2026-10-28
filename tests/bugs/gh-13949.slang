@@ -4,11 +4,23 @@
 // compilation never finished.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute -DINITIALIZED
+//TEST:SIMPLE(filecheck=INIT): -target spirv -entry computeMain -stage compute -DINITIALIZED
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -shaderobj -output-using-type -Xslang -DINITIALIZED
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type -Xslang -DINITIALIZED
 
 // CHECK: OpEntryPoint
+
+// With INITIALIZED, the param folds to `inputBuffer[1]`: the loop is gone and that value, converted
+// to float, is stored with no OpPhi in between.
+// INIT: %computeMain = OpFunction
+// INIT-NOT: OpPhi
+// INIT: %[[P:[0-9]+]] = OpAccessChain %{{[_a-zA-Z0-9]+}} %inputBuffer %int_0 %int_1
+// INIT: %[[V:[0-9]+]] = OpLoad %uint %[[P]]
+// INIT: %[[F:[0-9]+]] = OpConvertUToF %float %[[V]]
+// INIT-NOT: OpPhi
+// INIT: OpStore %{{[0-9]+}} %[[F]]
+// INIT-NOT: OpPhi
+// INIT: OpFunctionEnd
 
 static const bool kEnabled = false;
 
