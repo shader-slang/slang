@@ -1,13 +1,14 @@
 // Test that `-inline-single-call-functions` inlines a chain of single-call
 // wrappers into the entry point, and keeps functions that are called twice
-// or marked `[noinline]`. Without the option, or in a whole-program (library)
-// compile, every function stays.
+// or marked `[noinline]`. Without the option, or in a whole-program or
+// incomplete-library compile, every function stays.
 
 //TEST:SIMPLE(filecheck=INLINE_HLSL): -target hlsl -entry computeMain -stage compute -inline-single-call-functions
 //TEST:SIMPLE(filecheck=INLINE_WGSL): -target wgsl -entry computeMain -stage compute -inline-single-call-functions
 //TEST:SIMPLE(filecheck=KEEP_HLSL): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=KEEP_WGSL): -target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=KEEP_HLSL): -target hlsl -profile lib_6_6 -whole-program -inline-single-call-functions
+//TEST:SIMPLE(filecheck=KEEP_HLSL): -target hlsl -entry computeMain -stage compute -incomplete-library -inline-single-call-functions
 
 RWStructuredBuffer<float4> buffer;
 
