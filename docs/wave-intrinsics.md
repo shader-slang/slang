@@ -109,7 +109,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 ## WaveMulti
 
-The standard 'Multi' intrinsics were added to HLSL is SM 6.5 and are available in SPIRV through `SPV_NV_shader_subgroup_partitioned`, they can specify a mask of lanes via uint4. The cross-vendor `SPV_EXT_shader_subgroup_partitioned` extension defines the same operations; Slang declares it instead of the NV extension when the target includes the `spvGroupNonUniformPartitionedEXT` capability (for example `-capability spvGroupNonUniformPartitionedEXT`). SPIRV provide non-prefix (reduction) and prefix (scan) intrinsics for arithmetic and min/max operations, while HLSL only provides a subset of these, namely exclusive prefix arithmetic operations.
+The standard 'Multi' intrinsics were added to HLSL is SM 6.5 and are available in SPIRV through `SPV_NV_shader_subgroup_partitioned`, they can specify a mask of lanes via uint4. The cross-vendor `SPV_EXT_shader_subgroup_partitioned` extension defines the same operations. When the target includes the `spvGroupNonUniformPartitionedEXT` capability (for example `-capability spvGroupNonUniformPartitionedEXT`), every partitioned intrinsic (`WaveMatch`, `WaveMaskMatch` and the `WaveMulti*` reductions and scans) declares the EXT extension instead of the NV one. This applies only when Slang emits SPIR-V directly: GLSL output, and so `-emit-spirv-via-glsl`, still requires `GL_NV_shader_subgroup_partitioned`. Passing the extension atom `SPV_EXT_shader_subgroup_partitioned` alone does not select EXT. SPIRV provide non-prefix (reduction) and prefix (scan) intrinsics for arithmetic and min/max operations, while HLSL only provides a subset of these, namely exclusive prefix arithmetic operations.
 
 # Standard Wave intrinsics
 

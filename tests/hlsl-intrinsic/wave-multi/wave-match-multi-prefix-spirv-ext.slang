@@ -7,9 +7,12 @@
 //TEST:SIMPLE(filecheck=NV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly
 //TEST:SIMPLE(filecheck=NV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly -capability spvGroupNonUniformPartitionedNV
 //TEST:SIMPLE(filecheck=EXT): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly -capability spvGroupNonUniformPartitionedEXT
+// Only the capability atom selects EXT. The extension atom alone keeps the NV declaration.
+//TEST:SIMPLE(filecheck=NV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly -capability SPV_EXT_shader_subgroup_partitioned
 // With -restrictive-capability-check, a target whose capabilities do not satisfy the intrinsics'
-// requirements is an error (no implicit profile upgrade): the EXT capability alone, with the
-// ballot and arithmetic ones, must satisfy them, as the NV capability does.
+// requirements is an error (no implicit profile upgrade). These two runs check that
+// spvGroupNonUniformPartitionedEXT can take the place of spvGroupNonUniformPartitionedNV in the
+// intrinsics' requirements; the ballot and arithmetic capabilities are needed by both runs.
 //TEST:SIMPLE(filecheck=NV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly -capability spvGroupNonUniformBallot -capability spvGroupNonUniformArithmetic -capability spvGroupNonUniformPartitionedNV -restrictive-capability-check
 //TEST:SIMPLE(filecheck=EXT): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly -capability spvGroupNonUniformBallot -capability spvGroupNonUniformArithmetic -capability spvGroupNonUniformPartitionedEXT -restrictive-capability-check
 

@@ -622,8 +622,10 @@ def SPV_KHR_shader_clock : _spirv_1_0;
 def SPV_NV_shader_subgroup_partitioned : _spirv_1_0;
 
 /// Represents the cross-vendor SPIR-V extension for shader subgroup partitioned.
-/// Same opcodes and capability as SPV_NV_shader_subgroup_partitioned. Unlike the NV extension,
-/// whose specification predates the requirement, the EXT specification requires SPIR-V 1.3.
+/// Same opcodes and capability as SPV_NV_shader_subgroup_partitioned. The NV extension can be used
+/// from SPIR-V 1.0, while the EXT specification requires SPIR-V 1.3. Requesting this extension atom
+/// alone does not change what the partitioned intrinsics declare; request
+/// spvGroupNonUniformPartitionedEXT for that.
 /// [EXT]
 def SPV_EXT_shader_subgroup_partitioned : _spirv_1_3;
 
@@ -839,13 +841,18 @@ def spvGroupNonUniformVote : _spirv_1_3;
 /// [EXT]
 def spvGroupNonUniformPartitionedNV : _spirv_1_3 + SPV_NV_shader_subgroup_partitioned;
 
-/// Represents the SPIR-V capability for group non-uniform partitioned operations,
-/// declared through SPV_EXT_shader_subgroup_partitioned. The NV and EXT names of the capability,
-/// opcodes and group operations are aliases for the same enumerants (e.g. 5297 for the
-/// capability, 5296 for OpGroupNonUniformPartition). This atom therefore implies
-/// spvGroupNonUniformPartitionedNV, so a target that requests it satisfies the requirements of the
-/// partitioned intrinsics, while the more specific EXT case of their preamble declares
-/// SPV_EXT_shader_subgroup_partitioned instead of the NV extension.
+// The NV and EXT names of the capability, opcodes and group operations are aliases for the same
+// enumerants (e.g. 5297 for the capability, 5296 for OpGroupNonUniformPartition), so this atom
+// implies spvGroupNonUniformPartitionedNV on purpose: the partitioned intrinsics require the NV
+// atom, and a target that requests EXT satisfies them without any change to their requirements.
+// A side effect is that such a target is also modeled as having the
+// SPV_NV_shader_subgroup_partitioned extension atom, which nothing reads to choose what to declare.
+// (The SER pair implies the other way, NV => EXT, because NV SER is the superset there.)
+/// Represents the SPIR-V capability for group non-uniform partitioned operations, declared through
+/// SPV_EXT_shader_subgroup_partitioned. When a target requests it, the partitioned intrinsics
+/// (WaveMatch, WaveMaskMatch, and the WaveMulti reductions and scans) declare
+/// SPV_EXT_shader_subgroup_partitioned in place of SPV_NV_shader_subgroup_partitioned in the SPIR-V
+/// that Slang emits directly.
 /// [EXT]
 def spvGroupNonUniformPartitionedEXT : _spirv_1_3 + SPV_EXT_shader_subgroup_partitioned + spvGroupNonUniformPartitionedNV;
 

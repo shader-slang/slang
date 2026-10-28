@@ -657,8 +657,10 @@ Extensions
 
 `SPV_EXT_shader_subgroup_partitioned`
 > Represents the cross-vendor SPIR-V extension for shader subgroup partitioned.
-> Same opcodes and capability as SPV_NV_shader_subgroup_partitioned. Unlike the NV extension,
-> whose specification predates the requirement, the EXT specification requires SPIR-V 1.3.
+> Same opcodes and capability as SPV_NV_shader_subgroup_partitioned. The NV extension can be used
+> from SPIR-V 1.0, while the EXT specification requires SPIR-V 1.3. Requesting this extension atom
+> alone does not change what the partitioned intrinsics declare; request
+> spvGroupNonUniformPartitionedEXT for that.
 
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
@@ -845,13 +847,11 @@ Extensions
 > Represents the SPIR-V capability for group non-uniform clustered operations.
 
 `spvGroupNonUniformPartitionedEXT`
-> Represents the SPIR-V capability for group non-uniform partitioned operations,
-> declared through SPV_EXT_shader_subgroup_partitioned. The NV and EXT names of the capability,
-> opcodes and group operations are aliases for the same enumerants (e.g. 5297 for the
-> capability, 5296 for OpGroupNonUniformPartition). This atom therefore implies
-> spvGroupNonUniformPartitionedNV, so a target that requests it satisfies the requirements of the
-> partitioned intrinsics, while the more specific EXT case of their preamble declares
-> SPV_EXT_shader_subgroup_partitioned instead of the NV extension.
+> Represents the SPIR-V capability for group non-uniform partitioned operations, declared through
+> SPV_EXT_shader_subgroup_partitioned. When a target requests it, the partitioned intrinsics
+> (WaveMatch, WaveMaskMatch, and the WaveMulti reductions and scans) declare
+> SPV_EXT_shader_subgroup_partitioned in place of SPV_NV_shader_subgroup_partitioned in the SPIR-V
+> that Slang emits directly.
 
 `spvGroupNonUniformPartitionedNV`
 > Represents the SPIR-V capability for group non-uniform partitioned operations.
