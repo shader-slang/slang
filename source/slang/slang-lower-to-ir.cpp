@@ -3663,7 +3663,6 @@ void addArg(
     }
 }
 
-// Defined with the other l-value helpers below.
 static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo const& val);
 
 /// Add an argument that binds the immutable receiver argument `receiverExpr` to the `inout` `this`
