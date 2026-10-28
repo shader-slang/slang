@@ -1,7 +1,7 @@
 // A `[require(...)]` on a user-defined generic type must be enforced wherever the
 // type is used, not only in entry-point signatures, exactly as for the non-generic
-// spelling. The `*NG` cases are non-generic twins: GENERICNG, ENUMNG, NESTEDENUMNG
-// and STATICNG must report the same diagnostics as the rows they follow. LATENG
+// spelling. The `*NG` cases are non-generic twins: GENERICNG, ENUMNG, NESTEDENUMNG,
+// STATICNG and INTRINSICNG must report the same diagnostics as the rows they follow. LATENG
 // records a known gap instead: a non-generic type named only as a generic argument
 // before its declaration is still dropped, so its expected output is empty.
 //
@@ -39,6 +39,9 @@
 // The struct is named only as a generic argument, before its declaration in the file.
 //DIAGNOSTIC_TEST:SIMPLE(diag=LATE): -target hlsl -profile sm_6_5 -entry mainLate -stage compute -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=LATENG): -target hlsl -profile sm_6_5 -entry mainLateNG -stage compute -no-codegen
+// A requiring `__intrinsic_type` declared outside the core module.
+//DIAGNOSTIC_TEST:SIMPLE(diag=INTRINSIC): -target hlsl -profile sm_6_5 -entry mainIntrinsic -stage compute -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=INTRINSICNG): -target hlsl -profile sm_6_5 -entry mainIntrinsicNG -stage compute -no-codegen
 // A requiring generic enum, passed to a generic helper.
 //DIAGNOSTIC_TEST:SIMPLE(diag=ENUM): -target hlsl -profile sm_6_5 -entry mainEnum -stage compute -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=ENUMNG): -target hlsl -profile sm_6_5 -entry mainEnumNG -stage compute -no-codegen
@@ -303,6 +306,46 @@ void mainLateNG()
 {
     gOutput[0] = typeOnly<DeclaredLaterNG>();
 }
+
+[require(metal)]
+__intrinsic_type(UInt)
+struct UserIntrinsic<let N : int>
+{
+}
+
+[require(metal)]
+__intrinsic_type(UInt)
+struct UserIntrinsicNG
+{
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainIntrinsic()
+/*INTRINSIC:
+     ^^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^^ entrypoint 'mainIntrinsic' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
+*/
+{
+    gOutput[0] = typeOnly<UserIntrinsic<3> >();
+//INTRINSIC:     ^^^^^^^^ see using of 'UserIntrinsic'
+}
+//INTRINSIC: see definition of 'UserIntrinsic'
+//INTRINSIC: see declaration of 'require'
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainIntrinsicNG()
+/*INTRINSICNG:
+     ^^^^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^^^^ entrypoint 'mainIntrinsicNG' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
+*/
+{
+    gOutput[0] = typeOnly<UserIntrinsicNG>();
+//INTRINSICNG:   ^^^^^^^^ see using of 'UserIntrinsicNG'
+}
+//INTRINSICNG: see definition of 'UserIntrinsicNG'
+//INTRINSICNG: see declaration of 'require'
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
