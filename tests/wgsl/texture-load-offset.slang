@@ -1,10 +1,12 @@
-// Texture Load with a texel offset. WGSL's textureLoad takes no offset, so the offset is added to
-// the texel coordinate (not to the array layer, the mip level or the sample index).
+// Texture Load with a texel offset. WGSL's textureLoad and Metal's read() take no offset, so the
+// offset is added to the texel coordinate (not to the array layer, the mip level or the sample index).
 //TEST:SIMPLE(filecheck=WGSL): -stage compute -entry computeMain -target wgsl
 // Validate the emitted WGSL through Tint (ignored where the downstream compiler is absent).
 //TEST:SIMPLE(filecheck=SPV): -stage compute -entry computeMain -target wgsl-spirv-asm
 // The lowering is straight-line code: no loop anywhere in the module.
 //TEST:SIMPLE(filecheck=NOLOOP): -stage compute -entry computeMain -target wgsl
+// Metal's read() takes no offset either, so it gets the same coordinate arithmetic.
+//TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal
 
 RWStructuredBuffer<float4> outputBuffer;
 Texture1D<float4> t1D;
@@ -41,6 +43,24 @@ Texture2DMS<float4> t2DMS;
 // WGSL-NEXT: [[C5]][i32(0)] = [[C5]][i32(0)] + i32(-1);
 // WGSL-NEXT: [[C5]][i32(1)] = [[C5]][i32(1)] + i32(1);
 // WGSL-NEXT: textureLoad((t2DMS_{{[0-9]+}}), ([[C5]]), (i32(3)))
+// METAL: [[M1:coord_[0-9]+]] = int2(i_{{[0-9]+}}, int(0));
+// METAL: [[M1]].x = [[M1]].x + int(1);
+// METAL: (t1D_{{[0-9]+}}).read(
+// METAL: [[M2:coord_[0-9]+]] = int3(i_{{[0-9]+}}, int(1), int(2));
+// METAL: [[M2]].x = [[M2]].x + int(1);
+// METAL: [[M2]].y = [[M2]].y + int(-1);
+// METAL: (t2D_{{[0-9]+}}).read(
+// METAL: [[M3:coord_[0-9]+]] = int4(i_{{[0-9]+}}, int(1), int(1), int(0));
+// METAL: [[M3]].x = [[M3]].x + int(1);
+// METAL: (t2DArray_{{[0-9]+}}).read(
+// METAL: [[M4:coord_[0-9]+]] = int4(i_{{[0-9]+}}, int(1), int(2), int(1));
+// METAL: [[M4]].x = [[M4]].x + int(1);
+// METAL: [[M4]].z = [[M4]].z + int(-1);
+// METAL: (t3D_{{[0-9]+}}).read(
+// METAL: [[M5:coord_[0-9]+]] = int2(i_{{[0-9]+}}, int(2));
+// METAL: [[M5]].x = [[M5]].x + int(-1);
+// METAL: [[M5]].y = [[M5]].y + int(1);
+// METAL: (t2DMS_{{[0-9]+}}).read(([[M5]]), uint((int(3))))
 [numthreads(4, 1, 1)]
 void computeMain(int3 tid: SV_DispatchThreadID)
 {

@@ -5271,7 +5271,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -5305,9 +5305,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
-            case wgsl:
-                // WGSL's textureLoad has no offset: add it to the texel coordinate (the
-                // array layer and the mip level are left as they are).
+            default:
+                // Targets without an offset texel fetch (WGSL, Metal, CUDA): add the offset to the
+                // texel coordinate (the array layer and the mip level are left as they are).
                 var coord = location;
                 [ForceUnroll]
                 for (int i = 0; i < Shape.planeDimensions; i++)
@@ -5499,7 +5499,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -5530,8 +5530,9 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                         __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
-            case wgsl:
-                // WGSL's textureLoad has no offset: add it to the texel coordinate.
+            default:
+                // Targets without an offset texel fetch (WGSL, Metal): add the offset to the texel
+                // coordinate.
                 var coord = location;
                 [ForceUnroll]
                 for (int i = 0; i < Shape.planeDimensions; i++)
