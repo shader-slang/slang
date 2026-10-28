@@ -2100,6 +2100,10 @@ struct ModuleLinkingInfo : RefObject
     /// The result is only valid while the module is unchanged from when this info was built.
     ArrayView<IRInst*> getKnownBuiltins() { return m_knownBuiltins.getArrayView(); }
 
+    /// Query the acceleration cache for global DebugSource and DebugCompilationUnit records.
+    /// The result is only valid while the module is unchanged from when this info was built.
+    ArrayView<IRInst*> getDebugSourceRecords() { return m_debugSourceRecords.getArrayView(); }
+
     /// Return the module's GlobalHashedStringLiterals aggregate, if present when this info was
     /// built.
     IRGlobalHashedStringLiterals* getGlobalHashedStringLiterals()
@@ -2117,6 +2121,7 @@ private:
     List<IRInst*> m_hlslExports;
     List<IRInst*> m_globalParams;
     List<IRInst*> m_knownBuiltins;
+    List<IRInst*> m_debugSourceRecords;
 
     // Cached while walking global instructions with the linker caches above. Each module is
     // expected to contain at most one IRGlobalHashedStringLiterals instruction.

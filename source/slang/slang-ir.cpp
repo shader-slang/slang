@@ -5132,6 +5132,9 @@ void ModuleLinkingInfo::_build(IRModule* module)
         if (as<IRGlobalParam>(inst))
             m_globalParams.add(inst);
 
+        if (as<IRDebugSource>(inst) || as<IRDebugCompilationUnit>(inst))
+            m_debugSourceRecords.add(inst);
+
         bool isHLSLExported = false;
         bool isKnownBuiltin = false;
         for (auto decoration : inst->getDecorations())
