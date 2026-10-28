@@ -1,16 +1,19 @@
 // The GLSL EXT SER (hitObject*EXT) wrappers compile for -target spirv under the default profile,
 // with no SER capability given, and emit the EXT extension and capability, never the NV ones.
-//   (check)  every wrapper, with no capability, then with the EXT SER capability given.
+//   (check)  every wrapper except the position-fetch and motion ones, with no capability, then
+//            with the EXT SER capability given.
 //   (pos)    hitObjectGetIntersectionTriangleVertexPositionsEXT, given only position fetch.
 //   (motion) hitObjectTraceMotionReorderExecuteEXT, given only motion blur.
-//   (nonv)   the check and pos runs again; a separate prefix, as a NOT placed after a DAG
-//            group only scans the text after the group's last match.
+//   (nonv)   the check, pos and motion runs again, checking that neither the NV capability nor
+//            the NV extension appears; a separate prefix, as a NOT placed after a DAG group only
+//            scans the text after the group's last match.
 
 //TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/raytracing/ser-ext-spirv-default-capability.slang -stage raygeneration -entry main -target spirv-asm -emit-spirv-directly
 //TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/raytracing/ser-ext-spirv-default-capability.slang -stage raygeneration -entry main -target spirv-asm -emit-spirv-directly -capability spvShaderInvocationReorderEXT
 //TEST:SIMPLE_EX(filecheck=POS): -lang glsl tests/glsl-intrinsic/raytracing/ser-ext-spirv-default-capability.slang -stage raygeneration -entry main -target spirv-asm -emit-spirv-directly -capability spvRayTracingPositionFetchKHR -DPOSITION_FETCH
 //TEST:SIMPLE_EX(filecheck=NONV): -lang glsl tests/glsl-intrinsic/raytracing/ser-ext-spirv-default-capability.slang -stage raygeneration -entry main -target spirv-asm -emit-spirv-directly
 //TEST:SIMPLE_EX(filecheck=NONV): -lang glsl tests/glsl-intrinsic/raytracing/ser-ext-spirv-default-capability.slang -stage raygeneration -entry main -target spirv-asm -emit-spirv-directly -capability spvRayTracingPositionFetchKHR -DPOSITION_FETCH
+//TEST:SIMPLE_EX(filecheck=NONV): -lang glsl tests/glsl-intrinsic/raytracing/ser-ext-spirv-default-capability.slang -stage raygeneration -entry main -target spirv-asm -emit-spirv-directly -capability spvRayTracingMotionBlurNV -DMOTION
 //TEST:SIMPLE_EX(filecheck=MOTION): -lang glsl tests/glsl-intrinsic/raytracing/ser-ext-spirv-default-capability.slang -stage raygeneration -entry main -target spirv-asm -emit-spirv-directly -capability spvRayTracingMotionBlurNV -DMOTION
 
 // CHECK-DAG: OpExtension "SPV_EXT_shader_invocation_reorder"
@@ -35,6 +38,7 @@
 // MOTION-DAG: OpHitObjectTraceMotionReorderExecuteEXT
 
 // NONV-NOT: ShaderInvocationReorderNV
+// NONV-NOT: SPV_NV_shader_invocation_reorder
 
 layout(binding = 0) uniform accelerationStructureEXT topLevel;
 layout(location = 0) rayPayloadEXT vec4 payload;
