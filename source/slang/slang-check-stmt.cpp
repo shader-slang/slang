@@ -830,8 +830,9 @@ void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
 // The count assumes that the step moves `i` towards `finalValue` and that `i` never wraps around.
 // The caller checks neither in full: it rejects a step that moves away from a strict bound (`<`,
 // `>`) but not from an inclusive one (`<=`, `>=`), and it does not look for wrap-around. For
-// example, `for (int i = 10; i >= 0; i++)` is counted as 11 iterations and
-// `for (uint i = 0; i < 0xFFFFFFFFu; i += 0x80000000u)` as 2, although neither loop ends.
+// example, `for (int i = 10; i >= 0; i++)` is counted as 11 iterations although it runs until `i`
+// overflows, and `for (uint i = 0; i < 0xFFFFFFFFu; i += 0x80000000u)` as 2 although it never
+// ends. An under-count like these makes autodiff allocate too little per-iteration storage.
 static bool _tryCountForLoopIterations(
     IROp compareOp,
     bool isUnsigned64,
@@ -840,6 +841,10 @@ static bool _tryCountForLoopIterations(
     UInt64 absStep,
     int32_t& outIterations)
 {
+    SLANG_ASSERT(
+        compareOp == kIROp_Less || compareOp == kIROp_Leq || compareOp == kIROp_Greater ||
+        compareOp == kIROp_Geq);
+    SLANG_ASSERT(absStep != 0);
     const bool countsDown = compareOp == kIROp_Greater || compareOp == kIROp_Geq;
     const bool isInclusive = compareOp == kIROp_Leq || compareOp == kIROp_Geq;
     const IntegerLiteralValue low = countsDown ? finalValue : initialValue;
@@ -1099,7 +1104,8 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     // variable is still a bare operand, so that type is the variable's type. Only `uint64_t` and
     // `uintptr_t` values can exceed INT64_MAX. The ordering is right only when the folded bounds
     // are canonical values of that type, which the constant folder does not yet guarantee (issue
-    // #13954).
+    // #13954): a mis-folded low-side bound reads as `UINT64_MAX`, which gives a false zero-trip
+    // result and an inferred `MaxIters(0)`.
     auto compareType = as<BasicExpressionType>(cmpExpr->arguments[0]->type.type);
     SLANG_RELEASE_ASSERT(compareType);
     const BaseType compareBaseType = compareType->getBaseType();
