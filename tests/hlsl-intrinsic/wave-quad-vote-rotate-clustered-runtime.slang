@@ -4,7 +4,7 @@
 // Runs QuadAny, QuadAll, WaveRotate and WaveClusteredSum and checks each result in the shader, so
 // the test does not depend on the subgroup size. Each invocation writes 15 when all checks pass:
 // - 1: WaveRotate reads lane (self + delta) mod the subgroup size, including across the end of
-//   the subgroup;
+//   the subgroup (not checked when that lane has no invocation, see below);
 // - 2: QuadAny/QuadAll of a vote that only one lane of each quad casts (any but not all);
 // - 4: QuadAny/QuadAll of a vote that every lane casts (any and all);
 // - 8: WaveClusteredSum over clusters of 4 lanes.
@@ -21,7 +21,13 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     uint result = 0;
 
-    if (WaveRotate(lane * 10, delta) == ((lane + delta) % laneCount) * 10)
+    // WGSL allows a subgroup to be larger than the workgroup, so the source lane can be one with no
+    // invocation, whose value is indeterminate. The ballot tells which lanes have one.
+    const uint4 activeLanes = WaveActiveBallot(true);
+    const uint rotated = WaveRotate(lane * 10, delta);
+    const uint source = (lane + delta) % laneCount;
+    const bool sourceActive = ((activeLanes[source / 32] >> (source % 32)) & 1) != 0;
+    if (!sourceActive || rotated == source * 10)
         result |= 1;
 
     // Each vote is taken before the branch that tests it. Written as `QuadAny(v) && QuadAll(v)`,
