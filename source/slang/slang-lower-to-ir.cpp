@@ -3668,7 +3668,7 @@ static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo 
 /// Add an argument that binds the immutable receiver argument `receiverExpr` to the `inout` `this`
 /// parameter described by `thisParamInfo`, by passing a fresh copy of it.
 ///
-/// Semantic checking accepts such a call only through `canPassCopyOfImmutableReceiver`. The copy
+/// Semantic checking records such a call in `AppExprBase::passesImmutableReceiverCopy`. The copy
 /// is never written back, so the callee's writes to `this` stay in the copy. The argument does not
 /// go through `addArg`, because that tries `tryGetAddress` first, which can succeed for a constant
 /// buffer member or a `static const` and would hand the callee a pointer into read-only storage.
@@ -5118,8 +5118,7 @@ struct ExprLoweringContext
                     }
                 }
 
-                if (baseExpr && !baseExpr->type.isLeftValue &&
-                    doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
+                if (baseExpr && expr->passesImmutableReceiverCopy)
                 {
                     addImmutableReceiverCopyArg(context, *thisParamInfo, baseExpr, &irArgs);
                 }

@@ -1113,6 +1113,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                 if (canPassCopyOfImmutableReceiver(funcDeclRef))
                 {
                     candidate.conversionCostSum += kConversionCost_ImmutableReceiverCopy;
+                    candidate.passesImmutableReceiverCopy = true;
                     return true;
                 }
 
@@ -1693,6 +1694,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
 
                 callExpr->originalFunctionExpr = callExpr->functionExpr;
                 callExpr->functionExpr = baseExpr;
+                callExpr->passesImmutableReceiverCopy = candidate.passesImmutableReceiverCopy;
 
                 // `ConstructLookupResultExpr` can diagnose an invalid member reference (e.g. a
                 // non-static member named from a static function) after overload selection,
