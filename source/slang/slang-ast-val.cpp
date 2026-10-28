@@ -2247,6 +2247,53 @@ static bool _tryFoldConstantShift(
     return true;
 }
 
+// Fold the ordering comparison `op` (`<`, `>`, `<=` or `>=`) of two integer constants. When
+// either operand is unsigned, each operand is converted to its own type and the two are compared
+// as unsigned values, because `IntegerLiteralValue` is signed and front-end folding does not
+// narrow results. Consider `0xFFFFFFFFFFFFFFFFull > 5ull` and `(0u - 1u) > 5u`: both operands on
+// the left are held as -1, so only that conversion folds them to true. Signed operands compare
+// their held values directly, so `-1 < 0` stays true.
+static bool _foldOrderingComparison(
+    BuiltinOperationKind op,
+    ConstantIntVal* lhs,
+    ConstantIntVal* rhs)
+{
+    auto compare = [op](auto a, auto b) -> bool
+    {
+        switch (op)
+        {
+        case BuiltinOperationKind::Less:
+            return a < b;
+        case BuiltinOperationKind::Greater:
+            return a > b;
+        case BuiltinOperationKind::Leq:
+            return a <= b;
+        case BuiltinOperationKind::Geq:
+            return a >= b;
+        default:
+            SLANG_UNEXPECTED("not an ordering comparison");
+        }
+    };
+    auto isUnsignedIntegerType = [](BasicExpressionType* type)
+    {
+        const auto flags = BaseTypeInfo::Flag::Integer | BaseTypeInfo::Flag::Signed;
+        return type && (BaseTypeInfo::getInfo(type->getBaseType()).flags & flags) ==
+                           BaseTypeInfo::Flag::Integer;
+    };
+
+    IntegerLiteralValue lhsValue = lhs->getValue();
+    IntegerLiteralValue rhsValue = rhs->getValue();
+    auto lhsType = as<BasicExpressionType>(lhs->getType());
+    auto rhsType = as<BasicExpressionType>(rhs->getType());
+    if (!isUnsignedIntegerType(lhsType) && !isUnsignedIntegerType(rhsType))
+        return compare(lhsValue, rhsValue);
+    if (lhsType)
+        _tryConvertIntegerValueToBaseType(lhsType->getBaseType(), lhsValue);
+    if (rhsType)
+        _tryConvertIntegerValueToBaseType(rhsType->getBaseType(), rhsValue);
+    return compare(UInt64(lhsValue), UInt64(rhsValue));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op)
@@ -2455,16 +2502,10 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         r = (a0 != a1);
         break;
     case BuiltinOperationKind::Less:
-        r = (a0 < a1);
-        break;
     case BuiltinOperationKind::Greater:
-        r = (a0 > a1);
-        break;
     case BuiltinOperationKind::Leq:
-        r = (a0 <= a1);
-        break;
     case BuiltinOperationKind::Geq:
-        r = (a0 >= a1);
+        r = _foldOrderingComparison(op, constArgs[0], constArgs[1]);
         break;
     case BuiltinOperationKind::BitAnd:
         r = a0 & a1;
