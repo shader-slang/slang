@@ -15,7 +15,9 @@
 // INIT: %computeMain = OpFunction
 // INIT-NOT: OpPhi
 // INIT: %[[P:[0-9]+]] = OpAccessChain %{{[_a-zA-Z0-9]+}} %inputBuffer %int_0 %int_1
+// INIT-NOT: OpPhi
 // INIT: %[[V:[0-9]+]] = OpLoad %uint %[[P]]
+// INIT-NOT: OpPhi
 // INIT: %[[F:[0-9]+]] = OpConvertUToF %float %[[V]]
 // INIT-NOT: OpPhi
 // INIT: OpStore %{{[0-9]+}} %[[F]]
