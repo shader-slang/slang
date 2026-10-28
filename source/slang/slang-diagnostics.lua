@@ -1839,7 +1839,7 @@ warning(
     "redeclaration-compatibility-warning",
     30204,
     "conflicting declaration",
-    span { loc = "decl:Decl", message = "declaration of '~decl' conflicts with existing declaration; earlier compiler releases accepted it" }
+    span { loc = "decl:Decl", message = "declaration of '~decl' conflicts with existing declaration (allowed for compatibility)" }
 )
 
 err(
