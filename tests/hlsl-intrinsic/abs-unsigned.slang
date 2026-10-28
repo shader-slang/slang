@@ -6,11 +6,13 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-via-glsl -render-feature int64 -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -output-using-type
 
-// The signed overloads still lower to `SAbs`; the unsigned ones emit no `SAbs` at all, and glslang
-// accepts the GLSL path.
+// Signed element types still lower to `SAbs`; unsigned ones emit no `SAbs` at all. The
+// `OpEntryPoint` anchor fails the rows when compilation fails, which glslang does when the GLSL
+// path emits `abs` of an unsigned value.
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -emit-spirv-via-glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPV_SIGNED):-target spirv-asm -entry computeMain -stage compute
+// SPV: OpEntryPoint
 // SPV-NOT: OpExtInst %{{(u|v[0-9]u)}}{{[a-z0-9]*}} %{{[A-Za-z0-9_]+}} SAbs
 // SPV_SIGNED-DAG: OpExtInst %int %{{[A-Za-z0-9_]+}} SAbs
 // SPV_SIGNED-DAG: OpExtInst %v2int %{{[A-Za-z0-9_]+}} SAbs
@@ -28,7 +30,10 @@ void computeMain()
     uint five = inBuf[2];
 
     outBuf[0] = abs(allOnes);
-    outBuf[1] = abs(inBuf[1]);
+    // The INT_MIN bit pattern is poison for a signed `llvm.abs` with `i1 true`, so this checks that
+    // unsigned `abs` never reaches that lowering.
+    uint intMinBits = inBuf[1];
+    outBuf[1] = abs(intMinBits);
     outBuf[2] = abs(five);
 
     uint2 v = abs(uint2(allOnes, five));
