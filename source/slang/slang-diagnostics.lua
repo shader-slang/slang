@@ -1533,6 +1533,13 @@ err(
     span { loc = "location", message = "mutating method '~methodName:Name' cannot be called on an immutable value" }
 )
 
+warning(
+    "mutating-method-on-immutable-value-warning",
+    30134,
+    "mutating method called on immutable value",
+    span { loc = "location", message = "mutating method '~methodName:Name' called on an immutable value receives a temporary copy; changes to the copy are discarded. copy the value into a local variable if this behavior is intended" }
+)
+
 err(
     "invalid-swizzle-expr",
     30052,

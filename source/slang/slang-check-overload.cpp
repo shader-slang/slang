@@ -1111,6 +1111,12 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                 // receiver needs no copy, such as a `[nonmutating]` one, is preferred.
                 if (canPassCopyOfImmutableReceiver(funcDeclRef))
                 {
+                    if (context.mode == OverloadResolveContext::Mode::ForReal)
+                    {
+                        getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValueWarning{
+                            .methodName = funcDeclRef.getName(),
+                            .location = context.loc});
+                    }
                     candidate.conversionCostSum += kConversionCost_ImmutableReceiverCopy;
                     candidate.passesImmutableReceiverCopy = true;
                     return true;

@@ -1,11 +1,12 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -warnings-disable -xslang 30134
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -warnings-disable -xslang 30134
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-asm -entry computeMain -profile cs_6_0
 
 // HLSL code calls a default method on a constant buffer value whose type holds resources. The
 // call passes a copy of the receiver argument (issue #13964), and resource legalization still
-// produces code that samples the bound texture, as well as valid SPIR-V and DXIL.
+// produces code that samples the bound texture, as well as valid SPIR-V and DXIL. The runs disable
+// the call's warning E30134, which a diagnostics test checks.
 
 struct Material
 {

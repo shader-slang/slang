@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -warnings-disable -xslang 30134
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -warnings-disable -xslang 30134
 
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-asm -entry computeMain -profile cs_6_0
 
@@ -8,7 +8,9 @@
 // an `inout` `this` parameter: a constant buffer member, a `StructuredBuffer` element, a constant,
 // a temporary or an existential value. DXC accepts such calls for methods that do not write
 // `this`. The callee's writes to `this` stay in the copy, so they do not reach the immutable
-// storage (issue #13964).
+// storage (issue #13964). Each such call gets warning E30134, which
+// tests/diagnostics/methods/hlsl-mutating-method-on-immutable-value.slang checks; the runs here
+// disable it because they compare the values the calls produce.
 
 // The DXIL run checks that DXC validates the HLSL that Slang emits for these calls, in particular
 // that a copied receiver does not store to a constant buffer or `StructuredBuffer`.
