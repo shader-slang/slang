@@ -14853,28 +14853,6 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     return SLANG_FAIL;
 }
 
-/// Return whether `decl` is the `static const` alias that the unscoped enum `enumDecl` adds to
-/// its enclosing scope for its own case of the same name, as in
-/// `[UnscopedEnum] enum Mode { Mode }`. The parser creates the alias in `CompleteDecl` with the
-/// case's name and location, and with an initializer that refers to the case.
-///
-static bool isUnscopedEnumCaseAliasOfOwnEnum(Decl* decl, Decl* enumDecl)
-{
-    if (!isUnscopedEnum(enumDecl))
-        return false;
-    auto letDecl = as<LetDecl>(decl);
-    if (!letDecl)
-        return false;
-    auto initExpr = as<DeclRefExpr>(letDecl->initExpr);
-    if (!initExpr)
-        return false;
-    auto caseDecl = as<EnumCaseDecl>(initExpr->declRef.getDecl());
-    return caseDecl && caseDecl->parentDecl == enumDecl &&
-           caseDecl->getName() == enumDecl->getName() &&
-           caseDecl->getName() == letDecl->getName() &&
-           caseDecl->getNameLoc() == letDecl->getNameLoc();
-}
-
 Result SemanticsVisitor::checkRedeclaration(
     Decl* newDecl,
     Decl* oldDecl,
@@ -14914,16 +14892,20 @@ Result SemanticsVisitor::checkRedeclaration(
         return SLANG_OK;
     }
 
-    // Consider `[UnscopedEnum] enum Mode { Mode, Other }`. The case alias `Mode` that the parser
-    // adds to the enclosing scope conflicts with the enum type `Mode`. Lookup still tells the type
-    // and the value apart by where the name is used, and both DXC and earlier Slang versions accept
-    // the code, so for compatibility we warn in every language version instead of reporting an
-    // error. Only this synthesized alias is exempt. The failure result stops the caller's loop
-    // over older declarations; a conflict with one of those is reported at the enum itself.
-    if (isUnscopedEnumCaseAliasOfOwnEnum(newDecl, oldDecl))
+    // Consider `[UnscopedEnum] enum Mode { Mode, Other }`. The alias `Mode` that the parser adds
+    // for the case conflicts with the enum, but lookup tells the type and the value apart by where
+    // the name is used, and DXC and earlier Slang releases accept the code, so we warn; Slang 202c
+    // may make it an error (shader-slang/slang#13956). The failure result stops the caller's loop,
+    // so a conflict with an older declaration is reported at the enum. The case is null when user
+    // code attaches the modifier through `syntax`.
+    if (auto aliasModifier = newDecl->findModifier<UnscopedEnumCaseAliasModifier>())
     {
-        getSink()->diagnose(Diagnostics::UnscopedEnumCaseNamedLikeEnum{.decl = newDecl});
-        return SLANG_FAIL;
+        auto caseDecl = aliasModifier->enumCaseDecl;
+        if (caseDecl && caseDecl->parentDecl == oldDecl)
+        {
+            getSink()->diagnose(Diagnostics::UnscopedEnumCaseNamedLikeEnum{.decl = newDecl});
+            return SLANG_FAIL;
+        }
     }
 
 
