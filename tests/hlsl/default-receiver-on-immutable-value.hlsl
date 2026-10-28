@@ -136,6 +136,23 @@ extension Overloaded
 
 static const Overloaded kOverloaded = { 0 };
 
+// A call through an `inout` requirement whose witness is a `[__ref]` method runs the synthesized
+// `inout` wrapper on the copy, and the wrapper passes its own `this` to the method.
+interface IBump
+{
+    int bump();
+};
+
+struct RefBump : IBump
+{
+    int value;
+
+    [__ref]
+    int bump() { return ++value; }
+};
+
+static const RefBump kRefBump = { 5 };
+
 Helper makeHelper(int value)
 {
     Helper helper;
@@ -163,7 +180,7 @@ RWStructuredBuffer<Helper> gMutableHelpers;
 //TEST_INPUT: set gSlangCounters = ubuffer(data=[100], stride=4)
 StructuredBuffer<SlangCounter> gSlangCounters;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -254,4 +271,15 @@ void computeMain()
     MutatingKey d = { 6 };
     // CHECK: 6
     outputBuffer[31] = minOf(c, d).key;
+
+    // CHECK: 6
+    outputBuffer[32] = kRefBump.bump();
+    // CHECK: 5
+    outputBuffer[33] = kRefBump.value;
+
+    // On a mutable receiver argument, neither overload needs a copy, and the one declared in the
+    // type is chosen.
+    Overloaded mutableOverloaded = { 0 };
+    // CHECK: 1
+    outputBuffer[34] = mutableOverloaded.choose();
 }
