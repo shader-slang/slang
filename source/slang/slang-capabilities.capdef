@@ -2365,6 +2365,7 @@ alias fragmentprocessing = fragment + _sm_5_0
 /// [Compound]
 alias fragmentprocessing_derivativecontrol = fragment + _sm_5_0
                                            | fragment + GL_ARB_derivative_control
+                                           | fragment + wgsl
                                            | raytracingstages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
                                            ;
 /// Capabilities required to use 'getAttributeAtVertex'
