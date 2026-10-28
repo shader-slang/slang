@@ -27,6 +27,17 @@ struct Helper
         value += delta;
         return value;
     }
+
+    [mutating]
+    int mutatingAddAndGet(int delta)
+    {
+        value += delta;
+        return value;
+    }
+
+    // Inside a trailing-`const` method, `this` is immutable, so the implicit `this.get()` call
+    // passes a copy.
+    int getTwice() const { return get() + get(); }
 };
 
 // A default HLSL method also satisfies a requirement with an `in` receiver, such as those of the
@@ -39,6 +50,19 @@ struct Key : IComparable
     bool lessThan(Key other) { return key < other.key; }
     bool lessThanOrEquals(Key other) { return key <= other.key; }
     bool equals(Key other) { return key == other.key; }
+};
+
+// An explicit `[mutating]` method has an `inout` receiver too, so it also meets the requirement.
+struct MutatingKey : IComparable
+{
+    int key;
+
+    [mutating]
+    bool lessThan(MutatingKey other) { return key < other.key; }
+    [mutating]
+    bool lessThanOrEquals(MutatingKey other) { return key <= other.key; }
+    [mutating]
+    bool equals(MutatingKey other) { return key == other.key; }
 };
 
 T minOf<T : IComparable>(T a, T b)
@@ -136,7 +160,10 @@ StructuredBuffer<Helper> gHelpers;
 //TEST_INPUT: set gMutableHelpers = ubuffer(data=[40], stride=4)
 RWStructuredBuffer<Helper> gMutableHelpers;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set gSlangCounters = ubuffer(data=[100], stride=4)
+StructuredBuffer<SlangCounter> gSlangCounters;
+
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -210,4 +237,21 @@ void computeMain()
 
     // CHECK: 2
     outputBuffer[25] = kOverloaded.choose();
+
+    // Explicit `[mutating]` methods, written in HLSL or in Slang, also receive a copy when this HLSL
+    // code calls them on an immutable receiver argument.
+    // CHECK: 12
+    outputBuffer[26] = gHelper.mutatingAddAndGet(2);
+    // CHECK: 10
+    outputBuffer[27] = gHelper.get();
+    // CHECK: 101
+    outputBuffer[28] = gSlangCounters[0].addAndGet(1);
+    // CHECK: 100
+    outputBuffer[29] = gSlangCounters[0].value;
+    // CHECK: 20
+    outputBuffer[30] = gHelper.getTwice();
+    MutatingKey c = { 7 };
+    MutatingKey d = { 6 };
+    // CHECK: 6
+    outputBuffer[31] = minOf(c, d).key;
 }
