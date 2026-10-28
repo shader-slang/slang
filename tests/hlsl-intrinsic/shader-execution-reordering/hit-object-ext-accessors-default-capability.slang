@@ -16,7 +16,7 @@
 //TEST:SIMPLE(filecheck=NONV): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly
 //TEST:SIMPLE(filecheck=NONV): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderEXT
 //TEST:SIMPLE(filecheck=NONV): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvRayTracingPositionFetchKHR -DPOSITION_FETCH
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=NV): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
+//TEST:SIMPLE(filecheck=NV): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
 
 // CHECK-DAG: OpExtension "SPV_EXT_shader_invocation_reorder"
 // CHECK-DAG: OpCapability ShaderInvocationReorderEXT
@@ -34,6 +34,9 @@
 // No run uses the NV extension anywhere in the module.
 // NONV-NOT: ShaderInvocationReorderNV
 
+// The NV run is a plain SIMPLE test, not a DIAGNOSTIC_TEST, so that its output includes the result
+// code: the compile must fail, not only print the diagnostics.
+// NV: result code = -1
 // NV-DAG: SetShaderTableIndex() has no SPIRV NV equivalent
 // NV-DAG: GetRayFlags() has no SPIRV NV equivalent
 
