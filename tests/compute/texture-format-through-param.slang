@@ -9,7 +9,8 @@
 // `r16f`/`float` is used (rather than an integer format) because the CUDA prelude only defines the
 // converting-read helper for float element types.
 
-//TEST:SIMPLE(filecheck=CUDA,READ,NEG): -target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA,READ,NEG): -std 2026 -warnings-as-errors all -target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=FORMAT,NEG): -target cuda -entry formattedMain -stage compute
 
 // Both writes (through the parameter and direct) recover the format and convert with `* 1`.
 //CUDA-COUNT-2: surf2Dwrite_convert<{{.*}}>({{.*}}, {{.*}}, ({{.*}}).x * 1, {{.*}})
@@ -50,4 +51,30 @@ void computeMain()
     writeThroughParam(tex);
     outBuf[0] = readThroughParam(tex);
     tex[uint2(2, 0)] = 7.0f;
+}
+
+// A descriptor carries the same backing format through the parameter's type.
+// Keep this entry point separate so the original attribute test still exercises
+// both accesses through a parameter and the direct resource access unchanged.
+RWTexture2D<R16F> formattedTex;
+
+void writeFormatted(RWTexture2D<R16F> texture)
+{
+    texture[uint2(1, 0)] = 5.0f;
+}
+
+float readFormatted(RWTexture2D<R16F> texture)
+{
+    return texture[uint2(1, 0)];
+}
+
+// FORMAT: surf2Dwrite_convert<{{.*}}>({{.*}}, {{.*}}, ({{.*}}).x * 1, {{.*}})
+// FORMAT: surf2Dread_convert<{{.*}}>({{.*}}, ({{.*}}).x * 2, {{.*}})
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void formattedMain()
+{
+    writeFormatted(formattedTex);
+    outBuf[0] = readFormatted(formattedTex);
 }

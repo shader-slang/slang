@@ -339,6 +339,74 @@ where:
 
 Not all combinations of these options are supported, and some combinations may be unsupported on some targets.
 
+When the storage format of a texture is known, prefer using an explicit texture format type as the element type.
+For example, `RWTexture2D<RGBA16F>` declares a read-write 2D texture whose storage format is `rgba16f`, and whose loads and stores use `float4` values.
+Similarly, `RWTexture2D<RGBA8UI>` uses `uint4` values.
+The available format type names follow Slang's type naming convention, with names such as `RGBA32F`, `RG16F`, `R32UI`, `RGBA8Snorm`, and `BGRA8Unorm`.
+
+Plain scalar and vector element types, such as `float4`, `int4`, and `uint4`, retain their existing behavior, including when the storage format is provided externally.
+They do not encode a specific storage format in the texture type.
+Using explicit format types whenever possible makes declarations easier to read and lets the type system distinguish textures that have the same data type but different storage formats.
+
+Generic code that operates on scalar or vector values can continue to constrain its type parameter to `ITexelElement`.
+This interface retains `Element`, `elementCount`, and its scalar constructor.
+A generic extension gives these existing element types an `ITexelFormat` conformance with `DataType = T`, including any `unorm` or `snorm` modifier.
+Generic code that also accepts named format descriptors can use `T : ITexelFormat`; its texture operations return `T.DataType`.
+The original type argument remains part of the texture type, so generic calls can infer `T` from the texture argument.
+
+The existing `[format("...")]` attribute and numeric format parameters remain supported.
+Texture aliases retain their third format argument, and formatted buffer aliases retain their second format argument.
+The format argument keeps its existing default of zero. A nonzero argument selects that storage format; otherwise, a named descriptor supplies its format.
+Plain scalar/vector textures retain their existing format inference, including integer formats for integer values.
+Legacy declarations such as `RWTexture2D<float4>` keep their previous target-specific default-format behavior; adding named formats does not give them a new implicit storage format.
+
+##### Explicit Texture Element Formats
+
+| Texture element type | Storage format | Value type |
+|----------------------|----------------|------------|
+| `RGBA32F` | `rgba32f` | `float4` |
+| `RGBA16F` | `rgba16f` | `float4` |
+| `RG32F` | `rg32f` | `float2` |
+| `RG16F` | `rg16f` | `float2` |
+| `R11G11B10F` | `r11f_g11f_b10f` | `float3` |
+| `R32F` | `r32f` | `float` |
+| `R16F` | `r16f` | `float` |
+| `RGBA16Unorm` | `rgba16` | `float4` |
+| `RGB10A2Unorm` | `rgb10_a2` | `float4` |
+| `RGBA8Unorm` | `rgba8` | `float4` |
+| `RG16Unorm` | `rg16` | `float2` |
+| `RG8Unorm` | `rg8` | `float2` |
+| `R16Unorm` | `r16` | `float` |
+| `R8Unorm` | `r8` | `float` |
+| `RGBA16Snorm` | `rgba16_snorm` | `float4` |
+| `RGBA8Snorm` | `rgba8_snorm` | `float4` |
+| `RG16Snorm` | `rg16_snorm` | `float2` |
+| `RG8Snorm` | `rg8_snorm` | `float2` |
+| `R16Snorm` | `r16_snorm` | `float` |
+| `R8Snorm` | `r8_snorm` | `float` |
+| `RGBA32I` | `rgba32i` | `int4` |
+| `RGBA16I` | `rgba16i` | `int4` |
+| `RGBA8I` | `rgba8i` | `int4` |
+| `RG32I` | `rg32i` | `int2` |
+| `RG16I` | `rg16i` | `int2` |
+| `RG8I` | `rg8i` | `int2` |
+| `R32I` | `r32i` | `int` |
+| `R16I` | `r16i` | `int` |
+| `R8I` | `r8i` | `int` |
+| `RGBA32UI` | `rgba32ui` | `uint4` |
+| `RGBA16UI` | `rgba16ui` | `uint4` |
+| `RGB10A2UI` | `rgb10_a2ui` | `uint4` |
+| `RGBA8UI` | `rgba8ui` | `uint4` |
+| `RG32UI` | `rg32ui` | `uint2` |
+| `RG16UI` | `rg16ui` | `uint2` |
+| `RG8UI` | `rg8ui` | `uint2` |
+| `R32UI` | `r32ui` | `uint` |
+| `R16UI` | `r16ui` | `uint` |
+| `R8UI` | `r8ui` | `uint` |
+| `R64UI` | `r64ui` | `uint64_t` |
+| `R64I` | `r64i` | `int64_t` |
+| `BGRA8Unorm` | `bgra8` | `float4` |
+
 #### Sampler
 
 Sampler types encapsulate parameters that control addressing and filtering for texture-sampling operations.

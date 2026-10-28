@@ -8,6 +8,30 @@
 
 namespace Slang
 {
+// Keep provisional conformance facts subject to the same modifier exclusions as
+// the completed inheritance information. A no_diff type cannot supply either
+// differentiability witness while matching a modifier-preserving extension.
+static bool _isInterfaceExcludedByTypeModifiers(
+    ASTBuilder* astBuilder,
+    Type* type,
+    Type* interfaceType)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+    {
+        if (modifiedType->findModifier<NoDiffModifierVal>())
+        {
+            auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(interfaceType);
+            if (!interfaceDeclRef)
+                return false;
+            auto interfaceDecl = interfaceDeclRef.getDecl();
+            return interfaceDecl == astBuilder->getDifferentiableInterfaceDecl().getDecl() ||
+                   interfaceDecl == astBuilder->getDifferentiableRefInterfaceDecl().getDecl();
+        }
+        type = modifiedType->getBase();
+    }
+    return false;
+}
+
 UInt SharedSemanticsContext::getDeclExtensionEpoch(Decl* decl) const
 {
     if (!decl)
@@ -704,6 +728,12 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         selfFacetKind = Facet::Kind::Extension;
     }
 
+    // Retain the complete type for extensions that explicitly preserve modifiers.
+    // All ordinary extensions and declared bases keep their nominal-type context.
+    auto extensionApplicationType = selfType;
+    if (!declRef.as<ExtensionDecl>())
+        selfType = unwrapModifiedType(selfType);
+
     // Because we are dealing with entities that have declarations, the
     // first item in our linearization will always be a facet for
     // the declaration itself.
@@ -852,8 +882,40 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // the extension to the type and see if we succeed in
             // making a match.
             //
+            auto extensionTargetType = selfType;
+            auto extensionWitnesses = additionalSubtypeWitness;
+            Dictionary<Type*, SubtypeWitness*> modifiedTypeWitnesses;
+            if (extDecl->hasModifier<PreserveTypeModifiersModifier>())
+            {
+                SLANG_ASSERT(isDeclRefTypeOf<GenericTypeParamDecl>(extDecl->targetType.type));
+                extensionTargetType = extensionApplicationType;
+                if (additionalSubtypeWitness && extensionTargetType != selfType)
+                {
+                    // Consider an identity adapter on `unorm float4`. Its T must
+                    // include the modifier, and its T : IElement witness must be
+                    // rooted at that same type before the generic application is
+                    // interned. Ordinary extensions still use the nominal facts.
+                    // Filter no_diff exclusions before these facts reach inference;
+                    // they are assumptions about the complete modified subject.
+                    for (auto [interfaceType, witness] : *additionalSubtypeWitness)
+                    {
+                        if (_isInterfaceExcludedByTypeModifiers(
+                                astBuilder,
+                                extensionTargetType,
+                                interfaceType))
+                            continue;
+                        modifiedTypeWitnesses.add(
+                            interfaceType,
+                            visitor.getSubtypeWitnessForType(
+                                extensionTargetType,
+                                interfaceType,
+                                witness));
+                    }
+                    extensionWitnesses = &modifiedTypeWitnesses;
+                }
+            }
             auto extDeclRef =
-                applyExtensionToType(&visitor, extDecl, selfType, additionalSubtypeWitness);
+                applyExtensionToType(&visitor, extDecl, extensionTargetType, extensionWitnesses);
             if (!extDeclRef)
                 continue;
 
@@ -867,8 +929,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 getInheritanceInfo(extDeclRef, circularityInfo, ioSkippedIncompleteFacet);
             addDirectBaseFacet(
                 Facet::Kind::Extension,
-                selfType,
-                selfIsSelf,
+                extensionTargetType,
+                extensionTargetType == selfType
+                    ? selfIsSelf
+                    : visitor.createTypeEqualityWitness(extensionTargetType),
                 extDeclRef,
                 extInheritanceInfo);
             result = true;
@@ -2420,12 +2484,44 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
-        auto baseInheritanceInfo = _calcInheritanceInfo(
-            modifiedType->getBase(),
-            circularityInfo,
-            ioSkippedIncompleteFacet);
+        // Consider this identity conformance:
+        //
+        //     __preserve_type_modifiers
+        //     extension<T : ITexelElement> T : ITexelFormat { typealias DataType = T; }
+        //
+        // For `unorm float4`, reusing float4's completed facets would bind T to float4
+        // and lose the qualifier from DataType. Discover extensions from the nominal
+        // declaration again, retaining the qualified type for explicitly annotated
+        // extensions. Ordinary extensions continue to bind to the nominal base type.
+        // Call `_calcInheritanceInfo` directly: the outer type query caches this result
+        // under ModifiedType, while the declaration-keyed cache belongs to the base type.
+        //
+        // Aliases can introduce nested modifier wrappers. Record no_diff at every level
+        // so its interface exclusions still apply after the single discovery pass.
+        Type* baseType = modifiedType;
+        bool excludesDifferentiability = false;
+        while (auto wrapper = as<ModifiedType>(baseType))
+        {
+            excludesDifferentiability |= wrapper->findModifier<NoDiffModifierVal>() != nullptr;
+            baseType = wrapper->getBase();
+        }
 
-        if (modifiedType->findModifier<NoDiffModifierVal>())
+        InheritanceInfo baseInheritanceInfo;
+        if (auto baseDeclRefType = as<DeclRefType>(baseType))
+        {
+            baseInheritanceInfo = _calcInheritanceInfo(
+                baseDeclRefType->getDeclRef(),
+                modifiedType,
+                circularityInfo,
+                ioSkippedIncompleteFacet);
+        }
+        else
+        {
+            baseInheritanceInfo =
+                _calcInheritanceInfo(baseType, circularityInfo, ioSkippedIncompleteFacet);
+        }
+
+        if (excludesDifferentiability)
         {
             // Create a filtered facet list that excludes facets whose
             // origin matches the `IDifferentiable` or `IDifferentiablePtrType`
@@ -2440,9 +2536,6 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 type,
                 visitor.createTypeEqualityWitness(type));
 
-            auto diffInterfaceDecl = astBuilder->getDifferentiableInterfaceDecl().getDecl();
-            auto diffRefInterfaceDecl = astBuilder->getDifferentiableRefInterfaceDecl().getDecl();
-
             Facet tail = directFacet;
             for (auto facet : baseInheritanceInfo.facets)
             {
@@ -2450,18 +2543,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 if (facet->directness == Facet::Directness::Self)
                     continue;
 
-                // Check if this facet corresponds to IDifferentiable or IDifferentiablePtrType
-                bool shouldExclude = false;
-                if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
-                {
-                    auto interfaceDecl = interfaceDeclRef.getDecl();
-                    if (interfaceDecl == diffInterfaceDecl || interfaceDecl == diffRefInterfaceDecl)
-                    {
-                        shouldExclude = true;
-                    }
-                }
-
-                if (shouldExclude)
+                if (_isInterfaceExcludedByTypeModifiers(astBuilder, type, facet->origin.type))
                     continue;
 
                 // Copy the facet with updated structure

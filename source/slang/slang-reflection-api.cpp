@@ -78,6 +78,47 @@ static inline SlangReflectionTypeLayout* convert(TypeLayout* type)
     return (SlangReflectionTypeLayout*)type;
 }
 
+static SlangImageFormat _getImageFormatFromType(Type* type)
+{
+    if (!type)
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    auto textureType = as<TextureTypeBase>(unwrapArrayType(type));
+    if (!textureType)
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    SLANG_AST_BUILDER_RAII(textureType->getASTBuilderForReflection());
+    IntegerLiteralValue formatValue = 0;
+    if (!tryGetConstantIntVal(textureType->getFormat(), formatValue))
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    auto format = (ImageFormat)formatValue;
+    if (format == ImageFormat::unknown)
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    return (SlangImageFormat)format;
+}
+
+// Returns the format used by the variable, preserving the legacy attribute override.
+// A specialized layout supplies the descriptor format when the declaration is generic.
+static SlangImageFormat _getImageFormat(VarDeclBase* varDecl, TypeLayout* typeLayout)
+{
+    if (varDecl)
+    {
+        if (auto formatAttrib = varDecl->findModifier<FormatAttribute>())
+            return (SlangImageFormat)formatAttrib->format;
+    }
+
+    if (typeLayout)
+    {
+        auto format = _getImageFormatFromType(typeLayout->getType());
+        if (format != SLANG_IMAGE_FORMAT_unknown)
+            return format;
+    }
+
+    return varDecl ? _getImageFormatFromType(varDecl->type.type) : SLANG_IMAGE_FORMAT_unknown;
+}
+
 static inline SpecializationParamLayout* convert(SlangReflectionTypeParameter* typeParam)
 {
     return (SpecializationParamLayout*)typeParam;
@@ -1274,6 +1315,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
 
     if (auto textureType = as<TextureTypeBase>(type))
     {
+        SLANG_AST_BUILDER_RAII(textureType->getASTBuilderForReflection());
         return convert(textureType->getElementType());
     }
 
@@ -2831,11 +2873,7 @@ SLANG_API SlangImageFormat spReflectionTypeLayout_getBindingRangeImageFormat(
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
     auto leafVar = bindingRange.leafVariable;
-    if (auto formatAttrib = leafVar->findModifier<FormatAttribute>())
-    {
-        return (SlangImageFormat)formatAttrib->format;
-    }
-    return SLANG_IMAGE_FORMAT_unknown;
+    return _getImageFormat(leafVar, bindingRange.leafTypeLayout);
 }
 
 
@@ -4450,10 +4488,7 @@ spReflectionVariableLayout_GetImageFormat(SlangReflectionVariableLayout* inVarLa
 
     if (auto leafVar = varLayout->getVariable())
     {
-        if (auto formatAttrib = leafVar->findModifier<FormatAttribute>())
-        {
-            return (SlangImageFormat)formatAttrib->format;
-        }
+        return _getImageFormat(leafVar, varLayout->getTypeLayout());
     }
     return SLANG_IMAGE_FORMAT_unknown;
 }

@@ -2427,9 +2427,10 @@ ImageFormat inferImageFormatFromTextureType(
 {
     outIsInferred = false;
     ImageFormat format = ImageFormat::unknown;
-    if (auto formatVal = as<ConstantIntVal>(textureType->getFormat()))
+    IntegerLiteralValue formatValue = 0;
+    if (tryGetConstantIntVal(textureType->getFormat(), formatValue))
     {
-        format = (ImageFormat)formatVal->getValue();
+        format = (ImageFormat)formatValue;
     }
     if (format != ImageFormat::unknown)
         return format;
@@ -2615,6 +2616,13 @@ void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
         // For texture types, we will ensure there is a [format] attribute declared on the decl,
         // if not, we will infer the format from the texture type if it is not specified.
         //
+        // Core-library signatures can mention a texture before `_Texture`'s static
+        // format constant has been checked. Finish that declaration before querying
+        // its semantic value; later AST consumers only substitute the checked value.
+        auto formatDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+            BuiltinRequirementKind::TextureFormat);
+        SLANG_RELEASE_ASSERT(formatDecl);
+        ensureDecl(formatDecl, DeclCheckState::DefinitionChecked);
         bool isInferred = false;
         auto format = inferImageFormatFromTextureType(varDecl, textureType, isInferred);
         if (format != ImageFormat::unknown && isInferred)
@@ -17505,6 +17513,19 @@ void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
     // to extend.
     //
     decl->targetType = CheckProperType(decl->targetType);
+
+    if (auto modifier = decl->findModifier<PreserveTypeModifiersModifier>())
+    {
+        // A complete modified type can bind only a bare generic target. Validate
+        // that contract here, before extension discovery consumes the annotation.
+        auto targetParam = isDeclRefTypeOf<GenericTypeParamDecl>(decl->targetType.type);
+        if (!targetParam || targetParam.getDecl()->parentDecl != decl->parentDecl)
+        {
+            if (!as<ErrorType>(decl->targetType.type))
+                getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
+            removeModifier(decl, modifier);
+        }
+    }
 
     _validateExtensionDeclTargetType(decl);
 
