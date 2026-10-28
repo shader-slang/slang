@@ -3041,7 +3041,6 @@ public:
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
 
-    void checkStructuralRayTracingModule(ModuleDecl* moduleDecl);
     void checkStructuralRayTracingStageRestrictions(
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         WitnessTable* witnessTable,

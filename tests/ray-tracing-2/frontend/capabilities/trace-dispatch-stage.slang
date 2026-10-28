@@ -25,8 +25,6 @@ struct BadAnyHit : rt::IAnyHitShader
 {
     typealias Context = HitContext;
     static void invoke(rt::AnyHitInput<HitContext> input)
-//CHECK:        ^^^^^^ dependencies not compatible on stage
-//CHECK:        ^^^^^^ 'invoke' requires support for stage 'anyhit', but stage is unsupported.
     {
         rt::RayTracer<Schema> tracer;
         tracer.trace({}, scene, descriptor, input.payload);

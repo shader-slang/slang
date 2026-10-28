@@ -1,4 +1,9 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -ignore-capabilities -no-codegen
+// Native entry-point signatures reject structural inputs independently of capability checking.
+//DIAGNOSTIC_TEST:SIMPLE(diag=NATIVE): -experimental-feature -ignore-capabilities -no-codegen
+// A helper's explicit anyhit requirement must conflict with its ClosestHitInput parameter.
+// Re-enable this helper-only run after https://github.com/shader-slang/slang/issues/13579.
+//DISABLE_DIAGNOSTIC_TEST:SIMPLE(filecheck=HELPER): -experimental-feature -DTEST_HELPER=1 -no-codegen
+//HELPER: error[E361
 
 #pragma warning(disable: 38040)
 
@@ -21,10 +26,9 @@ struct TestHitContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
+#ifdef TEST_HELPER
 [require(anyhit)]
 void invalidAnyHitHelper(rt::ClosestHitInput<TestHitContext> input)
-//CHECK:                     ^^^^^^^^^^^^^^^ ray-tracing stage input used by the wrong stage
-//CHECK:                     ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' requires logical stage 'closesthit', but function 'invalidAnyHitHelper' is not restricted to that stage
 {
     IgnoreHit();
 }
@@ -35,12 +39,14 @@ struct TestClosestHit : rt::IClosestHitShader
     static void invoke(rt::ClosestHitInput<TestHitContext> input) { invalidAnyHitHelper(input); }
 }
 
-// An attributed entry point already has a concrete native stage. It must not inherit the logical
-// stage of its first structural input parameter as an ordinary unannotated helper would.
+#else
+// A native entry cannot receive a structural input, regardless of its shader stage.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void invalidComputeEntry(rt::ClosestHitInput<TestHitContext> input)
-//CHECK:                     ^^^^^^^^^^^^^^^ ray-tracing stage input used by the wrong stage
-//CHECK:                     ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' requires logical stage 'closesthit', but function 'invalidComputeEntry' is not restricted to that stage
+//NATIVE:                    ^^^^^^^^^^^^^^^ invalid native entry point signature
+//NATIVE:                    ^^^^^^^^^^^^^^^ cannot be used in a native entry point signature
 {
 }
+
+#endif

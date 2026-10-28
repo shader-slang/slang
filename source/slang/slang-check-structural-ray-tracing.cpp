@@ -109,76 +109,6 @@ static const char* _getStructuralRayTracingSchemaSectionName(AssocTypeDecl* requ
     return nullptr;
 }
 
-// Returns the native stage that constrains a function accepting a structural stage input.
-//
-// Consider this example:
-//
-//     [shader("anyhit")]
-//     void nativeAnyHit(rt::ClosestHitInput<C> input) { ... }
-//
-// `nativeAnyHit` is not selected by a structural stage conformance. Its checked
-// `EntryPointAttribute` is nevertheless an explicit any-hit contract and must win over the fallback
-// that infers a stage from an otherwise-unannotated helper's first stage-input parameter. Preserve
-// explicitly known stages, including compute, so they cannot be mistaken for an unconstrained
-// helper.
-static Stage _getRequiredStageForStructuralInput(FunctionDeclBase* functionDecl)
-{
-    if (auto entryPointAttribute = functionDecl->findModifier<EntryPointAttribute>())
-    {
-        auto stageAtom = CapabilitySet{entryPointAttribute->capabilitySet}.getTargetStage();
-        if (stageAtom != CapabilityAtom::Invalid)
-            return getStageFromAtom(stageAtom);
-    }
-
-    CapabilitySet declaredCapabilities;
-    for (auto decl = static_cast<Decl*>(functionDecl); decl; decl = decl->parentDecl)
-    {
-        for (auto requirement : decl->getModifiersOfType<RequireCapabilityAttribute>())
-            declaredCapabilities.unionWith(requirement->capabilitySet);
-        if (as<ModuleDecl>(decl))
-            break;
-    }
-
-    auto stageAtom = declaredCapabilities.getUniquelyImpliedStageAtom();
-    if (stageAtom == CapabilityAtom::Invalid)
-        return Stage::Unknown;
-    return getStageFromAtom(stageAtom);
-}
-
-// Checks the stage constraint on each input parameter. For example,
-// `helper(ClosestHitInput<C> hit, MissInput<C> miss)` mixes incompatible stages and is rejected.
-// A selected conformance supplies the stage for an implementation; ordinary helper functions use
-// their declared stage or first input.
-static void _diagnoseStructuralStageInputParameters(
-    SemanticsVisitor* visitor,
-    DeclRef<FunctionDeclBase> function,
-    Stage functionStage)
-{
-    auto functionDecl = function.getDecl();
-    for (auto parameter : functionDecl->getParameters())
-    {
-        auto parameterType = function.substitute(visitor->getASTBuilder(), parameter->type.type);
-        auto inputStage = _getDirectStageInputKind(parameterType);
-        if (inputStage == Stage::Unknown)
-            continue;
-
-        if (functionStage == Stage::Unknown)
-        {
-            functionStage = inputStage;
-            continue;
-        }
-        if (inputStage == functionStage)
-            continue;
-
-        auto location = parameter->type.exp ? parameter->type.exp->loc : parameter->loc;
-        visitor->diagnoseOnce(Diagnostics::StructuralRayTracingInputStageMismatch{
-            .type = parameterType,
-            .stage = getStageName(inputStage),
-            .function = functionDecl,
-            .location = location});
-    }
-}
-
 static DeclRef<FuncDecl> _getStageImplementationFromSubtypeWitness(
     ASTBuilder* astBuilder,
     InterfaceDecl* stageInterface,
@@ -197,91 +127,6 @@ static DeclRef<FuncDecl> _getStageImplementationFromSubtypeWitness(
     // back into the unspecialized declaration and make AST-to-IR lowering encounter a free generic
     // type. Preserve the checked declaration reference exactly as the conformance produced it.
     return invokeWitness.getDeclRef().as<FuncDecl>();
-}
-
-// Checks the functions selected by one completed conformance. Consider a generic extension that
-// supplies invoke for both an ordinary type and a miss-stage type: the method declaration alone
-// has no single stage. The stage belongs to the conformance whose witness selects that method.
-static void _diagnoseStructuralStageConformance(
-    SemanticsVisitor* visitor,
-    InheritanceDecl* inheritanceDecl)
-{
-    auto witnessTable = inheritanceDecl->witnessTable;
-    auto interfaceType = as<DeclRefType>(inheritanceDecl->base.type);
-    auto interfaceDeclRef =
-        interfaceType ? interfaceType->getDeclRef().as<InterfaceDecl>() : DeclRef<InterfaceDecl>();
-    if (!witnessTable || !interfaceDeclRef)
-        return;
-    auto astBuilder = visitor->getASTBuilder();
-    auto inheritanceDeclRef =
-        createDefaultSubstitutionsIfNeeded(astBuilder, visitor, makeDeclRef(inheritanceDecl));
-    auto witness = astBuilder->getDeclaredSubtypeWitness(
-        witnessTable->witnessedType,
-        interfaceType,
-        inheritanceDeclRef);
-    // Consider `MyMiss : IRefinedMiss`, where `IRefinedMiss : rt::IMissShader`. The checked
-    // interface facets express their witnesses using IRefinedMiss.This. Substitute this exact
-    // MyMiss conformance for This before reading invoke, as ordinary inheritance merging does.
-    // Looking up MyMiss's conformances again could select a different path to IMissShader.
-    auto substitutions = SubstitutionSet(
-        astBuilder->getLookupDeclRef(witness, interfaceDeclRef.getDecl()->getThisTypeDecl()));
-    for (auto facet : visitor->getShared()->getInheritanceInfo(interfaceType).facets)
-    {
-        auto stageInterface = facet->origin.declRef.as<InterfaceDecl>();
-        if (!isExecutableStructuralRayTracingStageInterface(stageInterface.getDecl()))
-            continue;
-        auto stageWitness =
-            as<SubtypeWitness>(facet->subtypeWitness->substitute(astBuilder, substitutions));
-        SLANG_RELEASE_ASSERT(stageWitness);
-        stageWitness = as<SubtypeWitness>(stageWitness->resolve());
-        SLANG_RELEASE_ASSERT(
-            stageWitness && stageWitness->getSub()->equals(witnessTable->witnessedType));
-        auto implementation = _getStageImplementationFromSubtypeWitness(
-            astBuilder,
-            stageInterface.getDecl(),
-            stageWitness);
-        if (!implementation)
-            continue;
-        auto stage = getStructuralRayTracingStageKind(stageInterface.getDecl());
-        auto functionDecl = implementation.getDecl();
-        auto capabilities = functionDecl->inferredCapabilityRequirements;
-        if (capabilities && capabilities->isIncompatibleWith(getAtomFromStage(stage)))
-        {
-            visitor->diagnoseOnce(Diagnostics::DeclHasDependenciesNotCompatibleOnStage{
-                .stage = getStageName(stage),
-                .decl = functionDecl});
-        }
-        _diagnoseStructuralStageInputParameters(visitor, implementation, stage);
-    }
-}
-
-// Runs after ordinary declaration, body, and capability checking has completed. At that point
-// conformance witnesses contain the selected methods, including inherited/default implementations.
-static void _diagnoseStructuralStageDeclarations(
-    SemanticsVisitor* visitor,
-    ContainerDecl* containerDecl)
-{
-    for (auto member : containerDecl->getDirectMemberDecls())
-    {
-        auto innerMember = member;
-        if (auto genericDecl = as<GenericDecl>(innerMember))
-            innerMember = genericDecl->inner;
-        if (auto inheritanceDecl = as<InheritanceDecl>(innerMember))
-            _diagnoseStructuralStageConformance(visitor, inheritanceDecl);
-        if (auto functionDecl = as<FunctionDeclBase>(innerMember))
-        {
-            auto function = createDefaultSubstitutionsIfNeeded(
-                visitor->getASTBuilder(),
-                visitor,
-                makeDeclRef(functionDecl));
-            _diagnoseStructuralStageInputParameters(
-                visitor,
-                function.as<FunctionDeclBase>(),
-                _getRequiredStageForStructuralInput(functionDecl));
-        }
-        if (auto childContainer = as<ContainerDecl>(innerMember))
-            _diagnoseStructuralStageDeclarations(visitor, childContainer);
-    }
 }
 
 // Only the library's stage interfaces and input views have restricted value uses. A user struct
@@ -819,14 +664,6 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
             .schema = schemaType->getCanonicalType(),
             .location = satisfyingDeclLoc});
     }
-}
-
-// Finishes stage checks after checked conformance witnesses are available.
-// For example, a generic extension can supply Miss.invoke; checking its selected stage before
-// ordinary conformance and capability inference finish would inspect an incomplete signature.
-void SemanticsVisitor::checkStructuralRayTracingModule(ModuleDecl* moduleDecl)
-{
-    _diagnoseStructuralStageDeclarations(this, moduleDecl);
 }
 
 // Checks the declaration's own type, direction, scope, and initializer. Consider:

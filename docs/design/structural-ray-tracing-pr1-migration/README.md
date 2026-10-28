@@ -218,11 +218,14 @@ can be used when the RT library has builtin ownership.
 
 Do not keep a stage-implementation registry on `Linkage` or cache stage identity on an `invoke`
 method. One generic method can implement both an ordinary type and a shader type. Ordinary calls
-can forward an existing stage input to either implementation. Module checking validates stage
-capabilities and input parameters through the completed conformance witnesses. For a refined
-interface, its checked inheritance facets already identify the stage-interface path. The check
-applies ordinary `This` substitution with the completed conformance to that facet witness before
-reading `invoke`; it does not perform a second search for a conformance path.
+can forward an existing stage input to either implementation. Ordinary interface checking matches
+the implementation's signature, and entry-point validation checks the selected method against its
+stage and target. There is no additional RT traversal after module checking. For example, selecting
+a closest-hit implementation that calls `IgnoreHit()` still fails entry-point validation.
+General capability inference gaps remain tracked separately: requirements on generic parameter
+types in [#13579](https://github.com/shader-slang/slang/issues/13579), and requirements hidden by
+generic interface calls in [#13995](https://github.com/shader-slang/slang/issues/13995). Affected
+regressions are disabled with issue links until those general checks are fixed.
 Representation diagnostics use the semantic checker's existing duplicate suppression. Native
 entry-point validation checks the selected parameter and result types for logical RT inputs,
 using the same type classifier as ordinary input-use checking.

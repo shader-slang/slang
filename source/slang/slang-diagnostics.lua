@@ -1115,14 +1115,6 @@ err(
     span { loc = "location", message = "structural ray-tracing type '~type:type' cannot be constructed by user code" }
 )
 
-
-err(
-    "structural-ray-tracing-input-stage-mismatch",
-    20029,
-    "ray-tracing stage input used by the wrong stage",
-    span { loc = "location", message = "ray-tracing stage input type '~type:type' requires logical stage '~stage', but function '~function:Decl' is not restricted to that stage" }
-)
-
 err(
     "structural-ray-tracing-input-generic-argument",
     20030,
