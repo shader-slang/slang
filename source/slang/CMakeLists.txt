@@ -89,6 +89,26 @@ set_source_files_properties(
         COMPILE_OPTIONS "${RICH_DIAG_SIZE_OPT_FLAGS}"
 )
 
+# MSVC can exceed the COFF section limit for this translation unit in optimized
+# ARM64 builds. Use the extended object format to accommodate its generated code.
+set_property(
+    SOURCE slang-check-decl.cpp
+    APPEND
+    PROPERTY COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/bigobj>"
+)
+
+# mimalloc-new-delete.h defines the aligned operator new/delete overloads only when __cplusplus
+# reports C++17 or later, which MSVC does only with /Zc:__cplusplus. We set the option on this file
+# alone because it changes the __cplusplus checks in every header a file includes, such as
+# slang-common.h. The file also skips the precompiled header, which is built without the option,
+# because MSVC expects a file that uses a precompiled header to be compiled with consistent options.
+set_source_files_properties(
+    slang-mimalloc.cpp
+    PROPERTIES
+        SKIP_PRECOMPILE_HEADERS ON
+        COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>"
+)
+
 #
 # generate capability files
 #
@@ -165,6 +185,19 @@ set(SLANG_RECORD_REPLAY_SYSTEM
     "${slang_SOURCE_DIR}/source/slang-record-replay"
     "${slang_SOURCE_DIR}/source/slang-record-replay/proxy"
 )
+
+# When SLANG_ENABLE_RECORD_REPLAY is OFF we exclude the record-replay sources from both the slang
+# library and the slang-common-objects object target. slang_add_target reports an error for a
+# keyword given no values, so we omit the whole EXTRA_SOURCE_DIRS fragment rather than pass it an
+# empty list.
+if(SLANG_ENABLE_RECORD_REPLAY)
+    set(slang_record_replay_source_args
+        EXTRA_SOURCE_DIRS
+        ${SLANG_RECORD_REPLAY_SYSTEM}
+    )
+else()
+    set(slang_record_replay_source_args)
+endif()
 
 add_custom_command(
     OUTPUT ${SLANG_LOOKUP_GENERATED_SOURCE}
@@ -246,7 +279,6 @@ set(slang_build_args
     # a warning is disabled for a memset boundary check.
     # everything looked fine and it is unclear why the checking fails
     $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow>
-    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<BOOL:${SLANG_ENABLE_ASAN}>>:/bigobj>
     INCLUDE_DIRECTORIES_PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     ${CMAKE_CURRENT_BINARY_DIR}/../standard-modules/slang-standard-module-config-header
@@ -255,8 +287,9 @@ set(slang_build_args
     SLANG
     EXPORT_TYPE_AS
     ${SLANG_LIB_TYPE}
-    EXTRA_SOURCE_DIRS
-    ${SLANG_RECORD_REPLAY_SYSTEM}
+    ${slang_record_replay_source_args}
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+    SLANG_ENABLE_RECORD_REPLAY=$<BOOL:${SLANG_ENABLE_RECORD_REPLAY}>
     REQUIRES
     copy_slang_headers
     generate_standard_module_config_header

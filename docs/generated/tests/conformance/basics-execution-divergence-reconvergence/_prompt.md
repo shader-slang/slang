@@ -51,6 +51,15 @@ wave/subgroup execution in Slang. Claims fall into four sections:
 - Thread-group-tangled UB claim has no slang-test-observable surface;
   mark as untested with `gpu-other`.
 
+## Loop emission maintenance
+
+For `loop-divergence-reconvergence-emission.slang`, preserve the
+thread-dependent trip count and the SPIR-V `OpLoopMerge` check. WGSL
+uses a native `loop` statement with an explicit exit `break`; the other
+source targets use `for(;;)`. Do not treat one target's loop spelling as
+a language-reference requirement for every target. Keep the README's
+coverage row consistent with these target-specific observations.
+
 ## What NOT to test here
 
 - Actual wave-op result values (WaveActiveMin, WaveActiveMax) — require a

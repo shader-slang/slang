@@ -163,9 +163,9 @@ a SlangPy PR and it will be cherry-picked for SlangPy workflow just in Slang rep
 There are two workflow YML related to this process. Slang uses `ci-slangpy-trigger-test.yml`
 and it simply triggers the existing workflow on SlangPy repo, `ci-latest-slang.yml`.
 Note that their names are similar:
+
 - `ci-slangpy-trigger-test.yml` is in Slang repo
 - `ci-latest-slang.yml` is in SlangPy repo; not Slang repo.
-
 
 You can specify which PR to cherry-pick by setting the following in `ci-slangpy-trigger-test.yml`:
 
@@ -180,9 +180,11 @@ will ignore this setting.
 
 In order to workaround the limitation, you need to manually trigger the workflow
 with `branch` name and the PR number from "Action" page:
+
 - https://github.com/shader-slang/slang/actions/workflows/ci-slangpy-trigger-test.yml
 
 Click "Run workflow" button on the right side of the page. It will ask two info:
+
 - "Use workflow from" that takes a branch name
 - "Slang PR number to test against SlangPy"
 
@@ -191,6 +193,7 @@ a branch in the https://github.com/shader-slang/slang/; not a forked repo.
 
 Once the SlangPy workflow is triggered, you need to track the result from the SlangPy
 side:
+
 - https://github.com/shader-slang/slangpy/actions/workflows/ci-latest-slang.yml
 
 The manual run reports its result back to the PR, onto the same `SlangPy Tests`
@@ -200,7 +203,6 @@ failure, and the PR page will end up green.
 It is worth noting that if you needed this feature of cherry-pick with the backward
 compatibility breaking change, you probably need to announce the breaking change to
 the community before merging the change.
-
 
 ## 2. Reusable building blocks (`workflow_call`)
 
@@ -229,21 +231,21 @@ Work too slow, too noisy, or too repetitive to gate a PR. Cadences are in each
 file's `schedule:` block; the nightly hours are staggered so the heavy suites do
 not compete for the same runners.
 
-| Workflow                           | Cadence    | Purpose                                                      |
-| ---------------------------------- | ---------- | ------------------------------------------------------------ |
-| `ci-health.yml`                    | sub-hourly | Samples runner-cap saturation and publishes a health signal. |
-| `sccache-populate.yml`             | sub-hourly | Builds master to keep the shared sccache warm for PRs.       |
-| `ci-retry-yielded-bot.yml`         | hourly     | Reruns bot CI runs that yielded their runner slot.           |
-| `nightly-slang-coverage-test.yml`  | nightly    | Full coverage run; publishes the report.                     |
-| `nightly-slang-sanitizer-test.yml` | nightly    | Sanitizer run over the full test suite.                      |
-| `nightly-remix-test.yml`           | nightly    | Compiles all RTX Remix shaders.                              |
-| `nightly-slang-test.yml`           | nightly    | Runs the generated, doc-anchored suite under `docs/`.        |
-| `nightly-slang-sascha-test.yml`    | nightly    | Compiles the Sascha Willems Vulkan sample shaders.           |
-| `nightly-slang-vkglcts-test.yml`   | nightly    | Runs the Vulkan CTS with Slang as the shader compiler.       |
-| `nightly-mdl-perf-test.yml`        | nightly    | Compile-performance suite for the MDL workloads.             |
-| `ci-analytics.yml`                 | daily      | Collects CI run statistics and publishes them.               |
-| `pr-sweep-nightly.yml`             | nightly    | Board-sync backstop over every open PR.                      |
-| `cmake-options.yml`                | weekly     | Builds the matrix of non-default CMake option combinations.  |
+| Workflow                           | Cadence                            | Purpose                                                              |
+| ---------------------------------- | ---------------------------------- | -------------------------------------------------------------------- |
+| `ci-health.yml`                    | sub-hourly                         | Samples runner-cap saturation and publishes a health signal.         |
+| `sccache-populate.yml`             | sub-hourly, recipe changes, manual | Populates missing LLVM prebuilts, then warms Slang's shared sccache. |
+| `ci-retry-yielded-bot.yml`         | hourly                             | Reruns bot CI runs that yielded their runner slot.                   |
+| `nightly-slang-coverage-test.yml`  | nightly                            | Full coverage run; publishes the report.                             |
+| `nightly-slang-sanitizer-test.yml` | nightly                            | Sanitizer run over the full test suite.                              |
+| `nightly-remix-test.yml`           | nightly                            | Compiles all RTX Remix shaders.                                      |
+| `nightly-slang-test.yml`           | nightly                            | Runs the generated, doc-anchored suite under `docs/`.                |
+| `nightly-slang-sascha-test.yml`    | nightly                            | Compiles the Sascha Willems Vulkan sample shaders.                   |
+| `nightly-slang-vkglcts-test.yml`   | nightly                            | Runs the Vulkan CTS with Slang as the shader compiler.               |
+| `nightly-mdl-perf-test.yml`        | nightly                            | Compile-performance suite for the MDL workloads.                     |
+| `ci-analytics.yml`                 | daily                              | Collects CI run statistics and publishes them.                       |
+| `pr-sweep-nightly.yml`             | nightly                            | Board-sync backstop over every open PR.                              |
+| `cmake-options.yml`                | weekly                             | Builds the matrix of non-default CMake option combinations.          |
 
 ## 4. PR board sync and bots
 
@@ -265,7 +267,6 @@ issue, comment, and review events rather than to a PR's code.
 | `pr-ci-complete.yml`                                    | Board sync when a gating workflow finishes.                                                                        |
 | `pr-commit-status.yml`                                  | Board sync when an external commit status settles.                                                                 |
 | `pr-review-fork-bridge.yml`, `pr-review-fork-apply.yml` | Two-stage relay for fork-PR reviews.                                                                               |
-| `issue-add-labels.yml`                                  | Labels new issues by the author's team membership.                                                                 |
 | `issue-onboard.yml` / `issue-board-onboard.yml`         | Adds a new issue to Slang-All; sets Source; Internal authors are assigned and moved to In Triage / current Sprint. |
 | `claude.yml`                                            | The `@claude` assistant on issues and PRs.                                                                         |
 | `claude-ci-analysis.yml`                                | On demand: analyzes a CI failure and pushes a fix to the PR.                                                       |
@@ -273,14 +274,21 @@ issue, comment, and review events rather than to a PR's code.
 ## 5. Slash-command regenerators
 
 `slash-command-dispatch.yml` turns an allow-listed comment into a
-`repository_dispatch`. Each regenerator rebuilds its file and opens a follow-up
-PR against your branch, so a failed check can be fixed without a local checkout.
+`repository_dispatch`. Each regenerator rebuilds its file in a job that has no
+secrets and uploads the change as the `regen-patch` artifact. The shared
+`slash-regenerate-publish.yml` then pushes `<command>/pr-<N>` to this repository with the
+`GITHUB_TOKEN` and comments on the PR with a compare link. A maintainer opens
+the PR from that link, because `GITHUB_TOKEN` cannot push to a contributor's
+fork. If the PR changes `.github/workflows/`, the branch is not pushed, because
+`GITHUB_TOKEN` cannot push workflow files, and the comment points to the patch
+instead.
+`slash-cleanup.yml` deletes the pushed branches when the PR closes.
 
-| Workflow                     | Command                   | Regenerates                        |
-| ---------------------------- | ------------------------- | ---------------------------------- |
-| `regenerate-format.yml`      | `/format`                 | Formatting across the tree.        |
-| `regenerate-toc.yml`         | `/regenerate-toc`         | The user-guide table of contents.  |
-| `regenerate-cmdline-ref.yml` | `/regenerate-cmdline-ref` | The slangc command-line reference. |
+| Workflow                           | Command                   | Regenerates                        |
+| ---------------------------------- | ------------------------- | ---------------------------------- |
+| `slash-regenerate-format.yml`      | `/format`                 | Formatting across the tree.        |
+| `slash-regenerate-toc.yml`         | `/regenerate-toc`         | The user-guide table of contents.  |
+| `slash-regenerate-cmdline-ref.yml` | `/regenerate-cmdline-ref` | The slangc command-line reference. |
 
 ## 6. Release, tag, and publishing
 

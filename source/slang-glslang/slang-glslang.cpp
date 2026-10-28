@@ -2,6 +2,7 @@
 #include "slang-glslang.h"
 
 #include "SPIRV/GlslangToSpv.h"
+#include "core/slang-exception.h"
 #include "glslang/Public/ShaderLang.h"
 #include "slang.h"
 #include "spirv-tools/libspirv.h"
@@ -1096,6 +1097,8 @@ extern "C"
     return glslang_compile_1_1(&request);
 }
 
+// Link the given SPIR-V modules into one. On success the caller owns request->linkResult and must
+// release it with glslang_freeLinkResult().
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
@@ -1107,7 +1110,7 @@ extern "C"
     if (!request || !request->modules || request->linkResult)
         return false;
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         spvtools::Context context(SPV_ENV_UNIVERSAL_1_5);
         spvtools::LinkerOptions options = {};
@@ -1156,8 +1159,22 @@ extern "C"
 
         return success == SPV_SUCCESS;
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         return false;
     }
+#endif
+}
+
+// Free a link result returned by glslang_linkSPIRV. A null pointer is accepted and ignored.
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        void glslang_freeLinkResult(const uint32_t* linkResult)
+{
+    delete[] linkResult;
 }
