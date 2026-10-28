@@ -4657,7 +4657,7 @@ vector<T.Element,4> __texture_gather_offset(
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(glsl_spirv_wgsl, texture_gather)]
+[require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<T.Element,4> __texture_gather_offsets(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
@@ -4671,7 +4671,7 @@ vector<T.Element,4> __texture_gather_offsets(
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGatherOffsets($p, $2, $T3[]($3, $4, $5, $6)), $7";
+        __intrinsic_asm "textureGatherOffsets($p, $2, $T3[]($3, $4, $5, $6), $7)";
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         let sampledImage = __makeCombinedTextureSampler(texture, s);
@@ -4680,10 +4680,11 @@ vector<T.Element,4> __texture_gather_offsets(
             // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
             result:$$vector<T.Element,4> = OpImageGather $sampledImage $location $component ConstOffsets $offsets;
         };
-    case wgsl:
-        // WGSL has no four-offset gather. Component i of the result is the texel the footprint
-        // at offset i has at (i0, j0), which is component w of a single-offset gather (as
-        // OpImageGather ConstOffsets and textureGatherOffsets define it).
+    default:
+        // A target without a four-offset gather (WGSL, Metal) emulates it. Component i of the
+        // result is the texel the footprint at offset i has at (i0, j0), which is component w of
+        // a single-offset gather (as OpImageGather ConstOffsets and textureGatherOffsets define
+        // it).
         return vector<T.Element,4>(
             __texture_gather_offset(texture, s, location, offset1, component).w,
             __texture_gather_offset(texture, s, location, offset2, component).w,
@@ -4869,7 +4870,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(glsl_spirv_wgsl, texture_gather)]
+[require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<T.Element,4> __texture_gatherCmp_offsets(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerComparisonState s,
@@ -4892,7 +4893,7 @@ vector<T.Element,4> __texture_gatherCmp_offsets(
             // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
             result:$$vector<T.Element,4> = OpImageDrefGather $sampledImage $location $compareValue ConstOffsets $offsets;
         };
-    case wgsl:
+    default:
         // Component i is component w of a gather with offset i (see __texture_gather_offsets).
         return vector<T.Element,4>(
             __texture_gatherCmp_offset(texture, s, location, compareValue, offset1).w,
@@ -5054,7 +5055,7 @@ $}
     }
 
     [ForceInline]
-    [require(glsl_hlsl_spirv_wgsl, texture_gather)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -5073,6 +5074,7 @@ $}
         case glsl:
         case spirv:
             return __texture_gather$(compareFunc)_offsets<T>(this $(samplerArg), location $(compareArg), offset1,offset2,offset3,offset4 $(componentArg));
+        case metal:
         case wgsl:
             return __texture_gather$(compareFunc)_offsets($(getTexture) $(getSampler), location $(compareArg), offset1,offset2,offset3,offset4 $(componentArg));
         }
