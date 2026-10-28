@@ -849,7 +849,8 @@ Extensions
 `spvGroupNonUniformPartitionedEXT`
 > Represents the SPIR-V capability for group non-uniform partitioned operations, declared through
 > SPV_EXT_shader_subgroup_partitioned. When a target requests it, the partitioned intrinsics
-> (WaveMatch, WaveMaskMatch, and the WaveMulti reductions and scans) declare
+> with a SPIR-V implementation (WaveMatch, WaveMaskMatch, and the WaveMulti reductions and scans
+> other than WaveMultiPrefixCountBits) declare
 > SPV_EXT_shader_subgroup_partitioned in place of SPV_NV_shader_subgroup_partitioned in the SPIR-V
 > that Slang emits directly.
 

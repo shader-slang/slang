@@ -19676,20 +19676,13 @@ vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint 
 // are emulated by performing an additional operation to the inclusive scan result. Reductions are not supported.
 //
 
-// Declares the SPIR-V capability and extension of the partitioned subgroup operations.
-// SPV_NV_shader_subgroup_partitioned and SPV_EXT_shader_subgroup_partitioned define the same
-// opcodes, operands and capability: the NV and EXT names are aliases for the same enumerants, so
-// the callers keep the NV spellings of the opcodes and group operations on both paths, and the
-// two capability spellings below are the same capability. Only the extension declared differs.
-// NV is the default, and EXT is used when the target requests spvGroupNonUniformPartitionedEXT.
-// A target with that capability matches both cases; `__target_switch` takes the most specific
-// matching case, not the first one in source order, so exactly one of the two blocks is emitted.
-//
-// Rule for every SPIR-V partitioned operation: declare the extension and capability through this
-// helper (directly, or through `__shaderSubgroupPartitionedPreamble` below, which also adds the
-// GLSL extension and the subgroup preamble for `T`). Do not write `OpExtension
-// "SPV_NV_shader_subgroup_partitioned"` in the operation's own `spirv_asm`: that would declare NV
-// even for a target that requested EXT.
+// Declares the SPIR-V extension and capability of the partitioned subgroup operations: EXT when
+// the target requests spvGroupNonUniformPartitionedEXT, NV otherwise (the NV and EXT enumerants
+// are aliases, see that atom in slang-capabilities.capdef). A target with the EXT atom matches
+// both cases, and `__target_switch` takes the most specific one, so exactly one block is emitted.
+// Every SPIR-V partitioned operation declares its extension through this helper, directly or via
+// `__shaderSubgroupPartitionedPreamble`, because an `OpExtension` in its own `spirv_asm` would
+// declare NV even when the target requested EXT.
 [ForceInline]
 [require(spirv)]
 void __spirvSubgroupPartitionedPreamble()
