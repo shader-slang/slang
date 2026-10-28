@@ -6135,6 +6135,10 @@ static void CompleteDecl(
                     staticConstDecl->nameAndLoc = enumCase->nameAndLoc;
                     addModifier(staticConstDecl, parser->astBuilder->create<HLSLStaticModifier>());
                     addModifier(staticConstDecl, parser->astBuilder->create<ConstModifier>());
+                    auto aliasModifier =
+                        parser->astBuilder->create<UnscopedEnumCaseAliasModifier>();
+                    aliasModifier->enumCaseDecl = enumCase;
+                    addModifier(staticConstDecl, aliasModifier);
 
                     // Copy visibility modifiers from the enum declaration
                     if (auto visibilityModifier = modifiers.findModifier<VisibilityModifier>())
