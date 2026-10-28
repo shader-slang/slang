@@ -1,10 +1,11 @@
-// Ordering comparisons on `uint64_t` constants must fold as unsigned (#13978).
+// Comparisons on integer constants must fold by the values the operands have at their types
+// (#13978).
 //
 // Integer constants are held in a signed 64-bit integer, so a `uint64_t` above INT64_MAX such as
 // 0xFFFFFFFFFFFFFFFF is stored as -1. Each folder below must still order it above 5: the IR SCCP
 // pass, the front-end folds that size arrays, and the folds that run once a generic value
-// parameter is specialized. Signed and 32-bit comparisons are controls whose results must not
-// change.
+// parameter is specialized. Front-end folding does not narrow results, so wrapped 32-bit results
+// pin the conversion to the operand's width; ordinary signed and 32-bit comparisons are controls.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
