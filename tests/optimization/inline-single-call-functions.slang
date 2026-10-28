@@ -71,10 +71,14 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // KEEP_HLSL-DAG: wrapLevel1{{.*}}(
 // KEEP_HLSL-DAG: wrapLevel2{{.*}}(
 // KEEP_HLSL-DAG: bigBody{{.*}}(
+// KEEP_HLSL-DAG: sharedHelper{{.*}}(
+// KEEP_HLSL-DAG: keptNoInline{{.*}}(
 // KEEP_HLSL: void computeMain(
 
 // KEEP_WGSL-DAG: fn wrapLevel0
 // KEEP_WGSL-DAG: fn wrapLevel1
 // KEEP_WGSL-DAG: fn wrapLevel2
 // KEEP_WGSL-DAG: fn bigBody
+// KEEP_WGSL-DAG: fn sharedHelper
+// KEEP_WGSL-DAG: fn keptNoInline
 // KEEP_WGSL: fn computeMain(
