@@ -192,7 +192,8 @@ struct SemanticsVisitor;
 
 List<ExtensionDecl*> const& getCandidateExtensions(
     DeclRef<Decl> const& declRef,
-    SemanticsVisitor* semantics);
+    SemanticsVisitor* semantics,
+    bool* outHasModifierPreservingCandidate = nullptr);
 
 // Returns the members of `genericInnerDecl`'s enclosing generic decl.
 inline FilteredMemberRefList<Decl> getGenericMembers(

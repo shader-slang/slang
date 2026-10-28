@@ -18961,7 +18961,7 @@ void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
 /// Note: this function creates an empty list of candidates for the given type if
 /// a matching entry doesn't exist already.
 ///
-static List<ExtensionDecl*>& _getCandidateExtensionList(
+static CandidateExtensionList& _getCandidateExtensionList(
     Decl* decl,
     Dictionary<Decl*, RefPtr<CandidateExtensionList>>& mapDeclToCandidateExtensions)
 {
@@ -18971,10 +18971,12 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
         entry = new CandidateExtensionList();
         mapDeclToCandidateExtensions.add(decl, entry);
     }
-    return entry->candidateExtensions;
+    return *entry;
 }
 
-List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTypeDecl(Decl* decl)
+List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTypeDecl(
+    Decl* decl,
+    bool* outHasModifierPreservingCandidate)
 {
     // We are caching the lists of candidate extensions on the shared
     // context, so we will only build the lists if they either have
@@ -19077,7 +19079,21 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
     // has been populated, we return to the user the entry they
     // asked for.
     //
-    return _getCandidateExtensionList(decl, m_mapDeclToCandidateExtensions);
+    auto& list = _getCandidateExtensionList(decl, m_mapDeclToCandidateExtensions);
+    if (outHasModifierPreservingCandidate)
+    {
+        // Candidate lists are append-only. Inspect every declaration, including
+        // candidates that inference will reject for this particular specialization.
+        while (!list.hasModifierPreservingCandidate &&
+               list.modifierClassifiedCount < list.candidateExtensions.getCount())
+        {
+            auto extension = list.candidateExtensions[list.modifierClassifiedCount++];
+            list.hasModifierPreservingCandidate =
+                extension->hasModifier<PreserveTypeModifiersModifier>();
+        }
+        *outHasModifierPreservingCandidate = list.hasModifierPreservingCandidate;
+    }
+    return list.candidateExtensions;
 }
 
 void SharedSemanticsContext::invalidateInheritanceInfo(Type* type)
@@ -19103,14 +19119,16 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     // code inside the module for the given `extDecl` to extend them.
     //
     auto moduleDecl = getModuleDecl(extDecl);
-    _getCandidateExtensionList(typeDecl, moduleDecl->mapDeclToCandidateExtensions).add(extDecl);
+    _getCandidateExtensionList(typeDecl, moduleDecl->mapDeclToCandidateExtensions)
+        .candidateExtensions.add(extDecl);
 
     // Because we've loaded a new extension, we need to invalidate whatever
     // information the `SharedSemanticsContext` had cached about loaded
     // extensions, and force it to rebuild its cache to include the
     // new extension we just added.
     //
-    _getCandidateExtensionList(typeDecl, m_mapDeclToCandidateExtensions).add(extDecl);
+    _getCandidateExtensionList(typeDecl, m_mapDeclToCandidateExtensions)
+        .candidateExtensions.add(extDecl);
 
     bool hasImplicitCastMember = false;
     for (auto member : extDecl->getDirectMemberDecls())
@@ -19174,7 +19192,7 @@ void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* modul
     for (auto& [entryKey, entryValue] : moduleDecl->mapDeclToCandidateExtensions)
     {
         auto& list = _getCandidateExtensionList(entryKey, m_mapDeclToCandidateExtensions);
-        list.addRange(entryValue->candidateExtensions);
+        list.candidateExtensions.addRange(entryValue->candidateExtensions);
     }
 }
 
@@ -19327,11 +19345,12 @@ FunctionDifferentiableLevel SharedSemanticsContext::_getFuncDifferentiableLevelI
 
 List<ExtensionDecl*> const& getCandidateExtensions(
     DeclRef<Decl> const& declRef,
-    SemanticsVisitor* semantics)
+    SemanticsVisitor* semantics,
+    bool* outHasModifierPreservingCandidate)
 {
     auto decl = declRef.getDecl();
     auto shared = semantics->getShared();
-    return shared->getCandidateExtensionsForTypeDecl(decl);
+    return shared->getCandidateExtensionsForTypeDecl(decl, outHasModifierPreservingCandidate);
 }
 
 void _foreachDirectOrExtensionMemberOfType(

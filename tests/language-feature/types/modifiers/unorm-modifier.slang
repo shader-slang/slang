@@ -110,6 +110,35 @@ extension<T : ITexelElement> T : IQualifiedWitnessKey
 }
 void checkWitnessKey(WitnessKey<UNorm4> value) {}
 
+// A preserving candidate can fail for Subject while applying to no_diff Subject.
+// Prime the nominal inheritance cache first: reuse must consider every candidate,
+// including this one whose constraint fails for the nominal type.
+interface ISubject {}
+struct Subject : ISubject {}
+typealias ModifiedSubject = no_diff Subject;
+interface IModifiedMarker {}
+struct Marker<T> {}
+extension Marker<ModifiedSubject> : IModifiedMarker {}
+interface IQualifiedOnly
+{
+    associatedtype Key;
+}
+__preserve_type_modifiers
+extension<T : ISubject> T : IQualifiedOnly
+    where Marker<T> : IModifiedMarker
+{
+    typealias Key = T;
+}
+void acceptSubject<T : ISubject>(T value) {}
+void checkNominal(Subject value) { acceptSubject(value); }
+struct SubjectKey<T> {}
+void checkQualifiedCandidate(SubjectKey<ModifiedSubject> value) {}
+void checkModifiedSubject()
+{
+    SubjectKey<ModifiedSubject.Key> key = {};
+    checkQualifiedCandidate(key);
+}
+
 // GENERIC-HLSL-DAG: Buffer<unorm float4 {{ *}}> unsignedResources_inputBuffer
 // GENERIC-HLSL-DAG: Texture2D<unorm float4 {{ *}}> unsignedResources_inputTexture
 // GENERIC-HLSL-DAG: RWBuffer<unorm float4 {{ *}}> unsignedResources_outputBuffer

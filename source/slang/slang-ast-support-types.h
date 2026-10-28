@@ -1813,6 +1813,13 @@ FIDDLE() namespace Slang
     {
         FIDDLE(...)
         List<ExtensionDecl*> candidateExtensions;
+
+        // Classify only lists that inheritance checking actually queries, so importing
+        // a serialized module does not eagerly deserialize every extension. These
+        // runtime fields are not serialized; appended candidates are classified on
+        // the next query, and a loaded list starts unclassified.
+        Index modifierClassifiedCount = 0;
+        bool hasModifierPreservingCandidate = false;
     };
 
 
