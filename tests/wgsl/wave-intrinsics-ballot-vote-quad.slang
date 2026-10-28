@@ -126,14 +126,18 @@ void quadReadLaneAtMain(uint3 tid: SV_DispatchThreadID)
 // A matrix is read row by row through the vector overload (`MATRIX_MAP_BINARY`) on every target
 // except HLSL, which has a matrix QuadReadLaneAt. Every row reads the same lane.
 // QUADMATHLSL: float2x2 {{.*}} = QuadReadLaneAt(
-// QUADMATGLSL: subgroupQuadBroadcast(sourceValue_{{[0-9]+}}[i_{{[0-9]+}}],
-// QUADMATMETAL: quad_shuffle((sourceValue_{{[0-9]+}}[i_{{[0-9]+}}]),
-// QUADMATCUDA: _waveShuffleMultiple(0xFFFFFFFF, (sourceValue_{{[0-9]+}}.rows[i_{{[0-9]+}}]),
+// QUADMATGLSL: subgroupQuadBroadcast(sourceValue_{{[0-9]+}}[0], [[LANE:quadLaneID_[0-9]+]])
+// QUADMATGLSL: subgroupQuadBroadcast(sourceValue_{{[0-9]+}}[1], [[LANE]])
+// QUADMATMETAL: quad_shuffle((sourceValue_{{[0-9]+}}[int(0)]), ushort(([[LANE:quadLaneID_[0-9]+]])))
+// QUADMATMETAL: quad_shuffle((sourceValue_{{[0-9]+}}[int(1)]), ushort(([[LANE]])))
+// QUADMATCUDA: _waveShuffleMultiple(0xFFFFFFFF, (sourceValue_{{[0-9]+}}.rows[int(0)]), {{.*}}([[LANE:quadLaneID_[0-9]+]]) & 3)
+// QUADMATCUDA: _waveShuffleMultiple(0xFFFFFFFF, (sourceValue_{{[0-9]+}}.rows[int(1)]), {{.*}}([[LANE]]) & 3)
 // QUADMATSPV: OpGroupNonUniformQuadBroadcast %v2float
 // QUADMAT: fn [[VEC:QuadReadLaneAt_[0-9]+]]( sourceValue_{{[0-9]+}} : vec2<f32>,  quadLaneID_{{[0-9]+}} : u32) -> vec2<f32>
 // QUADMAT: quadBroadcast(
 // QUADMAT: fn QuadReadLaneAt_{{[0-9]+}}( sourceValue_{{[0-9]+}} : mat2x2<f32>,  [[LANE:quadLaneID_[0-9]+]] : u32) -> mat2x2<f32>
-// QUADMAT: [[VEC]](sourceValue_{{[0-9]+}}[i_{{[0-9]+}}], [[LANE]])
+// QUADMAT: [[VEC]](sourceValue_{{[0-9]+}}[i32(0)], [[LANE]])
+// QUADMAT: [[VEC]](sourceValue_{{[0-9]+}}[i32(1)], [[LANE]])
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void quadReadLaneAtMatrixMain(uint3 tid: SV_DispatchThreadID)
