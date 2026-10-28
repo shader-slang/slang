@@ -1108,8 +1108,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
             if (context.baseExpr && !context.baseExpr->type.isLeftValue)
             {
                 // Copying the receiver argument costs a conversion, so that an overload whose
-                // receiver needs no copy, such as a `[nonmutating]` one, is preferred, as C++
-                // prefers a `const` overload for a `const` object.
+                // receiver needs no copy, such as a `[nonmutating]` one, is preferred.
                 if (canPassCopyOfImmutableReceiver(funcDeclRef))
                 {
                     candidate.conversionCostSum += kConversionCost_ImmutableReceiverCopy;
