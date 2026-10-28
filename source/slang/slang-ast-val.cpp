@@ -2113,8 +2113,8 @@ void TypeCastIntVal::_toTextOverride(StringBuilder& out)
 }
 
 // Convert `value` to the representation of the scalar `baseType`, truncating and sign- or
-// zero-extending it as a cast to that type does (e.g. `int(0x1FFFFFFFF)` is -1). Returns false
-// when `baseType` is neither an integer type nor `bool`.
+// zero-extending it as a cast to that type does (e.g. `int(0x1FFFFFFFF)` is -1). For any other
+// `baseType`, including `char`, it returns false and leaves `value` unchanged.
 static bool _tryConvertIntegerValueToBaseType(BaseType baseType, IntegerLiteralValue& value)
 {
     switch (baseType)
