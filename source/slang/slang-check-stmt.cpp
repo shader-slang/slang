@@ -820,12 +820,18 @@ void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
 }
 
 // Count the iterations of `for (i = initialValue; i compareOp finalValue; i += step)`, where the
-// step moves `i` towards `finalValue` by `absStep` per iteration and `i` does not wrap around.
-// Folded constants are held as a signed 64-bit `IntegerLiteralValue`, so a value of an unsigned
-// 64-bit type above INT64_MAX is held as a negative number, and we order the bounds as `UInt64`
-// when `isUnsigned64` is set. For example, in `for (uint64_t i = 0; i < 0xFFFFFFFFFFFFFFFFull;
-// i++)` the bound is held as -1 but lies above `initialValue`. The function returns false when the
-// count is above INT32_MAX, because `InferredMaxItersAttribute` stores the count as an `int32_t`.
+// step changes `i` by `absStep` per iteration. Folded constants are held as a signed 64-bit
+// `IntegerLiteralValue`, so a value of an unsigned 64-bit type above INT64_MAX is held as a
+// negative number, and we order the bounds as `UInt64` when `isUnsigned64` is set. For example, in
+// `for (uint64_t i = 0; i < 0xFFFFFFFFFFFFFFFFull; i++)` the bound is held as -1 but lies above
+// `initialValue`. The function returns false when the count is above INT32_MAX, because
+// `InferredMaxItersAttribute` stores the count as an `int32_t`.
+//
+// The count assumes that the step moves `i` towards `finalValue` and that `i` never wraps around.
+// The caller checks neither in full: it rejects a step that moves away from a strict bound (`<`,
+// `>`) but not from an inclusive one (`<=`, `>=`), and it does not look for wrap-around. For
+// example, `for (int i = 10; i >= 0; i++)` is counted as 11 iterations and
+// `for (uint i = 0; i < 0xFFFFFFFFu; i += 0x80000000u)` as 2, although neither loop ends.
 static bool _tryCountForLoopIterations(
     IROp compareOp,
     bool isUnsigned64,
@@ -848,6 +854,7 @@ static bool _tryCountForLoopIterations(
     // The distance between two values of a type of at most 64 bits fits in a `UInt64`, and
     // wrapping subtraction computes it exactly for signed and unsigned bounds alike.
     const UInt64 distance = UInt64(high) - UInt64(low);
+    SLANG_ASSERT(isInclusive || distance != 0);
     const UInt64 stepsAfterFirst = (isInclusive ? distance : distance - 1) / absStep;
     if (stepsAfterFirst >= UInt64(INT32_MAX))
         return false;
@@ -1088,14 +1095,16 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     if (!initialLitVal || !finalVal)
         return;
 
-    // The predicate compares in the type of its operands, one of which is the bare induction
-    // variable. Only an unsigned 64-bit type has values that do not fit in `IntegerLiteralValue`
-    // as a signed number.
+    // The fast path coerced both predicate operands to one common type, and the induction
+    // variable is still a bare operand, so that type is the variable's type. Only `uint64_t` and
+    // `uintptr_t` values can exceed INT64_MAX. The ordering is right only when the folded bounds
+    // are canonical values of that type, which the constant folder does not yet guarantee (issue
+    // #13954).
     auto compareType = as<BasicExpressionType>(cmpExpr->arguments[0]->type.type);
-    SLANG_ASSERT(compareType);
-    const auto& compareTypeInfo = BaseTypeInfo::getInfo(compareType->getBaseType());
-    const bool isUnsigned64 = !(compareTypeInfo.flags & BaseTypeInfo::Flag::Signed) &&
-                              compareTypeInfo.sizeInBytes == sizeof(UInt64);
+    SLANG_RELEASE_ASSERT(compareType);
+    const BaseType compareBaseType = compareType->getBaseType();
+    const bool isUnsigned64 =
+        compareBaseType == BaseType::UInt64 || compareBaseType == BaseType::UIntPtr;
 
     const IntegerLiteralValue step = stepSize->getValue();
     const UInt64 absStep = step < 0 ? UInt64(0) - UInt64(step) : UInt64(step);
