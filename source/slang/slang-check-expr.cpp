@@ -5043,6 +5043,11 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     else if ((matType = as<MatrixExpressionType>(operandType)))
         elementType = matType->getElementType();
 
+    // For `vector<T,N> == vector<T,N>` with a generic `T : __BuiltinFloatingPointType` or
+    // `__BuiltinIntegerType`, this path is what gives the per-component `vector<bool,N>` result.
+    // Overload resolution would bind the core module's scalar `IComparable` `operator==` instead,
+    // because `vector<T,N>` conforms to `IComparable` through `IFloat`/`IInteger` (see #12720), so
+    // vector equality is not declined here outside GLSL operator scope (#13969).
     auto family = classifyBuiltinArithmeticElementType(elementType);
     if (!family.isKnown())
         return nullptr;
