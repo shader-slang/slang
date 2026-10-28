@@ -243,7 +243,7 @@ struct UsedRanges
             const auto& rr = ranges[i];
             if (index >= rr.begin && index < rr.end)
             {
-                return index;
+                return i;
             }
         }
         return -1;
@@ -3370,6 +3370,9 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     entryPointLayout->profile = entryPoint->getProfile();
     entryPointLayout->name = entryPoint->getName();
     entryPointLayout->nameOverride = entryPointNameOverride;
+    entryPointLayout->inferredCapabilityRequirements =
+        specializationInfo ? specializationInfo->inferredCapabilityRequirements
+                           : entryPoint->getInferredCapabilityRequirements();
 
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.

@@ -2936,6 +2936,17 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             operands.getBuffer());
     }
 
+    // The AST encodes a reference parameter's access in the class of its wrapper type, while
+    // `IRRefParamType` records it as an operand after the value type.
+    IRType* visitRefParamTypeBase(RefParamTypeBase* type)
+    {
+        auto paramInfo = getParamInfoFromTypeWithModeWrapper(type);
+        return getBuilder()->getRefParamType(
+            lowerType(context, paramInfo.type),
+            getRefParamPassingModeAccess(paramInfo.mode),
+            AddressSpace::Generic);
+    }
+
     IRType* visitResourceType(ResourceType* type) { return lowerSimpleIntrinsicType(type); }
 
     IRType* visitSamplerStateType(SamplerStateType* type) { return lowerSimpleIntrinsicType(type); }
@@ -3482,7 +3493,9 @@ void addArg(
         addSimpleArg(context, ioArgs, argVal);
         break;
 
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         {
             // The next easiest case is the `ref` parameter passing
             // mode, because we always want to pass a pointer to
@@ -3670,7 +3683,9 @@ void addCallArgsForParam(
 {
     switch (paramPassingMode)
     {
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
     case ParamPassingMode::BorrowIn:
     case ParamPassingMode::Out:
     case ParamPassingMode::BorrowInOut:
@@ -3701,9 +3716,16 @@ void addCallArgsForParam(
 
 ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
+    if (paramDecl->hasModifier<RefReadOnlyModifier>())
+        return ParamPassingMode::RefReadOnly;
+    if (paramDecl->hasModifier<RefWriteOnlyModifier>())
+        return ParamPassingMode::RefWriteOnly;
     if (paramDecl->hasModifier<RefModifier>())
     {
-        return ParamPassingMode::Ref;
+        // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`.
+        if (paramDecl->hasModifier<ConstModifier>())
+            return ParamPassingMode::RefReadOnly;
+        return ParamPassingMode::RefReadWrite;
     }
     if (paramDecl->hasModifier<BorrowModifier>() || paramDecl->hasModifier<HLSLPayloadModifier>())
     {
@@ -4167,8 +4189,13 @@ void _lowerInfoFromFuncParameters(
         case ParamPassingMode::BorrowInOut:
             irParamType = builder->getBorrowInOutParamType(irParamType);
             break;
-        case ParamPassingMode::Ref:
-            irParamType = builder->getRefParamType(irParamType, AddressSpace::Generic);
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
+            irParamType = builder->getRefParamType(
+                irParamType,
+                getRefParamPassingModeAccess(paramInfo.actualParamPassingModeToUse),
+                AddressSpace::Generic);
             break;
         case ParamPassingMode::BorrowIn:
             irParamType = builder->getBorrowInParamType(irParamType, AddressSpace::Generic);
@@ -9262,9 +9289,27 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     }
 };
 
+// Resolve token-pasted names to the source that produced them for debug attribution.
+// For example, `void test_##name()` has a name in a synthetic, pathless source view.
+// That view retains the location of the paste, which may itself come from another paste.
+// Keep the AST location intact for diagnostics, and use the same resolved location for
+// both the debug source and its line/column information.
+static SourceLoc _getDebugSourceLoc(SourceManager* sourceManager, SourceLoc loc)
+{
+    while (auto view = sourceManager->findSourceView(loc))
+    {
+        if (view->getSourceFile()->getPathInfo().type != PathInfo::Type::TokenPaste ||
+            !view->getInitiatingSourceLoc().isValid())
+            break;
+        loc = view->getInitiatingSourceLoc();
+    }
+    return loc;
+}
+
 IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
 {
     auto sourceManager = context->getLinkage()->getSourceManager();
+    loc = _getDebugSourceLoc(sourceManager, loc);
     auto sourceView = sourceManager->findSourceView(loc);
     if (!sourceView)
         return nullptr;
@@ -9473,6 +9518,7 @@ static HumaneSourceLoc _getDebugHumaneLoc(
     SourceLoc loc)
 {
     auto sourceManager = context->getLinkage()->getSourceManager();
+    loc = _getDebugSourceLoc(sourceManager, loc);
     auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
     humaneLoc.column =
         _clampDebugColumn(context, debugSourceInst, humaneLoc.line, humaneLoc.column);
@@ -9540,7 +9586,8 @@ void maybeEmitDebugLine(
         return;
 
     auto sourceManager = context->getLinkage()->getSourceManager();
-    auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
+    auto humaneLoc =
+        sourceManager->getHumaneLoc(_getDebugSourceLoc(sourceManager, loc), SourceLocType::Emit);
     IRIntegerValue colStart = humaneLoc.column;
     IRIntegerValue colEnd = humaneLoc.column + 1;
     _clampDebugLineColumns(context, debugSourceInst, humaneLoc.line, colStart, colEnd);
@@ -11569,7 +11616,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (isGlobalDecl(decl))
         {
             if (decl->hasModifier<HLSLStaticModifier>())
-                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeMutableVarDecoration);
         }
 
         if (auto initExpr = decl->initExpr)
@@ -11640,12 +11687,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Mutable shadows have the storage rules of file/namespace `static` variables.
         // We record that category for validation of types resolved during linking.
-        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeMutableVarDecoration);
 
         // Next, we emit the initializer's return value. `getSimpleVal` obtains an ordinary
-        // parameter value directly, or loads the contents of a legacy `cbuffer`. The
-        // `MoveGlobalVarInitializationToEntryPointsPass` later emits a store at each entry point;
-        // on HLSL paths it may instead leave initialization for emission in the declaration.
+        // parameter value directly, or loads the contents of a legacy `cbuffer`.
+        // `moveGlobalVarInitializationToEntryPoints` examines all global initializers before
+        // resource-global replacement. It moves the shadow's initializer into entry points when
+        // the shadow will be replaced or the target requires per-entry-point initialization.
+        // Otherwise, emission retains the initializer at module scope.
         beginGlobalVarInitializer(builder, storage);
         builder->emitReturn(getSimpleVal(subContext, initialValue));
 
@@ -15202,6 +15251,31 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return info;
 }
 
+// Preserve the execution mode required by an entry point's checked capabilities.
+// Consider a generic entry point specialized with a type that requires
+// `spvShader64BitIndexingEXT`. Its requirement is known only after specialization, so the
+// selected program's layout IR must carry the decoration. The source-module producer also
+// uses this helper so serialized entry points retain requirements known before specialization.
+static void lowerEntryPointShader64BitIndexingRequirement(
+    IRBuilder* builder,
+    IRInst* entryPointInst,
+    CapabilitySet const& caps)
+{
+    // Membership in any target alternative is sufficient. `implies()` would require the atom
+    // in every alternative and miss functions that support other targets as well as SPIR-V.
+    for (auto atomSet : caps.getAtomSets())
+    {
+        for (auto atomVal : atomSet)
+        {
+            if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
+            {
+                builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(entryPointInst);
+                return;
+            }
+        }
+    }
+}
+
 static void lowerFrontEndEntryPointToIR(
     IRGenContext* context,
     EntryPoint* entryPoint,
@@ -15259,42 +15333,15 @@ static void lowerFrontEndEntryPointToIR(
             moduleName.getUnownedSlice());
     }
 
-    // The `[Shader64BitIndexing]` attribute requires the `spvShader64BitIndexingEXT` capability,
-    // which the semantic checker unions into `inferredCapabilityRequirements` for the attributed
-    // function and, transitively, for every entry point that can reach it through its call graph.
-    // The corresponding SPIR-V `Shader64BitIndexingEXT` execution mode (and its owning
-    // `OpCapability`/`OpExtension`) is entry-point scoped, so we lift the requirement onto the
-    // entry point here (never onto an attributed callee, where an execution mode would be invalid).
-    // The SPIR-V back-end emits all three from this single decoration. Reading the inferred
-    // capability set rather than the attribute directly covers the direct, call-graph, and
-    // `[require(spvShader64BitIndexingEXT)]` cases uniformly.
-    // Read the entry point's inferred requirements, which include stage-dependent contributions
-    // such as `SV_` semantic capabilities. `validateEntryPoint` runs before front-end IR lowering
-    // and always stores a (possibly empty but non-null) frozen set here, so this is never null for
-    // a front-end entry point.
-    auto inferredCaps = entryPoint->getInferredCapabilityRequirements();
-    SLANG_RELEASE_ASSERT(inferredCaps);
-    CapabilitySet caps{inferredCaps};
-    bool requiresShader64BitIndexing = false;
-    // Scan for membership of the atom in *any* alternative of the capability set. We iterate
-    // `getAtomSets()` rather than calling `caps.implies(spvShader64BitIndexingEXT)` because
-    // `implies()` is AND-across-all-alternatives: it would only report the atom when *every*
-    // target alternative requires it, which is too strict for a presence test.
-    for (auto atomSet : caps.getAtomSets())
-    {
-        for (auto atomVal : atomSet)
-        {
-            if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
-            {
-                requiresShader64BitIndexing = true;
-                break;
-            }
-        }
-        if (requiresShader64BitIndexing)
-            break;
-    }
-    if (requiresShader64BitIndexing)
-        builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
+    // This definition is shared by every specialization. Only declaration-wide requirements
+    // belong here; the selected program's layout IR adds requirements from generic arguments.
+    // With capability checking disabled the declaration's set is null, which denotes no
+    // inferred requirements.
+    auto inferredCaps = entryPointFuncDecl->inferredCapabilityRequirements;
+    lowerEntryPointShader64BitIndexingRequirement(
+        builder,
+        instToDecorate,
+        CapabilitySet{inferredCaps});
 }
 
 static void lowerProgramEntryPointToIR(
@@ -16485,19 +16532,6 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     auto latestSpirvAtom = getLatestSpirvAtom();
     auto latestMetalAtom = getLatestMetalAtom();
 
-    // Map each entry-point function declaration to the capability set inferred for it *as an entry
-    // point*, which can exceed the function declaration's own requirements (see
-    // `EntryPoint::getInferredCapabilityRequirements`). The layout list below is keyed by
-    // `DeclRef<FuncDecl>`, so we look up the owning `EntryPoint` here to read its stored set.
-    Dictionary<FuncDecl*, CapabilitySetVal*> entryPointInferredCaps;
-    for (Index i = 0; i < program->getEntryPointCount(); ++i)
-    {
-        auto entryPoint = program->getEntryPoint(i);
-        if (auto entryPointFuncDecl = entryPoint->getFuncDecl())
-            entryPointInferredCaps[entryPointFuncDecl] =
-                entryPoint->getInferredCapabilityRequirements();
-    }
-
     for (auto entryPointLayout : programLayout->entryPoints)
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
@@ -16523,14 +16557,11 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
                 getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
-        auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
-        SLANG_ASSERT(asFuncDecl);
-        // Every layout entry point is one of the program's entry points (both come from the same
-        // component-type walk), so its inferred capability set — which can exceed the function
-        // declaration's own requirements — is always in the map.
-        auto found = entryPointInferredCaps.tryGetValue(asFuncDecl);
-        SLANG_RELEASE_ASSERT(found);
-        CapabilitySet set{*found};
+        // The layout retains the requirements of this selection. The base EntryPoint can be
+        // shared by several specializations with different capability requirements.
+        SLANG_RELEASE_ASSERT(entryPointLayout->inferredCapabilityRequirements);
+        CapabilitySet set{entryPointLayout->inferredCapabilityRequirements};
+        lowerEntryPointShader64BitIndexingRequirement(builder, irFunc, set);
         for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)
