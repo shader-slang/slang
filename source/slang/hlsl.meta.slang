@@ -14,6 +14,7 @@ in uint __builtinWaveLaneCount : SV_WaveLaneCount;
 in uint __builtinQuadLaneIndex : SV_QuadLaneIndex;
 in uint __builtinWaveIndex : SV_WaveIndex;
 in uint __builtinGroupIndex : SV_GroupIndex;
+in uint3 __builtinWorkgroupCount : SV_WorkgroupCount;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -8449,8 +8450,6 @@ void AllMemoryBarrierWithGroupSync()
 [require(meshshading)]
 __intrinsic_op($(kIROp_GetWorkGroupSize))
 int3 WorkgroupSize();
-
-in uint3 __builtinWorkgroupCount : SV_WorkgroupCount;
 
 // Returns the number of workgroups that have been dispatched to a compute shader.
 [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
