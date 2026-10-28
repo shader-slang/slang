@@ -66,3 +66,22 @@ tbuffer TB
         ^^^^^^^^^^^^^^ declaration of 'gecTBufferName' conflicts with existing declaration
 */
 }
+
+// A `cbuffer` in a function body is compared with the other declarations of that block too.
+
+int functionWithGecBuffer()
+{
+    int gecLocalName = 1;
+/*CHECK:
+        ^^^^^^^^^^^^ see previous declaration of 'gecLocalName'
+*/
+    cbuffer GecLocalBuffer
+    {
+        int gecLocalName;
+/*CHECK:
+            ^^^^^^^^^^^^ warning E30204
+            ^^^^^^^^^^^^ declaration of 'gecLocalName' conflicts with existing declaration
+*/
+    }
+    return 0;
+}

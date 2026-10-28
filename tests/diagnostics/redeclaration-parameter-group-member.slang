@@ -309,6 +309,25 @@ static const int reopenedName = 1;
 */
 }
 
+// A buffer in a function body conflicts with the other declarations of that block.
+
+int functionWithBuffer()
+{
+    int localName = 1;
+/*CHECK:
+        ^^^^^^^^^ see previous declaration of 'localName'
+*/
+    cbuffer LocalBuffer
+    {
+        int localName;
+/*CHECK:
+            ^^^^^^^^^ warning E30204
+            ^^^^^^^^^ declaration of 'localName' conflicts with existing declaration
+*/
+    }
+    return 0;
+}
+
 // These declarations are in different scopes, so they do not conflict with the members.
 
 cbuffer BufferForScopes
