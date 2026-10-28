@@ -1305,6 +1305,11 @@ struct SingleCallSiteInliningPass : InliningPassBase
     }
 
     /// Does `func` have a decoration that requires it to stay a separate function?
+    ///
+    /// `export` and `public` (ExportDecoration, PublicDecoration) are not listed. Linking leaves an
+    /// export decoration on most functions, and the output exports such a function only in the
+    /// modes where this pass does not run (-whole-program, -incomplete-library and
+    /// -embed-downstream-ir; see linkAndOptimizeIR).
     static bool mustKeepAsFunction(IRFunc* func)
     {
         for (auto decor : func->getDecorations())

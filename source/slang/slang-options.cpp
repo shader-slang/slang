@@ -533,9 +533,10 @@ void initCommandOptions(CommandOptions& options)
          "Inline every function that has exactly one call site before emitting code. "
          "The output does not grow, and downstream compilers such as DXC no longer clone a large "
          "body once per wrapper function. Kept as functions: entry points, recursive functions "
-         "(a self-call is never inlined), [noinline] and [KeepAlive] functions, exported or extern "
-         "functions, target intrinsics, and functions used other than by a call (a witness table "
-         "entry, a function pointer). Has no effect "
+         "(a self-call is never inlined), [noinline] and [KeepAlive] functions, functions that the "
+         "output exports or declares extern (such as [DllExport], [CudaKernel] or extern \"C\"), "
+         "target intrinsics, and functions used other than by a call (a witness table entry, a "
+         "function pointer). Has no effect "
          "with -whole-program, -incomplete-library or -embed-downstream-ir. Default is off."},
         {OptionKind::DisableNonEssentialValidations,
          "-disable-non-essential-validations",
