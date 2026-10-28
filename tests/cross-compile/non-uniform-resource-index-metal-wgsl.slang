@@ -3,8 +3,8 @@
 // source/slang/slang-ir-float-non-uniform-resource-index.cpp for when that is correct.
 
 // The runs check the emitted text only, not downstream validity: core WGSL has no arrays of
-// textures, and Tint rejects the `array<texture_2d<f32>, ...>` declarations checked below (#9528).
-// Those checks pin today's spelling and will change when binding arrays are emitted.
+// textures, and the Tint that slang-test uses rejects the `binding_array<texture_2d<f32>, ...>`
+// declarations checked below (#9528).
 //
 // Besides the plain index, the kernel covers a wrapper around a cast index, nested wrappers, and
 // a wrapped index whose indexed resource is passed to a function. The emitter drops the wrapper
@@ -12,7 +12,7 @@
 // handles those shapes and that no call is left, not where the pass moved the wrapper.
 //
 // Run 1 (Metal) and run 2 (WGSL) index a sized array.
-// Run 3 indexes an unsized array on WGSL, emitted as a runtime-sized `array<texture_2d<f32>>`.
+// Run 3 indexes an unsized array on WGSL, emitted as an unsized `binding_array<texture_2d<f32>>`.
 // Metal is left out because an unsized resource array is not yet a valid Metal kernel argument
 // (see tests/metal/uniform-unsized-resource-array-unbound.slang).
 
@@ -69,7 +69,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // METAL-NOT: NonUniformResourceIndex
 
 // WGSL-NOT: NonUniformResourceIndex
-// WGSL: textures_{{[0-9]+}} : array<texture_2d<f32>, i32(8)>;
+// WGSL: textures_{{[0-9]+}} : binding_array<texture_2d<f32>, i32(8)>;
 // WGSL: textureSampleLevel((textures_{{[0-9]+}}[materialIndices_{{[0-9]+}}[{{.*}}(0.0f)
 // WGSL: textureSampleLevel((textures_{{[0-9]+}}[u32(f32({{.*}}(1.0f)
 // WGSL: textureSampleLevel((textures_{{[0-9]+}}[{{[A-Za-z0-9_.]+}}]{{.*}}(2.0f)
@@ -77,7 +77,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // WGSL-NOT: NonUniformResourceIndex
 
 // WGSL_UNBOUNDED-NOT: NonUniformResourceIndex
-// WGSL_UNBOUNDED: textures_{{[0-9]+}} : array<texture_2d<f32>>;
+// WGSL_UNBOUNDED: textures_{{[0-9]+}} : binding_array<texture_2d<f32>>;
 // WGSL_UNBOUNDED: textureSampleLevel((textures_{{[0-9]+}}[materialIndices_{{[0-9]+}}[{{.*}}(0.0f)
 // WGSL_UNBOUNDED: textureSampleLevel((textures_{{[0-9]+}}[u32(f32({{.*}}(1.0f)
 // WGSL_UNBOUNDED: textureSampleLevel((textures_{{[0-9]+}}[{{[A-Za-z0-9_.]+}}]{{.*}}(2.0f)
