@@ -2112,6 +2112,48 @@ void TypeCastIntVal::_toTextOverride(StringBuilder& out)
     out << ")";
 }
 
+// Convert `value` to the representation of the scalar `baseType`, truncating and sign- or
+// zero-extending it as a cast to that type does (e.g. `int(0x1FFFFFFFF)` is -1). Returns false
+// when `baseType` is neither an integer type nor `bool`.
+static bool _tryConvertIntegerValueToBaseType(BaseType baseType, IntegerLiteralValue& value)
+{
+    switch (baseType)
+    {
+    case BaseType::Int:
+        value = (int)value;
+        return true;
+    case BaseType::UInt:
+        value = (unsigned int)value;
+        return true;
+    case BaseType::Int64:
+    case BaseType::IntPtr:
+        value = (Int64)value;
+        return true;
+    case BaseType::UInt64:
+    case BaseType::UIntPtr:
+        value = (UInt64)value;
+        return true;
+    case BaseType::Int16:
+        value = (int16_t)value;
+        return true;
+    case BaseType::UInt16:
+        value = (uint16_t)value;
+        return true;
+    case BaseType::Int8:
+        value = (int8_t)value;
+        return true;
+    case BaseType::UInt8:
+        value = (uint8_t)value;
+        return true;
+    case BaseType::Bool:
+        // Match the C `(bool)` cast: any nonzero value is `true`, not a low-bit mask.
+        value = (value != 0);
+        return true;
+    default:
+        return false;
+    }
+}
+
 Val* TypeCastIntVal::tryFoldImpl(
     ASTBuilder* astBuilder,
     Type* resultType,
@@ -2119,57 +2161,20 @@ Val* TypeCastIntVal::tryFoldImpl(
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
-    auto convertValue = [&](BasicExpressionType* baseType, IntegerLiteralValue& resultValue) -> bool
-    {
-        switch (baseType->getBaseType())
-        {
-        case BaseType::Int:
-            resultValue = (int)resultValue;
-            return true;
-        case BaseType::UInt:
-            resultValue = (unsigned int)resultValue;
-            return true;
-        case BaseType::Int64:
-        case BaseType::IntPtr:
-            resultValue = (Int64)resultValue;
-            return true;
-        case BaseType::UInt64:
-        case BaseType::UIntPtr:
-            resultValue = (UInt64)resultValue;
-            return true;
-        case BaseType::Int16:
-            resultValue = (int16_t)resultValue;
-            return true;
-        case BaseType::UInt16:
-            resultValue = (uint16_t)resultValue;
-            return true;
-        case BaseType::Int8:
-            resultValue = (int8_t)resultValue;
-            return true;
-        case BaseType::UInt8:
-            resultValue = (uint8_t)resultValue;
-            return true;
-        case BaseType::Bool:
-            // Match the C `(bool)` cast: any nonzero value is `true`, not a low-bit mask.
-            resultValue = (resultValue != 0);
-            return true;
-        default:
-            return false;
-        }
-    };
     if (auto c = as<ConstantIntVal>(base))
     {
         IntegerLiteralValue resultValue = c->getValue();
         auto baseType = as<BasicExpressionType>(resultType);
         if (baseType)
         {
-            if (!convertValue(baseType, resultValue))
+            if (!_tryConvertIntegerValueToBaseType(baseType->getBaseType(), resultValue))
                 return nullptr;
         }
         else if (auto enumDecl = isEnumType(resultType))
         {
             baseType = as<BasicExpressionType>(enumDecl->tagType);
-            if (!baseType || !convertValue(baseType, resultValue))
+            if (!baseType ||
+                !_tryConvertIntegerValueToBaseType(baseType->getBaseType(), resultValue))
                 return nullptr;
         }
         return astBuilder->getIntVal(resultType, resultValue);
