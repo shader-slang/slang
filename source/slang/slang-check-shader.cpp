@@ -1861,11 +1861,7 @@ static void validateEntryPointCapabilities(
             {
                 if (targetCaps.isIncompatibleWith(
                         CapabilitySet{decl->inferredCapabilityRequirements}))
-                    diagnoseMissingCapabilityProvenance(
-                        targetOptionSet,
-                        sink,
-                        decl,
-                        failedSet);
+                    diagnoseMissingCapabilityProvenance(targetOptionSet, sink, decl, failedSet);
             }
 
             // The provenance walk above follows `capabilityRequirementProvenance`,
