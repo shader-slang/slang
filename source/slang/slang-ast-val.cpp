@@ -2247,21 +2247,22 @@ static bool _tryFoldConstantShift(
     return true;
 }
 
-// Fold the ordering comparison `op` (`<`, `>`, `<=` or `>=`) of two integer constants. When
-// either operand is unsigned, each operand is converted to its own type and the two are compared
-// as unsigned values, because `IntegerLiteralValue` is signed and front-end folding does not
-// narrow results. Consider `0xFFFFFFFFFFFFFFFFull > 5ull` and `(0u - 1u) > 5u`: both operands on
-// the left are held as -1, so only that conversion folds them to true. Signed operands compare
-// their held values directly, so `-1 < 0` stays true.
-static bool _foldOrderingComparison(
-    BuiltinOperationKind op,
-    ConstantIntVal* lhs,
-    ConstantIntVal* rhs)
+// Fold the comparison `op` (`==`, `!=`, `<`, `>`, `<=` or `>=`) of two integer constants as values
+// of their types. Front-end folding does not narrow its results (#13954), so `1u - 0xFFFFFFFFu` is
+// held as -4294967294 rather than 2; converting each operand to its own type recovers the value
+// the target computes. The values are then compared as unsigned when either operand is unsigned,
+// because `IntegerLiteralValue` is signed and holds `0xFFFFFFFFFFFFFFFFull` as -1. An operand
+// whose type the conversion does not cover, such as an enum or `char`, is compared as held.
+static bool _foldComparison(BuiltinOperationKind op, ConstantIntVal* lhs, ConstantIntVal* rhs)
 {
     auto compare = [op](auto a, auto b) -> bool
     {
         switch (op)
         {
+        case BuiltinOperationKind::Eql:
+            return a == b;
+        case BuiltinOperationKind::Neq:
+            return a != b;
         case BuiltinOperationKind::Less:
             return a < b;
         case BuiltinOperationKind::Greater:
@@ -2271,7 +2272,7 @@ static bool _foldOrderingComparison(
         case BuiltinOperationKind::Geq:
             return a >= b;
         default:
-            SLANG_UNEXPECTED("not an ordering comparison");
+            SLANG_UNEXPECTED("not a comparison");
         }
     };
     auto isUnsignedIntegerType = [](BasicExpressionType* type)
@@ -2285,13 +2286,13 @@ static bool _foldOrderingComparison(
     IntegerLiteralValue rhsValue = rhs->getValue();
     auto lhsType = as<BasicExpressionType>(lhs->getType());
     auto rhsType = as<BasicExpressionType>(rhs->getType());
-    if (!isUnsignedIntegerType(lhsType) && !isUnsignedIntegerType(rhsType))
-        return compare(lhsValue, rhsValue);
     if (lhsType)
         _tryConvertIntegerValueToBaseType(lhsType->getBaseType(), lhsValue);
     if (rhsType)
         _tryConvertIntegerValueToBaseType(rhsType->getBaseType(), rhsValue);
-    return compare(UInt64(lhsValue), UInt64(rhsValue));
+    if (isUnsignedIntegerType(lhsType) || isUnsignedIntegerType(rhsType))
+        return compare(UInt64(lhsValue), UInt64(rhsValue));
+    return compare(lhsValue, rhsValue);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2496,16 +2497,12 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         r = (a0 == 0);
         break;
     case BuiltinOperationKind::Eql:
-        r = (a0 == a1);
-        break;
     case BuiltinOperationKind::Neq:
-        r = (a0 != a1);
-        break;
     case BuiltinOperationKind::Less:
     case BuiltinOperationKind::Greater:
     case BuiltinOperationKind::Leq:
     case BuiltinOperationKind::Geq:
-        r = _foldOrderingComparison(op, constArgs[0], constArgs[1]);
+        r = _foldComparison(op, constArgs[0], constArgs[1]);
         break;
     case BuiltinOperationKind::BitAnd:
         r = a0 & a1;

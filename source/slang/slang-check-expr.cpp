@@ -2684,15 +2684,13 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         CASE_UINT(&);
         CASE_UINT(|);
         CASE_UINT(^);
-        CASE_UINT(!=);
-        CASE_UINT(==);
 #undef CASE_UINT
 
-        // Ordering comparisons fold through `BuiltinOperationIntVal::tryFoldImpl`, the folder the
-        // builtin-operator fast path uses, so both paths apply one rule for operand signedness.
+        // Comparisons fold through `BuiltinOperationIntVal::tryFoldImpl`, the folder the
+        // builtin-operator fast path uses, so a comparison folds the same way on both paths.
         else if (
-            opName == getName(">=") || opName == getName("<=") || opName == getName("<") ||
-            opName == getName(">"))
+            opName == getName("==") || opName == getName("!=") || opName == getName(">=") ||
+            opName == getName("<=") || opName == getName("<") || opName == getName(">"))
         {
             if (argCount != 2)
                 return nullptr;

@@ -10,7 +10,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 static const uint64_t kMax = 0xFFFFFFFFFFFFFFFFull;
@@ -71,8 +71,8 @@ void computeMain()
     outputBuffer[15] = sized.a.getCount();
 
     // Front-end folding does not narrow a wrapped 32-bit result, so `0u - 1u` is held as -1 and
-    // `1u - 0xFFFFFFFFu` as -4294967294. The comparison must read them as the uint values
-    // 0xFFFFFFFF and 2.
+    // `1u - 0xFFFFFFFFu` as -4294967294. Slot 16 needs an unsigned compare; slot 17 also needs the
+    // operand converted to `uint` width, which gives 2.
     int w0[((0u - 1u) > 5u) ? 1 : 2];
     int w1[((1u - 0xFFFFFFFFu) < 10u) ? 1 : 2];
     outputBuffer[16] = w0.getCount();
@@ -95,6 +95,16 @@ void computeMain()
     outputBuffer[23] = (u > 5u) ? 1 : 0;
     int s3[(0xFFFFFFFFu > 5u) ? 1 : 2];
     outputBuffer[24] = s3.getCount();
+
+    // Equality reads the same wrapped value as ordering does, on both front-end entry points.
+    int e0[((0u - 1u) == 0xFFFFFFFFu) ? 1 : 2];
+    int e1[operator!=(0u - 1u, 0xFFFFFFFFu) ? 1 : 2];
+    outputBuffer[25] = e0.getCount();
+    outputBuffer[26] = e1.getCount();
+
+    // A wrapped `int` result orders by its `int` value, as it does at run time.
+    int s4[((2147483647 + 1) < 0) ? 1 : 2];
+    outputBuffer[27] = s4.getCount();
 }
 
 // CHECK: 1
@@ -121,4 +131,7 @@ void computeMain()
 // CHECK-NEXT: 1
 // CHECK-NEXT: 1
 // CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 2
 // CHECK-NEXT: 1
