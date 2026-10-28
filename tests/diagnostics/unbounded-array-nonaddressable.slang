@@ -3,8 +3,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -stage compute -entry computeMain
 // Using non-exhaustive due to multiple duplicate cascading errors
 
-// Unbounded array itself is fine
-int unboundedArray[];
+// A resource element avoids E31215 so this test can isolate NonAddressable diagnostics.
+Texture2D unboundedArray[];
 
 // Array of unbounded arrays - should error (unbounded arrays are NonAddressable)
 int arrayOfUnbounded[3][];
