@@ -8024,7 +8024,7 @@ struct TriangleStream
 /// Try to terminate the current draw or dispatch call (HLSL SM 4.0)
 void abort();
 
-/// The abs function returns the absolute value of x.
+/// The abs function returns the absolute value of x. For an unsigned x, the result is x.
 /// @param x The input value.
 /// @return The absolute value of x.
 /// @category math
@@ -8033,9 +8033,10 @@ __generic<T : __BuiltinIntegerType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T abs(T x)
 {
-    // `abs` of an unsigned value is the value itself, as in DXC and WGSL. The GLSL.std.450 `SAbs`
-    // and `llvm.abs` lowerings read their operand as signed, and GLSL has no unsigned `abs`, so
-    // those targets return an unsigned `x` directly.
+    // `abs` of an unsigned value is the value itself, as in DXC and WGSL. The hlsl, metal and wgsl
+    // `abs` and the cpp/cuda prelude `U32_abs`/`U64_abs` already return it. The spirv and llvm
+    // cases lower to GLSL.std.450 `SAbs` and `llvm.abs`, which read their operand as signed, and
+    // GLSL has no unsigned `abs`, so the glsl, spirv and llvm cases return an unsigned `x` directly.
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
@@ -8071,6 +8072,8 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> abs(vector<T, N> x)
 {
+    // The glsl, spirv and llvm cases handle an unsigned `x` as in the scalar `abs` above; the
+    // matrix `abs` relies on them for its rows.
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
