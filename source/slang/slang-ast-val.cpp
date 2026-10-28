@@ -2242,6 +2242,56 @@ static bool _tryFoldConstantShift(
     return true;
 }
 
+// Return true if `type` is an unsigned integer type as wide as `IntegerLiteralValue`, such as
+// `uint64_t`. Its values at or above 2^63 are held as negative `IntegerLiteralValue`s, whereas
+// every value of a narrower unsigned type fits as a non-negative one.
+static bool _isFullWidthUnsignedIntegerType(Type* type)
+{
+    auto basicType = as<BasicExpressionType>(type);
+    if (!basicType)
+        return false;
+    const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
+    return (info.flags & BaseTypeInfo::Flag::Integer) &&
+           !(info.flags & BaseTypeInfo::Flag::Signed) &&
+           info.sizeInBytes == sizeof(IntegerLiteralValue);
+}
+
+// Fold the constant integer division `op` (`/` or `%`) of `lhs` by `rhs`, or return false for a
+// zero divisor.
+//
+// When either operand is full-width unsigned, the two divide as unsigned values:
+// 0x8000000000000000ull and 0xFFFFFFFFFFFFFFFFull are held as INT64_MIN and -1, yet their
+// quotient is 0. Other operands divide as signed. Signed division agrees with unsigned division on
+// every value of a narrower unsigned type, and keeps a value that folding left un-narrowed in its
+// representation: `~0u` is held as -1, and `~0u / 1u == ~0u` holds.
+//
+// A signed divisor of -1 folds without dividing, because `INT64_MIN / -1` overflows and traps
+// (SIGFPE) on real hardware: `x / -1` is the wrapping negation of `x`, and `x % -1` is 0.
+static bool _tryFoldConstantDivision(
+    BuiltinOperationKind op,
+    ConstantIntVal* lhs,
+    ConstantIntVal* rhs,
+    IntegerLiteralValue& out)
+{
+    const bool isDiv = (op == BuiltinOperationKind::Div);
+    const IntegerLiteralValue dividend = lhs->getValue();
+    const IntegerLiteralValue divisor = rhs->getValue();
+    if (divisor == 0)
+        return false;
+    if (_isFullWidthUnsignedIntegerType(lhs->getType()) ||
+        _isFullWidthUnsignedIntegerType(rhs->getType()))
+    {
+        const UInt64 n = UInt64(dividend);
+        const UInt64 d = UInt64(divisor);
+        out = IntegerLiteralValue(isDiv ? n / d : n % d);
+    }
+    else if (divisor == -1)
+        out = isDiv ? IntegerLiteralValue(UInt64(0) - UInt64(dividend)) : 0;
+    else
+        out = isDiv ? dividend / divisor : dividend % divisor;
+    return true;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op)
@@ -2481,18 +2531,12 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         break;
     case BuiltinOperationKind::Div:
     case BuiltinOperationKind::Mod:
-        if (a1 == 0)
+        if (!_tryFoldConstantDivision(op, constArgs[0], constArgs[1], r))
         {
             if (sink)
                 sink->diagnose(Diagnostics::DivideByZero{.location = loc});
             return nullptr;
         }
-        // `INT64_MIN / -1` overflows and traps (SIGFPE) on real hardware, so handle the
-        // `/ -1` case without dividing: `x / -1 == -x` (wrapping) and `x % -1 == 0`.
-        if (a1 == -1)
-            r = (op == BuiltinOperationKind::Div) ? (IntegerLiteralValue)(UInt(0) - u0) : 0;
-        else
-            r = (op == BuiltinOperationKind::Div) ? (a0 / a1) : (a0 % a1);
         break;
     case BuiltinOperationKind::Lsh:
     case BuiltinOperationKind::Rsh:
