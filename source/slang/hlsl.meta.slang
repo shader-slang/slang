@@ -8033,18 +8033,33 @@ __generic<T : __BuiltinIntegerType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T abs(T x)
 {
+    // `abs` of an unsigned value is the value itself, as in DXC and WGSL. The GLSL.std.450 `SAbs`
+    // and `llvm.abs` lowerings read their operand as signed, and GLSL has no unsigned `abs`, so
+    // those targets return an unsigned `x` directly.
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
-    case glsl: __intrinsic_asm "abs";
+    case glsl:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
     case cuda: __intrinsic_asm "$P_abs($0)";
     case cpp: __intrinsic_asm "$P_abs($0)";
-    case spirv: return spirv_asm {
-        result:$$T = OpExtInst glsl450 SAbs $x
-    };
+    case spirv:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 SAbs $x
+            };
     case wgsl: __intrinsic_asm "abs";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
+    case llvm:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     //default:
     // Note: this simple definition may not be appropriate for floating-point inputs
     // return x < 0 ? -x : x;
@@ -8059,13 +8074,25 @@ vector<T, N> abs(vector<T, N> x)
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
-    case glsl: __intrinsic_asm "abs";
+    case glsl:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
-    case spirv: return spirv_asm {
-        result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
-    };
+    case spirv:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
+            };
     case wgsl: __intrinsic_asm "abs";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
+    case llvm:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
