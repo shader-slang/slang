@@ -86,9 +86,9 @@ SLANG_UNIT_TEST(targetIgnoreCapabilities)
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     const UnownedStringSlice unavailable = toSlice("E36107");
-    // The notes that follow E36107 (for example "see using of 'spirvOnly'") name the function that
-    // needs the capability; the error itself does not.
-    const UnownedStringSlice provenance = toSlice("spirvOnly");
+    // The first of the notes that follow E36107 and point at the function that needs the
+    // capability. (The error's own source line also shows `spirvOnly`, so match the note's text.)
+    const UnownedStringSlice provenance = toSlice("see using of 'spirvOnly'");
     const TargetSpec hlsl = {SLANG_HLSL, false};
     const TargetSpec hlslIgnoring = {SLANG_HLSL, true};
 
