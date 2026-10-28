@@ -9,8 +9,14 @@
 
 import glsl;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
+
+// The GLSL scalar-bool `vec == vec` also applies when the element type is a generic parameter.
+bool allEqT<T : __BuiltinFloatingPointType>(vector<T, 4> a, vector<T, 4> b)
+{
+    return a == b;
+}
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -37,8 +43,11 @@ void computeMain()
     bool someNe = (va != vc);
     outputBuffer[3] = someNe ? 50.0 : 0.0; // -> 50.0
 
+    outputBuffer[4] = allEqT<float>(va, vc) ? 25.0 : 10.0; // -> 10.0
+
     // CHECK: 2.0
     // CHECK: 3.0
     // CHECK: 100.0
     // CHECK: 50.0
+    // CHECK: 10.0
 }

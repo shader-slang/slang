@@ -8,8 +8,9 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 __generic<T : __BuiltinFloatingPointType>
@@ -29,6 +30,8 @@ ComponentMask operator==(Component<T> a, Component<T> b)
 {
     ComponentMask result;
     result.data = a.data == b.data;
+    // The comparison is emitted per component, with no `all` reduction.
+    // HLSL: result{{.*}}.data{{.*}} = (a{{.*}}.data{{.*}}) == (b{{.*}}.data{{.*}});
     return result;
 }
 
@@ -60,6 +63,15 @@ bool3 eqVectorScalar<T : __BuiltinFloatingPointType>(vector<T, 3> a)
 bool3 eqScalarVector<T : __BuiltinFloatingPointType>(vector<T, 3> a)
 {
     return T(0) == a;
+}
+
+vector<T, 3> selectEq<T : __BuiltinFloatingPointType>(
+    vector<T, 3> a,
+    vector<T, 3> b,
+    vector<T, 3> x,
+    vector<T, 3> y)
+{
+    return select(a == b, x, y);
 }
 
 // A scalar reduction of a generic vector comparison is spelled with `all`/`any`, as it is for a
@@ -132,9 +144,17 @@ void computeMain()
     // CHECK-NEXT: 1
     // CHECK-NEXT: 0
 
-    outputBuffer[24] = (uint)allEqFloat<float>(a, a);
-    outputBuffer[25] = (uint)allEqFloat<float>(a, b);
-    outputBuffer[26] = (uint)anyNeqFloat<float>(a, b);
+    let selected = selectEq<float>(a, b, float3(1), float3(2));
+    outputBuffer[24] = (uint)selected[0];
+    outputBuffer[25] = (uint)selected[1];
+    outputBuffer[26] = (uint)selected[2];
+    // CHECK-NEXT: 2
+    // CHECK-NEXT: 1
+    // CHECK-NEXT: 2
+
+    outputBuffer[27] = (uint)allEqFloat<float>(a, a);
+    outputBuffer[28] = (uint)allEqFloat<float>(a, b);
+    outputBuffer[29] = (uint)anyNeqFloat<float>(a, b);
     // CHECK-NEXT: 1
     // CHECK-NEXT: 0
     // CHECK-NEXT: 1
