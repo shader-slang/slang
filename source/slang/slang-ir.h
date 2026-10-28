@@ -2174,7 +2174,7 @@ public:
     /// Ensure the module-owned acceleration cache used by linker global handling is built.
     /// A built cache assumes the module will not change after it is built; callers must
     /// manually rebuild it if module-scope annotations, global params, exports, known builtins,
-    /// or global hashed string literals change.
+    /// global hashed string literals, or debug source records change.
     void _ensureLinkingInfo();
 
     /// Build or return the module-owned acceleration cache used by linker global handling.
@@ -2259,7 +2259,8 @@ public:
     //
     // Version 38 gives each `DebugCompilationUnit` the `#include`d files of its translation unit
     // as operands. A version-37 module is still compatible, but its compilation units do not name
-    // those files, so the linker clones all of its debug source records.
+    // those files, so once the linked code reaches a version-37 module's debug source records, the
+    // linker clones all of them.
     const static UInt k_minSupportedModuleVersion = 37;
     const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);

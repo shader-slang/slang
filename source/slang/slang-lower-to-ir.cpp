@@ -15519,8 +15519,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // inline scopes need that parent. The emitter still omits extended debug info at -g1.
         //
         // Each compilation unit also names the `#include`d files of this translation unit. The
-        // linker clones the compilation units of each module that contributes code, and with them
-        // the module's whole file list, including a header that has no line-table entries.
+        // linker clones the compilation units of each module whose debug records the linked code
+        // reaches, and with them the module's whole file list, including a header that has no
+        // line-table entries.
         for (auto debugSource : topLevelSources)
         {
             auto compilationUnit = cast<IRDebugCompilationUnit>(

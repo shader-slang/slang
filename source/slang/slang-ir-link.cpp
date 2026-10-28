@@ -2204,48 +2204,50 @@ void cloneUsedWitnessTableEntries(IRSpecContext* context)
     }
 }
 
-/// Clone the debug source file list of each module in `modules` that the linked IR already
-/// refers to, and skip the list of every other module.
+/// Return whether the linked IR has already cloned any of `records`, the debug source records of
+/// one module.
+static bool hasClonedDebugSourceRecord(IRSpecContext* context, ArrayView<IRInst*> records)
+{
+    for (auto record : records)
+    {
+        if (findClonedValue(context, record))
+            return true;
+    }
+    return false;
+}
+
+/// Clone the debug source file list of each reached module in `modules`, and skip every other
+/// module. A module is reached when the linked IR has already cloned one of its `DebugSource` or
+/// `DebugCompilationUnit` records. The linked IR reaches those records only through the debug
+/// info of code cloned from the module, so this step runs after every step that clones code. A
+/// module whose contribution carries no debug info, such as a folded constant, is not reached.
+/// Consider an entry point whose file says `import Unused;` and that calls nothing from `Unused`:
+/// only the entry point's file is listed, so that the output does not depend on that import.
 ///
-/// The linked IR reaches a module's `DebugSource` and `DebugCompilationUnit` records only through
-/// the debug info of code cloned from that module, so a module that contributes no such code gets
-/// no records. Consider an entry point whose file says `import Unused;` and that calls nothing
-/// from `Unused`: only the entry point's file is listed, so that the output does not depend on
-/// imports that change nothing.
+/// For a reached module we clone its compilation units. Their operands name every file of the
+/// module's translation unit, including a file with no line-table entries, such as an
+/// `#include`d header. A module can also hold a `DebugSource` that none of its compilation units
+/// names: one made for a location in another module's file, such as the declaration of an
+/// imported function, or one for a path set by `#line`. Such a record is cloned only when the
+/// linked IR refers to it. The compilation units of a module written before version 38 do not
+/// name its `#include`d files, so for such a module we clone all of its records instead.
 ///
-/// Once the linked IR reaches any record of a module, we clone the module's compilation units.
-/// Their operands name every file of the module's translation unit, including a file with no
-/// line-table entries, such as an `#include`d header. A module can also hold a `DebugSource` for
-/// a file of another module, made for a location it refers to, such as the declaration of an
-/// imported function. No compilation unit of the module names that record, so it is cloned only
-/// when the linked IR refers to it.
-static void cloneDebugSourcesOfReferencedModules(
-    IRSpecContext* context,
-    ArrayView<IRModule*> modules)
+/// One pass over `modules` is enough. Every record cloned here is a record of the module being
+/// visited, and the clone map is keyed on each module's own instructions, so cloning the records
+/// of one module never makes another module reached.
+static void cloneDebugSourcesOfReachedModules(IRSpecContext* context, ArrayView<IRModule*> modules)
 {
     for (IRModule* irModule : modules)
     {
         auto records = irModule->_getLinkingInfo()->getDebugSourceRecords();
-
-        bool isReferenced = false;
-        for (auto record : records)
-        {
-            if (findClonedValue(context, record))
-            {
-                isReferenced = true;
-                break;
-            }
-        }
-        if (!isReferenced)
+        if (!hasClonedDebugSourceRecord(context, records))
             continue;
 
-        // The compilation units of a module written before version 38 do not name its
-        // `#include`d files, so we clone all of its records to keep those files listed.
-        const bool clonesAllRecords =
-            irModule->getVersion() < IRModule::k_firstModuleVersionWithCompilationUnitIncludes;
+        const bool doCompilationUnitsNameIncludes =
+            irModule->getVersion() >= IRModule::k_firstModuleVersionWithCompilationUnitIncludes;
         for (auto record : records)
         {
-            if (clonesAllRecords || as<IRDebugCompilationUnit>(record))
+            if (!doCompilationUnitsNameIncludes || as<IRDebugCompilationUnit>(record))
                 cloneValue(context, record);
         }
     }
@@ -2479,9 +2481,9 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // entries that are referenced.
     cloneUsedWitnessTableEntries(context);
 
-    // The debug source records of a module are only reachable through the code cloned from it,
-    // so this step comes after every step that clones code.
-    cloneDebugSourcesOfReferencedModules(context, userModules);
+    // A module's debug source records are reached only through code cloned from it, so this step
+    // comes after every step that clones code.
+    cloneDebugSourcesOfReachedModules(context, userModules);
 
     // It is possible that metadata has been attached to the input modules
     // themselves, which should be copied over to the output module.
