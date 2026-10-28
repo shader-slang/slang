@@ -592,8 +592,6 @@ struct SCCPContext
         IROp op0 = operandType0->getOp();
         IROp op1 = operandType1->getOp();
 
-        // Use floating-point path if either operand is floating-point
-        // Otherwise use integer path
         if (isFloatingPointType(op0) || isFloatingPointType(op1))
         {
             // Floating-point path - C++ operators follow IEEE 754 automatically
@@ -608,6 +606,7 @@ struct SCCPContext
         }
         else
         {
+            // bool constants use intVal despite not being integral types.
             resultVal = getBuilder()->getBoolValue(intFunc(c0->value.intVal, c1->value.intVal));
         }
         if (!resultVal)
