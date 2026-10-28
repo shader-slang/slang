@@ -8654,7 +8654,7 @@ __wgsl_extension(subgroups)
         __intrinsic_asm "simd_shuffle_xor($0, ushort($1))";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot;
+            OpCapability GroupNonUniformShuffle;
             OpGroupNonUniformShuffleXor $$T result Subgroup $value $mask
         };
     }
@@ -8691,7 +8691,7 @@ public vector<T,N> subgroupShuffleXor(vector<T,N> value, uint mask)
         __intrinsic_asm "simd_shuffle_xor($0, ushort($1))";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot;
+            OpCapability GroupNonUniformShuffle;
             OpGroupNonUniformShuffleXor $$vector<T,N> result Subgroup $value $mask
         };
     }
