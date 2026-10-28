@@ -19,3 +19,7 @@ tests/bugs/array-size-groupshared.slang.1 syn (wgpu)
 tests/bugs/generic-groupshared.slang.2 syn (wgpu)
 tests/compute/groupshared.slang.4 syn (wgpu)
 tests/metal/groupshared-threadlocal-same-parameter.slang.4 syn (wgpu)
+# fxc rejects the -O0 HLSL of this test with X4029 "infinite loop detected" when the source has
+# no #line directives (the same text with them compiles). render-test asks for no line
+# directives, which the session now passes on to its target.
+tests/autodiff/gh-12071.slang (dx11)
