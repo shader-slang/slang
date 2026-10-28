@@ -24,12 +24,20 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     if (WaveRotate(lane * 10, delta) == ((lane + delta) % laneCount) * 10)
         result |= 1;
 
+    // Each vote is taken before the branch that tests it. Written as `QuadAny(v) && QuadAll(v)`,
+    // the `&&` would make QuadAll conditional on QuadAny's result, and WGSL rejects a quad
+    // operation in control flow that depends on a value its uniformity analysis cannot prove
+    // uniform.
     const bool oneVote = (lane % 4) == 1;
-    if (QuadAny(oneVote) && !QuadAll(oneVote))
+    const bool anyOne = QuadAny(oneVote);
+    const bool allOne = QuadAll(oneVote);
+    if (anyOne && !allOne)
         result |= 2;
 
     const bool everyVote = lane < laneCount;
-    if (QuadAny(everyVote) && QuadAll(everyVote))
+    const bool anyEvery = QuadAny(everyVote);
+    const bool allEvery = QuadAll(everyVote);
+    if (anyEvery && allEvery)
         result |= 4;
 
     // Lanes 4k..4k+3 hold 1, 2, 3, 4 (lane % 4 + 1), which sum to 10 in each cluster.
