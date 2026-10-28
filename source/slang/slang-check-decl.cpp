@@ -793,7 +793,6 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void visitSetterDecl(SetterDecl* decl);
 
     void cloneModifiers(Decl* dest, Decl* src);
-    void setFuncTypeIntoRequirementDecl(CallableDecl* decl, FuncType* funcType);
 };
 
 struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
@@ -7603,43 +7602,6 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         auto thisVisibility = getDeclVisibility(context->parentDecl);
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
         addVisibilityModifier(synthesized, visibility);
-    }
-}
-
-/// Add the modifiers that spell `mode` to `paramDecl`. A parameter built from a
-/// function type has only its effective mode, and several spellings can produce the
-/// same mode (for example, `__ref_readonly` and its legacy alias `const __ref`), so
-/// we spell each mode one canonical way.
-static void addModifiersForParamPassingMode(
-    ASTBuilder* astBuilder,
-    ParamDecl* paramDecl,
-    ParamPassingMode mode)
-{
-    switch (mode)
-    {
-    case ParamPassingMode::In:
-        break;
-    case ParamPassingMode::Out:
-        addModifier(paramDecl, astBuilder->create<OutModifier>());
-        break;
-    case ParamPassingMode::BorrowInOut:
-        addModifier(paramDecl, astBuilder->create<InOutModifier>());
-        break;
-    case ParamPassingMode::BorrowIn:
-        addModifier(paramDecl, astBuilder->create<BorrowModifier>());
-        break;
-    case ParamPassingMode::RefReadWrite:
-        addModifier(paramDecl, astBuilder->create<RefModifier>());
-        break;
-    case ParamPassingMode::RefReadOnly:
-        addModifier(paramDecl, astBuilder->create<RefReadOnlyModifier>());
-        break;
-    case ParamPassingMode::RefWriteOnly:
-        addModifier(paramDecl, astBuilder->create<RefWriteOnlyModifier>());
-        break;
-    default:
-        SLANG_UNEXPECTED("unhandled parameter-passing mode");
-        break;
     }
 }
 
@@ -15492,26 +15454,6 @@ Stmt* SemanticsVisitor::maybeParseStmt(Stmt* stmt, const SemanticsContext& conte
 void SemanticsDeclHeaderVisitor::cloneModifiers(Decl* dest, Decl* src)
 {
     dest->modifiers = src->modifiers;
-}
-void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
-    CallableDecl* decl,
-    FuncType* funcType)
-{
-    if (!funcType)
-        return;
-    decl->returnType.type = funcType->getResultType();
-    decl->errorType.type = funcType->getErrorType();
-    for (Index i = 0; i < funcType->getParamCount(); i++)
-    {
-        auto paramInfo = funcType->getParamInfo(i);
-        auto paramType = paramInfo.type;
-        auto paramDir = paramInfo.mode;
-
-        auto param = m_astBuilder->create<ParamDecl>();
-        param->type.type = paramType;
-        addModifiersForParamPassingMode(m_astBuilder, param, paramDir);
-        decl->addMember(param);
-    }
 }
 
 DeclaredSubtypeWitness* SemanticsVisitor::getThisTypeWitness(
