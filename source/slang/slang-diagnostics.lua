@@ -4608,7 +4608,7 @@ err(
 
 err(
     "structural-ray-tracing-entry-point-stage-mismatch",
-    38054,
+    38093,
     "structural ray-tracing entry point stage mismatch",
     span { loc = "stageType:Decl", message = "struct '~stageType' does not implement the selected '~stage' stage" }
 )

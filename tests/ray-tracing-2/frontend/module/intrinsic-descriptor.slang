@@ -72,8 +72,8 @@ Optional<Bindings> optionalBindings;
 #elif defined(TEST_STATIC)
 static Descriptor staticDescriptor;
 /*STATIC:
-                  ^^^^^^^^^^^^^^^^ global variable cannot have opaque type
-                  ^^^^^^^^^^^^^^^^ global variable cannot have opaque type.
+                  ^^^^^^^^^^^^^^^^ opaque type is not supported for mutable static storage
+                  ^^^^^^^^^^^^^^^^ mutable file- or namespace-scope `static` variable 'staticDescriptor' has the opaque type 'rt.TraceProgramDescriptor<Schema>', which cannot be represented by mutable storage
                   ^^^^^^^^^^^^^^^^ do you intend to define a `uniform` parameter instead?
 */
 #endif

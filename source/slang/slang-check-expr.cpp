@@ -4412,7 +4412,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             Index paramCount = funcType->getParamCount();
 
             // Check argument requirements for the selected function. In particular, arguments
-            // passed to out, inout, and ref parameters must be writable.
+            // passed to out and inout parameters must be writable.
             for (Index pp = 0; pp < paramCount; ++pp)
             {
                 auto paramType = funcType->getParamTypeWithModeWrapper(pp);

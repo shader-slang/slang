@@ -398,9 +398,16 @@ Ordinary conformance checking already validates the selected `invoke` signature.
 native parameter classification because conformance has already checked its compiler-supplied
 input. Native entries keep the flag unset. Their signatures are checked for logical RT
 inputs before native parameter and capability validation; an invalid signature stops validation.
-The structural branch passes the annotated input declaration's source-stage requirements to
-`_validateEntryPointTargetCapabilities`, including synthesized stages on Metal; the native branch
-passes its ordinary stage profile.
+Both paths use upstream `validateEntryPointCapabilities`. For a structural entry, it reads the
+annotated input declaration's source-stage requirements, including synthesized stages on Metal.
+For a native entry, it uses the ordinary stage profile. The structural path also calls upstream
+`getDeclRefCapabilityRequirements` on the selected `invoke` reference, so concrete generic arguments
+contribute their requirements even when the method body is empty. For example,
+`GenericMiss<MetalContext>` must reject HLSL when `MetalContext` has `[require(metal)]`.
+The capability collection and per-specialization storage come from upstream
+[#13898](https://github.com/shader-slang/slang/pull/13898), which closed
+[#13893](https://github.com/shader-slang/slang/issues/13893). This does not enable the separate stage
+lookup and specialization path tracked in #13800.
 For example, a correctly typed `invoke` that calls a Metal-only helper must still be rejected for
 HLSL. Capability diagnostics use the ordinary function location at `invoke`; the public entry
 name remains the requested source name.

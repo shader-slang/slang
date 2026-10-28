@@ -1830,14 +1830,17 @@ static void validateEntryPointCapabilities(
 {
     auto linkage = entryPoint->getLinkage();
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
-    auto diagnosticDecl = entryPointFuncDecl;
     CapabilitySet stageCapabilitySet{entryPoint->getProfile().getCapabilityName()};
     if (entryPoint->isStructuralRayTracingEntryPoint())
     {
+        // Conformance guarantees one input; read its type with the selected generic arguments.
         auto astBuilder = linkage->getASTBuilder();
         auto parameters = getParameters(astBuilder, entryPoint->getFuncDeclRef());
         SLANG_RELEASE_ASSERT(parameters.getCount() == 1);
         auto inputType = unwrapModifiedType(getType(astBuilder, parameters[0]));
+
+        // MissInput<C>, for example, declares the source miss-stage capabilities, including
+        // Metal's synthesized miss path. The native miss profile alone does not include Metal.
         auto inputDecl = isDeclRefTypeOf<AggTypeDecl>(inputType).getDecl();
         SLANG_RELEASE_ASSERT(inputDecl && inputDecl->inferredCapabilityRequirements);
         stageCapabilitySet = CapabilitySet{inputDecl->inferredCapabilityRequirements};
@@ -1861,7 +1864,7 @@ static void validateEntryPointCapabilities(
                 Diagnostics::EntryPointUsesUnavailableCapability{
                     .stage = capabilityNameToString((CapabilityName)stageTarget),
                     .target = capabilityNameToString((CapabilityName)compileTarget),
-                    .decl = diagnosticDecl});
+                    .decl = entryPointFuncDecl});
 
             // Find out what is incompatible (ancestor missing a super set of 'target+stage')
             CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
@@ -1972,7 +1975,7 @@ static void validateEntryPointCapabilities(
                     }
                 }
                 StringBuilder entryPointNameSb;
-                printDiagnosticArg(entryPointNameSb, diagnosticDecl);
+                printDiagnosticArg(entryPointNameSb, entryPointFuncDecl);
                 auto atoms = addedAtoms.getElements<CapabilityAtom>();
                 StringBuilder capsSb;
                 printDiagnosticArg(capsSb, atoms);
@@ -1984,31 +1987,17 @@ static void validateEntryPointCapabilities(
                         .entryPoint = entryPointNameSb.produceString(),
                         .profile = target->getOptionSet().getProfile().getName(),
                         .capabilities = capsSb.produceString(),
-                        .location = diagnosticDecl->loc,
+                        .location = entryPointFuncDecl->loc,
                     },
                     Diagnostics::ProfileImplicitlyUpgradedRestrictive{
                         .entryPoint = entryPointNameSb.produceString(),
                         .profile = target->getOptionSet().getProfile().getName(),
                         .capabilities = capsSb.produceString(),
-                        .location = diagnosticDecl->loc,
+                        .location = entryPointFuncDecl->loc,
                     });
             }
         }
     }
-}
-
-static void _validateEntryPointTargetCapabilities(
-    EntryPoint* entryPoint,
-    CapabilitySet entryPointInferredCaps,
-    CapabilitySet stageCapabilitySet,
-    const List<GenericStructTypeUse>& signatureStructUses,
-    DiagnosticSink* sink)
-{
-    entryPoint->setInferredCapabilityRequirements(
-        entryPointInferredCaps.freeze(entryPoint->getLinkage()->getASTBuilder()));
-    List<Decl*> referencedDecls;
-    validateEntryPointCapabilities(
-        entryPoint, entryPointInferredCaps, referencedDecls, signatureStructUses, sink);
 }
 
 // Validate that an entry point function conforms to any additional
@@ -2024,22 +2013,27 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         // compiler, so native uniform/varying parameter rules do not apply. The selected
         // implementation must still support the requested target/profile.
 
-        // Conformance guarantees one input; read its type with the selected generic arguments.
-        auto astBuilder = linkage->getASTBuilder();
-        auto parameters = getParameters(astBuilder, entryPoint->getFuncDeclRef());
-        SLANG_RELEASE_ASSERT(parameters.getCount() == 1);
-        auto inputType = unwrapModifiedType(getType(astBuilder, parameters[0]));
-
-        // MissInput<C>, for example, declares the source miss-stage capabilities, including
-        // Metal's synthesized miss path. The native miss profile alone does not include Metal.
-        auto inputDecl = isDeclRefTypeOf<AggTypeDecl>(inputType).getDecl();
-        SLANG_RELEASE_ASSERT(inputDecl && inputDecl->inferredCapabilityRequirements);
-        List<GenericStructTypeUse> signatureStructUses;
-        _validateEntryPointTargetCapabilities(
+        // GenericMiss<MetalContext> requires Metal when MetalContext has [require(metal)],
+        // even if invoke has an empty body. Collect the selected reference's requirements
+        // with the same traversal used for ordinary generic entry points.
+        List<Decl*> referencedDecls;
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            getModule(entryPointFuncDecl),
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
+        auto entryPointInferredCaps = getDeclRefCapabilityRequirements(
+            &visitor,
+            entryPoint->getFuncDeclRef(),
+            referencedDecls);
+        entryPoint->setInferredCapabilityRequirements(
+            entryPointInferredCaps.freeze(linkage->getASTBuilder()));
+        validateEntryPointCapabilities(
             entryPoint,
-            CapabilitySet{entryPoint->getInferredCapabilityRequirements()},
-            CapabilitySet{inputDecl->inferredCapabilityRequirements},
-            signatureStructUses,
+            entryPointInferredCaps,
+            referencedDecls,
+            {},
             sink);
         return;
     }

@@ -2246,13 +2246,10 @@ public:
     // Adding an IR instruction requires a new writer version. Earlier modules can remain
     // supported when their AST and IR representations are compatible with the reader.
     //
-    // Adding `RefReadOnlyModifier`, `RefWriteOnlyModifier` and the reference parameter type
-    // classes shifts the sequential `ASTNodeType` values, so a version-36 module's later AST
-    // nodes would be decoded as different classes.
-    // Version 37 is the earliest module version with the updated AST node numbering, and with
-    // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
-    const static UInt k_minSupportedModuleVersion = 37;
-    // Version 38 adds structural ray-tracing IR instructions.
+    // The structural ray-tracing stage and descriptor AST classes shift the sequential
+    // `ASTNodeType` values, so version-37 modules would decode later nodes as different classes.
+    // Version 38 also adds the trace-program descriptor and Metal trace IR instructions.
+    const static UInt k_minSupportedModuleVersion = 38;
     const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
