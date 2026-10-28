@@ -611,6 +611,11 @@ SLANG_UNIT_TEST(irBlobRejectsVersion36)
 // The IR of `user` holds a `DebugSource` for dep.slang, made for the location of `depValue`. An
 // entry point that calls only `ownValue` does not reach that record. A current `user` module
 // therefore leaves dep.slang out of the SPIR-V, and the same module marked as version 37 keeps it.
+//
+// The test observes the version check through that record for another module's file, not through
+// an `#include`d header. Marking a current module as version 37 does not remove the `#include`d
+// files from its compilation units, so a header would be listed on both paths, while the record
+// for dep.slang is cloned only on the version-37 path.
 SLANG_UNIT_TEST(irBlobVersion37KeepsAllDebugSources)
 {
     const char* depSource = R"(
@@ -707,8 +712,9 @@ SLANG_UNIT_TEST(irBlobVersion37KeepsAllDebugSources)
         UnownedStringSlice spirv(
             (const char*)code->getBufferPointer(),
             (const char*)code->getBufferPointer() + code->getBufferSize());
-        // The entry point and `user` are listed either way, so the check is a real SPIR-V
-        // listing rather than an empty output.
+        // `user` is reached through `ownValue` on both paths, so user.slang is listed either way.
+        // The check makes the dep.slang result below a fact about a real SPIR-V listing, not
+        // about an empty output.
         SLANG_CHECK_ABORT(spirv.indexOf(UnownedStringSlice("\"user.slang\"")) != -1);
         return spirv.indexOf(UnownedStringSlice("\"dep.slang\"")) != -1;
     };
