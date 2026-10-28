@@ -4458,13 +4458,17 @@ struct TargetDesc
     SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
 
     /** Whether to force `scalar` layout for glsl shader storage buffers.
-        `true` forces it. `false` keeps the session's `GLSLForceScalarLayout` option, if any; to
-        turn scalar layout off for this target only when the session turns it on, add a
+        `true` forces it, unless this target's `compilerOptionEntries` set `GLSLForceScalarLayout`
+        to 0. `false` keeps the session's `GLSLForceScalarLayout` option, if any; to turn scalar
+        layout off for this target only when the session turns it on, add a
         `GLSLForceScalarLayout` entry with value 0 to this target's `compilerOptionEntries`.
      */
     bool forceGLSLScalarBufferLayout = false;
 
     /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
+        They are applied after `floatingPointMode`, `lineDirectiveMode` and
+        `forceGLSLScalarBufferLayout`, so an entry for the same option takes precedence over the
+        field.
      */
     const CompilerOptionEntry* compilerOptionEntries = nullptr;
 
