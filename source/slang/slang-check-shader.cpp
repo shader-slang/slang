@@ -1815,42 +1815,36 @@ static void collectGenericStructTypeUses(
     }
 }
 
-// Check the selected function's requirements against the supplied stage and each target.
-// Initial validation stores the result on EntryPoint. Later specialization stores it on that
-// selection's existing specialization info, leaving the base entry point unchanged.
+// Check a selected entry point's effective requirements against each requested target.
+// Both initial selection and later specialization use this check; the latter must not write
+// its requirements onto the base EntryPoint, which can have other independent specializations.
+// Previously checked requirements contribute to the profile baseline, so later specialization
+// reports only additional profile requirements. Target/stage compatibility uses the full set.
 static void validateEntryPointCapabilities(
     EntryPoint* entryPoint,
-    CapabilitySet entryPointInferredCaps,
-    CapabilitySet stageCapabilitySet,
+    const CapabilitySet& entryPointInferredCaps,
+    const List<Decl*>& referencedDecls,
     const List<GenericStructTypeUse>& signatureStructUses,
     DiagnosticSink* sink,
-    EntryPoint::EntryPointSpecializationInfo* specializationInfo = nullptr)
+    const CapabilitySetVal* previouslyCheckedCaps = nullptr)
 {
     auto linkage = entryPoint->getLinkage();
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
-    auto funcDeclRef = specializationInfo ? specializationInfo->specializedFuncDeclRef
-                                          : entryPoint->getFuncDeclRef();
+    CapabilitySet stageCapabilitySet{entryPoint->getProfile().getCapabilityName()};
+    if (entryPoint->isStructuralRayTracingEntryPoint())
+    {
+        // Conformance guarantees one input; read its type with the selected generic arguments.
+        auto astBuilder = linkage->getASTBuilder();
+        auto parameters = getParameters(astBuilder, entryPoint->getFuncDeclRef());
+        SLANG_RELEASE_ASSERT(parameters.getCount() == 1);
+        auto inputType = unwrapModifiedType(getType(astBuilder, parameters[0]));
 
-    // Selecting genericMain<MetalOnly> requires Metal even when the body never uses its type
-    // parameter. Add these requirements after the caller's body and signature requirements.
-    // Use join(), so conflicting arguments and signature requirements remain a conflict.
-    List<Decl*> referencedDecls;
-    auto shared = SharedSemanticsContext::createForOptionalModule(
-        linkage,
-        getModule(entryPointFuncDecl),
-        linkage->m_optionSet.getLanguageVersion(),
-        sink);
-    SemanticsVisitor visitor(shared);
-    entryPointInferredCaps.join(
-        getDeclRefCapabilityRequirements(&visitor, funcDeclRef, referencedDecls));
-
-    auto inferredCaps = entryPointInferredCaps.freeze(linkage->getASTBuilder());
-    auto previouslyCheckedCaps =
-        specializationInfo ? entryPoint->getInferredCapabilityRequirements() : nullptr;
-    if (specializationInfo)
-        specializationInfo->inferredCapabilityRequirements = inferredCaps;
-    else
-        entryPoint->setInferredCapabilityRequirements(inferredCaps);
+        // MissInput<C>, for example, declares the source miss-stage capabilities, including
+        // Metal's synthesized miss path. The native miss profile alone does not include Metal.
+        auto inputDecl = isDeclRefTypeOf<AggTypeDecl>(inputType).getDecl();
+        SLANG_RELEASE_ASSERT(inputDecl && inputDecl->inferredCapabilityRequirements);
+        stageCapabilitySet = CapabilitySet{inputDecl->inferredCapabilityRequirements};
+    }
 
     for (auto target : linkage->targets)
     {
@@ -2006,12 +2000,9 @@ static void validateEntryPointCapabilities(
     }
 }
 
-// Validate an initial entry selection or the already-resolved function from specialization.
-// Both paths choose their stage capabilities here; only initial selection checks the signature.
-static void validateEntryPoint(
-    EntryPoint* entryPoint,
-    DiagnosticSink* sink,
-    EntryPoint::EntryPointSpecializationInfo* specializationInfo)
+// Validate that an entry point function conforms to any additional
+// constraints based on the stage (and profile?) it specifies.
+void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 {
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
     auto linkage = entryPoint->getLinkage();
@@ -2019,39 +2010,31 @@ static void validateEntryPoint(
     if (entryPoint->isStructuralRayTracingEntryPoint())
     {
         // Conformance already checks invoke's signature. Its RT input is supplied by the
-        // compiler, so native uniform/varying parameter rules do not apply.
-        auto astBuilder = linkage->getASTBuilder();
-        auto funcDeclRef = specializationInfo ? specializationInfo->specializedFuncDeclRef
-                                              : entryPoint->getFuncDeclRef();
-        auto parameters = getParameters(astBuilder, funcDeclRef);
-        SLANG_RELEASE_ASSERT(parameters.getCount() == 1);
-        auto inputType = unwrapModifiedType(getType(astBuilder, parameters[0]));
+        // compiler, so native uniform/varying parameter rules do not apply. The selected
+        // implementation must still support the requested target/profile.
 
-        // MissInput<C>, for example, declares the source miss-stage capabilities, including
-        // Metal's synthesized miss path. The native miss profile alone does not include Metal.
-        auto inputDecl = isDeclRefTypeOf<AggTypeDecl>(inputType).getDecl();
-        SLANG_RELEASE_ASSERT(inputDecl && inputDecl->inferredCapabilityRequirements);
+        // GenericMiss<MetalContext> requires Metal when MetalContext has [require(metal)],
+        // even if invoke has an empty body. Collect the selected reference's requirements
+        // with the same traversal used for ordinary generic entry points.
+        List<Decl*> referencedDecls;
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            getModule(entryPointFuncDecl),
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
+        auto entryPointInferredCaps = getDeclRefCapabilityRequirements(
+            &visitor,
+            entryPoint->getFuncDeclRef(),
+            referencedDecls);
+        entryPoint->setInferredCapabilityRequirements(
+            entryPointInferredCaps.freeze(linkage->getASTBuilder()));
         validateEntryPointCapabilities(
             entryPoint,
-            CapabilitySet{entryPoint->getInferredCapabilityRequirements()},
-            CapabilitySet{inputDecl->inferredCapabilityRequirements},
+            entryPointInferredCaps,
+            referencedDecls,
             {},
-            sink,
-            specializationInfo);
-        return;
-    }
-
-    if (specializationInfo)
-    {
-        // Initial selection already checked this native signature. Recheck capabilities using
-        // the concrete generic arguments, retaining the base requirements as the profile baseline.
-        validateEntryPointCapabilities(
-            entryPoint,
-            CapabilitySet{entryPoint->getInferredCapabilityRequirements()},
-            CapabilitySet{entryPoint->getProfile().getCapabilityName()},
-            {},
-            sink,
-            specializationInfo);
+            sink);
         return;
     }
 
@@ -2862,17 +2845,36 @@ static void validateEntryPoint(
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
 
+    // For `void genericMain<T>() {}` selected with `-entry genericMain<MetalOnly>`,
+    // entryPoint->getFuncDeclRef() identifies genericMain<MetalOnly>. If MetalOnly has
+    // [require(metal)], include that requirement even though T is unused.
+    //
+    // Add argument requirements after the body, stage, and signature requirements collected above.
+    // For example, a Metal-only argument and an HLSL-only signature must produce a conflict.
+    // The earlier collectors use nonDestructiveJoin(), which can ignore conflicting requirements;
+    // using join() here ensures target validation sees the conflict.
+    List<Decl*> referencedDecls;
+    auto shared = SharedSemanticsContext::createForOptionalModule(
+        linkage,
+        module,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
+    SemanticsVisitor visitor(shared);
+    entryPointInferredCaps.join(
+        getDeclRefCapabilityRequirements(&visitor, entryPoint->getFuncDeclRef(), referencedDecls));
+
+    // The entry point's stage-specific requirements belong to the `EntryPoint`, not the
+    // stage-agnostic `FuncDecl`; store the finalized set there as the source of truth for
+    // downstream entry-point consumers.
+    entryPoint->setInferredCapabilityRequirements(
+        entryPointInferredCaps.freeze(linkage->getASTBuilder()));
+
     validateEntryPointCapabilities(
         entryPoint,
         entryPointInferredCaps,
-        CapabilitySet{entryPoint->getProfile().getCapabilityName()},
+        referencedDecls,
         signatureStructUses,
         sink);
-}
-
-void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
-{
-    validateEntryPoint(entryPoint, sink, nullptr);
 }
 
 bool resolveStageOfProfileWithEntryPoint(
@@ -3960,10 +3962,26 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
     info->specializedFuncDeclRef = specializedFuncDeclRef;
 
-    // Reuse entry validation to select the stage capabilities for this resolved function.
-    // A composite specialization can visit an already selected structural entry before consuming
-    // arguments for another component, so it needs the same stage context as initial selection.
-    validateEntryPoint(this, sink, info.get());
+    // The generic arguments supplied through -specialize or IComponentType::specialize are now
+    // bound to the entry point's generic parameters. For example, specializing genericMain<T>
+    // with MetalOnly makes specializedFuncDeclRef identify genericMain<MetalOnly>.
+    // Add the concrete arguments' capability requirements, even if the body never uses them,
+    // to the base entry point's requirements, then check the combined set against each target.
+    List<Decl*> referencedDecls;
+    CapabilitySet specializedCaps{getInferredCapabilityRequirements()};
+    specializedCaps.join(
+        getDeclRefCapabilityRequirements(&visitor, specializedFuncDeclRef, referencedDecls));
+    info->inferredCapabilityRequirements = specializedCaps.freeze(getLinkage()->getASTBuilder());
+    // validateEntryPoint already checked the base entry point's requirements. Pass them as the
+    // last argument so the profile check reports only requirements added by the concrete generic
+    // arguments, without repeating the base entry point's profile-upgrade warnings.
+    validateEntryPointCapabilities(
+        this,
+        specializedCaps,
+        referencedDecls,
+        {},
+        sink,
+        getInferredCapabilityRequirements());
 
     // Once the generic parameters (if any) have been dealt with,
     // any remaining specialization arguments are for existential/interface
