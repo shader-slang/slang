@@ -4446,14 +4446,21 @@ struct TargetDesc
     SlangTargetFlags flags = kDefaultTargetFlags;
 
     /** Default mode to use for floating-point operations on the target.
+        `SLANG_FLOATING_POINT_MODE_DEFAULT` keeps the mode set by the session's
+        `compilerOptionEntries` (`FloatingPointMode`), if any; any other value overrides it.
      */
     SlangFloatingPointMode floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
 
     /** The line directive mode for output source code.
+        `SLANG_LINE_DIRECTIVE_MODE_DEFAULT` keeps the mode set by the session's
+        `compilerOptionEntries` (`LineDirectiveMode`), if any; any other value overrides it.
      */
     SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
 
     /** Whether to force `scalar` layout for glsl shader storage buffers.
+        `true` forces it. `false` keeps the session's `GLSLForceScalarLayout` option, if any; to
+        turn scalar layout off for this target only when the session turns it on, add a
+        `GLSLForceScalarLayout` entry with value 0 to this target's `compilerOptionEntries`.
      */
     bool forceGLSLScalarBufferLayout = false;
 

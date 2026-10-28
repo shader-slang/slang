@@ -23,7 +23,22 @@ void main()
 }
 )";
 
-// Compile kSource for `targetDesc` with the session options `entries` and return the code.
+// Report which stage of compileWithSessionOptions failed, with its diagnostics.
+static String reportFailure(const char* stage, slang::IBlob* diagnostics)
+{
+    StringBuilder message;
+    message << "compileWithSessionOptions: " << stage << " failed";
+    if (diagnostics && diagnostics->getBufferSize())
+    {
+        message << ":\n";
+        message.append((const char*)diagnostics->getBufferPointer(), diagnostics->getBufferSize());
+    }
+    getTestReporter()->message(TestMessageType::TestFailure, message.getBuffer());
+    return String();
+}
+
+// Compile kSource for `targetDesc` with the session options `entries`. Returns the target code,
+// or an empty string if a stage fails; the failing stage and its diagnostics are reported.
 static String compileWithSessionOptions(
     slang::IGlobalSession* globalSession,
     slang::TargetDesc const& targetDesc,
@@ -38,23 +53,23 @@ static String compileWithSessionOptions(
 
     ComPtr<slang::ISession> session;
     if (SLANG_FAILED(globalSession->createSession(sessionDesc, session.writeRef())))
-        return String();
+        return reportFailure("createSession", nullptr);
 
     ComPtr<slang::IBlob> diagnostics;
     auto module =
         session->loadModuleFromSourceString("m", "m.slang", kSource, diagnostics.writeRef());
     if (!module)
-        return String();
+        return reportFailure("loadModuleFromSourceString", diagnostics);
 
     ComPtr<slang::IComponentType> linked;
     module->link(linked.writeRef(), diagnostics.writeRef());
     if (!linked)
-        return String();
+        return reportFailure("link", diagnostics);
 
     ComPtr<slang::IBlob> code;
     linked->getTargetCode(0, code.writeRef(), diagnostics.writeRef());
     if (!code)
-        return String();
+        return reportFailure("getTargetCode", diagnostics);
     return String(
         (const char*)code->getBufferPointer(),
         (const char*)code->getBufferPointer() + code->getBufferSize());
@@ -114,6 +129,12 @@ SLANG_UNIT_TEST(targetDescDefaultKeepsSessionLineDirectiveMode)
     String withDefault = compileWithSessionOptions(globalSession, targetDesc, nullptr, 0);
     SLANG_CHECK_ABORT(withDefault.getLength() != 0);
     SLANG_CHECK(withDefault.indexOf(toSlice("#line")) != -1);
+
+    // A mode set in the TargetDesc still takes precedence over the session's.
+    targetDesc.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_STANDARD;
+    String targetStandard = compileWithSessionOptions(globalSession, targetDesc, &noLines, 1);
+    SLANG_CHECK_ABORT(targetStandard.getLength() != 0);
+    SLANG_CHECK(targetStandard.indexOf(toSlice("#line")) != -1);
 }
 
 // `GLSLForceScalarLayout` in the session options reaches a target whose TargetDesc leaves
@@ -139,4 +160,14 @@ SLANG_UNIT_TEST(targetDescDefaultKeepsSessionGLSLScalarLayout)
     String withDefault = compileWithSessionOptions(globalSession, targetDesc, nullptr, 0);
     SLANG_CHECK_ABORT(withDefault.getLength() != 0);
     SLANG_CHECK(withDefault.indexOf(toSlice("layout(scalar")) == -1);
+
+    // A target turns the session's scalar layout off through its own compilerOptionEntries,
+    // as slang.h documents for `forceGLSLScalarBufferLayout`.
+    slang::CompilerOptionEntry noScalar = scalar;
+    noScalar.value.intValue0 = 0;
+    targetDesc.compilerOptionEntries = &noScalar;
+    targetDesc.compilerOptionEntryCount = 1;
+    String targetOff = compileWithSessionOptions(globalSession, targetDesc, &scalar, 1);
+    SLANG_CHECK_ABORT(targetOff.getLength() != 0);
+    SLANG_CHECK(targetOff.indexOf(toSlice("layout(scalar")) == -1);
 }

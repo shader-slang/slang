@@ -187,8 +187,12 @@ void Linkage::addTarget(slang::TargetDesc const& desc)
     auto& optionSet = target->getOptionSet();
     optionSet.inheritFrom(m_optionSet);
 
-    // A field of the target description left at its default does not override a value the
-    // session's options set: the target inherits it, as it inherits every other session option.
+    // The floating-point mode, line-directive mode and scalar-layout fields of the target
+    // description override the session's options only when they are not at their defaults, so a
+    // target that leaves them alone inherits the session's values, as it inherits every other
+    // session option. (`forceGLSLScalarBufferLayout` has no "unset" value: `false` inherits, and
+    // a target turns the layout off through its `compilerOptionEntries`, applied last below.)
+    // `profile` and `flags` are not covered by this rule and are applied as they always were.
     if (desc.floatingPointMode != SLANG_FLOATING_POINT_MODE_DEFAULT)
         optionSet.set(
             CompilerOptionName::FloatingPointMode,
