@@ -85,7 +85,7 @@ Big make(int k)
 // WGSL: leaf{{.*}}(&([[COPY]])
 int twoCalls(int k)
 {
-    Big m = make(k);
+    let m = make(k);
     return leaf(m, 0) + leaf(m, 1);
 }
 
