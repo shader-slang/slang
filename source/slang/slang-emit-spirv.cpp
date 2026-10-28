@@ -9002,12 +9002,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRAlignedAttr* alignedAttr = nullptr;
         IRMemoryScopeAttr* memoryScopeAttr = nullptr;
 
-        for (auto attr : inst->getAllAttrs())
+        // `inst` is null when the access has no attributes of its own.
+        if (inst)
         {
-            if (auto foundAlignedAttr = as<IRAlignedAttr>(attr))
-                alignedAttr = foundAlignedAttr;
-            else if (auto foundMemoryScopeAttr = as<IRMemoryScopeAttr>(attr))
-                memoryScopeAttr = foundMemoryScopeAttr;
+            for (auto attr : inst->getAllAttrs())
+            {
+                if (auto foundAlignedAttr = as<IRAlignedAttr>(attr))
+                    alignedAttr = foundAlignedAttr;
+                else if (auto foundMemoryScopeAttr = as<IRMemoryScopeAttr>(attr))
+                    memoryScopeAttr = foundMemoryScopeAttr;
+            }
         }
 
         // Determine coherence
@@ -9798,12 +9802,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto convertedVal =
             emitInst(parent, nullptr, SpvOpCopyLogical, dstValType, kResultID, srcVal);
 
-        // Compute memory access operands for PhysicalStorageBuffer alignment
+        // Compute memory access operands for PhysicalStorageBuffer alignment. The copy's attributes
+        // (alignment, memory scope) belong to the load from the source, so the store to the
+        // destination takes only what its own pointer implies: a coherent load into a local
+        // variable must not make the store to that variable `NonPrivatePointer`, which SPIR-V
+        // rejects for the Function storage class.
         int memoryAccessMask = 0;
         int alignment = -1;
         MemoryScope memoryScope{};
         getMemoryAccessOperandsOfLoadStore<MemoryAccessType::Store>(
-            inst,
+            nullptr,
             inst->getPtr(),
             memoryAccessMask,
             alignment,
