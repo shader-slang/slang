@@ -7151,7 +7151,7 @@ public void hitObjectTraceMotionReorderExecuteEXT(
     {
     case _GL_EXT_shader_invocation_reorder_motion:
         __intrinsic_asm "hitObjectTraceMotionReorderExecuteEXT";
-    case spvShaderInvocationReorderMotionEXT:
+    case spirv:
     {
         spirv_asm
         {
