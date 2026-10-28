@@ -3132,6 +3132,13 @@ struct TypeLayoutReflection
             index);
     }
 
+    /** Get the index of the descriptor set containing a binding range.
+     *
+     * This is an index into this type layout's descriptor sets, not a Vulkan descriptor-set
+     * number. Pass it to `getDescriptorSetSpaceOffset()` to query the set's space offset.
+     * A binding range without a descriptor set may return -1; check
+     * `getBindingRangeDescriptorRangeCount()` before enumerating its descriptor ranges.
+     */
     SlangInt getBindingRangeDescriptorSetIndex(SlangInt index)
     {
         return spReflectionTypeLayout_getBindingRangeDescriptorSetIndex(
@@ -3139,6 +3146,12 @@ struct TypeLayoutReflection
             index);
     }
 
+    /** Get the first descriptor-range index for a binding range within its descriptor set.
+     *
+     * This is not a Vulkan binding number. Use it with `getBindingRangeDescriptorSetIndex()`
+     * as the arguments to `getDescriptorSetDescriptorRangeIndexOffset()`. The number of
+     * consecutive descriptor ranges is given by `getBindingRangeDescriptorRangeCount()`.
+     */
     SlangInt getBindingRangeFirstDescriptorRangeIndex(SlangInt index)
     {
         return spReflectionTypeLayout_getBindingRangeFirstDescriptorRangeIndex(
@@ -3158,6 +3171,13 @@ struct TypeLayoutReflection
         return spReflectionTypeLayout_getDescriptorSetCount((SlangReflectionTypeLayout*)this);
     }
 
+    /** Get the register-space offset of the descriptor set at `setIndex`.
+     *
+     * For Vulkan descriptor-backed resources, this is the descriptor-set offset, which can
+     * differ from `setIndex`.
+     * Like other type-layout offsets, it is relative to this layout; account for enclosing
+     * variable-layout offsets when determining a cumulative binding location.
+     */
     SlangInt getDescriptorSetSpaceOffset(SlangInt setIndex)
     {
         return spReflectionTypeLayout_getDescriptorSetSpaceOffset(
@@ -3173,6 +3193,11 @@ struct TypeLayoutReflection
     }
 
     /** Get the index offset for a descriptor range within a descriptor set.
+     *
+     * `setIndex` and `rangeIndex` are indices into this type layout's descriptor sets and
+     * descriptor ranges, respectively. For Vulkan descriptor-backed resources, the result is
+     * the binding offset, not `rangeIndex`. Account for enclosing variable-layout offsets
+     * when determining a cumulative binding location.
      *
      * Returns `SLANG_UNKNOWN_SIZE` when the offset depends on unresolved generic parameters or
      * link-time constants.
