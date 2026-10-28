@@ -660,7 +660,8 @@ struct SCCPContext
             [](IRIntegerValue c0, IRIntegerValue c1)
             {
                 // `INT64_MIN / -1` overflows and traps (SIGFPE) on the host, so a divisor of -1
-                // folds to the wrapping negation of `c0` without dividing.
+                // folds to the wrapping negation of `c0` without dividing, as the front end's
+                // `_tryFoldConstantDivision` does.
                 if (c1 == -1)
                     return static_cast<IRIntegerValue>(
                         IRUnsignedIntegerValue(0) - static_cast<IRUnsignedIntegerValue>(c0));

@@ -4,9 +4,17 @@
 // The IR SCCP pass and the front-end folds must fold the wrapped quotient INT64_MIN and the
 // remainder 0 instead. Integer constants are held in a signed 64-bit integer, so the `uint64_t`
 // divisor 0xFFFFFFFFFFFFFFFF is held as -1 as well; it must divide as unsigned, which gives
-// 0x8000000000000000 / 0xFFFFFFFFFFFFFFFF == 0 and a remainder of 0x8000000000000000. Signed
-// `-7 / 2` and `-7 % 2`, 32-bit `INT_MIN / -1` and `% -1`, and 32-bit unsigned `~0u / 1u` and
-// `~0x7FFFFFFFu % 0xFFFFFFFFu` are controls whose results must not change.
+// 0x8000000000000000 / 0xFFFFFFFFFFFFFFFF == 0 and a remainder of 0x8000000000000000.
+//
+// The controls guard the signed and narrow paths:
+// - `-7 / 2` and `-7 % 2` must stay signed (-3 and -1), so only 64-bit unsigned operands divide
+//   as unsigned.
+// - 32-bit `INT_MIN / -1` and `% -1` fold through SCCP's 64-bit values without trapping.
+// - `7 / -1` checks the wrapping negation on an ordinary dividend.
+// - `~0x7FFFFFFFu % 0xFFFFFFFFu` (b6) pins the narrow rule: front-end folding does not narrow
+//   results (#13954), so `~0x7FFFFFFFu` is held as -2^31, and only a signed fold returns it
+//   unchanged to compare equal to itself.
+// - `~0u / 1u` (b5) is an identity that any rule keeps.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type

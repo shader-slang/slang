@@ -2242,51 +2242,50 @@ static bool _tryFoldConstantShift(
     return true;
 }
 
-// Return true if `type` is an unsigned integer type as wide as `IntegerLiteralValue`, such as
-// `uint64_t`. Its values at or above 2^63 are held as negative `IntegerLiteralValue`s, whereas
-// every value of a narrower unsigned type fits as a non-negative one.
-static bool _isFullWidthUnsignedIntegerType(Type* type)
+// Return true if `type` is `uint64_t` or `uintptr_t`. The front end folds `uintptr_t` as 64 bits
+// on every host, as `TypeCastIntVal::tryFoldImpl` does, so both have values at or above 2^63 that
+// an `IntegerLiteralValue` holds as negative.
+static bool _is64BitUnsignedIntegerType(Type* type)
 {
     auto basicType = as<BasicExpressionType>(type);
     if (!basicType)
         return false;
-    const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
-    return (info.flags & BaseTypeInfo::Flag::Integer) &&
-           !(info.flags & BaseTypeInfo::Flag::Signed) &&
-           info.sizeInBytes == sizeof(IntegerLiteralValue);
+    const auto baseType = basicType->getBaseType();
+    return baseType == BaseType::UInt64 || baseType == BaseType::UIntPtr;
 }
 
-// Fold the constant integer division `op` (`/` or `%`) of `lhs` by `rhs`, or return false for a
-// zero divisor.
+// Fold the constant integer quotient (`isDiv`) or remainder of `lhs` by `rhs`, or return false
+// for a zero divisor. The SCCP pass folds the IR `div` and `irem` instructions by the same rules
+// (`evalDiv` and `evalRem` in slang-ir-sccp.cpp).
 //
-// When either operand is full-width unsigned, the two divide as unsigned values:
+// When either operand is 64-bit unsigned, the two divide as unsigned values:
 // 0x8000000000000000ull and 0xFFFFFFFFFFFFFFFFull are held as INT64_MIN and -1, yet their
-// quotient is 0. Other operands divide as signed. Signed division agrees with unsigned division on
-// every value of a narrower unsigned type, and keeps a value that folding left un-narrowed in its
-// representation: `~0u` is held as -1, and `~0u / 1u == ~0u` holds.
+// quotient is 0. Overload resolution gives both operands the operation's type, so either operand
+// names it. Narrower operands divide as signed, which is exact only while each operand is held
+// within its type's range. Front-end folding does not narrow results to their type (#13954), so
+// `~0u` is held as -1 and `~0u / 2u` still folds to 0.
 //
 // A signed divisor of -1 folds without dividing, because `INT64_MIN / -1` overflows and traps
-// (SIGFPE) on real hardware: `x / -1` is the wrapping negation of `x`, and `x % -1` is 0.
+// (SIGFPE) on the host: `x / -1` is the wrapping negation of `x`, and `x % -1` is 0.
 static bool _tryFoldConstantDivision(
-    BuiltinOperationKind op,
     ConstantIntVal* lhs,
     ConstantIntVal* rhs,
+    bool isDiv,
     IntegerLiteralValue& out)
 {
-    const bool isDiv = (op == BuiltinOperationKind::Div);
+    using UInt = std::make_unsigned_t<IntegerLiteralValue>;
     const IntegerLiteralValue dividend = lhs->getValue();
     const IntegerLiteralValue divisor = rhs->getValue();
     if (divisor == 0)
         return false;
-    if (_isFullWidthUnsignedIntegerType(lhs->getType()) ||
-        _isFullWidthUnsignedIntegerType(rhs->getType()))
+    if (_is64BitUnsignedIntegerType(lhs->getType()) || _is64BitUnsignedIntegerType(rhs->getType()))
     {
-        const UInt64 n = UInt64(dividend);
-        const UInt64 d = UInt64(divisor);
+        const UInt n = UInt(dividend);
+        const UInt d = UInt(divisor);
         out = IntegerLiteralValue(isDiv ? n / d : n % d);
     }
     else if (divisor == -1)
-        out = isDiv ? IntegerLiteralValue(UInt64(0) - UInt64(dividend)) : 0;
+        out = isDiv ? IntegerLiteralValue(UInt(0) - UInt(dividend)) : 0;
     else
         out = isDiv ? dividend / divisor : dividend % divisor;
     return true;
@@ -2476,8 +2475,8 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     const IntegerLiteralValue a1 = (constArgs.getCount() > 1) ? constArgs[1]->getValue() : 0;
     const IntegerLiteralValue a2 = (constArgs.getCount() > 2) ? constArgs[2]->getValue() : 0;
     // Do the wrapping arithmetic (negate/add/sub/mul) through the unsigned type: signed
-    // overflow is UB (and `-INT64_MIN` / `INT64_MIN / -1` even trap on real hardware), while
-    // unsigned wraps two's-complement, matching what the target IR ops compute at runtime.
+    // overflow is UB (`-INT64_MIN`), while unsigned wraps two's-complement, matching what the
+    // target IR ops compute at runtime.
     using UInt = std::make_unsigned_t<IntegerLiteralValue>;
     const UInt u0 = (UInt)a0;
     const UInt u1 = (UInt)a1;
@@ -2531,7 +2530,11 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         break;
     case BuiltinOperationKind::Div:
     case BuiltinOperationKind::Mod:
-        if (!_tryFoldConstantDivision(op, constArgs[0], constArgs[1], r))
+        if (!_tryFoldConstantDivision(
+                constArgs[0],
+                constArgs[1],
+                op == BuiltinOperationKind::Div,
+                r))
         {
             if (sink)
                 sink->diagnose(Diagnostics::DivideByZero{.location = loc});

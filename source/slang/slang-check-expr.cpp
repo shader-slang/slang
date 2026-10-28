@@ -2741,13 +2741,12 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
         // Division folds through `BuiltinOperationIntVal::tryFoldImpl`, the folder the
         // builtin-operator fast path uses, so both paths share its handling of a -1 divisor
-        // (`INT64_MIN / -1` traps on the host) and of unsigned operands.
+        // (`INT64_MIN / -1` traps on the host) and of unsigned operands. With no sink, a zero
+        // divisor fails to fold without the diagnostic the fast path reports.
         // TODO: issue a suitable error for a zero divisor.
         else if (opName == getName("/") || opName == getName("%"))
         {
             if (argCount != 2)
-                return nullptr;
-            if (!constArgVals[1])
                 return nullptr;
             List<IntVal*> divisionArgs;
             divisionArgs.add(argVals[0]);
@@ -2759,8 +2758,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                     getText(opName).getUnownedSlice(),
                     OperatorArity::Binary),
                 divisionArgs,
-                getSink(),
-                invokeExpr.getExpr()->loc));
+                nullptr));
         }
         else if (opName == getName("?:"))
         {
