@@ -22525,6 +22525,35 @@ void visitReferencedDecls(
         visitor.dispatchIfNotNull(decl);
 }
 
+CapabilitySet getDeclRefCapabilityRequirements(
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef,
+    List<Decl*>& outReferencedDecls)
+{
+    // Consider this example:
+    //     [require(metal)] struct MetalOnly {}
+    //     void main<T>() {}
+    // Selecting main<MetalOnly> retains MetalOnly in the checked reference even though the body
+    // never uses T. Use the ordinary reference walk so selection has the same requirements as
+    // calling main<MetalOnly>() in a function body. As in visitDeclRefExpr, include the selected
+    // declaration itself as well as its operands.
+    CapabilitySet requirements{declRef.getDecl()->inferredCapabilityRequirements};
+    visitReferencedDecls(
+        *visitor,
+        declRef.declRefBase,
+        declRef.getDecl()->loc,
+        nullptr,
+        [&](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc)
+        {
+            requirements.join(nodeCaps);
+            if (auto decl = as<Decl>(node);
+                decl && decl != declRef.getDecl() && nodeCaps && !nodeCaps->isEmpty())
+                outReferencedDecls.add(decl);
+        },
+        [](DiagnosticCategory) {});
+    return requirements;
+}
+
 CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
 {
     if (stmt == nullptr)
