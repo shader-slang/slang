@@ -6308,6 +6308,13 @@ err(
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
+err(
+    "byte-address-buffer-sub-word-store-not-supported-in-wgsl",
+    56112,
+    "byte-address buffer stores of 8- or 16-bit values are not supported in WGSL",
+    span { loc = "location", message = "storing '~type:IRInst' to a byte-address buffer writes 8- or 16-bit values; WGSL byte-address buffers are arrays of 32-bit words, so the store would have to rewrite the whole word and could lose a concurrent write to its other bytes. Use a 'RWStructuredBuffer' of the type, pack the values into 32-bit words, or use 'Atomic<uint>' operations." }
+)
+
 -- SPIRV (57001-57007)
 
 warning(
