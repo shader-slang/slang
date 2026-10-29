@@ -1,4 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute
 
 // Test that a ternary/select on a specialization constant used as a groupshared
 // array size compiles successfully to SPIR-V using OpSpecConstantOp Select.
@@ -9,6 +11,10 @@
 // CHECK: %[[ARR_TYPE:[0-9A-Za-z_]+]] = OpTypeArray %float %[[SIZE]]
 // CHECK: %[[PT_TYPE:[0-9A-Za-z_]+]] = OpTypePointer Workgroup %[[ARR_TYPE]]
 // CHECK: OpVariable %[[PT_TYPE]] Workgroup
+
+// GLSL: const int [[SIZE:_S[0-9]+]] = FOO_0 > 0 ? FOO_0 : 1;
+// GLSL: shared float {{ *}}arr_0{{\[}}[[SIZE]]{{\]}};
+// WGSL: var<workgroup> arr_0 : array<f32, select(i32(1), FOO_0, (FOO_0 > i32(0)))>;
 
 [vk::specialization_constant]
 const int FOO = 4;
