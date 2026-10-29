@@ -5623,6 +5623,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         typeLayout->elementTypeLayout = element.layout;
         typeLayout->uniformStride = elementStride;
+        typeLayout->isLaidOutAsArray = elementCount > kMaxNativeVectorElementCount;
 
         typeLayout->addResourceUsage(info.kind, info.size);
 
