@@ -4,6 +4,7 @@
 //TEST:SIMPLE(filecheck=MIXCOUNT): -target metal -entry cmain -stage compute
 //TEST:SIMPLE(filecheck=CLONE): -target metal -entry cmain -stage compute
 //TEST:SIMPLE(filecheck=ORDER): -target metal -entry cmain -stage compute
+//TEST:SIMPLE(filecheck=ORIG): -target metal -entry cmain -stage compute
 
 // Exported functions are given `thread` parameters on Metal even when nothing calls them. An
 // export that *is* called is still specialized from its call sites, and the original is removed
@@ -45,7 +46,9 @@ export void bumpBoth(inout int x)
 
 // Passing a buffer element makes an earlier pass clone `addTo`, and the clone keeps the export
 // decoration. Its call is then specialized to `threadgroup`, so the clone itself has no uses left
-// and no `thread` variant of it is emitted.
+// and no `thread` variant of it is emitted. The original `addTo` is no longer called after the
+// earlier pass, so, like any uncalled export, it is emitted with `thread` parameters (ORIG).
+// ORIG: void addTo_{{[0-9]+}}(int thread* {{[A-Za-z0-9_]+}}, int thread* {{[A-Za-z0-9_]+}})
 // CLONE-NOT: void addTo_{{[0-9]+}}(int {{[A-Za-z0-9_]+}}, int thread*
 // CLONE: void addTo_{{[0-9]+}}(int {{[A-Za-z0-9_]+}}, int threadgroup*
 // CLONE-NOT: void addTo_{{[0-9]+}}(int {{[A-Za-z0-9_]+}}, int thread*

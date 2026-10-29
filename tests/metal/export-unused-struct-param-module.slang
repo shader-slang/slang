@@ -13,3 +13,8 @@ export public float unusedExport(Payload p)
 {
     return p.a.x + p.b;
 }
+
+export void helperInout(inout float x)
+{
+    x = x * 2;
+}

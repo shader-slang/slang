@@ -46,6 +46,13 @@ export void writeStruct(inout S s, out float r)
     r = s.a.x;
 }
 
+// A user pointer is already `device`, so only the `out` parameter takes the `thread` default.
+// CHECK-DAG: void readPtr_{{[0-9]+}}(int device* {{[A-Za-z0-9_]+}}, int thread* {{[A-Za-z0-9_]+}})
+export void readPtr(int* p, out int r)
+{
+    r = *p;
+}
+
 // CHECK-DAG: float takeStructDll_{{[0-9]+}}(const S_{{[0-9]+}} thread* {{[A-Za-z0-9_]+}})
 [DllExport]
 float takeStructDll(S s)
