@@ -3827,6 +3827,10 @@ struct ShaderReflection
 
     /** Get the binding index for the global constant buffer.
      *
+     * The index is in the resource kind the target binds that buffer with: a constant-buffer
+     * register on D3D, a descriptor binding on Vulkan, a buffer index on Metal. The register
+     * space or descriptor set is not included. Returns 0 when there is no global constant buffer.
+     *
      * Returns `SLANG_UNKNOWN_SIZE` when the binding depends on unresolved generic parameters or
      * link-time constants.
      */

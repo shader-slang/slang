@@ -2271,19 +2271,23 @@ struct ExtendedTypeLayoutContext
 
             if (shouldAllocDescriptorSet)
             {
-                // The logic here assumes that when a parameter group consumes
-                // resources that must "leak" into the outer scope (including
-                // reosurces consumed by the group "container"), those resources
-                // will amount to descriptor ranges that are part of the same
-                // descriptor set.
+                // When a parameter group consumes resources that must "leak" into the
+                // outer scope (including resources consumed by the group "container"),
+                // those resources normally amount to descriptor ranges in one descriptor
+                // set, which the binding range built here describes. (If the contents of a
+                // group consume whole spaces/sets, then those resources are accounted for
+                // separately.)
                 //
-                // (If the contents of a group consume whole spaces/sets, then
-                // those resources will be accounted for separately).
+                // The container's own range takes its index from the path through the
+                // container and its set from the container's own space. Both offsets are
+                // zero except for the global scope's default constant buffer (see
+                // `generateParameterBindings`), which sits at the root path. Under
+                // `-fvk-bind-globals` that buffer is in a set of its own: the binding range
+                // built here then covers only the buffer's range, and `addRangesRec` adds
+                // the leaked element ranges to their own set.
                 //
-                // The container's offsets are relative to the parameter group. They are
-                // non-zero only for the default constant buffer of the global scope, whose
-                // binding `generateParameterBindings` records there, and which
-                // `-fvk-bind-globals` can place in a set of its own.
+                // TODO: The path's space is not added to the set, so a `ConstantBuffer`
+                // declared in an explicit space still reports its own range in set 0.
                 //
                 auto containerVarLayout = parameterGroupTypeLayout->containerVarLayout;
                 ExtendedBindingRangePath containerPath(path, containerVarLayout);
@@ -5553,23 +5557,23 @@ SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection*
         return 0;
 
     // The default constant buffer's binding is the scope's offset plus the offset of the
-    // container of the scope's constant-buffer layout (see `generateParameterBindings`), in
-    // whichever resource kind the target binds the buffer with: a constant-buffer register on
-    // D3D, a descriptor-table slot on Vulkan.
+    // container of the scope's constant-buffer layout (see `generateParameterBindings`). The
+    // container lays out the buffer object alone, which uses one resource kind: a
+    // constant-buffer register on D3D, a descriptor-table slot on Vulkan, a buffer index on
+    // Metal, and a zero byte offset on CPU/CUDA.
     auto scopeVarLayout = program->parametersLayout;
     auto scopeTypeLayout = as<ParameterGroupTypeLayout>(scopeVarLayout->typeLayout);
     if (!scopeTypeLayout)
         return 0;
-    for (auto& containerInfo : scopeTypeLayout->containerVarLayout->resourceInfos)
-    {
-        if (containerInfo.kind == LayoutResourceKind::RegisterSpace)
-            continue;
-        LayoutOffset index = containerInfo.index;
-        if (auto scopeInfo = scopeVarLayout->FindResourceInfo(containerInfo.kind))
-            index += scopeInfo->index;
-        return getReflectionOffset(index);
-    }
-    return 0;
+    auto& containerInfos = scopeTypeLayout->containerVarLayout->resourceInfos;
+    SLANG_ASSERT(containerInfos.getCount() == 1);
+    if (containerInfos.getCount() == 0)
+        return 0;
+    auto& containerInfo = containerInfos[0];
+    LayoutOffset index = containerInfo.index;
+    if (auto scopeInfo = scopeVarLayout->FindResourceInfo(containerInfo.kind))
+        index += scopeInfo->index;
+    return getReflectionOffset(index);
 }
 
 SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inProgram)
