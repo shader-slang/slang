@@ -16,24 +16,39 @@ static bool isSpecConstSizedArrayType(IRType* type)
     return arrayType && isSpecConstRateType(arrayType->getElementCount()->getFullType());
 }
 
-/// Return true if `type` or any of its element array types is sized by a specialization constant.
-/// This is true for `float[kTile]` and `float[kTile][4]`, and false for `float[4]` and for a
-/// struct that has a `float values[kTile]` field.
+/// Return true if `type` holds an array sized by a specialization constant without a struct in
+/// between: as the type itself, as the element type of an array, or as the value type of a pointer
+/// or a builtin generic type such as a structured buffer. This is true for `float[kTile]`,
+/// `float[kTile][4]` and `RWStructuredBuffer<float[kTile]>`, and false for `float[4]` and for a
+/// struct that has a `float values[kTile]` field, because that field is checked on its own.
 static bool hasSpecConstSizedArrayLayer(IRType* type)
 {
-    while (auto arrayType = as<IRArrayTypeBase>(type))
+    for (;;)
     {
-        if (isSpecConstSizedArrayType(arrayType))
-            return true;
-        type = arrayType->getElementType();
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            if (isSpecConstSizedArrayType(arrayType))
+                return true;
+            type = arrayType->getElementType();
+        }
+        else if (auto ptrType = as<IRPtrTypeBase>(type))
+            type = ptrType->getValueType();
+        else if (auto genericType = as<IRBuiltinGenericType>(type))
+            type = genericType->getElementType();
+        else
+            return false;
     }
-    return false;
 }
 
 struct SpecConstSizedArrayCheckContext
 {
     CodeGenTarget target;
     DiagnosticSink* sink;
+
+    // The storage types already reported at a declaration, and the WGSL `var<workgroup>` store
+    // types that are allowed, so that a value of one of these types is not reported again.
+    HashSet<IRType*> reportedTypes;
+    HashSet<IRType*> allowedTypes;
 
     void checkInst(IRInst* inst)
     {
@@ -81,13 +96,50 @@ struct SpecConstSizedArrayCheckContext
             // WGSL allows an override-sized array only as the store type of a `var<workgroup>`;
             // its element type needs a size fixed at shader creation:
             // https://www.w3.org/TR/WGSL/#array-types
+            allowedTypes.add(storageType);
             return;
         }
 
+        reportedTypes.add(storageType);
         sink->diagnose(Diagnostics::SpecializationConstantSizedArrayNotSupported{
             .target = target,
             .location = location,
         });
+    }
+
+    /// Report each value of an unsupported array type that no declaration holds, such as the
+    /// result of `ByteAddressBuffer.Load<float[kTile]>(0)`, because the emitter declares a
+    /// temporary of that type for it. Each such type is reported once. Call results are reported
+    /// first, so that the location is the user's call rather than the body of a core-module
+    /// function such as `ByteAddressBuffer.Load`.
+    void checkValues(IRInst* inst, bool callsOnly)
+    {
+        if (auto block = as<IRBlock>(inst))
+        {
+            for (auto child : block->getChildren())
+            {
+                if (as<IRVar>(child) || (callsOnly && !as<IRCall>(child)))
+                    continue;
+                IRType* storageType = child->getDataType();
+                if (auto ptrType = as<IRPtrTypeBase>(storageType))
+                    storageType = ptrType->getValueType();
+                if (!storageType || !hasSpecConstSizedArrayLayer(storageType))
+                    continue;
+                // A call cannot return a WGSL `var<workgroup>` store type, because WGSL allows
+                // that type nowhere else.
+                if (reportedTypes.contains(storageType) ||
+                    (!callsOnly && allowedTypes.contains(storageType)))
+                    continue;
+                reportedTypes.add(storageType);
+                sink->diagnose(Diagnostics::SpecializationConstantSizedArrayNotSupported{
+                    .target = target,
+                    .location = child->sourceLoc,
+                });
+            }
+            return;
+        }
+        for (auto child : inst->getChildren())
+            checkValues(child, callsOnly);
     }
 };
 
@@ -101,6 +153,8 @@ void checkSpecializationConstantSizedArrays(
 
     SpecConstSizedArrayCheckContext context{target, sink};
     context.checkInst(module->getModuleInst());
+    context.checkValues(module->getModuleInst(), true);
+    context.checkValues(module->getModuleInst(), false);
 }
 
 /// Return the ordinary opcode for the operation that `constexprOp` performs, or `kIROp_Invalid` if
