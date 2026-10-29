@@ -2,6 +2,8 @@
 //TEST:SIMPLE(filecheck=NOHEAPSAMPLER): -target hlsl -entry main -stage compute -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry main -stage compute -profile cs_6_6
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry wgslMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLNOSAMPLER): -target wgsl -entry wgslMain -stage compute
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry wgslMain -stage compute
 
 // shader-slang/slang#13737: `Load`, the subscript and `GetDimensions` on a bindless combined
 // texture-sampler handle use only the texture. On HLSL the handle resolves to a texture taken
@@ -36,7 +38,11 @@ void main(uint3 id: SV_DispatchThreadID)
 }
 
 // WGSL keeps the `$q` string for `Load`, so the bindless texture is read directly.
-// WGSL: textureLoad((_slang_resource_heap_{{[0-9]+}}[
+// WGSL: var [[WC:_S[0-9]+]] : vec3<i32> = vec3<i32>(vec2<i32>(id_{{[0-9]+}}.xy), i32(0));
+// WGSL: textureLoad((_slang_resource_heap_{{[0-9]+}}[handles_{{[0-9]+}}[id_{{[0-9]+}}.x].x]), (([[WC]])).xy, (([[WC]])).z)
+// WGSLNOSAMPLER-NOT: sampler
+// METAL: int3 [[MC:_S[0-9]+]] = int3(int2(id_{{[0-9]+}}.xy), int(0));
+// METAL: .texture_{{[0-9]+}}).read(vec<uint,2>((([[MC]])).xy), uint((([[MC]])).z))
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void wgslMain(uint3 id: SV_DispatchThreadID)
