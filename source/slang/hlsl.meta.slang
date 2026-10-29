@@ -5197,11 +5197,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             static_assert(false, "Unsupported 'Load' of 'texture' for 'cuda' target");
             __intrinsic_asm "<invalid intrinsic>";
         case metal:
-            // The Metal and WGSL strings start with `$q`, which skips the sampler argument that a
-            // combined receiver gains; see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`.
-            // These targets keep `$q` instead of forwarding like HLSL: forwarding WGSL `Load`
-            // crashes type legalization for a bindless `Sampler2D.Handle`, and Metal uses the same
-            // mechanism as WGSL and as its `GetDimensions` strings.
+            // A combined receiver forwards to the extracted texture, as on HLSL. Inside a
+            // `ParameterBlock` (a Metal argument buffer) the combined value stays one
+            // `{texture, sampler}` struct instead of being split into call arguments, so the
+            // strings below would receive the struct as `$0`.
+            if (isCombined != 0)
+                return __loadTexture(__extractImage(this), location);
             switch (Shape.flavor)
             {
             case $(SLANG_TEXTURE_1D):
@@ -5289,6 +5290,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 };
             }
         case wgsl:
+            // The WGSL strings start with `$q`, which skips the sampler argument that a combined
+            // receiver gains; see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`. WGSL does
+            // not go through `__extractImage` like HLSL and Metal, because type legalization does
+            // not support that call on a bindless `Sampler2D.Handle` for WGSL.
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
             static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
@@ -5483,6 +5488,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                     return __loadTextureMS(__extractImage(this), location, sampleIndex);
                 __intrinsic_asm ".Load";
             case metal:
+                if (isCombined != 0)
+                    return __loadTextureMS(__extractImage(this), location, sampleIndex);
                 switch (Shape.flavor)
                 {
                 case $(SLANG_TEXTURE_2D):

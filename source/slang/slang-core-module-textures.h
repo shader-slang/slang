@@ -68,9 +68,9 @@ public:
     };
 
     // `combinedForward` holds statements emitted verbatim (already indented) at the start of the
-    // shared cpp/hlsl case, before the member-form intrinsic. A path that handles the call must
-    // `return`; every other path falls through to the member form. The only use is forwarding a
-    // combined receiver; an empty string emits only the member form.
+    // shared cpp/hlsl case and of the metal case, before their intrinsics. A path that handles the
+    // call must `return`; every other path falls through to the intrinsic. The only use is
+    // forwarding a combined receiver; an empty string emits only the intrinsics.
     void writeFuncBody(
         const char* funcName,
         const String& combinedForward,

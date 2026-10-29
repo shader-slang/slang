@@ -99,6 +99,7 @@ void TextureTypeInfo::writeFuncBody(
         if (metal.getLength())
         {
             sb << i << "case metal:\n";
+            sb << combinedForward;
             sb << i << "__intrinsic_asm \"" << metal << "\";\n";
         }
         if (spirvDefault.getLength() && spirvCombined.getLength())
@@ -275,9 +276,9 @@ void TextureTypeInfo::writeGetDimensionFunctions(StringBuilder& outCombinedForwa
 
             // The Metal and WGSL strings are positional and start with `$q`, so a combined
             // receiver's split-out sampler argument is skipped (see `case 'q'` in
-            // `IntrinsicExpandContext::_emitSpecial`). HLSL and CPU forward the combined case
-            // instead; see `combinedForward` below. CUDA keeps a combined `Sampler2D` as a single
-            // `CUtexObject`, so its string needs no marker.
+            // `IntrinsicExpandContext::_emitSpecial`). HLSL, CPU and Metal forward the combined
+            // case instead; see `combinedForward` below. CUDA keeps a combined `Sampler2D` as a
+            // single `CUtexObject`, so its string needs no marker.
             StringBuilder metal;
             metal << "$q";
             const char* metalMipLevel = "0";
@@ -665,8 +666,8 @@ void TextureTypeInfo::writeGetDimensionFunctions(StringBuilder& outCombinedForwa
             if (cuda.getLength() && includeMipInfo)
                 sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
-            // On HLSL and CPU a combined receiver forwards to the extracted texture through a
-            // file-scope function (see `__loadTexture` in hlsl.meta.slang for why it is not a
+            // On HLSL, CPU and Metal a combined receiver forwards to the extracted texture through
+            // a file-scope function (see `__loadTexture` in hlsl.meta.slang for why it is not a
             // member call). Each shape, array and multisample combination gets its own forwarder
             // name, so overload resolution only sees the overloads of one texture type. The
             // forwarder's generic sample count is `texSampleCount` because the multisample

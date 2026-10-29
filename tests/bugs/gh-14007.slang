@@ -9,6 +9,13 @@
 //TEST:SIMPLE(filecheck=HELPER): -target metal -entry helperMain -stage fragment
 //TEST:SIMPLE(filecheck=COMPUTE): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HANDLE): -target metal -entry handleMain -stage fragment
+//TEST:SIMPLE(filecheck=NESTED): -target metal -entry nestedMain -stage compute
+// The Metal compiler, where it is available, must accept the argument-buffer accesses.
+//TEST:SIMPLE(filecheck=LIBLOAD): -target metallib -entry loadMain -stage fragment
+//TEST:SIMPLE(filecheck=LIBDIMS): -target metallib -entry dimsMain -stage fragment
+//TEST:SIMPLE(filecheck=LIBSCALAR): -target metallib -entry scalarLoadOnlyMain -stage fragment
+//TEST:SIMPLE(filecheck=LIBFIELD): -target metallib -entry fieldMain -stage fragment
+//TEST:SIMPLE(filecheck=LIBMS): -target metallib -entry msMain -stage fragment
 
 // shader-slang/slang#14007 and #14006: on Metal, a combined texture-sampler inside a
 // `ParameterBlock` is an argument-buffer field of the lowered `{texture_0, sampler_0}` struct.
@@ -20,6 +27,7 @@
 ParameterBlock<Sampler2D[16]> gArray;
 ParameterBlock<Sampler2D> gScalar;
 
+// LIBLOAD: @loadMain
 // LOAD: texture_0).sample(
 // LOAD-SAME: texture_0).read(
 [shader("fragment")]
@@ -28,6 +36,7 @@ float4 loadMain(float2 uv : TEXCOORD0, nointerpolation uint i : TEXCOORD1) : SV_
     return gArray[i].SampleLevel(uv, 0) + gArray[i + 1].Load(int3(1, 1, 0));
 }
 
+// LIBDIMS: @dimsMain
 // The dimension queries take the extracted texture, not the address of the block element.
 // DIMS: texture2d<float, access::sample> [[T0:_S[0-9]+]] = gArray_0->data_0[{{[_A-Za-z0-9.]+}}].texture_0;
 // DIMS: = ([[T0]]).get_width(0)),{{.*}} = ([[T0]]).get_height(0));
@@ -81,6 +90,7 @@ float4 loadOnlyMain(nointerpolation uint i : TEXCOORD1) : SV_Target
 
 ParameterBlock<Sampler2D> gScalarLoadOnly;
 
+// LIBSCALAR: @scalarLoadOnlyMain
 // SCALARLOADONLY: struct [[ELEM:Sampler2D[A-Za-z0-9_]*]]
 // SCALARLOADONLY-NEXT: {
 // SCALARLOADONLY-NEXT: texture2d<float, access::sample> texture_0;
@@ -101,6 +111,7 @@ struct Material
 };
 ParameterBlock<Material> gMaterial;
 
+// LIBFIELD: @fieldMain
 // FIELD: texture2d<float, access::sample> [[T:_S[0-9]+]] = gMaterial_{{[0-9]+}}->tex_0.texture_0;
 // FIELD: = ([[T]]).get_width(0)),
 // FIELD: texture_0).sample(
@@ -116,6 +127,7 @@ float4 fieldMain(float2 uv : TEXCOORD0) : SV_Target
 
 ParameterBlock<Sampler2DMS> gMS;
 
+// LIBMS: @msMain
 // MS: struct [[ELEM:Sampler2DMS[A-Za-z0-9_]*]]
 // MS-NEXT: {
 // MS-NEXT: texture2d_ms<float, access::read> texture_0;
@@ -164,4 +176,31 @@ StructuredBuffer<Sampler2D.Handle> gHandles;
 float4 handleMain(float2 uv : TEXCOORD0, nointerpolation uint i : TEXCOORD1) : SV_Target
 {
     return gHandles[i].Sample(uv) + gHandles[i].Load(int3(1, 1, 0));
+}
+
+// Outside an argument buffer the lowered struct is split as before, and each texture keeps the
+// binding that reflection reports, even when no sampling operation uses the texture-sampler.
+cbuffer NestedCB
+{
+    Sampler2D<float4> nestedA;
+    Sampler2D<float4> nestedB;
+    float4 nestedC;
+}
+ConstantBuffer<Material> gNestedMaterial;
+uniform Material gUniformMaterial;
+RWStructuredBuffer<float4> nestedOut;
+
+// NESTED-DAG: NestedCB_nestedB_texture_{{[0-9]+}} {{\[\[}}texture(1){{\]\]}}
+// NESTED-DAG: gNestedMaterial_tex_texture_{{[0-9]+}} {{\[\[}}texture(2){{\]\]}}
+// NESTED-DAG: globalParams_gUniformMaterial_tex_texture_{{[0-9]+}} {{\[\[}}texture(3){{\]\]}}
+// NESTED-DAG: entryPointParams_epTex_texture_{{[0-9]+}} {{\[\[}}texture(4){{\]\]}}
+// NESTED-DAG: (entryPointParams_epTex_texture_{{[0-9]+}}).get_width(0)
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void nestedMain(uint3 id: SV_DispatchThreadID, uniform Sampler2D<float4> epTex)
+{
+    uint w, h;
+    epTex.GetDimensions(w, h);
+    nestedOut[0] = nestedB.Load(int3(id.xy, 0)) + gNestedMaterial.tex[id.xy]
+        + gUniformMaterial.tex.Load(int3(0)) + float4(w, h, 0, 0) + nestedC;
 }
