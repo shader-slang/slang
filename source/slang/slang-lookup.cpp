@@ -80,6 +80,15 @@ bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
         // FileDecls should never be discovered via name lookups.
         return false;
     }
+    else if (const auto moduleDeclarationDecl = as<ModuleDeclarationDecl>(decl);
+             moduleDeclarationDecl)
+    {
+        // A `module M;` declaration only carries the module's name and modifiers onto the
+        // `ModuleDecl`; it is neither the module nor a value or a type. Lookup never returns it,
+        // so that `M` does not hide a core-module function named `M`, and `M.member` is
+        // reported as an undefined name rather than as an inaccessible declaration.
+        return false;
+    }
     // semantic declaration
     else if (const auto semanticDecl = as<SemanticDecl>(decl); semanticDecl)
     {
