@@ -8,6 +8,8 @@ RWStructuredBuffer<float> floatBuffer;
 RWStructuredBuffer<half> halfBuffer;
 RWStructuredBuffer<double> doubleBuffer;
 RWStructuredBuffer<Atomic<float>> atomicFloatBuffer;
+RWStructuredBuffer<Atomic<half>> atomicHalfBuffer;
+RWStructuredBuffer<Atomic<double>> atomicDoubleBuffer;
 RWStructuredBuffer<int> intBuffer;
 
 [numthreads(1, 1, 1)]
@@ -31,6 +33,20 @@ void computeMain(uint tid: SV_DispatchThreadID)
     atomicFloatBuffer[1].max(float(tid));
 //CHECK:                    ^ unsupported intrinsic operation
 //CHECK:                    ^ intrinsic operation 'floating point atomic operation' is not supported for the current target.
+
+    float orig;
+    InterlockedMax(floatBuffer[2], float(tid), orig);
+//CHECK:          ^ error E55204
+//CHECK:          ^ intrinsic operation 'floating point atomic operation' is not supported for the current target.
+    atomicHalfBuffer[0].min(half(tid));
+//CHECK:                   ^ error E55204
+//CHECK:                   ^ intrinsic operation 'floating point atomic operation' is not supported for the current target.
+    atomicDoubleBuffer[0].max(double(tid));
+//CHECK:                     ^ error E55204
+//CHECK:                     ^ intrinsic operation 'floating point atomic operation' is not supported for the current target.
+    atomicFloatBuffer[2].reduceMin(float(tid));
+//CHECK:                          ^ error E55204
+//CHECK:                          ^ intrinsic operation 'floating point atomic operation' is not supported for the current target.
 
     // Integer min/max are valid HLSL and must not be diagnosed.
     InterlockedMin(intBuffer[0], int(tid));
