@@ -3059,8 +3059,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // bodyless IR ops, so the emitter picks the extension itself.
             // GL_EXT_shader_atomic_float2 defines float min/max and every scalar half atomic;
             // GL_EXT_shader_atomic_float defines 32/64-bit float add and exchange (sub, inc and dec
-            // are emitted as atomicAdd). Float compare-exchange is in neither extension and keeps
-            // the first one, as before.
+            // are emitted as atomicAdd). Float compare-exchange is supported by neither extension.
             const bool isMinMax =
                 inst->getOp() == kIROp_AtomicMin || inst->getOp() == kIROp_AtomicMax;
             if (isMinMax || inst->getDataType()->getOp() == kIROp_HalfType)
