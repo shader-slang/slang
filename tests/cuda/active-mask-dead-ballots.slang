@@ -4,9 +4,18 @@
 // The inner loop has no wave op, but it can reach the `WaveActiveSum` of the
 // next outer iteration through the outer back edge. That mask comes from the
 // exit ballots of the outer iteration, so the inner loop and the
-// `WaveIsFirstLane()` branch need no ballot. The kernel keeps five: the initial
-// mask, the `true` and `false` exit ballots of the outer loop condition, and
-// the `true` and `false` exit ballots of the outer iteration.
+// `WaveIsFirstLane()` branch need no ballot. The kernel keeps five, in this
+// order in the CUDA output:
+//
+// * before the first barrier: the initial mask; the `true` exit ballot of the
+//   `if` that the `pass < 4` condition is lowered to (its merge block is the
+//   loop body); and on the `break` path, the `false` exit ballots of that `if`
+//   and of the outer iteration;
+// * after the second barrier: the `true` exit ballot of the outer iteration on
+//   its `continue` edge.
+//
+// The SIMPLE run uses `-O3` as in the issue's report; the result is the same
+// at the default level.
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none -O3 -validate-ir
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type

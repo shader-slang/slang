@@ -2,7 +2,7 @@
 // header as a block argument, which rebuilds the `loop` instruction. The
 // rebuilt instruction must keep the `[unroll]` attribute.
 
-//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none -O0 -validate-ir
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none -validate-ir
 
 RWStructuredBuffer<uint> outputBuffer;
 

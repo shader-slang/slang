@@ -459,10 +459,13 @@ struct SynthesizeActiveMaskForFunctionContext
         SLANG_ASSERT(funcEntryBlock);
 
         // We don't want to inject logic for computing and maintaining the
-        // active mask into parts of a function that don't actually use it,
+        // active mask into parts of a function that don't take part in it,
         // so one of the first things we do (once we've finished messing with
-        // the CFG of the function) is to mark which blocks (transitively) need
-        // the active mask, and which don't.
+        // the CFG of the function) is to mark the blocks that the region walk
+        // must process: those that (transitively) need the active mask, and
+        // those whose lanes must take part in the exit ballots of an enclosing
+        // region. The marking can include more blocks than needed; the last
+        // step below removes the synchronization that no code observes.
         //
         markBlocksNeedingActiveMask();
         //
@@ -496,11 +499,12 @@ struct SynthesizeActiveMaskForFunctionContext
         //
         transformRegions(funcEntryBlock);
 
-        // The region walk emits a collective on every branch and merge of the
-        // regions it processes, whether or not a later use needs the resulting
-        // mask, so the last step removes the ones that nothing observes.
+        // The region walk emits a collective on every conditional branch and on
+        // every edge that leaves a region, whether or not a later use needs the
+        // resulting mask. The last step removes every mask value that the walk
+        // created and no code observes, keeping collective groups whole.
         //
-        removeDeadCollectives();
+        removeDeadSynthesizedMasks();
     }
 
     void breakCriticalAndPseudoCriticalEdges()
@@ -616,8 +620,11 @@ struct SynthesizeActiveMaskForFunctionContext
         return false;
     }
 
-    // We want to identify which blocks need the active mask,
-    // and will use a set to keep track of them.
+    // We want to identify which blocks the region walk must process, and
+    // will use a set to keep track of them. A block is in the set if it needs
+    // the active mask (it uses the mask, or passes it along to a block that
+    // does), or if it is inside a structured region whose entry is in the set,
+    // so that its lanes take part in that region's exit ballots.
     //
     HashSet<IRBlock*> m_blocksNeedingActiveMask;
 
@@ -718,12 +725,12 @@ struct SynthesizeActiveMaskForFunctionContext
         // The `else` block cannot reach a use of the active mask, but its lanes
         // still leave the `if` region, whose `then` block reconverges into the
         // rest of the loop body with `waveMaskBallot(activeMaskOnEntry, true)`.
-        // The exit ballots of a region are one collective spread over all of the
-        // edges that leave it: every lane that entered the region executes exactly
-        // one of them, and a lane waits in its ballot until every other lane of
-        // `activeMaskOnEntry` has executed one. If we skipped the `else` block,
-        // lanes 0-3 would wait in their ballot for lanes that are waiting at the
-        // barrier, and the kernel would never finish.
+        // The exit ballots of a region form one collective group (see
+        // `m_collectiveGroups`): every lane that entered the region executes exactly
+        // one of them, on whichever edge it leaves by, and a lane waits in its ballot
+        // until every other lane of `activeMaskOnEntry` has executed one. If we skipped the `else`
+        // block, lanes 0-3 would wait in their ballot for lanes that are waiting at the barrier,
+        // and the kernel would never finish.
         //
         // We therefore also mark every block inside a structured region whose entry
         // is marked, so that the region walk emits an exit ballot on every edge that
@@ -803,6 +810,45 @@ struct SynthesizeActiveMaskForFunctionContext
     // so far in a dictionary.
     //
     Dictionary<IRBlock*, IRInst*> m_activeMaskForBlock;
+
+    // Every `waveMaskBallot` or `waveMaskMatch` that this pass emits is a
+    // *collective*: an instruction that synchronizes with other lanes. Each
+    // collective belongs to exactly one *collective group*, the set of
+    // collectives that together form one synchronizing operation: every lane in
+    // the operation's mask executes exactly one member of the group, and a lane
+    // waits in its member until all of the other lanes have executed one.
+    //
+    // The ballot that computes the initial mask of a kernel, the ballot for the
+    // condition of an `ifElse`, and the match for a `switch` each form a group of
+    // their own. The exit ballots of a region (`true` on its normal exits, `false`
+    // on its abnormal exits) form one group per region.
+    //
+    // `removeDeadSynthesizedMasks()` removes a collective only together with the
+    // rest of its group, so every collective goes through `addCollectiveToGroup()`.
+    //
+    List<List<IRInst*>> m_collectiveGroups;
+    Dictionary<IRInst*, Index> m_groupForCollective;
+
+    // The mask values that this pass creates and may remove again if no code
+    // observes them: the collectives, the `bitNot`/`bitAnd` that compute the mask
+    // for the `false` side of an `ifElse`, and the mask parameters of blocks with
+    // multiple predecessors. A value outside this set is never removed, and its
+    // uses keep the values it depends on alive.
+    //
+    OrderedHashSet<IRInst*> m_synthesizedMaskInsts;
+
+    Index createCollectiveGroup()
+    {
+        m_collectiveGroups.add(List<IRInst*>());
+        return m_collectiveGroups.getCount() - 1;
+    }
+
+    void addCollectiveToGroup(IRInst* collective, Index group)
+    {
+        m_collectiveGroups[group].add(collective);
+        m_groupForCollective.add(collective, group);
+        m_synthesizedMaskInsts.add(collective);
+    }
 
     void createInitialActiveMask(IRBlock* funcEntryBlock)
     {
@@ -1026,11 +1072,21 @@ struct SynthesizeActiveMaskForFunctionContext
         IRInst* activeMaskOnEntry = nullptr;
 
         // The ballots that lanes execute when they leave this region form one
-        // collective group (see `removeDeadCollectives()`). We create the group
-        // when we emit the first of them.
+        // collective group (see `m_collectiveGroups`), or -1 until we emit the
+        // first of them.
         //
         Index exitBallotGroup = -1;
     };
+
+    // Return the collective group for the exit ballots of `region`, creating it
+    // when we emit the first of them.
+    //
+    Index getOrCreateExitBallotGroup(RegionInfo* region)
+    {
+        if (region->exitBallotGroup < 0)
+            region->exitBallotGroup = createCollectiveGroup();
+        return region->exitBallotGroup;
+    }
 
     // Given the definition of a region, one of the most important
     // queries to be able to answer is: given a block B and a region R,
@@ -1911,7 +1967,7 @@ struct SynthesizeActiveMaskForFunctionContext
                         m_maskType,
                         r->activeMaskOnEntry,
                         builder.getBoolValue(true));
-                    addCollectiveToGroup(toActiveMask, getExitBallotGroup(r));
+                    addCollectiveToGroup(toActiveMask, getOrCreateExitBallotGroup(r));
                 }
 
                 // If we are exiting a region normally, then we can't
@@ -1949,7 +2005,7 @@ struct SynthesizeActiveMaskForFunctionContext
                     m_maskType,
                     r->activeMaskOnEntry,
                     builder.getBoolValue(false));
-                addCollectiveToGroup(exitBallot, getExitBallotGroup(r));
+                addCollectiveToGroup(exitBallot, getOrCreateExitBallotGroup(r));
             }
         }
 
@@ -2197,48 +2253,9 @@ struct SynthesizeActiveMaskForFunctionContext
         transformRegion(&region);
     }
 
-    // Each collective that this pass emits (a `waveMaskBallot` or `waveMaskMatch`)
-    // belongs to exactly one group. A group is the set of call sites that together
-    // form a single collective operation: every lane in the operation's mask executes
-    // exactly one member of the group, and a lane waits in its member until all of
-    // the other lanes have executed one.
-    //
-    // The ballot that computes the initial mask of a kernel, the ballot for the
-    // condition of an `ifElse`, and the match for a `switch` each form a group of
-    // their own. The exit ballots of a region (`true` on its normal exits, `false`
-    // on its abnormal exits) form one group per region.
-    //
-    List<List<IRInst*>> m_collectiveGroups;
-    Dictionary<IRInst*, Index> m_groupForCollective;
-
-    // The mask values that this pass creates and may remove again: the collectives,
-    // the `bitNot`/`bitAnd` that compute the mask for the `false` side of an
-    // `ifElse`, and the mask parameters of blocks with multiple predecessors.
-    //
-    OrderedHashSet<IRInst*> m_synthesizedMaskInsts;
-
-    Index createCollectiveGroup()
-    {
-        m_collectiveGroups.add(List<IRInst*>());
-        return m_collectiveGroups.getCount() - 1;
-    }
-
-    Index getExitBallotGroup(RegionInfo* region)
-    {
-        if (region->exitBallotGroup < 0)
-            region->exitBallotGroup = createCollectiveGroup();
-        return region->exitBallotGroup;
-    }
-
-    void addCollectiveToGroup(IRInst* collective, Index group)
-    {
-        m_collectiveGroups[group].add(collective);
-        m_groupForCollective.add(collective, group);
-        m_synthesizedMaskInsts.add(collective);
-    }
-
-    // Remove every collective group whose results no code observes, together with
-    // the mask values that only feed such groups.
+    // Remove every mask value in `m_synthesizedMaskInsts` that no code observes,
+    // keeping collective groups whole: a collective is live if any member of its
+    // group is live.
     //
     // The region walk emits collectives without knowing whether a later use needs
     // the mask they compute. Consider this example:
@@ -2264,13 +2281,12 @@ struct SynthesizeActiveMaskForFunctionContext
     // removed some members and kept others, the lanes that execute a kept member
     // would wait forever for the lanes that skipped it. The analysis therefore keeps
     // a whole group as soon as one member is live. A mask value is live when code
-    // other than these mask computations uses it (a wave operation, a call that
-    // takes the mask, or user code that stores `WaveGetActiveMask()`), or when a
-    // live mask value depends on it. Removing a dead group does not change any live
+    // other than these mask computations uses it, or when a live mask value
+    // depends on it. Removing a dead group does not change any live
     // mask, because no live mask depends on its results, and it does not change
     // which lanes reach the remaining groups, because control flow is unchanged.
     //
-    void removeDeadCollectives()
+    void removeDeadSynthesizedMasks()
     {
         // The block parameters for masks receive their values as arguments on the
         // branches that target them. Those arguments only matter if the parameter
@@ -2300,6 +2316,10 @@ struct SynthesizeActiveMaskForFunctionContext
                 workList.add(inst);
         };
 
+        // The roots of the analysis are the values with a use outside of the mask
+        // computations: a wave operation, a call that takes the mask, or user code
+        // that stores or returns `WaveGetActiveMask()`.
+        //
         for (auto inst : m_synthesizedMaskInsts)
         {
             for (auto use = inst->firstUse; use; use = use->nextUse)
@@ -2312,6 +2332,9 @@ struct SynthesizeActiveMaskForFunctionContext
             }
         }
 
+        // A live value keeps alive the other members of its collective group, its
+        // operands, and, for a mask parameter, the arguments that branches pass to it.
+        //
         for (Index i = 0; i < workList.getCount(); ++i)
         {
             auto inst = workList[i];
