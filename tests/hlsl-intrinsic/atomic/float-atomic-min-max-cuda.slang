@@ -4,8 +4,10 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type
 
-// 16-bit atomicCAS needs sm_70, above the sm_60 that half alone requires; NVRTC rejects the
-// shader if the SM version is not raised.
+// 16-bit atomicCAS needs sm_70, above the sm_60 that half alone requires, so the emitter raises
+// the SM version for half min/max. NVRTC before 12.8 defaults to an older architecture and rejects
+// this row without that raise. NVRTC 12.8 and later default to compute_75, where the row passes
+// either way, so it guards the raise only on older NVRTC.
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry halfMinMain -stage compute
 // PTX: atom{{.*}}.cas.b16
 
@@ -24,7 +26,7 @@ RWStructuredBuffer<Atomic<double>> atomicDoubleBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=2):name=halfBuffer
 RWStructuredBuffer<half> halfBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0], stride=4):name=atomicHalfBuffer
+//TEST_INPUT:ubuffer(data=[0 0], stride=2):name=atomicHalfBuffer
 RWStructuredBuffer<Atomic<half>> atomicHalfBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
@@ -147,26 +149,33 @@ void computeMain(uint tid: SV_DispatchThreadID)
     }
 }
 
+// float: InterlockedMin/Max, Atomic<float>.min/max, .reduceMin/.reduceMax
 // BUF: {{^}}-8.0
 // BUF-NEXT: {{^}}7.5
 // BUF-NEXT: {{^}}-8.0
 // BUF-NEXT: {{^}}7.5
 // BUF-NEXT: {{^}}-8.0
 // BUF-NEXT: {{^}}7.5
+// double: InterlockedMin/Max, Atomic<double>.reduceMin/.reduceMax
 // BUF-NEXT: {{^}}-8.0
 // BUF-NEXT: {{^}}7.5
 // BUF-NEXT: {{^}}-8.0
 // BUF-NEXT: {{^}}7.5
+// half: InterlockedMin/Max, Atomic<half>.reduceMin, Atomic<half>.max
 // BUF-NEXT: {{^}}-8.0
 // BUF-NEXT: {{^}}7.5
 // BUF-NEXT: {{^}}-8.0
 // BUF-NEXT: {{^}}7.5
+// groupshared float InterlockedMin
 // BUF-NEXT: {{^}}-8.0
+// double precision; float, double and half return-value and NaN checks
 // BUF-NEXT: {{^}}1.0
 // BUF-NEXT: {{^}}1.0
 // BUF-NEXT: {{^}}1.0
 // BUF-NEXT: {{^}}1.0
 
+// A separate entry point keeps reduceMin's own sm_70 requirement out of the PTX row, so only the
+// emitter's raise for half min/max is in play.
 [numthreads(1, 1, 1)]
 void halfMinMain(uint tid: SV_DispatchThreadID)
 {
