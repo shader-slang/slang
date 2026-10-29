@@ -392,7 +392,7 @@ class BudgetTests(unittest.TestCase):
                 self.assertEqual(perf_bisect.budget_minutes(self.at(start), (5, 0)), minutes)
 
     def test_the_cron_is_read_from_the_nightly_workflow(self):
-        nightly = (Path(__file__).resolve().parents[2] / ".github" / "workflows"
+        nightly = (Path(__file__).resolve().parents[3] / ".github" / "workflows"
                    / "nightly-mdl-perf-test.yml")
         if not nightly.exists():
             self.skipTest("nightly workflow is not in this checkout")
