@@ -12,6 +12,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0], stride=4)
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none -validate-ir
 
 RWStructuredBuffer<uint> outputBuffer;
 groupshared uint shared[8];
@@ -47,3 +48,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-NEXT: 28
 // CHECK-NEXT: 28
 // CHECK-NEXT: 28
+
+// The lanes that leave the region on the path with no wave op take part in
+// its exit ballots (`false`), and those ballots survive pruning.
+// CUDA-COUNT-4: __ballot_sync({{[^,]*}}, false)
+// CUDA-NOT: __ballot_sync({{[^,]*}}, false)
