@@ -3,6 +3,7 @@
 //TEST:SIMPLE(filecheck=MIX): -target metal -entry cmain -stage compute
 //TEST:SIMPLE(filecheck=MIXCOUNT): -target metal -entry cmain -stage compute
 //TEST:SIMPLE(filecheck=CLONE): -target metal -entry cmain -stage compute
+//TEST:SIMPLE(filecheck=ORDER): -target metal -entry cmain -stage compute
 
 // Exported functions are given `thread` parameters on Metal even when nothing calls them. An
 // export that *is* called is still specialized from its call sites, and the original is removed
@@ -53,6 +54,16 @@ export void addTo(inout int a, inout int b)
     a += b;
 }
 
+// `chainG` calls `chainF` with its own `thread` parameter, so it reuses the seeded `chainF`.
+// Both are also called with `threadgroup` arguments, which leaves the seeded originals with no
+// uses once `chainG` is removed. Neither original is emitted, whichever call comes first.
+// ORDER-NOT: void chainF{{[12]}}_{{[0-9]+}}(int thread*
+// ORDER-NOT: void chainG{{[12]}}_{{[0-9]+}}(int thread*
+export void chainF1(inout int x) { x += 1; }
+export void chainG1(inout int y) { chainF1(y); }
+export void chainF2(inout int x) { x += 2; }
+export void chainG2(inout int y) { chainF2(y); }
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void cmain()
@@ -67,5 +78,10 @@ void cmain()
     bumpBoth(gs2);
 
     addTo(buf[0], gs);
+
+    chainF1(gs);
+    chainG1(gs);
+    chainG2(gs2);
+    chainF2(gs2);
     buf[1] = local + gs + gs2;
 }

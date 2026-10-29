@@ -773,11 +773,30 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         applyAddressSpaceToInstType();
 
+        // Removing one candidate can leave another without uses: a seeded export calls the
+        // unspecialized exports it reuses, so those lose their last use only when the caller goes.
+        // We sweep to a fixpoint so the result does not depend on the order of the candidates.
+        List<IRFunc*> candidates;
         for (IRFunc* func : functionsToConsiderRemoving)
         {
             SLANG_ASSERT(!func->findDecoration<IREntryPointDecoration>());
-            if (!func->hasUses())
+            candidates.add(func);
+        }
+        for (bool removedAny = true; removedAny;)
+        {
+            removedAny = false;
+            for (Index i = 0; i < candidates.getCount();)
+            {
+                auto func = candidates[i];
+                if (func->hasUses())
+                {
+                    i++;
+                    continue;
+                }
                 func->removeAndDeallocate();
+                candidates.fastRemoveAt(i);
+                removedAny = true;
+            }
         }
     }
 };
