@@ -332,7 +332,7 @@ Metal's `threadgroup_barrier` orders memory only among the threads of one thread
 
 A device-scope fence needs MSL 3.2, so these functions require the `metallib_3_2` capability. A target that is limited to an older version gets the usual capability-upgrade warning (E41012), or error E41013 with `-restrictive-capability-check`. When the metal compiler is invoked for `-target metallib`, it is given `-std=metal3.2`. MSL emitted with `-target metal` must be compiled with MSL 3.2 or newer.
 
-`globallycoherent` is not emitted for Metal. MSL 3.2 spells it `coherent(device)`, but that qualifier is part of the pointer type, so every pointer derived from the buffer would need it too.
+`globallycoherent` is not emitted for Metal. MSL 3.2 spells it `coherent(device)`, but that qualifier is part of the pointer type, so every pointer derived from the buffer would need it too. Without that qualifier, MSL makes device memory coherent only within a threadgroup. The device-scope fence orders memory operations, but it does not change the coherence scope of a buffer, so MSL does not guarantee that plain (non-atomic) writes to a `globallycoherent` buffer become visible to other threadgroups. Emitting `coherent(device)` is left as follow-up work.
 
 ## Explicit Parameter Binding
 

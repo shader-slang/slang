@@ -8455,6 +8455,8 @@ void AllMemoryBarrier()
     case cuda: __intrinsic_asm "__threadfence()";
     // `threadgroup_barrier` orders memory only within a threadgroup, and is an execution barrier.
     // Device scope needs a fence, which MSL has from 3.2.
+    // The fence does not widen a buffer's coherence scope beyond the threadgroup; that needs
+    // `coherent(device)`, which is not emitted (see the Metal page of the user guide).
     case metal: __intrinsic_asm "atomic_thread_fence(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture, memory_order_seq_cst, thread_scope_device)";
     case spirv: spirv_asm
         {
@@ -10619,6 +10621,8 @@ void DeviceMemoryBarrier()
     case cuda: __intrinsic_asm "__threadfence()";
     // `threadgroup_barrier` orders memory only within a threadgroup, and is an execution barrier.
     // Device scope needs a fence, which MSL has from 3.2.
+    // The fence does not widen a buffer's coherence scope beyond the threadgroup; that needs
+    // `coherent(device)`, which is not emitted (see the Metal page of the user guide).
     case metal: __intrinsic_asm "atomic_thread_fence(mem_flags::mem_device | mem_flags::mem_texture, memory_order_seq_cst, thread_scope_device)";
     case spirv: spirv_asm
         {
