@@ -124,8 +124,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return func;
     }
 
-    // Retypes the pointer parameter `param`, whose type is `ptrType`, to point into `addrSpace`,
-    // and records that address space for it. The caller fixes up the function type afterwards.
+    // The caller fixes up the function type after retyping its parameters.
     void setPointerParamAddrSpace(
         IRBuilder& builder,
         IRParam* param,
@@ -436,11 +435,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
     }
 
-    // Gives every `Generic` pointer parameter of the exported function `func` the address space
-    // `defaultAddrSpace`, and registers `func` as its own specialization for the address spaces
-    // of its parameters. An exported function may have no call site to infer those address
-    // spaces from. Because of the registration, a call whose arguments have the same address
-    // spaces reuses `func` instead of cloning an identical copy of it.
+    // An exported function may have no call site to infer parameter address spaces from.
+    // Registering it as its own specialization lets matching calls reuse it instead of cloning it.
     void seedExportedFunc(IRFunc* func, AddressSpace defaultAddrSpace)
     {
         IRBuilder builder(module);
