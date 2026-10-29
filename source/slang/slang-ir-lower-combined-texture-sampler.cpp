@@ -144,33 +144,35 @@ IRTextureTypeBase* isCombinedTextureSamplerType(IRInst* typeInst)
     return textureType;
 }
 
-// Return true if a value of `type` holds a combined texture-sampler whose type this pass
-// replaces, directly or inside arrays, struct fields or uniform parameter groups. These are the
-// containers that can hold a bound combined texture-sampler of a global parameter;
-// structured-buffer elements are never split into separate resources and are not followed.
-static bool containsLoweredCombinedTextureSampler(
+// Return true if a value of `type` holds a combined texture-sampler whose type this pass will
+// replace (one in `mapTypeToLoweredInfo`), directly or inside arrays, struct fields or uniform
+// parameter groups. These are the containers whose layouts `legalizeResourceTypes` reads to bind
+// the resources of a global parameter; a structured-buffer element is never split into separate
+// resources, so its layout is not followed. `getTypeLayoutWithLoweredCombinedTextureSamplers`
+// handles exactly these four cases.
+static bool containsCombinedTextureSamplerToLower(
     LowerCombinedSamplerContext& context,
     IRType* type)
 {
     if (auto textureType = isCombinedTextureSamplerType(type))
         return context.mapTypeToLoweredInfo.containsKey(textureType);
     if (auto arrayType = as<IRArrayTypeBase>(type))
-        return containsLoweredCombinedTextureSampler(context, arrayType->getElementType());
+        return containsCombinedTextureSamplerToLower(context, arrayType->getElementType());
     if (auto structType = as<IRStructType>(type))
     {
         for (auto field : structType->getFields())
         {
-            if (containsLoweredCombinedTextureSampler(context, field->getFieldType()))
+            if (containsCombinedTextureSamplerToLower(context, field->getFieldType()))
                 return true;
         }
         return false;
     }
     if (auto groupType = as<IRUniformParameterGroupType>(type))
-        return containsLoweredCombinedTextureSampler(context, groupType->getElementType());
+        return containsCombinedTextureSamplerToLower(context, groupType->getElementType());
     return false;
 }
 
-static IRVarLayout* getVarLayoutWithLoweredCombinedSamplers(
+static IRVarLayout* getVarLayoutWithLoweredCombinedTextureSamplers(
     LowerCombinedSamplerContext& context,
     IRBuilder* builder,
     IRType* type,
@@ -190,31 +192,32 @@ static IRVarLayout* getVarLayoutWithLoweredCombinedSamplers(
 // the type of `b` becomes the lowered struct, `legalizeResourceTypes` looks up the layouts of
 // its `texture` and `sampler` fields to bind the two resources it splits out, so `b` needs a
 // struct layout with those fields.
-static IRTypeLayout* getTypeLayoutWithLoweredCombinedSamplers(
+static IRTypeLayout* getTypeLayoutWithLoweredCombinedTextureSamplers(
     LowerCombinedSamplerContext& context,
     IRBuilder* builder,
     IRType* type,
     IRTypeLayout* layout)
 {
-    if (!containsLoweredCombinedTextureSampler(context, type))
+    if (!containsCombinedTextureSamplerToLower(context, type))
         return layout;
 
-    // A combined texture-sampler gets the same layout as a lowered top-level one. Its field
-    // offsets are relative, so the offsets of the enclosing var layouts place the two resources.
-    // That layout uses the resource kinds of the targets that split the struct; on CPU-like
-    // targets and inside a Metal argument buffer the struct is not split, and nothing reads the
-    // field layouts.
+    // A combined texture-sampler gets the same layout as a lowered top-level one: field layouts
+    // for the texture and the sampler with relative offsets, and no sizes of its own. When
+    // `legalizeResourceTypes` splits the struct, `buildSimpleVarLayout` binds each split-out
+    // resource from that field's own type layout plus the offsets of the enclosing var layouts,
+    // so nothing reads the struct's sizes. On CPU-like targets and inside a Metal argument buffer
+    // the struct is not split, and nothing reads these layouts at all.
     if (auto textureType = isCombinedTextureSamplerType(type))
         return context.mapTypeToLoweredInfo.getValue(textureType).typeLayout;
 
-    // Front-end layouts follow the shape of the type, so a container of a lowered combined
-    // texture-sampler always has the matching layout kind; anything else would lose the
-    // bindings of the resources the struct is split into.
+    // The cases below are the containers that `containsCombinedTextureSamplerToLower` follows.
+    // Front-end layouts follow the shape of the type, so such a container always has the matching
+    // layout kind; anything else would lose the bindings of the resources the struct is split into.
     if (auto arrayType = as<IRArrayTypeBase>(type))
     {
         auto arrayLayout = as<IRArrayTypeLayout>(layout);
         SLANG_RELEASE_ASSERT(arrayLayout);
-        auto newElementLayout = getTypeLayoutWithLoweredCombinedSamplers(
+        auto newElementLayout = getTypeLayoutWithLoweredCombinedTextureSamplers(
             context,
             builder,
             arrayType->getElementType(),
@@ -234,12 +237,13 @@ static IRTypeLayout* getTypeLayoutWithLoweredCombinedSamplers(
         {
             auto fieldKey = cast<IRStructKey>(fieldAttr->getFieldKey());
             auto fieldLayout = fieldAttr->getLayout();
-            // The layout of the struct of global-scope parameters still lists the parameters
-            // that `collectGlobalUniformParameters` left at global scope because they have no
-            // uniform data, under keys that the struct has no field for. Those parameters are
-            // rewritten as global parameters of their own.
+            // Only the struct of global-scope parameters has layout entries without a field:
+            // `collectGlobalUniformParameters` leaves a parameter with no uniform data at global
+            // scope but keeps its entry, under a key the struct has no field for. The driver loop
+            // in `lowerCombinedTextureSamplers` visits such a parameter as a global parameter of
+            // its own.
             if (auto field = findStructField(structType, fieldKey))
-                fieldLayout = getVarLayoutWithLoweredCombinedSamplers(
+                fieldLayout = getVarLayoutWithLoweredCombinedTextureSamplers(
                     context,
                     builder,
                     field->getFieldType(),
@@ -249,11 +253,12 @@ static IRTypeLayout* getTypeLayoutWithLoweredCombinedSamplers(
         return structLayoutBuilder.build();
     }
 
+    // The last container that `containsCombinedTextureSamplerToLower` follows.
     auto groupType = as<IRUniformParameterGroupType>(type);
     SLANG_RELEASE_ASSERT(groupType);
     auto groupLayout = as<IRParameterGroupTypeLayout>(layout);
     SLANG_RELEASE_ASSERT(groupLayout);
-    auto newElementVarLayout = getVarLayoutWithLoweredCombinedSamplers(
+    auto newElementVarLayout = getVarLayoutWithLoweredCombinedTextureSamplers(
         context,
         builder,
         groupType->getElementType(),
@@ -263,8 +268,11 @@ static IRTypeLayout* getTypeLayoutWithLoweredCombinedSamplers(
     groupLayoutBuilder.setContainerVarLayout(groupLayout->getContainerVarLayout());
     groupLayoutBuilder.setElementVarLayout(newElementVarLayout);
     // `getFieldLayout` reads a field of a parameter group's element through the offset element
-    // layout, whose field offsets include the element's own offsets. It is derived from the new
-    // element layout the same way the front end derives it.
+    // layout, so it is derived from the new element layout the same way the front end derives it:
+    // the field offsets of a struct element include the element's own offsets. An element that is
+    // itself a combined texture-sampler (`ParameterBlock<Sampler2D>`) has a layout with no sizes,
+    // so `applyOffsetToTypeLayout` returns it unchanged; that is correct because such an element
+    // starts at offset 0 of its group, which holds no uniform data that could come first.
     groupLayoutBuilder.setOffsetElementTypeLayout(applyOffsetToTypeLayout(
         builder,
         newElementVarLayout->getTypeLayout(),
@@ -273,9 +281,9 @@ static IRTypeLayout* getTypeLayoutWithLoweredCombinedSamplers(
 }
 
 // Return `varLayout`, the layout of a variable of `type`, with its type layout rewritten by
-// `getTypeLayoutWithLoweredCombinedSamplers`. The offsets and every other property of `varLayout`
-// are kept.
-static IRVarLayout* getVarLayoutWithLoweredCombinedSamplers(
+// `getTypeLayoutWithLoweredCombinedTextureSamplers`. The offsets and every other property of
+// `varLayout` are kept.
+static IRVarLayout* getVarLayoutWithLoweredCombinedTextureSamplers(
     LowerCombinedSamplerContext& context,
     IRBuilder* builder,
     IRType* type,
@@ -283,7 +291,7 @@ static IRVarLayout* getVarLayoutWithLoweredCombinedSamplers(
 {
     auto typeLayout = varLayout->getTypeLayout();
     auto newTypeLayout =
-        getTypeLayoutWithLoweredCombinedSamplers(context, builder, type, typeLayout);
+        getTypeLayoutWithLoweredCombinedTextureSamplers(context, builder, type, typeLayout);
     if (newTypeLayout == typeLayout)
         return varLayout;
     IRVarLayout::Builder varLayoutBuilder(builder, newTypeLayout);
@@ -472,8 +480,10 @@ void lowerCombinedTextureSamplers(
     // A combined texture-sampler nested inside a global parameter gets the layout of its lowered
     // struct here: a field of a constant buffer, a parameter block or a struct, including the
     // `globalParams` and `entryPointParams` structs that hold `uniform` globals and entry-point
-    // parameters. The loops above registered every combined type that is replaced below, and the
-    // walk rewrites exactly those, so a type that keeps its combined form also keeps its layout.
+    // parameters. The loops above added every combined type that is replaced below to
+    // `mapTypeToLoweredInfo`, and the walk rewrites exactly those. A combined type that no loop
+    // added keeps both its type and its layout; for example, a WGSL `Sampler2D` used only by
+    // `Load` is never lowered, because its `$q` string does not extract the texture.
     // The first loop handled a global parameter that is itself a combined texture-sampler or an
     // array of them; that loop also gives an explicitly bound texture a descriptor-table offset,
     // which a nested field cannot need because it has no binding of its own.
@@ -489,7 +499,7 @@ void lowerCombinedTextureSamplers(
         if (!varLayout)
             continue;
         builder.setInsertBefore(globalParam);
-        auto newVarLayout = getVarLayoutWithLoweredCombinedSamplers(
+        auto newVarLayout = getVarLayoutWithLoweredCombinedTextureSamplers(
             context,
             &builder,
             globalParam->getFullType(),
