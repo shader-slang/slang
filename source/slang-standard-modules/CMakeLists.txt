@@ -50,10 +50,7 @@ add_custom_command(
         ${embed_generated_source}
     DEPENDS
         slang-embed-standard-modules
-        slang-neural-module
-        slang-workgraph-module
-        slang-numerics-modules
-        slang-functional-module
+        ${SLANG_STANDARD_MODULE_TARGETS}
         ${SLANG_STANDARD_MODULE_FILES}
     COMMENT "Embedding standard modules (LZ4) into ${embed_generated_source}"
     VERBATIM
