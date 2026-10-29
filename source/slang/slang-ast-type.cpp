@@ -2381,7 +2381,7 @@ Type* BuiltinGenericType::getElementType() const
 }
 
 // Returns the original texture type argument, which conforms to ITexelFormat.
-// For Texture2D<RGBA16F>, this is RGBA16F; getElementType() returns float4.
+// For Texture2D<RGBA16F>, this is RGBA16F: ITexelFormat
 Type* ResourceType::getTexelFormatType()
 {
     return as<Type>(_getGenericTypeArg(this, 0));
