@@ -4131,7 +4131,9 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func, const String& name)
     // and as a result it *also* doesn't have the IR `param` instructions,
     // so we emit the declaration from the type. The parameter names come
     // from the name hints that header-only emit recorded before it removed
-    // the function's body, or are `_<i>` when there are none.
+    // the function's body, or are `_<i>` when there are none. A forward
+    // declaration of a function that keeps its body also uses `_<i>`; only
+    // header prototypes are read as API documentation.
 
     auto funcType = func->getDataType();
     auto resultType = func->getResultType();

@@ -9,7 +9,8 @@
 // a derived struct shares that name. Both get numbered names that no other
 // member uses, so the emitted struct has no duplicate member. A source field
 // that looks like a numbered name (`base_0`) keeps its own name, and so does
-// a field marked `__extern_cpp` itself (`base_1`).
+// a field marked `__extern_cpp` itself (`base_1`). `-Wno-30816` silences the
+// deprecation warning for struct inheritance.
 
 //CHECK: struct Derived
 //CHECK-NEXT: {

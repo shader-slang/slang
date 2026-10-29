@@ -6,17 +6,17 @@
 namespace Slang
 {
 
-/// Return `base` followed by the smallest number that gives a name not in `usedNames`.
+/// Return `prefix` followed by the smallest number that gives a name not in `usedNames`.
 ///
-/// The number follows an underscore unless `base` already ends with one: `base` gives `base_0`,
-/// or `base_1` when a field already uses `base_0`.
-static String makeUnusedFieldName(UnownedStringSlice base, const HashSet<String>& usedNames)
+/// The number follows an underscore unless `prefix` already ends with one: `pos` gives `pos_0`,
+/// or `pos_1` when a field already uses `pos_0`.
+static String makeUnusedFieldName(UnownedStringSlice prefix, const HashSet<String>& usedNames)
 {
     for (Int32 n = 0;; n++)
     {
         StringBuilder sb;
-        sb << base;
-        if (!base.endsWith("_"))
+        sb << prefix;
+        if (!prefix.endsWith("_"))
             sb << "_";
         sb << n;
         String candidate = sb.produceString();
@@ -34,8 +34,8 @@ void applyExternCppStructFieldNames(IRModule* module)
         if (!structType || !structType->findDecoration<IRExternCppDecoration>())
             continue;
 
-        // We choose every member name of the struct here, so that the names are distinct by
-        // construction. Names of fields marked `__extern_cpp` themselves are fixed already.
+        // We name every field that has a name hint here, so that those names are distinct from
+        // each other. Names of fields marked `__extern_cpp` themselves are fixed already.
         HashSet<String> usedNames;
         Dictionary<String, Index> fieldCountForNameHint;
         for (auto field : structType->getFields())
@@ -48,10 +48,10 @@ void applyExternCppStructFieldNames(IRModule* module)
         }
 
         // A field keeps its source name unless the checker synthesized it (such members are
-        // named with a leading `$`, which no source identifier contains and C++ rejects) or
+        // named with a leading `$`, which no source identifier contains and is not standard C++) or
         // another field shares the name. Lowering names the field that holds an inherited struct
         // `base`, so a source field `base` in a derived struct shares that name.
-        List<IRInst*> keysToNumber;
+        List<KeyValuePair<IRInst*, UnownedStringSlice>> fieldsToNumber;
         for (auto field : structType->getFields())
         {
             auto key = field->getKey();
@@ -67,20 +67,19 @@ void applyExternCppStructFieldNames(IRModule* module)
             if (name.startsWith("$") || fieldCountForNameHint.getValue(name) > 1 ||
                 usedNames.contains(String(name)))
             {
-                keysToNumber.add(key);
+                fieldsToNumber.add(KeyValuePair<IRInst*, UnownedStringSlice>(
+                    key,
+                    name.startsWith("$") ? name.tail(1) : name));
                 continue;
             }
             builder.addExternCppDecoration(key, name);
             usedNames.add(String(name));
         }
 
-        for (auto key : keysToNumber)
+        for (auto& field : fieldsToNumber)
         {
-            auto name = key->findDecoration<IRNameHintDecoration>()->getName();
-            if (name.startsWith("$"))
-                name = name.tail(1);
-            auto uniqueName = makeUnusedFieldName(name, usedNames);
-            builder.addExternCppDecoration(key, uniqueName.getUnownedSlice());
+            auto uniqueName = makeUnusedFieldName(field.value, usedNames);
+            builder.addExternCppDecoration(field.key, uniqueName.getUnownedSlice());
             usedNames.add(uniqueName);
         }
     }
