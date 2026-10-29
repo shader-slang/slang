@@ -9,7 +9,7 @@
 //
 // Each entry point uses its own diag tag because a `DIAGNOSTIC_TEST` invocation
 // must match every annotation for its tag, and only the compiled entry point's
-// diagnostics fire. PARAM, DUP, RET, MIXED, SPECIALIZE and BODYONLY are exhaustive, so each
+// diagnostics fire. PARAM, DUP, RET, MIXED, NGWRAP, SPECIALIZE and BODYONLY are exhaustive, so each
 // pins exactly one "see using of" note per use site. The other error invocations are
 // non-exhaustive and pin only the notes they are about. Carets align to the
 // columns of the preceding source line.
@@ -25,8 +25,11 @@
 // A generic and a non-generic requiring struct side by side: each is reported at its own
 // parameter.
 //DIAGNOSTIC_TEST:SIMPLE(diag=MIXED): -target spirv -emit-spirv-directly -entry mainMixed -stage vertex
-// A generic entry point whose specialization argument is a requiring generic struct.
-//DIAGNOSTIC_TEST:SIMPLE(diag=SPECIALIZE): -target spirv -emit-spirv-directly -entry mainSpecialize -stage vertex -specialize Foo<int>
+// A non-generic requiring struct reached only through a field of a non-requiring wrapper.
+//DIAGNOSTIC_TEST:SIMPLE(diag=NGWRAP): -target spirv -emit-spirv-directly -entry mainNgWrap -stage vertex
+// A generic entry point whose specialization argument is a requiring generic struct with a
+// value parameter.
+//DIAGNOSTIC_TEST:SIMPLE(diag=SPECIALIZE): -target spirv -emit-spirv-directly -entry mainSpecialize -stage vertex -specialize MG<3>
 // Same generic struct on two parameters: both use sites must be reported (the
 // hash-consed `Val` for `Foo<int>` must not collapse to a single note). Each use also
 // carries its own "see definition" and "see declaration of 'require'" notes.
@@ -99,6 +102,17 @@ struct Bar<T>
 struct Baz
 {
     int z;
+}
+
+struct BazWrap
+{
+    Baz b;
+}
+
+[require(cpp)]
+struct MG<let N : int>
+{
+    int w;
 }
 
 // A generic wrapper with no capability requirement of its own; used to verify the
@@ -284,6 +298,18 @@ void mainMixed(Foo<int> a, Baz b)
 //MIXED: see declaration of 'require'
 
 [shader("vertex")]
+void mainNgWrap(BazWrap w)
+/*NGWRAP:
+     ^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^ entrypoint 'mainNgWrap' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+                ^^^^^^^ see using of 'Baz'
+*/
+{
+}
+//NGWRAP: see definition of 'Baz'
+//NGWRAP: see declaration of 'require'
+
+[shader("vertex")]
 void mainSpecialize<T>()
 /*SPECIALIZE:
      ^^^^^^^^^^^^^^ unavailable features in entry point
@@ -291,8 +317,8 @@ void mainSpecialize<T>()
 */
 {
 }
-//SPECIALIZE: see using of 'Foo'
-//SPECIALIZE: see definition of 'Foo'
+//SPECIALIZE: see using of 'MG'
+//SPECIALIZE: see definition of 'MG'
 //SPECIALIZE: see declaration of 'require'
 
 // A generic struct requiring a higher shader model; used to exercise the
