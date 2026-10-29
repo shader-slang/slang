@@ -835,7 +835,9 @@ void CLikeSourceEmitter::emitVal(IRInst* val, EmitOpInfo const& outerPrec)
     }
     else
     {
-        emitInstExpr(val, outerPrec);
+        // A value operand of a type can be a declaration, such as the specialization constant
+        // `kTile` in `float[kTile]`, which is referenced by name rather than by its definition.
+        emitOperand(val, outerPrec);
     }
 }
 
