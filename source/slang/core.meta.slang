@@ -4719,7 +4719,8 @@ attribute_syntax [NumThreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttr
 /// `subgroups` and `subgroup_size_control` extensions). SPIR-V and GLSL have no in-shader form:
 /// the size is requested when the pipeline is created (`VK_EXT_subgroup_size_control`), and
 /// reflection reports it through `EntryPointReflection::getComputeWaveSize`. Metal cannot request
-/// a SIMD-group width, so the attribute is ignored there with a warning.
+/// a SIMD-group width, so the attribute is ignored there with a warning. CUDA warps are always 32
+/// lanes wide: `[WaveSize(32)]` needs nothing emitted, and any other size is ignored with a warning.
 /// @param numLanes The wave size this shader entrypoint is compatible with. Must be one of 4, 8, 16, 32, 64, 128.
 __attributeTarget(FuncDecl)
 attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
