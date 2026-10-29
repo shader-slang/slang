@@ -3,6 +3,7 @@
 
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -494,6 +495,12 @@ struct SynthesizeActiveMaskForFunctionContext
         // for the function serves as the starting point of the outer-most region.
         //
         transformRegions(funcEntryBlock);
+
+        // The region walk emits a collective on every branch and merge of the
+        // regions it processes, whether or not a later use needs the resulting
+        // mask, so the last step removes the ones that nothing observes.
+        //
+        removeDeadCollectives();
     }
 
     void breakCriticalAndPseudoCriticalEdges()
@@ -845,6 +852,7 @@ struct SynthesizeActiveMaskForFunctionContext
             //
             auto initialActiveMask =
                 builder.emitWaveMaskBallot(m_maskType, allLanesMask, builder.getBoolValue(true));
+            addCollectiveToGroup(initialActiveMask, createCollectiveGroup());
             //
             // Note: an important detail here is that we are invoking `waveMaskBallot`
             // with the all-ones mask and *assuming* that a target will properly ignore
@@ -908,7 +916,11 @@ struct SynthesizeActiveMaskForFunctionContext
             // predecessors, then we know that it needs a new
             // block parameter to be added to represent the active mask.
             //
-            addActiveMaskParameter(block);
+            // Unlike the mask parameter of a function, which is part of its
+            // signature, this parameter can be removed if its value turns out
+            // to be dead.
+            //
+            m_synthesizedMaskInsts.add(addActiveMaskParameter(block));
         }
     }
 
@@ -1012,6 +1024,12 @@ struct SynthesizeActiveMaskForFunctionContext
         // error checks around them.
         //
         IRInst* activeMaskOnEntry = nullptr;
+
+        // The ballots that lanes execute when they leave this region form one
+        // collective group (see `removeDeadCollectives()`). We create the group
+        // when we emit the first of them.
+        //
+        Index exitBallotGroup = -1;
     };
 
     // Given the definition of a region, one of the most important
@@ -1308,6 +1326,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 builder.setInsertBefore(ifElse);
                 auto trueMask =
                     builder.emitWaveMaskBallot(m_maskType, activeMaskOnRegionEntry, condition);
+                addCollectiveToGroup(trueMask, createCollectiveGroup());
 
                 // To establish the mask value for `falseBlock`, we will
                 // insert code into the false block that computes an inverted mask as:
@@ -1318,6 +1337,8 @@ struct SynthesizeActiveMaskForFunctionContext
                 auto invertedTrueMask = builder.emitBitNot(m_maskType, trueMask);
                 auto falseMask =
                     builder.emitBitAnd(m_maskType, activeMaskOnRegionEntry, invertedTrueMask);
+                m_synthesizedMaskInsts.add(invertedTrueMask);
+                m_synthesizedMaskInsts.add(falseMask);
 
                 // The task of associating the mask value comptued by a conditional branch
                 // with the successor block(s) is delegated to a subroutine, which we will
@@ -1540,6 +1561,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 //
                 auto matchingMask =
                     builder.emitWaveMaskMatch(m_maskType, activeMaskOnRegionEntry, condition);
+                addCollectiveToGroup(matchingMask, createCollectiveGroup());
                 //
                 // TODO: this mask computation yields a surprising value in cases where
                 // multiple values go to the same code:
@@ -1889,6 +1911,7 @@ struct SynthesizeActiveMaskForFunctionContext
                         m_maskType,
                         r->activeMaskOnEntry,
                         builder.getBoolValue(true));
+                    addCollectiveToGroup(toActiveMask, getExitBallotGroup(r));
                 }
 
                 // If we are exiting a region normally, then we can't
@@ -1922,10 +1945,11 @@ struct SynthesizeActiveMaskForFunctionContext
                 // the ballot operation, since it will only represent
                 // the active mask for threads that wanted to re-converge.
                 //
-                builder.emitWaveMaskBallot(
+                auto exitBallot = builder.emitWaveMaskBallot(
                     m_maskType,
                     r->activeMaskOnEntry,
                     builder.getBoolValue(false));
+                addCollectiveToGroup(exitBallot, getExitBallotGroup(r));
             }
         }
 
@@ -2170,6 +2194,166 @@ struct SynthesizeActiveMaskForFunctionContext
         region.mergeBlock = parentRegion->mergeBlock;
         region.parentRegion = parentRegion;
         transformRegion(&region);
+    }
+
+    // Each collective that this pass emits (a `waveMaskBallot` or `waveMaskMatch`)
+    // belongs to exactly one group. A group is the set of call sites that together
+    // form a single collective operation: every lane in the operation's mask executes
+    // exactly one member of the group, and a lane waits in its member until all of
+    // the other lanes have executed one.
+    //
+    // The ballot that computes the initial mask of a kernel, the ballot for the
+    // condition of an `ifElse`, and the match for a `switch` each form a group of
+    // their own. The exit ballots of a region (`true` on its normal exits, `false`
+    // on its abnormal exits) form one group per region.
+    //
+    List<List<IRInst*>> m_collectiveGroups;
+    Dictionary<IRInst*, Index> m_groupForCollective;
+
+    // The mask values that this pass creates and may remove again: the collectives,
+    // the `bitNot`/`bitAnd` that compute the mask for the `false` side of an
+    // `ifElse`, and the mask parameters of blocks with multiple predecessors.
+    //
+    OrderedHashSet<IRInst*> m_synthesizedMaskInsts;
+
+    Index createCollectiveGroup()
+    {
+        m_collectiveGroups.add(List<IRInst*>());
+        return m_collectiveGroups.getCount() - 1;
+    }
+
+    Index getExitBallotGroup(RegionInfo* region)
+    {
+        if (region->exitBallotGroup < 0)
+            region->exitBallotGroup = createCollectiveGroup();
+        return region->exitBallotGroup;
+    }
+
+    void addCollectiveToGroup(IRInst* collective, Index group)
+    {
+        m_collectiveGroups[group].add(collective);
+        m_groupForCollective.add(collective, group);
+        m_synthesizedMaskInsts.add(collective);
+    }
+
+    // Remove every collective group whose results no code observes, together with
+    // the mask values that only feed such groups.
+    //
+    // The region walk emits collectives without knowing whether a later use needs
+    // the mask they compute. Consider this example:
+    //
+    //      for (uint pass = 0; pass < 4; pass++)
+    //      {
+    //          uint total = WaveActiveSum(data[tid.x]);
+    //          ...
+    //          for (uint i = tid.x; i < n; i += 256)
+    //          {
+    //              if ((data[i] & 1) != 0) acc += data[i]; else acc ^= data[i];
+    //          }
+    //      }
+    //
+    // The inner loop reaches the `WaveActiveSum` through the outer back edge, so
+    // the walk emits a ballot on each of its branches and merges. The mask that the
+    // `WaveActiveSum` uses comes from the exit ballots of the outer iteration, which
+    // depend only on the mask on entry to that iteration, so none of the inner
+    // ballots' results is used. Each of them still synchronizes the warp, and a
+    // downstream compiler cannot remove it.
+    //
+    // We can only remove a collective together with the rest of its group: if we
+    // removed some members and kept others, the lanes that execute a kept member
+    // would wait forever for the lanes that skipped it. The analysis therefore keeps
+    // a whole group as soon as one member is live. A mask value is live when code
+    // other than these mask computations uses it (a wave operation, a call that
+    // takes the mask, or user code that stores `WaveGetActiveMask()`), or when a
+    // live mask value depends on it. Removing a dead group does not change any live
+    // mask, because no live mask depends on its results, and it does not change
+    // which lanes reach the remaining groups, because control flow is unchanged.
+    //
+    void removeDeadCollectives()
+    {
+        // The block parameters for masks receive their values as arguments on the
+        // branches that target them. Those arguments only matter if the parameter
+        // is live, so they are not roots of the analysis.
+        //
+        HashSet<IRUse*> maskArgUses;
+        for (auto inst : m_synthesizedMaskInsts)
+        {
+            auto param = as<IRParam>(inst);
+            if (!param)
+                continue;
+            auto paramIndex = getParamIndexInBlock(param);
+            for (auto pred : cast<IRBlock>(param->getParent())->getPredecessors())
+            {
+                auto branch = cast<IRUnconditionalBranch>(pred->getTerminator());
+                SLANG_RELEASE_ASSERT(UInt(paramIndex) < branch->getArgCount());
+                maskArgUses.add(&branch->getArgs()[paramIndex]);
+            }
+        }
+
+        HashSet<IRInst*> liveInsts;
+        HashSet<Index> liveGroups;
+        List<IRInst*> workList;
+        auto markLive = [&](IRInst* inst)
+        {
+            if (m_synthesizedMaskInsts.contains(inst) && liveInsts.add(inst))
+                workList.add(inst);
+        };
+
+        for (auto inst : m_synthesizedMaskInsts)
+        {
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                if (!m_synthesizedMaskInsts.contains(use->getUser()) && !maskArgUses.contains(use))
+                {
+                    markLive(inst);
+                    break;
+                }
+            }
+        }
+
+        for (Index i = 0; i < workList.getCount(); ++i)
+        {
+            auto inst = workList[i];
+
+            Index group = -1;
+            if (m_groupForCollective.tryGetValue(inst, group) && liveGroups.add(group))
+            {
+                for (auto member : m_collectiveGroups[group])
+                    markLive(member);
+            }
+
+            for (UInt operandIndex = 0; operandIndex < inst->getOperandCount(); ++operandIndex)
+                markLive(inst->getOperand(operandIndex));
+
+            if (as<IRParam>(inst))
+            {
+                for (auto arg : getPhiArgs(inst))
+                    markLive(arg);
+            }
+        }
+
+        // Every remaining use of a dead value is by another dead value, either as
+        // an operand or as the argument for a dead mask parameter. Once we have
+        // removed those arguments and operands, nothing uses the dead values and
+        // we can remove them in any order.
+        //
+        List<IRInst*> deadInsts;
+        for (auto inst : m_synthesizedMaskInsts)
+        {
+            if (!liveInsts.contains(inst))
+                deadInsts.add(inst);
+        }
+        for (auto inst : deadInsts)
+        {
+            if (as<IRParam>(inst))
+                removePhiArgs(inst);
+            inst->removeArguments();
+        }
+        for (auto inst : deadInsts)
+        {
+            SLANG_ASSERT(!inst->hasUses());
+            inst->removeAndDeallocate();
+        }
     }
 };
 
