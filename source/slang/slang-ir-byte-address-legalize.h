@@ -47,7 +47,8 @@ struct ByteAddressBufferLegalizationOptions
 /// When `translateToStructuredBufferOps` is set, it also replaces each global
 /// byte-address buffer parameter, including one that nothing uses, with an
 /// equivalent structured-buffer parameter, so that no byte-address buffer
-/// parameter reaches the emitter.
+/// parameter reaches the emitter unless it still has a use this pass does not
+/// translate.
 ///
 void legalizeByteAddressBufferOps(
     IRModule* module,
