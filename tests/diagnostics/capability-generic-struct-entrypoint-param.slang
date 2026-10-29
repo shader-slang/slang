@@ -8,7 +8,7 @@
 //
 // Each entry point uses its own diag tag because a `DIAGNOSTIC_TEST` invocation
 // must match every annotation for its tag, and only the compiled entry point's
-// diagnostics fire. PARAM, DUP, RET, SPECIALIZE and BODYONLY are exhaustive, so each
+// diagnostics fire. PARAM, DUP, RET, MIXED, SPECIALIZE and BODYONLY are exhaustive, so each
 // pins exactly one "see using of" note per use site. The other error invocations are
 // non-exhaustive and pin only the notes they are about. Carets align to the
 // columns of the preceding source line.
@@ -21,6 +21,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=MULTI,non-exhaustive): -target spirv -emit-spirv-directly -entry mainMulti -stage vertex
 // Generic return type.
 //DIAGNOSTIC_TEST:SIMPLE(diag=RET): -target spirv -emit-spirv-directly -entry mainRet -stage vertex
+// A generic and a non-generic requiring struct side by side: each is reported at its own
+// parameter.
+//DIAGNOSTIC_TEST:SIMPLE(diag=MIXED): -target spirv -emit-spirv-directly -entry mainMixed -stage vertex
 // A generic entry point whose specialization argument is a requiring generic struct.
 //DIAGNOSTIC_TEST:SIMPLE(diag=SPECIALIZE): -target spirv -emit-spirv-directly -entry mainSpecialize -stage vertex -specialize Foo<int>
 // Same generic struct on two parameters: both use sites must be reported (the
@@ -87,6 +90,12 @@ struct Foo<T>
 struct Bar<T>
 {
     int y;
+}
+
+[require(cpp)]
+struct Baz
+{
+    int z;
 }
 
 // A generic wrapper with no capability requirement of its own; used to verify the
@@ -255,6 +264,21 @@ Foo<int> mainRet()
 }
 //RET: see definition of 'Foo'
 //RET: see declaration of 'require'
+
+[shader("vertex")]
+void mainMixed(Foo<int> a, Baz b)
+/*MIXED:
+     ^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^ entrypoint 'mainMixed' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+               ^^^ see using of 'Foo'
+                           ^^^ see using of 'Baz'
+*/
+{
+}
+//MIXED: see definition of 'Foo'
+//MIXED: see definition of 'Baz'
+//MIXED: see declaration of 'require'
+//MIXED: see declaration of 'require'
 
 [shader("vertex")]
 void mainSpecialize<T>()

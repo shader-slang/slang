@@ -1701,15 +1701,15 @@ static bool _allTargetsSupportVkBindingOnEntryPointParameters(Linkage* linkage)
 }
 
 
-// A user-defined generic struct found in an entry-point signature type, paired
-// with the source location of its use.
+// A struct found in an entry-point signature type, paired with the source location
+// of its use.
 struct StructTypeUse
 {
     StructDecl* structDecl;
     SourceLoc useLoc;
 };
 
-// Collect every user-defined generic struct (e.g. `Foo<int>`) reachable from an
+// Collect every struct (e.g. `Foo<int>` or `Bar`) reachable from an
 // entry-point signature type `type`, recursing through wrapper/composite types so
 // that `Foo<int>`, `Foo<int>[N]`, `Optional<Foo<int>>`, and
 // `ConstantBuffer<Foo<int>>` are all found. Results are appended to `outUses` and
@@ -1720,17 +1720,18 @@ struct StructTypeUse
 // So a struct named only by the return type (`Foo<int> main()`) or reached only through a
 // wrapper's field (`struct Field<T> { Foo<T> f; }` used as `Field<int>`) reaches the entry point
 // only through this walk. The provenance chain of an incompatible entry point also names a single
-// use, so collecting every use here lets `validateEntryPoint` report each contributing struct at
-// its own use site.
+// use, and inference records a use only when it adds to the requirement, so with the same
+// `[require]` on both structs the chain of `main(Foo<int> a, Baz b)` never names `Baz`.
+// Collecting every use here lets `validateEntryPoint` report each contributing struct at its own
+// use site.
 //
-// Only generic struct specializations are collected. The same return-type and field-only gaps
-// exist for a non-generic struct (`Bar main()`, `struct W { Bar b; }`), a member type
-// (`Outer<3>.In`) and an enum, and this walk does not cover them.
+// Generic and non-generic structs, including member types such as `Outer<3>.In`, are collected
+// alike. Enums are not, so an enum named only by the return type is still missed.
 //
 // Core-module magic/intrinsic structs are excluded to match general inference (see
 // `isCoreModuleIntrinsicTypeDecl`); those that appear in signatures, such as `LineStream<T>` and
 // `OutputPatch<T,N>`, already get more specific stage diagnostics. Builtin wrappers are still
-// recursed *through* so that a user-defined `Foo<int>` nested inside them is found.
+// recursed *through* so that a `Foo<int>` nested inside them is found.
 static void collectStructTypeUses(
     ASTBuilder* astBuilder,
     Val* type,
@@ -1755,8 +1756,7 @@ static void collectStructTypeUses(
     if (auto declRefType = as<DeclRefType>(type))
     {
         auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
-        if (structDeclRef && as<GenericAppDeclRef>(declRefType->getDeclRefBase()) &&
-            !isCoreModuleIntrinsicTypeDecl(structDeclRef.getDecl()))
+        if (structDeclRef && !isCoreModuleIntrinsicTypeDecl(structDeclRef.getDecl()))
         {
             // Only contribute structs that actually carry a requirement; this keeps
             // both the aggregation and the diagnostic loop free of null/empty sets.
@@ -1784,7 +1784,7 @@ static void collectStructTypeUses(
     }
 
     // Recurse into the type's `Val` operands (generic arguments, element types,
-    // etc.) so nested user generic structs inside wrappers/arrays are found.
+    // etc.) so structs nested inside wrappers/arrays are found.
     for (Index i = 0; i < type->getOperandCount(); i++)
     {
         if (type->m_operands[i].kind == ValNodeOperandKind::ValNode)
@@ -2719,7 +2719,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     }
 
     // Augment the entry point's inferred requirements with the capability
-    // requirements of the *generic* struct types reachable from its signature
+    // requirements of the struct types reachable from its signature
     // (parameters and return type), including those the general inference walk does
     // not reach (see `collectStructTypeUses`). `signatureStructUses` keeps
     // each contributing struct and its use location so we can point a note at each
