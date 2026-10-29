@@ -342,7 +342,10 @@ void lowerCombinedTextureSamplers(
         }
         auto newVarLayout = newVarLayoutBuilder.build();
         subBuilder.addLayoutDecoration(globalParam, newVarLayout);
-        varLayout->removeAndDeallocate();
+        // Layouts are deduplicated, so `varLayout` can also be the layout of a field nested in
+        // another parameter: the first `Sampler2D` field of a constant buffer has the same
+        // relative offsets as a global `Sampler2D` at t0/s0. The nested-layout loop below reads
+        // that field layout, so only the decoration is removed here.
         layoutDecor->removeAndDeallocate();
     }
 
