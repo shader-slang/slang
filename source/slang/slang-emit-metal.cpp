@@ -421,9 +421,12 @@ void MetalSourceEmitter::emitAtomicSrcOperand(bool isImage, IRInst* inst)
 
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
-    auto emitAtomicOp = [&](const char* imageFunc, const char* bufferFunc)
+    // Emit `inst` as a call to `imageFunc` on a texture or `bufferFunc` on a buffer. The MSL
+    // atomics that return void are emitted with `returnsValue` false, as a bare statement.
+    auto emitAtomicCall = [&](const char* imageFunc, const char* bufferFunc, bool returnsValue)
     {
-        emitInstResultDecl(inst);
+        if (returnsValue)
+            emitInstResultDecl(inst);
         bool isImageOp = false;
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -446,11 +449,13 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", ");
             emitMemoryOrderOperand(inst->getOperand(inst->getOperandCount() - 1));
         }
-        if (isImageOp)
+        if (isImageOp && returnsValue)
             m_writer->emit(").x;\n");
         else
             m_writer->emit(");\n");
     };
+    auto emitAtomicOp = [&](const char* imageFunc, const char* bufferFunc)
+    { emitAtomicCall(imageFunc, bufferFunc, true); };
     auto diagnoseFloatAtomic = [&]()
     {
         getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
