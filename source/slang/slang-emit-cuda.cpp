@@ -408,6 +408,34 @@ void CUDASourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     {
         m_writer->emit("#define SLANG_CUDA_ENABLE_FAST_MATH 1\n");
     }
+
+    // The prelude includes the CUDA SDK headers for half, bf16 and fp8, and enables its helpers
+    // for them, only under these defines. NVRTC already receives them as -D options from the same
+    // tracker (slang-code-gen.cpp), but an offline nvcc compile of this source gets them only
+    // from here. The module body is emitted before the front matter, so the tracker is complete.
+    if (m_extensionTracker->isBaseTypeRequired(BaseType::Half))
+    {
+        _emitGuardedDefine("SLANG_CUDA_ENABLE_HALF");
+    }
+    if (m_extensionTracker->isBfloat16Required())
+    {
+        _emitGuardedDefine("SLANG_CUDA_ENABLE_BF16");
+    }
+    if (m_extensionTracker->isFp8Required())
+    {
+        _emitGuardedDefine("SLANG_CUDA_ENABLE_FP8");
+    }
+}
+
+void CUDASourceEmitter::_emitGuardedDefine(const char* name)
+{
+    // The `#ifndef` guard leaves a definition that arrives on the downstream compiler's
+    // command line (NVRTC always gets one; an nvcc user may pass their own) in place.
+    m_writer->emit("#ifndef ");
+    m_writer->emit(name);
+    m_writer->emit("\n#define ");
+    m_writer->emit(name);
+    m_writer->emit(" 1\n#endif\n");
 }
 
 void CUDASourceEmitter::emitLayoutSemanticsImpl(
