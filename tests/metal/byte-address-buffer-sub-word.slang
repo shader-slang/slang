@@ -12,12 +12,12 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-mtl -compute -shaderobj
 
 // A sub-word store must not write the whole word: neither a masked read-modify-write
-// (`as_type<uint32_t>((word & mask) | ...)`) nor a widened 8/16-bit value.
-// MTL-NOT: >>2] = as_type<uint32_t>({{\(|ushort\(|uchar\(}}
+// (`as_type<uint32_t>((word & mask) | ...)`) nor a widened 8/16-bit value, half included.
+// MTL-NOT: >>2] = as_type<uint32_t>({{\(|ushort\(|uchar\(|half\(|[0-9.]+h\)}}
 // MTL: ((device ushort*)(
-// MTL-NOT: >>2] = as_type<uint32_t>({{\(|ushort\(|uchar\(}}
+// MTL-NOT: >>2] = as_type<uint32_t>({{\(|ushort\(|uchar\(|half\(|[0-9.]+h\)}}
 // MTL: ((device uchar*)(
-// MTL-NOT: >>2] = as_type<uint32_t>({{\(|ushort\(|uchar\(}}
+// MTL-NOT: >>2] = as_type<uint32_t>({{\(|ushort\(|uchar\(|half\(|[0-9.]+h\)}}
 // MTL-NOT: as_type<uint32_t>(half
 // MTL-NOT: as_type<half>(pool
 // MTL-NOT: as_type<array<
