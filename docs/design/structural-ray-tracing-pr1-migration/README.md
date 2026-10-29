@@ -191,8 +191,9 @@ descriptor identity on struct declarations. Both use the existing `DeclRefType::
 path with one inherited declaration reference, so ordinary substitution and serialization preserve
 their generic arguments. No new AST constructor or IR lowering path is needed for the descriptor.
 
-The annotation constants belong to the ray-tracing module as `rt::__RayTracingBuiltin`.
-The module's `compiler-intrinsics.slang` includes the generated constants. Public trace and
+The annotation constants are declared in the internal enum `rt::__RayTracingBuiltin`.
+The module's `compiler-intrinsics.slang` includes the generated constants; applications cannot
+name this enum. Public trace and
 callable methods are ordinary functions without operation-specific source attributes.
 
 Build `raytracing-builtins.meta.slang` into the ordinary `raytracing-builtins.slang` include using
@@ -542,13 +543,15 @@ import slang.raytracing.portable;
 
 The API types remain in namespace `rt`, so names such as `rt::MissInput` and
 `rt::RayTracer` do not change. The module sources live under
-`source/standard-modules/raytracing/portable/`: `portable.slang` declares `module portable`,
+`source/standard-modules/raytracing/portable/`: `raytracing.slang` declares `module portable`,
 and its source parts use `implementing portable`. The parent ray-tracing CMake directory adds
 this portable subdirectory.
 
 The `slang-portable-raytracing-module` target compiles the module and packages its source files
 and generated builtin identifiers under the `slang/raytracing` import directory. The saved module
-is `slang/raytracing/portable.slang-module`. Both source and serialized imports use the same
+is `slang/raytracing/portable.slang-module`. The build copies the source entry `raytracing.slang`
+to `slang/raytracing/portable.slang` so ordinary source lookup finds the public module name.
+Both source and serialized imports use the same
 `slang.raytracing.portable` name and require the existing experimental-feature flag.
 
 ### Optional builtin ownership

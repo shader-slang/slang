@@ -1,7 +1,7 @@
 # Build the experimental slang.raytracing.portable standard module.
 
 set(portable_raytracing_shader_sources
-    portable.slang
+    raytracing.slang
     compiler-intrinsics.slang
     ray-types.slang
     contexts.slang
@@ -21,6 +21,10 @@ set(portable_raytracing_copied_files)
 foreach(shader_file ${portable_raytracing_shader_sources})
     set(source_file "${CMAKE_CURRENT_SOURCE_DIR}/${shader_file}")
     set(dest_file "${portable_raytracing_output_dir}/${shader_file}")
+    if(shader_file STREQUAL "raytracing.slang")
+        # Source imports resolve slang.raytracing.portable through portable.slang.
+        set(dest_file "${portable_raytracing_output_dir}/portable.slang")
+    endif()
     add_custom_command(
         OUTPUT ${dest_file}
         COMMAND

@@ -8,7 +8,7 @@ namespace rt
 // Identifies the ordinary declarations whose roles are consumed by ray-tracing checking.
 // For example, a Context requirement keeps its identity after importing a serialized module;
 // neither the containing context interface nor its implementations need a special AST type.
-public enum __RayTracingBuiltin : int
+internal enum __RayTracingBuiltin : int
 {
     ClosestHitInput = $((int)KnownBuiltinDeclName::RayTracingClosestHitInput),
     AnyHitInput = $((int)KnownBuiltinDeclName::RayTracingAnyHitInput),
