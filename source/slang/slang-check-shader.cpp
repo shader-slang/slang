@@ -1703,7 +1703,7 @@ static bool _allTargetsSupportVkBindingOnEntryPointParameters(Linkage* linkage)
 
 // A user-defined generic struct found in an entry-point signature type, paired
 // with the source location of its use.
-struct GenericStructTypeUse
+struct StructTypeUse
 {
     StructDecl* structDecl;
     SourceLoc useLoc;
@@ -1731,12 +1731,12 @@ struct GenericStructTypeUse
 // `isCoreModuleIntrinsicTypeDecl`); those that appear in signatures, such as `LineStream<T>` and
 // `OutputPatch<T,N>`, already get more specific stage diagnostics. Builtin wrappers are still
 // recursed *through* so that a user-defined `Foo<int>` nested inside them is found.
-static void collectGenericStructTypeUses(
+static void collectStructTypeUses(
     ASTBuilder* astBuilder,
     Val* type,
     SourceLoc useLoc,
     HashSet<Val*>& visited,
-    List<GenericStructTypeUse>& outUses,
+    List<StructTypeUse>& outUses,
     UInt recursionDepth = 0)
 {
     if (!type || !visited.add(type))
@@ -1773,7 +1773,7 @@ static void collectGenericStructTypeUses(
         {
             for (auto fieldDeclRef :
                  getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
-                collectGenericStructTypeUses(
+                collectStructTypeUses(
                     astBuilder,
                     getType(astBuilder, fieldDeclRef),
                     useLoc,
@@ -1788,7 +1788,7 @@ static void collectGenericStructTypeUses(
     for (Index i = 0; i < type->getOperandCount(); i++)
     {
         if (type->m_operands[i].kind == ValNodeOperandKind::ValNode)
-            collectGenericStructTypeUses(
+            collectStructTypeUses(
                 astBuilder,
                 type->getOperand(i),
                 useLoc,
@@ -1807,7 +1807,7 @@ static void validateEntryPointCapabilities(
     EntryPoint* entryPoint,
     const CapabilitySet& entryPointInferredCaps,
     const List<Decl*>& referencedDecls,
-    const List<GenericStructTypeUse>& signatureStructUses,
+    const List<StructTypeUse>& signatureStructUses,
     DiagnosticSink* sink,
     const CapabilitySetVal* previouslyCheckedCaps = nullptr)
 {
@@ -1842,7 +1842,7 @@ static void validateEntryPointCapabilities(
             // whose own requirement is incompatible with the target. When the chain ends at one
             // of exactly those structs, we report that struct once, at its signature use site,
             // even when the chain reached it through the body.
-            List<GenericStructTypeUse> incompatibleStructUses;
+            List<StructTypeUse> incompatibleStructUses;
             for (auto& use : signatureStructUses)
             {
                 if (targetCaps.isIncompatibleWith(
@@ -1856,7 +1856,7 @@ static void validateEntryPointCapabilities(
                 auto provenance = findMissingCapabilityProvenance(entryPointFuncDecl, failedSet);
                 bool isProvenanceAnIncompatibleStruct =
                     incompatibleStructUses.findFirstIndex(
-                        [&](GenericStructTypeUse const& use)
+                        [&](StructTypeUse const& use)
                         { return use.structDecl == provenance.referencedNode; }) != -1;
                 if (!isProvenanceAnIncompatibleStruct)
                     diagnoseMissingCapabilityProvenance(linkage->m_optionSet, sink, provenance);
@@ -2721,10 +2721,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // Augment the entry point's inferred requirements with the capability
     // requirements of the *generic* struct types reachable from its signature
     // (parameters and return type), including those the general inference walk does
-    // not reach (see `collectGenericStructTypeUses`). `signatureStructUses` keeps
+    // not reach (see `collectStructTypeUses`). `signatureStructUses` keeps
     // each contributing struct and its use location so we can point a note at each
     // use site.
-    List<GenericStructTypeUse> signatureStructUses;
+    List<StructTypeUse> signatureStructUses;
     {
         auto astBuilder = linkage->getASTBuilder();
         // Use a fresh `visited` set per signature position. `Val` nodes are
@@ -2739,7 +2739,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // retained.
             SourceLoc useLoc = (param->type.exp) ? param->type.exp->loc : param->loc;
             HashSet<Val*> visited;
-            collectGenericStructTypeUses(
+            collectStructTypeUses(
                 astBuilder,
                 param->getType(),
                 useLoc,
@@ -2753,7 +2753,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                                   ? entryPointFuncDecl->returnType.exp->loc
                                   : entryPointFuncDecl->loc;
         HashSet<Val*> visited;
-        collectGenericStructTypeUses(
+        collectStructTypeUses(
             astBuilder,
             entryPointFuncDecl->returnType.type,
             returnLoc,
