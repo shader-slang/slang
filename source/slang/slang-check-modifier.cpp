@@ -1,8 +1,8 @@
 // slang-check-modifier.cpp
 #include "core/slang-char-util.h"
 #include "slang-check-impl.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-structural-ray-tracing.h"
 
 // This file implements semantic checking behavior for
 // modifiers.
@@ -1984,7 +1984,7 @@ Modifier* SemanticsVisitor::checkModifier(
         if ((as<MagicTypeModifier>(m) || as<BuiltinTypeModifier>(m) ||
              as<BuiltinRequirementModifier>(m)) &&
             !isFromCoreModule(decl) &&
-            !isRayTracingBuiltinTypeModifier(as<MagicTypeModifier>(m), decl))
+            !PortableRT::isBuiltinTypeModifier(as<MagicTypeModifier>(m), decl))
         {
             if (!ignoreUnallowedModifier)
                 getSink()->diagnose(Diagnostics::BuiltinOnlyModifierOnNonCoreDecl{.modifier = m});

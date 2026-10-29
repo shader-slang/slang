@@ -1,6 +1,6 @@
 // slang-check-shader.cpp
 #include "slang-check-impl.h"
-#include "slang-structural-ray-tracing.h"
+#include "slang-check-portable-ray-tracing.h"
 
 // This file encapsulates semantic checking logic primarily
 // related to shaders, including validating entry points,
@@ -2041,7 +2041,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // Reject logical inputs before applying native parameter rules.
     if (!sink->getErrorCount())
     {
-        diagnoseStructuralRayTracingInputInNativeEntryPoint(entryPoint, sink);
+        PortableRT::diagnoseInputInNativeEntryPoint(entryPoint, sink);
         if (sink->getErrorCount())
             return;
     }
@@ -2960,7 +2960,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     Type* structuralStageType = nullptr;
     if (linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
     {
-        auto structuralEntryPointFuncDeclRef = findStructuralRayTracingEntryPointByName(
+        auto structuralEntryPointFuncDeclRef = PortableRT::findEntryPointByName(
             linkage,
             translationUnit->getModule(),
             entryPointName,
@@ -3010,7 +3010,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
         EntryPoint::create(linkage, entryPointFuncDeclRef, entryPointProfile);
     if (foundStructuralStage)
     {
-        initializeStructuralRayTracingEntryPoint(entryPoint, entryPointName, structuralStageType);
+        PortableRT::initializeEntryPoint(entryPoint, entryPointName, structuralStageType);
     }
 
     // Now that we've *found* the entry point, it is time to validate

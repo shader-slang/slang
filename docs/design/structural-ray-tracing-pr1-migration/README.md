@@ -187,7 +187,7 @@ name in duplicate-entry diagnostics. Context members and primitive types use ord
 and constraints without unused compiler identifiers. Preserve the retained annotations through
 ordinary serialization; do not introduce a special AST class for each supporting library type.
 
-`isRayTracingBuiltinTypeModifier` permits stage identities on interface declarations and the
+`PortableRT::isBuiltinTypeModifier` permits stage identities on interface declarations and the
 descriptor identity on struct declarations. Both use the existing `DeclRefType::create` construction
 path with one inherited declaration reference, so ordinary substitution and serialization preserve
 their generic arguments. No new AST constructor or IR lowering path is needed for the descriptor.
@@ -235,9 +235,12 @@ using the same type classifier as ordinary input-use checking.
 ## 8. Centralize special rules and allow ordinary metadata/payload values
 
 All additional semantic rules and declaration-identity queries live in
-`source/slang/slang-check-structural-ray-tracing.cpp`, with examples beside the rule implementations.
+`source/slang/slang-check-portable-ray-tracing.cpp`, with examples beside the rule implementations.
 Ordinary declaration, conformance, expression and entry-point checking call into that file.
-The eight RT validation functions are free functions declared in `slang-structural-ray-tracing.h`.
+The checker functions live in `Slang::PortableRT`; their declarations, including entry lookup and
+native-entry input checking, are collected in `slang-check-portable-ray-tracing.h`. Call sites use
+short names such as `PortableRT::getStageInputKind` and `PortableRT::diagnoseInvalidExpression`.
+The namespace and paired filenames identify the portable API whose rules these helpers implement.
 Return-type, property and generic-argument checks take a diagnostic sink; duplicate-schema checking
 also takes the AST builder. Stage-restriction, variable and expression checks receive the existing
 `SemanticsVisitor` only because they use its `diagnoseOnce` suppression. These dependencies are
@@ -334,7 +337,7 @@ has already selected the conformance paths used by the input type and its access
 requirements provided by extensions or inherited interfaces. Generic substitutions on the
 function reference apply through the ordinary parameter lookup.
 
-`initializeStructuralRayTracingEntryPoint` marks the entry as structural, preserves the requested
+`PortableRT::initializeEntryPoint` marks the entry as structural, preserves the requested
 public name (`SkyMiss` or `SkyMiss.invoke`), and derives the generated shader name. Creating an
 `EntryPoint` collects specialization parameters and function parameters through the ordinary path.
 `markAsStructuralRayTracingEntryPoint` sets the classification flag and currently clears the
@@ -347,11 +350,11 @@ The generated name includes both the selected type and shader stage. For a struc
 that implements closest-hit and any-hit, the generated names are `MultiStage_closesthit` and
 `MultiStage_anyhit`; selecting `Miss` as a miss shader produces `Miss_miss`. The public entry name
 remains the requested source name: selecting `Miss.invoke` also generates `Miss_miss`, while its
-public name is `Miss.invoke`. `getStructuralRayTracingSourceTypeName` reuses ordinary
+public name is `Miss.invoke`. `PortableRT::getSourceTypeName` reuses ordinary
 type/declaration-reference formatting (`DeclRefType::toString()`) for a non-generic type's qualified
 name. For a generic specialization, it uses the canonical type's existing
 mangled name, which includes the selected type arguments.
-`getStructuralRayTracingEntryPointName` replaces dots in that type name with underscores, then
+`PortableRT::getEntryPointName` replaces dots in that type name with underscores, then
 appends `_` and the canonical spelling from `getStageName(stage)`. For example, `Stages.Miss`
 becomes `Stages_Miss_miss`, and `main` becomes `main_miss`. Entry lookup, stage selection, and
 the selected method are unchanged by this generated name. The API regression selects both stages of
@@ -388,7 +391,7 @@ itself. Ordinary extension lookup then resolves that member. The non-RT `Pixel.M
 regression selects a static extension method and generates SPIR-V without experimental features.
 
 Both lookup paths return a `DeclRef<FuncDecl>`. `findAndValidateEntryPoint` creates the entry
-once and calls `initializeStructuralRayTracingEntryPoint` in the RT checker to mark a structural
+once and calls `PortableRT::initializeEntryPoint` in the RT checker to mark a structural
 entry and set its public and generated shader names when needed, then calls `validateEntryPoint`.
 The structural finder also supplies the stage selected by conformance; native entries resolve
 their stage through the usual function attributes.

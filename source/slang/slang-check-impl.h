@@ -4341,19 +4341,6 @@ public:
     SubtypeWitness* isFuncBackwardDifferentiable(DeclRef<CallableDecl> declRef);
 };
 
-DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
-    Linkage* linkage,
-    Module* module,
-    Name* name,
-    Profile& ioProfile,
-    DiagnosticSink* sink,
-    bool* outFoundStruct,
-    Type** outStageType);
-void diagnoseStructuralRayTracingInputInNativeEntryPoint(
-    EntryPoint* entryPoint,
-    DiagnosticSink* sink);
-
-
 inline void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)
 {
     visitor->ensureDecl(decl, state);

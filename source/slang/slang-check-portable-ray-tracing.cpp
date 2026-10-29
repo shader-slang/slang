@@ -1,16 +1,19 @@
+#include "slang-check-portable-ray-tracing.h"
+
 #include "core/slang-string-util.h"
 #include "slang-check-impl.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-module.h"
 #include "slang-session.h"
-#include "slang-structural-ray-tracing.h"
 #include "slang-syntax.h"
 
 namespace Slang
 {
+namespace PortableRT
+{
 
-// This file owns the structural ray-tracing rules and their declaration identities.
+// This file owns the portable ray-tracing rules and their declaration identities.
 // Ordinary interfaces, associated-type constraints, overload resolution, and capability inference
 // remain in the normal checker. Their call sites delegate here only for the additional rules:
 // stage types and inputs, stage selection, schema entry uniqueness, and native entry signatures.
@@ -35,7 +38,7 @@ static ASTNodeType _getMagicTypeClass(Decl* declaration)
 // Reads a semantic role from an ordinary declaration's checked attribute. For example,
 // MissInput<C> remains an ordinary generic struct while its annotation identifies the stage view.
 // The attribute is serialized with the declaration, so no module-import registration is needed.
-static KnownBuiltinDeclName _getRayTracingBuiltin(Decl* declaration)
+static KnownBuiltinDeclName _getBuiltin(Decl* declaration)
 {
     auto attribute = declaration ? declaration->findModifier<KnownBuiltinAttribute>() : nullptr;
     auto value = attribute ? as<ConstantIntVal>(attribute->name) : nullptr;
@@ -47,14 +50,14 @@ static Stage _getDirectStageInputKind(Type* type)
     type = unwrapModifiedType(type);
     auto declRefType = as<DeclRefType>(type);
     auto typeDecl = declRefType ? declRefType->getDeclRef().as<AggTypeDecl>().getDecl() : nullptr;
-    return getStructuralRayTracingStageInputKind(typeDecl);
+    return getStageInputKind(typeDecl);
 }
 
 // Requires a concrete stage implementation to be a user-defined struct. Its invoke method is
 // static, so ordinary fields and instances do not participate in stage dispatch. For example,
 // `struct Miss : rt::IMissShader { uint state; ... }` is allowed: selecting Miss as a stage calls
 // its static invoke function without constructing Miss or supplying a value for state.
-static void _checkStructuralRayTracingStageImplementationType(
+static void _checkStageImplementationType(
     SemanticsVisitor* visitor,
     Type* stageType,
     SourceLoc conformanceLoc)
@@ -93,9 +96,9 @@ static void _checkStructuralRayTracingStageImplementationType(
 
 // Returns the section name for a structural schema requirement used in duplicate-entry diagnostics,
 // or null for other associated-type requirements.
-static const char* _getStructuralRayTracingSchemaSectionName(AssocTypeDecl* requirement)
+static const char* _getSchemaSectionName(AssocTypeDecl* requirement)
 {
-    switch (_getRayTracingBuiltin(requirement))
+    switch (_getBuiltin(requirement))
     {
     case KnownBuiltinDeclName::RayTracingProgramHitGroups:
         return "hit-group";
@@ -115,7 +118,7 @@ static DeclRef<FuncDecl> _getStageImplementationFromSubtypeWitness(
     SubtypeWitness* witness)
 {
     witness = witness ? as<SubtypeWitness>(witness->resolve()) : nullptr;
-    auto invokeRequirement = getStructuralRayTracingStageInvokeRequirement(stageInterface);
+    auto invokeRequirement = getStageInvokeRequirement(stageInterface);
     if (!invokeRequirement || !witness)
         return DeclRef<FuncDecl>();
     auto invokeWitness = tryLookUpRequirementWitness(astBuilder, witness, invokeRequirement);
@@ -131,21 +134,21 @@ static DeclRef<FuncDecl> _getStageImplementationFromSubtypeWitness(
 
 // Only the library's stage interfaces and input views have restricted value uses. A user struct
 // implementing a stage interface is an ordinary value; identifying it never requires inheritance.
-enum class RestrictedRayTracingTypeKind
+enum class RestrictedTypeKind
 {
     None,
     StageInterface,
     StageInput,
 };
 
-static RestrictedRayTracingTypeKind _getDirectRestrictedRayTracingTypeKind(Type* type)
+static RestrictedTypeKind _getDirectRestrictedTypeKind(Type* type)
 {
     type = unwrapModifiedType(type);
     if (_getDirectStageInputKind(type) != Stage::Unknown)
-        return RestrictedRayTracingTypeKind::StageInput;
+        return RestrictedTypeKind::StageInput;
     if (as<RayTracingStageInterfaceType>(type))
-        return RestrictedRayTracingTypeKind::StageInterface;
-    return RestrictedRayTracingTypeKind::None;
+        return RestrictedTypeKind::StageInterface;
+    return RestrictedTypeKind::None;
 }
 
 // Checks the supplied type and built-in containers without inspecting ordinary struct fields.
@@ -157,19 +160,19 @@ static RestrictedRayTracingTypeKind _getDirectRestrictedRayTracingTypeKind(Type*
 // already-checked element types. Generic fields such as T.Item need validation after
 // specialization, just like T.Item() construction; that limitation is tracked in
 // shader-slang/slang#13686.
-static RestrictedRayTracingTypeKind _getRestrictedRayTracingTypeKind(Type* type)
+static RestrictedTypeKind _getRestrictedTypeKind(Type* type)
 {
     type = unwrapModifiedType(type);
-    auto kind = _getDirectRestrictedRayTracingTypeKind(type);
-    if (kind != RestrictedRayTracingTypeKind::None)
+    auto kind = _getDirectRestrictedTypeKind(type);
+    if (kind != RestrictedTypeKind::None)
         return kind;
 
     unwrapTypeElements(
         type,
         [&](Type* elementType)
         {
-            kind = _getRestrictedRayTracingTypeKind(elementType);
-            return kind != RestrictedRayTracingTypeKind::None;
+            kind = _getRestrictedTypeKind(elementType);
+            return kind != RestrictedTypeKind::None;
         });
     return kind;
 }
@@ -178,17 +181,17 @@ static RestrictedRayTracingTypeKind _getRestrictedRayTracingTypeKind(Type* type)
 // "RT builtin" means a compiler-recognized library type, not necessarily a C++ BuiltinType.
 // Concrete structs implementing the interface remain ordinary types. Returns true when an error
 // is reported, or false when the supplied type needs no diagnostic.
-static bool _diagnoseInvalidRTBuiltinTypeUse(DiagnosticSink* sink, Type* type, SourceLoc location)
+static bool _diagnoseInvalidBuiltinTypeUse(DiagnosticSink* sink, Type* type, SourceLoc location)
 {
-    switch (_getRestrictedRayTracingTypeKind(type))
+    switch (_getRestrictedTypeKind(type))
     {
-    case RestrictedRayTracingTypeKind::StageInterface:
+    case RestrictedTypeKind::StageInterface:
         // The interface itself, e.g. IMissShader, cannot be a runtime value. A concrete struct
         // implementing IMissShader is an ordinary type and does not enter this branch.
         sink->diagnose(
             Diagnostics::StructuralRayTracingStageRuntimeValue{.type = type, .location = location});
         return true;
-    case RestrictedRayTracingTypeKind::StageInput:
+    case RestrictedTypeKind::StageInput:
         // Allowed input parameters and local copies return from the variable checker before
         // reaching this helper. Here the context forbids an input, even in an array or pointer.
         sink->diagnose(
@@ -204,32 +207,26 @@ static bool _diagnoseInvalidRTBuiltinTypeUse(DiagnosticSink* sink, Type* type, S
 // consume<T>(T value): its checked substitution names MissInput<C> even without written <...>.
 // A variadic call groups these same arguments into a ConcreteTypePack, so inspect its elements.
 // No inheritance, fields, or conformance witnesses are needed to recognize these builtin types.
-static bool _diagnoseRestrictedRayTracingGenericArgument(
-    DiagnosticSink* sink,
-    Type* type,
-    SourceLoc location)
+static bool _diagnoseRestrictedGenericArgument(DiagnosticSink* sink, Type* type, SourceLoc location)
 {
     if (auto typePack = as<ConcreteTypePack>(type))
     {
         for (Index i = 0; i < typePack->getTypeCount(); ++i)
         {
-            if (_diagnoseRestrictedRayTracingGenericArgument(
-                    sink,
-                    typePack->getElementType(i),
-                    location))
+            if (_diagnoseRestrictedGenericArgument(sink, typePack->getElementType(i), location))
                 return true;
         }
         return false;
     }
-    switch (_getDirectRestrictedRayTracingTypeKind(type))
+    switch (_getDirectRestrictedTypeKind(type))
     {
-    case RestrictedRayTracingTypeKind::StageInput:
+    case RestrictedTypeKind::StageInput:
         sink->diagnose(Diagnostics::StructuralRayTracingInputGenericArgument{
             .type = type,
             .location = location});
         return true;
-    case RestrictedRayTracingTypeKind::StageInterface:
-        return _diagnoseInvalidRTBuiltinTypeUse(sink, type, location);
+    case RestrictedTypeKind::StageInterface:
+        return _diagnoseInvalidBuiltinTypeUse(sink, type, location);
     default:
         return false;
     }
@@ -245,7 +242,7 @@ static bool _diagnoseRestrictedRayTracingGenericArgument(
 // their checked declaration reference. Existing type construction can therefore preserve their
 // generic arguments without a custom representation. Other core magic classes may require
 // different operands and cannot safely be applied to an ordinary declaration.
-bool isRayTracingBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl)
+bool isBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl)
 {
     if (!modifier || !modifier->magicNodeType || !modifier->magicNodeType.getInfo()->createFunc)
         return false;
@@ -255,7 +252,7 @@ bool isRayTracingBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl)
             modifier->magicNodeType.isSubClassOf<TraceProgramDescriptorType>());
 }
 
-String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* stageType)
+String getSourceTypeName(ASTBuilder* astBuilder, Type* stageType)
 {
     auto declRefType = as<DeclRefType>(stageType ? stageType->resolve() : nullptr);
     if (!declRefType)
@@ -272,7 +269,7 @@ String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* stage
     return declRefType->toString();
 }
 
-String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName, Stage stage)
+String getEntryPointName(UnownedStringSlice sourceTypeName, Stage stage)
 {
     SLANG_RELEASE_ASSERT(isRaytracingStage(stage));
 
@@ -285,7 +282,7 @@ String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName, 
     return result.produceString();
 }
 
-Stage getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl)
+Stage getStageKind(InterfaceDecl* interfaceDecl)
 {
     switch (_getMagicTypeClass(interfaceDecl))
     {
@@ -304,16 +301,16 @@ Stage getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl)
     }
 }
 
-bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl)
+bool isExecutableStageInterface(InterfaceDecl* interfaceDecl)
 {
     auto modifier = interfaceDecl ? interfaceDecl->findModifier<MagicTypeModifier>() : nullptr;
     return modifier && modifier->magicNodeType &&
            modifier->magicNodeType.isSubClassOf<RayTracingStageInterfaceType>();
 }
 
-Stage getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl)
+Stage getStageInputKind(AggTypeDecl* typeDecl)
 {
-    switch (_getRayTracingBuiltin(typeDecl))
+    switch (_getBuiltin(typeDecl))
     {
     case KnownBuiltinDeclName::RayTracingClosestHitInput:
         return Stage::ClosestHit;
@@ -330,9 +327,9 @@ Stage getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl)
     }
 }
 
-FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* interfaceDecl)
+FunctionDeclBase* getStageInvokeRequirement(InterfaceDecl* interfaceDecl)
 {
-    if (!isExecutableStructuralRayTracingStageInterface(interfaceDecl))
+    if (!isExecutableStageInterface(interfaceDecl))
         return nullptr;
     for (auto member : interfaceDecl->getDirectMemberDeclsOfType<FunctionDeclBase>())
     {
@@ -344,9 +341,7 @@ FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* i
 
 // Returns the checked entry types used by the duplicate-entry diagnostic. The list's conformance
 // witnesses are handled by ordinary conformance checking and are not needed to compare types.
-static ConcreteTypePack* _getStructuralRayTracingEntryTypes(
-    ASTBuilder* astBuilder,
-    Type* entryListType)
+static ConcreteTypePack* _getEntryTypes(ASTBuilder* astBuilder, Type* entryListType)
 {
     if (auto declRefType = as<DeclRefType>(entryListType))
     {
@@ -381,14 +376,12 @@ static ConcreteTypePack* _getStructuralRayTracingEntryTypes(
 // A helper may accept MissInput<C>, but selecting that helper with -entry requires this check.
 // Source imports and saved modules use the same checked function reference. Types revealed only
 // by later, separate specialization still need validation at that specialization boundary.
-void diagnoseStructuralRayTracingInputInNativeEntryPoint(
-    EntryPoint* entryPoint,
-    DiagnosticSink* sink)
+void diagnoseInputInNativeEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 {
     SLANG_RELEASE_ASSERT(!entryPoint->isStructuralRayTracingEntryPoint());
     auto diagnoseInputType = [sink](Type* type, SourceLoc location)
     {
-        if (_getRestrictedRayTracingTypeKind(type) == RestrictedRayTracingTypeKind::StageInput)
+        if (_getRestrictedTypeKind(type) == RestrictedTypeKind::StageInput)
         {
             sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
                 .type = type,
@@ -417,7 +410,7 @@ void diagnoseStructuralRayTracingInputInNativeEntryPoint(
 // Generic stages currently need arguments in the entry name, for example `-entry "M<P>"`.
 // TODO(#13800): Support separate CLI/API specialization while keeping invoke, its stage contract,
 // and target validation consistent with the concrete arguments.
-DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
+DeclRef<FuncDecl> findEntryPointByName(
     Linkage* linkage,
     Module* module,
     Name* name,
@@ -482,7 +475,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     for (auto facet : visitor.getShared()->getInheritanceInfo(stageType).facets)
     {
         auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>();
-        auto kind = getStructuralRayTracingStageKind(interfaceDeclRef.getDecl());
+        auto kind = getStageKind(interfaceDeclRef.getDecl());
         if (kind != Stage::Unknown)
         {
             if (auto implementation = _getStageImplementationFromSubtypeWitness(
@@ -573,18 +566,13 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
 // Sets the names of an entry point selected through a checked stage conformance.
 // Preserve the requested public name, such as Stages.Miss or Stages.Miss.invoke. Both spellings
 // derive the same target symbol from the stage type and select the same checked invoke method.
-void initializeStructuralRayTracingEntryPoint(
-    EntryPoint* entryPoint,
-    Name* entryPointName,
-    Type* stageType)
+void initializeEntryPoint(EntryPoint* entryPoint, Name* entryPointName, Type* stageType)
 {
     entryPoint->markAsStructuralRayTracingEntryPoint();
     entryPoint->setNameOverride(entryPointName);
-    auto sourceTypeName =
-        getStructuralRayTracingSourceTypeName(entryPoint->getLinkage()->getASTBuilder(), stageType);
-    entryPoint->setEntryPointNameOverride(getStructuralRayTracingEntryPointName(
-        sourceTypeName.getUnownedSlice(),
-        entryPoint->getStage()));
+    auto sourceTypeName = getSourceTypeName(entryPoint->getLinkage()->getASTBuilder(), stageType);
+    entryPoint->setEntryPointNameOverride(
+        getEntryPointName(sourceTypeName.getUnownedSlice(), entryPoint->getStage()));
 }
 
 // =============================================================================
@@ -597,23 +585,20 @@ void initializeStructuralRayTracingEntryPoint(
 // invoke. Applying these restrictions at that point also covers a Miss listed in a schema
 // without being selected directly with `-entry Miss`.
 // A conformance to an ordinary interface, such as ITraceProgramSchema, needs no stage restrictions.
-void checkStructuralRayTracingStageRestrictions(
+void checkStageRestrictions(
     SemanticsVisitor* visitor,
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
     WitnessTable* witnessTable,
     SourceLoc conformanceLoc)
 {
-    auto stageKind = getStructuralRayTracingStageKind(superInterfaceDeclRef.getDecl());
+    auto stageKind = getStageKind(superInterfaceDeclRef.getDecl());
     if (stageKind == Stage::Unknown || !witnessTable)
         return;
 
-    _checkStructuralRayTracingStageImplementationType(
-        visitor,
-        witnessTable->witnessedType,
-        conformanceLoc);
+    _checkStageImplementationType(visitor, witnessTable->witnessedType, conformanceLoc);
 }
 
-void diagnoseDuplicateStructuralRayTracingSchemaEntries(
+void diagnoseDuplicateSchemaEntries(
     ASTBuilder* astBuilder,
     DiagnosticSink* sink,
     Type* entryListType,
@@ -622,7 +607,7 @@ void diagnoseDuplicateStructuralRayTracingSchemaEntries(
     SourceLoc satisfyingDeclLoc)
 {
 
-    auto sectionName = _getStructuralRayTracingSchemaSectionName(associatedTypeRequirement);
+    auto sectionName = _getSchemaSectionName(associatedTypeRequirement);
     if (!sectionName)
         return;
 
@@ -641,8 +626,7 @@ void diagnoseDuplicateStructuralRayTracingSchemaEntries(
     //
     // Canonical AST identity makes aliases name the same entry without reconstructing or
     // structurally comparing types here.
-    auto entries =
-        _getStructuralRayTracingEntryTypes(astBuilder, entryListType->getCanonicalType());
+    auto entries = _getEntryTypes(astBuilder, entryListType->getCanonicalType());
     HashSet<Type*> seenEntries;
     for (Index i = 0; i < entries->getTypeCount(); ++i)
     {
@@ -669,9 +653,7 @@ void diagnoseDuplicateStructuralRayTracingSchemaEntries(
 // A direct input is allowed as a non-uniform in parameter or an initialized non-static local.
 // Globals, fields, and other parameter directions are rejected. An initializer must itself pass
 // the ordinary expression/conversion checks below, which reject fresh input construction.
-void diagnoseInvalidStructuralRayTracingVariableType(
-    SemanticsVisitor* visitor,
-    VarDeclBase* varDecl)
+void diagnoseInvalidVariableType(SemanticsVisitor* visitor, VarDeclBase* varDecl)
 {
     auto type = varDecl->getType();
     // Recognize the input type itself, such as MissInput<C>. Unknown means it is not a stage input.
@@ -695,7 +677,7 @@ void diagnoseInvalidStructuralRayTracingVariableType(
             //
             // For `MissInput<C> fresh;`, variable checking may insert a default-constructor call.
             // Check that inserted expression too, even though no initializer was written.
-            diagnoseInvalidStructuralRayTracingExpression(visitor, varDecl->initExpr);
+            diagnoseInvalidExpression(visitor, varDecl->initExpr);
             // The local declaration is allowed; any initializer error was reported above.
             return;
         }
@@ -705,17 +687,17 @@ void diagnoseInvalidStructuralRayTracingVariableType(
     // checks restricted types inside built-in containers and the stage interface itself.
     // Reaching this call does not imply an error: ordinary types, including concrete stage
     // structs, pass without a diagnostic.
-    _diagnoseInvalidRTBuiltinTypeUse(visitor->getSink(), type, varDecl->loc);
+    _diagnoseInvalidBuiltinTypeUse(visitor->getSink(), type, varDecl->loc);
 }
 
 // Rejects results such as `rt::MissInput<C> makeInput();`. Inputs may be received as in parameters
 // and copied locally, but a function cannot promise a new input. Constructors are checked at
 // their call expressions instead, so their declarations do not trigger this result check.
-void diagnoseInvalidStructuralRayTracingReturnType(DiagnosticSink* sink, CallableDecl* decl)
+void diagnoseInvalidReturnType(DiagnosticSink* sink, CallableDecl* decl)
 {
     if (as<ConstructorDecl>(decl))
         return;
-    _diagnoseInvalidRTBuiltinTypeUse(
+    _diagnoseInvalidBuiltinTypeUse(
         sink,
         decl->returnType.type,
         decl->returnType.exp ? decl->returnType.exp->loc : decl->loc);
@@ -723,11 +705,9 @@ void diagnoseInvalidStructuralRayTracingReturnType(DiagnosticSink* sink, Callabl
 
 // Rejects a property such as `property rt::MissInput<C> input { get; }`. Payload and record
 // properties have ordinary application-defined result types and remain legal.
-void diagnoseInvalidStructuralRayTracingPropertyType(
-    DiagnosticSink* sink,
-    PropertyDecl* propertyDecl)
+void diagnoseInvalidPropertyType(DiagnosticSink* sink, PropertyDecl* propertyDecl)
 {
-    _diagnoseInvalidRTBuiltinTypeUse(
+    _diagnoseInvalidBuiltinTypeUse(
         sink,
         propertyDecl->type.type,
         propertyDecl->type.exp ? propertyDecl->type.exp->loc : propertyDecl->loc);
@@ -741,10 +721,10 @@ void diagnoseInvalidStructuralRayTracingPropertyType(
 //
 // ResolveInvoke and coercion distinguish these cases. Inspect their checked result, rather than
 // treating every Type(...) spelling as construction. Ordinary struct results need no RT check.
-bool diagnoseInvalidStructuralRayTracingExpression(SemanticsVisitor* visitor, Expr* expr)
+bool diagnoseInvalidExpression(SemanticsVisitor* visitor, Expr* expr)
 {
     auto type = expr->type;
-    if (_getRestrictedRayTracingTypeKind(type) == RestrictedRayTracingTypeKind::None)
+    if (_getRestrictedTypeKind(type) == RestrictedTypeKind::None)
         return false;
 
     bool isConstruction = false;
@@ -776,7 +756,7 @@ bool diagnoseInvalidStructuralRayTracingExpression(SemanticsVisitor* visitor, Ex
             Diagnostics::StructuralRayTracingTypeConstruction{.type = type, .location = location});
         return true;
     }
-    return _diagnoseInvalidRTBuiltinTypeUse(visitor->getSink(), type, location);
+    return _diagnoseInvalidBuiltinTypeUse(visitor->getSink(), type, location);
 }
 
 // Checks the type arguments of a resolved function, method, or constructor call. Consider:
@@ -791,7 +771,7 @@ bool diagnoseInvalidStructuralRayTracingExpression(SemanticsVisitor* visitor, Ex
 // The chosen declaration's substitutions include both written and inferred arguments. Rejecting
 // Input for T prevents the generic body from constructing it after specialization. This temporary
 // restriction does not catch an associated type such as T.Item becoming Input; see issue #13686.
-bool diagnoseInvalidStructuralRayTracingGenericArguments(DiagnosticSink* sink, InvokeExpr* invoke)
+bool diagnoseInvalidGenericArguments(DiagnosticSink* sink, InvokeExpr* invoke)
 {
     auto functionDeclRef = as<DeclRefExpr>(invoke->functionExpr);
     if (!functionDeclRef)
@@ -809,7 +789,7 @@ bool diagnoseInvalidStructuralRayTracingGenericArguments(DiagnosticSink* sink, I
                     // Integer arguments and conformance witnesses need no type-use check.
                     if (auto argumentType = as<Type>(argument))
                     {
-                        if (_diagnoseRestrictedRayTracingGenericArgument(
+                        if (_diagnoseRestrictedGenericArgument(
                                 sink,
                                 argumentType,
                                 invoke->functionExpr->loc))
@@ -831,22 +811,18 @@ bool diagnoseInvalidStructuralRayTracingGenericArguments(DiagnosticSink* sink, I
 // This has the same unknown-T construction risk as a generic call. Check the written type
 // arguments once normal type resolution succeeds. A concrete stage struct is an ordinary
 // argument, so shader lists and generic helpers require no special exemption for those structs.
-bool diagnoseInvalidStructuralRayTracingGenericTypeApplication(
-    DiagnosticSink* sink,
-    GenericAppExpr* genericApplication)
+bool diagnoseInvalidGenericTypeApplication(DiagnosticSink* sink, GenericAppExpr* genericApplication)
 {
     for (auto argument : genericApplication->arguments)
     {
         if (auto argumentType = as<TypeType>(argument->type))
         {
-            if (_diagnoseRestrictedRayTracingGenericArgument(
-                    sink,
-                    argumentType->getType(),
-                    argument->loc))
+            if (_diagnoseRestrictedGenericArgument(sink, argumentType->getType(), argument->loc))
                 return true;
         }
     }
     return false;
 }
 
+} // namespace PortableRT
 } // namespace Slang

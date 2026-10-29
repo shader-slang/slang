@@ -17,11 +17,11 @@
 #include "slang-ast-iterator.h"
 #include "slang-ast-print.h"
 #include "slang-ast-synthesis.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-structural-ray-tracing.h"
 #include "slang-syntax.h"
 
 #include <limits>
@@ -3086,7 +3086,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     // Therefore, the body visitor will not check them for invalid RT builtin type use.
     // Run that check here instead, now that their types and initializers are known.
     if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
-        diagnoseInvalidStructuralRayTracingVariableType(this, varDecl);
+        PortableRT::diagnoseInvalidVariableType(this, varDecl);
 
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
@@ -3931,7 +3931,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     // An input local must receive an existing view. Check after initialization has been chosen:
     // `let copy = input` is valid, while an inserted default constructor still creates a new input.
-    diagnoseInvalidStructuralRayTracingVariableType(this, varDecl);
+    PortableRT::diagnoseInvalidVariableType(this, varDecl);
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
 
@@ -6769,7 +6769,7 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
             return false;
     }
 
-    diagnoseDuplicateStructuralRayTracingSchemaEntries(
+    PortableRT::diagnoseDuplicateSchemaEntries(
         getASTBuilder(),
         getSink(),
         satisfyingType,
@@ -11744,7 +11744,7 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     }
 
     interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
-    checkStructuralRayTracingStageRestrictions(
+    PortableRT::checkStageRestrictions(
         this,
         superInterfaceDeclRef,
         witnessTable,
@@ -16700,10 +16700,10 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
-        diagnoseInvalidStructuralRayTracingVariableType(this, paramDecl);
+        PortableRT::diagnoseInvalidVariableType(this, paramDecl);
     }
 
-    diagnoseInvalidStructuralRayTracingReturnType(getSink(), decl);
+    PortableRT::diagnoseInvalidReturnType(getSink(), decl);
 
     maybeInferPrefixModifierForOperator(decl);
 
@@ -18136,7 +18136,7 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
 {
     SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
-    diagnoseInvalidStructuralRayTracingPropertyType(getSink(), decl);
+    PortableRT::diagnoseInvalidPropertyType(getSink(), decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
 }
@@ -23268,7 +23268,7 @@ bool isOpaqueHandleType(Type* type)
         type = modifiedType->getBase();
     // Logical RT inputs are supplied by the compiler, like patch and stream inputs/outputs.
     // Include them in the ordinary opaque-type checks so Optional cannot store them either.
-    if (getStructuralRayTracingStageInputKind(isDeclRefTypeOf<AggTypeDecl>(type).getDecl()) !=
+    if (PortableRT::getStageInputKind(isDeclRefTypeOf<AggTypeDecl>(type).getDecl()) !=
         Stage::Unknown)
         return true;
     if (as<TraceProgramDescriptorType>(type))

@@ -1,8 +1,8 @@
 // slang-check-conversion.cpp
 #include "slang-ast-synthesis.h"
 #include "slang-check-impl.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-structural-ray-tracing.h"
 
 // This file contains semantic-checking logic for dealing
 // with conversion (both implicit and explicit) of expressions
@@ -3464,7 +3464,7 @@ Expr* SemanticsVisitor::coerce(
     // input to helper is allowed. Check the converted expression here, after _coerce succeeds.
     // Overload resolution also calls _coerce to try conversions for candidates it may discard;
     // reporting an error there could reject a call whose chosen overload needs no forbidden input.
-    if (diagnoseInvalidStructuralRayTracingExpression(this, expr))
+    if (PortableRT::diagnoseInvalidExpression(this, expr))
         return CreateImplicitCastExpr(m_astBuilder->getErrorType(), expr);
 
     return expr;
