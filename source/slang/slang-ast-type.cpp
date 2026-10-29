@@ -2380,13 +2380,6 @@ Type* BuiltinGenericType::getElementType() const
     return as<Type>(_getGenericTypeArg(getDeclRefBase(), 0));
 }
 
-// Returns the original texture type argument, which conforms to ITexelFormat.
-// For Texture2D<RGBA16F>, this is RGBA16F: ITexelFormat
-Type* ResourceType::getTexelFormatType()
-{
-    return as<Type>(_getGenericTypeArg(this, 0));
-}
-
 // Returns Texel.DataType, which conforms to ITexelElement.
 // For Texture2D<RGBA16F>, RGBA16F.DataType is float4 : ITexelElement
 Type* ResourceType::getElementType()
@@ -2472,7 +2465,9 @@ void ResourceType::_toTextOverride(StringBuilder& out)
             return false;
         if (isShadow())
             return false;
-        auto texelFormatType = getTexelFormatType();
+        // Print the original texture argument, which conforms to ITexelFormat.
+        // For Texture2D<RGBA16F>, this is RGBA16F: ITexelFormat
+        auto texelFormatType = _getGenericTypeArg(this, 0);
         if (texelFormatType)
         {
             resultSB << "<";

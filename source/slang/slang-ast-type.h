@@ -250,9 +250,6 @@ class ResourceType : public BuiltinType
     SlangResourceShape getBaseShape();
     SlangResourceShape getShape();
     SlangResourceAccess getAccess();
-    /// Returns the original first texture argument, Texel, which conforms to ITexelFormat.
-    /// For Texture2D<RGBA16F> this is RGBA16F; for Texture2D<float4> it is float4.
-    Type* getTexelFormatType();
     /// Returns Texel.DataType, which satisfies ITexelElement and describes the whole
     /// declared value type for loads and stores, including any type modifiers.
     /// For Texture2D<RGBA16F> and Texture2D<float4>, this is float4, whereas
