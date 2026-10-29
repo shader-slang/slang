@@ -729,50 +729,63 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         applyAddressSpaceToInstType();
 
-        auto removedFuncs = removeUnusedFunctions();
+        // After these two calls, each linkage name belongs to at most one surviving function: the
+        // original if it survives, otherwise its only surviving specialization.
+        auto removedFuncs = removeDeadRedirectedCallees();
         removeLinkageFromSpecializationsThatDoNotReplaceOriginal(removedFuncs);
     }
 
+    // Removes the functions in `functionsToConsiderRemoving` (the callees whose calls this pass
+    // redirected) that are left without uses, and returns them. The returned functions are
+    // deallocated, so their pointers are only good for comparison.
+    //
     // Removing a dead original can leave another original without uses, so the removal repeats
-    // until nothing changes. An original marked for export from a precompiled module stays even
-    // when every call to it now targets a specialization, because `collectMetadata` has already
-    // listed it as exported with its original signature. A specialization copies that decoration
-    // but only serves the calls redirected to it.
-    HashSet<IRFunc*> removeUnusedFunctions()
+    // until nothing changes. An original marked `DownstreamModuleExport` stays even without uses:
+    // precompiling the module marks it `AvailableInDownstreamIR` under its name for importers
+    // (see `precompileForTarget`), so the precompiled SPIR-V must define that name with the
+    // unspecialized signature. A specialization copies that decoration from its original, so the
+    // exemption checks `specializationOrigin` to apply to originals only.
+    HashSet<IRFunc*> removeDeadRedirectedCallees()
     {
         HashSet<IRFunc*> removedFuncs;
-        bool changed = true;
-        while (changed)
+        for (;;)
         {
-            changed = false;
+            List<IRFunc*> deadFuncs;
             for (IRFunc* func : functionsToConsiderRemoving)
             {
-                if (removedFuncs.contains(func) || func->hasUses())
+                if (func->hasUses())
                     continue;
                 if (func->findDecoration<IRDownstreamModuleExportDecoration>() &&
                     !specializationOrigin.containsKey(func))
                     continue;
+                deadFuncs.add(func);
+            }
+            if (!deadFuncs.getCount())
+                return removedFuncs;
+            for (IRFunc* func : deadFuncs)
+            {
                 SLANG_ASSERT(!func->findDecoration<IREntryPointDecoration>());
+                functionsToConsiderRemoving.remove(func);
                 removedFuncs.add(func);
                 func->removeAndDeallocate();
-                changed = true;
             }
         }
-        return removedFuncs;
     }
 
-    // Removes the linkage decorations from each surviving specialization unless it is the only
-    // surviving specialization of a removed original. `removedFuncs` holds the functions that
-    // `removeUnusedFunctions` has already deallocated; they are only compared, never dereferenced.
+    // Removes the linkage decorations from each surviving specialization that does not replace its
+    // original. A specialization replaces its original when the original was removed and no other
+    // specialization of it survived; it then keeps the original's linkage, as the only function
+    // left with that name. `slang-ir-lower-buffer-element-type.cpp` applies the same rule to its
+    // specializations; here an original counts as removed only once `removeDeadRedirectedCallees`
+    // has removed it, and `removedFuncs` is only compared, never dereferenced.
     //
     // `specializeFunc` clones the original's linkage decorations along with its body, so every
     // specialization starts with the original's mangled name. An emitter names a function that
-    // has no name hint (as under `-obfuscate`) by its mangled name, so two surviving functions
-    // that share it are emitted as two definitions with one name, which WGSL and Metal reject.
-    // For example, `void bump(inout uint dst)` called with a local and with a `groupshared`
-    // element has a `thread*` and a `threadgroup*` specialization on Metal. A single
-    // specialization of a removed original keeps the linkage, because it has taken the
-    // original's place.
+    // has no name hint (as under `-obfuscate`) by its mangled name, so two surviving functions that
+    // share it are emitted as two definitions with one name. WGSL has no overloading and rejects
+    // them; Metal rejects them when their parameter types coincide. For example, `void bump(inout
+    // uint dst)` called with a local and with a `groupshared` element has a `thread*` and a
+    // `threadgroup*` specialization on Metal.
     void removeLinkageFromSpecializationsThatDoNotReplaceOriginal(
         const HashSet<IRFunc*>& removedFuncs)
     {
@@ -784,11 +797,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
         for (auto& [original, specializations] : survivingSpecializationsByOriginal)
         {
-            if (!removedFuncs.contains(original) || specializations.getCount() > 1)
-            {
-                for (auto specialization : specializations)
-                    removeLinkageDecorations(specialization);
-            }
+            bool replacesOriginal =
+                removedFuncs.contains(original) && specializations.getCount() == 1;
+            if (replacesOriginal)
+                continue;
+            for (auto specialization : specializations)
+                removeLinkageDecorations(specialization);
         }
     }
 };
