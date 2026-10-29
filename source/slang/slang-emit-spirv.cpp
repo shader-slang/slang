@@ -3601,6 +3601,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             UInt index = rr->getOffset();
             UInt space = rr->getSpace();
+            // This emitter reads the variable's own offsets rather than an `EmitVarChain`, so it
+            // adds a parameter group's container offset to get the group's own binding.
             if (auto containerAttr =
                     findParameterGroupContainerOffsetAttr(layout, rr->getResourceKind()))
             {

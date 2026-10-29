@@ -228,9 +228,12 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
 
         if (auto offsetAttr = varLayout->findOffsetAttr(kind))
         {
-            // Get the binding information from this attribute and insert it into the list
             auto spaceIndex = spaceOffset + offsetAttr->getSpace();
             auto registerIndex = offsetAttr->getOffset();
+            // A parameter group's own binding adds its container's offset. The whole group's
+            // `count` then starts there, which holds because the only group with a non-zero
+            // container offset, the global scope's default constant buffer, has no element
+            // resources: the global parameters are separate variables with their own layouts.
             if (auto containerOffsetAttr = findParameterGroupContainerOffsetAttr(varLayout, kind))
             {
                 spaceIndex += containerOffsetAttr->getSpace();

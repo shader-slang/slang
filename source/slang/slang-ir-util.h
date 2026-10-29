@@ -624,11 +624,11 @@ IRVarLayout* findVarLayout(IRInst* value);
 /// `varLayout` lays out, or return null when `varLayout` is not for a parameter group or its
 /// container uses no `kind` resources.
 ///
-/// The resources of a parameter group itself (the buffer of a `ConstantBuffer<T>`) are at
-/// `varLayout`'s offset plus this offset. The offset is zero for every group except the default
-/// constant buffer of the global scope: the global-scope parameters keep absolute bindings, so
-/// `generateParameterBindings` leaves the scope variable at offset zero and records the buffer's
-/// binding on the container.
+/// The binding of a parameter group itself (the buffer of a `ConstantBuffer<T>`) is
+/// `varLayout`'s offset plus this offset, in both index and space. Emitters that chain variable
+/// layouts through an `EmitVarChain` already form that sum; consumers that read a variable
+/// layout's own offset attributes use this helper to add it. The offset is non-zero only where
+/// `generateParameterBindings` records the global scope's default constant buffer.
 IRVarOffsetAttr* findParameterGroupContainerOffsetAttr(
     IRVarLayout* varLayout,
     LayoutResourceKind kind);

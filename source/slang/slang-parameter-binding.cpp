@@ -4785,23 +4785,37 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     globalScopeVarLayout = globalScopeLayoutBuilder.endLayout(globalScopeVarLayout);
 
     // The global-scope parameters keep the absolute bindings that `_completeBindings`
-    // assigned them, while reflection offsets are relative to the parent variable, so the
-    // scope variable itself sits at offset zero. We record the binding of the default
-    // constant buffer on the container of the scope's constant-buffer layout instead:
-    // scope + container then gives the buffer's binding without also shifting every
-    // global-scope parameter by it. The scope variable still gets an entry (at zero) for the
-    // buffer's resource kind, as every variable layout has one for each kind its type uses,
-    // and consumers such as the SPIR-V emitter add the container offset to that entry.
+    // assigned them, and every consumer of a layout (reflection's cumulative-offset walk,
+    // and the legalization pass that splits resources out of the default constant buffer)
+    // adds a parent variable's offsets to its children's. The scope variable therefore sits
+    // at offset zero, and we record the default constant buffer's binding on the container
+    // of the scope's constant-buffer layout. Consider this example:
+    //
+    //      [[vk::binding(0)]] RWStructuredBuffer<float> result;
+    //      struct S { Texture2D t; float f; }
+    //      uniform S s;
+    //
+    // The default constant buffer gets binding 1 and `s.t` gets binding 2. Scope (0) +
+    // container (1) gives the buffer's binding, and scope (0) + element (0) + `s` (2) gives
+    // the binding of `s.t` after legalization splits it out. Had the scope carried the 1,
+    // `s.t` would be emitted at 3.
+    //
+    // This is the only producer of a non-zero container offset; for every other parameter
+    // group `_createParameterGroupTypeLayout` leaves the container at zero.
     if (globalConstantBufferBinding.count.compare(0) != std::partial_ordering::equivalent)
     {
         auto scopeTypeLayout = as<ParameterGroupTypeLayout>(globalScopeVarLayout->typeLayout);
 
         // `-fvk-bind-globals` reserves its binding even when no global uses ordinary data, and
-        // then there is no constant buffer to record it on. A binding allocated for the
-        // default constant buffer always has one.
+        // then there is no constant buffer to record it on. A binding that was allocated
+        // because a global uses ordinary data always has one; `needDefaultConstantBuffer` is
+        // only computed on that path, so the assertion says nothing about the other.
         SLANG_ASSERT(scopeTypeLayout || !needDefaultConstantBuffer);
         if (scopeTypeLayout)
         {
+            // The scope variable keeps an entry at zero for the buffer's kind. Consumers that
+            // read a variable's own offset attributes, such as the SPIR-V emitter, find the
+            // group's binding through that entry and add the container's offset to it.
             globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
 
             auto cbInfo = scopeTypeLayout->containerVarLayout->findOrAddResourceInfo(

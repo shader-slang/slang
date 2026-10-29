@@ -170,6 +170,8 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 
     for (auto rr : layout->getOffsetAttrs())
     {
+        // As in the SPIR-V emitter, a parameter group's own binding adds its container's
+        // offset. Metal bindings have no space, so only the index is adjusted.
         UInt index = rr->getOffset();
         if (auto containerAttr =
                 findParameterGroupContainerOffsetAttr(layout, rr->getResourceKind()))
