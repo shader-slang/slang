@@ -6058,6 +6058,13 @@ err(
     span { loc = "location", message = "target '~target:CodeGenTarget' cannot size an array with a specialization constant; such arrays are supported on SPIR-V and GLSL, and on WGSL only as the type of a 'groupshared' variable." }
 )
 
+err(
+    "specialization-constant-sized-array-initializer-not-supported",
+    55223,
+    "an array sized by a specialization constant cannot be initialized from a list",
+    span { loc = "location", message = "this array is initialized from a list, which would need one value per element, but its size is a specialization constant; no target can express that, so assign the elements in a loop instead." }
+)
+
 fatal(
     "generic-specialization-recursion-cycle",
     55206,

@@ -22,6 +22,9 @@ class DiagnosticSink;
 /// function parameters and struct fields; a variable of a struct type is not reported again,
 /// because the struct field that holds the array already is.
 ///
+/// No target can build such an array from an initializer list (`float a[kTile] = {};`), so SPIR-V
+/// and GLSL report that initializer instead.
+///
 /// The check runs after specialization and dead-code elimination, so an array that a generic
 /// argument introduces is reported and one in removed code is not. On targets without
 /// specialization constants `collectGlobalUniformParameters` has by then turned `kTile` into a

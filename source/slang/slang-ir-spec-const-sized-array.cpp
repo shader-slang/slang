@@ -107,6 +107,23 @@ struct SpecConstSizedArrayCheckContext
         });
     }
 
+    /// Report each `makeArrayFromElement` that builds an array sized by a specialization
+    /// constant, as `float a[kTile] = {};` does. No target can spell that value: a GLSL or HLSL
+    /// array constructor needs one argument per element, and SPIR-V's `OpCompositeConstruct` needs
+    /// one operand per element.
+    void checkInitializers(IRInst* inst)
+    {
+        if (inst->getOp() == kIROp_MakeArrayFromElement &&
+            isSpecConstSizedArrayType(inst->getDataType()))
+        {
+            sink->diagnose(Diagnostics::SpecializationConstantSizedArrayInitializerNotSupported{
+                .location = inst->sourceLoc,
+            });
+        }
+        for (auto child : inst->getChildren())
+            checkInitializers(child);
+    }
+
     /// Report each value of an unsupported array type that no declaration holds, such as the
     /// result of `ByteAddressBuffer.Load<float[kTile]>(0)`, because the emitter declares a
     /// temporary of that type for it. Each such type is reported once. Call results are reported
@@ -148,10 +165,16 @@ void checkSpecializationConstantSizedArrays(
     CodeGenTarget target,
     DiagnosticSink* sink)
 {
-    if (isKhronosTarget(target))
-        return;
-
     SpecConstSizedArrayCheckContext context{target, sink};
+
+    // SPIR-V and GLSL accept every such declaration, but not an initializer for one. Every other
+    // target already reports the declaration that the initializer belongs to.
+    if (isKhronosTarget(target))
+    {
+        context.checkInitializers(module->getModuleInst());
+        return;
+    }
+
     context.checkInst(module->getModuleInst());
     context.checkValues(module->getModuleInst(), true);
     context.checkValues(module->getModuleInst(), false);
