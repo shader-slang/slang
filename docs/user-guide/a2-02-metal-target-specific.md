@@ -270,6 +270,30 @@ RWTexture2D<float2> tex;
 tex[coord] = float2(1,2);  // Automatically expanded to float4(1,2,0,0)
 ```
 
+## Atomic Operations
+
+The Metal Shading Language limits 64-bit integer atomics to a min or max that
+returns `void`: `atomic_min_explicit` and `atomic_max_explicit` on a device
+`atomic_ulong` with `memory_order_relaxed`, and the `atomic_min` and
+`atomic_max` members of a `ulong` texture. Slang emits those forms for a
+`uint64_t` min or max on device memory or a texture whose original value is not
+used:
+
+```slang
+RWStructuredBuffer<uint64_t> buffer;
+
+InterlockedMin(buffer[i], key);      // atomic_min_explicit(..., memory_order_relaxed);
+uint64_t original;
+InterlockedMax(buffer[i], key, original);
+buffer[j] = original;                // error 55204: the original value is used
+```
+
+Every other 64-bit integer atomic, including any `int64_t` atomic, a
+`groupshared` destination, and `Atomic<uint64_t>` methods other than `min`,
+`max`, `reduceMin` and `reduceMax`, is reported as error 55204. Apple GPUs run
+the 64-bit min and max only on some GPU families; see the Metal Feature Set
+Tables.
+
 ## Conservative Rasterization
 
 Since Metal doesn't support conservative rasterization, SV_InnerCoverage is always false.
