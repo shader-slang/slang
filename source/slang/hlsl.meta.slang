@@ -1373,6 +1373,16 @@ void __wgsl_check_texture_type_texel_offset()
          , "WGSL texture shape must be 2D or 3D when sampling with texel offsets");
 }
 
+// WGSL's sampling builtins (textureSample, textureSampleLevel, textureSampleGrad,
+// textureSampleBias) take only f32 textures; an integer texture is read with Load.
+[require(wgsl)]
+__generic<T:ITexelElement>
+void __wgsl_check_sample_texture()
+{
+    static_assert(T.Element is float,
+        "WGSL can only sample (Sample, SampleLevel, SampleGrad, SampleBias) a float texture: use Load to read an integer texture");
+}
+
 //@public:
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
@@ -3080,6 +3090,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3148,6 +3159,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<
                     T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3297,6 +3309,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3361,6 +3374,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4025,6 +4039,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4090,6 +4105,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4318,6 +4334,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4383,6 +4400,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
