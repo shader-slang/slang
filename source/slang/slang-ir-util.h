@@ -547,11 +547,9 @@ IRInst* emitLoopBlocks(
 
 void sortBlocksInFunc(IRGlobalValueWithCode* func);
 
-// Removes the decorations that give `inst` a linkage name (imports, exports and their
-// target-specific forms), and `DownstreamModuleExportDecoration`, which is resolved through the
-// `ExportDecoration` name. `DownstreamModuleImportDecoration` is resolved the same way, but it is
-// only added when a function's body is replaced by a precompiled definition, after every caller
-// of this function has run.
+// Removes the decorations that make `inst` visible to or found by other modules: imports and
+// exports with their target-specific forms, `Public`, `KeepAlive`, and `AvailableInDownstreamIR`,
+// which a later pass turns into an import of the `ExportDecoration` name.
 void removeLinkageDecorations(IRInst* inst);
 
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);

@@ -1811,9 +1811,9 @@ void removeLinkageDecorations(IRInst* inst)
         case kIROp_CudaDeviceExportDecoration:
         case kIROp_DllExportDecoration:
         case kIROp_HLSLExportDecoration:
-        // The SPIR-V emitter and `collectMetadata` read the `ExportDecoration` name of every
-        // function marked `DownstreamModuleExport`.
-        case kIROp_DownstreamModuleExportDecoration:
+        // A later pass reduces a function marked `AvailableInDownstreamIR` to an import of its
+        // `ExportDecoration` name, so the decoration cannot outlive that name.
+        case kIROp_AvailableInDownstreamIRDecoration:
             toRemove.add(decoration);
             break;
         default:

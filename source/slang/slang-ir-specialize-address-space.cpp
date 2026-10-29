@@ -124,6 +124,16 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return func;
     }
 
+    // Returns true if retyping a pointer parameter from `oldAddrSpace` to `newAddrSpace` changes
+    // its emitted type. The SPIR-V emitter emits a pointer without an address space as a
+    // `Function` pointer, so retyping it to `Function` keeps the emitted type.
+    static bool changesEmittedPointerType(AddressSpace oldAddrSpace, AddressSpace newAddrSpace)
+    {
+        if (newAddrSpace == oldAddrSpace)
+            return false;
+        return !(oldAddrSpace == AddressSpace::Generic && newAddrSpace == AddressSpace::Function);
+    }
+
     // Clones `key.getFunc()` with its pointer parameters retyped to the key's address spaces,
     // records the clone in `functionSpecializations` (under `key`) and in `specializationOrigin`,
     // and returns it. `key.getFunc()` must be an unspecialized function, never a clone.
@@ -139,6 +149,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         auto specializedFunc = as<IRFunc>(cloneInst(&cloneEnv, &builder, func));
 
         // Update the parameter types with new address spaces in the specialized function.
+        bool changesEmittedSignature = false;
         Index paramIndex = 0;
         for (auto param : specializedFunc->getParams())
         {
@@ -147,6 +158,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             if (ptrType)
             {
                 auto paramAddrSpace = key.getArgAddrSpaces()[paramIndex];
+                if (changesEmittedPointerType(ptrType->getAddressSpace(), paramAddrSpace))
+                    changesEmittedSignature = true;
                 auto newParamType = builder.getPtrType(
                     ptrType->getOp(),
                     ptrType->getValueType(),
@@ -162,13 +175,23 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // Update the function type.
         fixUpFuncType(specializedFunc);
 
-        // A precompiled module defines `func` with its unspecialized parameter types, which the
-        // clone's retyped pointer parameters need not match, so the clone keeps its own body
-        // instead of being reduced to an import of that definition, even when it keeps `func`'s
-        // linkage. A module precompiled for several targets has one such decoration per target.
-        while (auto availableDecor =
-                   specializedFunc->findDecoration<IRAvailableInDownstreamIRDecoration>())
-            availableDecor->removeAndDeallocate();
+        // When a module is precompiled, `func` itself stays as the exported function (see
+        // `removeDeadRedirectedCallees`), so the clone is not marked for export.
+        if (auto exportDecor =
+                specializedFunc->findDecoration<IRDownstreamModuleExportDecoration>())
+            exportDecor->removeAndDeallocate();
+
+        // `removeAvailableInDownstreamModuleDecorations` later replaces the body of a function
+        // marked `AvailableInDownstreamIR` with an import of the precompiled definition, which has
+        // `func`'s parameter types. A clone with a different emitted signature therefore loses
+        // those decorations (one per precompiled target) and keeps its own body. A clone with the
+        // same signature keeps them and reuses the precompiled definition.
+        if (changesEmittedSignature)
+        {
+            while (auto availableDecor =
+                       specializedFunc->findDecoration<IRAvailableInDownstreamIRDecoration>())
+                availableDecor->removeAndDeallocate();
+        }
 
         functionSpecializations[key] = specializedFunc;
         specializationOrigin[specializedFunc] = func;
@@ -740,12 +763,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // redirected) that are left without uses, and returns them. The returned functions are
     // deallocated, so their pointers are only good for comparison.
     //
-    // Removing a dead original can leave another original without uses, so the removal repeats
-    // until nothing changes. An original marked `DownstreamModuleExport` stays even without uses:
-    // precompiling the module marks it `AvailableInDownstreamIR` under its name for importers
-    // (see `precompileForTarget`), so the precompiled SPIR-V must define that name with the
-    // unspecialized signature. A specialization copies that decoration from its original, so the
-    // exemption checks `specializationOrigin` to apply to originals only.
+    // Removing a dead original can leave another original without uses, so the removal repeats.
+    // Each further round removes at least one function from the set, so the loop ends. A function
+    // marked `DownstreamModuleExport`, which only exists while `precompileForTarget` compiles the
+    // module and never on a clone, stays even without uses: `collectMetadata` has already listed
+    // its name as exported before SPIR-V legalization runs this pass, and importers find the
+    // precompiled definition under that name with the unspecialized signature.
     HashSet<IRFunc*> removeDeadRedirectedCallees()
     {
         HashSet<IRFunc*> removedFuncs;
@@ -756,8 +779,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             {
                 if (func->hasUses())
                     continue;
-                if (func->findDecoration<IRDownstreamModuleExportDecoration>() &&
-                    !specializationOrigin.containsKey(func))
+                if (func->findDecoration<IRDownstreamModuleExportDecoration>())
                     continue;
                 deadFuncs.add(func);
             }
@@ -776,17 +798,19 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // Removes the linkage decorations from each surviving specialization that does not replace its
     // original. A specialization replaces its original when the original was removed and no other
     // specialization of it survived; it then keeps the original's linkage, as the only function
-    // left with that name. `slang-ir-lower-buffer-element-type.cpp` applies the same rule to its
-    // specializations; here an original counts as removed only once `removeDeadRedirectedCallees`
-    // has removed it, and `removedFuncs` is only compared, never dereferenced.
+    // left with that name. `slang-ir-lower-buffer-element-type.cpp` uses a similar rule for its
+    // specializations but removes the original itself when the rule holds. Here
+    // `removeDeadRedirectedCallees` has already removed the dead originals, except precompiled
+    // exports, and `removedFuncs` is only compared, never dereferenced.
     //
     // `specializeFunc` clones the original's linkage decorations along with its body, so every
     // specialization starts with the original's mangled name. An emitter names a function that
     // has no name hint (as under `-obfuscate`) by its mangled name, so two surviving functions that
     // share it are emitted as two definitions with one name. WGSL has no overloading and rejects
-    // them; Metal rejects them when their parameter types coincide. For example, `void bump(inout
-    // uint dst)` called with a local and with a `groupshared` element has a `thread*` and a
-    // `threadgroup*` specialization on Metal.
+    // them, and Metal rejects them when their parameter types also coincide. For example,
+    // `void bump(inout uint dst)` called with a local and with a `groupshared` element has a
+    // `thread*` and a `threadgroup*` specialization on Metal, which would both be emitted as
+    // `_Sh2F0590F5ACC4C8A8` if they kept the linkage.
     void removeLinkageFromSpecializationsThatDoNotReplaceOriginal(
         const HashSet<IRFunc*>& removedFuncs)
     {
