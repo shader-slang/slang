@@ -1,6 +1,7 @@
 // slang-emit-cuda.cpp
 #include "slang-emit-cuda.h"
 
+#include "core/slang-type-text-util.h"
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-rich-diagnostics.h"
@@ -437,8 +438,20 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(
     IRFunc* irFunc,
     IREntryPointDecoration* entryPointDecor)
 {
-    SLANG_UNUSED(irFunc);
     SLANG_UNUSED(entryPointDecor);
+
+    // A CUDA warp is always 32 threads wide, so `[WaveSize(32)]` holds without anything to emit,
+    // and any other size cannot be honored. Warn instead of dropping it silently.
+    const Int kCudaWarpSize = 32;
+    Int waveSize = 0;
+    if (getComputeWaveSize(irFunc, &waveSize) && waveSize != kCudaWarpSize)
+    {
+        getSink()->diagnose(Diagnostics::WaveSizeMismatchOnTarget{
+            .waveSize = int(waveSize),
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .targetWaveSize = int(kCudaWarpSize),
+            .location = irFunc->sourceLoc});
+    }
 }
 
 static bool _isCudaDeviceFunctionDefinitionExported(IRFunc* func)
@@ -511,7 +524,7 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 
         // `__noinline__` is a declaration specifier, so it belongs in this specifier
         // sequence. Kernels are call-graph roots with no caller to be inlined into, so the
-        // request is honoured for ordinary device functions only.
+        // request is honored for ordinary device functions only.
         if (inst->findDecoration<IRNoInlineDecoration>())
         {
             m_writer->emit("__noinline__ ");

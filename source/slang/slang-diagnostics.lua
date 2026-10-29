@@ -6257,7 +6257,7 @@ err(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal or WGSL (56101-56114)
+-- Metal, WGSL or CUDA (56101-56115)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
@@ -6341,6 +6341,13 @@ err(
     56114,
     "the workgroup's x dimension (~workgroupSizeX:int) must be a multiple of the 'WaveSize' (~waveSize:int) on target '~target'",
     span { loc = "location", message = "WGSL's '@subgroup_size' requires the x dimension of '@workgroup_size' to be a multiple of the subgroup size; otherwise pipeline creation fails" }
+)
+
+warning(
+    "wave-size-mismatch-on-target",
+    56115,
+    "'WaveSize(~waveSize:int)' cannot be honored on target '~target', whose wave size is always ~targetWaveSize:int; the attribute will be ignored",
+    span { loc = "location", message = "the entry point runs with ~targetWaveSize:int-lane waves, so code that assumes ~waveSize:int lanes per wave computes wrong results" }
 )
 
 -- SPIRV (57001-57007)
