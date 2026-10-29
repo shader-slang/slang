@@ -647,11 +647,13 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     List<Expr*> argExprs;
     for (SlangInt aa = 0; aa < argTypes.getCount(); ++aa)
     {
-        auto argType = argTypes[aa];
+        auto argType = visitor.CoerceToProperType(TypeExp(argTypes[aa])).type;
+        if (as<ErrorType>(argType))
+            return DeclRef<Decl>();
 
-        // Create an 'empty' expr with the given type. Ideally, the expression itself should not
-        // matter only its checked type.
-        //
+        // A reflected `IFoo` must become `dyn IFoo` before it can describe a value.
+        // The normal call checker then opens that box for inference, just as it would
+        // for an argument written in Slang. The placeholder needs no value beyond its checked type.
         auto argExpr = getCurrentASTBuilder()->create<VarExpr>();
         argExpr->type = argType;
         argExpr->type.isLeftValue = true;
@@ -694,10 +696,10 @@ DeclRef<Decl> Linkage::specializeGeneric(
     genericAppExpr->functionExpr = declRefExpr;
     genericAppExpr->arguments = argExprs;
 
-    auto specializedDeclRef =
-        as<DeclRefExpr>(visitor.checkGenericAppWithCheckedArgs(genericAppExpr))->declRef;
-
-    return specializedDeclRef;
+    auto checkedExpr = visitor.checkGenericAppWithCheckedArgs(genericAppExpr);
+    if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+        return declRefExpr->declRef;
+    return DeclRef<Decl>();
 }
 
 SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
@@ -942,13 +944,21 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         SemanticsVisitor visitor(sharedSemanticsContext);
         visitor = visitor.withSink(&sink);
 
-        auto witness = visitor.isSubtype(
-            (Slang::Type*)type,
-            (Slang::Type*)interfaceType,
-            IsSubTypeOptions::None);
-        if (auto subtypeWitness = as<SubtypeWitness>(witness))
+        auto implementationType = visitor.CoerceToProperType(TypeExp(asInternal(type))).type;
+        auto targetInterface = asInternal(interfaceType);
+        // Hosts can obtain the target from a `dyn IFoo` shader parameter. It identifies
+        // the payload's interface here, rather than a box that the implementation must conform to.
+        if (auto boxType = as<ExistentialBoxType>(targetInterface))
+            targetInterface = boxType->getInterfaceType();
+
+        if (!as<ErrorType>(implementationType))
         {
-            result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
+            auto witness =
+                visitor.isSubtype(implementationType, targetInterface, IsSubTypeOptions::None);
+            if (auto subtypeWitness = as<SubtypeWitness>(witness))
+            {
+                result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
+            }
         }
     }
 #if SLANG_HAS_EXCEPTIONS

@@ -5682,6 +5682,10 @@ SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
         auto specialized = linkage->specializeGeneric(slangGeneric, argExprs, &sink);
         sink.getBlobIfNeeded(outDiagnostics);
 
+        // The checker can retain error arguments in a declaration reference for recovery.
+        if (sink.getErrorCount() != 0)
+            return nullptr;
+
         return convertDeclToGeneric(specialized);
     }
 #if SLANG_HAS_EXCEPTIONS

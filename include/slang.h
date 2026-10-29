@@ -3554,6 +3554,13 @@ struct FunctionReflection
             (SlangReflectionGeneric*)generic);
     }
 
+    /** Resolve this function as a call with arguments of `types`.
+
+        Argument types use the session's data-type rules: interface metadata implicitly becomes
+        its existential-box type through Slang 2026; Slang 202c requires explicit `dyn` types.
+        Normal call inference opens existential arguments to infer their payload types.
+        Returns null if the call cannot be resolved.
+     */
     FunctionReflection* specializeWithArgTypes(unsigned int argCount, TypeReflection* const* types)
     {
         return (FunctionReflection*)spReflectionFunction_specializeWithArgTypes(
@@ -3908,6 +3915,9 @@ struct ShaderReflection
             EntryPointReflection*)spReflection_findEntryPointByName((SlangReflection*)this, name);
     }
 
+    /** Specialize existential payload slots in `type`, using the rules of
+     * `ISession::specializeType`.
+     */
     TypeReflection* specializeType(
         TypeReflection* type,
         SlangInt specializationArgCount,
@@ -3922,6 +3932,16 @@ struct ShaderReflection
             outDiagnostics);
     }
 
+    /** Specialize a generic declaration with explicit arguments.
+
+        Type arguments follow the session's data-type conversion rules: interface metadata
+        implicitly becomes its existential-box type through Slang 2026; Slang 202c requires
+        explicit `dyn` types. Constraints apply directly to the resulting explicit type arguments.
+        `FunctionReflection::specializeWithArgTypes` performs call inference, which can open
+        existential boxes to infer their payload types.
+        Returns null for semantic errors or when specialization does not produce a completed
+        declaration. Semantic errors are reported in `outDiagnostics` when requested.
+     */
     GenericReflection* specializeGeneric(
         GenericReflection* generic,
         SlangInt specializationArgCount,
@@ -4635,7 +4655,15 @@ struct ISession : public ISlangUnknown
         IComponentType** outCompositeComponentType,
         ISlangBlob** outDiagnostics = nullptr) = 0;
 
-    /** Specialize a type based on type arguments.
+    /** Specialize the existential payload slots in `type`.
+
+        Payload arguments must be concrete conforming types or the dynamic-dispatch marker
+        returned by `getDynamicType`.
+        The base `type` uses the same interface conversion rules as `getTypeLayout`.
+        For example, specializing reflected `IFoo` with `Foo` specializes the payload of
+        `dyn IFoo` through Slang 2026; Slang 202c requires the explicit box as the base.
+        An interface contract or existential box cannot itself be a concrete payload argument.
+        Returns null on failure, with diagnostics in `outDiagnostics` when requested.
      */
     virtual SLANG_NO_THROW TypeReflection* SLANG_MCALL specializeType(
         TypeReflection* type,
@@ -4729,6 +4757,11 @@ struct ISession : public ISlangUnknown
         `conformanceIdOverride` is -1, there will be no override behavior and Slang will
         automatically assign IDs to implementation types. The automatically assigned IDs can be
         queried via `ISession::getTypeConformanceWitnessSequentialID`.
+
+        `type` must describe an implementation, using the session's data-type conversion rules.
+        Interface metadata does not supply an implementation of itself or its base interfaces.
+        `interfaceType` identifies the interface contract; a box obtained from a reflected shader
+        parameter also identifies its enclosed interface here. This does not make the box conform.
 
         Returns SLANG_OK if succeeds, or SLANG_FAIL if `type` does not conform to `interfaceType`.
     */
