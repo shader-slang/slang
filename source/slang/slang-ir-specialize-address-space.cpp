@@ -279,7 +279,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     case kIROp_FieldAddress:
                     case kIROp_GetOffsetPtr:
                     case kIROp_BitCast:
-                        if (!mapInstToAddrSpace.containsKey(inst))
+                        // A bitcast to a non-pointer, such as `bit_cast<uint64_t>(p)`, has no
+                        // address space.
+                        if (!mapInstToAddrSpace.containsKey(inst) &&
+                            as<IRPtrTypeBase>(inst->getDataType()))
                         {
                             auto addrSpace = getAddrSpace(inst->getOperand(0));
                             if (addrSpace != AddressSpace::Generic)

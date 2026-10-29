@@ -54,6 +54,13 @@ export void readPtr(int* p, out int r)
     r = *p;
 }
 
+// Converting a pointer parameter to an integer gives a value with no address space.
+// CHECK-DAG: ulong addressOf_{{[0-9]+}}(int device* {{[A-Za-z0-9_]+}})
+export uint64_t addressOf(int* p)
+{
+    return bit_cast<uint64_t>(p);
+}
+
 // CHECK-DAG: float takeStructDll_{{[0-9]+}}(const S_{{[0-9]+}} thread* {{[A-Za-z0-9_]+}})
 [DllExport]
 float takeStructDll(S s)
