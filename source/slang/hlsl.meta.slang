@@ -8058,7 +8058,14 @@ struct TriangleStream
 
 //@public:
 
-/// Try to terminate the current draw or dispatch call (HLSL SM 4.0)
+/// Terminate execution.
+/// @remarks Available on HLSL and C++ only. On HLSL (SM 4.0 and later) it tries to terminate the
+/// current draw or dispatch call. On C++ it calls the host `abort()` from `<stdlib.h>`, which ends
+/// the whole process. Calling it for any other target is a capability error. GLSL and SPIR-V
+/// targets have `abort(format, args...)` instead, through GL_EXT_shader_abort on GLSL and
+/// SPV_KHR_abort on SPIR-V (both VK_KHR_shader_abort). CUDA, Metal and WGSL have no form of
+/// `abort`.
+[require(cpp_hlsl)]
 void abort();
 
 /// The abs function returns the absolute value of x.
