@@ -1886,6 +1886,12 @@ struct SynthesizeActiveMaskForFunctionContext
                     newOperands.getCount(),
                     newOperands.getBuffer());
 
+                // The new branch must keep the decorations of the old one, such
+                // as the loop-control decoration that `[unroll]` puts on a `loop`.
+                //
+                terminator->transferDecorationsTo(newTerminator);
+                newTerminator->sourceLoc = terminator->sourceLoc;
+
                 terminator->replaceUsesWith(newTerminator);
                 terminator->removeAndDeallocate();
             }
