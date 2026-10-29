@@ -6,6 +6,7 @@
 #include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-deprecated.h"
+#include "slang-ir-legalize-large-vector-matrix-types.h"
 #include "slang-lookup.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
@@ -1564,6 +1565,15 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
     }
     else if (auto vectorTypeLayout = as<VectorTypeLayout>(typeLayout))
     {
+        // A vector with more than 4 elements is laid out as an array, whose element stride can be
+        // larger than the element size (e.g. 16 bytes under std140).
+        auto vectorType = as<VectorExpressionType>(vectorTypeLayout->type);
+        auto elementCount =
+            vectorType ? as<ConstantIntVal>(vectorType->getElementCount()) : nullptr;
+        if (elementCount && elementCount->getValue() > kMaxNativeVectorElementCount &&
+            category == SLANG_PARAMETER_CATEGORY_UNIFORM)
+            return getReflectionOffset(vectorTypeLayout->uniformStride);
+
         auto resInfo =
             vectorTypeLayout->elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
         if (!resInfo)
