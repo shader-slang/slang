@@ -27,12 +27,13 @@ RWStructuredBuffer<float4> outBuf;
 // CBUF: [[B]].GetDimensions(
 // CBUF: [[B]].Load(int3(int2(
 // CBUF-SAME: [[B]].Load(int3(uint3(
-// Metal and WGSL keep the `$q` strings, so a `Load`-only `C.b` stays an unsplit texture there, with
-// the texture binding and the real coordinate.
+// WGSL keeps the `$q` strings, so a `Load`-only `C.b` is never lowered there: it stays one texture
+// variable, with the texture binding and the real coordinate. Metal forwards to the extracted
+// texture, like HLSL, so it reads the split-out texture at the same binding.
 // WGSL: @binding(2) @group(0) var [[WB:C_b_[0-9]+]] : texture_2d<f32>;
 // WGSL: var [[WL:_S[0-9]+]] : vec3<i32> = vec3<i32>(vec2<i32>({{_S[0-9]+}}), i32(0));
 // WGSL: textureLoad(([[WB]]), (([[WL]])).xy, (([[WL]])).z)
-// METAL: [[MB:C_b_[0-9]+]] {{\[\[}}texture(1){{\]\]}}
+// METAL: [[MB:C_b_texture_[0-9]+]] {{\[\[}}texture(1){{\]\]}}
 // METAL: int3 [[ML:_S[0-9]+]] = int3(int2({{_S[0-9]+}}), int(0));
 // METAL: ([[MB]]).read(vec<uint,2>((([[ML]])).xy), uint((([[ML]])).z))
 [shader("compute")]

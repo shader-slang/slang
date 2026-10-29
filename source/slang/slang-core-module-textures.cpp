@@ -66,7 +66,7 @@ TextureTypeInfo::TextureTypeInfo(
 
 void TextureTypeInfo::writeFuncBody(
     const char* funcName,
-    const String& cppHlslPreamble,
+    const String& combinedForward,
     const String& glsl,
     const String& cuda,
     const String& spirvDefault,
@@ -81,7 +81,7 @@ void TextureTypeInfo::writeFuncBody(
         BraceScope switchScope{i, sb};
         sb << i << "case cpp:\n";
         sb << i << "case hlsl:\n";
-        sb << cppHlslPreamble;
+        sb << combinedForward;
         sb << i << "__intrinsic_asm \"." << funcName << "\";\n";
         if (glsl.getLength())
         {
@@ -99,6 +99,7 @@ void TextureTypeInfo::writeFuncBody(
         if (metal.getLength())
         {
             sb << i << "case metal:\n";
+            sb << combinedForward;
             sb << i << "__intrinsic_asm \"" << metal << "\";\n";
         }
         if (spirvDefault.getLength() && spirvCombined.getLength())
@@ -139,7 +140,7 @@ void TextureTypeInfo::writeFuncBody(
 
 void TextureTypeInfo::writeFuncWithSig(
     const char* funcName,
-    const String& cppHlslPreamble,
+    const String& combinedForward,
     const String& sig,
     const String& glsl,
     const String& spirvDefault,
@@ -156,7 +157,7 @@ void TextureTypeInfo::writeFuncWithSig(
     sb << i << sig << "\n";
     writeFuncBody(
         funcName,
-        cppHlslPreamble,
+        combinedForward,
         glsl,
         cuda,
         spirvDefault,
@@ -170,7 +171,7 @@ void TextureTypeInfo::writeFuncWithSig(
 void TextureTypeInfo::writeFunc(
     const char* returnType,
     const char* funcName,
-    const String& cppHlslPreamble,
+    const String& combinedForward,
     const String& params,
     const String& glsl,
     const String& spirvDefault,
@@ -183,7 +184,7 @@ void TextureTypeInfo::writeFunc(
 {
     writeFuncWithSig(
         funcName,
-        cppHlslPreamble,
+        combinedForward,
         cat(returnType, " ", funcName, "(", params, ")"),
         glsl,
         spirvDefault,
@@ -273,13 +274,11 @@ void TextureTypeInfo::writeGetDimensionFunctions(StringBuilder& outCombinedForwa
             StringBuilder args;
             int paramCount = 0;
 
-            // The Metal and WGSL strings are positional and start with `$q`, so a combined
-            // receiver's split-out sampler argument is skipped (see `case 'q'` in
-            // `IntrinsicExpandContext::_emitSpecial`). HLSL and CPU forward the combined case
-            // instead; see `combinedForward` below. CUDA keeps a combined `Sampler2D` as a single
-            // `CUtexObject`, so its string needs no marker.
+            // HLSL, CPU and Metal forward a combined receiver to the extracted texture; see
+            // `combinedForward` below. WGSL uses the `$q` marker instead (see its builder below),
+            // and CUDA keeps a combined `Sampler2D` as a single `CUtexObject`, so its string needs
+            // neither.
             StringBuilder metal;
-            metal << "$q";
             const char* metalMipLevel = "0";
 
             // CUDA inline assembly numbers output operands before input operands. The mip-level
@@ -288,6 +287,10 @@ void TextureTypeInfo::writeGetDimensionFunctions(StringBuilder& outCombinedForwa
             cuda << "{";
             const char* cudaTxqPrefix = includeMipInfo ? "txq.level." : "txq.";
 
+            // The WGSL string is positional and starts with `$q`, so a combined receiver's
+            // split-out sampler argument is skipped (see `case 'q'` in
+            // `IntrinsicExpandContext::_emitSpecial`, and the WGSL case of `Load` in
+            // hlsl.meta.slang for why WGSL does not forward).
             StringBuilder wgsl;
             wgsl << "$q{";
 
@@ -665,8 +668,8 @@ void TextureTypeInfo::writeGetDimensionFunctions(StringBuilder& outCombinedForwa
             if (cuda.getLength() && includeMipInfo)
                 sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
-            // On HLSL and CPU a combined receiver forwards to the extracted texture through a
-            // file-scope function (see `__loadTexture` in hlsl.meta.slang for why it is not a
+            // On HLSL, CPU and Metal a combined receiver forwards to the extracted texture through
+            // a file-scope function (see `__loadTexture` in hlsl.meta.slang for why it is not a
             // member call). Each shape, array and multisample combination gets its own forwarder
             // name, so overload resolution only sees the overloads of one texture type. The
             // forwarder's generic sample count is `texSampleCount` because the multisample

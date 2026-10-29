@@ -5197,46 +5197,50 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             static_assert(false, "Unsupported 'Load' of 'texture' for 'cuda' target");
             __intrinsic_asm "<invalid intrinsic>";
         case metal:
-            // The Metal and WGSL strings start with `$q`, which skips the sampler argument that a
-            // combined receiver gains; see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`.
-            // These targets keep `$q` instead of forwarding like HLSL: forwarding WGSL `Load`
-            // crashes type legalization for a bindless `Sampler2D.Handle`, and Metal uses the same
-            // mechanism as WGSL and as its `GetDimensions` strings.
+            // A combined receiver forwards to the extracted texture, as on HLSL, so the strings
+            // below only ever receive a plain texture as `$0`. Inside a `ParameterBlock` (a Metal
+            // argument buffer) type legalization does not split the `{texture, sampler}` struct,
+            // so a string reading `$0` as the texture received the whole struct and aborted or
+            // emitted invalid MSL; taking the texture out first works whether or not the struct
+            // is split. The multisample `Load` and the generated `GetDimensions` forward the same
+            // way.
+            if (isCombined != 0)
+                return __loadTexture(__extractImage(this), location);
             switch (Shape.flavor)
             {
             case $(SLANG_TEXTURE_1D):
                 // lod is not supported for 1D texture
                 if (isArray == 1)
                     // Tv read(uint coord, uint array, uint lod = 0) const
-                    __intrinsic_asm "$q$c$0.read(uint(($1).x), uint(($1).y))$z";
+                    __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y))$z";
                 else
                     // Tv read(uint coord, uint lod = 0) const
-                    __intrinsic_asm "$q$c$0.read(uint(($1).x))$z";
+                    __intrinsic_asm "$c$0.read(uint(($1).x))$z";
                 break;
             case $(SLANG_TEXTURE_2D):
                 if (isShadow == 1)
                 {
                     if (isArray == 1)
                         // T read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // T read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 else
                 {
                     if (isArray == 1)
                         // Tv read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // Tv read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 break;
             case $(SLANG_TEXTURE_3D):
                 if (isShadow == 0 && isArray == 0)
                     // Tv read(uint3 coord, uint lod = 0) const
-                    __intrinsic_asm "$q$c$0.read(vec<uint,3>(($1).xyz), uint(($1).w))$z";
+                    __intrinsic_asm "$c$0.read(vec<uint,3>(($1).xyz), uint(($1).w))$z";
                 break;
             case $(SLANG_TEXTURE_CUBE):
                 static_assert(isArray == 0, "Unsupported 'Load' of 'texture cube array' for 'metal' target");
@@ -5247,7 +5251,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __intrinsic_asm "<invalid intrinsics>";
                     else
                         // T read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 else
                 {
@@ -5256,7 +5260,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __intrinsic_asm "<invalid intrinsics>";
                     else
                         // Tv read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 break;
             }
@@ -5289,6 +5293,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 };
             }
         case wgsl:
+            // The WGSL strings start with `$q`, which skips the sampler argument that a combined
+            // receiver gains; see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`. WGSL does
+            // not forward to `__extractImage` like HLSL and Metal: for a bindless
+            // `Sampler2D.Handle`, the forwarded call aborts `legalizeInst` in
+            // slang-ir-legalize-types.cpp with "non-simple operand(s)!". That legalization gap
+            // also aborts `Sample` on such a handle (#14041), so `$q` stays until it is fixed.
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
             static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
@@ -5483,6 +5493,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                     return __loadTextureMS(__extractImage(this), location, sampleIndex);
                 __intrinsic_asm ".Load";
             case metal:
+                if (isCombined != 0)
+                    return __loadTextureMS(__extractImage(this), location, sampleIndex);
                 switch (Shape.flavor)
                 {
                 case $(SLANG_TEXTURE_2D):
@@ -5491,20 +5503,20 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$q$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$q$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$q$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$q$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
                     }
                     break;
                 }
