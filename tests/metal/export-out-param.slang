@@ -7,7 +7,7 @@
 // is seeded. Left as `AddressSpace::Generic` it reaches the Metal emitter's
 // pointer address-space switch, which has no case for it.
 
-// CHECK-DAG: void onb_{{[A-Za-z0-9_]*}}({{.*}}, {{.*}}thread{{.*}}* {{.*}}, {{.*}}thread{{.*}}* {{.*}})
+// CHECK-DAG: void onb_{{[A-Za-z0-9_]*}}(float3 {{[A-Za-z0-9_]+}}, float3 thread* {{[A-Za-z0-9_]+}}, float3 thread* {{[A-Za-z0-9_]+}})
 export void onb(float3 n, out float3 b1, out float3 b2)
 {
     const float s = n.z >= 0.0 ? 1.0 : -1.0;
@@ -15,7 +15,7 @@ export void onb(float3 n, out float3 b1, out float3 b2)
     b2 = float3(0, s, 0);
 }
 
-// CHECK-DAG: void advance_{{[A-Za-z0-9_]*}}({{.*}}thread{{.*}}* {{.*}})
+// CHECK-DAG: void advance_{{[A-Za-z0-9_]*}}(uint thread* {{[A-Za-z0-9_]+}})
 export void advance(inout uint state)
 {
     state = state * 747796405u + 2891336453u;
