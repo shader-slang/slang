@@ -318,6 +318,34 @@ static IRImageSubscript* isTextureAccess(IRInst* inst)
     return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
 }
 
+// Return why MSL cannot express the floating-point atomic load, exchange, compare-exchange, min
+// or max `inst`, or nullptr if it can or if the value of `inst` is not floating-point. MSL has
+// `atomic_float` load, exchange and compare-exchange on device memory only (MSL 4.1 spec,
+// section 6.16.4), no floating-point atomic min or max, and integer-only texture atomics
+// (section 6.13). For example, `Atomic<float>.load` through a device pointer fits, but the same
+// load on a `groupshared Atomic<float>` does not.
+static const char* getUnsupportedFloatAtomicReason(IRInst* inst)
+{
+    auto valueType = inst->getDataType();
+    if (!isFloatingType(valueType))
+        return nullptr;
+    if (inst->getOp() == kIROp_AtomicMin || inst->getOp() == kIROp_AtomicMax)
+        return "floating point atomic min or max";
+    if (valueType->getOp() != kIROp_FloatType)
+        return "floating point atomic operation on a type other than 32-bit float";
+    if (isTextureAccess(inst))
+        return "floating point atomic operation on a texture";
+    auto destPtrType = cast<IRPtrTypeBase>(inst->getOperand(0)->getDataType());
+    switch (destPtrType->getAddressSpace())
+    {
+    case AddressSpace::Global:
+    case AddressSpace::UserPointer:
+        return nullptr;
+    default:
+        return "floating point atomic operation outside device memory";
+    }
+}
+
 void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
 {
     emitOperand(imageOperand, getInfo(EmitOp::Postfix));
@@ -451,11 +479,12 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         else
             m_writer->emit(");\n");
     };
-    auto diagnoseFloatAtomic = [&]()
+    auto diagnoseUnsupportedFloatAtomic = [&]()
     {
-        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-            .operation = "Unsupported floating point atomic operation",
-            .location = inst->sourceLoc});
+        if (auto reason = getUnsupportedFloatAtomicReason(inst))
+            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = reason,
+                .location = inst->sourceLoc});
     };
     switch (inst->getOp())
     {
@@ -488,8 +517,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicLoad:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
+            diagnoseUnsupportedFloatAtomic();
 
             emitInstResultDecl(inst);
             bool isImageOp = false;
@@ -543,16 +571,14 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicExchange:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
+            diagnoseUnsupportedFloatAtomic();
 
             emitAtomicOp("atomic_exchange", "atomic_exchange_explicit");
             return true;
         }
     case kIROp_AtomicCompareExchange:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
+            diagnoseUnsupportedFloatAtomic();
 
             bool isImageOp = false;
             auto imageSubscript = isTextureAccess(inst);
@@ -624,16 +650,14 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicMin:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
+            diagnoseUnsupportedFloatAtomic();
 
             emitAtomicOp("atomic_fetch_min", "atomic_fetch_min_explicit");
             return true;
         }
     case kIROp_AtomicMax:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
+            diagnoseUnsupportedFloatAtomic();
 
             emitAtomicOp("atomic_fetch_max", "atomic_fetch_max_explicit");
             return true;
