@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=HPP): -target hpp -line-directive-mode none
 //TEST:SIMPLE(filecheck=CPP): -target cpp -line-directive-mode none
+//TEST:SIMPLE(filecheck=CUH): -target cuh -line-directive-mode none
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none
 
 // Regression test for https://github.com/shader-slang/slang/issues/14028 :
 // host C++ code accesses the fields of an `__extern_cpp` struct by their
@@ -25,6 +27,22 @@
 //CPP: ->point =
 //CPP: ->bary =
 //CPP: ->dist2 =
+
+//CUH: struct ClosestResult
+//CUH-NEXT: {
+//CUH-NEXT: float3 point;
+//CUH-NEXT: float2 bary;
+//CUH-NEXT: float dist2;
+//CUH-NEXT: };
+//CUH: ClosestResult closestPointOnSegment(float3 p_{{[0-9]+}}, float3 a_{{[0-9]+}}, float3 b_{{[0-9]+}});
+
+//CUDA: struct ClosestResult
+//CUDA-NEXT: {
+//CUDA-NEXT: float3 point;
+//CUDA-NEXT: float2 bary;
+//CUDA-NEXT: float dist2;
+//CUDA-NEXT: };
+//CUDA: ->dist2 =
 
 public __extern_cpp struct ClosestResult
 {

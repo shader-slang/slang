@@ -53,6 +53,7 @@
 #include "slang-ir-expand-autodiff-parameter-contexts.h"
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
+#include "slang-ir-extern-cpp-struct-fields.h"
 #include "slang-ir-fix-entrypoint-callsite.h"
 #include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-fuse-satcoop.h"
@@ -2528,6 +2529,21 @@ Result linkAndOptimizeIR(
             SLANG_PASS(convertEntryPointPtrParamsToRawPtrs);
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
+        break;
+    }
+
+    // Host code accesses the fields of an `__extern_cpp` struct by their source names, so the
+    // C++ and CUDA source targets emit those names. Other targets keep uniqued field names.
+    switch (target)
+    {
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::HostCPPSource:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
+        SLANG_PASS(applyExternCppStructFieldNames);
+        break;
+    default:
         break;
     }
 
