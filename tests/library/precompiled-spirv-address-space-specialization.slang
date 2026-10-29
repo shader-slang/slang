@@ -1,21 +1,22 @@
 // precompiled-spirv-address-space-specialization.slang
 
 // Address-space specialization of functions exported from, and imported from, a module with
-// embedded precompiled SPIR-V (#14004). The library's entry point clones `bump` and `Acc.add`
-// while the module is precompiled; the exported originals must stay, so that the precompiled
-// SPIR-V exports each of them once. This file clones the imported `bump` again; those clones
-// lose their linkage, so they must keep their own bodies instead of becoming imports.
+// embedded precompiled SPIR-V (#14004).
 
 //TEST:COMPILE: tests/library/module-library-address-space-specialization.slang -o tests/library/module-library-address-space-specialization.slang-module -target spirv -embed-downstream-ir -incomplete-library -fvk-use-entrypoint-name
+
+// The library's own test checks that its precompiled SPIR-V exports each name once.
+
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry useMain -stage compute -fvk-use-entrypoint-name
-
-// CHECK: OpEntryPoint GLCompute %useMain "useMain"
-
 //TEST:SIMPLE(filecheck=SHARED): -target spirv-asm -entry useSharedReceiver -stage compute -fvk-use-entrypoint-name
 
-// `useSharedReceiver` gives the imported `Acc.add` a single specialization whose `this` is a
-// `Workgroup` pointer. The precompiled definition takes the unspecialized pointer, so the
-// specialization keeps its own body instead of becoming an import of it.
+// This file specializes the imported functions again. A specialization never becomes an import
+// of the precompiled definition, whose parameter types are the unspecialized ones: `useMain`
+// gives `bump` two specializations, which lose their linkage, and `useSharedReceiver` gives
+// `Acc.add` a single specialization whose `this` is a `Workgroup` pointer. When linking with the
+// precompiled SPIR-V fails, slangc writes no SPIR-V, so these checks fail.
+
+// CHECK: OpEntryPoint GLCompute %useMain "useMain"
 
 // SHARED: OpEntryPoint GLCompute %useSharedReceiver "useSharedReceiver"
 
