@@ -59,6 +59,17 @@ bool isUniformParameterType(Type* type);
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
+/// How `checkRedeclaration` reports two declarations of the same name that cannot coexist.
+enum class RedeclarationSeverity
+{
+    /// An error in every language version.
+    Error,
+    /// A warning in every language version. Earlier compiler releases did not diagnose these
+    /// conflicts, so we keep code that they accepted compiling; Slang 202c may make them errors
+    /// (shader-slang/slang#13956).
+    Warning,
+};
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -1449,6 +1460,7 @@ struct SemanticsContext
 {
 public:
     friend struct OuterScopeContextRAII;
+    friend struct OperandTryCoverageRAII;
 
     explicit SemanticsContext(SharedSemanticsContext* shared)
         : m_shared(shared)
@@ -1742,18 +1754,26 @@ protected:
     /// The linked list of lexically surrounding statements.
     OuterStmtInfo* m_outerStmts = nullptr;
 
-    /// The type of a try clause (if any) enclosing current expr.
-    TryClauseType m_enclosingTryClauseType = TryClauseType::None;
-
     /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
     /// is considered valid in the current context.
     bool m_allowStaticReferenceToNonStaticMember = false;
 
+    bool m_allowDroppingDerivatives = false;
+
+    /// The type of the try clause (if any) that covers the call being checked. A `try` covers only
+    /// the call it wraps, so `visitInvokeExpr`, `visitIndexExpr` and `visitTypeCastExpr` check
+    /// their operands under an `OperandTryCoverageRAII`, where this is `None`.
+    TryClauseType m_enclosingTryClauseType = TryClauseType::None;
+
+    /// The throwing calls whose coverage waits for the single-argument call around them to
+    /// resolve. Consider `try int(f())` where `f` returns `int`: `ResolveInvoke` reduces the
+    /// identity conversion `int(...)` to `f()` itself, so the `try` covers `f()`, but that is only
+    /// known after `f()` has been checked. Any other kind of operand is checked with this null.
+    List<InvokeExpr*>* m_pendingTryCoverage = nullptr;
+
     /// Whether or not we are in a `no_diff` environment (and therefore should treat the call to
     /// a non-differentiable function as differentiable and not issue a diagnostic).
     TreatAsDifferentiableExpr* m_treatAsDifferentiableExpr = nullptr;
-
-    bool m_allowDroppingDerivatives = false;
 
     ASTBuilder* m_astBuilder = nullptr;
 
@@ -1799,6 +1819,35 @@ struct OuterScopeContextRAII
     }
 
     ~OuterScopeContextRAII() { m_context->m_outerScope = m_oldOuterScope; }
+};
+
+/// Checks the operands of a call, which a `try` on that call does not cover, on the current
+/// context for the lifetime of this object. A throwing call found in an operand is diagnosed, or
+/// collected in `pendingTryCoverage` when that is non-null (see `m_pendingTryCoverage`).
+///
+/// We change the context in place so that each recursive operand level does not hold a copy of it;
+/// a long operator chain, as in `tests/glsl-intrinsic/intrinsic-texture.slang`, would otherwise
+/// overflow the stack of a Debug build.
+struct OperandTryCoverageRAII
+{
+    SemanticsContext* m_context;
+    TryClauseType m_oldEnclosingTryClauseType;
+    List<InvokeExpr*>* m_oldPendingTryCoverage;
+
+    OperandTryCoverageRAII(SemanticsContext* context, List<InvokeExpr*>* pendingTryCoverage)
+        : m_context(context)
+        , m_oldEnclosingTryClauseType(context->m_enclosingTryClauseType)
+        , m_oldPendingTryCoverage(context->m_pendingTryCoverage)
+    {
+        context->m_enclosingTryClauseType = TryClauseType::None;
+        context->m_pendingTryCoverage = pendingTryCoverage;
+    }
+
+    ~OperandTryCoverageRAII()
+    {
+        m_context->m_enclosingTryClauseType = m_oldEnclosingTryClauseType;
+        m_context->m_pendingTryCoverage = m_oldPendingTryCoverage;
+    }
 };
 
 #define SLANG_OUTER_SCOPE_CONTEXT_RAII(context, scope) \
@@ -3082,9 +3131,10 @@ public:
     // of overload resolution.
     bool doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd);
 
-    Result checkRedeclaration(Decl* newDecl, Decl* oldDecl);
+    Result checkRedeclaration(Decl* newDecl, Decl* oldDecl, RedeclarationSeverity severity);
     Result checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* oldDecl);
-    void checkForRedeclaration(Decl* decl);
+    void checkForRedeclaration(Decl* decl, RedeclarationSeverity severity);
+    void checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl);
 
     Expr* checkPredicateExpr(Expr* expr);
 
@@ -3591,14 +3641,6 @@ public:
         Type* subType,
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
-
-    /// Roots a declared facet witness at the type whose conformance is being queried.
-    /// Both ordinary subtype queries and provisional extension constraints use this path.
-    /// Other witness forms are returned unchanged.
-    SubtypeWitness* getSubtypeWitnessForType(
-        Type* subType,
-        Type* superType,
-        SubtypeWitness* witness);
 
     Witness* getDiffTypeInfoWitness(Type* type);
     Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
@@ -4151,6 +4193,21 @@ public:
         FuncType* funcType,
         List<DeclRef<ParamDecl>> const& paramDeclRefs);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
+
+    /// Diagnose `invoke`, a call whose callee may throw, unless a `try` covers it. While its
+    /// coverage is pending, `invoke` is added to `m_pendingTryCoverage` instead.
+    void checkThrowingCallIsCovered(InvokeExpr* invoke);
+
+    /// Return whether the coverage of the throwing calls in the argument of `expr` waits for
+    /// `expr` to resolve: `expr` is a single-argument call that is not an operator, so it may
+    /// resolve to an identity conversion of its argument, and a `try` covers or may cover it.
+    bool shouldDeferArgumentTryCoverage(InvokeExpr* expr);
+
+    /// Settle the coverage of `pendingCalls`, collected while the argument of a call was checked.
+    /// A pending call that the call resolved to (`checkedExpr`) is covered when the call would be;
+    /// no `try` covers any other pending call.
+    void settlePendingTryCoverage(Expr* checkedExpr, List<InvokeExpr*> const& pendingCalls);
+
     // Get the type to use when referencing a declaration
     QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
 
@@ -4707,6 +4764,14 @@ bool getExtensionTargetDeclList(
     ShortList<AggTypeDecl*>& targetDecls);
 
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
+
+// Collect the requirements of a checked declaration reference, including its generic arguments.
+// Append contributing declarations to `outReferencedDecls` for use-site diagnostics without
+// changing the shared declaration's requirements or provenance.
+CapabilitySet getDeclRefCapabilityRequirements(
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef,
+    List<Decl*>& outReferencedDecls);
 
 RefPtr<ComponentType> createUnspecializedGlobalComponentType(
     FrontEndCompileRequest* compileRequest);

@@ -11,7 +11,7 @@ Thank you for considering contributing to the Shader-Slang project! We welcome y
 
 This document is designed to guide you in contributing to the project. It is intended to be easy to follow without sending readers to other pages and links. You can simply copy and paste the command lines described in this document.
 
-- Contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant the rights to use your contribution.
+- Contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant the rights to use your contribution. See the CLA at [https://cla-assistant.io/shader-slang/slang](https://cla-assistant.io/shader-slang/slang). The CLA for `shader-slang/spec` is different from, and longer than, the CLA for the other `shader-slang` repositories.
 - When you submit a pull request, a CLA bot will determine whether you need to sign a CLA. Simply follow the instructions provided.
 - Please read and follow the contributor [Code of Conduct](CODE_OF_CONDUCT.md).
 - Bug reports and feature requests should be submitted via the GitHub issue tracker.
@@ -51,7 +51,6 @@ By submitting a Contribution to this repository, you additionally represent that
 Navigate to the [Shader-Slang repository](https://github.com/shader-slang/slang).
 Click on the "Fork" button in the top right corner to create a copy of the repository in your GitHub account.
 This document will assume that the name of your forked repository is "slang".
-Make sure your "Actions" are enabled. Visit your forked repository, click on the "Actions" tab, and enable the actions.
 
 ### Cloning Your Fork
 

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -default-image-format-unknown
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly
 
 // When using a write-only texture (WTexture2D) without an explicit format,
 // only StorageImageWriteWithoutFormat should be required, not
