@@ -1880,48 +1880,51 @@ void WGSLSourceEmitter::emitIntrinsicCallExprImpl(
         inOuterPrec);
 }
 
-static bool isIntegerScalarOrVectorType(IRType* type)
-{
-    if (auto vectorType = as<IRVectorType>(type))
-        type = vectorType->getElementType();
-    return type && isIntegralType(type);
-}
-
 void WGSLSourceEmitter::emitInterpolationModifiersImpl(
     IRInst* varInst,
     IRType* valueType,
     IRVarLayout* /* layout */)
 {
     // https://www.w3.org/TR/WGSL/#interpolation
-    // WGSL interpolation types: perspective (the default), linear (no perspective correction),
-    // flat. Sampling: center (the default), centroid, sample.
-    char const* interpolationType = nullptr;
-    char const* interpolationSampling = nullptr;
-    for (auto dd : varInst->getDecorations())
+    // We start from WGSL's defaults (perspective, center) and let the decorations override them.
+    // HLSL `linear` is perspective-correct interpolation, which is WGSL's `perspective`. WGSL's
+    // `linear` is HLSL `noperspective`.
+    enum class InterpolationType
     {
-        if (dd->getOp() != kIROp_InterpolationModeDecoration)
+        Perspective,
+        Linear,
+        Flat
+    };
+    enum class InterpolationSampling
+    {
+        Center,
+        Centroid,
+        Sample
+    };
+    InterpolationType interpolationType = InterpolationType::Perspective;
+    InterpolationSampling interpolationSampling = InterpolationSampling::Center;
+
+    for (auto decoration : varInst->getDecorations())
+    {
+        auto modeDecoration = as<IRInterpolationModeDecoration>(decoration);
+        if (!modeDecoration)
             continue;
-        auto decoration = (IRInterpolationModeDecoration*)dd;
-        IRInterpolationMode mode = decoration->getMode();
-        switch (mode)
+        switch (modeDecoration->getMode())
         {
         case IRInterpolationMode::NoInterpolation:
-            interpolationType = "flat";
+            interpolationType = InterpolationType::Flat;
             break;
         case IRInterpolationMode::NoPerspective:
-            interpolationType = "linear";
-            break;
-        case IRInterpolationMode::Linear:
-            // HLSL `linear` is perspective-correct interpolation, WGSL's `perspective`
-            // (not WGSL's `linear`, which is HLSL `noperspective`).
-            if (!interpolationType)
-                interpolationType = "perspective";
+            interpolationType = InterpolationType::Linear;
             break;
         case IRInterpolationMode::Sample:
-            interpolationSampling = "sample";
+            interpolationSampling = InterpolationSampling::Sample;
             break;
         case IRInterpolationMode::Centroid:
-            interpolationSampling = "centroid";
+            interpolationSampling = InterpolationSampling::Centroid;
+            break;
+        case IRInterpolationMode::Linear:
+            interpolationType = InterpolationType::Perspective;
             break;
         default:
             break;
@@ -1933,26 +1936,29 @@ void WGSLSourceEmitter::emitInterpolationModifiersImpl(
     // semantic (emitted as @location), not a system value (@builtin).
     const bool isUserVarying = varInst->findDecoration<IRSemanticDecoration>() &&
                                !varInst->findDecoration<IRTargetSystemValueDecoration>();
-    if (isUserVarying && isIntegerScalarOrVectorType(valueType))
-        interpolationType = "flat";
+    IRType* scalarType = valueType;
+    if (auto vectorType = as<IRVectorType>(valueType))
+        scalarType = vectorType->getElementType();
+    if (isUserVarying && scalarType && isIntegralType(scalarType))
+        interpolationType = InterpolationType::Flat;
 
-    // A sampling mode needs an interpolation type; flat takes no centroid/sample sampling.
-    if (interpolationSampling && !interpolationType)
-        interpolationType = "perspective";
-    if (interpolationType && strcmp(interpolationType, "flat") == 0)
-        interpolationSampling = nullptr;
+    // flat takes no sampling.
+    if (interpolationType == InterpolationType::Flat)
+        interpolationSampling = InterpolationSampling::Center;
 
-    // perspective with center sampling is the default.
-    if (!interpolationType ||
-        (strcmp(interpolationType, "perspective") == 0 && !interpolationSampling))
+    // perspective with center sampling is the default, so we emit nothing.
+    if (interpolationType == InterpolationType::Perspective &&
+        interpolationSampling == InterpolationSampling::Center)
         return;
 
+    static const char* const kInterpolationTypeNames[] = {"perspective", "linear", "flat"};
+    static const char* const kInterpolationSamplingNames[] = {"center", "centroid", "sample"};
     m_writer->emit("@interpolate(");
-    m_writer->emit(interpolationType);
-    if (interpolationSampling)
+    m_writer->emit(kInterpolationTypeNames[int(interpolationType)]);
+    if (interpolationSampling != InterpolationSampling::Center)
     {
         m_writer->emit(", ");
-        m_writer->emit(interpolationSampling);
+        m_writer->emit(kInterpolationSamplingNames[int(interpolationSampling)]);
     }
     m_writer->emit(") ");
 }
