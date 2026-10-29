@@ -2,7 +2,6 @@
 
 set(portable_raytracing_shader_sources
     raytracing.slang
-    compiler-intrinsics.slang
     ray-types.slang
     contexts.slang
     stage-inputs.slang
@@ -35,26 +34,6 @@ foreach(shader_file ${portable_raytracing_shader_sources})
     )
     list(APPEND portable_raytracing_copied_files ${dest_file})
 endforeach()
-
-# Keep the generated enum with the ordinary module sources so source imports and installations
-# use the same builtin IDs as serialized imports. generator() supplies a host executable when
-# SLANG_GENERATORS_PATH is set for cross compilation.
-set(portable_raytracing_builtin_source
-    "${portable_raytracing_output_dir}/raytracing-builtins.slang"
-)
-add_custom_command(
-    OUTPUT ${portable_raytracing_builtin_source}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${portable_raytracing_output_dir}
-    COMMAND
-        slang-standard-module-generator ${portable_raytracing_builtin_source}
-    DEPENDS slang-standard-module-generator
-    VERBATIM
-)
-list(
-    APPEND
-    portable_raytracing_copied_files
-    ${portable_raytracing_builtin_source}
-)
 
 set(portable_raytracing_module_file
     "${portable_raytracing_output_dir}/portable.slang-module"
@@ -104,10 +83,8 @@ set_target_properties(
     PROPERTIES FOLDER generated
 )
 
+# Install only current outputs so files left by an older build are not packaged.
 install(
-    DIRECTORY ${portable_raytracing_output_dir}/
+    FILES ${portable_raytracing_copied_files} ${portable_raytracing_module_file}
     DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang/raytracing
-    FILES_MATCHING
-    PATTERN "*.slang"
-    PATTERN "*.slang-module"
 )

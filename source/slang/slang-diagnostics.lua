@@ -2897,6 +2897,13 @@ err(
 )
 
 err(
+    "unknown-builtin-name",
+    31166,
+    "unknown builtin name",
+    span { loc = "location", message = "unknown builtin name '~name'" }
+)
+
+err(
     "non-positive-num-threads",
     31102,
     "invalid 'numthreads' value",

@@ -5061,7 +5061,7 @@ attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
 
 // @hidden:
 __attributeTarget(DeclBase)
-attribute_syntax [KnownBuiltin(name : int)] : KnownBuiltinAttribute;
+attribute_syntax [KnownBuiltin(name)] : KnownBuiltinAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;

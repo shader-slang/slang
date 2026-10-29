@@ -59,7 +59,7 @@ public interface IStageContext
     /// This associated type has no conformance constraint. Use `void` when the stage has no
     /// record data. For a non-void type, the application must supply matching record data using
     /// the target's record layout; this declaration does not validate the host allocation.
-    [KnownBuiltin(__RayTracingBuiltin.StageRecord)]
+    [KnownBuiltin("RayTracingStageRecord")]
     associatedtype Record;
 }
 
@@ -84,7 +84,7 @@ public interface IPayloadContext : IStageContext
     /// empty payload types. Intersection-stage access additionally requires
     /// `structural_raytracing_intersection_payload` (Metal or CUDA/OptiX). Empty structs are valid
     /// payload types; the target ABI determines their physical storage.
-    [KnownBuiltin(__RayTracingBuiltin.PayloadContextPayload)]
+    [KnownBuiltin("RayTracingPayloadContextPayload")]
     associatedtype Payload;
 }
 
@@ -102,7 +102,7 @@ public interface IHitContext : IPayloadContext
     /// additionally requires `ICustomIntersectionPrimitive`; `NoIntersection` instead requires
     /// `IBuiltinIntersectionPrimitive`. Those stage constraints restrict this selection when a
     /// hit group is assembled.
-    [KnownBuiltin(__RayTracingBuiltin.HitPrimitive)]
+    [KnownBuiltin("RayTracingHitPrimitive")]
     associatedtype Primitive : IIntersectionPrimitive;
 }
 
@@ -119,7 +119,7 @@ public interface ICallableContext : IStageContext
     /// @par Constraints
     /// This associated type has no conformance constraint. The argument passed to `callShader`
     /// and the receiving callable stage must use the same callable-data type.
-    [KnownBuiltin(__RayTracingBuiltin.CallableData)]
+    [KnownBuiltin("RayTracingCallableData")]
     associatedtype CallableData;
 }
 

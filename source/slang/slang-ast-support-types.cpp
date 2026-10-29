@@ -9,6 +9,16 @@
 
 namespace Slang
 {
+KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name)
+{
+#define SLANG_KNOWN_BUILTIN_DECL(NAME, VALUE)           \
+    if (name == UnownedStringSlice::fromLiteral(#NAME)) \
+        return KnownBuiltinDeclName::NAME;
+#include "slang-known-builtin-decl-name-defs.h"
+#undef SLANG_KNOWN_BUILTIN_DECL
+    return KnownBuiltinDeclName::COUNT;
+}
+
 QualType::QualType(Type* type)
     : type(type), isLeftValue(false)
 {

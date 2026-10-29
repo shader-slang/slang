@@ -1295,13 +1295,29 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
 
-        ConstantIntVal* value = checkConstantEnumVal(attr->args[0]);
-        if (!value)
+        if (auto nameExpr = as<StringLiteralExpr>(attr->args[0]))
         {
-            return nullptr;
-        }
+            auto builtin = getKnownBuiltinDeclNameFromString(nameExpr->value.getUnownedSlice());
+            if (builtin == KnownBuiltinDeclName::COUNT)
+            {
+                getSink()->diagnose(Diagnostics::UnknownBuiltinName{
+                    .name = nameExpr->value,
+                    .location = nameExpr->token.loc});
+                return nullptr;
+            }
 
-        knownBuiltinAttr->name = value;
+            // For example, KnownBuiltin("RayTracingStageContext") stores the same integer ID
+            // as a numeric annotation. Later checks and serialization only need that value.
+            knownBuiltinAttr->name =
+                m_astBuilder->getIntVal(m_astBuilder->getIntType(), IntegerLiteralValue(builtin));
+        }
+        else
+        {
+            auto value = checkConstantEnumVal(attr->args[0]);
+            if (!value)
+                return nullptr;
+            knownBuiltinAttr->name = value;
+        }
     }
     else if (auto pyExportAttr = as<PyExportAttribute>(attr))
     {

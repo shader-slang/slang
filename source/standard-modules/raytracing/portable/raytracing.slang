@@ -6,7 +6,6 @@
 [ExperimentalModule]
 module portable;
 
-__include "compiler-intrinsics";
 __include "ray-types";
 __include "contexts";
 __include "stage-inputs";

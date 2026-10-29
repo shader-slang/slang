@@ -118,39 +118,6 @@ generator(slang-embed)
 generator(slang-core-module-cache)
 generator(slang-generate USE_FEWER_WARNINGS)
 
-# Evaluate module-local Slang templates against compiler enum values. The resulting sources are
-# ordinary module files; generating them does not require a special compiler mode or core import.
-set(standard_module_meta_source
-    "${slang_SOURCE_DIR}/source/standard-modules/raytracing/portable/raytracing-builtins.meta.slang"
-)
-set(standard_module_meta_output_dir
-    "${CMAKE_CURRENT_BINARY_DIR}/standard-module-meta"
-)
-set(standard_module_meta_header
-    "${standard_module_meta_output_dir}/raytracing-builtins.meta.slang.h"
-)
-if(NOT SLANG_GENERATORS_PATH)
-    add_custom_command(
-        OUTPUT ${standard_module_meta_header}
-        COMMAND
-            ${CMAKE_COMMAND} -E make_directory
-            ${standard_module_meta_output_dir}
-        COMMAND
-            slang-generate ${standard_module_meta_source} --target-directory
-            ${standard_module_meta_output_dir}
-        DEPENDS ${standard_module_meta_source} slang-generate
-        VERBATIM
-    )
-endif()
-generator(
-    slang-standard-module-generator
-    EXPLICIT_SOURCE
-    slang-standard-module-generator/slang-standard-module-generator.cpp
-    ${standard_module_meta_header}
-    INCLUDE_DIRECTORIES_PRIVATE
-    ${standard_module_meta_output_dir}
-)
-
 generator(slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
 generator(slang-capability-generator LINK_WITH_PRIVATE compiler-core)
 generator(slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)

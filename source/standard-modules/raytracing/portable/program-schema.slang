@@ -182,7 +182,7 @@ public interface ITraceProgramSchema
     ///
     /// @par Constraints
     /// Must conform to the sealed `IHitGroupList`: use `HitGroupList<...>` or `EmptyHitGroupList`.
-    [KnownBuiltin(__RayTracingBuiltin.ProgramHitGroups)]
+    [KnownBuiltin("RayTracingProgramHitGroups")]
     associatedtype HitGroups : IHitGroupList;
 
     /// Selects the finite list of miss stages available to this program.
@@ -190,7 +190,7 @@ public interface ITraceProgramSchema
     /// @par Constraints
     /// Must conform to the sealed `IMissShaderList`: use `MissShaderList<...>` or
     /// `EmptyMissShaderList`.
-    [KnownBuiltin(__RayTracingBuiltin.ProgramMissShaders)]
+    [KnownBuiltin("RayTracingProgramMissShaders")]
     associatedtype MissShaders : IMissShaderList;
 
     /// Selects the finite list of callable stages available to this program.
@@ -198,7 +198,7 @@ public interface ITraceProgramSchema
     /// @par Constraints
     /// Must conform to the sealed `ICallableShaderList`: use `CallableShaderList<...>` or
     /// `EmptyCallableShaderList`.
-    [KnownBuiltin(__RayTracingBuiltin.ProgramCallableShaders)]
+    [KnownBuiltin("RayTracingProgramCallableShaders")]
     associatedtype CallableShaders : ICallableShaderList;
 }
 

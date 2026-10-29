@@ -169,7 +169,7 @@ The RT library's stage interfaces declare their compiler identity with `__magic_
 __magic_type(MissShaderType)
 public interface IMissShader
 {
-    [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
+    [KnownBuiltin("RayTracingStageContext")]
     associatedtype Context : IPayloadContext;
     static void invoke(in MissInput<Context> input);
 }
@@ -191,15 +191,14 @@ descriptor identity on struct declarations. Both use the existing `DeclRefType::
 path with one inherited declaration reference, so ordinary substitution and serialization preserve
 their generic arguments. No new AST constructor or IR lowering path is needed for the descriptor.
 
-The annotation constants are declared in the internal enum `rt::__RayTracingBuiltin`.
-The module's `compiler-intrinsics.slang` includes the generated constants; applications cannot
-name this enum. Public trace and
-callable methods are ordinary functions without operation-specific source attributes.
-
-Build `raytracing-builtins.meta.slang` into the ordinary `raytracing-builtins.slang` include using
-`slang-standard-module-generator`. Its values come directly from `KnownBuiltinDeclName` in the
-shared C++ header; do not copy numeric IDs into the module. Ship this generated include with the
-other RT source files so source compilation and serialized imports use the same declarations.
+Write builtin roles by name, for example `[KnownBuiltin("RayTracingStageContext")]`.
+During attribute validation, the compiler resolves this spelling to its existing
+`KnownBuiltinDeclName` value and stores the same `ConstantIntVal` used by numeric annotations.
+A shared C++ definition list supplies both the enum and name lookup, preserving the numeric IDs.
+Unknown names are diagnosed during attribute checking. Existing integer and enum-valued
+annotations remain valid; lowering and serialization continue to use their checked integer values.
+The RT sources need no generated Slang enum or compiler-identifier include. Public trace and
+callable methods remain ordinary functions without operation-specific source attributes.
 
 Stage checking reads the declaration annotations preserved through source imports and serialized
 modules; an unannotated interface named `IMissShader` remains an ordinary interface. Metal trace

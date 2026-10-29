@@ -612,7 +612,7 @@ public extension<Input : ICommonHitInput> Input
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
 [require(structural_raytracing_closesthit)]
-[KnownBuiltin(__RayTracingBuiltin.ClosestHitInput)]
+[KnownBuiltin("RayTracingClosestHitInput")]
 public struct ClosestHitInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
@@ -835,7 +835,7 @@ public extension<Context> ClosestHitInput<Context>
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
 [require(structural_raytracing_anyhit)]
-[KnownBuiltin(__RayTracingBuiltin.AnyHitInput)]
+[KnownBuiltin("RayTracingAnyHitInput")]
 public struct AnyHitInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
@@ -1106,7 +1106,7 @@ public extension<Context> AnyHitInput<Context>
 /// An `IIntersectionShader` implementation additionally requires
 /// `Context.Primitive : ICustomIntersectionPrimitive`.
 [require(structural_raytracing_intersection)]
-[KnownBuiltin(__RayTracingBuiltin.IntersectionInput)]
+[KnownBuiltin("RayTracingIntersectionInput")]
 public struct IntersectionInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
@@ -1354,7 +1354,7 @@ public extension<Context> IntersectionInput<Context>
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
 [require(structural_raytracing_miss)]
-[KnownBuiltin(__RayTracingBuiltin.MissInput)]
+[KnownBuiltin("RayTracingMissInput")]
 public struct MissInput<Context>
     where Context : IPayloadContext
 {
@@ -1488,7 +1488,7 @@ public extension<Context> MissInput<Context>
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
 [require(structural_raytracing_callable)]
-[KnownBuiltin(__RayTracingBuiltin.CallableInput)]
+[KnownBuiltin("RayTracingCallableInput")]
 public struct CallableInput<Context>
     where Context : ICallableContext
 {

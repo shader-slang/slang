@@ -223,7 +223,7 @@ FIDDLE() namespace Slang
 
     char const* getGLSLNameForImageFormat(ImageFormat format);
 
-    /// Convert string name to KnownBuiltinDeclName enum
+    /// Returns the builtin identified by an exact name, or COUNT if the name is unknown.
     KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name);
 
     /// Returns true if `name` identifies one of the differentiable builtin
