@@ -69,6 +69,7 @@
 #include "slang-ir-legalize-empty-array.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
+#include "slang-ir-legalize-large-vector-matrix-types.h"
 #include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-resource-globals.h"
@@ -1956,6 +1957,12 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(legalizeEmptyArray, sink);
+
+    // Vectors with more than 4 elements and matrices with more than 4 rows or columns have no
+    // native type on any target; lower them to arrays. This runs after autodiff and
+    // specialization (so the sizes are known and the derivative code is generated on the vector
+    // form), and before buffer element types are lowered and laid out (so those see the arrays).
+    SLANG_PASS(legalizeLargeVectorMatrixTypes, sink);
 
     SLANG_PASS(legalizeVectorTypes, sink);
 
