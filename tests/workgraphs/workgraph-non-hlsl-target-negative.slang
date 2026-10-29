@@ -23,9 +23,9 @@ struct Record
 [numthreads(1, 1, 1)]
 void nodeMain(DispatchNodeInputRecord<Record> input)
 //CHECK_NODE: entrypoint 'nodeMain' uses features that are not available
+//CHECK_NODE: ^^^^^^^^^^^^^^^^^^^^^^^ see using of 'DispatchNodeInputRecord'
 {
     input.Get();
-    //CHECK_NODE: see using of 'Get'
 }
 #else
 [shader("compute")]
