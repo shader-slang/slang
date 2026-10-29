@@ -6346,7 +6346,8 @@ T __atomic_decrement<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed);
 
 // Atomic Reduction intrinsics (void return).
 // These are in-place atomic operations that don't return the old value.
-// On CUDA, they map to the `red` PTX instruction which is faster than `atom`.
+// On CUDA, integer reductions map to the `red` PTX instruction, which is faster than `atom`;
+// floating-point min/max use a compare-and-swap loop because `red` has no float min/max.
 // On other targets, they fall back to the corresponding atomic operations (ignoring return value).
 
 /// Atomic add reduction. On CUDA, uses PTX `red.add` instruction.
@@ -12739,6 +12740,8 @@ $}
 /// `RWByteAddressBuffer.InterlockedAddF32` or `RWByteAddressBuffer.InterlockedAddF16` instead when NVAPI is available.
 /// On SPIR-V (Vulkan), all integer and floating point types are supported.
 /// On Metal and WGSL, all floating-point types are not supported.
+/// On CUDA, floating-point `InterlockedMin` and `InterlockedMax` use a compare-and-swap loop; `half`
+/// requires SM 7.0.
 /// @category atomic Atomic functions
 [ForceInline]
 __glsl_version(430)

@@ -3010,12 +3010,8 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
 
 // Floating-point atomic min/max
 // CUDA has no native floating-point atomicMin/atomicMax, so we implement them with a
-// compare-and-swap loop on the bits of the stored value; each returns the original value. The
-// stored value is replaced only when `val` wins the comparison, or when the stored value is a NaN
-// and `val` is not, which are the SPIR-V OpAtomicFMinEXT/OpAtomicFMaxEXT rules: a NaN operand is
-// ignored and either zero may win between -0.0 and +0.0. We write the bits of `val` rather than
-// a result of fminf/fmaxf, because under flush-to-zero those return a flushed copy of a subnormal
-// input and would overwrite a stored value that should have won.
+// compare-and-swap loop on the bits of the stored value, below. __slang_atomic_compare_value
+// gives each type the value its comparison uses.
 __device__ __forceinline__ float __slang_atomic_compare_value(float v)
 {
     return v;
@@ -3034,9 +3030,20 @@ __device__ __forceinline__ float __slang_atomic_compare_value(__half v)
 }
 #endif
 
+// Atomically apply min (isMin) or max of `val` to `*address` and return the original value. The
+// stored value is replaced only when:
+// - the stored value is a NaN and `val` is not (a stored NaN is replaced), or
+// - neither is a NaN and `val` strictly wins the comparison.
+// A NaN `val` is therefore ignored, and on a tie, including -0.0 against +0.0, the stored value
+// stays; these are the SPIR-V OpAtomicFMinEXT/OpAtomicFMaxEXT rules. The location only ever holds
+// the exact bits of some operand: we write the bits of `val` rather than a result of fminf/fmaxf,
+// which under flush-to-zero could store a flushed copy of a subnormal. Under -fp-mode fast the
+// comparison itself flushes too, so a subnormal ties with zero. The initial volatile load is a
+// coherent relaxed load, which makes returning without a write a valid min/max at that load.
 template<typename T, typename Bits>
 __device__ __forceinline__ T __slang_atomic_min_max(T* address, T val, bool isMin)
 {
+    static_assert(sizeof(T) == sizeof(Bits), "Bits must be the same size as T");
     Bits* bits = reinterpret_cast<Bits*>(address);
     const Bits valBits = *reinterpret_cast<const Bits*>(&val);
     const auto value = __slang_atomic_compare_value(val);
