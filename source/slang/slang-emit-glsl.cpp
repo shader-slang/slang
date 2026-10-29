@@ -2248,6 +2248,24 @@ void GLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
     }
 }
 
+CLikeSourceEmitter::FoldPolicy GLSLSourceEmitter::getFoldPolicy(IRInst* inst)
+{
+    // glslang gives each spelling of a specialization-constant expression its own
+    // `OpSpecConstantOp`, so `float a[kN * 2]` spelled twice becomes two array types, and an
+    // `out` argument copied between them keeps only element 0. Declaring an array size that
+    // depends on a specialization constant once, as a named `const`, gives every declaration
+    // of the array one constant and one type.
+    if (as<IRModuleInst>(inst->getParent()) && isSpecConstRateType(inst->getFullType()))
+    {
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            if (as<IRArrayType>(use->getUser()))
+                return FoldPolicy::Never;
+        }
+    }
+    return Super::getFoldPolicy(inst);
+}
+
 bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->getOp())
