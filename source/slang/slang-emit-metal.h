@@ -100,6 +100,8 @@ protected:
 
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
 
+    virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink) SLANG_OVERRIDE;
+
     virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual bool doesTargetSupportPtrTypes() SLANG_OVERRIDE { return true; }
 
