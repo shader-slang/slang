@@ -4,6 +4,7 @@
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "slang-check-impl.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-large-vector-matrix-types.h"
 #include "slang-mangle.h"
 #include "slang-syntax.h"
 
@@ -5600,7 +5601,20 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             elementBaseType = elementBasicType->getBaseType();
         }
 
-        auto info = rules->GetVectorLayout(elementBaseType, element.info, elementCount);
+        SimpleLayoutInfo info;
+        LayoutOffset elementStride = element.info.getUniformLayout().size.getFiniteValue();
+        if (elementCount > kMaxNativeVectorElementCount)
+        {
+            // A vector with more than 4 elements has no native type; it is lowered to an array
+            // (see `legalizeLargeVectorMatrixTypes`), so it is laid out as one.
+            auto arrayInfo = rules->GetArrayLayout(element.info, LayoutSize(elementCount));
+            info = arrayInfo;
+            elementStride = arrayInfo.elementStride;
+        }
+        else
+        {
+            info = rules->GetVectorLayout(elementBaseType, element.info, elementCount);
+        }
 
         RefPtr<VectorTypeLayout> typeLayout = new VectorTypeLayout();
         typeLayout->type = type;
@@ -5608,7 +5622,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         typeLayout->uniformAlignment = info.alignment;
 
         typeLayout->elementTypeLayout = element.layout;
-        typeLayout->uniformStride = element.info.getUniformLayout().size.getFiniteValue();
+        typeLayout->uniformStride = elementStride;
 
         typeLayout->addResourceUsage(info.kind, info.size);
 
@@ -5631,6 +5645,13 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             elementBaseType = elementBasicType->getBaseType();
         }
 
+        // A matrix with more than 4 rows or columns has no native type; it is lowered to an
+        // array of rows (see `legalizeLargeVectorMatrixTypes`), so it is laid out as one: always
+        // row-major, with each row laid out as a vector, or as an array if it has more than 4
+        // elements.
+        bool isLargeMatrix =
+            rowCount > kMaxNativeVectorElementCount || colCount > kMaxNativeVectorElementCount;
+
         // The `GetMatrixLayout` implementation in the layout rules
         // currently defaults to assuming row-major layout,
         // so if we want column-major layout we achieve it here by
@@ -5643,25 +5664,48 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         {
             matrixLayout = context.matrixLayoutMode;
         }
+        if (isLargeMatrix)
+        {
+            matrixLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+        }
         if (matrixLayout == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
         {
             size_t tmp = layoutMajorCount;
             layoutMajorCount = layoutMinorCount;
             layoutMinorCount = tmp;
         }
-        auto info = rules->GetMatrixLayout(
-            elementBaseType,
-            elementInfo,
-            layoutMajorCount,
-            layoutMinorCount);
+
+        SimpleArrayLayoutInfo info;
+        SimpleLayoutInfo rowInfo;
+        LayoutOffset minorStride = elementInfo.getUniformLayout().size.getFiniteValue();
+        if (isLargeMatrix)
+        {
+            if (colCount > kMaxNativeVectorElementCount)
+            {
+                auto rowArrayInfo = rules->GetArrayLayout(elementInfo, LayoutSize(colCount));
+                rowInfo = rowArrayInfo;
+                minorStride = rowArrayInfo.elementStride;
+            }
+            else
+            {
+                rowInfo = rules->GetVectorLayout(elementBaseType, elementInfo, colCount);
+            }
+            info = rules->GetArrayLayout(rowInfo, LayoutSize(rowCount));
+        }
+        else
+        {
+            info = rules->GetMatrixLayout(
+                elementBaseType,
+                elementInfo,
+                layoutMajorCount,
+                layoutMinorCount);
+            rowInfo = rules->GetVectorLayout(elementBaseType, elementInfo, colCount);
+        }
 
         auto rowType = matType->getRowType();
         RefPtr<VectorTypeLayout> rowTypeLayout = new VectorTypeLayout();
 
-        auto rowInfo = rules->GetVectorLayout(elementBaseType, elementInfo, colCount);
-
         LayoutOffset majorStride = info.elementStride;
-        LayoutOffset minorStride = elementInfo.getUniformLayout().size.getFiniteValue();
 
         LayoutOffset rowStride = 0;
         LayoutOffset colStride = 0;
