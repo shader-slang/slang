@@ -743,7 +743,8 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator%(T left, T right)
     return result;
 }
 
-#if SLANG_CUDA_RTC || SLANG_CUDA_ENABLE_HALF
+// SLANG_MAKE_VECTOR is defined unconditionally because each use below sits under the gate
+// for its own type, and an offline build may enable any one of those types alone.
 #define SLANG_MAKE_VECTOR(T)                                                \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##2 make_##T##2(T x, T y)           \
     {                                                                       \
@@ -757,7 +758,6 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator%(T left, T right)
     {                                                                       \
         return T##4 {x, y, z, w};                                           \
     }
-#endif
 
 #if SLANG_CUDA_RTC
 SLANG_MAKE_VECTOR(int)
