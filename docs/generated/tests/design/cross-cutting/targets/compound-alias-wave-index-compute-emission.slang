@@ -39,8 +39,9 @@ void main(uint3 tid : SV_DispatchThreadID)
 // not a GLSL/SPIR-V-only affordance. HLSL reaches the wave size with
 // the `WaveGetLaneCount()` intrinsic, Metal takes the SIMD-group
 // index and width in as entry-point attributes, and WGSL has to turn
-// the `subgroups` extension on and take the same two values as
-// `@builtin` inputs.
+// the `subgroups` extension on and take the subgroup index
+// (`subgroup_id`) and the number of subgroups in the workgroup
+// (`num_subgroups`) as `@builtin` inputs.
 
 // HLSL: WaveGetLaneCount()
 
@@ -51,4 +52,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // WGSL: enable subgroups;
 // WGSL-DAG: @builtin(subgroup_id)
-// WGSL-DAG: @builtin(subgroup_size)
+// WGSL-DAG: @builtin(num_subgroups)
