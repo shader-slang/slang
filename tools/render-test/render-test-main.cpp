@@ -1605,7 +1605,7 @@ static SlangResult _setSessionPrelude(
         SLANG_RETURN_ON_FAIL(TestToolUtil::getRootPath(exePath, rootPath));
         String includePath;
         SLANG_RETURN_ON_FAIL(
-            TestToolUtil::getIncludePath(rootPath, "external/nvapi/nvHLSLExtns.h", includePath))
+            TestToolUtil::getIncludePath(rootPath, "external/nvapi/nvHLSLExtns.h", includePath));
 
         StringBuilder buf;
         // We have to choose a slot that NVAPI will use.

@@ -2332,8 +2332,10 @@ static SlangResult _initSlangCompiler(TestContext* context, CommandLine& ioCmdLi
             String rootPath;
             SLANG_RETURN_ON_FAIL(TestToolUtil::getRootPath(context->exePath.getBuffer(), rootPath));
             String includePath;
-            SLANG_RETURN_ON_FAIL(
-                TestToolUtil::getIncludePath(rootPath, "external/nvapi/nvHLSLExtns.h", includePath))
+            SLANG_RETURN_ON_FAIL(TestToolUtil::getIncludePath(
+                rootPath,
+                "external/nvapi/nvHLSLExtns.h",
+                includePath));
 
             StringBuilder buf;
 
@@ -7252,7 +7254,7 @@ SlangResult innerMain(int argc, char** argv)
 
     // The context holds useful things used during testing
     TestContext context;
-    SLANG_RETURN_ON_FAIL(context.init(argv[0]))
+    SLANG_RETURN_ON_FAIL(context.init(argv[0]));
 
     auto& categorySet = context.categorySet;
 
