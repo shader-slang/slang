@@ -5157,11 +5157,17 @@ protected:
                 auto arrayType = as<IRArrayType>(varType);
                 auto count = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
                 if (arrayType && count && count->getValue() >= 1 && count->getValue() <= 8 &&
-                    as<IRBasicType>(arrayType->getElementType()) &&
                     arrayType->getElementType()->getOp() == kIROp_FloatType)
                 {
                     result.systemValueName = toSlice("clip_distances");
                     result.permittedTypes.add(arrayType);
+
+                    // The built-in name is attached to the struct key when `parentVar` is a
+                    // field, so the extension requirement is attached to the key as well.
+                    auto decorated = parentVar;
+                    if (auto field = as<IRStructField>(parentVar))
+                        decorated = field->getKey();
+                    builder.addRequireWGSLExtensionDecoration(decorated, toSlice("clip_distances"));
                 }
                 else
                 {

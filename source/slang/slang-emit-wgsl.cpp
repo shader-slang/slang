@@ -302,8 +302,6 @@ bool WGSLSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
 {
     if (auto sysSemanticDecor = inst->findDecoration<IRTargetSystemValueDecoration>())
     {
-        if (sysSemanticDecor->getSemantic() == toSlice("clip_distances"))
-            _requireExtension(toSlice("clip_distances"));
         m_writer->emit("@builtin(");
         m_writer->emit(sysSemanticDecor->getSemantic());
         m_writer->emit(")");
