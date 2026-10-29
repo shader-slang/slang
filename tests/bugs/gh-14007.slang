@@ -10,12 +10,15 @@
 //TEST:SIMPLE(filecheck=COMPUTE): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HANDLE): -target metal -entry handleMain -stage fragment
 //TEST:SIMPLE(filecheck=NESTED): -target metal -entry nestedMain -stage compute
+//TEST:SIMPLE(filecheck=SHAPES): -target metal -entry shapesMain -stage fragment
 // The Metal compiler, where it is available, must accept the argument-buffer accesses.
 //TEST:SIMPLE(filecheck=LIBLOAD): -target metallib -entry loadMain -stage fragment
 //TEST:SIMPLE(filecheck=LIBDIMS): -target metallib -entry dimsMain -stage fragment
 //TEST:SIMPLE(filecheck=LIBSCALAR): -target metallib -entry scalarLoadOnlyMain -stage fragment
 //TEST:SIMPLE(filecheck=LIBFIELD): -target metallib -entry fieldMain -stage fragment
 //TEST:SIMPLE(filecheck=LIBMS): -target metallib -entry msMain -stage fragment
+//TEST:SIMPLE(filecheck=LIBHANDLE): -target metallib -entry handleMain -stage fragment
+//TEST:SIMPLE(filecheck=LIBSHAPES): -target metallib -entry shapesMain -stage fragment
 
 // shader-slang/slang#14007 and #14006: on Metal, a combined texture-sampler inside a
 // `ParameterBlock` is an argument-buffer field of the lowered `{texture_0, sampler_0}` struct.
@@ -170,12 +173,68 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // A bindless handle reaches `Load` as a `{texture_0, sampler_0}` value built from the handle.
 StructuredBuffer<Sampler2D.Handle> gHandles;
 
+// LIBHANDLE: @handleMain
+// HANDLE: texture2d<float, access::sample> [[T:_S[0-9]+]] = gHandles_{{[0-9]+}}[{{.*}}].texture_0;
+// HANDLE: = ([[T]]).get_width(0)),
 // HANDLE: texture_0).sample(
 // HANDLE-SAME: texture_0).read(
+// HANDLE: texture_0).read(
 [shader("fragment")]
 float4 handleMain(float2 uv : TEXCOORD0, nointerpolation uint i : TEXCOORD1) : SV_Target
 {
-    return gHandles[i].Sample(uv) + gHandles[i].Load(int3(1, 1, 0));
+    uint w, h;
+    gHandles[i].GetDimensions(w, h);
+    return gHandles[i].Sample(uv) + gHandles[i].Load(int3(1, 1, 0)) + gHandles[i][uint2(w, h) / 2];
+}
+
+// Every texture shape forwards `GetDimensions` through its own generated function.
+ParameterBlock<Sampler1D> gShape1D;
+ParameterBlock<Sampler1DArray> gShape1DArray;
+ParameterBlock<Sampler2DArray> gShape2DArray;
+ParameterBlock<Sampler3D> gShape3D;
+ParameterBlock<SamplerCube> gShapeCube;
+ParameterBlock<SamplerCubeArray> gShapeCubeArray;
+ParameterBlock<Sampler2DMS> gShape2DMS;
+ParameterBlock<Sampler2DMSArray> gShape2DMSArray;
+
+// LIBSHAPES: @shapesMain
+// SHAPES: ((*gShape1D_{{[0-9]+}}).texture_{{[0-9]+}}).get_width(0)
+// SHAPES: [[T0:_S[0-9]+]] = (*gShape1DArray_{{[0-9]+}}).texture_{{[0-9]+}};
+// SHAPES: ([[T0]]).get_array_size()
+// SHAPES: [[T1:_S[0-9]+]] = (*gShape2DArray_{{[0-9]+}}).texture_{{[0-9]+}};
+// SHAPES: ([[T1]]).get_array_size()
+// SHAPES: [[T2:_S[0-9]+]] = (*gShape3D_{{[0-9]+}}).texture_{{[0-9]+}};
+// SHAPES: ([[T2]]).get_depth(0)
+// SHAPES: [[T3:_S[0-9]+]] = (*gShapeCube_{{[0-9]+}}).texture_{{[0-9]+}};
+// SHAPES: ([[T3]]).get_height(0)
+// SHAPES: [[T4:_S[0-9]+]] = (*gShapeCubeArray_{{[0-9]+}}).texture_{{[0-9]+}};
+// SHAPES: ([[T4]]).get_array_size()
+// SHAPES: [[T5:_S[0-9]+]] = (*gShape2DMS_{{[0-9]+}}).texture_{{[0-9]+}};
+// SHAPES: ([[T5]]).get_num_samples()
+// SHAPES: [[T6:_S[0-9]+]] = (*gShape2DMSArray_{{[0-9]+}}).texture_{{[0-9]+}};
+// SHAPES: ([[T6]]).get_num_samples()
+[shader("fragment")]
+float4 shapesMain() : SV_Target
+{
+    uint w, h, d, e, s;
+    float4 r = 0;
+    gShape1D.GetDimensions(w);
+    r.x += w;
+    gShape1DArray.GetDimensions(w, e);
+    r.x += w + e;
+    gShape2DArray.GetDimensions(w, h, e);
+    r.y += w + h + e;
+    gShape3D.GetDimensions(w, h, d);
+    r.y += w + h + d;
+    gShapeCube.GetDimensions(w, h);
+    r.z += w + h;
+    gShapeCubeArray.GetDimensions(w, h, e);
+    r.z += w + h + e;
+    gShape2DMS.GetDimensions(w, h, s);
+    r.w += w + h + s;
+    gShape2DMSArray.GetDimensions(w, h, e, s);
+    r.w += w + h + e + s;
+    return r;
 }
 
 // Outside an argument buffer the lowered struct is split as before, and each texture keeps the
