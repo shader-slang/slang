@@ -1,0 +1,78 @@
+name: Regenerate TOC
+# The job regenerates the ToC without secrets and uploads the result as a patch.
+# slash-regenerate-publish.yml pushes the patch and reports the outcome.
+on:
+  repository_dispatch:
+    types: [regenerate-toc-command]
+permissions:
+  contents: read
+concurrency:
+  group: regenerate-toc-pr-${{ github.event.client_payload.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  regenerate-toc:
+    if: >-
+      github.repository == 'shader-slang/slang' &&
+      github.event.client_payload.github.payload.repository.full_name == 'shader-slang/slang' &&
+      github.event.client_payload.pull_request.base.repo.full_name == 'shader-slang/slang'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.client_payload.pull_request.head.sha }}
+          path: pr-branch
+          persist-credentials: false
+
+      - name: Checkout target branch
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: shader-slang/slang
+          ref: ${{ github.event.client_payload.pull_request.base.ref }}
+          path: target-branch
+          persist-credentials: false
+
+      - name: Install Mono
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mono-complete
+
+      - name: Regenerate Table of Contents
+        run: |
+          ./target-branch/docs/build_toc.sh --source ./pr-branch
+
+      - name: Create patch
+        id: diff
+        run: |
+          git -C pr-branch diff --binary > regen.patch
+          if [ -s regen.patch ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload patch
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: regen-patch
+          path: regen.patch
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: regenerate-toc
+    if: always() && needs.regenerate-toc.result != 'skipped'
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    uses: ./.github/workflows/slash-regenerate-publish.yml
+    with:
+      command: regenerate-toc
+      commit-message: "regenerate documentation Table of Contents"
+      generate-result: ${{ needs.regenerate-toc.result }}
+      changed: ${{ needs.regenerate-toc.outputs.changed }}

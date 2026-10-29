@@ -850,6 +850,13 @@ FIDDLE()
 class NamespaceDecl : public NamespaceDeclBase
 {
     FIDDLE(...)
+
+    // Every scope that the parser creates for this namespace (see `Parser::pushLookupScope`).
+    // `ownedScope` is the most recent of them that `PushScope` created, so for a reopened
+    // namespace it belongs to one body only. The semantic checker attaches the imported
+    // namespaces of the same name to every scope in this list, so code in each body finds
+    // the imported members.
+    List<Scope*> lexicalScopes;
 };
 
 // A "module" of code (essentially, a single translation unit)
@@ -1239,11 +1246,6 @@ bool isGenericConstraintParameterDecl(Decl* decl);
 bool isLocalVar(const Decl* decl);
 
 
-// Add a sibling lookup scope for `dest` to refer to `source`.
-void addSiblingScopeForContainerDecl(
-    ASTBuilder* builder,
-    ContainerDecl* dest,
-    ContainerDecl* source);
 void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source);
 
 // Cast `decl` to a valid `ContainerDecl*` if its members will become global scope symbols after

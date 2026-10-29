@@ -1186,6 +1186,20 @@ err(
 )
 
 err(
+    "spirv-snippet-undefined-id",
+    29001,
+    "undefined id in SPIR-V snippet",
+    span { loc = "location", message = "undefined SPIR-V id '%~id' in target intrinsic snippet: ~snippet" }
+)
+
+err(
+    "spirv-snippet-unknown-operand",
+    29002,
+    "unknown operand in SPIR-V snippet",
+    span { loc = "location", message = "unknown operand '~operand' in target intrinsic snippet: ~snippet" }
+)
+
+err(
     "unrecognized-spirv-opcode",
     29100,
     "unrecognized SPIR-V opcode",
@@ -1508,8 +1522,8 @@ standalone_note(
 warning(
     "potentially-aliased-out-parameter",
     30051,
-    "potentially aliased argument to 'out'/'inout'/'ref' parameter",
-    span { loc = "firstArg:Expr", message = "argument for '~direction1' parameter '~param1:Name' may alias argument for '~direction2' parameter '~param2:Name'; passing the same value to both may produce unexpected results" }
+    "potentially aliased argument to a parameter that may be written",
+    span { loc = "firstArg:Expr", message = "argument for '~direction1:ParamPassingMode' parameter '~param1:Name' may alias argument for '~direction2:ParamPassingMode' parameter '~param2:Name'; passing the same value to both may produce undefined behavior" }
 )
 
 err(
@@ -2375,6 +2389,13 @@ warning(
     30132,
     "__apply is experimental and requires '-experimental-feature'",
     span { loc = "expr:Expr", message = "__apply expressions are rejected unless '-experimental-feature' is enabled." }
+)
+
+err(
+    "ref-access-keyword-requires-experimental-feature",
+    30133,
+    "reference access keyword requires '-experimental-feature'",
+    span { loc = "modifier:Modifier", message = "'~modifier' is intended for the core module, so it is rejected in user code unless '-experimental-feature' is enabled." }
 )
 
 -- type pack diagnostics
@@ -3429,6 +3450,13 @@ warning(
     31231,
     "use of deprecated modifier",
     span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
+)
+
+err(
+    "const-on-writable-parameter",
+    31232,
+    "'const' conflicts with parameter passing mode '~mode:ParamPassingMode'",
+    span { loc = "modifier:Modifier", message = "an '~mode:ParamPassingMode' parameter is meant to be written by its function, so '~param:Decl' cannot be 'const'" }
 )
 
 -- Enums (320xx)
@@ -5138,6 +5166,15 @@ err(
     span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
 )
 
+err(
+    "multiple-push-constant-blocks-in-entry-point",
+    39033,
+    "entry point uses more than one push-constant block",
+    span { loc = "entryPoint:IRInst", message = "entry point `~entryPoint` uses more than one push-constant block, but Vulkan allows at most one per entry point" },
+    variadic_note { cpp_name = "Block", message = "~blockDescription is used by this entry point", span { loc = "blockLocation" } },
+    note { message = "combine the data into one `[[vk::push_constant]]` block or into the entry point's `uniform` parameters", span { loc = "entryPoint:IRInst" } }
+)
+
 warning(
     "register-modifier-but-no-vk-binding-nor-shift",
     39029,
@@ -6269,6 +6306,13 @@ err(
     56109,
     "SubpassInput in ParameterBlock not supported on Metal",
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
+)
+
+err(
+    "byte-address-buffer-sub-word-store-not-supported-in-wgsl",
+    56112,
+    "byte-address buffer stores of 8- or 16-bit values are not supported in WGSL",
+    span { loc = "location", message = "storing '~type:IRInst' to a byte-address buffer writes 8- or 16-bit values; WGSL byte-address buffers are arrays of 32-bit words, so the store would have to rewrite the whole word and could lose a concurrent write to its other bytes. Use a 'RWStructuredBuffer' of the type, pack the values into 32-bit words, or use 'Atomic<uint>' operations." }
 )
 
 -- SPIRV (57001-57007)
