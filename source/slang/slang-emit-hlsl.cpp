@@ -876,6 +876,10 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
+            if (isFloatingType(inst->getDataType()))
+            {
+                diagnoseFloatAtommic();
+            }
             m_writer->emit("InterlockedMin");
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
@@ -890,6 +894,10 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
+            if (isFloatingType(inst->getDataType()))
+            {
+                diagnoseFloatAtommic();
+            }
             m_writer->emit("InterlockedMax");
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
