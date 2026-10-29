@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry vmain -stage vertex
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry cmain -stage compute
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry cmain -stage compute
 
 // An exported function that no entry point calls is still emitted, but nothing specializes the
 // address spaces of its reference parameters. On Metal, a by-value struct or array parameter is
@@ -27,6 +28,8 @@ void cmain()
 {
     outputBuffer[0] = 1;
 }
+
+// METALLIB: @cmain
 
 // CHECK-DAG: float takeStruct_{{[0-9]+}}(const S_{{[0-9]+}} thread* {{[A-Za-z0-9_]+}})
 export float takeStruct(S s)

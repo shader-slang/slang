@@ -5,6 +5,7 @@
 //TEST:SIMPLE(filecheck=CLONE): -target metal -entry cmain -stage compute
 //TEST:SIMPLE(filecheck=ORDER): -target metal -entry cmain -stage compute
 //TEST:SIMPLE(filecheck=ORIG): -target metal -entry cmain -stage compute
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry cmain -stage compute
 
 // Exported functions are given `thread` parameters on Metal even when nothing calls them. An
 // export that *is* called is still specialized from its call sites, and the original is removed
@@ -78,6 +79,7 @@ export void chainG3(inout int y) { chainH3(y); }
 export void chainF4(inout int a, inout int b) { a += b; }
 export void chainG4(inout int y) { chainF4(y, gs); }
 
+// METALLIB: @cmain
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void cmain()

@@ -55,10 +55,11 @@ export uint scramble(uint seed)
     return a + b;
 }
 
-// The `onb` call inside `buildFrame` requests exactly the `thread` address
-// spaces the seeded exported `onb` already carries, so no duplicate `thread*`
-// variant should be emitted alongside it: `onb` must be defined exactly once.
-// The DEDUP prefix runs as a separate FileCheck pass so this count is not
-// perturbed by the CHECK-DAG matches above.
+// The `onb` call inside `buildFrame` requests the same `thread` address spaces
+// that the seeded `onb` has, so `onb` must be defined exactly once. The DEDUP
+// prefix checks that count in a separate FileCheck pass, so the CHECK-DAG
+// matches above do not affect it. The ORDER prefix in
+// export-called-address-space.slang is what fails when the export is not
+// registered as its own specialization.
 // DEDUP-COUNT-1: void onb_{{[A-Za-z0-9_]*}}(
 // DEDUP-NOT: void onb_{{[A-Za-z0-9_]*}}(

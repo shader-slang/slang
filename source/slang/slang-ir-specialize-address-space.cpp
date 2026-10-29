@@ -440,12 +440,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
     }
 
-    // Retypes every `Generic` pointer parameter of the exported function `func` in place to
+    // Seeds the exported function `func`: retypes every `Generic` pointer parameter in place to
     // `defaultAddrSpace`, fixes up its function type, and registers `func` as its own
     // specialization. An exported function may have no call site to infer parameter address spaces
     // from. The registered key holds the address space each parameter now has, as
     // `getAddressSpaceFromVarType` reports it, so a call whose arguments are in the same address
-    // spaces targets `func` itself instead of a new clone.
+    // spaces targets `func` itself. A call whose arguments are in other spaces, such as a `Global`
+    // buffer element passed for a `UserPointer` parameter, misses the key and gets a clone.
     void seedExportedFunc(IRFunc* func, AddressSpace defaultAddrSpace)
     {
         IRBuilder builder(module);
@@ -788,8 +789,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         // A candidate's body can hold the last call to another candidate, for example an original
         // `G` that still calls the original `F` after the entry point's calls to both were
-        // redirected to clones. We sweep to a fixpoint so the result does not depend on the order of
-        // the candidates.
+        // redirected to clones. We sweep to a fixpoint so the result does not depend on the order
+        // of the candidates.
         List<IRFunc*> candidates;
         for (IRFunc* func : functionsToConsiderRemoving)
         {
