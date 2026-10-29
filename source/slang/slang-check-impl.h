@@ -3041,23 +3041,6 @@ public:
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
 
-    void checkStructuralRayTracingStageRestrictions(
-        DeclRef<InterfaceDecl> superInterfaceDeclRef,
-        WitnessTable* witnessTable,
-        SourceLoc conformanceLoc);
-    void diagnoseDuplicateStructuralRayTracingSchemaEntries(
-        Type* entryListType,
-        AssocTypeDecl* associatedTypeRequirement,
-        Type* schemaType,
-        SourceLoc satisfyingDeclLoc);
-    void diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl);
-    void diagnoseInvalidStructuralRayTracingReturnType(CallableDecl* decl);
-    void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
-    bool diagnoseInvalidStructuralRayTracingExpression(Expr* expr);
-    bool diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke);
-    bool diagnoseInvalidStructuralRayTracingGenericTypeApplication(
-        GenericAppExpr* genericApplication);
-
     void _checkDifferentialConformance(
         ConformanceCheckingContext* context,
         Type* subType,

@@ -178,23 +178,20 @@ static RestrictedRayTracingTypeKind _getRestrictedRayTracingTypeKind(Type* type)
 // "RT builtin" means a compiler-recognized library type, not necessarily a C++ BuiltinType.
 // Concrete structs implementing the interface remain ordinary types. Returns true when an error
 // is reported, or false when the supplied type needs no diagnostic.
-static bool _diagnoseInvalidRTBuiltinTypeUse(
-    SemanticsVisitor* visitor,
-    Type* type,
-    SourceLoc location)
+static bool _diagnoseInvalidRTBuiltinTypeUse(DiagnosticSink* sink, Type* type, SourceLoc location)
 {
     switch (_getRestrictedRayTracingTypeKind(type))
     {
     case RestrictedRayTracingTypeKind::StageInterface:
         // The interface itself, e.g. IMissShader, cannot be a runtime value. A concrete struct
         // implementing IMissShader is an ordinary type and does not enter this branch.
-        visitor->getSink()->diagnose(
+        sink->diagnose(
             Diagnostics::StructuralRayTracingStageRuntimeValue{.type = type, .location = location});
         return true;
     case RestrictedRayTracingTypeKind::StageInput:
         // Allowed input parameters and local copies return from the variable checker before
         // reaching this helper. Here the context forbids an input, even in an array or pointer.
-        visitor->getSink()->diagnose(
+        sink->diagnose(
             Diagnostics::StructuralRayTracingInputStorage{.type = type, .location = location});
         return true;
     default:
@@ -208,7 +205,7 @@ static bool _diagnoseInvalidRTBuiltinTypeUse(
 // A variadic call groups these same arguments into a ConcreteTypePack, so inspect its elements.
 // No inheritance, fields, or conformance witnesses are needed to recognize these builtin types.
 static bool _diagnoseRestrictedRayTracingGenericArgument(
-    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
     Type* type,
     SourceLoc location)
 {
@@ -217,7 +214,7 @@ static bool _diagnoseRestrictedRayTracingGenericArgument(
         for (Index i = 0; i < typePack->getTypeCount(); ++i)
         {
             if (_diagnoseRestrictedRayTracingGenericArgument(
-                    visitor,
+                    sink,
                     typePack->getElementType(i),
                     location))
                 return true;
@@ -227,12 +224,12 @@ static bool _diagnoseRestrictedRayTracingGenericArgument(
     switch (_getDirectRestrictedRayTracingTypeKind(type))
     {
     case RestrictedRayTracingTypeKind::StageInput:
-        visitor->getSink()->diagnose(Diagnostics::StructuralRayTracingInputGenericArgument{
+        sink->diagnose(Diagnostics::StructuralRayTracingInputGenericArgument{
             .type = type,
             .location = location});
         return true;
     case RestrictedRayTracingTypeKind::StageInterface:
-        return _diagnoseInvalidRTBuiltinTypeUse(visitor, type, location);
+        return _diagnoseInvalidRTBuiltinTypeUse(sink, type, location);
     default:
         return false;
     }
@@ -591,7 +588,7 @@ void initializeStructuralRayTracingEntryPoint(
 }
 
 // =============================================================================
-// SemanticsVisitor methods
+// Checks called by ordinary semantic checking
 // =============================================================================
 
 // Checks the extra RT API restrictions after ordinary interface conformance checking succeeds.
@@ -600,7 +597,8 @@ void initializeStructuralRayTracingEntryPoint(
 // invoke. Applying these restrictions at that point also covers a Miss listed in a schema
 // without being selected directly with `-entry Miss`.
 // A conformance to an ordinary interface, such as ITraceProgramSchema, needs no stage restrictions.
-void SemanticsVisitor::checkStructuralRayTracingStageRestrictions(
+void checkStructuralRayTracingStageRestrictions(
+    SemanticsVisitor* visitor,
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
     WitnessTable* witnessTable,
     SourceLoc conformanceLoc)
@@ -610,12 +608,14 @@ void SemanticsVisitor::checkStructuralRayTracingStageRestrictions(
         return;
 
     _checkStructuralRayTracingStageImplementationType(
-        this,
+        visitor,
         witnessTable->witnessedType,
         conformanceLoc);
 }
 
-void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
+void diagnoseDuplicateStructuralRayTracingSchemaEntries(
+    ASTBuilder* astBuilder,
+    DiagnosticSink* sink,
     Type* entryListType,
     AssocTypeDecl* associatedTypeRequirement,
     Type* schemaType,
@@ -642,7 +642,7 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
     // Canonical AST identity makes aliases name the same entry without reconstructing or
     // structurally comparing types here.
     auto entries =
-        _getStructuralRayTracingEntryTypes(getASTBuilder(), entryListType->getCanonicalType());
+        _getStructuralRayTracingEntryTypes(astBuilder, entryListType->getCanonicalType());
     HashSet<Type*> seenEntries;
     for (Index i = 0; i < entries->getTypeCount(); ++i)
     {
@@ -650,7 +650,7 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
         if (seenEntries.add(entryType))
             continue;
 
-        getSink()->diagnose(Diagnostics::DuplicateStructuralRayTracingEntry{
+        sink->diagnose(Diagnostics::DuplicateStructuralRayTracingEntry{
             .section = sectionName,
             .entry = entryType,
             .schema = schemaType->getCanonicalType(),
@@ -669,7 +669,9 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
 // A direct input is allowed as a non-uniform in parameter or an initialized non-static local.
 // Globals, fields, and other parameter directions are rejected. An initializer must itself pass
 // the ordinary expression/conversion checks below, which reject fresh input construction.
-void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl)
+void diagnoseInvalidStructuralRayTracingVariableType(
+    SemanticsVisitor* visitor,
+    VarDeclBase* varDecl)
 {
     auto type = varDecl->getType();
     // Recognize the input type itself, such as MissInput<C>. Unknown means it is not a stage input.
@@ -693,7 +695,7 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBa
             //
             // For `MissInput<C> fresh;`, variable checking may insert a default-constructor call.
             // Check that inserted expression too, even though no initializer was written.
-            diagnoseInvalidStructuralRayTracingExpression(varDecl->initExpr);
+            diagnoseInvalidStructuralRayTracingExpression(visitor, varDecl->initExpr);
             // The local declaration is allowed; any initializer error was reported above.
             return;
         }
@@ -703,28 +705,30 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBa
     // checks restricted types inside built-in containers and the stage interface itself.
     // Reaching this call does not imply an error: ordinary types, including concrete stage
     // structs, pass without a diagnostic.
-    _diagnoseInvalidRTBuiltinTypeUse(this, type, varDecl->loc);
+    _diagnoseInvalidRTBuiltinTypeUse(visitor->getSink(), type, varDecl->loc);
 }
 
 // Rejects results such as `rt::MissInput<C> makeInput();`. Inputs may be received as in parameters
 // and copied locally, but a function cannot promise a new input. Constructors are checked at
 // their call expressions instead, so their declarations do not trigger this result check.
-void SemanticsVisitor::diagnoseInvalidStructuralRayTracingReturnType(CallableDecl* decl)
+void diagnoseInvalidStructuralRayTracingReturnType(DiagnosticSink* sink, CallableDecl* decl)
 {
     if (as<ConstructorDecl>(decl))
         return;
     _diagnoseInvalidRTBuiltinTypeUse(
-        this,
+        sink,
         decl->returnType.type,
         decl->returnType.exp ? decl->returnType.exp->loc : decl->loc);
 }
 
 // Rejects a property such as `property rt::MissInput<C> input { get; }`. Payload and record
 // properties have ordinary application-defined result types and remain legal.
-void SemanticsVisitor::diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl)
+void diagnoseInvalidStructuralRayTracingPropertyType(
+    DiagnosticSink* sink,
+    PropertyDecl* propertyDecl)
 {
     _diagnoseInvalidRTBuiltinTypeUse(
-        this,
+        sink,
         propertyDecl->type.type,
         propertyDecl->type.exp ? propertyDecl->type.exp->loc : propertyDecl->loc);
 }
@@ -737,7 +741,7 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingPropertyType(PropertyD
 //
 // ResolveInvoke and coercion distinguish these cases. Inspect their checked result, rather than
 // treating every Type(...) spelling as construction. Ordinary struct results need no RT check.
-bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingExpression(Expr* expr)
+bool diagnoseInvalidStructuralRayTracingExpression(SemanticsVisitor* visitor, Expr* expr)
 {
     auto type = expr->type;
     if (_getRestrictedRayTracingTypeKind(type) == RestrictedRayTracingTypeKind::None)
@@ -768,11 +772,11 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingExpression(Expr* expr)
     {
         // Coercion can check the same constructor after call checking. Use ordinary suppression
         // so that one forbidden construction produces one diagnostic.
-        diagnoseOnce(
+        visitor->diagnoseOnce(
             Diagnostics::StructuralRayTracingTypeConstruction{.type = type, .location = location});
         return true;
     }
-    return _diagnoseInvalidRTBuiltinTypeUse(this, type, location);
+    return _diagnoseInvalidRTBuiltinTypeUse(visitor->getSink(), type, location);
 }
 
 // Checks the type arguments of a resolved function, method, or constructor call. Consider:
@@ -787,7 +791,7 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingExpression(Expr* expr)
 // The chosen declaration's substitutions include both written and inferred arguments. Rejecting
 // Input for T prevents the generic body from constructing it after specialization. This temporary
 // restriction does not catch an associated type such as T.Item becoming Input; see issue #13686.
-bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke)
+bool diagnoseInvalidStructuralRayTracingGenericArguments(DiagnosticSink* sink, InvokeExpr* invoke)
 {
     auto functionDeclRef = as<DeclRefExpr>(invoke->functionExpr);
     if (!functionDeclRef)
@@ -806,7 +810,7 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(Invok
                     if (auto argumentType = as<Type>(argument))
                     {
                         if (_diagnoseRestrictedRayTracingGenericArgument(
-                                this,
+                                sink,
                                 argumentType,
                                 invoke->functionExpr->loc))
                         {
@@ -827,7 +831,8 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(Invok
 // This has the same unknown-T construction risk as a generic call. Check the written type
 // arguments once normal type resolution succeeds. A concrete stage struct is an ordinary
 // argument, so shader lists and generic helpers require no special exemption for those structs.
-bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericTypeApplication(
+bool diagnoseInvalidStructuralRayTracingGenericTypeApplication(
+    DiagnosticSink* sink,
     GenericAppExpr* genericApplication)
 {
     for (auto argument : genericApplication->arguments)
@@ -835,7 +840,7 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericTypeApplication
         if (auto argumentType = as<TypeType>(argument->type))
         {
             if (_diagnoseRestrictedRayTracingGenericArgument(
-                    this,
+                    sink,
                     argumentType->getType(),
                     argument->loc))
                 return true;

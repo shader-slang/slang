@@ -236,7 +236,12 @@ using the same type classifier as ordinary input-use checking.
 
 All additional semantic rules and declaration-identity queries live in
 `source/slang/slang-check-structural-ray-tracing.cpp`, with examples beside the rule implementations.
-Conformance, expression, entry-point, and code-generation boundaries call into that file.
+Ordinary declaration, conformance, expression and entry-point checking call into that file.
+The eight RT validation functions are free functions declared in `slang-structural-ray-tracing.h`.
+Return-type, property and generic-argument checks take a diagnostic sink; duplicate-schema checking
+also takes the AST builder. Stage-restriction, variable and expression checks receive the existing
+`SemanticsVisitor` only because they use its `diagnoseOnce` suppression. These dependencies are
+explicit at the existing call sites; the checking order is unchanged and no module pass is added.
 The ordinary library constraints remain the source of truth for type relationships. The semantic
 rules do not require a separate registry of stage implementations. Library loading and builtin
 registration should use the existing builtin mechanisms described in section 9.

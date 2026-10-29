@@ -3086,7 +3086,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     // Therefore, the body visitor will not check them for invalid RT builtin type use.
     // Run that check here instead, now that their types and initializers are known.
     if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
-        diagnoseInvalidStructuralRayTracingVariableType(varDecl);
+        diagnoseInvalidStructuralRayTracingVariableType(this, varDecl);
 
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
@@ -3931,7 +3931,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     // An input local must receive an existing view. Check after initialization has been chosen:
     // `let copy = input` is valid, while an inserted default constructor still creates a new input.
-    diagnoseInvalidStructuralRayTracingVariableType(varDecl);
+    diagnoseInvalidStructuralRayTracingVariableType(this, varDecl);
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
 
@@ -6770,6 +6770,8 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
     }
 
     diagnoseDuplicateStructuralRayTracingSchemaEntries(
+        getASTBuilder(),
+        getSink(),
         satisfyingType,
         requiredAssociatedTypeDeclRef.getDecl(),
         witnessTable->witnessedType,
@@ -11743,6 +11745,7 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
 
     interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
     checkStructuralRayTracingStageRestrictions(
+        this,
         superInterfaceDeclRef,
         witnessTable,
         inheritanceDecl->loc);
@@ -16697,10 +16700,10 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
-        diagnoseInvalidStructuralRayTracingVariableType(paramDecl);
+        diagnoseInvalidStructuralRayTracingVariableType(this, paramDecl);
     }
 
-    diagnoseInvalidStructuralRayTracingReturnType(decl);
+    diagnoseInvalidStructuralRayTracingReturnType(getSink(), decl);
 
     maybeInferPrefixModifierForOperator(decl);
 
@@ -18133,7 +18136,7 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
 {
     SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
-    diagnoseInvalidStructuralRayTracingPropertyType(decl);
+    diagnoseInvalidStructuralRayTracingPropertyType(getSink(), decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
 }

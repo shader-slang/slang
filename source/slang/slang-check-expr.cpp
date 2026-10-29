@@ -23,6 +23,7 @@
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-structural-ray-tracing.h"
 
 namespace Slang
 {
@@ -4385,12 +4386,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
         // Check generic arguments even when the result is void. A call to make<MissInput<C>>()
         // could otherwise hide construction inside a generic body such as void make<T>() { T(); }.
-        if (diagnoseInvalidStructuralRayTracingGenericArguments(invoke))
+        if (diagnoseInvalidStructuralRayTracingGenericArguments(getSink(), invoke))
             return CreateErrorExpr(invoke);
 
         // Check constructor calls and ordinary call results. A user-defined constructor cannot
         // create a fresh MissInput<C>; a substituted call result cannot supply one either.
-        if (diagnoseInvalidStructuralRayTracingExpression(invoke))
+        if (diagnoseInvalidStructuralRayTracingExpression(this, invoke))
             return CreateErrorExpr(invoke);
 
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
@@ -4629,7 +4630,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
     // ResolveInvoke can produce an initializer list for rt::MissInput<C>() rather than a call.
     // `typealias Inputs = rt::MissInput<C>[1]; Inputs();` likewise constructs fresh inputs.
     // Its aggregate fallback calls _coerceInitializerList directly, bypassing coerce's check.
-    else if (diagnoseInvalidStructuralRayTracingExpression(rs))
+    else if (diagnoseInvalidStructuralRayTracingExpression(this, rs))
     {
         return CreateErrorExpr(rs);
     }

@@ -14,6 +14,48 @@ class Decl;
 class Type;
 class ASTBuilder;
 class MagicTypeModifier;
+struct SemanticsVisitor;
+
+// These checks inspect already-checked declarations, types, and expressions. The checks taking
+// a visitor use its existing diagnoseOnce state to avoid reporting the same error twice.
+
+/// Checks the additional stage-implementation restrictions after ordinary conformance checking.
+void checkStructuralRayTracingStageRestrictions(
+    SemanticsVisitor* visitor,
+    DeclRef<InterfaceDecl> superInterfaceDeclRef,
+    WitnessTable* witnessTable,
+    SourceLoc conformanceLoc);
+
+/// Diagnoses repeated program types in a checked schema section.
+void diagnoseDuplicateStructuralRayTracingSchemaEntries(
+    ASTBuilder* astBuilder,
+    DiagnosticSink* sink,
+    Type* entryListType,
+    AssocTypeDecl* associatedTypeRequirement,
+    Type* schemaType,
+    SourceLoc satisfyingDeclLoc);
+
+/// Checks whether the variable's storage, parameter direction, and initializer allow an RT input.
+void diagnoseInvalidStructuralRayTracingVariableType(
+    SemanticsVisitor* visitor,
+    VarDeclBase* varDecl);
+
+/// Diagnoses restricted RT types used as function results.
+void diagnoseInvalidStructuralRayTracingReturnType(DiagnosticSink* sink, CallableDecl* decl);
+
+/// Diagnoses restricted RT types used as property results.
+void diagnoseInvalidStructuralRayTracingPropertyType(DiagnosticSink* sink, PropertyDecl* decl);
+
+/// Diagnoses forbidden RT input construction or a call returning a restricted RT type.
+bool diagnoseInvalidStructuralRayTracingExpression(SemanticsVisitor* visitor, Expr* expr);
+
+/// Diagnoses restricted RT types in the selected call's explicit or inferred generic arguments.
+bool diagnoseInvalidStructuralRayTracingGenericArguments(DiagnosticSink* sink, InvokeExpr* invoke);
+
+/// Diagnoses restricted RT types in an explicit generic type application.
+bool diagnoseInvalidStructuralRayTracingGenericTypeApplication(
+    DiagnosticSink* sink,
+    GenericAppExpr* genericApplication);
 
 /// Allows the ray-tracing stage-interface and descriptor AST types in imported library
 /// declarations.

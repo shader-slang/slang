@@ -5,6 +5,7 @@
 #include "slang-check-impl.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-structural-ray-tracing.h"
 
 // This file implements semantic checking logic related
 // to resolving overloading call operations, by checking
@@ -4054,7 +4055,7 @@ Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
 
     auto result = checkGenericAppWithCheckedArgs(genericAppExpr);
     if (!IsErrorExpr(result) && as<TypeType>(result->type) &&
-        diagnoseInvalidStructuralRayTracingGenericTypeApplication(genericAppExpr))
+        diagnoseInvalidStructuralRayTracingGenericTypeApplication(getSink(), genericAppExpr))
     {
         return CreateErrorExpr(genericAppExpr);
     }
