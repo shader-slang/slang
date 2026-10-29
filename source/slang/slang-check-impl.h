@@ -4753,6 +4753,14 @@ bool getExtensionTargetDeclList(
 
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
 
+// Collect the requirements of a checked declaration reference, including its generic arguments.
+// Append contributing declarations to `outReferencedDecls` for use-site diagnostics without
+// changing the shared declaration's requirements or provenance.
+CapabilitySet getDeclRefCapabilityRequirements(
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef,
+    List<Decl*>& outReferencedDecls);
+
 RefPtr<ComponentType> createUnspecializedGlobalComponentType(
     FrontEndCompileRequest* compileRequest);
 
