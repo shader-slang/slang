@@ -52,13 +52,19 @@ Slang language version 2025 brings these changes on top of the legacy language:
 Slang language version 2026 brings these changes on top of Slang 2025:
 
 - Comma expression is removed when it is used inside a parenthesis. The expression `(a, b)` no longer evaluates to have `b`'s type as in C/C++. Instead, `(a,b)` means `makeTuple(a,b)` and returns a tuple consisting of `a` and `b`. See [SP#027](https://github.com/shader-slang/spec/blob/main/proposals/027-tuple-syntax.md) for details.
-- Interfaces marked `[anyValueSize]` cannot be generic or contain associated types, generic methods, mutating methods, or differentiable methods.
-  Their base interfaces must also have `[anyValueSize]`, and generic types and extensions cannot declare conformances to them.
-  The `-enable-experimental-dynamic-dispatch` option bypasses these restrictions.
+- In Slang 2026, the compiler applies additional checks to interface declarations with an `[anyValueSize(...)]` attribute and to declarations of conformance to those interfaces.
+  Such an interface declaration must not have generic parameters or contain associated types, methods with generic parameters, mutating methods, or differentiable methods.
+  An interface declared with this attribute may refine only interfaces whose declarations also have the attribute.
+  Conformances to these interfaces must not be declared in a generic type declaration; the restriction applies to every specialization of that declaration.
+  Conformances to these interfaces must not be declared in an `extension` declaration, whether or not that extension declares generic parameters.
+  The compiler skips these declaration checks when `-enable-experimental-dynamic-dispatch` is specified.
+  Writing `dyn IFoo` specifies a box type and does not bypass these checks.
 - Modifier `volatile` has been removed from Slang. See GitHub issue
   [#10614](https://github.com/shader-slang/slang/issues/10614) for details. The modifier is still accepted
   in GLSL source code for compatibility reasons.
-- Interface-typed variables can no longer be default-initialized. See GitHub issue
+- Explicit default initialization of an existential box, such as `dyn IFoo value = {};`, is an error.
+  A declaration without an initializer, such as `dyn IFoo value;`, is allowed and leaves the variable uninitialized.
+  See GitHub issue
   [#9191](https://github.com/shader-slang/slang/issues/9191) for details.
 - Constructing a 4-dimensional vector from `(vector<T,2>, T)` and `(T, vector<T,2>)` has been removed. In previous language
   versions, these initializers implicitly converted the scalar `T` argument into a `vector<T,2>`, producing unexpected results.
@@ -72,8 +78,9 @@ Slang language version 2026 brings these changes on top of Slang 2025:
 
 Slang language version 202c brings these changes on top of Slang 2026:
 
-- Existential box types require explicit `dyn`, as in `dyn IFoo value`.
-  A bare `IFoo` names the interface contract and is valid in aliases, constraints, and conformance declarations.
+- Existential box types must be written explicitly with `dyn`, as in `dyn IFoo`.
+  The interface name `IFoo` denotes the contract and is valid in aliases, constraints, and conformance declarations.
+  In legacy Slang, Slang 2025, and Slang 2026, the compiler implicitly forms a box when an interface name appears where a value type is required.
   See [Existential Box Types](06-interfaces-generics.md#existential-box-types).
 
 - The generic-parameter-count overload tie-breaker has been removed.

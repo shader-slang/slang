@@ -11,8 +11,9 @@ Tuple t0;
 // This should be OK, compiling down to a zero-sized type
 Tuple<> t1;
 
-// A bare generic name fills declared defaults, but does not infer missing arguments from
-// constraints. Explicit specialization can still use the same constraint.
+// The compiler uses declared defaults to complete a generic declaration reference; it does
+// not infer missing arguments from constraints. The explicit `Fixed<int>` below satisfies
+// the same constraint.
 struct Fixed<T> where T == int
 {
     T value;

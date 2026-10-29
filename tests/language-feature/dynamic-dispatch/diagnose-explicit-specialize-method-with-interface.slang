@@ -1,5 +1,5 @@
 // Explicitly specializing a generic interface method with an existential box is rejected
-// because the box does not conform to the stored interface. This check happens before typeflow.
+// because the box itself does not conform to `IFoo`. This check happens before typeflow.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"

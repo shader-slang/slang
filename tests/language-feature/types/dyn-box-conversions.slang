@@ -68,7 +68,8 @@ dyn IDerived makePure(int payload)
     return First(payload);
 }
 
-// A nondifferentiable result of a differentiable function has a modified box type.
+// The checker wraps `makeNoDiffBox`'s result type in `no_diff` because `IDerived` does not
+// refine `IDifferentiable`.
 [Differentiable]
 dyn IDerived makeNoDiffBox(int payload)
 {

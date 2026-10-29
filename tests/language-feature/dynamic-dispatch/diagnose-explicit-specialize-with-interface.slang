@@ -1,5 +1,5 @@
 // Explicitly specializing a constrained generic function with an existential box is rejected
-// because the box does not conform to the stored interface. Implicit opening of a boxed
+// because the box itself does not conform to `IFoo`. Implicit opening of a boxed
 // argument is distinct: it specializes the function with the concrete payload type instead.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
