@@ -2387,6 +2387,8 @@ Type* ResourceType::getTexelFormatType()
     return as<Type>(_getGenericTypeArg(this, 0));
 }
 
+// Returns Texel.DataType, which conforms to ITexelElement.
+// For Texture2D<RGBA16F>, this is float4: ITexelElement
 Type* ResourceType::getElementType()
 {
     // Evaluate the checked _Texture.T = Texel.DataType alias using this resource's arguments.
