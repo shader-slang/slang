@@ -276,8 +276,9 @@ The Metal Shading Language limits 64-bit integer atomics to a min or max that
 returns `void`: `atomic_min_explicit` and `atomic_max_explicit` on a device
 `atomic_ulong` with `memory_order_relaxed`, and the `atomic_min` and
 `atomic_max` members of a `ulong` texture. Slang emits those forms for a
-`uint64_t` min or max with relaxed memory order on device memory or a texture,
-when the original value of the destination is not used:
+`uint64_t` min or max whose original value is not used, either on device memory
+with relaxed memory order or on a texture (texture atomics take no memory
+order):
 
 ```slang
 RWStructuredBuffer<uint64_t> buffer;
