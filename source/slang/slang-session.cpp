@@ -76,9 +76,9 @@ static ComPtr<ISlangBlob> tryLoadStandardModuleFromDLL(String const& moduleName)
     // handle is intentionally left loaded for the lifetime of the process.
     static GetModuleFunc* s_getModule = []() -> GetModuleFunc*
     {
-        // Undecorated library name: versioned off-Windows, matching the filename
-        // slang_add_target produces (see source/slang-standard-modules) and
-        // tryLoadBuiltinModuleFromDLL.
+    // Undecorated library name: versioned off-Windows, matching the filename
+    // slang_add_target produces (see source/slang-standard-modules) and
+    // tryLoadBuiltinModuleFromDLL.
 #if SLANG_WINDOWS_FAMILY
         String libBaseName = "slang-standard-modules";
 #else
@@ -97,8 +97,7 @@ static ComPtr<ISlangBlob> tryLoadStandardModuleFromDLL(String const& moduleName)
             SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
         if (libslangPath.getLength())
         {
-            String besidePath =
-                Path::combine(Path::getParentDirectory(libslangPath), libBaseName);
+            String besidePath = Path::combine(Path::getParentDirectory(libslangPath), libBaseName);
             SharedLibrary::load(besidePath.getBuffer(), handle);
         }
 

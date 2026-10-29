@@ -31,7 +31,7 @@ namespace
 {
 struct ModuleFile
 {
-    String key; // import path, e.g. "slang/numerics/differentiable"
+    String key;  // import path, e.g. "slang/numerics/differentiable"
     String path; // absolute path to the .slang-module file
 };
 
@@ -53,17 +53,12 @@ void enumCallback(SlangPathType pathType, const char* name, void* userData)
 bool hasSuffix(const String& s, const char* suffix)
 {
     const size_t n = strlen(suffix);
-    return s.getLength() >= Index(n) &&
-           memcmp(s.getBuffer() + s.getLength() - n, suffix, n) == 0;
+    return s.getLength() >= Index(n) && memcmp(s.getBuffer() + s.getLength() - n, suffix, n) == 0;
 }
 
 // Recursively collect every .slang-module under 'root', keyed by its path
 // relative to 'root' with forward slashes and the ".slang-module" suffix removed.
-void collect(
-    ISlangFileSystemExt* fs,
-    const String& root,
-    const String& rel,
-    List<ModuleFile>& out)
+void collect(ISlangFileSystemExt* fs, const String& root, const String& rel, List<ModuleFile>& out)
 {
     String dirPath = rel.getLength() ? Path::combine(root, rel) : root;
 
@@ -110,8 +105,7 @@ int main(int argc, char** argv)
     }
 
     // Deterministic order so the generated file is stable across builds.
-    modules.sort([](const ModuleFile& a, const ModuleFile& b)
-                 { return a.key < b.key; });
+    modules.sort([](const ModuleFile& a, const ModuleFile& b) { return a.key < b.key; });
 
     auto lz4 = LZ4CompressionSystem::getSingleton();
     CompressionStyle style;
@@ -132,11 +126,8 @@ int main(int argc, char** argv)
         }
 
         ComPtr<ISlangBlob> compressed;
-        if (SLANG_FAILED(lz4->compress(
-                &style,
-                bytes.getBuffer(),
-                bytes.getCount(),
-                compressed.writeRef())))
+        if (SLANG_FAILED(
+                lz4->compress(&style, bytes.getBuffer(), bytes.getCount(), compressed.writeRef())))
         {
             fprintf(stderr, "error: compression failed for %s\n", modules[i].path.getBuffer());
             return 1;
@@ -159,8 +150,8 @@ int main(int argc, char** argv)
         }
         sb << "};\n";
 
-        table << "    { \"" << modules[i].key << "\", " << sym << ", sizeof(" << sym
-              << "), " << UInt64(uncompressedSize) << " },\n";
+        table << "    { \"" << modules[i].key << "\", " << sym << ", sizeof(" << sym << "), "
+              << UInt64(uncompressedSize) << " },\n";
     }
 
     sb << "\nstatic const EmbeddedStandardModule g_standardModules[] = {\n";
