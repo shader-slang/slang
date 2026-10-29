@@ -24,15 +24,10 @@ struct InitialAddressSpaceAssigner
     virtual AddressSpace getAddressSpaceFromVarType(IRInst* type) = 0;
     virtual AddressSpace getLeafInstAddressSpace(IRInst* inst) = 0;
 
-    /// Default address space for a mutable-reference (`out`/`inout`/pointer) parameter of an
-    /// exported/`public` (library-boundary) function that has no caller to specialize it from.
-    ///
-    /// Ordinary functions receive their parameter address spaces by call-site specialization
-    /// (see `specializeFunc`), but an exported function that is emitted with its own signature
-    /// has no caller. Returning a concrete address space here makes `specializeAddressSpace` seed
-    /// such functions and assign the returned space to any pointer parameter still left
-    /// `Generic`. The default `Generic` means "do not force a space", which leaves library
-    /// boundaries untouched for targets that do not need one (this is the base behavior).
+    /// Return the address space for a still-`Generic` pointer parameter of an exported function.
+    /// Ordinary functions get parameter address spaces from their call sites, but an exported
+    /// function may have no caller. A concrete result makes `specializeAddressSpace` visit
+    /// exported functions and apply it; the base `Generic` leaves them untouched.
     virtual AddressSpace getDefaultAddressSpaceForExportedFunctionParam();
 };
 
