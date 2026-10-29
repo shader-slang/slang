@@ -15708,6 +15708,29 @@ vector<T, N> reversebits<T : __BuiltinIntegerType, let N : int>(vector<T, N> val
     }
 }
 
+// Rounds to the nearest integer with halfway cases to the nearest even integer for targets whose
+// `round` may round them away from zero: it corrects the result of `round` in halfway cases.
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+T __rintFallback(T x)
+{
+    T nearest = round(x);
+
+    // Check if the value is exactly halfway between two integers
+    if (abs(x - nearest) == T(0.5))
+    {
+        // If halfway, choose the even number
+        if ((nearest / T(2)) * T(2) != nearest)
+        {
+            // If the nearest number is odd,
+            // move to the closest even number
+            nearest -= ((x < nearest) ? T(1) : T(-1));
+        }
+    }
+    return nearest;
+}
+
 /// Round even.
 /// @param x The value to round.
 /// @return The value rounded to the nearest integer, with ties rounded to the nearest even integer.
@@ -15721,26 +15744,21 @@ T rint(T x)
     __target_switch
     {
     case glsl: __intrinsic_asm "roundEven";
+    case hlsl:
+        // HLSL `round` rounds halfway cases to the nearest even integer (DXIL `Round_ne`). It has
+        // no `double` overload: DXC converts a `double` argument to `float` and returns a `float`,
+        // which would give the expression the wrong type, so `double` keeps the fallback.
+        if (__type_equals<T, double>())
+            return __rintFallback(x);
+        else
+            __intrinsic_asm "round";
     case metal: __intrinsic_asm "rint";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 RoundEven $x
     };
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.roundeven($0)";
     default:
-        T nearest = round(x);
-
-        // Check if the value is exactly halfway between two integers
-        if (abs(x - nearest) == T(0.5))
-        {
-            // If halfway, choose the even number
-            if ((nearest / T(2)) * T(2) != nearest)
-            {
-                // If the nearest number is odd,
-                // move to the closest even number
-                nearest -= ((x < nearest) ? T(1) : T(-1));
-            }
-        }
-        return nearest;
+        return __rintFallback(x);
     }
 }
 
@@ -15753,6 +15771,14 @@ vector<T,N> rint(vector<T,N> x)
     __target_switch
     {
     case glsl: __intrinsic_asm "roundEven";
+    case hlsl:
+        // `double` keeps the fallback, as in the scalar overload above.
+        if (__type_equals<T, double>())
+        {
+            VECTOR_MAP_UNARY(T, N, rint, x);
+        }
+        else
+            __intrinsic_asm "round";
     case metal: __intrinsic_asm "rint";
     case spirv: return spirv_asm {
         OpExtInst $$vector<T,N> result glsl450 RoundEven $x
