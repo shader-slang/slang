@@ -96,11 +96,24 @@ The type `vector<T,N>` is a vector of `N` _elements_ (also called _components_) 
 As a convenience, pre-defined vector types exist for each scalar type and valid element count, with a name using the formula `<<scalar-type>><<element-count>>`.
 For example, `float3` is a convenient name for `vector<float,3>`.
 
-> Note: Slang doesn't support vectors longer than 4 elements. They map to native vector types on many platforms, including CUDA, and none of these platforms support vectors longer than 4 elements. If needed, you can use an array like `float myArray[8]`.
+#### Vectors and Matrices Larger Than 4
+
+`N` can also be from 5 to 16 (inclusive), as can the row and column counts of a matrix (see below), for small dense linear algebra such as the 12x12 matrices of a contact solver.
+No target has native vector or matrix types of these sizes, so the compiler lowers them to arrays on every target: `vector<float,8>` becomes `float[8]`, and `matrix<float,12,12>` becomes an array of 12 rows of 12 floats (a row with 4 or fewer elements stays a native vector, so `matrix<float,8,3>` becomes `float3[8]`).
+
+They support construction (from a single scalar, or from all their elements for a vector), element and row access with constant or dynamic indices, component-wise arithmetic, comparisons and `select`, casts, `mul` (matrix-matrix, matrix-vector and vector-matrix), `transpose`, `dot`, `length`, `normalize`, `any`, `all`, and the element-wise math functions such as `min`, `max`, `clamp`, `abs`, `sqrt`, `exp` or `sin`. They work with automatic differentiation.
+
+Some uses are not supported and are reported as errors:
+
+* vectors or matrices with more than 16 elements, rows or columns;
+* shader stage inputs and outputs (varyings and vertex attributes);
+* functions that only have a native target implementation, such as `determinant` (limited to 4x4 matrices) and the wave and derivative functions.
+
+In buffers, they are laid out as the equivalent arrays under the buffer's layout rules (for example a `vector<float,5>` takes 20 bytes in a `StructuredBuffer`, and 80 bytes in a std140 constant buffer). Matrices larger than 4 are always laid out row after row, whatever the matrix layout mode.
 
 ### Matrix Types
 
-Matrix types can be written as `matrix<T,R,C>` where `T` is a scalar type and both `R` and `C` are integers from 2 to 4 (inclusive).
+Matrix types can be written as `matrix<T,R,C>` where `T` is a scalar type and both `R` and `C` are integers from 2 to 4 (inclusive), or up to 16 as described in [Vectors and Matrices Larger Than 4](#vectors-and-matrices-larger-than-4).
 The type `matrix<T,R,C>` is a matrix with _elements_ of type `T`, and comprising `R` rows and `C` columns.
 
 As a convenience, pre-defined matrix types exist for each scalar type and valid row/column count, with a name using the formula `<<scalar-type>><<row-count>>x<<column-count>>`.
