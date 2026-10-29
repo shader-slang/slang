@@ -1723,10 +1723,9 @@ struct GenericStructTypeUse
 // use, so collecting every use here lets `validateEntryPoint` report each contributing struct at
 // its own use site.
 //
-// Only generic struct specializations are collected, the spelling reported in
-// shader-slang/slang#9489. The same return-type and field-only gaps exist for a non-generic
-// struct (`Bar main()`, `struct W { Bar b; }`), a member type (`Outer<3>.In`) and an enum, and
-// this walk does not cover them.
+// Only generic struct specializations are collected. The same return-type and field-only gaps
+// exist for a non-generic struct (`Bar main()`, `struct W { Bar b; }`), a member type
+// (`Outer<3>.In`) and an enum, and this walk does not cover them.
 //
 // Core-module magic/intrinsic structs are excluded to match general inference (see
 // `isCoreModuleIntrinsicTypeDecl`); those that appear in signatures, such as `LineStream<T>` and
