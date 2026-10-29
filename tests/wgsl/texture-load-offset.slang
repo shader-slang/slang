@@ -60,7 +60,8 @@ Texture2DMS<float4> t2DMS;
 // METAL: [[M5:coord_[0-9]+]] = int2(i_{{[0-9]+}}, int(2));
 // METAL: [[M5]].x = [[M5]].x + int(-1);
 // METAL: [[M5]].y = [[M5]].y + int(1);
-// METAL: (t2DMS_{{[0-9]+}}).read(([[M5]]), uint((int(3))))
+// Metal's read() takes unsigned coordinates; a signed int2 has no implicit conversion.
+// METAL: (t2DMS_{{[0-9]+}}).read(vec<uint,2>(([[M5]])), uint((int(3))))
 [numthreads(4, 1, 1)]
 void computeMain(int3 tid: SV_DispatchThreadID)
 {

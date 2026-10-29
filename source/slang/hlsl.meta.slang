@@ -5440,20 +5440,20 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint($2))$z";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>($1), uint($2))$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint($2))$z";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>($1), uint($2))$z";
                     }
                     break;
                 }
