@@ -3,9 +3,105 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
+
+/// Return true if `type` is an array whose size is a specialization constant, or an expression
+/// over one.
+static bool isSpecConstSizedArrayType(IRType* type)
+{
+    auto arrayType = as<IRArrayType>(type);
+    return arrayType && isSpecConstRateType(arrayType->getElementCount()->getFullType());
+}
+
+/// Return true if `type` or any of its element array types is sized by a specialization constant.
+/// This is true for `float[kTile]` and `float[kTile][4]`, and false for `float[4]` and for a
+/// struct that has a `float values[kTile]` field.
+static bool hasSpecConstSizedArrayLayer(IRType* type)
+{
+    while (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        if (isSpecConstSizedArrayType(arrayType))
+            return true;
+        type = arrayType->getElementType();
+    }
+    return false;
+}
+
+struct SpecConstSizedArrayCheckContext
+{
+    CodeGenTarget target;
+    DiagnosticSink* sink;
+
+    void checkInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_GlobalVar:
+        case kIROp_GlobalParam:
+        case kIROp_Var:
+            checkDeclaration(inst, inst->getDataType(), inst->sourceLoc);
+            break;
+        case kIROp_StructField:
+            {
+                // The lowered struct field carries no location of its own; its key has the
+                // location of the field declaration.
+                auto field = as<IRStructField>(inst);
+                checkDeclaration(inst, field->getFieldType(), field->getKey()->sourceLoc);
+            }
+            break;
+        case kIROp_Func:
+            for (auto param : as<IRFunc>(inst)->getParams())
+                checkDeclaration(param, param->getDataType(), param->sourceLoc);
+            break;
+        default:
+            break;
+        }
+
+        for (auto child : inst->getChildren())
+            checkInst(child);
+    }
+
+    void checkDeclaration(IRInst* decl, IRType* declType, SourceLoc location)
+    {
+        // A variable, and an `out` or `inout` parameter, owns the storage its pointer type
+        // points to.
+        IRType* storageType = declType;
+        if (auto ptrType = as<IRPtrTypeBase>(declType))
+            storageType = ptrType->getValueType();
+
+        if (!hasSpecConstSizedArrayLayer(storageType))
+            return;
+        if (isWGPUTarget(target) && as<IRGlobalVar>(decl) &&
+            as<IRGroupSharedRate>(decl->getRate()) && isSpecConstSizedArrayType(storageType) &&
+            !hasSpecConstSizedArrayLayer(as<IRArrayType>(storageType)->getElementType()))
+        {
+            // WGSL allows an override-sized array only as the store type of a `var<workgroup>`;
+            // its element type needs a size fixed at shader creation:
+            // https://www.w3.org/TR/WGSL/#array-types
+            return;
+        }
+
+        sink->diagnose(Diagnostics::SpecializationConstantSizedArrayNotSupported{
+            .target = target,
+            .location = location,
+        });
+    }
+};
+
+void checkSpecializationConstantSizedArrays(
+    IRModule* module,
+    CodeGenTarget target,
+    DiagnosticSink* sink)
+{
+    if (isKhronosTarget(target))
+        return;
+
+    SpecConstSizedArrayCheckContext context{target, sink};
+    context.checkInst(module->getModuleInst());
+}
 
 /// Return the ordinary opcode for the operation that `constexprOp` performs, or `kIROp_Invalid` if
 /// `constexprOp` is not one of the `constexpr*` opcodes.

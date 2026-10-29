@@ -1706,6 +1706,8 @@ Result linkAndOptimizeIR(
         SLANG_PASS(checkForInvalidShaderParameterType, targetRequest, sink);
     }
 
+    SLANG_PASS(checkSpecializationConstantSizedArrays, targetRequest->getTarget(), sink);
+
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
