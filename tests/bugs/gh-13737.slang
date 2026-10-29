@@ -9,6 +9,8 @@
 //TEST:SIMPLE(filecheck=METALSHAPES): -target metal -entry shapesMain -stage compute
 //TEST:SIMPLE(filecheck=NOSAMPLER): -target metal -entry shapesMain -stage compute
 //TEST:SIMPLE(filecheck=NOSAMPLER): -target hlsl -entry shapesMain -stage compute
+//TEST:SIMPLE(filecheck=HLSLSHAPES): -target hlsl -entry shapesMain -stage compute
+//TEST:SIMPLE(filecheck=DXILSHAPES): -target dxil-assembly -entry shapesMain -stage compute -profile cs_6_0
 
 // shader-slang/slang#13737 and #10522: `Load`, the subscripts and `GetDimensions` on a combined
 // texture-sampler must use only the texture. HLSL, Metal and WGSL have no combined
@@ -133,6 +135,10 @@ void portableMain(uint3 id: SV_DispatchThreadID)
 // METALSHAPES: u_arrayShadow_texture_{{[0-9]+}}).read(vec<uint,2>((([[AS]])).xy), uint((([[AS]])).z), uint((([[AS]])).w))
 // METALSHAPES: u_texCube_texture_{{[0-9]+}}).read(vec<uint,2>((([[C]])).xy), uint((([[C]])).z), uint((([[C]])).w))
 // METALSHAPES: u_cubeShadow_texture_{{[0-9]+}}).read(vec<uint,2>((([[CS]])).xy), uint((([[CS]])).z), uint((([[CS]])).w))
+// HLSLSHAPES: u_tex1DArray_texture_{{[0-9]+}}.Load(int3(p_{{[0-9]+}}, int(1), int(0)))
+// HLSLSHAPES-SAME: u_texMSArray_texture_{{[0-9]+}}.Load(int3(p_{{[0-9]+}}, p_{{[0-9]+}}, int(1)), int(2))
+// HLSLSHAPES-SAME: u_arrayShadow_texture_{{[0-9]+}}.Load(int4(p_{{[0-9]+}}, p_{{[0-9]+}}, int(1), int(0)))
+// DXILSHAPES: @dx.op.textureLoad
 float4 shapeOps(int p)
 {
     float4 r = u_tex1DArray.Load(int3(p, 1, 0));

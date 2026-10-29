@@ -2,6 +2,8 @@
 //TEST:SIMPLE(filecheck=NESTED): -target hlsl -entry nestedMain -stage compute
 //TEST:SIMPLE(filecheck=EP): -target hlsl -entry epMain -stage compute
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry cbufMain -stage compute -profile cs_6_0
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry cbufMain -stage compute
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry cbufMain -stage compute
 
 // shader-slang/slang#13737: `Load`, the subscript and `GetDimensions` on a combined
 // texture-sampler nested in a constant buffer, a struct or an entry-point parameter forward to
@@ -25,6 +27,14 @@ RWStructuredBuffer<float4> outBuf;
 // CBUF: [[B]].GetDimensions(
 // CBUF: [[B]].Load(int3(int2(
 // CBUF-SAME: [[B]].Load(int3(uint3(
+// Metal and WGSL keep the `$q` strings, so a `Load`-only `C.b` stays an unsplit texture there, with
+// the texture binding and the real coordinate.
+// WGSL: @binding(2) @group(0) var [[WB:C_b_[0-9]+]] : texture_2d<f32>;
+// WGSL: var [[WL:_S[0-9]+]] : vec3<i32> = vec3<i32>(vec2<i32>({{_S[0-9]+}}), i32(0));
+// WGSL: textureLoad(([[WB]]), (([[WL]])).xy, (([[WL]])).z)
+// METAL: [[MB:C_b_[0-9]+]] {{\[\[}}texture(1){{\]\]}}
+// METAL: int3 [[ML:_S[0-9]+]] = int3(int2({{_S[0-9]+}}), int(0));
+// METAL: ([[MB]]).read(vec<uint,2>((([[ML]])).xy), uint((([[ML]])).z))
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void cbufMain(uint3 id: SV_DispatchThreadID)
