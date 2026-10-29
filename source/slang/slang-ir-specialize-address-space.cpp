@@ -128,6 +128,23 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return func;
     }
 
+    // Retypes the pointer parameter `param`, whose type is `ptrType`, to point into `addrSpace`,
+    // and records that address space for it. The caller fixes up the function type afterwards.
+    void setPointerParamAddrSpace(
+        IRBuilder& builder,
+        IRParam* param,
+        IRPtrTypeBase* ptrType,
+        AddressSpace addrSpace)
+    {
+        param->setFullType(builder.getPtrType(
+            ptrType->getOp(),
+            ptrType->getValueType(),
+            ptrType->getAccessQualifier(),
+            addrSpace,
+            ptrType->getDataLayout()));
+        mapInstToAddrSpace[param] = addrSpace;
+    }
+
     // Clones `key.getFunc()` with its pointer parameters retyped to the key's address spaces,
     // records the clone in `functionSpecializations` (under `key`) and in `specializationOrigin`,
     // and returns it. `key.getFunc()` must be an unspecialized function, never a clone.
@@ -146,20 +163,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         Index paramIndex = 0;
         for (auto param : specializedFunc->getParams())
         {
-            auto paramType = param->getFullType();
-            auto ptrType = as<IRPtrTypeBase>(paramType);
-            if (ptrType)
-            {
-                auto paramAddrSpace = key.getArgAddrSpaces()[paramIndex];
-                auto newParamType = builder.getPtrType(
-                    ptrType->getOp(),
-                    ptrType->getValueType(),
-                    ptrType->getAccessQualifier(),
-                    paramAddrSpace,
-                    ptrType->getDataLayout());
-                param->setFullType(newParamType);
-                mapInstToAddrSpace[param] = paramAddrSpace;
-            }
+            if (auto ptrType = as<IRPtrTypeBase>(param->getFullType()))
+                setPointerParamAddrSpace(
+                    builder,
+                    param,
+                    ptrType,
+                    key.getArgAddrSpaces()[paramIndex]);
             paramIndex++;
         }
 
@@ -449,14 +458,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             auto ptrType = as<IRPtrTypeBase>(param->getFullType());
             if (!ptrType || ptrType->getAddressSpace() != AddressSpace::Generic)
                 continue;
-            auto newType = builder.getPtrType(
-                ptrType->getOp(),
-                ptrType->getValueType(),
-                ptrType->getAccessQualifier(),
-                defaultAddrSpace,
-                ptrType->getDataLayout());
-            param->setFullType(newType);
-            mapInstToAddrSpace[param] = defaultAddrSpace;
+            setPointerParamAddrSpace(builder, param, ptrType, defaultAddrSpace);
             changed = true;
         }
         if (changed)
