@@ -65,8 +65,10 @@ void computeMain()
     outputBuffer[10] = copysign(Vec8(3.0), b)[0] * 10.0 + copysign(Vec8(3.0), b)[7];
     // CHECK-NEXT: {{^}}9.000000
     outputBuffer[11] = cospi(Vec8(1.0))[5] + 10.0 * sinpi(Vec8(0.5))[6] + tanpi(Vec8(0.0))[7];
+    // Metal's exp10(1.0f) is 9.999999, so the exp10 result is rounded. Rounding still tells
+    // exp10 (10) apart from exp (3) and exp2 (2).
     // CHECK-NEXT: {{^}}13.000000
-    outputBuffer[12] = divide(Vec8(9.0), Vec8(3.0))[4] + exp10(Vec8(1.0))[5];
+    outputBuffer[12] = divide(Vec8(9.0), Vec8(3.0))[4] + round(exp10(Vec8(1.0))[5]);
     // CHECK-NEXT: {{^}}8.000000
     outputBuffer[13] = powr(Vec8(2.0), Vec8(3.0))[2];
 
