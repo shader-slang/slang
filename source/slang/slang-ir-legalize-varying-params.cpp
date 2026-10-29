@@ -4251,18 +4251,20 @@ private:
         // ensureStructHasUserSemantic maps it (or reports it unsupported) as for a struct field.
         UInt targetIndex = 0;
         bool isOtherSystemValue = false;
-        if (auto systemValueAttr =
-                resultLayout ? resultLayout->findSystemValueSemanticAttr() : nullptr)
+        if (resultLayout)
         {
-            auto name = systemValueAttr->getName();
-            if (name.startsWithCaseInsensitive(toSlice("sv_target")))
+            if (auto systemValueAttr = resultLayout->findSystemValueSemanticAttr())
             {
-                targetIndex = systemValueAttr->getIndex();
-            }
-            else
-            {
-                isOtherSystemValue = true;
-                builder.addSemanticDecoration(key, name, (int)systemValueAttr->getIndex());
+                auto name = systemValueAttr->getName();
+                if (name.startsWithCaseInsensitive(toSlice("sv_target")))
+                {
+                    targetIndex = systemValueAttr->getIndex();
+                }
+                else
+                {
+                    isOtherSystemValue = true;
+                    builder.addSemanticDecoration(key, name, (int)systemValueAttr->getIndex());
+                }
             }
         }
         IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
