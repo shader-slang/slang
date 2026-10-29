@@ -2532,8 +2532,8 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // Host code accesses the fields of an `__extern_cpp` struct by their source names, so the
-    // C++ and CUDA source targets emit those names. Other targets keep uniqued field names.
+    // The C++-family source targets emit the fields of an `__extern_cpp` struct under their source
+    // names, which host code uses; see `applyExternCppStructFieldNames` for why GPU targets do not.
     switch (target)
     {
     case CodeGenTarget::CPPSource:
@@ -2541,6 +2541,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::PyTorchCppBinding:
         SLANG_PASS(applyExternCppStructFieldNames);
         break;
     default:
