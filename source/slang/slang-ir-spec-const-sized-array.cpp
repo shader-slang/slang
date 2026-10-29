@@ -114,7 +114,8 @@ struct SpecConstSizedArrayCheckContext
     void checkInitializers(IRInst* inst)
     {
         if (inst->getOp() == kIROp_MakeArrayFromElement &&
-            isSpecConstSizedArrayType(inst->getDataType()))
+            isSpecConstSizedArrayType(inst->getDataType()) &&
+            !reportedTypes.contains(inst->getDataType()))
         {
             sink->diagnose(Diagnostics::SpecializationConstantSizedArrayInitializerNotSupported{
                 .location = inst->sourceLoc,
@@ -166,18 +167,16 @@ void checkSpecializationConstantSizedArrays(
     DiagnosticSink* sink)
 {
     SpecConstSizedArrayCheckContext context{target, sink};
-
-    // SPIR-V and GLSL accept every such declaration, but not an initializer for one. Every other
-    // target already reports the declaration that the initializer belongs to.
-    if (isKhronosTarget(target))
+    if (!isKhronosTarget(target))
     {
-        context.checkInitializers(module->getModuleInst());
-        return;
+        context.checkInst(module->getModuleInst());
+        context.checkValues(module->getModuleInst(), true);
+        context.checkValues(module->getModuleInst(), false);
     }
 
-    context.checkInst(module->getModuleInst());
-    context.checkValues(module->getModuleInst(), true);
-    context.checkValues(module->getModuleInst(), false);
+    // An initializer is reported even where the declaration is accepted (SPIR-V, GLSL, a WGSL
+    // `var<workgroup>`), unless its array type has already been reported at a declaration.
+    context.checkInitializers(module->getModuleInst());
 }
 
 /// Return the ordinary opcode for the operation that `constexprOp` performs, or `kIROp_Invalid` if

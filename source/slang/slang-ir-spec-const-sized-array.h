@@ -24,8 +24,9 @@ class DiagnosticSink;
 /// is. A value of such a type that no declaration holds, such as the result of
 /// `ByteAddressBuffer.Load<float[kTile]>`, is reported once per type.
 ///
-/// No target can build such an array from an initializer list (`float a[kTile] = {};`), so SPIR-V
-/// and GLSL report that initializer instead.
+/// No target can build such an array from an initializer list (`float a[kTile] = {};`), so such
+/// an initializer is reported even where the declaration is accepted, unless the declaration that
+/// owns it is reported already.
 ///
 /// The check runs after specialization and dead-code elimination, so an array that a generic
 /// argument introduces is reported and one in removed code is not. On targets without
