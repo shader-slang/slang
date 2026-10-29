@@ -4784,12 +4784,31 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
     globalScopeVarLayout = globalScopeLayoutBuilder.endLayout(globalScopeVarLayout);
 
+    // The global-scope parameters keep the absolute bindings that `_completeBindings`
+    // assigned them, while reflection offsets are relative to the parent variable, so the
+    // scope variable itself sits at offset zero. We record the binding of the default
+    // constant buffer on the container of the scope's constant-buffer layout instead:
+    // scope + container then gives the buffer's binding without also shifting every
+    // global-scope parameter by it. The scope variable still gets an entry (at zero) for the
+    // buffer's resource kind, as every variable layout has one for each kind its type uses,
+    // and consumers such as the SPIR-V emitter add the container offset to that entry.
     if (globalConstantBufferBinding.count.compare(0) != std::partial_ordering::equivalent)
     {
-        auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
+        auto scopeTypeLayout = as<ParameterGroupTypeLayout>(globalScopeVarLayout->typeLayout);
 
-        cbInfo->space = globalConstantBufferBinding.space;
-        cbInfo->index = globalConstantBufferBinding.index;
+        // `-fvk-bind-globals` reserves its binding even when no global uses ordinary data, and
+        // then there is no constant buffer to record it on. A binding allocated for the
+        // default constant buffer always has one.
+        SLANG_ASSERT(scopeTypeLayout || !needDefaultConstantBuffer);
+        if (scopeTypeLayout)
+        {
+            globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
+
+            auto cbInfo = scopeTypeLayout->containerVarLayout->findOrAddResourceInfo(
+                globalConstantBufferBinding.kind);
+            cbInfo->space = globalConstantBufferBinding.space;
+            cbInfo->index = globalConstantBufferBinding.index;
+        }
     }
 
     programLayout->parametersLayout = globalScopeVarLayout;
