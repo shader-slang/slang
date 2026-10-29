@@ -721,13 +721,27 @@ static void validateVectorElementCount(DiagnosticSink* sink, IRVectorType* vecto
 static void validateMatrixDimensions(DiagnosticSink* sink, IRMatrixType* matrixType)
 {
     // Matrices with more than 4 rows or columns (up to `kMaxVectorElementCount`) have been
-    // lowered to arrays by `legalizeLargeVectorMatrixTypes`. A matrix whose row type is too large
-    // is reported through that vector type; this catches a matrix with too many rows.
-    auto rowCount = as<IRIntLit>(matrixType->getRowCount());
-    if (rowCount && rowCount->getValue() > kMaxNativeVectorElementCount)
+    // lowered to arrays by `legalizeLargeVectorMatrixTypes`, which leaves a matrix unchanged when
+    // either dimension is over that bound. Check both dimensions, because the row vector type of
+    // a matrix with too many columns need not appear in the module, and report the dimension that
+    // is out of range rather than a valid one (e.g. 20, not 6, for `matrix<float, 6, 20>`).
+    IRIntLit* const counts[] = {
+        as<IRIntLit>(matrixType->getRowCount()),
+        as<IRIntLit>(matrixType->getColumnCount())};
+    IRIntLit* invalidCount = nullptr;
+    for (auto limit :
+         {IRIntegerValue(kMaxVectorElementCount), IRIntegerValue(kMaxNativeVectorElementCount)})
+    {
+        for (auto count : counts)
+        {
+            if (!invalidCount && count && count->getValue() > limit)
+                invalidCount = count;
+        }
+    }
+    if (invalidCount)
     {
         sink->diagnose(Diagnostics::VectorWithInvalidElementCountEncountered{
-            .count = String(rowCount->getValue()),
+            .count = String(invalidCount->getValue()),
             .min = "1",
             .max = String(kMaxVectorElementCount),
             .location = matrixType->sourceLoc});

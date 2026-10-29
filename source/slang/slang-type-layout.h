@@ -1054,6 +1054,10 @@ public:
 class VectorTypeLayout : public SequenceTypeLayout
 {
 public:
+    /// Is this vector laid out as an array? A vector with more than 4 elements has no native
+    /// type on any target; it is lowered to an array and laid out as one, so its element stride
+    /// can be larger than its element size (e.g. 16 bytes under std140).
+    bool isLaidOutAsArray = false;
 };
 
 
