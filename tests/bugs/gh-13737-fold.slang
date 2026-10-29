@@ -2,12 +2,13 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry main -stage compute
 //TEST:SIMPLE(filecheck=MIP): -target metal -entry mipMain -stage compute
 
-// shader-slang/slang#13737: the `$q` strings for `Load` on a combined texture-sampler read the
-// coordinate from call operand 2, because operand 1 is the split-out sampler. The emitter decides
-// whether to fold an argument into the call by counting its uses in the target string, so that
-// count must use the same operand mapping. If it counted `($1)` as the sampler, the coordinate
-// would look unused and be folded into every `($1)` of the next `Load`, and the expression would
-// grow exponentially with each chained `Load`.
+// shader-slang/slang#13737: the WGSL `$q` strings for `Load` on a combined texture-sampler read
+// the coordinate from call operand 2, because operand 1 is the split-out sampler. The emitter
+// decides whether to fold an argument into the call by counting its uses in the target string, so
+// that count must use the same operand mapping. If it counted `($1)` as the sampler, the
+// coordinate would look unused and be folded into every `($1)` of the next `Load`, and the
+// expression would grow exponentially with each chained `Load`. Metal forwards the combined
+// receiver to a plain texture, whose strings also use the coordinate more than once.
 
 Sampler2DArray<int4> u_tex;
 RWStructuredBuffer<int4> outBuf;

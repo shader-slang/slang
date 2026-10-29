@@ -5209,35 +5209,35 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 // lod is not supported for 1D texture
                 if (isArray == 1)
                     // Tv read(uint coord, uint array, uint lod = 0) const
-                    __intrinsic_asm "$q$c$0.read(uint(($1).x), uint(($1).y))$z";
+                    __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y))$z";
                 else
                     // Tv read(uint coord, uint lod = 0) const
-                    __intrinsic_asm "$q$c$0.read(uint(($1).x))$z";
+                    __intrinsic_asm "$c$0.read(uint(($1).x))$z";
                 break;
             case $(SLANG_TEXTURE_2D):
                 if (isShadow == 1)
                 {
                     if (isArray == 1)
                         // T read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // T read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 else
                 {
                     if (isArray == 1)
                         // Tv read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // Tv read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 break;
             case $(SLANG_TEXTURE_3D):
                 if (isShadow == 0 && isArray == 0)
                     // Tv read(uint3 coord, uint lod = 0) const
-                    __intrinsic_asm "$q$c$0.read(vec<uint,3>(($1).xyz), uint(($1).w))$z";
+                    __intrinsic_asm "$c$0.read(vec<uint,3>(($1).xyz), uint(($1).w))$z";
                 break;
             case $(SLANG_TEXTURE_CUBE):
                 static_assert(isArray == 0, "Unsupported 'Load' of 'texture cube array' for 'metal' target");
@@ -5248,7 +5248,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __intrinsic_asm "<invalid intrinsics>";
                     else
                         // T read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 else
                 {
@@ -5257,7 +5257,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __intrinsic_asm "<invalid intrinsics>";
                     else
                         // Tv read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 break;
             }
@@ -5498,20 +5498,20 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$q$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$q$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$q$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$q$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
                     }
                     break;
                 }

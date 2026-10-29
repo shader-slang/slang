@@ -487,7 +487,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // struct on HLSL, Metal, WGSL and CPU-like targets. On HLSL, Metal and WGSL,
             // `legalizeResourceTypes` (`LegalCallBuilder::addArg`) then splits that struct into
             // two call arguments, so the call gains the sampler as argument 1. C and C++ skip the
-            // split and keep the struct, and CUDA never builds it.
+            // split and keep the struct, and CUDA never builds it. A Metal argument buffer
+            // (`ParameterBlock`) also keeps the struct whole, so Metal forwards a combined
+            // receiver to the extracted texture instead of using `$q`; only WGSL strings use it.
             //
             // When the split-out sampler is present, `emit` sets `m_skipsSplitSamplerArg` and
             // each bare `$N` (N >= 1) reads argument N + 1; other indexed accessors such as `$TN`
