@@ -2,9 +2,9 @@
 //TEST:SIMPLE(filecheck=CLONES): -target metal -obfuscate -entry computeMain -stage compute
 
 // An exported function called with a `thread` and a `threadgroup` pointer (#14004). `export`
-// adds `HLSLExport` and `[KeepAlive]` to `bump`, and its specializations copy them. Whether the
-// exported original survives the pass or not, its emitted definitions must have different names
-// under `-obfuscate`, where a definition with a linkage name is named by it.
+// adds `HLSLExport` and `[KeepAlive]` to `bump`, and its specializations copy them. The pass
+// removes the unused original, and its two specializations must have different names under
+// `-obfuscate`, where a definition with a linkage name is named by it.
 
 // DISTINCT: {{^}}void [[BUMP:[_A-Za-z0-9]+]](uint {{thread|threadgroup}}*
 // DISTINCT-NOT: {{^}}void [[BUMP]](

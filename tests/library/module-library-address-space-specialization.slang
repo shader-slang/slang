@@ -3,18 +3,27 @@
 // A library for precompiled-spirv-address-space-specialization.slang (#14004). Its entry point
 // specializes the exported `bump`, `inc` and `Acc.add` while the module is precompiled. The
 // exported originals stay, and their specializations lose their linkage, so the precompiled
-// SPIR-V exports each name exactly once. The checks capture each export name and reject a second
-// `LinkageAttributes` decoration with it before the first function definition.
+// SPIR-V exports each name exactly once.
+//
+// `-dump-ir` prints the embedded SPIR-V as disassembly; the `.slang-module` these runs write is
+// not used. Each run captures the first `LinkageAttributes` export of one function and rejects a
+// second one for the same name before the first function definition, in any order.
 
-//TEST:SIMPLE(filecheck=LIB): -o tests/library/module-library-address-space-specialization-dump.slang-module -target spirv -embed-downstream-ir -incomplete-library -fvk-use-entrypoint-name -dump-ir
+//TEST:SIMPLE(filecheck=BUMP): -o tests/library/module-library-address-space-specialization-bump.slang-module -target spirv -embed-downstream-ir -incomplete-library -fvk-use-entrypoint-name -dump-ir
+//TEST:SIMPLE(filecheck=INC): -o tests/library/module-library-address-space-specialization-inc.slang-module -target spirv -embed-downstream-ir -incomplete-library -fvk-use-entrypoint-name -dump-ir
+//TEST:SIMPLE(filecheck=ADD): -o tests/library/module-library-address-space-specialization-add.slang-module -target spirv -embed-downstream-ir -incomplete-library -fvk-use-entrypoint-name -dump-ir
 
-// LIB: OpDecorate %{{[A-Za-z_0-9]+}} LinkageAttributes "[[BUMP:[^"]*4bumpp[^"]*]]" Export
-// LIB-NOT: LinkageAttributes "[[BUMP]]" Export
-// LIB: OpDecorate %{{[A-Za-z_0-9]+}} LinkageAttributes "[[INC:[^"]*3incp[^"]*]]" Export
-// LIB-NOT: LinkageAttributes "{{[^"]*}}{{4bumpp|3incp}}{{[^"]*}}" Export
-// LIB: OpDecorate %{{[A-Za-z_0-9]+}} LinkageAttributes "[[ADD:[^"]*3Acc3addp[^"]*]]" Export
-// LIB-NOT: LinkageAttributes "{{[^"]*}}{{4bumpp|3incp|3Acc3addp}}{{[^"]*}}" Export
-// LIB: = OpFunction
+// BUMP: OpDecorate %{{[A-Za-z_0-9]+}} LinkageAttributes "[[NAME:[^"]*4bumpp[^"]*]]" Export
+// BUMP-NOT: LinkageAttributes "[[NAME]]" Export
+// BUMP: = OpFunction
+
+// INC: OpDecorate %{{[A-Za-z_0-9]+}} LinkageAttributes "[[NAME:[^"]*3incp[^"]*]]" Export
+// INC-NOT: LinkageAttributes "[[NAME]]" Export
+// INC: = OpFunction
+
+// ADD: OpDecorate %{{[A-Za-z_0-9]+}} LinkageAttributes "[[NAME:[^"]*3Acc3addp[^"]*]]" Export
+// ADD-NOT: LinkageAttributes "[[NAME]]" Export
+// ADD: = OpFunction
 
 module "module-library-address-space-specialization";
 
