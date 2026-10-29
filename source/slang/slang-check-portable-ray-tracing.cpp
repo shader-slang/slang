@@ -500,7 +500,7 @@ DeclRef<FuncDecl> findEntryPointByName(
 
     Count implementedStageCount = 0;
     Stage onlyImplementedStage = Stage::Unknown;
-    for (int i = 0; i < SLANG_STAGE_COUNT; ++i)
+    for (UInt i = 0; i < SLANG_STAGE_COUNT; ++i)
     {
         if (stageImplementations[i])
         {
