@@ -566,8 +566,8 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
         as<PtrType>(type))
         return cacheResult(true);
 
-    // A box needs a conforming payload. Slang 2026 and later therefore require initialization
-    // from a value instead of C-style default initialization.
+    // In Slang 2026 and later, we do not classify existential box types as C-style.
+    // C-style default initialization cannot supply a conforming payload.
     if (isSlang2026OrLater(this))
     {
         if (as<ExistentialBoxType>(type))
@@ -2400,8 +2400,8 @@ bool SemanticsVisitor::_coerce(
     }
 
     // Packing a box requires a witness for its payload, rather than a conformance to the box.
-    // For a box upcast, the interface refinement decides whether the conversion is possible;
-    // constructing the expression opens the box and composes the payload's conformance proof.
+    // For a box upcast, we check the interface refinement to determine whether conversion is
+    // possible. We then open the box and compose the payload's conformance proof.
     auto fromBoxType = as<ExistentialBoxType>(fromType);
     auto toBoxType = as<ExistentialBoxType>(toType);
     auto witnessSubType = fromType.type;
@@ -3401,8 +3401,8 @@ Expr* SemanticsVisitor::createExistentialBoxUpcastExpr(
     //     dyn IBase base = makeDerived();
     //
     // Opening the call result needs a temporary so its payload and witness come from one
-    // evaluation. A fresh scope attaches these bindings at the conversion itself. Adding them
-    // to an enclosing expression's existing bindings would introduce additional hoisting.
+    // evaluation. We place these bindings in a fresh scope at the conversion itself. Adding
+    // them to an enclosing expression's existing bindings would introduce additional hoisting.
     // Initializer coercion can also run after expression checking has closed its temporary scope.
     ExprLocalScope localScope;
     SemanticsVisitor visitor = withExprLocalScope(&localScope);

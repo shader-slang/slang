@@ -1747,7 +1747,7 @@ err(
     "concrete-argument-to-existential-box-reference-parameter",
     30077,
     "concrete type passed to an existential box reference parameter",
-    span { loc = "location", message = "parameter '~paramName' requires storage of type '~paramType:Type', but argument has concrete type '~argType:QualType'. To accept concrete storage, use a generic 'T ~paramName' with a 'where T : ~constraintInterface:Type' constraint." }
+    span { loc = "location", message = "parameter '~paramName' has type '~paramType:Type' and is passed by reference, but the argument has concrete storage type '~argType:QualType'. To accept concrete storage, use 'T ~paramName' with a type parameter 'T' constrained by 'where T : ~constraintInterface:Type'." }
 )
 
 standalone_note(
@@ -1831,8 +1831,8 @@ err(
 err(
     "runtime-type-test-requires-boxed-value",
     30300,
-    "runtime 'is'/'as' requires an existential box value",
-    span { loc = "expr:Expr", message = "runtime 'is'/'as' requires an existential box value." }
+    "runtime 'is'/'as' must be applied to an existential box value",
+    span { loc = "expr:Expr", message = "runtime 'is'/'as' must be applied to an existential box value." }
 )
 
 err(
@@ -1894,7 +1894,7 @@ err(
 err(
     "expected-proper-type-for-specialization-arg",
     30327,
-    "existential box specialization requires a value type, got '~type:Type'",
+    "expected a value type for an existential box specialization argument, got '~type:Type'",
     span { loc = "location" }
 )
 
@@ -1939,78 +1939,78 @@ err(
 err(
     "cannot-have-generic-interface-with-any-value-size",
     33072,
-    "interfaces with [anyValueSize] cannot be generic",
-    span { loc = "decl:Decl", message = "interfaces with [anyValueSize] cannot be generic: '~decl'." }
+    "interface declaration with [anyValueSize(...)] has generic parameters",
+    span { loc = "decl:Decl", message = "interface declaration '~decl' with [anyValueSize(...)] must not have generic parameters." }
 )
 
 err(
     "cannot-have-associated-type-in-interface-with-any-value-size",
     33073,
-    "interfaces with [anyValueSize] cannot have associated types",
-    span { loc = "member:Decl", message = "interfaces with [anyValueSize] cannot have associated types." }
+    "interface declaration with [anyValueSize(...)] has associated types",
+    span { loc = "member:Decl", message = "associated types must not be declared in an interface declaration with [anyValueSize(...)]." }
 )
 
 err(
     "cannot-have-generic-method-in-interface-with-any-value-size",
     33074,
-    "interfaces with [anyValueSize] cannot have generic methods",
-    span { loc = "member:Decl", message = "interfaces with [anyValueSize] cannot have generic methods." }
+    "interface declaration with [anyValueSize(...)] has methods with generic parameters",
+    span { loc = "member:Decl", message = "methods with generic parameters must not be declared in an interface declaration with [anyValueSize(...)]." }
 )
 
 err(
     "cannot-have-mutating-method-in-interface-with-any-value-size",
     33075,
-    "interfaces with [anyValueSize] cannot have [mutating] methods",
-    span { loc = "member:Decl", message = "interfaces with [anyValueSize] cannot have [mutating] methods." }
+    "interface declaration with [anyValueSize(...)] has [mutating] methods",
+    span { loc = "member:Decl", message = "methods with a [mutating] attribute must not be declared in an interface declaration with [anyValueSize(...)]." }
 )
 
 err(
     "cannot-have-differentiable-method-in-interface-with-any-value-size",
     33076,
-    "interfaces with [anyValueSize] cannot have [Differentiable] methods",
-    span { loc = "member:Decl", message = "interfaces with [anyValueSize] cannot have [Differentiable] methods." }
+    "interface declaration with [anyValueSize(...)] has [Differentiable] methods",
+    span { loc = "member:Decl", message = "methods with a [Differentiable] attribute must not be declared in an interface declaration with [anyValueSize(...)]." }
 )
 
 err(
     "interface-with-any-value-size-cannot-inherit-interface-without-any-value-size",
     33077,
-    "interface with [anyValueSize] inheritance error",
-    span { loc = "inheritance:Decl", message = "interface '~sizedInterface:Decl' specifies [anyValueSize] and may only inherit interfaces that also specify it. '~inherited:Decl' has no [anyValueSize] attribute." }
+    "interface declaration with [anyValueSize(...)] refines an interface without the attribute",
+    span { loc = "inheritance:Decl", message = "interface declaration '~sizedInterface:Decl' has an [anyValueSize(...)] attribute and must only refine interfaces whose declarations also have that attribute. Interface '~inherited:Decl' has no [anyValueSize(...)] attribute on its declaration." }
 )
 
 err(
     "cannot-use-extension-to-conform-to-interface-with-any-value-size",
     33078,
-    "extension cannot conform to interface with [anyValueSize]",
-    span { loc = "extension:Decl", message = "an extension cannot add a conformance to interface '~interface:Decl' because it specifies [anyValueSize]." }
+    "extension adds conformance to an interface with [anyValueSize(...)]",
+    span { loc = "extension:Decl", message = "conformance to interface '~interface:Decl' must not be added in an extension because the interface declaration has an [anyValueSize(...)] attribute." }
 )
 
 err(
     "cannot-have-unsized-member-when-inheriting-interface-with-any-value-size",
     33079,
     "unsized member is not allowed with an explicitly sized interface",
-    span { loc = "member:Decl", message = "unsized member '~member' is not allowed in a type conforming to interface '~interface:Decl', which specifies [anyValueSize]." }
+    span { loc = "member:Decl", message = "unsized member '~member' is not allowed in a type conforming to interface '~interface:Decl', whose declaration has an [anyValueSize(...)] attribute." }
 )
 
 err(
     "cannot-have-opaque-member-when-inheriting-interface-with-any-value-size",
     33080,
     "opaque member is not allowed with an explicitly sized interface",
-    span { loc = "member:Decl", message = "opaque member '~member' is not allowed in a type conforming to interface '~interface:Decl', which specifies [anyValueSize]." }
+    span { loc = "member:Decl", message = "opaque member '~member' is not allowed in a type conforming to interface '~interface:Decl', whose declaration has an [anyValueSize(...)] attribute." }
 )
 
 err(
     "cannot-have-non-copyable-member-when-inheriting-interface-with-any-value-size",
     33081,
     "non-copyable member is not allowed with an explicitly sized interface",
-    span { loc = "member:Decl", message = "non-copyable member '~member' is not allowed in a type conforming to interface '~interface:Decl', which specifies [anyValueSize]." }
+    span { loc = "member:Decl", message = "non-copyable member '~member' is not allowed in a type conforming to interface '~interface:Decl', whose declaration has an [anyValueSize(...)] attribute." }
 )
 
 err(
     "cannot-conform-generic-type-to-interface-with-any-value-size",
     33082,
-    "generic type cannot conform to an explicitly sized interface",
-    span { loc = "inheritance:Decl", message = "generic type '~generic:Decl' cannot conform to interface '~interface:Decl' because it specifies [anyValueSize]." }
+    "inheritance clause in a generic type declaration names an interface with [anyValueSize(...)]",
+    span { loc = "inheritance:Decl", message = "an inheritance clause in generic type declaration '~generic:Decl' cannot name interface '~interface:Decl' because the interface declaration has an [anyValueSize(...)] attribute." }
 )
 
 -- Conversion diagnostics
@@ -5944,7 +5944,7 @@ err(
     "ref-accessor-with-interface-type-in-dynamic-dispatch",
     52012,
     "ref accessor incompatible with dynamic dispatch",
-    span { loc = "location", message = "'ref' accessor returning type '~valueType:Type' is incompatible with dynamic dispatch because interface types require AnyValue marshalling." }
+    span { loc = "location", message = "'ref' accessor returning type '~valueType:Type' is incompatible with dynamic dispatch because the compiler uses AnyValue marshalling for an existential box in the return type." }
 )
 
 err(

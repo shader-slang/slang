@@ -33,8 +33,8 @@ static bool doesExistentialBoxPackingLoseRequiredReferenceStorage(
     if (!parameterType.isLeftValue)
         return false;
 
-    // Passing an existing box does not pack a concrete value. A concrete argument instead
-    // needs a conversion that creates a box, so its original storage has the wrong type.
+    // Passing an existing box does not pack a concrete value. For a concrete argument,
+    // coercion creates a new box, so the argument's original storage has the wrong type.
     if (as<ExistentialBoxType>(argumentType))
         return false;
     return as<ExistentialBoxType>(parameterType) != nullptr;
@@ -3992,9 +3992,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
     if (auto typetype = as<TypeType>(typeExpr->type))
     {
-        // Consider `NativeRef<IFoo>(IFoo())` for a COM interface. Before Slang 202c, the inner
-        // constructor must produce a boxed interface value. Initializing a raw interface instead
-        // would create a value of a non-proper type and make the outer conversion pack it again.
+        // Consider `NativeRef<IFoo>(IFoo())` for a COM interface in legacy mode or Slang 2025.
+        // The inner constructor must produce a value of type `dyn IFoo`. A value incorrectly typed
+        // as `IFoo` would make the outer conversion pack it again.
         auto targetType = CoerceToProperType(TypeExp(typeExpr, typetype->getType())).type;
         if (as<ErrorType>(targetType))
             return CreateErrorExpr(expr);

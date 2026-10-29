@@ -2750,7 +2750,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         if (as<ExistentialBoxType>(pairType->getPrimalType()))
         {
             // Existential differential pairs are handled specially later in autodiff lowering:
-            // their differential type is modeled as `IDifferentiable`, and the witness operand
+            // their checked differential type is `dyn IDifferentiable`, and the witness operand
             // on a differential pair with a boxed primal is not consulted.
             //
             // We lower a poison witness for a boxed primal because the box itself does not conform
@@ -6244,8 +6244,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         //
         if (argCount == 0)
         {
-            // An empty initializer cannot supply the concrete value and conformance that a box
-            // requires. We diagnose the empty box according to the selected language version.
+            // We diagnose an empty initializer for an existential box according to the selected
+            // language version. Such an initializer names no concrete payload or conformance.
             if (as<ExistentialBoxType>(type))
             {
                 auto moduleDecl = context->getMainModuleDecl();
@@ -15327,8 +15327,8 @@ static void lowerProgramEntryPointToIR(
             getMangledName(context->astBuilder, entryPointFuncDeclRef).getUnownedSlice());
     }
 
-    // We may have shader parameters of existential box type,
-    // which need us to supply concrete type information for specialization.
+    // To specialize shader parameters of existential box type, we supply concrete payload type
+    // information.
     //
     if (specializationInfo && specializationInfo->existentialSpecializationArgs.getCount() != 0)
     {

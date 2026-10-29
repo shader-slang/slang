@@ -1,4 +1,4 @@
-// Regression test for #10908: a dyn interface impl with a Ptr<float> field
+// Regression test for #10908: a conforming type with a `Ptr<float>` field
 // must compile to valid SPIR-V via the AnyValue dynamic dispatch path. The
 // pointer is packed/unpacked as raw bits (uint2 <-> ptr), so no
 // Function-class pointee struct is created — there is no storage-class type

@@ -3,8 +3,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -std 2026 -no-codegen
 //TEST:SIMPLE(filecheck=CHECK): -std 202c -no-codegen
 
-// Both paths in #12430 must diagnose before IR generation: a bare static reference and
-// explicit specialization of a constrained generic with a box type.
+// Both paths in #12430 must be diagnosed before IR generation: a static requirement reference
+// through `IV` and explicit specialization of a constrained generic function with a box type.
 interface IV
 {
     associatedtype Differential;

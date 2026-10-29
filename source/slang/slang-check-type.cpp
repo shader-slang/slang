@@ -333,9 +333,10 @@ bool SemanticsVisitor::coerceToAliasableTypeImpl(
 
     if (auto genericDeclRefType = as<GenericDeclRefType>(type))
     {
-        // We complete a bare generic name using only declared defaults. Missing defaults and
-        // parameter packs require an argument list, even if call inference could find an argument.
-        // For example, `Tuple<>` is a proper type, but `Tuple` still requires an argument list.
+        // We use declared defaults when completing a reference to a generic declaration.
+        // The programmer must write an argument list for a missing default or a parameter pack,
+        // even when call inference could find an argument. For example, `Tuple<>` names the empty
+        // tuple type, but `Tuple` without an argument list cannot be completed here.
         auto genericDeclRef = genericDeclRefType->getDeclRef();
         ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
         for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
@@ -410,7 +411,7 @@ bool SemanticsVisitor::coerceToAliasableTypeImpl(
         }
         result = DeclRefType::create(m_astBuilder, specializedDeclRef);
     }
-    // Non-generic types and interfaces need no argument completion.
+    // All other inputs retain their existing type.
     if (!result)
     {
         result = type;

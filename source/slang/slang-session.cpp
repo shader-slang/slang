@@ -653,7 +653,8 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
 
         // A reflected `IFoo` must become `dyn IFoo` before it can describe a value.
         // The normal call checker then opens that box for inference, just as it would
-        // for an argument written in Slang. The placeholder needs no value beyond its checked type.
+        // for an argument written in Slang. Only the placeholder's checked type is used; no runtime
+        // value is supplied.
         auto argExpr = getCurrentASTBuilder()->create<VarExpr>();
         argExpr->type = argType;
         argExpr->type.isLeftValue = true;
@@ -746,8 +747,8 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
     slang::ContainerType containerType,
     ISlangBlob** outDiagnostics)
 {
-    // We form the requested container over a proper type and cache the result. `None` preserves
-    // metadata identity without introducing an element position that needs a value type.
+    // We form the requested container over a proper type and cache the result.
+    // For `None`, we return the input metadata unchanged.
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     if (containerType == slang::ContainerType::None)

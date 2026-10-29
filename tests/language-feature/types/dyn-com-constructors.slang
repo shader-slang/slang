@@ -16,8 +16,8 @@ typealias Box = dyn IFoo;
 // type-level representation must not be mistaken for a constructor target.
 T identity<T>(T value) { return value; }
 
-// Both constructor forms must produce a proper COM-interface value. A raw interface value
-// would be boxed again when passed to `NativeRef`, generating an invalid `nullptr.get()` expression.
+// Both constructor forms must produce values of type `dyn IFoo`. A value incorrectly typed as
+// `IFoo` would be boxed again when passed to `NativeRef`, generating an invalid `nullptr.get()` expression.
 #ifndef SKIP_DEFAULT
 export __extern_cpp NativeRef<Box> makeNull()
 {

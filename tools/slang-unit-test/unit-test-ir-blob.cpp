@@ -512,8 +512,8 @@ SLANG_UNIT_TEST(irBlobRejectsIncompatibleASTVersions)
     SLANG_CHECK_ABORT(
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
-    // We use Slang 202c so semantic checking cannot implicitly box a bare interface if
-    // serialization loses the existential box wrapper.
+    // We use Slang 202c so semantic checking cannot implicitly form an existential box type
+    // from an interface type if serialization loses the box wrapper.
     slang::CompilerOptionEntry languageVersionEntry = {};
     languageVersionEntry.name = slang::CompilerOptionName::LanguageVersion;
     languageVersionEntry.value.kind = slang::CompilerOptionValueKind::Int;
@@ -547,8 +547,9 @@ SLANG_UNIT_TEST(irBlobRejectsIncompatibleASTVersions)
         moduleBlob,
         nullptr));
 
-    // The constraint requires the interface alias, while the parameter and local require the box
-    // alias. In Slang 202c, importing this module fails if either serialized alias changes meaning.
+    // The importer uses `InterfaceAlias` in a generic constraint and `Box` as the type of a
+    // parameter and local variable. In Slang 202c, importing this module fails if either
+    // serialized alias changes meaning.
     const char* importerText = R"(
         import version_guard;
         public int readThroughConstraint<T : InterfaceAlias>(T value)

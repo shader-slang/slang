@@ -4034,9 +4034,10 @@ Type* Linkage::specializeType(
     SharedSemanticsContext sharedSemanticsContext(this, m_optionSet.getLanguageVersion(), sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
-    // We apply the session's proper-type rules before collecting the base's payload slots.
-    // For example, reflected `IFoo` becomes `dyn IFoo` through Slang 2026; Slang 202c rejects
-    // that bare contract. We check each concrete payload's conformance separately below.
+    // We apply the session's proper-type rules before collecting payload slots in
+    // `unspecializedType`. For a reflected interface type such as `IFoo`, we form `dyn IFoo`
+    // in language versions through Slang 2026. In Slang 202c, we diagnose the use of `IFoo`
+    // where a proper type is expected. We check each concrete payload's conformance below.
     unspecializedType = visitor.CoerceToProperType(TypeExp(unspecializedType)).type;
     if (as<ErrorType>(unspecializedType))
         return nullptr;

@@ -380,7 +380,8 @@ static bool allowExperimentalDynamicDispatch(
            !isSlang2026OrLater(visitor);
 }
 
-/// Validate requirements and inherited interfaces of a declaration with `[anyValueSize]`.
+/// Validate requirements and inherited interfaces of an interface declaration with
+/// an `[anyValueSize(...)]` attribute.
 ///
 /// These restrictions apply in Slang 2026 and later unless experimental dynamic dispatch is
 /// enabled; they keep the explicitly sized interface within the supported dispatch feature set.
@@ -450,18 +451,21 @@ static void validateSizedInterfaceUsage(
         }
     }
 
-    // An interface with an explicit AnyValue size cannot be generic.
+    // We reject `[anyValueSize(...)]` on interface declarations with an enclosing generic
+    // declaration.
     if (visitor->GetOuterGeneric(decl))
     {
         sink->diagnose(Diagnostics::CannotHaveGenericInterfaceWithAnyValueSize{.decl = decl});
     }
 }
 
-/// Validate a checked inheritance clause whose base may specify `[anyValueSize]`.
+/// Validate a checked inheritance clause whose base interface declaration may have
+/// an `[anyValueSize(...)]` attribute.
 ///
-/// Generic and extension conformances have the same version/experimental gate as
-/// `validateSizedInterfaceUsage`. In every mode, all direct variable members of a conforming
-/// aggregate, including static members, are checked for unsized, opaque, and non-copyable types.
+/// Conformances declared in extensions and conformances declared within generic declarations
+/// use the same version/experimental gate as `validateSizedInterfaceUsage`. In every mode, this
+/// function checks all direct variable members of a conforming aggregate, including static
+/// members, for unsized, opaque, and non-copyable types.
 static void validateSizedInterfaceUseWithInheritanceDecl(
     SemanticsDeclVisitorBase* visitor,
     DiagnosticSink* sink,
@@ -18183,8 +18187,8 @@ Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
     }
 }
 
-// Check whether an AST type includes an existential box over a non-COM, non-builtin interface
-// that requires AnyValue packing.
+// Check whether an AST type includes an existential box over a non-COM, non-builtin interface.
+// The compiler uses AnyValue packing to access the concrete payload of such a box.
 // This mirrors the IR-level `typeIncludesDynamicDispatch()` in
 // slang-ir-typeflow-specialize.cpp but operates on AST types so it
 // can be used during semantic checking.
@@ -18220,8 +18224,8 @@ static bool _astTypeIncludesDynamicDispatch(
             for (auto field : structDecl->getFields())
             {
                 visitor->ensureDecl(field, DeclCheckState::CanUseTypeOfValueDecl);
-                // Use getMemberDeclRef + getType to apply generic substitutions,
-                // so that e.g. Box<IFoo> with field `T item` resolves T to IFoo.
+                // We apply the struct's generic substitutions through `getMemberDeclRef` and
+                // `getType`. For example, a field `T item` in `Box<dyn IFoo>` has type `dyn IFoo`.
                 auto fieldDeclRef = visitor->getASTBuilder()
                                         ->getMemberDeclRef(structType->getDeclRef(), field)
                                         .as<VarDeclBase>();

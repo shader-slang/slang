@@ -986,7 +986,7 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                     if (isValidGenericConstraintType(witness->getSup()))
                     {
                         // We created no breadcrumb expression, so we also skip clearing its
-                        // location below. The original receiver needs its location for hover.
+                        // location below. We preserve the original receiver's location for hover.
                         continue;
                     }
                     auto expr = createCastToSuperTypeExpr(witness->getSup(), bb, witness);
@@ -7997,8 +7997,8 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     //     bool isFoo(dyn IFoo value) { return value is Foo; }
     //
     // We open `value` explicitly and represent the payload test with
-    // `OpenedExistentialTypeTestExpr`. An ordinary `IsTypeExpr` then needs no knowledge of boxes
-    // or their conformance witnesses.
+    // `OpenedExistentialTypeTestExpr`. Ordinary `IsTypeExpr` nodes represent known results,
+    // guards for optional constraints, or static type comparisons.
     expr->typeExpr = checkAliasableType(expr->typeExpr);
     if (as<ExistentialBoxType>(unwrapModifiedType(expr->typeExpr.type)))
     {
@@ -8028,9 +8028,10 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
 
     if (witness && !hasOptionalWitness)
     {
-        // We keep the parsed expression for the language server, but the known result does not
-        // evaluate `value`. For example, `makeBox() is IFoo` skips the call when `makeBox` returns
-        // `dyn IFoo`. We preserve that observable behavior for compatibility; changing evaluation
+        // We keep the parsed expression for the language server. When `constantVal` is set,
+        // IR lowering emits the known result without evaluating `value`. For example,
+        // `makeBox() is IFoo` skips the call when `makeBox` returns `dyn IFoo`.
+        // We preserve that observable behavior for compatibility; changing evaluation
         // of proven tests requires a separate language-version decision.
         expr->constantVal = m_astBuilder->create<BoolLiteralExpr>();
         expr->constantVal->type = m_astBuilder->getBoolType();
@@ -8041,9 +8042,10 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
 
     if (hasOptionalWitness)
     {
-        // We keep optional-constraint guards as `IsTypeExpr` so the guarded body can recognize
-        // `if (T is IFoo)` and use `T`'s conformance. We also preserve the existing opening scope
-        // for a boxed operand, even though the result depends only on the optional witness.
+        // We keep optional-constraint guards as `IsTypeExpr` so semantic checking can recognize
+        // `if (T is IFoo)` and use `T`'s conformance while checking the guarded body.
+        // We also preserve the existing opening scope for a boxed operand, even though the result
+        // depends only on the optional witness.
         expr->value = maybeOpenExistential(originalVal);
         expr->witnessArg = witness;
         return expr;
@@ -8112,8 +8114,8 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     //     Optional<Foo> castFoo(dyn IFoo value) { return value as Foo; }
     //
     // The target conformance `Foo : IFoo` lets us compare the opened payload's witness with
-    // `Foo`'s witness. An unresolved generic target instead uses an ordinary `AsTypeExpr` that
-    // compares the type of the whole operand, including a box, for compatibility.
+    // `Foo`'s witness. When the generic target is unresolved, we use an ordinary `AsTypeExpr`.
+    // IR lowering compares the type of the whole operand, including a box, for compatibility.
     TypeExp typeExpr;
     typeExpr.exp = expr->typeExpr;
     typeExpr = checkAliasableType(typeExpr);

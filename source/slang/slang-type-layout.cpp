@@ -6198,9 +6198,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             {
                 if (usage.kind == LayoutResourceKind::Uniform)
                 {
-                    // If the amount of uniform storage that the concrete type
-                    // requires is more than has been reserved, when the
-                    // type does not fit.
+                    // If the amount of uniform storage used for a value of the concrete
+                    // type is more than has been reserved, the value does not fit.
                     //
                     if (usage.count.compare(fixedExistentialValueSize) ==
                         std::partial_ordering::greater)
@@ -6211,9 +6210,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 }
                 else
                 {
-                    // If the concrete type requires any kind of storage
-                    // beyond ordinary uniform data, then it also
-                    // does not fit.
+                    // If resources other than ordinary uniform storage are used for a
+                    // value of the concrete type, it also does not fit.
                     //
                     // TODO: Make sure this is okay with nested existential boxes.
                     //

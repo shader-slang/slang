@@ -1889,10 +1889,10 @@ public:
     /// Requires an expression-local scope. The binding is added to that scope, and the returned
     /// expression is the callback's result. The temporary is also registered as a member of
     /// the surrounding container. For example, opening `makeBox()` in this field initializer
-    /// can introduce an unnamed interface-valued field:
+    /// can introduce an unnamed field of type `dyn IValue`:
     ///
     ///     interface IValue { int get(); }
-    ///     IValue makeBox();
+    ///     dyn IValue makeBox();
     ///     struct Holder { int value = makeBox().get(); }
     ///
     /// Those implicit members are visible in reflection results and buffer element layouts.
@@ -2197,14 +2197,15 @@ public:
 
     /// Form an existential box type from a checked interface, conjunction, or `ErrorType`.
     ///
-    /// Returns a box retaining the checked interface operand, propagates an existing error, or
+    /// Returns a box type with the checked interface operand, propagates an existing error, or
     /// returns `ErrorType` for an unsupported conjunction. A null `diagSink` suppresses the
     /// conjunction diagnostic.
     Type* formExistentialBoxType(TypeExp const& interfaceType, DiagnosticSink* diagSink);
 
     /// Coerce a type expression to a type that can have values, including `void`.
     ///
-    /// Before Slang 202c, a bare interface in this context implicitly forms its box type.
+    /// Before Slang 202c, this function converts an interface type in this context to the
+    /// corresponding existential box type.
     /// The checked-input, required-output, and diagnostic-sink contracts match
     /// `coerceToAliasableTypeImpl`; rejected box formation also returns false and `ErrorType`.
     bool CoerceToProperTypeImpl(
@@ -2297,8 +2298,8 @@ public:
     /// Return the differential type of `type`, or null if one is unavailable.
     ///
     /// For an existential box, returns a box type for the built-in interface selected by
-    /// `isTypeDifferentiable`, preferring `IDifferentiable` to `IDifferentiablePtrType`. A boxed
-    /// `IDifferentiablePtrType` result is not supported by
+    /// `isTypeDifferentiable`, preferring `IDifferentiable` to `IDifferentiablePtrType`. A
+    /// `dyn IDifferentiablePtrType` result is not supported by
     /// `maybeRegisterDifferentiableTypeImplRecursive`.
     Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
 

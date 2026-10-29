@@ -3,9 +3,9 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -xslang -std -xslang 2026 -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -xslang -std -xslang 202c -output-using-type
 
-// Regression for https://github.com/shader-slang/slang/issues/13996. The two applications of
-// `IBase` share one inheritance declaration. Each conforming type needs one canonical `IRoot`
-// witness table.
+// Regression for https://github.com/shader-slang/slang/issues/13996. The specializations
+// `IBase<int>` and `IBase<float>` share one inheritance declaration. For each conforming type,
+// the compiler must create only one canonical `IRoot` witness table.
 interface IRoot
 {
     int read();
@@ -35,8 +35,9 @@ int readDerived<V : IDerived>(V value)
     return readBase<int, V>(value) + readBase<float, V>(value);
 }
 
-// A generic derived interface also needs to preserve its application while constructing
-// the inherited path tables for a generic constraint. Its base order reverses `IDerived`'s.
+// When checking `V : IParamDerived<T>`, we construct inherited path tables using the
+// specialized interface reference `IParamDerived<T>`. For `T = float`, the base order is
+// `IBase<float>, IBase<int>`, reversing the two specializations in `IDerived`.
 interface IParamDerived<T> : IBase<T>, IBase<int> {}
 
 struct GenericValue : IParamDerived<float>
@@ -50,8 +51,9 @@ int readParamDerived<T, V : IParamDerived<T>>(V value)
     return readBase<T, V>(value) + readBase<int, V>(value);
 }
 
-// Different applications of the final base must keep distinct tables. Overloaded requirements
-// make their selection observable, including when one application is written through an alias.
+// The compiler must create distinct witness tables for `IGenericRoot<int>` and
+// `IGenericRoot<float>`. Overloaded requirements make an incorrect selection observable,
+// including when a type argument is written through an alias.
 interface IGenericRoot<T>
 {
     T read(T input);

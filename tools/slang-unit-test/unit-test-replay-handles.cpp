@@ -444,8 +444,9 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
     ctx().reset();
 }
 
-// A 202c replay must recover `dyn IFoo` separately from bare `IFoo` metadata. We record their
-// owning module and full names, then replay their lookup and compare the recovered types.
+// A 202c replay must recover `dyn IFoo` separately from the interface metadata for `IFoo`.
+// We record their owning module and full names, then replay their lookup and compare the
+// recovered types.
 SLANG_UNIT_TEST(replayContextTypeReflectionExistentialBox)
 {
     REPLAY_TEST;
