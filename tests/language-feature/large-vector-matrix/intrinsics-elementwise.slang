@@ -74,9 +74,10 @@ void computeMain()
 
     Mat6 m = Mat6(1.0);
     m[5][5] = -0.5;
-    // all(m > -1) is true; any(m > 100) is false.
-    // CHECK-NEXT: {{^}}1.000000
-    outputBuffer[14] = (all(m > -1.0) ? 1.0 : 0.0) + (any(m > 100.0) ? 10.0 : 0.0);
+    // Only m[5][5] decides both: all(m > 0) is false and any(m < 0) is true. A reduction that
+    // skips the last row or column would give 1.
+    // CHECK-NEXT: {{^}}10.000000
+    outputBuffer[14] = (all(m > 0.0) ? 1.0 : 0.0) + (any(m < 0.0) ? 10.0 : 0.0);
     // CHECK-NEXT: {{^}}3.141593
     outputBuffer[15] = radians(Mat6(180.0))[5][5];
 }
