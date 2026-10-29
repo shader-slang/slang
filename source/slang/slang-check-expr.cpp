@@ -5526,6 +5526,11 @@ static Name* findClosestInScopeName(
                 if (Math::Abs(candidateText.getLength() - target.getLength()) > maxDistance)
                     continue;
 
+                // Skip declarations that lookup never returns, such as a `module`
+                // declaration: suggesting one would name something the user cannot refer to.
+                if (!DeclPassesLookupMask(candidateDecl, LookupMask::Default))
+                    continue;
+
                 // Don't suggest a declaration the user could not have referenced:
                 // real lookup already filtered inaccessible (`private`/`internal`)
                 // candidates, so offering one as a "did you mean" would name a
