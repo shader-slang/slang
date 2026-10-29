@@ -439,6 +439,11 @@ void calcRequiredLoweringPassSet(
     if (isRayTracingLocationOperand(inst->getOp()))
         result.rayTracingLocationOperand = true;
 
+    // Every byte-address buffer type needs the pass, even when nothing loads from or stores to
+    // the buffer, so we match the base class rather than listing each buffer type.
+    if (as<IRByteAddressBufferTypeBase>(inst))
+        result.byteAddressBuffer = true;
+
     switch (inst->getOp())
     {
     case kIROp_DebugValue:
@@ -568,8 +573,6 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_ByteAddressBufferLoad:
     case kIROp_ByteAddressBufferStore:
-    case kIROp_HLSLRWByteAddressBufferType:
-    case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
     case kIROp_HLSLAppendStructuredBufferType:
