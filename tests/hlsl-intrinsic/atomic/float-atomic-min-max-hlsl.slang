@@ -1,6 +1,6 @@
 // HLSL has no floating-point atomic min/max, so float, half and double InterlockedMin/Max and
 // Atomic<T>.min/max report a Slang error instead of emitting HLSL that DXC rejects. Half and
-// double atomic add/sub get the same error that float add/sub already had.
+// double atomic add/sub also report E55204.
 // https://github.com/shader-slang/slang/issues/14026
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -profile cs_6_6
