@@ -171,6 +171,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         functionSpecializations[key] = specializedFunc;
         specializationOrigin[specializedFunc] = func;
+        // A clone exists only to serve calls, so the sweep removes it once its last caller is gone,
+        // e.g. a clone made while processing a seeded export that the sweep removes.
+        functionsToConsiderRemoving.add(specializedFunc);
         return specializedFunc;
     }
 
@@ -783,9 +786,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         applyAddressSpaceToInstType();
 
-        // Removing one candidate can leave another without uses: a seeded export calls the
-        // unspecialized exports it reuses, so those lose their last use only when the caller goes.
-        // We sweep to a fixpoint so the result does not depend on the order of the candidates.
+        // A candidate's body can hold the last call to another candidate, for example an original
+        // `G` that still calls the original `F` after the entry point's calls to both were
+        // redirected to clones. We sweep to a fixpoint so the result does not depend on the order of
+        // the candidates.
         List<IRFunc*> candidates;
         for (IRFunc* func : functionsToConsiderRemoving)
         {

@@ -60,12 +60,23 @@ export void addTo(inout int a, inout int b)
 // `chainG` calls `chainF` with its own `thread` parameter, so it reuses the seeded `chainF`.
 // Both are also called with `threadgroup` arguments, which leaves the seeded originals with no
 // uses once `chainG` is removed. Neither original is emitted, whichever call comes first.
-// ORDER-NOT: void chainF{{[12]}}_{{[0-9]+}}(int thread*
-// ORDER-NOT: void chainG{{[12]}}_{{[0-9]+}}(int thread*
+// `chainG3` reaches `chainF3` through the non-exported `chainH3`: processing the seeded `chainG3`
+// makes a `thread` clone of `chainH3`, which is the last user of the seeded `chainF3` once
+// `chainG3` is removed, so that clone is removed too.
+// The seeded `chainG4` calls `chainF4` with a `thread` and a `threadgroup` argument, which makes a
+// clone of `chainF4`. That clone has no caller once `chainG4` is removed, so it is removed as well.
+// ORDER-NOT: void chain{{[FGH][1-4]}}_{{[0-9]+}}(int thread*
+// ORDER: void chainF3_{{[0-9]+}}(int threadgroup*
+// ORDER-NOT: void chain{{[FGH][1-4]}}_{{[0-9]+}}(int thread*
 export void chainF1(inout int x) { x += 1; }
 export void chainG1(inout int y) { chainF1(y); }
 export void chainF2(inout int x) { x += 2; }
 export void chainG2(inout int y) { chainF2(y); }
+export void chainF3(inout int x) { x += 3; }
+void chainH3(inout int z) { chainF3(z); }
+export void chainG3(inout int y) { chainH3(y); }
+export void chainF4(inout int a, inout int b) { a += b; }
+export void chainG4(inout int y) { chainF4(y, gs); }
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -86,5 +97,7 @@ void cmain()
     chainG1(gs);
     chainG2(gs2);
     chainF2(gs2);
+    chainG3(gs);
+    chainG4(gs2);
     buf[1] = local + gs + gs2;
 }
