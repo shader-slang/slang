@@ -8,6 +8,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NODE,non-exhaustive): -target wgsl -stage node -entry nodeMain -profile lib_6_8 -experimental-feature -DNODE_ENTRY
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NODE,non-exhaustive): -target glsl -stage node -entry nodeMain -profile lib_6_8 -experimental-feature -DNODE_ENTRY
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NODE,non-exhaustive): -target cuda -stage node -entry nodeMain -profile lib_6_8 -experimental-feature -DNODE_ENTRY
+// A node whose body is empty uses the HLSL-only input record type only in its signature, and
+// it must still be rejected rather than reach the SPIR-V backend.
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_EMPTY,non-exhaustive): -target spirv -stage node -entry nodeEmpty -profile lib_6_8 -experimental-feature -DNODE_ENTRY
 
 import experimental.workgraph;
 
@@ -26,6 +29,16 @@ void nodeMain(DispatchNodeInputRecord<Record> input)
 //CHECK_NODE: ^^^^^^^^^^^^^^^^^^^^^^^ see using of 'DispatchNodeInputRecord'
 {
     input.Get();
+}
+
+[shader("node")]
+[NodeLaunch("broadcasting")]
+[NodeDispatchGrid(1, 1, 1)]
+[numthreads(1, 1, 1)]
+void nodeEmpty(DispatchNodeInputRecord<Record> input)
+//CHECK_EMPTY: entrypoint 'nodeEmpty' uses features that are not available
+//CHECK_EMPTY: ^^^^^^^^^^^^^^^^^^^^^^^ see using of 'DispatchNodeInputRecord'
+{
 }
 #else
 [shader("compute")]

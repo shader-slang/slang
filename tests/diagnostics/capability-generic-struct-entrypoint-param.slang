@@ -8,8 +8,8 @@
 //
 // Each entry point uses its own diag tag because a `DIAGNOSTIC_TEST` invocation
 // must match every annotation for its tag, and only the compiled entry point's
-// diagnostics fire. PARAM, DUP and BODYONLY are exhaustive, so each pins exactly one
-// "see using of 'Foo'" note per use site. The other error invocations are
+// diagnostics fire. PARAM, DUP, RET, SPECIALIZE and BODYONLY are exhaustive, so each
+// pins exactly one "see using of" note per use site. The other error invocations are
 // non-exhaustive and pin only the notes they are about. Carets align to the
 // columns of the preceding source line.
 
@@ -20,7 +20,9 @@
 // Multiple contributing generic structs.
 //DIAGNOSTIC_TEST:SIMPLE(diag=MULTI,non-exhaustive): -target spirv -emit-spirv-directly -entry mainMulti -stage vertex
 // Generic return type.
-//DIAGNOSTIC_TEST:SIMPLE(diag=RET,non-exhaustive): -target spirv -emit-spirv-directly -entry mainRet -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=RET): -target spirv -emit-spirv-directly -entry mainRet -stage vertex
+// A generic entry point whose specialization argument is a requiring generic struct.
+//DIAGNOSTIC_TEST:SIMPLE(diag=SPECIALIZE): -target spirv -emit-spirv-directly -entry mainSpecialize -stage vertex -specialize Foo<int>
 // Same generic struct on two parameters: both use sites must be reported (the
 // hash-consed `Val` for `Foo<int>` must not collapse to a single note).
 //DIAGNOSTIC_TEST:SIMPLE(diag=DUP): -target spirv -emit-spirv-directly -entry mainDup -stage vertex
@@ -244,12 +246,27 @@ void mainBodyOnly(int x)
 Foo<int> mainRet()
 /*RET:
          ^^^^^^^ unavailable features in entry point
+         ^^^^^^^ entrypoint 'mainRet' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+^^^ see using of 'Foo'
 */
-//RET: see using of 'Foo'
 {
     Foo<int> f = { 0 };
     return f;
 }
+//RET: see definition of 'Foo'
+//RET: see declaration of 'require'
+
+[shader("vertex")]
+void mainSpecialize<T>()
+/*SPECIALIZE:
+     ^^^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^^^ entrypoint 'mainSpecialize' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+*/
+{
+}
+//SPECIALIZE: see using of 'Foo'
+//SPECIALIZE: see definition of 'Foo'
+//SPECIALIZE: see declaration of 'require'
 
 // A generic struct requiring a higher shader model; used to exercise the
 // profile-implicit-upgrade path rather than the hard incompatibility path.

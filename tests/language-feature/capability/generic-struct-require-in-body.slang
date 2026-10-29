@@ -2,8 +2,9 @@
 // type is used, not only in entry-point signatures, exactly as for the non-generic
 // spelling. The `*NG` cases are non-generic twins: GENERICNG, ENUMNG, NESTEDENUMNG,
 // STATICNG and INTRINSICNG must report the same diagnostics as the rows they follow. LATENG
-// records a known gap instead: a non-generic type named only as a generic argument
-// before its declaration is still dropped, so its expected output is empty.
+// and COREINTRINSIC record known gaps instead, so their expected output is empty: a
+// non-generic type named only as a generic argument before its declaration is still dropped,
+// and so is a core-module intrinsic generic such as `CoopVec<float, 4>`.
 //
 // Regression test for https://github.com/shader-slang/slang/issues/13579.
 //
@@ -49,6 +50,10 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=NESTEDENUM): -target hlsl -profile sm_6_5 -entry mainNestedEnum -stage compute -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=NESTEDENUMNG): -target hlsl -profile sm_6_5 -entry mainNestedEnumNG -stage compute -no-codegen
 // Positive case: every entry point compiles for the target the struct requires.
+// A core-module intrinsic generic is excluded from requirement inference (see
+// `isCoreModuleIntrinsicTypeDecl`), so naming `CoopVec<float, 4>` only as a generic argument
+// is not diagnosed on a target without cooperative vectors, and the expected output is empty.
+//DIAGNOSTIC_TEST:SIMPLE(diag=COREINTRINSIC): -target metal -entry mainCoreIntrinsic -stage compute -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=METAL): -target metal -no-codegen
 
 [require(metal)]
@@ -284,6 +289,13 @@ void mainStaticNG()
 uint typeOnly<T>()
 {
     return 1;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainCoreIntrinsic()
+{
+    gOutput[0] = typeOnly<CoopVec<float, 4> >();
 }
 
 [shader("compute")]
