@@ -1,7 +1,8 @@
 // Texture.Load of a three-component texel type returns the first three channels of the texel,
-// in order. On CUDA the three-component fetch reads four channels and keeps the first three; the
-// gradient texture gives every channel of every texel a distinct value, so a reordered or
-// shifted component would change the output. The CPU lane checks the same expected values.
+// in order. On CUDA the three-component fetch reads four channels and keeps the first three. The
+// gradient texture stores x / 3 in red, y / 3 in green, 0 in blue and 1 in alpha, and both texels
+// read here have red, green and alpha all different, so a reordered or shifted component (alpha in
+// place of red or blue, for example) changes the output. The CPU lane checks the same values.
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
@@ -17,7 +18,7 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain()
 {
     float3 a = t2.Load(int3(1, 2, 0));
-    float3 b = t2a.Load(int4(3, 1, 1, 0));
+    float3 b = t2a.Load(int4(2, 1, 1, 0));
     outputBuffer[0] = a.x;
     outputBuffer[1] = a.y;
     outputBuffer[2] = a.z;
