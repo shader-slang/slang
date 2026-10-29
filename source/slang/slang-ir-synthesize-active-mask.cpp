@@ -501,9 +501,12 @@ struct SynthesizeActiveMaskForFunctionContext
 
         // The region walk emits a collective on every conditional branch and on
         // every edge that leaves a region, whether or not a later use needs the
-        // resulting mask. The last step removes every mask value that the walk
-        // created and no code observes, keeping collective groups whole.
+        // resulting mask. The exit ballots of a region that no lane leaves
+        // abnormally only recompute the mask on entry, so we first replace them
+        // with it. The last step removes every mask value that the walk created
+        // and no code observes, keeping collective groups whole.
         //
+        reuseEntryMaskForRegionsWithOnlyNormalExits();
         removeDeadSynthesizedMasks();
     }
 
@@ -1084,9 +1087,14 @@ struct SynthesizeActiveMaskForFunctionContext
     Index getOrCreateExitBallotGroup(RegionInfo* region)
     {
         if (region->exitBallotGroup < 0)
+        {
             region->exitBallotGroup = createCollectiveGroup();
+            m_exitBallotGroups.add(region->exitBallotGroup);
+        }
         return region->exitBallotGroup;
     }
+
+    List<Index> m_exitBallotGroups;
 
     // Given the definition of a region, one of the most important
     // queries to be able to answer is: given a block B and a region R,
@@ -1976,8 +1984,10 @@ struct SynthesizeActiveMaskForFunctionContext
                 // merge point as their parent at the top of our loop.
                 //
                 // Thus we are done checking if regions have been
-                // exited.
+                // exited. The exit ballots of the parent region are only
+                // complete if that holds, so we check it.
                 //
+                SLANG_RELEASE_ASSERT(!r->parentRegion || isBlockInRegion(toBlock, r->parentRegion));
                 break;
             }
             else
@@ -2251,6 +2261,49 @@ struct SynthesizeActiveMaskForFunctionContext
         region.mergeBlock = parentRegion->mergeBlock;
         region.parentRegion = parentRegion;
         transformRegion(&region);
+    }
+
+    // Replace the exit ballots of every region that no lane leaves abnormally with
+    // the region's mask on entry.
+    //
+    // Consider this example:
+    //
+    //      uint a = odd ? x : y;
+    //      uint total = WaveActiveSum(a);
+    //
+    // The `?:` lowers to an `ifElse` whose arms both branch to the merge block, and
+    // each arm executes `waveMaskBallot(activeMaskOnEntry, true)` to compute the
+    // mask for the `WaveActiveSum`. Every lane that enters the region also leaves it
+    // through the merge block, so each of these ballots returns `activeMaskOnEntry`
+    // and only adds a synchronization.
+    //
+    // A group without a `false` ballot belongs to a region without abnormal exits,
+    // because every edge that leaves a processed region executes one of its exit
+    // ballots: `markBlocksNeedingActiveMask()` makes the walk visit every block of
+    // the region, and `transformUnconditionalEdge()` checks that an edge that leaves
+    // a region normally leaves no enclosing region. We replace the whole group, so
+    // no lane is left waiting in a ballot that the others skip; the ballots then
+    // have no uses, and `removeDeadSynthesizedMasks()` removes them.
+    //
+    void reuseEntryMaskForRegionsWithOnlyNormalExits()
+    {
+        for (auto group : m_exitBallotGroups)
+        {
+            // The `false` ballots are the ones on abnormal exits.
+            auto& ballots = m_collectiveGroups[group];
+            bool hasAbnormalExit = false;
+            for (auto ballot : ballots)
+            {
+                auto exitsNormally = as<IRBoolLit>(ballot->getOperand(1));
+                SLANG_ASSERT(exitsNormally);
+                if (!exitsNormally->getValue())
+                    hasAbnormalExit = true;
+            }
+            if (hasAbnormalExit)
+                continue;
+            for (auto ballot : ballots)
+                ballot->replaceUsesWith(ballot->getOperand(0));
+        }
     }
 
     // Remove every mask value in `m_synthesizedMaskInsts` that no code observes,
