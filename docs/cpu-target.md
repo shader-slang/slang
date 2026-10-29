@@ -224,6 +224,19 @@ export __extern_cpp int myFunc(int a)
 }
 ```
 
+In C++ and CUDA source output, `__extern_cpp` on a struct keeps the original name of the struct and of each of its fields, so application code can use the generated type directly:
+
+```
+// Emitted as `struct Result { float value; int32_t count; };`
+__extern_cpp struct Result
+{
+    float value;
+    int count;
+}
+```
+
+The field names must therefore be valid C++ identifiers. Other targets keep generated field names, and so does storage that the compiler synthesizes, such as the backing field of bitfield members. Under `-obfuscate` the fields, like the struct itself, get hashed names.
+
 ## <a id="com-interface"/>COM interface support
 
 Slang has preliminary support for [Component Object Model (COM)](https://en.wikipedia.org/wiki/Component_Object_Model) interfaces in CPU code. 
