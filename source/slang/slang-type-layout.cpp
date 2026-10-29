@@ -5731,6 +5731,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         rowTypeLayout->uniformAlignment = info.alignment;
 
         rowTypeLayout->uniformStride = colStride;
+        rowTypeLayout->isLaidOutAsArray = isLargeMatrix && colCount > kMaxNativeVectorElementCount;
         rowTypeLayout->elementTypeLayout = elementTypeLayout;
         rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
 

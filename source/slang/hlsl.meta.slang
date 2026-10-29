@@ -9422,8 +9422,7 @@ int16_t asint16(float16_t value)
 [__readNone]
 vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value)
 {
-    if (N > 4)
-        return asuint16(value);
+    LARGE_VECTOR_MAP_UNARY(int16_t, N, asint16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asint16";
@@ -9437,8 +9436,7 @@ vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value)
 [__readNone]
 matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> value)
 {
-    if (R > 4 || C > 4)
-        return asuint16(value);
+    LARGE_MATRIX_MAP_UNARY(int16_t, R, C, asint16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asint16";
@@ -9467,8 +9465,7 @@ float16_t asfloat16(int16_t value)
 [__readNone]
 vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
 {
-    if (N > 4)
-        return asfloat16(asuint16(value));
+    LARGE_VECTOR_MAP_UNARY(float16_t, N, asfloat16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
@@ -9485,8 +9482,7 @@ vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
 [__readNone]
 matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> value)
 {
-    if (R > 4 || C > 4)
-        return asfloat16(asuint16(value));
+    LARGE_MATRIX_MAP_UNARY(float16_t, R, C, asfloat16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
