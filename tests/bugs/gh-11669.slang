@@ -10,9 +10,10 @@
 // injected sampler so the outputs line up. Metal forwards the combined case to the extracted
 // texture, as HLSL and CPU do.
 //
-// WGSL and Metal both lower the combined value and emit GetDimensions through positional `$N`
-// strings, so both are asserted below. CUDA is not in the combined-sampler lowering set (its
-// `Sampler2D` stays a single `CUtexObject`), so it needs no marker.
+// Both targets lower the combined value, so both are asserted below: WGSL through `$q`, and Metal
+// through the forward, whose positional string then sees only the texture. CUDA is not in the
+// combined-sampler lowering set (its `Sampler2D` stays a single `CUtexObject`), so it needs
+// neither.
 // `tests/bugs/gh-13737.slang` covers HLSL, `tests/bugs/gh-13737-cpu.slang` covers CPU, and
 // `tests/bugs/gh-14007.slang` covers Metal argument buffers.
 

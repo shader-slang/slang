@@ -67,10 +67,11 @@ public:
         Always
     };
 
-    // `combinedForward` holds statements emitted verbatim (already indented) at the start of the
-    // shared cpp/hlsl case and of the metal case, before their intrinsics. A path that handles the
-    // call must `return`; every other path falls through to the intrinsic. The only use is
-    // forwarding a combined receiver; an empty string emits only the intrinsics.
+    // `combinedForward` holds the statements that forward a combined receiver to its extracted
+    // texture, emitted verbatim (already indented) at the start of the shared cpp/hlsl case and of
+    // the metal case, before their intrinsics. A path that handles the call must `return`; every
+    // other path falls through to the intrinsic. WGSL gets no forward and uses `$q` instead (see
+    // the WGSL case of `Load` in hlsl.meta.slang); an empty string emits only the intrinsics.
     void writeFuncBody(
         const char* funcName,
         const String& combinedForward,

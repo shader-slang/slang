@@ -275,8 +275,9 @@ void TextureTypeInfo::writeGetDimensionFunctions(StringBuilder& outCombinedForwa
             int paramCount = 0;
 
             // HLSL, CPU and Metal forward a combined receiver to the extracted texture; see
-            // `combinedForward` below. CUDA keeps a combined `Sampler2D` as a single
-            // `CUtexObject`, so its string needs no marker.
+            // `combinedForward` below. WGSL uses the `$q` marker instead (see its builder below),
+            // and CUDA keeps a combined `Sampler2D` as a single `CUtexObject`, so its string needs
+            // neither.
             StringBuilder metal;
             const char* metalMipLevel = "0";
 
@@ -288,7 +289,8 @@ void TextureTypeInfo::writeGetDimensionFunctions(StringBuilder& outCombinedForwa
 
             // The WGSL string is positional and starts with `$q`, so a combined receiver's
             // split-out sampler argument is skipped (see `case 'q'` in
-            // `IntrinsicExpandContext::_emitSpecial`).
+            // `IntrinsicExpandContext::_emitSpecial`, and the WGSL case of `Load` in
+            // hlsl.meta.slang for why WGSL does not forward).
             StringBuilder wgsl;
             wgsl << "$q{";
 

@@ -5197,10 +5197,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             static_assert(false, "Unsupported 'Load' of 'texture' for 'cuda' target");
             __intrinsic_asm "<invalid intrinsic>";
         case metal:
-            // A combined receiver forwards to the extracted texture, as on HLSL. Inside a
-            // `ParameterBlock` (a Metal argument buffer) the combined value stays one
-            // `{texture, sampler}` struct instead of being split into call arguments, so the
-            // strings below would receive the struct as `$0`.
+            // The strings below are numbered for a plain texture, so a combined receiver forwards
+            // to the extracted texture, as on HLSL. Taking the texture out first works whether or
+            // not type legalization later splits the `{texture, sampler}` struct; inside a
+            // `ParameterBlock` (a Metal argument buffer) the struct stays whole.
             if (isCombined != 0)
                 return __loadTexture(__extractImage(this), location);
             switch (Shape.flavor)
@@ -5292,8 +5292,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         case wgsl:
             // The WGSL strings start with `$q`, which skips the sampler argument that a combined
             // receiver gains; see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`. WGSL does
-            // not go through `__extractImage` like HLSL and Metal, because type legalization does
-            // not support that call on a bindless `Sampler2D.Handle` for WGSL.
+            // not forward to `__extractImage` like HLSL and Metal: for a bindless
+            // `Sampler2D.Handle`, the forwarded call aborts `legalizeInst` in
+            // slang-ir-legalize-types.cpp with "non-simple operand(s)!".
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
             static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)

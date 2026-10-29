@@ -478,18 +478,18 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
     case 'q':
         {
-            // `$q` marks a texture-only operation (`Load`, `GetDimensions`) whose string is
+            // `$q` marks a texture-only operation (`Load`, `GetDimensions`) on WGSL whose string is
             // numbered as if the receiver were a plain texture. This comment is the canonical
             // description of `$q`; other comments point here.
             //
-            // A combined texture-sampler reaches the emitter in one of three shapes.
-            // `lowerCombinedTextureSamplers` rewrites the combined type as a `{texture, sampler}`
-            // struct on HLSL, Metal, WGSL and CPU-like targets. On HLSL, Metal and WGSL,
-            // `legalizeResourceTypes` (`LegalCallBuilder::addArg`) then splits that struct into
-            // two call arguments, so the call gains the sampler as argument 1. C and C++ skip the
-            // split and keep the struct, and CUDA never builds it. A Metal argument buffer
-            // (`ParameterBlock`) also keeps the struct whole, so Metal forwards a combined
-            // receiver to the extracted texture instead of using `$q`; only WGSL strings use it.
+            // `lowerCombinedTextureSamplers` rewrites a combined texture-sampler as a
+            // `{texture, sampler}` struct, and on WGSL `legalizeResourceTypes`
+            // (`LegalCallBuilder::addArg`) splits that struct into two call arguments, so a
+            // combined receiver reaches the string as the texture followed by the sampler as
+            // argument 1. A plain texture reaches it alone. HLSL, CPU and Metal forward a combined
+            // receiver to the extracted texture instead, so their strings only see a plain
+            // texture; on Metal the struct is not split inside an argument buffer, and the WGSL
+            // case of `Load` in hlsl.meta.slang says why WGSL does not forward.
             //
             // When the split-out sampler is present, `emit` sets `m_skipsSplitSamplerArg` and
             // each bare `$N` (N >= 1) reads argument N + 1; other indexed accessors such as `$TN`

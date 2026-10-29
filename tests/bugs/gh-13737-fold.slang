@@ -7,8 +7,10 @@
 // decides whether to fold an argument into the call by counting its uses in the target string, so
 // that count must use the same operand mapping. If it counted `($1)` as the sampler, the
 // coordinate would look unused and be folded into every `($1)` of the next `Load`, and the
-// expression would grow exponentially with each chained `Load`. Metal forwards the combined
-// receiver to a plain texture, whose strings also use the coordinate more than once.
+// expression would grow exponentially with each chained `Load`. The WGSL run checks that mapping.
+// The Metal runs check the same no-duplication property on the forwarded call: Metal forwards the
+// combined receiver to a plain texture, whose strings also use the coordinate and the mip level
+// more than once, with no `$q` shift.
 
 Sampler2DArray<int4> u_tex;
 RWStructuredBuffer<int4> outBuf;
