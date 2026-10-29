@@ -753,8 +753,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         applyAddressSpaceToInstType();
 
-        // After these two calls, each linkage name belongs to at most one surviving function: the
-        // original if it survives, otherwise its only surviving specialization.
+        // After these two calls, at most one of an original and its address-space specializations
+        // keeps the original's linkage: the original if it survives, otherwise its only surviving
+        // specialization.
         auto removedFuncs = removeDeadRedirectedCallees();
         removeLinkageFromSpecializationsThatDoNotReplaceOriginal(removedFuncs);
     }
