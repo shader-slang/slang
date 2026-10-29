@@ -26046,15 +26046,14 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl_nvapi:
+        case hlsl:
             {
+                // The helper chooses between NVAPI and the native DXR 1.3
+                // `GetAttributes(out attr)`, so one HLSL case serves both.
                 attr_t v;
                 __hlslGetAttributesFromHitObject(v);
                 return v;
             }
-        case hlsl:
-            // DXR 1.3 native - direct method call
-            __intrinsic_asm ".GetAttributes";
         case _GL_NV_shader_invocation_reorder:
             {
                 __requireTargetExtension("GL_NV_shader_invocation_reorder");
