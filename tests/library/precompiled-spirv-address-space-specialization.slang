@@ -11,6 +11,14 @@
 
 // CHECK: OpEntryPoint GLCompute %useMain "useMain"
 
+//TEST:SIMPLE(filecheck=SHARED): -target spirv-asm -entry useSharedReceiver -stage compute -fvk-use-entrypoint-name
+
+// `useSharedReceiver` gives the imported `Acc.add` a single specialization whose `this` is a
+// `Workgroup` pointer. The precompiled definition takes the unspecialized pointer, so the
+// specialization keeps its own body instead of becoming an import of it.
+
+// SHARED: OpEntryPoint GLCompute %useSharedReceiver "useSharedReceiver"
+
 import "module-library-address-space-specialization";
 
 RWStructuredBuffer<float> outputBuffer;
@@ -29,4 +37,15 @@ void useMain(uint3 id: SV_DispatchThreadID)
 
     GroupMemoryBarrierWithGroupSync();
     outputBuffer[id.x] = local + gValues[id.x] + acc.v;
+}
+
+groupshared Acc gAcc;
+
+[shader("compute")]
+[numthreads(4, 1, 1)]
+void useSharedReceiver(uint3 id: SV_DispatchThreadID)
+{
+    gAcc.add(2);
+    GroupMemoryBarrierWithGroupSync();
+    outputBuffer[id.x] = gAcc.v;
 }

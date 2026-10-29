@@ -162,6 +162,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // Update the function type.
         fixUpFuncType(specializedFunc);
 
+        // A precompiled module defines `func` with its unspecialized parameter types, so a clone
+        // with retyped pointer parameters is never that definition. The clone keeps its own body
+        // instead of being reduced to an import of it, even when it keeps `func`'s linkage.
+        if (auto availableDecor =
+                specializedFunc->findDecoration<IRAvailableInDownstreamIRDecoration>())
+            availableDecor->removeAndDeallocate();
+
         functionSpecializations[key] = specializedFunc;
         specializationOrigin[specializedFunc] = func;
         return specializedFunc;
