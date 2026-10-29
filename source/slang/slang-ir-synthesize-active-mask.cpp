@@ -2160,7 +2160,8 @@ struct SynthesizeActiveMaskForFunctionContext
         //
         if (!doesBlockNeedActiveMask(regionEntry))
         {
-            SLANG_ASSERT(!parentRegion->mergeBlock || m_dominatorTree->isUnreachable(regionEntry));
+            SLANG_RELEASE_ASSERT(
+                !parentRegion->mergeBlock || m_dominatorTree->isUnreachable(regionEntry));
             return;
         }
 
