@@ -15041,8 +15041,7 @@ void SemanticsVisitor::checkForRedeclarationOfTransparentMembers(ContainerDecl* 
     Dictionary<Name*, Decl*> visibleDecls;
     for (auto memberDecl : containerDecl->getDirectMemberDecls())
     {
-        if (memberDecl->getName() && !as<ModuleDeclarationDecl>(memberDecl) &&
-            DeclPassesLookupMask(memberDecl, LookupMask::Default))
+        if (memberDecl->getName() && DeclPassesLookupMask(memberDecl, LookupMask::Default))
         {
             compareWithNearestVisibleDecl(
                 this,
