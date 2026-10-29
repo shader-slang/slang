@@ -439,8 +439,10 @@ void calcRequiredLoweringPassSet(
     if (isRayTracingLocationOperand(inst->getOp()))
         result.rayTracingLocationOperand = true;
 
-    // Every byte-address buffer type needs the pass, even when nothing loads from or stores to
-    // the buffer, so we match the base class rather than listing each buffer type.
+    // Buffer types enable the pass, not only loads and stores, because a buffer that is unused or
+    // reached only through `GetEquivalentStructuredBuffer` (as `GetDimensions` and `Interlocked*`
+    // are) still needs translating on structured-buffer targets. We match the base class so that
+    // every byte-address buffer type enables it, including rasterizer-ordered ones.
     if (as<IRByteAddressBufferTypeBase>(inst))
         result.byteAddressBuffer = true;
 

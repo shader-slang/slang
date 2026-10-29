@@ -44,6 +44,11 @@ struct ByteAddressBufferLegalizationOptions
 /// aggregate types into primitive load-store operations on
 /// scalar or vector types.
 ///
+/// When `translateToStructuredBufferOps` is set, it also replaces each global
+/// byte-address buffer parameter, including one that nothing uses, with an
+/// equivalent structured-buffer parameter, so that no byte-address buffer
+/// parameter reaches the emitter.
+///
 void legalizeByteAddressBufferOps(
     IRModule* module,
     Session* session,
