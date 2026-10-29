@@ -1,7 +1,7 @@
 // Every target compiles intrinsics with a native vector or matrix implementation for vectors and
 // matrices larger than 4, element by element, instead of reporting E38208. Metal-only intrinsics
-// are compiled for Metal, 16-bit casts for the targets that support them, and `clip` in a
-// fragment shader.
+// are compiled for Metal, 16-bit casts for the targets that support them (Metal has only the
+// signed vector casts), and each `clip` overload in a fragment shader of its own.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute -DHALF_CASTS
 //TEST:SIMPLE(filecheck=CHECK): -target glsl -entry computeMain -stage compute -DHALF_CASTS
@@ -9,9 +9,12 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute -DHALF_CASTS
 //TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute -DHALF_CASTS
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute -DMETAL_ONLY
+//TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute -DSIGNED_HALF_CASTS
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CLIP): -target hlsl -entry fragmentMain -stage fragment
-//TEST:SIMPLE(filecheck=CLIP): -target spirv-asm -entry fragmentMain -stage fragment
+//TEST:SIMPLE(filecheck=CLIP): -target hlsl -entry clipVector -stage fragment
+//TEST:SIMPLE(filecheck=CLIP): -target spirv-asm -entry clipVector -stage fragment
+//TEST:SIMPLE(filecheck=CLIP): -target hlsl -entry clipMatrix -stage fragment
+//TEST:SIMPLE(filecheck=CLIP): -target spirv-asm -entry clipMatrix -stage fragment
 
 // CHECK-NOT: {{error\[E[0-9]+\]}}
 // CHECK: outputBuffer
@@ -66,12 +69,29 @@ void computeMain()
     bits += uint(asfloat16(mi16)[5][3]) + uint(asfloat16(mu16)[5][2]);
     outputBits[2] = bits;
 #endif
+
+#ifdef SIGNED_HALF_CASTS
+    // The 4-wide casts check that the large-size path does not hide the native Metal cast.
+    vector<half, 8> h8 = vector<half, 8>(half(outputBuffer[7]));
+    vector<int16_t, 8> i8 = vector<int16_t, 8>(int16_t(outputBits[0]));
+    vector<half, 4> h4 = vector<half, 4>(half(outputBuffer[8]));
+    vector<int16_t, 4> i4 = vector<int16_t, 4>(int16_t(outputBits[1]));
+    uint signedBits = uint(asint16(h8)[7]) + uint(asfloat16(i8)[6]);
+    signedBits += uint(asint16(h4)[3]) + uint(asfloat16(i4)[2]);
+    outputBits[3] = signedBits;
+#endif
 }
 
 [shader("fragment")]
-float4 fragmentMain(float4 pos : SV_Position) : SV_Target
+float4 clipVector(float4 pos : SV_Position) : SV_Target
 {
     clip(vector<float, 8>(pos.x - 1.0));
+    return pos;
+}
+
+[shader("fragment")]
+float4 clipMatrix(float4 pos : SV_Position) : SV_Target
+{
     clip(matrix<float, 6, 6>(pos.y - 1.0));
     return pos;
 }
