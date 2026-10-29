@@ -445,8 +445,11 @@ const char* MetalSourceEmitter::getUnsupported64BitAtomicReason(IRInst* inst)
         return "64-bit integer atomic other than min or max";
     if (getIntTypeSigned(inst->getDataType()))
         return "64-bit signed integer atomic min or max";
-    // Under `-g` a `DebugValue` can refer to an otherwise unused original value; emission skips
-    // debug instructions, so such a use does not need the result.
+    // "Used" means the IR reaching emission has a non-debug user of the result, so the outcome
+    // depends on earlier passes having removed dead code. For example, `-g` with
+    // `-minimum-slang-optimization` keeps the never-read `original` local of
+    // `InterlockedMin(dest, value, original)`, and the call reports E55204. Debug-info users do
+    // not count: the Metal emitter skips debug instructions, so they never name the result.
     for (auto use = inst->firstUse; use; use = use->nextUse)
     {
         if (!isDebugInfoInst(use->getUser()))
@@ -473,7 +476,8 @@ const char* MetalSourceEmitter::getUnsupported64BitAtomicReason(IRInst* inst)
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     // Emit `inst` as a call to `imageFunc` on a texture or `bufferFunc` on a buffer. The MSL
-    // atomics that return void are emitted with `returnsValue` false, as a bare statement.
+    // atomics that return void are emitted with `returnsValue` false, as a bare statement; that
+    // is only valid when nothing but debug instructions uses the result of `inst`.
     auto emitAtomicCall = [&](const char* imageFunc, const char* bufferFunc, bool returnsValue)
     {
         if (returnsValue)
@@ -517,18 +521,20 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         if (auto reason = getUnsupported64BitAtomicReason(inst))
         {
+            // As with `diagnoseFloatAtomic`, emission continues below; the error fails the
+            // compile, so that output is never used.
             getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
                 .operation = reason,
                 .location = inst->sourceLoc});
         }
-        else if (inst->getOp() == kIROp_AtomicMin)
-        {
-            emitAtomicCall("atomic_min", "atomic_min_explicit", false);
-            return true;
-        }
         else
         {
-            emitAtomicCall("atomic_max", "atomic_max_explicit", false);
+            // A null reason means `inst` is an `atomicMin` or `atomicMax`.
+            bool isMin = inst->getOp() == kIROp_AtomicMin;
+            emitAtomicCall(
+                isMin ? "atomic_min" : "atomic_max",
+                isMin ? "atomic_min_explicit" : "atomic_max_explicit",
+                false);
             return true;
         }
     }
