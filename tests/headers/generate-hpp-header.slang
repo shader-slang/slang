@@ -28,7 +28,7 @@ __extern_cpp struct Struct
 //CHECK: };
 __extern_cpp groupshared float sharedMemory[4];
 
-//CHECK: void kernel(Vector<uint32_t, 3>  {{[[:alnum:]_]+}}, Struct * {{[[:alnum:]_]+}}, KernelContext * {{[[:alnum:]_]+}});
+//CHECK: void kernel(Vector<uint32_t, 3>  globalIdx_{{[0-9]+}}, Struct * s_{{[0-9]+}}, KernelContext * kernelContext_{{[0-9]+}});
 export __extern_cpp void kernel(uint3 globalIdx, Struct s)
 {
     sharedMemory[globalIdx.x] = s.vec[globalIdx.x] + s.x;

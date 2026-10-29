@@ -824,6 +824,11 @@ protected:
     // to use for it when emitting code.
     Dictionary<IRInst*, String> m_mapInstToName;
 
+    // Map a function whose body was removed for a header-only emit to the
+    // name hints of its parameters, in order; an empty string marks a
+    // parameter without a hint.
+    Dictionary<IRInst*, List<String>> m_headerFuncParamNameHints;
+
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
 
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
