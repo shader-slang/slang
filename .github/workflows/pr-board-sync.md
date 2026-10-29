@@ -28,8 +28,9 @@ For each open PR the workflow:
 5. Assigns still-unassigned **linked (closing) issues** to the PR owner.
 6. Co-assigns the **community author** on Community PRs (best-effort, after the
    owner is set).
-7. Unrequests **ignored reviewers** (e.g. `bmillsNV`) on onboarding and when
-   freshly assigning an owner — not on every sweep pass for already-assigned PRs.
+7. Unrequests **ignored reviewers** (members of `default_reviewer_team`, plus any
+   `ignored_reviewers` logins) on onboarding and when freshly assigning an
+   owner — not on every sweep pass for already-assigned PRs.
 
 Repo-scoped writes use the run's `GITHUB_TOKEN`, so assignee changes, review
 requests, and comments appear as `github-actions[bot]`. Calling jobs grant
@@ -125,7 +126,8 @@ merge-queued PRs.
    `Scope:` includes this repo — the same criteria used for Source Internal).
 2. Top **committer-signal** owner from changed files (still gated by the owners
    team: `pr-owners` for Community, `bot-pr-owners` for Bot).
-3. Maintainer team member (or `fallback_assignee`).
+3. Maintainer team member, else `default_reviewer_team` member, else
+   `fallback_assignee` (empty by default).
 
 Linked-issue inheritance and committer-signal use different allowlists on
 purpose: an Internal person who owns the issue should shepherd the PR even when
@@ -169,9 +171,14 @@ Consequences worth knowing:
 
 **Community PRs** also co-assign the external author (separate API call, best-effort).
 
-**Ignored reviewers** (`bmillsNV`, …) are unrequested when a new owner is assigned
-and on `opened`/`reopened` onboarding. Already-assigned PRs are not re-scanned
-for ignored reviewers on sweep.
+**Ignored reviewers** are the members of `default_reviewer_team`
+(`shader-slang/default-reviewer`, whom GitHub auto-requests on new PRs) plus any
+explicit `ignored_reviewers` logins. Changing the default reviewer is a team
+membership change; no workflow edit is needed. They are unrequested when a new
+owner is assigned and on `opened`/`reopened` onboarding, and never count as a
+real existing reviewer, so the shepherd is requested instead. Already-assigned
+PRs are not re-scanned for ignored reviewers on sweep. Reading the team uses
+`SLANG_PR_BOT_TOKEN`; the unrequest itself is made as `github-actions[bot]`.
 
 ## Committer signal
 

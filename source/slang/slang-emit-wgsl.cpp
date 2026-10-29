@@ -953,8 +953,18 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         type->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
         type->getOp() == kIROp_HLSLRWByteAddressBufferType)
     {
+        // A GLSL `readonly buffer` reaches here as an RWStructuredBuffer (the SSBO lowering keeps
+        // the binding a UAV for the other targets); WGSL forbids read_write storage in vertex
+        // shaders, so honour its `readonly` qualifier with the `read` access mode.
+        bool readOnly = false;
+        if (auto qualifiers = varDecl->findDecoration<IRMemoryQualifierSetDecoration>())
+        {
+            const auto flags = qualifiers->getMemoryQualifierBit();
+            readOnly = (flags & MemoryQualifierSetModifier::Flags::kReadOnly) &&
+                       !(flags & MemoryQualifierSetModifier::Flags::kWriteOnly);
+        }
         m_writer->emit("<");
-        m_writer->emit("storage, read_write");
+        m_writer->emit(readOnly ? "storage, read" : "storage, read_write");
         m_writer->emit(">");
     }
     else if (
