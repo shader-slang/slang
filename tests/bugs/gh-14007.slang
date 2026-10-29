@@ -239,6 +239,10 @@ float4 shapesMain() : SV_Target
 
 // Outside an argument buffer the lowered struct is split as before, and each texture keeps the
 // binding that reflection reports, even when no sampling operation uses the texture-sampler.
+// The parameter blocks above are argument buffers and take buffer slots, not textures, so
+// reflection gives `NestedCB` textures 0 and 1 (`nestedB` is texture 1), `gNestedMaterial.tex`
+// texture 2 and `gUniformMaterial.tex` texture 3; the entry-point parameter `epTex` comes after
+// the globals, at texture 4.
 cbuffer NestedCB
 {
     Sampler2D<float4> nestedA;

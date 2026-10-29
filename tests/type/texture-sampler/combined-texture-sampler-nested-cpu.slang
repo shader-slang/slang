@@ -3,8 +3,10 @@
 
 // On CPU-like targets the lowered `{texture, sampler}` struct of a combined texture-sampler is not
 // split into separate resources, so one nested in a constant buffer, a struct or the uniform
-// parameters of an entry point stays a struct member. Rebuilding the nested layouts must leave
-// that C++ intact.
+// parameters of an entry point stays a struct member. `lowerCombinedTextureSamplers` still
+// rebuilds the layouts of these nested fields on CPU, where they carry `Uniform` sizes; this test
+// guards that the walk's layout-kind assertions hold for the `globalParams` and
+// `entryPointParams` structs and that the C++ reads the texture field of each member.
 
 cbuffer C
 {
