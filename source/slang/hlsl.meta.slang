@@ -5298,7 +5298,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             // not forward to `__extractImage` like HLSL and Metal: for a bindless
             // `Sampler2D.Handle`, the forwarded call aborts `legalizeInst` in
             // slang-ir-legalize-types.cpp with "non-simple operand(s)!". That legalization gap
-            // also aborts `Sample` on such a handle, so `$q` stays until it is fixed.
+            // also aborts `Sample` on such a handle (#14041), so `$q` stays until it is fixed.
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
             static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
