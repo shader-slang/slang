@@ -912,7 +912,7 @@ struct SynthesizeActiveMaskForFunctionContext
         }
     }
 
-    void addActiveMaskParameter(IRBlock* block)
+    IRParam* addActiveMaskParameter(IRBlock* block)
     {
         // Adding a paramter to a block to represent the
         // active mask is a straightforward application
@@ -930,6 +930,7 @@ struct SynthesizeActiveMaskForFunctionContext
         auto activeMaskParam = builder.emitParam(m_maskType);
 
         m_activeMaskForBlock.add(block, activeMaskParam);
+        return activeMaskParam;
     }
 
     // The remainder of the work in this pass is going to be based
@@ -1314,10 +1315,9 @@ struct SynthesizeActiveMaskForFunctionContext
                 //      falseMask = activeMaskOnRegionEntry & ~trueMask;
                 //
                 builder.setInsertBefore(falseBlock->getFirstOrdinaryInst());
-                auto falseMask = builder.emitBitAnd(
-                    m_maskType,
-                    activeMaskOnRegionEntry,
-                    builder.emitBitNot(m_maskType, trueMask));
+                auto invertedTrueMask = builder.emitBitNot(m_maskType, trueMask);
+                auto falseMask =
+                    builder.emitBitAnd(m_maskType, activeMaskOnRegionEntry, invertedTrueMask);
 
                 // The task of associating the mask value comptued by a conditional branch
                 // with the successor block(s) is delegated to a subroutine, which we will
