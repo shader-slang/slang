@@ -445,6 +445,12 @@ struct SynthesizeActiveMaskForFunctionContext
         //
         breakCriticalAndPseudoCriticalEdges();
 
+        // Both the marking step below and the region walk rely on a dominator
+        // tree. Adding block parameters for the active mask does not change the
+        // CFG, so one tree computed after breaking edges serves both.
+        //
+        m_dominatorTree = computeDominatorTree(m_func);
+
         // Given that we are processing a function that had a `waveGetActiveMask` instruction
         // in its body, we expect to find an entry block on the function.
         //
@@ -962,15 +968,10 @@ struct SynthesizeActiveMaskForFunctionContext
     {
         // Given the definition of regiosn we will use,
         // we can process the entire function by recursively
-        // carving it up into regions.
+        // carving it up into regions, using the dominator
+        // tree computed in `transformFunc()`.
         //
-        // We start by computing a dominator tree for
-        // the function, since that will help us
-        // identify the regions.
-        //
-        m_dominatorTree = computeDominatorTree(m_func);
-
-        // Next we look up th active mask for the function's
+        // We start by looking up the active mask for the function's
         // entry region, which had better be set before
         // we run this code.
         //
