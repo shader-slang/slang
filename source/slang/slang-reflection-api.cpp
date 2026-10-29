@@ -5551,10 +5551,25 @@ SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection*
     auto program = convert(inProgram);
     if (!program)
         return 0;
-    auto cb = program->parametersLayout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
-    if (!cb)
+
+    // The default constant buffer's binding is the scope's offset plus the offset of the
+    // container of the scope's constant-buffer layout (see `generateParameterBindings`), in
+    // whichever resource kind the target binds the buffer with: a constant-buffer register on
+    // D3D, a descriptor-table slot on Vulkan.
+    auto scopeVarLayout = program->parametersLayout;
+    auto scopeTypeLayout = as<ParameterGroupTypeLayout>(scopeVarLayout->typeLayout);
+    if (!scopeTypeLayout)
         return 0;
-    return getReflectionOffset(cb->index);
+    for (auto& containerInfo : scopeTypeLayout->containerVarLayout->resourceInfos)
+    {
+        if (containerInfo.kind == LayoutResourceKind::RegisterSpace)
+            continue;
+        LayoutOffset index = containerInfo.index;
+        if (auto scopeInfo = scopeVarLayout->FindResourceInfo(containerInfo.kind))
+            index += scopeInfo->index;
+        return getReflectionOffset(index);
+    }
+    return 0;
 }
 
 SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inProgram)
