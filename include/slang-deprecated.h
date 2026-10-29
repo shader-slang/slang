@@ -972,9 +972,20 @@ extern "C"
         SlangReflection* reflection,
         char const* name);
 
+    /** Find a type by name.
+
+        An interface name such as `IFoo` identifies the interface contract; `dyn IFoo` identifies
+        its existential-box type.
+    */
     SLANG_API SlangReflectionType* spReflection_FindTypeByName(
         SlangReflection* reflection,
         char const* name);
+    /** Get the layout of `reflectionType`.
+
+        Interface types follow the conversion rules described by `ISession::getTypeLayout`.
+        Returns null if `reflectionType` cannot be used as a data type. This function does not
+        return diagnostics.
+    */
     SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
         SlangReflection* reflection,
         SlangReflectionType* reflectionType,

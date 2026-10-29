@@ -260,6 +260,9 @@ public:
     /// Any names in the string will be resolved using the modules
     /// referenced by the program.
     ///
+    /// Interface names and conjunctions produce interface metadata; `dyn IFoo` produces an
+    /// existential-box type. Callers that need a data type apply proper-type checking separately.
+    ///
     /// On an error, returns null and reports diagnostic messages
     /// to the provided `sink`.
     ///
@@ -286,6 +289,10 @@ public:
     Expr* findDeclFromString(String const& name, DeclLookupPurpose purpose, DiagnosticSink* sink);
     Expr* tryResolveOverloadedExpr(Expr* exprIn);
 
+    /// Look up member metadata by name in `type`.
+    ///
+    /// For an existential box, lookup uses its enclosed interface. Interface requirements may
+    /// be reflected without a concrete `This`; this lookup does not supply one for invocation.
     Expr* findDeclFromStringInType(
         Type* type,
         String const& name,
