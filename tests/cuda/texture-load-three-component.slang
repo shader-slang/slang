@@ -11,11 +11,13 @@ Texture1DArray<uint3> t1a;
 Texture2DArray<float3> t2a;
 RWStructuredBuffer<float3> outputBuffer;
 
+// The two PTX-NOT lines cover the output before and after the texture fetches.
 // PTX-NOT: .extern .func
 // PTX-DAG: tex.level.2d.v4.f32.s32
 // PTX-DAG: tex.level.3d.v4.s32.s32
 // PTX-DAG: tex.level.a1d.v4.u32.s32
 // PTX-DAG: tex.level.a2d.v4.f32.s32
+// PTX-NOT: .extern .func
 [numthreads(1, 1, 1)]
 void computeMain(int3 tid: SV_DispatchThreadID)
 {
