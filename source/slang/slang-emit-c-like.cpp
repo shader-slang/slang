@@ -4129,7 +4129,9 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func, const String& name)
 
     // A function declaration doesn't have any IR basic blocks,
     // and as a result it *also* doesn't have the IR `param` instructions,
-    // so we need to emit a declaration entirely from the type.
+    // so we emit the declaration from the type. The parameter names come
+    // from the name hints that header-only emit recorded before it removed
+    // the function's body, or are `_<i>` when there are none.
 
     auto funcType = func->getDataType();
     auto resultType = func->getResultType();

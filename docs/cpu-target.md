@@ -227,7 +227,7 @@ export __extern_cpp int myFunc(int a)
 In C++ and CUDA source output, `__extern_cpp` on a struct keeps the original name of the struct and of each of its fields, so application code can use the generated type directly:
 
 ```
-// Emitted as `struct Result { float value; int32_t count; };`
+// -target cpp emits `struct Result { float value; int32_t count; };`
 __extern_cpp struct Result
 {
     float value;
@@ -235,7 +235,7 @@ __extern_cpp struct Result
 }
 ```
 
-The field names must therefore be valid C++ identifiers. Other targets keep generated field names, and so does storage that the compiler synthesizes, such as the backing field of bitfield members. Under `-obfuscate` the fields, like the struct itself, get hashed names.
+The field names must therefore be valid C++ identifiers that do not clash with names the prelude defines, such as `Vector`; Slang does not check this, so a clash shows up as a C++ compile error. Other targets keep generated field names. Storage that the compiler synthesizes, such as the backing field of bitfield members, gets its internal name plus a number. The field that holds an inherited struct is named `base`; if the derived struct also declares a field `base`, both get a number that no other member uses (`base_0`, `base_1`). Under `-obfuscate` the fields, like the struct itself, get hashed names.
 
 ## <a id="com-interface"/>COM interface support
 
