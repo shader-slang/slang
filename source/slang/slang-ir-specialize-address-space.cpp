@@ -185,7 +185,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // marked `AvailableInDownstreamIR` with an import of the precompiled definition, which has
         // `func`'s parameter types. A clone with a different emitted signature therefore loses
         // those decorations (one per precompiled target) and keeps its own body. A clone with the
-        // same signature keeps them and reuses the precompiled definition.
+        // same signature keeps them, and reuses the precompiled definition unless it later loses
+        // its linkage, which removes them too.
         if (changesEmittedSignature)
         {
             while (auto availableDecor =
@@ -702,9 +703,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             {
                 mapInstToAddrSpace[globalInst] = addrSpace;
             }
+            // A function marked `DownstreamModuleExport` stays in the module with its own body
+            // (see `removeDeadRedirectedCallees`), so its calls are specialized like an entry
+            // point's. Its own parameters keep their types, which `collectMetadata` has recorded.
             if (auto func = as<IRFunc>(globalInst))
             {
-                if (func->findDecoration<IREntryPointDecoration>())
+                if (func->findDecoration<IREntryPointDecoration>() ||
+                    func->findDecoration<IRDownstreamModuleExportDecoration>())
                     workList.add(func);
             }
         }
@@ -807,11 +812,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // `specializeFunc` clones the original's linkage decorations along with its body, so every
     // specialization starts with the original's mangled name. An emitter names a function that
     // has no name hint (as under `-obfuscate`) by its mangled name, so two surviving functions that
-    // share it are emitted as two definitions with one name. WGSL has no overloading and rejects
-    // them, and Metal rejects them when their parameter types also coincide. For example,
-    // `void bump(inout uint dst)` called with a local and with a `groupshared` element has a
-    // `thread*` and a `threadgroup*` specialization on Metal, which would both be emitted as
-    // `_Sh2F0590F5ACC4C8A8` if they kept the linkage.
+    // share it are emitted as two definitions with one name. For example, `void bump(inout uint
+    // dst)` called with a local and with a `groupshared` element has a `thread*` and a
+    // `threadgroup*` specialization on Metal, which would both be emitted as
+    // `_Sh2F0590F5ACC4C8A8` if they kept the linkage. WGSL has no overloading and rejects two
+    // definitions with one name; Metal rejects them when their parameter types also coincide.
     void removeLinkageFromSpecializationsThatDoNotReplaceOriginal(
         const HashSet<IRFunc*>& removedFuncs)
     {

@@ -12,6 +12,7 @@
 //TEST:SIMPLE(filecheck=BUMP): -o tests/library/module-library-address-space-specialization-bump.slang-module -target spirv -embed-downstream-ir -incomplete-library -fvk-use-entrypoint-name -dump-ir
 //TEST:SIMPLE(filecheck=INC): -o tests/library/module-library-address-space-specialization-inc.slang-module -target spirv -embed-downstream-ir -incomplete-library -fvk-use-entrypoint-name -dump-ir
 //TEST:SIMPLE(filecheck=ADD): -o tests/library/module-library-address-space-specialization-add.slang-module -target spirv -embed-downstream-ir -incomplete-library -fvk-use-entrypoint-name -dump-ir
+//TEST:SIMPLE(filecheck=CALL): -o tests/library/module-library-address-space-specialization-call.slang-module -target spirv -embed-downstream-ir -incomplete-library -fvk-use-entrypoint-name -O0 -dump-ir
 
 // BUMP: OpDecorate %{{[A-Za-z_0-9]+}} LinkageAttributes "[[NAME:[^"]*4bumpp[^"]*]]" Export
 // BUMP-NOT: LinkageAttributes "[[NAME]]" Export
@@ -24,6 +25,16 @@
 // ADD: OpDecorate %{{[A-Za-z_0-9]+}} LinkageAttributes "[[NAME:[^"]*3Acc3addp[^"]*]]" Export
 // ADD-NOT: LinkageAttributes "[[NAME]]" Export
 // ADD: = OpFunction
+
+// The precompiled SPIR-V defines the exported `addShared` with its own body, so the call that
+// passes `gSum` in that body must target the `Workgroup` specialization of `accumulate`, not the
+// exported `accumulate`, whose parameter is a `Function` pointer.
+
+// CALL-DAG: OpDecorate %[[ACC:[A-Za-z_0-9]+]] LinkageAttributes "{{[^"]*}}10accumulatep{{[^"]*}}" Export
+// CALL-DAG: OpDecorate %[[ADDSHARED:[A-Za-z_0-9]+]] LinkageAttributes "{{[^"]*}}9addSharedp{{[^"]*}}" Export
+// CALL: %[[ADDSHARED]] = OpFunction
+// CALL-NOT: %[[ACC]] %gSum
+// CALL: OpFunctionEnd
 
 module "module-library-address-space-specialization";
 
@@ -54,6 +65,19 @@ public struct Acc
 static Acc gPrivate;
 groupshared Acc gShared;
 groupshared float gSharedValues[64];
+groupshared float gSum;
+
+[noinline]
+void accumulate(inout float dst, float v)
+{
+    dst += v;
+}
+
+public void addShared(inout float x)
+{
+    accumulate(gSum, x);
+    x += gSum;
+}
 
 // `bump` is specialized for a local and a `groupshared` element, `Acc.add` for a local, a
 // `static` and a `groupshared` receiver, and `inc` for a local only.
@@ -65,6 +89,7 @@ void libMain(uint3 id: SV_DispatchThreadID)
     bump(local, 1);
     bump(gSharedValues[id.x], 2);
     inc(local);
+    addShared(local);
 
     Acc acc = {};
     acc.add(1);

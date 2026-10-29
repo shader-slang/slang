@@ -548,8 +548,9 @@ IRInst* emitLoopBlocks(
 void sortBlocksInFunc(IRGlobalValueWithCode* func);
 
 // Removes the decorations that make `inst` visible to or found by other modules: imports and
-// exports with their target-specific forms, `Public`, `KeepAlive`, and `AvailableInDownstreamIR`,
-// which a later pass turns into an import of the `ExportDecoration` name.
+// exports with their target-specific forms, `Public`, `KeepAlive`, `AvailableInDownstreamIR`,
+// which a later pass turns into an import of the `ExportDecoration` name, and
+// `DownstreamModuleExport`, which `collectMetadata` and the SPIR-V emitter resolve through it.
 void removeLinkageDecorations(IRInst* inst);
 
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
