@@ -419,6 +419,57 @@ void MetalSourceEmitter::emitAtomicSrcOperand(bool isImage, IRInst* inst)
     m_writer->emit(")");
 }
 
+// Return true if `inst` is an atomic operation whose value is a 64-bit integer, such as
+// `InterlockedAdd` on a `uint64_t` or any method of `Atomic<int64_t>`.
+bool MetalSourceEmitter::is64BitIntegerAtomic(IRInst* inst)
+{
+    IRType* valueType = nullptr;
+    if (auto atomicStore = as<IRAtomicStore>(inst))
+        valueType = atomicStore->getVal()->getDataType();
+    else if (as<IRAtomicOperation>(inst))
+        valueType = inst->getDataType();
+    else
+        return false;
+    return isIntegralType(valueType) && getIntTypeInfo(getTargetReq(), valueType).width == 64;
+}
+
+// Return why MSL cannot express the 64-bit integer atomic `inst`, or nullptr if it can. MSL has
+// 64-bit atomics only as a min or max that returns void: `atomic_min_explicit` and
+// `atomic_max_explicit` on a device `atomic_ulong` with relaxed order (MSL spec 6.16.4.6), and
+// the `atomic_min`/`atomic_max` members of a `ulong` texture. For example,
+// `InterlockedMin(buffer[i], key)` on a `RWStructuredBuffer<uint64_t>` fits, but
+// `InterlockedMin(buffer[i], key, original)` does not once `original` is read.
+const char* MetalSourceEmitter::getUnsupported64BitAtomicReason(IRInst* inst)
+{
+    if (inst->getOp() != kIROp_AtomicMin && inst->getOp() != kIROp_AtomicMax)
+        return "64-bit integer atomic other than min or max";
+    if (getIntTypeSigned(inst->getDataType()))
+        return "64-bit signed integer atomic min or max";
+    // Under `-g` a `DebugValue` can refer to an otherwise unused original value; emission skips
+    // debug instructions, so such a use does not need the result.
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        if (!isDebugInfoInst(use->getUser()))
+            return "64-bit integer atomic min or max whose original value is used";
+    }
+    // Texture atomics take no memory order and are not limited to an address space.
+    if (isTextureAccess(inst))
+        return nullptr;
+    auto destPtrType = cast<IRPtrTypeBase>(inst->getOperand(0)->getDataType());
+    switch (destPtrType->getAddressSpace())
+    {
+    case AddressSpace::Global:
+    case AddressSpace::UserPointer:
+        break;
+    default:
+        return "64-bit integer atomic min or max outside device memory";
+    }
+    auto memoryOrder = (IRMemoryOrder)getIntVal(inst->getOperand(inst->getOperandCount() - 1));
+    if (memoryOrder != kIRMemoryOrder_Relaxed)
+        return "64-bit integer atomic min or max with a memory order other than relaxed";
+    return nullptr;
+}
+
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     // Emit `inst` as a call to `imageFunc` on a texture or `bufferFunc` on a buffer. The MSL
@@ -462,6 +513,25 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             .operation = "Unsupported floating point atomic operation",
             .location = inst->sourceLoc});
     };
+    if (is64BitIntegerAtomic(inst))
+    {
+        if (auto reason = getUnsupported64BitAtomicReason(inst))
+        {
+            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = reason,
+                .location = inst->sourceLoc});
+        }
+        else if (inst->getOp() == kIROp_AtomicMin)
+        {
+            emitAtomicCall("atomic_min", "atomic_min_explicit", false);
+            return true;
+        }
+        else
+        {
+            emitAtomicCall("atomic_max", "atomic_max_explicit", false);
+            return true;
+        }
+    }
     switch (inst->getOp())
     {
     case kIROp_Discard:
