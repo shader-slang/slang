@@ -739,7 +739,7 @@ void HLSLSourceEmitter::ensureCoopVecHlslPreludeForProfile()
 
 bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
-    auto diagnoseFloatAtommic = [&]()
+    auto diagnoseFloatAtomic = [&]()
     {
         getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
             .operation = "floating point atomic operation",
@@ -800,7 +800,7 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(";\n");
             if (inst->getDataType()->getOp() == kIROp_FloatType)
             {
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
             }
             m_writer->emit("InterlockedAdd");
             m_writer->emit("(");
@@ -818,7 +818,7 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(";\n");
             if (inst->getDataType()->getOp() == kIROp_FloatType)
             {
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
             }
             m_writer->emit("InterlockedAdd");
             m_writer->emit("(");
@@ -878,7 +878,7 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(";\n");
             if (isFloatingType(inst->getDataType()))
             {
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
             }
             m_writer->emit("InterlockedMin");
             m_writer->emit("(");
@@ -896,7 +896,7 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(";\n");
             if (isFloatingType(inst->getDataType()))
             {
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
             }
             m_writer->emit("InterlockedMax");
             m_writer->emit("(");
