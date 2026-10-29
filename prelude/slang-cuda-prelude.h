@@ -3008,6 +3008,79 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
     return __int_as_float(old);
 }
 
+// Floating-point atomic min/max
+// CUDA has no native floating-point atomicMin/atomicMax, so we implement them with a
+// compare-and-swap loop on the bits of the stored value; each returns the original value. The
+// stored value is replaced only when `val` wins the comparison, or when the stored value is a NaN
+// and `val` is not, which are the SPIR-V OpAtomicFMinEXT/OpAtomicFMaxEXT rules: a NaN operand is
+// ignored and either zero may win between -0.0 and +0.0. We write the bits of `val` rather than
+// a result of fminf/fmaxf, because under flush-to-zero those return a flushed copy of a subnormal
+// input and would overwrite a stored value that should have won.
+__device__ __forceinline__ float __slang_atomic_compare_value(float v)
+{
+    return v;
+}
+
+__device__ __forceinline__ double __slang_atomic_compare_value(double v)
+{
+    return v;
+}
+
+#if defined(SLANG_CUDA_ENABLE_HALF)
+// Widening half to float is exact, so comparing in float orders half values correctly.
+__device__ __forceinline__ float __slang_atomic_compare_value(__half v)
+{
+    return __half2float(v);
+}
+#endif
+
+template<typename T, typename Bits>
+__device__ __forceinline__ T __slang_atomic_min_max(T* address, T val, bool isMin)
+{
+    Bits* bits = reinterpret_cast<Bits*>(address);
+    const Bits valBits = *reinterpret_cast<const Bits*>(&val);
+    const auto value = __slang_atomic_compare_value(val);
+    Bits old = *(volatile Bits*)bits;
+    for (;;)
+    {
+        const T oldValue = *reinterpret_cast<const T*>(&old);
+        const auto stored = __slang_atomic_compare_value(oldValue);
+        const bool replace =
+            isnan(stored) ? !isnan(value) : (isMin ? value < stored : value > stored);
+        if (!replace)
+            return oldValue;
+        const Bits observed = atomicCAS(bits, old, valBits);
+        if (observed == old)
+            return oldValue;
+        old = observed;
+    }
+}
+
+#define SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(T, Bits)                                       \
+    __device__ __forceinline__ T __slang_atomic_min(T* address, T val)                      \
+    {                                                                                       \
+        return __slang_atomic_min_max<T, Bits>(address, val, true);                         \
+    }                                                                                       \
+    __device__ __forceinline__ T __slang_atomic_max(T* address, T val)                      \
+    {                                                                                       \
+        return __slang_atomic_min_max<T, Bits>(address, val, false);                        \
+    }                                                                                       \
+    __device__ __forceinline__ void __slang_atomic_reduce_min(T* address, T val, int order) \
+    {                                                                                       \
+        __slang_atomic_min_max<T, Bits>(address, val, true);                                \
+    }                                                                                       \
+    __device__ __forceinline__ void __slang_atomic_reduce_max(T* address, T val, int order) \
+    {                                                                                       \
+        __slang_atomic_min_max<T, Bits>(address, val, false);                               \
+    }
+
+SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(float, int)
+SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(double, unsigned long long)
+// 16-bit atomicCAS is only declared for sm_70 and up (and for the host pass).
+#if defined(SLANG_CUDA_ENABLE_HALF) && (!defined(__CUDA_ARCH__) || (__CUDA_ARCH__ >= 700))
+SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(__half, unsigned short)
+#endif
+
 // =====================================================================
 // Atomic Reduction Operations (PTX `red` instruction)
 // These are in-place atomic operations that don't return the old value.
@@ -3016,7 +3089,7 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
 //
 // Supported operations based on PTX ISA:
 // - add: .s32, .u32, .u64, .s64, .f16, .f16x2, .bf16, .bf16x2, .f32, .f64
-// - min/max: .s32, .u32, .s64, .u64, .f32, .f64, .f16, .f16x2
+// - min/max: .s32, .u32, .s64, .u64
 // - and/or/xor: .b32, .b64
 // - inc/dec: .u32
 // =====================================================================
@@ -3120,9 +3193,9 @@ __device__ __forceinline__ void __slang_atomic_reduce_min(uint64_t* addr, uint64
 }
 
 // NOTE: PTX `red` instruction does NOT support min/max for floating-point types.
-// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max.
-// For floating-point min/max atomics, use the regular `atom` instruction via
-// __atomic_min/__atomic_max.
+// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max. The
+// floating-point overloads are compare-and-swap loops, defined with
+// __slang_atomic_min_max.
 
 // Atomic reduction MAX operations
 __device__ __forceinline__ void __slang_atomic_reduce_max(int32_t* addr, int32_t val, int order)
@@ -3146,9 +3219,9 @@ __device__ __forceinline__ void __slang_atomic_reduce_max(uint64_t* addr, uint64
 }
 
 // NOTE: PTX `red` instruction does NOT support min/max for floating-point types.
-// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max.
-// For floating-point min/max atomics, use the regular `atom` instruction via
-// __atomic_min/__atomic_max.
+// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max. The
+// floating-point overloads are compare-and-swap loops, defined with
+// __slang_atomic_min_max.
 
 // Atomic reduction AND operations (bitwise, integers only)
 __device__ __forceinline__ void __slang_atomic_reduce_and(int32_t* addr, int32_t val, int order)
