@@ -1,10 +1,10 @@
 // A `[require(...)]` on a user-defined generic type must be enforced wherever the
 // type is used, not only in entry-point signatures, exactly as for the non-generic
 // spelling. The `*NG` cases are non-generic twins: GENERICNG, ENUMNG, NESTEDENUMNG,
-// STATICNG and INTRINSICNG must report the same diagnostics as the rows they follow. LATENG
-// and COREINTRINSIC record known gaps instead, so their expected output is empty: a
-// non-generic type named only as a generic argument before its declaration is still dropped,
-// and so is a core-module intrinsic generic such as `CoopVec<float, 4>`.
+// STATICNG, OUTERMAKENG and INTRINSICNG must report the same diagnostics as the rows they
+// follow. LATENG and COREINTRINSIC record known gaps instead, so their expected output is
+// empty: a non-generic type named only as a generic argument before its declaration is still
+// dropped, and so is a core-module intrinsic generic such as `CoopVec<float, 4>`.
 //
 // Regression test for https://github.com/shader-slang/slang/issues/13579.
 //
@@ -37,6 +37,9 @@
 // A static member accessed through the specialized struct (`MetalOnly<3>.make()`).
 //DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -target hlsl -profile sm_6_5 -entry mainStatic -stage compute -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=STATICNG): -target hlsl -profile sm_6_5 -entry mainStaticNG -stage compute -no-codegen
+// A static member of a requiring struct nested in a generic parent (`Outer<3>.In.make()`).
+//DIAGNOSTIC_TEST:SIMPLE(diag=OUTERMAKE): -target hlsl -profile sm_6_5 -entry mainOuterMake -stage compute -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=OUTERMAKENG): -target hlsl -profile sm_6_5 -entry mainOuterMakeNG -stage compute -no-codegen
 // The struct is named only as a generic argument, before its declaration in the file.
 //DIAGNOSTIC_TEST:SIMPLE(diag=LATE): -target hlsl -profile sm_6_5 -entry mainLate -stage compute -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=LATENG): -target hlsl -profile sm_6_5 -entry mainLateNG -stage compute -no-codegen
@@ -98,6 +101,11 @@ struct Outer<let N : int>
     struct In
     {
         uint value;
+
+        static uint make()
+        {
+            return 1;
+        }
     }
 
     [require(metal)]
@@ -121,6 +129,20 @@ struct Holder
     {
         A,
         B
+    }
+}
+
+struct PlainHolder
+{
+    [require(metal)]
+    struct In
+    {
+        uint value;
+
+        static uint make()
+        {
+            return 1;
+        }
     }
 }
 
@@ -268,7 +290,7 @@ void mainStatic()
 */
 {
     gOutput[0] = MetalOnly<3>.make();
-//STATIC:                     ^^^^ see using of 'MetalOnly'
+//STATIC:        ^^^^^^^^^ see using of 'MetalOnly'
 }
 //STATIC: see definition of 'MetalOnly'
 //STATIC: see declaration of 'require'
@@ -282,14 +304,43 @@ void mainStaticNG()
 */
 {
     gOutput[0] = MetalOnlyNG.make();
-//STATICNG:                  ^^^^ see using of 'make'
+//STATICNG:      ^^^^^^^^^^^ see using of 'MetalOnlyNG'
 }
-//STATICNG: see definition of 'make'
+//STATICNG: see definition of 'MetalOnlyNG'
+//STATICNG: see declaration of 'require'
 
 uint typeOnly<T>()
 {
     return 1;
 }
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainOuterMake()
+/*OUTERMAKE:
+     ^^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^^ entrypoint 'mainOuterMake' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
+*/
+{
+    gOutput[0] = Outer<3>.In.make();
+//OUTERMAKE:              ^^ see using of 'In'
+}
+//OUTERMAKE: see definition of 'In'
+//OUTERMAKE: see declaration of 'require'
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainOuterMakeNG()
+/*OUTERMAKENG:
+     ^^^^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^^^^ entrypoint 'mainOuterMakeNG' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
+*/
+{
+    gOutput[0] = PlainHolder.In.make();
+//OUTERMAKENG:               ^^ see using of 'In'
+}
+//OUTERMAKENG: see definition of 'In'
+//OUTERMAKENG: see declaration of 'require'
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

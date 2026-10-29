@@ -22316,6 +22316,11 @@ struct CapabilityDeclReferenceVisitor
     }
     void visitStaticMemberExpr(StaticMemberExpr* expr)
     {
+        // The base walk visits only the member's decl-ref, and `getMemberDeclRef` folds an
+        // intermediate member into its parent, so `Outer<3>.In.make()` names `make` as a member of
+        // `Outer<3>` and never names `In`. Walking the base expression, the type as written,
+        // contributes `In`; for `S.make()` it contributes `S`.
+        this->dispatchIfNotNull(expr->baseExpression);
         Base::visitStaticMemberExpr(expr);
         maybePropagateForDiffMember(expr->declRef.getDecl(), expr->baseExpression);
     }
