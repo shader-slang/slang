@@ -15,12 +15,14 @@ class DiagnosticSink;
 ///     [SpecializationConstant] const int kTile = 128;
 ///     groupshared float tile[kTile];
 ///
-/// SPIR-V and GLSL size `tile` with the specialization constant itself, and WGSL sizes a
-/// `var<workgroup>` array with an `override`, but WGSL allows an override-sized array nowhere
-/// else, and HLSL, CUDA, Metal and the CPU targets have no array whose size is fixed at pipeline
-/// creation. The declarations checked are global variables and parameters, local variables,
-/// function parameters and struct fields; a variable of a struct type is not reported again,
-/// because the struct field that holds the array already is.
+/// SPIR-V and GLSL size `tile` with the specialization constant itself. WGSL sizes it with an
+/// `override`, but only when the spec-constant dimension is the outermost dimension of a
+/// `var<workgroup>` and the element type has a fixed size. HLSL, CUDA, Metal and the CPU targets
+/// have no array whose size is fixed at pipeline creation. The declarations checked are global
+/// variables and parameters, local variables, function parameters and struct fields; a variable
+/// of a struct type is not reported again, because the struct field that holds the array already
+/// is. A value of such a type that no declaration holds, such as the result of
+/// `ByteAddressBuffer.Load<float[kTile]>`, is reported once per type.
 ///
 /// No target can build such an array from an initializer list (`float a[kTile] = {};`), so SPIR-V
 /// and GLSL report that initializer instead.

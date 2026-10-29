@@ -6055,7 +6055,7 @@ err(
     "specialization-constant-sized-array-not-supported",
     55222,
     "array sized by a specialization constant is not supported on this target",
-    span { loc = "location", message = "target '~target:CodeGenTarget' cannot size an array with a specialization constant; such arrays are supported on SPIR-V and GLSL, and on WGSL only as the type of a 'groupshared' variable." }
+    span { loc = "location", message = "target '~target:CodeGenTarget' cannot size an array with a specialization constant; such arrays are supported on SPIR-V and GLSL, and on WGSL only as the outermost dimension of a 'groupshared' variable whose element type has a fixed size." }
 )
 
 err(

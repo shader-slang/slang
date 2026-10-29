@@ -251,7 +251,8 @@ static IROp getOrdinaryOpForConstexprOp(IROp constexprOp)
 
 void lowerConstexprInstsToOrdinaryInsts(IRModule* module)
 {
-    // `constexpr*` instructions are hoistable, so they all live at module scope.
+    // This runs after specialization, so a remaining `constexpr*` instruction depends only on
+    // specialization constants and literals, and hoisting has placed it at module scope.
     List<IRInst*> constexprInsts;
     for (auto inst : module->getGlobalInsts())
     {

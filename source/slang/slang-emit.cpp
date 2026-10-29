@@ -476,8 +476,11 @@ void calcRequiredLoweringPassSet(
     // already covers it; they are listed here for parity with `lowerEnumType`'s
     // handled set. The `Constexpr*` cast variants are intentionally excluded: they
     // arise only in constant `IntVal` contexts (`emitConstexprCast`, from
-    // `visitTypeCastIntVal`), never in runtime value flow that reaches emit, and
-    // `lowerEnumType` has no case for them.
+    // `visitTypeCastIntVal`), never in runtime value flow, and `lowerEnumType` has no
+    // case for them. One reaches codegen only as an array size that depends on an
+    // enum-typed specialization constant; that constant keeps its `IREnumType` alive,
+    // and on GLSL and WGSL `lowerConstexprInstsToOrdinaryInsts` later turns the cast
+    // into an integer cast.
     case kIROp_CastEnumToInt:
     case kIROp_CastIntToEnum:
     case kIROp_EnumCast:
@@ -1706,6 +1709,11 @@ Result linkAndOptimizeIR(
         SLANG_PASS(checkForInvalidShaderParameterType, targetRequest, sink);
     }
 
+    // This check runs after specialization and dead-code elimination, so that it sees the arrays
+    // a generic argument introduces and none from removed code, and before any target
+    // legalization or emit that would crash on such an array. It is not optional validation:
+    // without it HLSL emits a variable-length array. The requested target, not the emitted source
+    // language, decides what is accepted and is named in the message.
     SLANG_PASS(checkSpecializationConstantSizedArrays, targetRequest->getTarget(), sink);
 
     if (sink->getErrorCount() != 0)
@@ -2381,7 +2389,10 @@ Result linkAndOptimizeIR(
         SLANG_PASS(resolveVaryingInputRef);
 
     // GLSL and WGSL print an array size that depends on a specialization constant as an
-    // expression over that constant.
+    // expression over that constant. The other source targets have rejected such arrays in
+    // `checkSpecializationConstantSizedArrays`, and the SPIR-V emitter handles `constexpr*`
+    // directly. The lowering runs before the target legalization below so that it applies to the
+    // resulting ordinary instructions, and after `lowerEnumType`, which its enum casts rely on.
     if (target == CodeGenTarget::GLSL || isWGPUTarget(target))
         SLANG_PASS(lowerConstexprInstsToOrdinaryInsts);
 
