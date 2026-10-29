@@ -5,7 +5,6 @@
 #include "compiler-core/slang-source-loc.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
-#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
@@ -219,32 +218,33 @@ static void collectUsedBindingsFromVarLayout(
     if (auto registerSpaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
         localSpace += registerSpaceAttr->getOffset();
 
+    // A parameter group's resources are reserved below through its container (the group's own
+    // buffer) and its element (the contents). Reserving the group's whole range at the
+    // variable's offset would assume the container sits at offset zero, which does not hold
+    // for the global scope's default constant buffer (see `generateParameterBindings`).
+    auto groupLayout = as<IRParameterGroupTypeLayout>(typeLayout);
+
     if (auto offsetAttr = varLayout->findOffsetAttr(kind))
     {
         localBinding += offsetAttr->getOffset();
         localSpace += offsetAttr->getSpace();
 
-        UInt rangeBinding = localBinding;
-        UInt rangeSpace = localSpace;
-        if (auto containerAttr = findParameterGroupContainerOffsetAttr(varLayout, kind))
+        if (!groupLayout)
         {
-            rangeBinding += containerAttr->getOffset();
-            rangeSpace += containerAttr->getSpace();
+            bool isUnbounded = false;
+            UInt count = getResourceCount(typeLayout, kind, isUnbounded);
+            // If a layout carries an explicit resource-kind offset but
+            // its type layout does not expose a finite size, reserve the
+            // base slot rather than pretending the offset is unused.
+            if (count == 0)
+                count = 1;
+            if (isUnsizedArrayResourceSource(source))
+                isUnbounded = true;
+            addUsedBindingRange(outRanges, localSpace, localBinding, count, isUnbounded, source);
         }
-
-        bool isUnbounded = false;
-        UInt count = getResourceCount(typeLayout, kind, isUnbounded);
-        // If a layout carries an explicit resource-kind offset but
-        // its type layout does not expose a finite size, reserve the
-        // base slot rather than pretending the offset is unused.
-        if (count == 0)
-            count = 1;
-        if (isUnsizedArrayResourceSource(source))
-            isUnbounded = true;
-        addUsedBindingRange(outRanges, rangeSpace, rangeBinding, count, isUnbounded, source);
     }
 
-    if (auto groupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+    if (groupLayout)
     {
         UInt elementSpace = localSpace;
         if (auto subElementSpaceAttr =
