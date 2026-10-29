@@ -12,6 +12,7 @@
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
 #include "core/slang-char-util.h"
+#include "core/slang-io.h"
 #include "core/slang-math.h"
 #include "core/slang-short-dictionary.h"
 #include "core/slang-string-util.h"
@@ -5565,6 +5566,50 @@ static Name* findClosestInScopeName(
     return best;
 }
 
+// Return whether `name` names the module that `scope` belongs to or a module imported into it,
+// so that an undefined-identifier error on `name` can explain that a module name cannot be used
+// in code. A module is named both by its declared name (`module ModA;`) and by the path that an
+// `import` spells (`import mod_a;`, `import lib.mod_d;`, `import "lib/StrMod.slang";`); a module
+// without a `module` declaration takes its name from that path. For a path, user code would
+// write the file name without its extension, so that is what we compare `name` with.
+static bool isNameOfCurrentOrImportedModule(SemanticsVisitor* semantics, Name* name, Scope* scope)
+{
+    if (!name)
+        return false;
+
+    const String nameText = getText(name);
+    auto isSpellingOfModule = [&](Name* moduleName)
+    { return moduleName && Path::getFileNameWithoutExt(getText(moduleName)) == nameText; };
+    auto hasImportSpelledAsName = [&](ContainerDecl* containerDecl)
+    {
+        for (auto importDecl : containerDecl->getMembersOfType<ImportDecl>())
+        {
+            // An `import` that failed to load names no module.
+            if (importDecl->importedModuleDecl &&
+                isSpellingOfModule(importDecl->moduleNameAndLoc.name))
+                return true;
+        }
+        return false;
+    };
+
+    if (auto moduleDecl = getModuleDecl(scope))
+    {
+        if (isSpellingOfModule(moduleDecl->getName()) || hasImportSpelledAsName(moduleDecl))
+            return true;
+        for (auto fileDecl : moduleDecl->getMembersOfType<FileDecl>())
+        {
+            if (hasImportSpelledAsName(fileDecl))
+                return true;
+        }
+    }
+    for (auto importedModuleDecl : semantics->getShared()->importedModulesList)
+    {
+        if (isSpellingOfModule(importedModuleDecl->getName()))
+            return true;
+    }
+    return false;
+}
+
 Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
 {
     // If we've already resolved this expression, don't try again.
@@ -5620,7 +5665,10 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
             .name = expr->name,
             .suggestion = suggestion,
             .location = expr->loc,
-            .suggestionLocation = suggestion ? expr->loc : SourceLoc{}});
+            .suggestionLocation = suggestion ? expr->loc : SourceLoc{},
+            .moduleNameLocation = isNameOfCurrentOrImportedModule(this, expr->name, expr->scope)
+                                      ? expr->loc
+                                      : SourceLoc{}});
     }
 
     return resultExpr;
