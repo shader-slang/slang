@@ -697,8 +697,8 @@ DeclRef<Decl> Linkage::specializeGeneric(
     genericAppExpr->arguments = argExprs;
 
     auto checkedExpr = visitor.checkGenericAppWithCheckedArgs(genericAppExpr);
-    if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
-        return declRefExpr->declRef;
+    if (auto specializedExpr = as<DeclRefExpr>(checkedExpr))
+        return specializedExpr->declRef;
     return DeclRef<Decl>();
 }
 

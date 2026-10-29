@@ -441,8 +441,9 @@ public:
     /// Resolves a reflected function as a call with hypothetical arguments of the given types.
     ///
     /// Forms proper argument types using the session's language-version rules, then uses normal
-    /// call inference, including opening existential arguments. Returns an empty reference on
-    /// error.
+    /// call inference, including opening existential arguments.
+    /// Returns the selected function reference, or an empty reference when none is available.
+    /// Semantic errors are reported to `sink`; a returned reference may be a recovery result.
     DeclRef<Decl> specializeWithArgTypes(
         Expr* funcExpr,
         List<Type*> argTypes,
