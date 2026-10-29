@@ -3541,6 +3541,16 @@ bool isDebugInfoInst(IRInst* inst)
     }
 }
 
+bool hasNonDebugUse(IRInst* inst)
+{
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        if (!isDebugInfoInst(use->getUser()))
+            return true;
+    }
+    return false;
+}
+
 bool doesOpReadResourceContents(IROp op)
 {
     // These dedicated operations produce results that depend on resource contents. A resource

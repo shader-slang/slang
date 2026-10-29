@@ -751,6 +751,11 @@ IRInst* peelAddressForwardingOps(IRInst* addr);
 /// Return whether `inst` records source-level debug information without affecting execution.
 bool isDebugInfoInst(IRInst* inst);
 
+/// Return whether `inst` has a user other than a debug-info instruction. Debug-info users describe
+/// a value for a debugger without consuming it; for example, under `-g` a `DebugValue` can be the
+/// only user of an atomic's result when the source discards that result.
+bool hasNonDebugUse(IRInst* inst);
+
 /// Return whether `op` is a dedicated IR operation that reads resource contents.
 bool doesOpReadResourceContents(IROp op);
 
