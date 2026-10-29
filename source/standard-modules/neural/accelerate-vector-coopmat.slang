@@ -196,7 +196,10 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     [ForceInline]
     [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
-    [require(cuda_metal_spirv)]
+    [require(cuda)]
+    [require(metal)]
+    // The SPIR-V tiled path converts weight tiles of type `T` to the half-precision MatrixA.
+    [require(spirv, spvCooperativeMatrixConversionsNV)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress)
             where Address : IPointerLikeAddress<T>
@@ -242,7 +245,10 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     [ForceInline]
     [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
-    [require(cuda_metal_spirv)]
+    [require(cuda)]
+    [require(metal)]
+    // The SPIR-V tiled path converts weight tiles of type `T` to the half-precision MatrixA.
+    [require(spirv, spvCooperativeMatrixConversionsNV)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
