@@ -19,12 +19,12 @@ RWStructuredBuffer<uint> outputBuffer;
 
 [shader("compute")]
 [WaveSize(32)]
+/*DIAG:
+ ^^^^^^^^ 'WaveSize' attribute is not supported on target 'metal' and will be ignored
+ ^^^^^^^^ the target has no way to request a wave (SIMD-group) size, so the entry point runs at the size the device chooses; WaveGetLaneCount() returns it
+*/
 [numthreads(64, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
-/*DIAG:
-     ^^^^^^^^^^^ 'WaveSize' attribute is not supported on target 'metal' and will be ignored
-     ^^^^^^^^^^^ the target has no way to request a wave (SIMD-group) size, so the entry point runs at the size the device chooses; WaveGetLaneCount() returns it
-*/
 {
     outputBuffer[dispatchThreadID.x] = WaveActiveSum(dispatchThreadID.x);
 }
@@ -50,12 +50,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
 [shader("compute")]
 [WaveSize(32)]
+/*XDIM:
+ ^^^^^^^^ the workgroup's x dimension (8) must be a multiple of the 'WaveSize' (32) on target 'wgsl'
+ ^^^^^^^^ WGSL's '@subgroup_size' requires the x dimension of '@workgroup_size' to be a multiple of the subgroup size; otherwise pipeline creation fails
+*/
 [numthreads(8, 8, 1)]
 void badWorkgroupMain(uint3 dispatchThreadID: SV_DispatchThreadID)
-/*XDIM:
-     ^^^^^^^^^^^^^^^^ the workgroup's x dimension (8) must be a multiple of the 'WaveSize' (32) on target 'wgsl'
-     ^^^^^^^^^^^^^^^^ WGSL's '@subgroup_size' requires the x dimension of '@workgroup_size' to be a multiple of the subgroup size; otherwise pipeline creation fails
-*/
 {
     outputBuffer[dispatchThreadID.x] = WaveActiveSum(dispatchThreadID.x);
 }
@@ -66,12 +66,12 @@ void badWorkgroupMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
 [shader("compute")]
 [WaveSize(64)]
+/*CUDA64:
+ ^^^^^^^^ 'WaveSize(64)' cannot be honored on target 'cuda', whose wave size is always 32; the attribute will be ignored
+ ^^^^^^^^ the entry point runs with 32-lane waves, so code that assumes 64 lanes per wave computes wrong results
+*/
 [numthreads(64, 1, 1)]
 void wave64Main(uint3 dispatchThreadID: SV_DispatchThreadID)
-/*CUDA64:
-     ^^^^^^^^^^ 'WaveSize(64)' cannot be honored on target 'cuda', whose wave size is always 32; the attribute will be ignored
-     ^^^^^^^^^^ the entry point runs with 32-lane waves, so code that assumes 64 lanes per wave computes wrong results
-*/
 {
     outputBuffer[dispatchThreadID.x] = WaveActiveSum(dispatchThreadID.x);
 }

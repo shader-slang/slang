@@ -231,19 +231,6 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
             Int waveSize = 0;
             if (getComputeWaveSize(irFunc, &waveSize))
             {
-                // WGSL makes it a pipeline-creation error if the workgroup's x dimension is not
-                // a multiple of the subgroup size, so report it at compile time.
-                Int sizeAlongAxis[kThreadGroupAxisCount];
-                getComputeThreadGroupSize(irFunc, sizeAlongAxis);
-                if (waveSize > 0 && sizeAlongAxis[0] % waveSize != 0)
-                {
-                    getSink()->diagnose(Diagnostics::WaveSizeNotDivisorOfWorkgroupX{
-                        .workgroupSizeX = int(sizeAlongAxis[0]),
-                        .waveSize = int(waveSize),
-                        .target =
-                            TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
-                        .location = irFunc->sourceLoc});
-                }
                 _requireExtension(toSlice("subgroups"));
                 _requireExtension(toSlice("subgroup_size_control"));
                 m_writer->emit("@subgroup_size(");

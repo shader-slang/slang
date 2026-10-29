@@ -269,20 +269,9 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
         m_writer->emit("[[vertex]] ");
         break;
     case Stage::Compute:
-        {
-            // Metal has no way to request a SIMD-group width: a kernel runs at the device's
-            // thread execution width. Warn instead of dropping `[WaveSize(N)]` silently.
-            Int waveSize = 0;
-            if (getComputeWaveSize(irFunc, &waveSize))
-            {
-                getSink()->diagnose(Diagnostics::WaveSizeUnsupportedOnTarget{
-                    .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
-                    .location = irFunc->sourceLoc});
-            }
-            emitRequiredThreadsPerThreadgroup();
-            m_writer->emit("[[kernel]] ");
-            break;
-        }
+        emitRequiredThreadsPerThreadgroup();
+        m_writer->emit("[[kernel]] ");
+        break;
     case Stage::Mesh:
         emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[mesh]] ");

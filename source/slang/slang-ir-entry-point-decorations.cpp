@@ -50,7 +50,92 @@ private:
             {
                 checkPostDepthCoverageDecoration(postDepthCoverage);
             }
+            else if (auto waveSize = as<IRWaveSizeDecoration>(decoration))
+            {
+                checkWaveSizeDecoration(entryPoint, waveSize);
+            }
         }
+    }
+
+    // A CUDA warp is always 32 lanes wide.
+    static constexpr Int kCudaWarpSize = 32;
+
+    // Diagnose `[WaveSize(N)]` on the targets that cannot request a wave size N. The decoration is
+    // checked here, right after linking, rather than in the target emitters, so that the
+    // diagnostic uses the location recorded when the attribute was lowered instead of depending on
+    // the source location of an entry point that later passes may have rewritten.
+    //
+    // Consider this example:
+    //
+    //     [WaveSize(64)]
+    //     [numthreads(64, 1, 1)]
+    //     void computeMain() { ... }
+    //
+    // HLSL emits it as `[WaveSize(64)]`, WGSL as `@subgroup_size(64)`, and SPIR-V leaves the size
+    // to the pipeline creation. Metal has no way to request a SIMD-group width, and a CUDA warp
+    // is always 32 lanes wide, so on those two targets the attribute is dropped. Dropping it
+    // silently would let code that sizes its groupshared memory by the requested width compute
+    // wrong results, so we warn instead. WGSL needs one more check: the workgroup's x dimension
+    // must be a multiple of the subgroup size.
+    void checkWaveSizeDecoration(IRFunc* entryPoint, IRWaveSizeDecoration* decoration)
+    {
+        const Int waveSize = getIntVal(decoration->getOperand(0));
+
+        if (isMetalTarget(m_target))
+        {
+            m_sink->diagnose(Diagnostics::WaveSizeUnsupportedOnTarget{
+                .target = getTargetName(),
+                .location = decoration->sourceLoc});
+        }
+        else if (isCUDATarget(m_target))
+        {
+            if (waveSize != kCudaWarpSize)
+            {
+                m_sink->diagnose(Diagnostics::WaveSizeMismatchOnTarget{
+                    .waveSize = int(waveSize),
+                    .target = getTargetName(),
+                    .targetWaveSize = int(kCudaWarpSize),
+                    .location = decoration->sourceLoc});
+            }
+        }
+        else if (isWGPUTarget(m_target))
+        {
+            checkWaveSizeDividesWorkgroupX(entryPoint, waveSize, decoration);
+        }
+    }
+
+    // WGSL makes it a pipeline-creation error if the x dimension of `@workgroup_size` is not a
+    // multiple of `@subgroup_size`, so we report it at compile time. A workgroup size that is a
+    // specialization constant is not an `IRIntLit` and is only known at pipeline creation, so we
+    // cannot check it here.
+    void checkWaveSizeDividesWorkgroupX(
+        IRFunc* entryPoint,
+        Int waveSize,
+        IRWaveSizeDecoration* decoration)
+    {
+        // The emitter writes a missing `[numthreads]` as a workgroup size of 1 along each axis.
+        Int workgroupSizeX = 1;
+        if (auto numThreads = entryPoint->findDecoration<IRNumThreadsDecoration>())
+        {
+            auto xLiteral = as<IRIntLit>(numThreads->getOperand(0));
+            if (!xLiteral)
+                return;
+            workgroupSizeX = Int(xLiteral->getValue());
+        }
+
+        if (workgroupSizeX % waveSize != 0)
+        {
+            m_sink->diagnose(Diagnostics::WaveSizeNotDivisorOfWorkgroupX{
+                .workgroupSizeX = int(workgroupSizeX),
+                .waveSize = int(waveSize),
+                .target = getTargetName(),
+                .location = decoration->sourceLoc});
+        }
+    }
+
+    String getTargetName() const
+    {
+        return String(TypeTextUtil::getCompileTargetName(SlangCompileTarget(m_target)));
     }
 
     // `[postdepthcoverage]` only lowers to an execution mode on the Khronos targets (SPIR-V and
