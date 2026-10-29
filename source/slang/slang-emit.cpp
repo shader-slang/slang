@@ -110,6 +110,7 @@
 #include "slang-ir-restructure.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-simplify-for-emit.h"
+#include "slang-ir-spec-const-sized-array.h"
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
@@ -2376,6 +2377,11 @@ Result linkAndOptimizeIR(
     // functions.
     if (requiredLoweringPassSet.resolveVaryingInputRef)
         SLANG_PASS(resolveVaryingInputRef);
+
+    // GLSL and WGSL print an array size that depends on a specialization constant as an
+    // expression over that constant.
+    if (target == CodeGenTarget::GLSL || isWGPUTarget(target))
+        SLANG_PASS(lowerConstexprInstsToOrdinaryInsts);
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
