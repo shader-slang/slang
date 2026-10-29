@@ -501,9 +501,12 @@ struct SynthesizeActiveMaskForFunctionContext
 
         // The region walk emits a collective on every conditional branch and on
         // every edge that leaves a region, whether or not a later use needs the
-        // resulting mask. The last step removes every mask value that the walk
-        // created and no code observes, keeping collective groups whole.
+        // resulting mask. The exit ballots of a region that no lane leaves
+        // abnormally only recompute the mask on entry, so we first replace them
+        // with it. The last step removes every mask value that the walk created
+        // and no code observes, keeping collective groups whole.
         //
+        reuseEntryMaskForRegionsWithOnlyNormalExits();
         removeDeadSynthesizedMasks();
     }
 
@@ -1084,9 +1087,19 @@ struct SynthesizeActiveMaskForFunctionContext
     Index getOrCreateExitBallotGroup(RegionInfo* region)
     {
         if (region->exitBallotGroup < 0)
+        {
             region->exitBallotGroup = createCollectiveGroup();
+            m_exitBallotGroups.add(region->exitBallotGroup);
+        }
         return region->exitBallotGroup;
     }
+
+    // The exit-ballot groups, kept apart from `m_collectiveGroups` because only
+    // they can have their ballots replaced by the region's entry mask. The
+    // initial-mask ballot of a kernel is also a `true` ballot, but it narrows the
+    // all-lanes mask to the lanes that are running.
+    //
+    List<Index> m_exitBallotGroups;
 
     // Given the definition of a region, one of the most important
     // queries to be able to answer is: given a block B and a region R,
@@ -1976,8 +1989,14 @@ struct SynthesizeActiveMaskForFunctionContext
                 // merge point as their parent at the top of our loop.
                 //
                 // Thus we are done checking if regions have been
-                // exited.
+                // exited. If the edge did leave an enclosing region, that
+                // region would miss the exit ballot of this edge: its group
+                // would no longer hold one ballot per exit edge, and lanes
+                // could wait for each other forever (and
+                // `reuseEntryMaskForRegionsWithOnlyNormalExits()` could
+                // mistake an abnormal exit for none), so we check it.
                 //
+                SLANG_RELEASE_ASSERT(!r->parentRegion || isBlockInRegion(toBlock, r->parentRegion));
                 break;
             }
             else
@@ -2251,6 +2270,54 @@ struct SynthesizeActiveMaskForFunctionContext
         region.mergeBlock = parentRegion->mergeBlock;
         region.parentRegion = parentRegion;
         transformRegion(&region);
+    }
+
+    // Replace the exit ballots of every region that no lane leaves abnormally with
+    // the region's mask on entry.
+    //
+    // Consider this example:
+    //
+    //      uint a = odd ? x : y;
+    //      uint total = WaveActiveSum(a);
+    //
+    // The `?:` lowers to an `ifElse` whose arms both branch to the merge block, and
+    // each arm executes `waveMaskBallot(activeMaskOnEntry, true)` to compute the
+    // mask for the `WaveActiveSum`. Every lane that enters the region also leaves it
+    // through the merge block, so each of these ballots returns `activeMaskOnEntry`
+    // and only adds a synchronization. (A lane that reaches `unreachable` or a
+    // missing `return` executes no exit ballot, but reaching those is undefined.)
+    //
+    // A group without a `false` ballot belongs to a region without abnormal exits,
+    // because every edge that leaves a processed region executes one of its exit
+    // ballots: `markBlocksNeedingActiveMask()` makes the walk visit every block of
+    // the region, and `transformUnconditionalEdge()` checks that an edge that leaves
+    // a region normally leaves no enclosing region. We decide after the walk because
+    // the walk can emit a region's normal exits before it reaches an abnormal one.
+    //
+    // Replacing the uses of every ballot in the group leaves all of them unused, so
+    // `removeDeadSynthesizedMasks()`, which keeps or removes a group as a whole,
+    // removes the whole group, and no lane is left waiting in a ballot that the
+    // others skip.
+    //
+    void reuseEntryMaskForRegionsWithOnlyNormalExits()
+    {
+        for (auto group : m_exitBallotGroups)
+        {
+            // The `false` ballots are the ones on abnormal exits.
+            auto& ballots = m_collectiveGroups[group];
+            bool hasAbnormalExit = false;
+            for (auto ballot : ballots)
+            {
+                auto exitsNormally = as<IRBoolLit>(cast<IRWaveMaskBallot>(ballot)->getCondition());
+                SLANG_RELEASE_ASSERT(exitsNormally);
+                if (!exitsNormally->getValue())
+                    hasAbnormalExit = true;
+            }
+            if (hasAbnormalExit)
+                continue;
+            for (auto ballot : ballots)
+                ballot->replaceUsesWith(cast<IRWaveMaskBallot>(ballot)->getMask());
+        }
     }
 
     // Remove every mask value in `m_synthesizedMaskInsts` that no code observes,
