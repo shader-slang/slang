@@ -169,7 +169,6 @@ The RT library's stage interfaces declare their compiler identity with `__magic_
 __magic_type(MissShaderType)
 public interface IMissShader
 {
-    [KnownBuiltin("RayTracingStageContext")]
     associatedtype Context : IPayloadContext;
     static void invoke(in MissInput<Context> input);
 }
@@ -181,20 +180,23 @@ with their associated-type and function requirements. Generic conformances and i
 use ordinary interface lowering and module serialization.
 The five executable stage interfaces and the descriptor handle have dedicated AST classes.
 The descriptor uses `TraceProgramDescriptorType`; it is not a stage interface. Context, primitive,
-input, list, schema, and tracer declarations remain ordinary Slang types. `KnownBuiltin` annotations mark
-only compiler-consumed associated requirements, the five stage-input structs, the shader-list
-containers, and the two built-in primitive attribute models. Preserve these declaration annotations through ordinary serialization;
-do not introduce a special AST class for each supporting library type.
+input, list, schema, and tracer declarations remain ordinary Slang types. `KnownBuiltin` annotations
+identify the five stage-input structs and the three schema section requirements consumed by the
+frontend. The input identifiers support input-use checks; the schema identifiers select the section
+name in duplicate-entry diagnostics. Context members and primitive types use ordinary declarations
+and constraints without unused compiler identifiers. Preserve the retained annotations through
+ordinary serialization; do not introduce a special AST class for each supporting library type.
 
 `isRayTracingBuiltinTypeModifier` permits stage identities on interface declarations and the
 descriptor identity on struct declarations. Both use the existing `DeclRefType::create` construction
 path with one inherited declaration reference, so ordinary substitution and serialization preserve
 their generic arguments. No new AST constructor or IR lowering path is needed for the descriptor.
 
-Write builtin roles by name, for example `[KnownBuiltin("RayTracingStageContext")]`.
+Write builtin roles by name, for example `[KnownBuiltin("RayTracingMissInput")]`.
 During attribute validation, the compiler resolves this spelling to its existing
 `KnownBuiltinDeclName` value and stores the same `ConstantIntVal` used by numeric annotations.
-A shared C++ definition list supplies both the enum and name lookup, preserving the numeric IDs.
+A shared C++ definition list supplies both the enum and name lookup. Retained roles keep their
+numeric IDs; removed roles leave gaps rather than renumbering later entries.
 Unknown names are diagnosed during attribute checking. Existing integer and enum-valued
 annotations remain valid; lowering and serialization continue to use their checked integer values.
 The RT sources need no generated Slang enum or compiler-identifier include. Public trace and

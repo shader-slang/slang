@@ -1306,7 +1306,7 @@ Modifier* SemanticsVisitor::validateAttribute(
                 return nullptr;
             }
 
-            // For example, KnownBuiltin("RayTracingStageContext") stores the same integer ID
+            // For example, KnownBuiltin("RayTracingMissInput") stores the same integer ID
             // as a numeric annotation. Later checks and serialization only need that value.
             knownBuiltinAttr->name =
                 m_astBuilder->getIntVal(m_astBuilder->getIntType(), IntegerLiteralValue(builtin));

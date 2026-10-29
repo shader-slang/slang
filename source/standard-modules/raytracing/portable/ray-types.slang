@@ -336,7 +336,6 @@ public interface IIntersectionPrimitive
     /// This associated type has no conformance constraint. Built-in primitives select their
     /// zero-storage `TriangleData` or `CurveData` view; procedural primitives select the value
     /// type reported by their intersection shader.
-    [KnownBuiltin("RayTracingPrimitiveAttributes")]
     associatedtype Attributes;
 }
 
@@ -370,7 +369,6 @@ public interface ICustomIntersectionPrimitive : IIntersectionPrimitive {}
 ///
 /// @par Constraints
 /// Conforms to `IBuiltinIntersectionPrimitive`, so a matching hit group uses `NoIntersection`.
-[KnownBuiltin("RayTracingTrianglePrimitive")]
 public struct TrianglePrimitive : IBuiltinIntersectionPrimitive
 {
     /// Selects the built-in triangle attribute view for matching hit-stage inputs.
@@ -387,7 +385,6 @@ public struct TrianglePrimitive : IBuiltinIntersectionPrimitive
 /// Conforms to `IBuiltinIntersectionPrimitive`, so a matching hit group uses `NoIntersection`.
 /// Requires Metal library version 3.1 or later.
 [require(metallib_3_1)]
-[KnownBuiltin("RayTracingCurvePrimitive")]
 public struct CurvePrimitive : IBuiltinIntersectionPrimitive
 {
     /// Selects the built-in curve attribute view for matching hit-stage inputs.

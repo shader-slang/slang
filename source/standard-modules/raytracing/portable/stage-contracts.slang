@@ -19,13 +19,9 @@ public interface IClosestHitShader
 {
     /// Defines the payload, primitive, and shader-record types available to this stage.
     ///
-    /// The compiler follows this requirement to collect types for later native stage generation.
-    /// `StageContext` identifies the requirement even if the library renames `Context`.
-    ///
     /// @par Constraints
     /// Must conform to `IHitContext`. A hit group using this shader requires this type to equal
     /// the group's `Context`.
-    [KnownBuiltin("RayTracingStageContext")]
     associatedtype Context : IHitContext;
 
     /// Implements the closest-hit stage selected for the committed hit.
@@ -49,13 +45,9 @@ public interface IAnyHitShader
 {
     /// Defines the payload, primitive, and shader-record types available to this stage.
     ///
-    /// The compiler follows this requirement to collect types for later native stage generation.
-    /// `StageContext` identifies the requirement even if the library renames `Context`.
-    ///
     /// @par Constraints
     /// Must conform to `IHitContext`. A hit group using this shader requires this type to equal
     /// the group's `Context`.
-    [KnownBuiltin("RayTracingStageContext")]
     associatedtype Context : IHitContext;
 
     /// Implements the any-hit stage for an intersection candidate.
@@ -82,13 +74,9 @@ public interface IIntersectionStage
 {
     /// Defines the shared context for procedural or hardware intersection.
     ///
-    /// The compiler follows this requirement to collect types for later native stage generation.
-    /// `StageContext` identifies the requirement even if the library renames `Context`.
-    ///
     /// @par Constraints
     /// Must conform to `IHitContext`. A hit group using this stage requires this type to equal
     /// the group's `Context`.
-    [KnownBuiltin("RayTracingStageContext")]
     associatedtype Context : IHitContext;
 }
 
@@ -133,12 +121,8 @@ public interface IMissShader
 {
     /// Defines the trace payload and shader-record types available to this stage.
     ///
-    /// The compiler follows this requirement to collect types for later native stage generation.
-    /// `StageContext` identifies the requirement even if the library renames `Context`.
-    ///
     /// @par Constraints
     /// Must conform to `IPayloadContext`.
-    [KnownBuiltin("RayTracingStageContext")]
     associatedtype Context : IPayloadContext;
 
     /// Implements the miss stage for a trace that finds no accepted hit.
@@ -161,12 +145,8 @@ public interface ICallableShader
 {
     /// Defines the callable-data and shader-record types available to this stage.
     ///
-    /// The compiler follows this requirement to collect types for later native stage generation.
-    /// `StageContext` identifies the requirement even if the library renames `Context`.
-    ///
     /// @par Constraints
     /// Must conform to `ICallableContext`.
-    [KnownBuiltin("RayTracingStageContext")]
     associatedtype Context : ICallableContext;
 
     /// Implements the callable stage selected by `RayTracer.callShader`.

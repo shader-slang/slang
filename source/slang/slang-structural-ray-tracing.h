@@ -10,40 +10,14 @@ namespace Slang
 class InterfaceDecl;
 class FunctionDeclBase;
 class AggTypeDecl;
-class AssocTypeDecl;
-class GenericTypeConstraintDecl;
 class Decl;
-class ModuleDecl;
-class FuncDecl;
 class Type;
 class ASTBuilder;
-class SubtypeWitness;
-class ConcreteTypePack;
-class TypePackSubtypeWitness;
-class GenericTypeParamDecl;
 class MagicTypeModifier;
 
 /// Allows the ray-tracing stage-interface and descriptor AST types in imported library
 /// declarations.
 bool isRayTracingBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl);
-
-/// Names the concrete entries and matching subtype witnesses encoded by a section-list type.
-///
-/// Concrete lists keep the two packs index-aligned, including two zero-length packs for an empty
-/// list. A list that is still a type parameter or unresolved associated type returns an empty
-/// `types` pack to skip the current duplicate check; this does not prove that the list is empty
-/// or arrange another check after specialization. Callers discover each pack by semantic value
-/// kind rather than operand position.
-struct StructuralRayTracingEntryPack
-{
-    ConcreteTypePack* types = nullptr;
-    TypePackSubtypeWitness* witnesses = nullptr;
-};
-
-/// Decodes the entry and witness packs from a trusted section-list specialization.
-StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
-    ASTBuilder* astBuilder,
-    Type* entryListType);
 
 /// Returns the executable stage represented by the interface's AST type, or Stage::Unknown.
 Stage getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl);

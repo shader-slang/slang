@@ -345,26 +345,22 @@ FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* i
     return nullptr;
 }
 
-StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
+// Returns the checked entry types used by the duplicate-entry diagnostic. The list's conformance
+// witnesses are handled by ordinary conformance checking and are not needed to compare types.
+static ConcreteTypePack* _getStructuralRayTracingEntryTypes(
     ASTBuilder* astBuilder,
     Type* entryListType)
 {
-    StructuralRayTracingEntryPack result;
     if (auto declRefType = as<DeclRefType>(entryListType))
     {
         if (auto genericApp = SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef())
         {
-            // A concrete entry-list specialization has a type pack and a matching conformance-
-            // witness pack, both empty for an empty list. Select them by semantic role instead of
-            // relying on their positions among the generic arguments. Both IR lowering and
-            // reflection consume this exact checked representation.
+            // Select the type pack by its semantic kind, independently of the positions of the
+            // generic arguments. An empty list already has a zero-length type pack.
             for (auto argument : genericApp->getArgs())
             {
-                auto resolvedArgument = argument->resolve();
-                if (auto typePack = as<ConcreteTypePack>(resolvedArgument))
-                    result.types = typePack;
-                else if (auto witnessPack = as<TypePackSubtypeWitness>(resolvedArgument))
-                    result.witnesses = witnessPack;
+                if (auto typePack = as<ConcreteTypePack>(argument->resolve()))
+                    return typePack;
             }
         }
     }
@@ -381,11 +377,7 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     // A list such as MissShaderList<T> already has an enumerable pack, even if T is generic.
     // TODO: Check duplicates after specialization too. This fallback does not schedule a later
     // check; Schema<MissShaderList<M, M>> currently passes this declaration-time restriction.
-    if (!result.types)
-        result.types = astBuilder->getTypePack(ArrayView<Type*>());
-    SLANG_RELEASE_ASSERT(
-        !result.witnesses || result.witnesses->getCount() == result.types->getTypeCount());
-    return result;
+    return astBuilder->getTypePack(ArrayView<Type*>());
 }
 
 // Checks the selected native entry signature, including aliases and closed generic arguments.
@@ -650,11 +642,11 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
     // Canonical AST identity makes aliases name the same entry without reconstructing or
     // structurally comparing types here.
     auto entries =
-        getStructuralRayTracingEntryPack(getASTBuilder(), entryListType->getCanonicalType());
+        _getStructuralRayTracingEntryTypes(getASTBuilder(), entryListType->getCanonicalType());
     HashSet<Type*> seenEntries;
-    for (Index i = 0; i < entries.types->getTypeCount(); ++i)
+    for (Index i = 0; i < entries->getTypeCount(); ++i)
     {
-        auto entryType = entries.types->getElementType(i)->getCanonicalType();
+        auto entryType = entries->getElementType(i)->getCanonicalType();
         if (seenEntries.add(entryType))
             continue;
 
