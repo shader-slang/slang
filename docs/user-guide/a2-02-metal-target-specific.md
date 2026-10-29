@@ -276,23 +276,31 @@ The Metal Shading Language limits 64-bit integer atomics to a min or max that
 returns `void`: `atomic_min_explicit` and `atomic_max_explicit` on a device
 `atomic_ulong` with `memory_order_relaxed`, and the `atomic_min` and
 `atomic_max` members of a `ulong` texture. Slang emits those forms for a
-`uint64_t` min or max on device memory or a texture whose original value is not
-used:
+`uint64_t` min or max with relaxed memory order on device memory or a texture,
+when the original value of the destination is not used:
 
 ```slang
 RWStructuredBuffer<uint64_t> buffer;
 
-InterlockedMin(buffer[i], key);      // atomic_min_explicit(..., memory_order_relaxed);
+InterlockedMin(buffer[i], key);           // atomic_min_explicit(..., memory_order_relaxed);
 uint64_t original;
-InterlockedMax(buffer[i], key, original);
-buffer[j] = original;                // error 55204: the original value is used
+InterlockedMax(buffer[i], key, original); // error E55204: `original` is read below
+buffer[j] = original;
 ```
 
+Slang decides whether the original value is used after its own optimizations,
+so an `original_value` argument that is never read normally counts as unused.
+With `-g` and `-minimum-slang-optimization`, Slang keeps that variable and the
+call reports error E55204; the two-argument `InterlockedMin(dest, value)` form
+does not have this limit.
+
 Every other 64-bit integer atomic, including any `int64_t` atomic, a
-`groupshared` destination, and `Atomic<uint64_t>` methods other than `min`,
-`max`, `reduceMin` and `reduceMax`, is reported as error 55204. Apple GPUs run
-the 64-bit min and max only on some GPU families; see the Metal Feature Set
-Tables.
+`groupshared` destination, a memory order other than `MemoryOrder.Relaxed`, and
+`Atomic<uint64_t>` methods other than `min`, `max`, `reduceMin` and
+`reduceMax`, is reported as error E55204. Apple GPUs run the 64-bit min and max
+only on some GPU families (see the Metal Feature Set Tables). Slang does not
+check the GPU family, so on other GPUs the failure comes from Metal, not from
+Slang.
 
 ## Conservative Rasterization
 

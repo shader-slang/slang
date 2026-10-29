@@ -12744,6 +12744,9 @@ $}
 /// `RWByteAddressBuffer.InterlockedAddF32` or `RWByteAddressBuffer.InterlockedAddF16` instead when NVAPI is available.
 /// On SPIR-V (Vulkan), all integer and floating point types are supported.
 /// On Metal and WGSL, all floating-point types are not supported.
+/// On Metal, a 64-bit integer `T` is supported only by `InterlockedMin` and `InterlockedMax` on an
+/// unsigned type in device memory or a texture, when `original_value` is not used; any other
+/// 64-bit integer use reports error E55204.
 /// @category atomic Atomic functions
 [ForceInline]
 __glsl_version(430)
@@ -12784,7 +12787,8 @@ $}
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, all floating-point types are not supported.
+/// On Metal and WGSL, all floating-point types are not supported. On Metal, 64-bit integer types
+/// are not supported either and report error E55204.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
