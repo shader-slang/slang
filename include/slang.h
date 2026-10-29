@@ -3851,6 +3851,11 @@ struct ShaderReflection
         return spReflection_getGlobalConstantBufferSize((SlangReflection*)this);
     }
 
+    /** Find a type by its name.
+
+        An interface name such as `IFoo` identifies the interface contract. Use `dyn IFoo` to
+        look up its existential-box type.
+    */
     TypeReflection* findTypeByName(const char* name)
     {
         return (TypeReflection*)spReflection_FindTypeByName((SlangReflection*)this, name);
@@ -3887,6 +3892,11 @@ struct ShaderReflection
             name);
     }
 
+    /** Get the layout of `type`.
+
+        Interface types follow the conversion rules described by `ISession::getTypeLayout`.
+        Returns null if `type` cannot be used as a data type. This form does not return diagnostics.
+    */
     TypeLayoutReflection* getTypeLayout(
         TypeReflection* type,
         LayoutRules rules = LayoutRules::Default)
@@ -4704,7 +4714,12 @@ struct ISession : public ISlangUnknown
         ISlangBlob** outDiagnostics = nullptr) = 0;
 
 
-    /** Get the layout `type` on the chosen `target`.
+    /** Get the layout of `type` on the chosen target.
+
+        For an interface `IFoo`, versions before Slang 202c compute the layout of `dyn IFoo`.
+        Slang 202c requires `type` to name the existential-box type explicitly.
+        Returns null if `type` cannot be used as a data type, with diagnostics in
+        `outDiagnostics` when requested.
      */
     virtual SLANG_NO_THROW TypeLayoutReflection* SLANG_MCALL getTypeLayout(
         TypeReflection* type,
@@ -4714,6 +4729,10 @@ struct ISession : public ISlangUnknown
 
     /** Get a container type from `elementType`. For example, given type `T`, returns
         a type that represents `StructuredBuffer<T>`.
+
+        Uses the same interface conversion rules for `elementType` as `getTypeLayout`.
+        Returns null with diagnostics in `outDiagnostics` when a data type cannot be formed.
+        For `ContainerType::None`, returns `elementType` unchanged without conversion.
 
         @param `elementType`: the element type to wrap around.
         @param `containerType`: the type of the container to wrap `elementType` in.
@@ -4731,11 +4750,17 @@ struct ISession : public ISlangUnknown
     virtual SLANG_NO_THROW TypeReflection* SLANG_MCALL getDynamicType() = 0;
 
     /** Get the mangled name for a type RTTI object.
+
+        For an existential-box type `dyn IFoo`, returns the same name as for its enclosed
+        interface `IFoo`.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getTypeRTTIMangledName(TypeReflection* type, ISlangBlob** outNameBlob) = 0;
 
     /** Get the mangled name for a type witness.
+
+        An existential-box `interfaceType`, such as `dyn IFoo`, selects its enclosed interface
+        `IFoo`. The `type` argument still identifies the conforming type.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessMangledName(
         TypeReflection* type,
@@ -4743,7 +4768,10 @@ struct ISession : public ISlangUnknown
         ISlangBlob** outNameBlob) = 0;
 
     /** Get the sequential ID used to identify a type witness in a dynamic object.
+
         The sequential ID is part of the RTTI bytes returned by `getDynamicObjectRTTIBytes`.
+        An existential-box `interfaceType` selects its enclosed interface, as in
+        `getTypeConformanceWitnessMangledName`.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
         slang::TypeReflection* type,
