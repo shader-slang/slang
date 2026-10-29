@@ -3054,7 +3054,14 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         if (isFloatingType(inst->getDataType()))
         {
-            _requireGLSLExtension(toSlice("GL_EXT_shader_atomic_float"));
+            // GL_EXT_shader_atomic_float defines the 32/64-bit float atomics other than min/max;
+            // float min/max and every 16-bit float atomic are in GL_EXT_shader_atomic_float2.
+            const bool isMinMax =
+                inst->getOp() == kIROp_AtomicMin || inst->getOp() == kIROp_AtomicMax;
+            if (isMinMax || inst->getDataType()->getOp() == kIROp_HalfType)
+                _requireGLSLExtension(toSlice("GL_EXT_shader_atomic_float2"));
+            else
+                _requireGLSLExtension(toSlice("GL_EXT_shader_atomic_float"));
         }
         if (isIntegralType(inst->getDataType()))
         {
