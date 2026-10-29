@@ -74,8 +74,6 @@ void applyExternCppStructFieldNames(IRModule* module)
             usedNames.add(String(name));
         }
 
-        // The remaining fields get their name hint, without a leading `$`, plus a number that no
-        // other member of the struct uses.
         for (auto key : keysToNumber)
         {
             auto name = key->findDecoration<IRNameHintDecoration>()->getName();
