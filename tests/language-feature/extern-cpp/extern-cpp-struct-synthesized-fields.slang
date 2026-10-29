@@ -4,20 +4,22 @@
 
 // A field of an `__extern_cpp` struct keeps its source name in C++ and CUDA
 // output (https://github.com/shader-slang/slang/issues/14028). The backing
-// storage that the checker synthesizes for bitfields has no source name, so it
-// keeps a generated name: its `$`-prefixed internal name is not valid C++.
+// storage that the checker synthesizes for bitfields has no source name, and its
+// `$`-prefixed internal name is not valid C++, so it gets that name without the
+// `$` plus a number that no other member uses.
 // Under `-obfuscate` the fields keep their hashed names.
 
 //CHECK: struct Packed
 //CHECK-NEXT: {
-//CHECK-NOT: $
-//CHECK: bit_field_backing
+//CHECK-NEXT: bit_field_backing_0_1;
 //CHECK-NEXT: float c;
+//CHECK-NEXT: float bit_field_backing_0_0;
 //CHECK-NEXT: };
 
 //OBF: struct _Sh{{[0-9A-F]+}}
 //OBF-NEXT: {
 //OBF-NEXT: uint32_t _Sh{{[0-9A-F]+}};
+//OBF-NEXT: float _Sh{{[0-9A-F]+}};
 //OBF-NEXT: float _Sh{{[0-9A-F]+}};
 //OBF-NEXT: };
 
@@ -26,9 +28,9 @@ __extern_cpp struct Packed
     uint a : 3;
     uint b : 5;
     float c;
+    float bit_field_backing_0_0;
 }
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
