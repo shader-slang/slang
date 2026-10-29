@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=GENERIC): -experimental-feature -entry MyHit<ExternalContext> -stage closesthit -dump-ir -no-codegen
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -entry HitWithExternalContext -stage closesthit -dump-ir -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 // Another module supplies this context's payload, record, and primitive at link time.
 // Selecting MyHit<ExternalContext> must preserve the unresolved conformance in IR;

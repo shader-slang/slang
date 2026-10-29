@@ -4,7 +4,7 @@
 //TEST:SIMPLE: -experimental-feature -entry Miss -stage miss -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry Callable -stage callable -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

@@ -8,7 +8,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=ENTRY): -experimental-feature -entry TestClosestHit -target hlsl -no-codegen
 //ENTRY: error[E36107]: unavailable features in entry point
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

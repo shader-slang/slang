@@ -1,6 +1,6 @@
 //TEST:SIMPLE: -experimental-feature -entry main -stage compute -target hlsl -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestTraceContext : rt::ITraceContext
 {

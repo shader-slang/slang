@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -target metal -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct PortableTraceContext : rt::ITraceContext
 {

@@ -2,7 +2,7 @@
 
 // Importing the module makes its declarations available without selecting the structural API.
 // Importing the structural library leaves this ordinary native entry signature valid.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 [shader("miss")]
 void legacyMiss() {}

@@ -1,7 +1,7 @@
 //TEST:SIMPLE: -experimental-feature -entry ExtraBound -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry RefinedPayloadBound -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 import magic_stage_library;
 
 interface IExtra {}

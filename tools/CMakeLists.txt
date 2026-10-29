@@ -121,7 +121,7 @@ generator(slang-generate USE_FEWER_WARNINGS)
 # Evaluate module-local Slang templates against compiler enum values. The resulting sources are
 # ordinary module files; generating them does not require a special compiler mode or core import.
 set(standard_module_meta_source
-    "${slang_SOURCE_DIR}/source/standard-modules/raytracing/raytracing-builtins.meta.slang"
+    "${slang_SOURCE_DIR}/source/standard-modules/raytracing/portable/raytracing-builtins.meta.slang"
 )
 set(standard_module_meta_output_dir
     "${CMAKE_CURRENT_BINARY_DIR}/standard-module-meta"
@@ -398,7 +398,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     add_dependencies(
         slang-test
         slang-neural-module
-        slang-raytracing-module
+        slang-portable-raytracing-module
         slang-workgraph-module
     )
     add_dependencies(slang-test slang-numerics-modules)

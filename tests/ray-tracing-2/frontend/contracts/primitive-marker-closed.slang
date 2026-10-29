@@ -1,10 +1,10 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -target hlsl -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct FakePrimitive : rt::IIntersectionPrimitive
-//CHECK:                   ^^^^^^^^^^^^^^^^^^^^^^ cannot inherit from type 'rt.IIntersectionPrimitive' marked 'sealed' in module 'raytracing'
+//CHECK:                   ^^^^^^^^^^^^^^^^^^^^^^ cannot inherit from type 'rt.IIntersectionPrimitive' marked 'sealed' in module 'portable'
 {
     typealias Attributes = float2;
 }

@@ -11,7 +11,7 @@
 // CHECK: output_{{[0-9]+}}[int(0)] = FieldMiss_read_
 // CHECK: output_{{[0-9]+}}[int(1)] = {{.*}}.state_{{[0-9]+}} + {{.*}}.state_
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

@@ -7,7 +7,7 @@
 
 #pragma warning(disable: 38040)
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

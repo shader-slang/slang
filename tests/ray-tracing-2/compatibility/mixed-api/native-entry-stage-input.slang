@@ -4,7 +4,7 @@
 //TEST:COMPILE: tests/ray-tracing-2/compatibility/mixed-api/native-entry-stage-input.slang -experimental-feature -DUNANNOTATED -o tests/ray-tracing-2/compatibility/mixed-api/native-entry-stage-input-cache.slang-module
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=SERIALIZED): -experimental-feature tests/ray-tracing-2/compatibility/mixed-api/native-entry-stage-input-cache.slang-module -entry nativeClosestHit -stage closesthit -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload {}
 

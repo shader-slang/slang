@@ -2,7 +2,7 @@
 // calls its static invoke function and does not supply an object containing those fields.
 //TEST:SIMPLE: -experimental-feature -entry main -stage raygeneration -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload
 {

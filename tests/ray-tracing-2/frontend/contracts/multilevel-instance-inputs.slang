@@ -4,7 +4,7 @@
 
 // All three hit stages can inspect the actual instance path. These checks cover only the
 // declarations; Metal must synthesize the count and per-level identifiers in a following PR.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload
 {

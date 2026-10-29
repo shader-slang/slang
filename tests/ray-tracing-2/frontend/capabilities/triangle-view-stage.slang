@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -experimental-feature -entry main -target metal -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 RWStructuredBuffer<uint> output;
 

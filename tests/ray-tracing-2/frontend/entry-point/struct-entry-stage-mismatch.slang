@@ -3,7 +3,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=COMPUTE): -experimental-feature -entry ClosestHit -stage compute -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=RAYGEN): -experimental-feature -entry ClosestHit -stage raygeneration -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

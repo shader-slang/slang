@@ -1,7 +1,7 @@
 // A field-bearing stage is a valid entry point. Dispatch calls its static function with input.
 //TEST:SIMPLE: -experimental-feature -entry ClosestHit -stage closesthit -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

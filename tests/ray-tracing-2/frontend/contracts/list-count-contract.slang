@@ -13,7 +13,7 @@
 //NONEMPTY-DAG: return int(2);
 //NONEMPTY-DAG: return int(3);
 //NONEMPTY-DAG: return int(3);
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

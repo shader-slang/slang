@@ -5,7 +5,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CLOSEST_METAL): -experimental-feature -entry CurveClosestHit -stage closesthit -target metal -capability metallib_3_0 -restrictive-capability-check -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=ANY_METAL): -experimental-feature -entry CurveAnyHit -stage anyhit -target metal -capability metallib_3_0 -restrictive-capability-check -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

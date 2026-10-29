@@ -5,7 +5,7 @@
 //CHECK: error[E361
 //CHECK: error[E361
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestTraceContext : rt::ITraceContext
 {

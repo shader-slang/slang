@@ -3,7 +3,7 @@
 //TEST:SIMPLE: -experimental-feature -entry DualStage -stage callable -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry SharedInvoke -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 import magic_stage_library;
 import magic_stage_secondary_library;
 

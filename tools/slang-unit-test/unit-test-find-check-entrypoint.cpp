@@ -97,7 +97,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointLookupIsModuleLocal)
     auto importingModule = session->loadModuleFromSourceString(
         "StructuralImporter",
         "StructuralImporter.slang",
-        "import slang.raytracing;",
+        "import slang.raytracing.portable;",
         diagnostics.writeRef());
     SLANG_CHECK_ABORT(importingModule != nullptr);
 

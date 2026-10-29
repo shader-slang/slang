@@ -2,7 +2,7 @@
 // Re-enable when https://github.com/shader-slang/slang/issues/13579 is fixed.
 //DISABLE_DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5 -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload
 {

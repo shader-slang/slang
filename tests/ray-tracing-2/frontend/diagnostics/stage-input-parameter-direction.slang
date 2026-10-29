@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry ClosestHitStage -stage closesthit -target hlsl -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry ClosestHitStage -stage closesthit -target metal -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct PayloadData {}
 struct MaterialRecord {}

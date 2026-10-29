@@ -15,7 +15,7 @@
 //TWO-DAG: return 2U;
 //TWO-DAG: return 2U;
 //TWO-DAG: return 2U;
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

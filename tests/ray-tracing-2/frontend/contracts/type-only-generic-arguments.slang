@@ -1,7 +1,7 @@
 //TEST:SIMPLE: -experimental-feature -ignore-capabilities -entry main -stage compute -target hlsl -no-codegen
 //TEST:SIMPLE: -experimental-feature -ignore-capabilities -entry main -stage compute -target metal -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload
 {

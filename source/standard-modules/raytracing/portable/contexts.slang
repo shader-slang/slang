@@ -1,4 +1,4 @@
-implementing raytracing;
+implementing portable;
 
 namespace rt
 {

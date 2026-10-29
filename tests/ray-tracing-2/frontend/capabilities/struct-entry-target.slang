@@ -5,7 +5,7 @@
 //TEST:SIMPLE: -experimental-feature -entry GenericMiss<MissContext> -stage miss -target hlsl -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry GenericMiss<MetalContext> -stage miss -target metal -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

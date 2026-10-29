@@ -9,7 +9,7 @@
 //TEST:SIMPLE: -experimental-feature -entry nativeStagePayload -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry nativeOrdinaryResource -stage closesthit -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

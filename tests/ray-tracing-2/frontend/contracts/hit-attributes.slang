@@ -5,7 +5,7 @@
 //TEST:SIMPLE: -experimental-feature -entry TriangleClosestHit -stage closesthit -target metal -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry TriangleAnyHit -stage anyhit -target metal -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

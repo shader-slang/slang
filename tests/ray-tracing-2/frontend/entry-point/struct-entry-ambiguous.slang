@@ -5,7 +5,7 @@
 //TEST:SIMPLE: -experimental-feature -entry MultiStage.invoke -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry MultiStage.invoke -stage anyhit -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

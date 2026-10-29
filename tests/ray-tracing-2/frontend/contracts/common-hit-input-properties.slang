@@ -10,7 +10,7 @@
 // Each concrete view must keep its native stage contract when using the generic extension.
 // Object/world transforms must also be available with direct primitive-AS traversal and with
 // multilevel instancing. These frontend checks do not exercise Metal's pending adapter synthesis.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload
 {

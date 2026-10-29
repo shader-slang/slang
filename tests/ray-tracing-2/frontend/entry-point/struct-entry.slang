@@ -18,7 +18,7 @@
 // IR-NEXT: param {{.*}} : specialize({{.*}})):
 // IR-NEXT: let
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 RWStructuredBuffer<uint> outputBuffer;
 

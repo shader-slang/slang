@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -experimental-feature -dump-ir -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 // Stage identity is checked in the AST. All five contracts lower to ordinary IR interfaces.
 // CHECK-DAG: let %rtx5FIClosestHitShader{{.*}}= interface(

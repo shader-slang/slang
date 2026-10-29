@@ -5,7 +5,7 @@
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -r tests/ray-tracing-2/frontend/module/magic-first-stage-cache.slang-module -r tests/ray-tracing-2/frontend/module/magic-second-stage-cache.slang-module -entry FirstMiss<Payload> -dump-ir -no-codegen
 //TEST:SIMPLE: -experimental-feature -r tests/ray-tracing-2/frontend/module/magic-first-stage-cache.slang-module -r tests/ray-tracing-2/frontend/module/magic-second-stage-cache.slang-module -entry SecondMiss -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 import magic_stage_library;
 import magic_stage_secondary_library;
 

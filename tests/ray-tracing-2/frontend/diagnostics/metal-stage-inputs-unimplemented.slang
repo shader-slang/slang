@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=HLSL): -experimental-feature -target hlsl -whole-program
 //DIAGNOSTIC_TEST:SIMPLE(diag=CUDA): -experimental-feature -target cuda -whole-program -DTEST_CUDA_PENDING_INPUTS=1
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

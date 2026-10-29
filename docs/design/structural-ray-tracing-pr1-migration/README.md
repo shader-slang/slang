@@ -4,7 +4,7 @@ This report describes the changes the full implementation and demos need to adop
 [PR1](https://github.com/kaizhangNV/slang/pull/24).
 
 Reference: the current PR1 source and the shared-table design documented in this report and
-the accompanying source comments. Updated on 2026-10-20. The full implementation comparison point
+the accompanying source comments. Updated on 2026-10-29. The full implementation comparison point
 is `f96ab27c0` from [PR #12691](https://github.com/shader-slang/slang/pull/12691). The shared Metal
 layout is agreed design; its backend implementation is deferred.
 
@@ -165,7 +165,7 @@ its constraint interface directly incorrectly imposed miss/callable requirements
 The RT library's stage interfaces declare their compiler identity with `__magic_type`, for example:
 
 ```slang
-// Inside slang.raytracing, in namespace rt:
+// Inside slang.raytracing.portable, in namespace rt:
 __magic_type(MissShaderType)
 public interface IMissShader
 {
@@ -532,13 +532,32 @@ do not impose an API-family restriction. The independent input-use, stage and ca
 still apply. Native stage adapters, descriptor layout and Metal dispatch remain backend work for
 a later PR.
 
-## 9. Load RT as an optional builtin module
+## 9. Package the portable RT module and load it explicitly
+
+Application shaders import the portable API explicitly:
+
+```slang
+import slang.raytracing.portable;
+```
+
+The API types remain in namespace `rt`, so names such as `rt::MissInput` and
+`rt::RayTracer` do not change. The module sources live under
+`source/standard-modules/raytracing/portable/`: `portable.slang` declares `module portable`,
+and its source parts use `implementing portable`. The parent ray-tracing CMake directory adds
+this portable subdirectory.
+
+The `slang-portable-raytracing-module` target compiles the module and packages its source files
+and generated builtin identifiers under the `slang/raytracing` import directory. The saved module
+is `slang/raytracing/portable.slang-module`. Both source and serialized imports use the same
+`slang.raytracing.portable` name and require the existing experimental-feature flag.
+
+### Optional builtin ownership
 
 **Status: agreed design; global-session loading and caching are not yet implemented.**
 
 Compile the RT library separately from core so it does not increase core compilation time. Load
-it only on the first `import slang.raytracing`, and reuse the loaded module for subsequent imports
-in the same global session. An application that does not import RT should not load it.
+it only on the first `import slang.raytracing.portable`, and reuse the loaded module for subsequent
+imports in the same global session. An application that does not import RT should not load it.
 
 The global session should own the RT declarations, as it owns the other builtin declarations.
 The existing builtin-registration machinery can then store them with the correct lifetime.
@@ -685,10 +704,10 @@ table does not itself require that restriction.
 
 ## References
 
-- [Program schemas and explicit lists](../../../source/standard-modules/raytracing/program-schema.slang)
-- [Opaque descriptor and logical SBT layout](../../../source/standard-modules/raytracing/descriptor.slang)
-- [Stage inputs](../../../source/standard-modules/raytracing/stage-inputs.slang)
-- [Ray, primitive, and acceleration-structure types](../../../source/standard-modules/raytracing/ray-types.slang)
+- [Program schemas and explicit lists](../../../source/standard-modules/raytracing/portable/program-schema.slang)
+- [Opaque descriptor and logical SBT layout](../../../source/standard-modules/raytracing/portable/descriptor.slang)
+- [Stage inputs](../../../source/standard-modules/raytracing/portable/stage-inputs.slang)
+- [Ray, primitive, and acceleration-structure types](../../../source/standard-modules/raytracing/portable/ray-types.slang)
 - [PR1 contract tests](../../../tests/ray-tracing-2/frontend/contracts)
 
 The full proposal is in the PR #12691 checkout at

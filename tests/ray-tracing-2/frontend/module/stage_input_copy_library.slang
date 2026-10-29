@@ -1,4 +1,4 @@
-import slang.raytracing;
+import slang.raytracing.portable;
 
 namespace input_copy
 {

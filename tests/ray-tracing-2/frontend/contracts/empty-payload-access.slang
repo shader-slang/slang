@@ -1,7 +1,7 @@
 //TEST:SIMPLE: -experimental-feature -entry Miss -stage miss -target hlsl -profile sm_6_5 -no-codegen
 
 // Empty payloads are ordinary source values; target legalization owns their physical storage.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct EmptyPayload
 {}

@@ -2,7 +2,7 @@
 
 module descriptor_library;
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 namespace descriptors
 {

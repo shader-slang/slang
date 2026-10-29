@@ -2,7 +2,7 @@
 
 // A structural stage and its caller can use both the public trace wrapper and native TraceRay.
 // Calling a tracing function does not introduce a second shader declaration model.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload
 {

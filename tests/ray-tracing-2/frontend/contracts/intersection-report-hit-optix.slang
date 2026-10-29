@@ -4,7 +4,7 @@
 // that both structural `reportHit` overloads resolve for an OptiX intersection stage. Target tests
 // will verify their later lowering to `optixReportIntersection` once adapters are enabled.
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload {}
 struct Record {}

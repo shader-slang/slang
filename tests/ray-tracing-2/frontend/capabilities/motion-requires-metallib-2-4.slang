@@ -2,7 +2,7 @@
 
 // Selecting PrimitiveMotion makes the trace operation require metallib_2_4. Compiling its caller
 // for metallib_2_3 must fail capability checking even though the schema contains no hit groups.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload
 {

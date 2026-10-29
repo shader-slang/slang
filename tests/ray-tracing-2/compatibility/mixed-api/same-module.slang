@@ -7,7 +7,7 @@
 // native [shader("miss")] entry point in the same module. Each has its own valid signature.
 // Explicit native selection, automatic discovery, and structural selection must all succeed.
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

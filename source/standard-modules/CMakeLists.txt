@@ -82,5 +82,5 @@ add_subdirectory(numerics)
 # Build the experimental functional module.
 add_subdirectory(functional)
 
-# Build the structural ray-tracing module.
+# Build the portable ray-tracing module.
 add_subdirectory(raytracing)

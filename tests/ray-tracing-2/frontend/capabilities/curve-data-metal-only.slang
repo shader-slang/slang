@@ -2,7 +2,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=METAL): -experimental-feature -entry main -target metal -capability metallib_3_0 -restrictive-capability-check -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry main -target metal -capability metallib_3_1 -restrictive-capability-check -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 // Direct use of the view must preserve its target/version requirement independently of a stage
 // context's CurvePrimitive requirement. No property access or structural entry selection is needed.

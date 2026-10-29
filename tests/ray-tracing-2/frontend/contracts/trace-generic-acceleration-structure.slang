@@ -10,7 +10,7 @@
 // A generic helper should be able to trace the acceleration structure chosen by its caller.
 // Both trace overloads must resolve while A is still generic; the helper does not need to
 // constrain A to the native or multilevel handle family. Test every supported motion mode.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload
 {

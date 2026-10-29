@@ -5,7 +5,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CONSTRUCTOR): -experimental-feature -ignore-capabilities -no-codegen -DTEST_CONSTRUCTOR
 //DIAGNOSTIC_TEST:SIMPLE(diag=NONE): -experimental-feature -ignore-capabilities -no-codegen -DTEST_NONE
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 [raypayload]
 struct InvalidPayload

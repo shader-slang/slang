@@ -1,4 +1,4 @@
-implementing raytracing;
+implementing portable;
 
 // Generated from the compiler's KnownBuiltinDeclName values. These annotations identify library
 // declarations that the compiler uses when preparing types for backend code generation. For

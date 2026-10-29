@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 /*CHECK:
-       ^^^^^ 'slang/raytracing' is an experimental module, need to enable '-experimental-feature' to load this module
+       ^^^^^ 'slang/raytracing/portable' is an experimental module, need to enable '-experimental-feature' to load this module
 */

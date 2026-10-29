@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=HLSL): -experimental-feature -ignore-capabilities -entry main -stage compute -target hlsl
 // HLSL: void main()
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestTraceContext : rt::ITraceContext
 {

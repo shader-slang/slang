@@ -9,7 +9,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -experimental-feature -r tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module -DTEST_STATIC -no-codegen
 //TEST:SIMPLE_EX(filecheck=CHECK): -experimental-feature -lang glsl tests/ray-tracing-2/frontend/module/intrinsic-descriptor.slang -r tests/ray-tracing-2/frontend/module/descriptor-cache.slang-module -entry main -stage compute -dump-ir -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 import descriptor_library;
 
 // A distinct cache filename keeps the first runs on source imports of the application helper.

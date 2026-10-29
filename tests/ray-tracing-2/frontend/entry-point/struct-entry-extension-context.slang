@@ -1,6 +1,6 @@
 //TEST:SIMPLE: -experimental-feature -entry ClosestHit -stage closesthit -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload
 {

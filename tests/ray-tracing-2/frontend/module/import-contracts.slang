@@ -2,7 +2,7 @@
 // HLSL: void main()
 //TEST:SIMPLE: -experimental-feature -entry main -stage compute -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

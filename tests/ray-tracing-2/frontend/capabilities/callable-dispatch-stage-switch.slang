@@ -1,6 +1,6 @@
 //TEST:SIMPLE: -experimental-feature -entry AnyHit -target hlsl -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 // The helper dispatches a callable only in its closest-hit branch. Capability inference preserves
 // the stage switch, so sharing this helper with an any-hit stage is valid. A source call graph that

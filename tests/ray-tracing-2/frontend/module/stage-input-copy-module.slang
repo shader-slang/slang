@@ -2,7 +2,7 @@
 //TEST:COMPILE: tests/ray-tracing-2/frontend/module/stage_input_copy_library.slang -experimental-feature -o tests/ray-tracing-2/frontend/module/stage-input-copy-cache.slang-module
 //TEST:SIMPLE: -experimental-feature -r tests/ray-tracing-2/frontend/module/stage-input-copy-cache.slang-module -entry Miss -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 import stage_input_copy_library;
 
 // The helper copies the stage input in its body. Both source and serialized imports must retain

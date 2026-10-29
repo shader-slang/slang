@@ -2,7 +2,7 @@
 
 module refined_miss_library;
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 public struct RefinedTraceContext : rt::ITraceContext
 {

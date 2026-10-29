@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -target hlsl -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct PayloadData
 {
@@ -24,7 +24,7 @@ struct HitContext : rt::IHitContext
 }
 
 struct FakeNoIntersection : rt::IIntersectionStage
-//CHECK:                        ^^^^^^^^^^^^^^^^^^ cannot inherit from type 'rt.IIntersectionStage' marked 'sealed' in module 'raytracing'
+//CHECK:                        ^^^^^^^^^^^^^^^^^^ cannot inherit from type 'rt.IIntersectionStage' marked 'sealed' in module 'portable'
 {
     typealias Context = HitContext;
     static void invoke(rt::IntersectionInput<HitContext> input) {}

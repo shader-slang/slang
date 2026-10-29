@@ -5,7 +5,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR): -experimental-feature -entry ValueMiss<1.5> -stage miss -no-codegen -warnings-as-errors all
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR): -experimental-feature -entry ValueMiss<1.5>.invoke -stage miss -no-codegen -warnings-as-errors all
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct P {}
 struct R {}

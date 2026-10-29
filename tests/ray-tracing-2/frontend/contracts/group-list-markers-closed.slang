@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -target hlsl -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct PayloadData
 {
@@ -15,19 +15,19 @@ struct MyTraceContext : rt::ITraceContext
 }
 
 struct FakeHitGroups : rt::IHitGroupList
-//CHECK:                   ^^^^^^^^^^^^^ cannot inherit from type 'rt.IHitGroupList' marked 'sealed' in module 'raytracing'
+//CHECK:                   ^^^^^^^^^^^^^ cannot inherit from type 'rt.IHitGroupList' marked 'sealed' in module 'portable'
 {
     static const int count = 1;
 }
 
 struct FakeMissShaders : rt::IMissShaderList
-//CHECK:                     ^^^^^^^^^^^^^^^ cannot inherit from type 'rt.IMissShaderList' marked 'sealed' in module 'raytracing'
+//CHECK:                     ^^^^^^^^^^^^^^^ cannot inherit from type 'rt.IMissShaderList' marked 'sealed' in module 'portable'
 {
     static const int count = 1;
 }
 
 struct FakeCallableShaders : rt::ICallableShaderList
-//CHECK:                         ^^^^^^^^^^^^^^^^^^^ cannot inherit from type 'rt.ICallableShaderList' marked 'sealed' in module 'raytracing'
+//CHECK:                         ^^^^^^^^^^^^^^^^^^^ cannot inherit from type 'rt.ICallableShaderList' marked 'sealed' in module 'portable'
 {
     static const int count = 1;
 }

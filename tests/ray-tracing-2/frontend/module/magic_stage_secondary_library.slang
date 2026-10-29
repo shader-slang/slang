@@ -2,7 +2,7 @@
 
 module magic_stage_secondary_library;
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 namespace second
 {

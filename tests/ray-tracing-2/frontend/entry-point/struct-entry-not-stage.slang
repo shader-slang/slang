@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry NotAStage -stage closesthit -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct NotAStage
 /*CHECK:

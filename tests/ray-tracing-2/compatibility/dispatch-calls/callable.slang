@@ -2,7 +2,7 @@
 
 // A structural stage can call a helper that uses the native CallShader function.
 // The helper is an ordinary function; it does not declare a native callable shader.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload
 {

@@ -2,7 +2,7 @@
 //TEST:COMPILE: tests/ray-tracing-2/frontend/module/refined_miss_library.slang -experimental-feature -o tests/ray-tracing-2/frontend/module/refined-miss-invoke-cache.slang-module
 //TEST:SIMPLE: -experimental-feature -r tests/ray-tracing-2/frontend/module/refined-miss-invoke-cache.slang-module -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 import refined_miss_library;
 
 // The serialized file has a different name from the imported module so the first run always

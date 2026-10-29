@@ -3,7 +3,7 @@
 //TEST:SIMPLE: -experimental-feature -entry DefaultClosestHit -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry DefaultClosestHit.invoke -stage closesthit -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 RWStructuredBuffer<uint> outputBuffer;
 

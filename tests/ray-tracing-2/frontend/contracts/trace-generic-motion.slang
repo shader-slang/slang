@@ -14,7 +14,7 @@
 // The helper needs to know only that motion is enabled. Selecting a concrete motion type
 // at the call site must still enforce that type's target and Metal version requirements.
 // Library-definition notes have no source location, so the target-error runs are non-exhaustive.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 void traceEnabled<Schema : rt::ITraceProgramSchema, Payload>(
     Schema.TraceContext.AccelerationStructure scene,

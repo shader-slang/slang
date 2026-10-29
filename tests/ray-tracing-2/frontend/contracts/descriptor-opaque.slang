@@ -4,7 +4,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=INITIALIZER): -experimental-feature -entry main -stage compute -target hlsl -DTEST_INITIALIZER
 //DIAGNOSTIC_TEST:SIMPLE(diag=OPTIONAL): -experimental-feature -entry main -stage compute -target hlsl -DTEST_OPTIONAL
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestTraceContext : rt::ITraceContext
 {

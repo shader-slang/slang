@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=PAYLOAD): -experimental-feature -target cuda -whole-program
 //DIAGNOSTIC_TEST:SIMPLE(diag=NO_PAYLOAD): -experimental-feature -target cuda -whole-program -DTEST_NO_PAYLOAD
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 // An exported generic helper reaches the real trace implementation without selecting a structural
 // entry point or requiring a concrete descriptor's target layout. This lets the pending CUDA

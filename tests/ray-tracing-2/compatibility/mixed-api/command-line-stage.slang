@@ -4,7 +4,7 @@
 //TEST:COMPILE: -experimental-feature tests/ray-tracing-2/compatibility/mixed-api/command-line-stage-cache.slang-module -entry legacyMiss -stage miss -no-codegen
 //TEST:COMPILE: -experimental-feature tests/ray-tracing-2/compatibility/mixed-api/command-line-stage-cache.slang-module -entry StructuralMiss -stage miss -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

@@ -5,7 +5,7 @@
 // https://github.com/shader-slang/slang/issues/13618.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload
 {

@@ -1,7 +1,7 @@
 // Selecting an any-hit stage through a hit group does not construct its ordinary object fields.
 //TEST:SIMPLE: -experimental-feature -entry main -stage raygeneration -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload
 {

@@ -2,7 +2,7 @@
 //TEST:COMPILE: tests/ray-tracing-2/compatibility/legacy-only/metadata-does-not-activate.slang -experimental-feature -o tests/ray-tracing-2/compatibility/legacy-only/metadata-values-cache.slang-module
 //TEST:COMPILE: -experimental-feature tests/ray-tracing-2/compatibility/legacy-only/metadata-values-cache.slang-module -entry legacyMiss -stage miss -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext
 {

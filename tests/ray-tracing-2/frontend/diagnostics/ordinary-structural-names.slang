@@ -1,6 +1,6 @@
 //TEST:SIMPLE: -experimental-feature -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 interface IClosestHitShader
 {

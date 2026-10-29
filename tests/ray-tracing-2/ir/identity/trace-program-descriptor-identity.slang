@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry main -stage compute -dump-ir -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestTraceContext : rt::ITraceContext
 {

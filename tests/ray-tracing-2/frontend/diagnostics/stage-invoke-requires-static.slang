@@ -3,7 +3,7 @@
 // All five stage interfaces require static invoke. An otherwise matching instance method must
 // fail ordinary interface conformance, even if no stage is selected as an entry point.
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

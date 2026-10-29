@@ -1,6 +1,6 @@
 //TEST:SIMPLE: -experimental-feature -entry CallingMiss -entry SharedMiss -target hlsl -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

@@ -1,6 +1,6 @@
 //TEST:SIMPLE: -experimental-feature -ignore-capabilities -no-codegen
 
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct TestPayload {}
 struct TestRecord {}

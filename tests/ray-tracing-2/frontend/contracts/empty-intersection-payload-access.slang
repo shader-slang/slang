@@ -2,7 +2,7 @@
 //TEST:SIMPLE: -experimental-feature -entry Intersection -stage intersection -target metal -no-codegen
 
 // Empty payloads are ordinary source values; target legalization owns their physical storage.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct EmptyPayload
 {}

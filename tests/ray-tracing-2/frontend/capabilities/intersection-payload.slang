@@ -16,7 +16,7 @@
 
 // Payload access is an additional target capability, not a restriction on IntersectionInput.
 // These checks cover the source contract; native adapters are outside this frontend slice.
-import slang.raytracing;
+import slang.raytracing.portable;
 
 struct Payload
 {
