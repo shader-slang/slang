@@ -66,7 +66,7 @@ TextureTypeInfo::TextureTypeInfo(
 
 void TextureTypeInfo::writeFuncBody(
     const char* funcName,
-    const String& cppHlslPreamble,
+    const String& combinedForward,
     const String& glsl,
     const String& cuda,
     const String& spirvDefault,
@@ -81,7 +81,7 @@ void TextureTypeInfo::writeFuncBody(
         BraceScope switchScope{i, sb};
         sb << i << "case cpp:\n";
         sb << i << "case hlsl:\n";
-        sb << cppHlslPreamble;
+        sb << combinedForward;
         sb << i << "__intrinsic_asm \"." << funcName << "\";\n";
         if (glsl.getLength())
         {
@@ -139,7 +139,7 @@ void TextureTypeInfo::writeFuncBody(
 
 void TextureTypeInfo::writeFuncWithSig(
     const char* funcName,
-    const String& cppHlslPreamble,
+    const String& combinedForward,
     const String& sig,
     const String& glsl,
     const String& spirvDefault,
@@ -156,7 +156,7 @@ void TextureTypeInfo::writeFuncWithSig(
     sb << i << sig << "\n";
     writeFuncBody(
         funcName,
-        cppHlslPreamble,
+        combinedForward,
         glsl,
         cuda,
         spirvDefault,
@@ -170,7 +170,7 @@ void TextureTypeInfo::writeFuncWithSig(
 void TextureTypeInfo::writeFunc(
     const char* returnType,
     const char* funcName,
-    const String& cppHlslPreamble,
+    const String& combinedForward,
     const String& params,
     const String& glsl,
     const String& spirvDefault,
@@ -183,7 +183,7 @@ void TextureTypeInfo::writeFunc(
 {
     writeFuncWithSig(
         funcName,
-        cppHlslPreamble,
+        combinedForward,
         cat(returnType, " ", funcName, "(", params, ")"),
         glsl,
         spirvDefault,

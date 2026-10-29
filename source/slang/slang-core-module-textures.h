@@ -67,13 +67,13 @@ public:
         Always
     };
 
-    // `cppHlslPreamble` holds statements emitted verbatim (already indented) at the start of the
+    // `combinedForward` holds statements emitted verbatim (already indented) at the start of the
     // shared cpp/hlsl case, before the member-form intrinsic. A path that handles the call must
     // `return`; every other path falls through to the member form. The only use is forwarding a
     // combined receiver; an empty string emits only the member form.
     void writeFuncBody(
         const char* funcName,
-        const String& cppHlslPreamble,
+        const String& combinedForward,
         const String& glsl,
         const String& cuda,
         const String& spirvDefault,
@@ -83,7 +83,7 @@ public:
         const String& wgsl);
     void writeFuncWithSig(
         const char* funcName,
-        const String& cppHlslPreamble,
+        const String& combinedForward,
         const String& sig,
         const String& glsl = String{},
         const String& spirvDefault = String{},
@@ -96,7 +96,7 @@ public:
     void writeFunc(
         const char* returnType,
         const char* funcName,
-        const String& cppHlslPreamble,
+        const String& combinedForward,
         const String& params,
         const String& glsl = String{},
         const String& spirvDefault = String{},
