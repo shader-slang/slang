@@ -18965,7 +18965,7 @@ void SemanticsDeclScopeWiringVisitor::visitUsingDecl(UsingDecl* decl)
     decl->arg = CheckTerm(decl->arg);
 
     // Next, we want to ensure that whatever is being named by `decl->arg`
-    // is a namespace (or a module, since modules are namespace-like).
+    // is a namespace.
     //
     // If a user `import`s multiple modules that all have namespaces
     // of the same name, it would be possible for `decl->arg` to be overloaded.
@@ -19015,7 +19015,9 @@ void SemanticsDeclScopeWiringVisitor::visitUsingDecl(UsingDecl* decl)
 
     if (!scopesAdded)
     {
-        if (!hasValidNamespace)
+        // An argument that failed to check (e.g. an undefined name) has already been
+        // diagnosed, so "expected a namespace, got a 'error'" would only repeat it.
+        if (!hasValidNamespace && !IsErrorExpr(decl->arg))
             getSink()->diagnose(Diagnostics::ExpectedANamespace{.expr = decl->arg});
         return;
     }
