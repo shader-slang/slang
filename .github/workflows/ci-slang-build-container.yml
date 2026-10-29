@@ -29,7 +29,7 @@ jobs:
       contents: read
       packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0
       # Drop --user root and -v /:/host_root mount; host cleanup step removed
       # below. If disk pressure resurfaces, slim the container image (issue
       # #11339) rather than bringing host-root access back. The UID:GID is an
@@ -53,7 +53,13 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
-          submodules: "recursive"
+          submodules: "false"
+          fetch-depth: "2"
+
+      - name: Update submodules
+        uses: ./.github/actions/submodule-update-retry
+        timeout-minutes: 15
+        with:
           fetch-depth: "2"
 
       - name: Configure Git safe directory
@@ -106,7 +112,7 @@ jobs:
           os: linux
           compiler: gcc
           platform: x86_64
-          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
           build-if-missing: "true"
           github-token: ${{ github.token }}
 
@@ -225,7 +231,7 @@ jobs:
             exit 1
           fi
 
-      # Save sccache cache (master only, for populate-sccache workflow)
+      # Save sccache cache (master only, for sccache-populate workflow)
       - name: Save sccache cache (master only)
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5

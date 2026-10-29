@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-packbranchtypeexpr
-//META: doc_section_digest=1d025242d1797d4e136aa1be3b95725504ad5b96bc6526725ad99442cfbb5be0
+//META: doc_section_digest=c81f550a9810da4877739b3075a0cd088585204924f21fbdc02d017dbf1948e5
 //META: purpose=A ModifiedTypeExpr `const T` carries a modifier prefix on the type; reads of the const-qualified value return the initialized value.
 //META: intent=functional
 //META: pipeline_stage=check

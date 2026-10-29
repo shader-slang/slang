@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-b-mandatory-pre-optimization-transformations
-//META: doc_section_digest=66e42c380f46944149ef8be6f03d48d261bb38ca06b684a7dbf8006ad76839f6
+//META: doc_section_digest=09d7020162c923ab03acb173454bec8822828843cdb98846ded36a61470ed1b3
 //META: purpose=Phase B's insertDebugValueStore (B6) emits DebugValue insts binding locals to their debug variables only when the debug-info level is Standard or higher.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass
@@ -15,8 +15,8 @@
 // appear anywhere -- which is what makes the gate, rather than the mere
 // presence of debug info, the thing being observed.
 
-//TEST:SIMPLE(filecheck=STD):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g2
-//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=STD):-target spirv-asm -dump-ir -o - -entry main -stage compute -g2
+//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

@@ -4,6 +4,7 @@
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-call-graph.h"
+#include "slang-ir-check-push-constant-blocks.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
@@ -68,12 +69,20 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
             SLANG_ASSERT(requireComputeDerivative);
             SLANG_ASSERT(m_entryPointStage == Stage::Compute);
 
-            // Compute derivatives are quad by default, add the decoration if entry point
-            // does not not explicit linear decoration.
-            bool isQuad = !entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
-            if (isQuad)
+            // Grouping may be explicit or already inferred for an earlier derivative operation.
+            if (!entryPoint->findDecoration<IRDerivativeGroupDecoration>())
             {
-                builder.addDecoration(entryPoint, kIROp_DerivativeGroupQuadDecoration);
+                switch (inferDerivativeGroupMode(entryPoint))
+                {
+                case DerivativeGroupMode::Quad:
+                    builder.addDecoration(entryPoint, kIROp_DerivativeGroupQuadDecoration);
+                    break;
+                case DerivativeGroupMode::Linear:
+                    builder.addDecoration(entryPoint, kIROp_DerivativeGroupLinearDecoration);
+                    break;
+                default:
+                    SLANG_UNEXPECTED("unexpected derivative-group mode");
+                }
             }
         }
     }
@@ -82,6 +91,24 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
 void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
 {
     buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
+
+    // glslang rejects a stage that declares more than one `layout(push_constant)` block. We report
+    // the case where an entry point's own call tree uses more than one block. A block read only by
+    // an exported function that the entry point does not call is still declared, and this check
+    // does not count it.
+    checkForMultiplePushConstantBlocksPerEntryPoint(
+        module,
+        m_referencingEntryPoints,
+        isPushConstantBlockByLayout,
+        getSink());
+
+    Index pushConstantBlockCount = 0;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (as<IRGlobalParam>(globalInst) && isPushConstantBlockByLayout(globalInst))
+            pushConstantBlockCount++;
+    }
+    m_hasMultiplePushConstantBlocks = pushConstantBlockCount > 1;
 
     IRBuilder builder(module);
     for (auto globalInst : module->getGlobalInsts())
@@ -1472,6 +1499,13 @@ void GLSLSourceEmitter::emitParameterGroupImpl(
     IRGlobalParam* varDecl,
     IRUniformParameterGroupType* type)
 {
+    // glslang allows one `layout(push_constant)` block per stage and counts every block we
+    // declare, including one that nothing reads. `-preserve-params` keeps such unused blocks, so
+    // a module with one used block and one unused block would be rejected. We therefore omit a
+    // push-constant block with no uses when the module has more than one push-constant block.
+    if (m_hasMultiplePushConstantBlocks && isPushConstantBlockByLayout(varDecl) &&
+        !varDecl->hasUses())
+        return;
     _emitGLSLParameterGroup(varDecl, type);
 }
 
@@ -1594,9 +1628,9 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 m_writer->emit(") in;\n");
             }
 
-            // These decorations were moved from the parameters to the entry point by
-            // ir-glsl-legalize. The actual parameters have become potentially multiple global
-            // parameters.
+            // The input primitive topology is available on the entry-point function by emit time;
+            // the emitter reads it there because the input parameter may have been split into
+            // multiple globals or erased entirely (e.g. an empty input struct).
             if (auto decor = as<IRGeometryInputPrimitiveTypeDecoration>(decoration))
             {
                 switch (decor->getOp())
@@ -1648,6 +1682,18 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
             {
                 // https://www.khronos.org/opengl/wiki/Early_Fragment_Test
                 m_writer->emit("layout(early_fragment_tests) in;\n");
+            }
+            else if (as<IRPostDepthCoverageDecoration>(decoration))
+            {
+                // GL_ARB_post_depth_coverage: `layout(post_depth_coverage) in;` makes
+                // gl_SampleMaskIn report only samples that survived the early depth/stencil
+                // test. The extension implicitly enables early_fragment_tests, so it is not
+                // redeclared here. If the entry point also has `[earlydepthstencil]`, the
+                // separate decoration branch additionally emits `layout(early_fragment_tests)
+                // in;`; declaring both qualifiers is valid (the ARB-implied one made explicit).
+                _requireGLSLExtension(
+                    UnownedStringSlice::fromLiteral("GL_ARB_post_depth_coverage"));
+                m_writer->emit("layout(post_depth_coverage) in;\n");
             }
             else if (as<IRGLSLFragDepthGreaterDecoration>(decoration))
             {
@@ -3977,6 +4023,15 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         {
             _requireGLSLExtension(toSlice("GL_EXT_fragment_shader_barycentric"));
             prefix = toSlice("pervertex");
+        }
+        else if (as<IRGLSLPatchDecoration>(decoration))
+        {
+            prefix = toSlice("patch");
+            // `patch` is a core GLSL keyword, no need for suffix like EXT
+            postfix = toSlice("");
+            // Unlike the payload branches below, no `layout(location = ...)` here: a patch
+            // variable is an ordinary varying, so its location comes from the normal varying
+            // layout path (`emitLayoutQualifiersImpl`), and emitting one here would duplicate it.
         }
         else
         {

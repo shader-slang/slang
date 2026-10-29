@@ -21,6 +21,25 @@
 #include <optional>
 #include <type_traits>
 
+// Validation checks on deserialized data guard against mal-formed input, but
+// cost performance on a hot path (loading the trusted core module out of
+// `slang.dll`). This build option selects whether they are compiled in.
+//
+#ifndef SLANG_ENABLE_VALIDATION_FOSSIL
+#define SLANG_ENABLE_VALIDATION_FOSSIL 0
+#endif
+
+#if SLANG_ENABLE_VALIDATION_FOSSIL
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION)                             \
+    do                                                                         \
+    {                                                                          \
+        if (!(CONDITION))                                                      \
+            SLANG_UNEXPECTED("invalid format encountered in serialized data"); \
+    } while (0)
+#else
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION) SLANG_ASSERT(CONDITION)
+#endif
+
 namespace Slang
 {
 
@@ -160,7 +179,10 @@ public:
     SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind) { return kind == kKind; }
 
 private:
-    T _value;
+    // The writer aligns every simple value to its size; force the same
+    // alignment here so that 64-bit fields keep that layout on targets
+    // (such as 32-bit x86) where alignof(UInt64) is only 4.
+    alignas(sizeof(T)) T _value;
 };
 
 #define SLANG_DECLARE_FOSSILIZED_SIMPLE_TYPE(TYPE, TAG)                           \
@@ -195,6 +217,14 @@ static_assert(sizeof(Fossilized<uint64_t>) == 8);
 
 static_assert(sizeof(Fossilized<float>) == 4);
 static_assert(sizeof(Fossilized<double>) == 8);
+
+// The fossil writer aligns each simple value to its size, so the reader-side
+// wrapper must do the same. On targets such as 32-bit x86 the natural
+// alignment of a 64-bit type is only 4, which would make records with 64-bit
+// fields have a different layout when read than when written.
+static_assert(alignof(Fossilized<int64_t>) == 8);
+static_assert(alignof(Fossilized<uint64_t>) == 8);
+static_assert(alignof(Fossilized<double>) == 8);
 
 //
 // The `bool` type shouldn't be fossilized as itself, because

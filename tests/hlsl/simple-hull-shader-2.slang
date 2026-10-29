@@ -1,7 +1,7 @@
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry hullMain -stage hull -allow-glsl
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry hullMain -stage hull
 
 // Currently SPIR-V fails to compile this hull shader (#4914)
-//DISABLE_TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull -allow-glsl
+//DISABLE_TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull
 
 //GLSL-DAG: location = 0
 //GLSL-DAG: location = 1

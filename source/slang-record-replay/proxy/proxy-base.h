@@ -34,7 +34,14 @@ public:
         // is already 0 (release would trigger re-destruction).
         // The static_cast chain is safe here because we know the concrete type.
         ISlangUnknown* identity = static_cast<ISlangUnknown*>(static_cast<TFirstInterface*>(this));
-        ReplayContext::get().unregisterProxy(identity);
+
+        // tryGet() rather than get(): a proxy the user still holds can outlive
+        // ReplayContext::destroySingleton(), and get() would construct a
+        // replacement context just to unregister into it -- leaking that
+        // context, since nothing deletes it afterwards. With no context there is
+        // no registry to remove ourselves from, so there is nothing to do.
+        if (ReplayContext* context = ReplayContext::tryGet())
+            context->unregisterProxy(identity);
     }
 
     // ISlangUnknown implementation - these are virtual so derived classes can override
@@ -42,6 +49,25 @@ public:
     SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return addRefImpl(); }
 
     SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return releaseImpl(); }
+
+    /// Called from the addRef()/release() overrides of a proxy. During playback, every
+    /// addRef()/release() that is not under SuppressRefCountRecording is a replayed user
+    /// call. A replayed user release() gives up a reference the recorded user owned, which
+    /// on playback is one of the orphaned creation references, and a replayed user addRef()
+    /// adds one. The orphan notes follow these calls so that the end-of-replay sweep
+    /// releases only the references the stream did not.
+    void noteUserAddRefIfPlayback(ReplayContext& ctx)
+    {
+        if (ctx.isPlayback())
+            ctx.playbackUserAddRef(
+                static_cast<ISlangUnknown*>(static_cast<TFirstInterface*>(this)));
+    }
+    void noteUserReleaseIfPlayback(ReplayContext& ctx)
+    {
+        if (ctx.isPlayback())
+            ctx.unnotePlaybackOrphanedProxy(
+                static_cast<ISlangUnknown*>(static_cast<TFirstInterface*>(this)));
+    }
 
     /// Internal addRef - used by the replay system to hold references without recording
     uint32_t addRefImpl() { return (uint32_t)RefObject::addReference(); }

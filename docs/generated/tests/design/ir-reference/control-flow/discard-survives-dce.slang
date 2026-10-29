@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#moving-and-deleting-control-flow-instructions
-//META: doc_section_digest=1a35f3e6e880b02476bb7fbe3db3c3bfa0fe959a20d8b9005e5bd64d9b003102
+//META: doc_section_digest=4b9b78e095e823ff9e4ea99f9bac16b4d2d602d19756c7975a748f91e74e06e3
 //META: purpose=discard survives dead-code elimination at -O3 because it reports as possibly-side-effecting even though it produces no value.
 //META: intent=functional
 //META: pipeline_stage=emit

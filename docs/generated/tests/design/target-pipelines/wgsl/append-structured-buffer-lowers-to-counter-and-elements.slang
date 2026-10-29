@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=1d8e7a1c30049e4d9b67c4beb3ca230fe889d9d80802b14075e9c38d36c53d4c
+//META: doc_section_digest=d55555774e3671195c911b5700b7f3b76e600649eaa66a65a238dcf8a1620c86
 //META: purpose=lowerAppendConsumeStructuredBuffers runs for WGSL and splits AppendStructuredBuffer<T> into an atomic counter buffer plus an element buffer
 //META: intent=functional
 //META: pipeline_stage=ir-pass

@@ -50,6 +50,7 @@
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-entry-point-uniforms.h"
+#include "slang-ir-expand-autodiff-parameter-contexts.h"
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
 #include "slang-ir-fix-entrypoint-callsite.h"
@@ -70,6 +71,7 @@
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
+#include "slang-ir-legalize-resource-globals.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-legalize-vector-types.h"
@@ -83,6 +85,7 @@
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-conditional-type.h"
 #include "slang-ir-lower-coopvec.h"
+#include "slang-ir-lower-copy-logical.h"
 #include "slang-ir-lower-cpu-resource-types.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
@@ -99,6 +102,7 @@
 #include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-ray-tracing-legalize.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-resolve-texture-format.h"
 #include "slang-ir-resolve-varying-input-ref.h"
@@ -120,6 +124,7 @@
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
+#include "slang-ir-thread-switch-on-constant-phi.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-translate.h"
@@ -429,6 +434,11 @@ void calcRequiredLoweringPassSet(
             result.autodiff = true;
     }
 
+    // The replacement pass owns the opcode classification so this scan cannot silently omit a
+    // location-operand role that the pass knows how to consume.
+    if (isRayTracingLocationOperand(inst->getOp()))
+        result.rayTracingLocationOperand = true;
+
     switch (inst->getOp())
     {
     case kIROp_DebugValue:
@@ -440,6 +450,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
     case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
         result.debugInfo = true;
@@ -611,6 +622,26 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetValueFromTaggedUnion:
     case kIROp_CastInterfaceToTaggedUnionPtr:
         result.taggedUnion = true;
+        result.untaggedUnion = true;
+        result.tagOps = true;
+        result.tagType = true;
+        break;
+    case kIROp_AssumeAddress:
+        result.assumeAddress = true;
+        break;
+    case kIROp_UntaggedUnionType:
+    case kIROp_NoneTypeElement:
+        result.untaggedUnion = true;
+        break;
+    case kIROp_GetTagOfElementInSet:
+    case kIROp_GetTagForSuperSet:
+    case kIROp_GetTagForSubSet:
+    case kIROp_GetTagForMappedSet:
+        result.tagOps = true;
+        result.tagType = true;
+        break;
+    case kIROp_SetTagType:
+        result.tagType = true;
         break;
     case kIROp_InOutImplicitCast:
     case kIROp_OutImplicitCast:
@@ -622,6 +653,16 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_LateRequireCapability:
         result.lateRequireCapability = true;
+        break;
+    case kIROp_MatrixType:
+        // An `Unknown` layout needs the pass. So does `Unknown` passed as a generic argument,
+        // which this scan cannot recognize, so a generic (non-literal) layout requests it too.
+        if (auto matrixType = as<IRMatrixType>(inst))
+        {
+            auto layout = as<IRIntLit>(matrixType->getLayout());
+            if (!layout || layout->getValue() == SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
+                result.unresolvedMatrixLayout = true;
+        }
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1033,6 +1074,12 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // Scan the IR module and determine which lowering/legalization passes are needed.
+    RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
+    requiredLoweringPassSet = {};
+    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
+
+    if (requiredLoweringPassSet.assumeAddress)
     {
         bool validate = !isCPUTarget(targetRequest) && !isCUDATarget(targetRequest);
         SLANG_PASS(validateAndRemoveAssumeAddress, validate, sink);
@@ -1041,11 +1088,6 @@ Result linkAndOptimizeIR(
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
-
-    // Scan the IR module and determine which lowering/legalization passes are needed.
-    RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
-    requiredLoweringPassSet = {};
-    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     // Debug info is added by the front-end. If the target cannot express debug info, or if the user
     // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
@@ -1105,16 +1147,31 @@ Result linkAndOptimizeIR(
     // so this pass is independent of debug-info state. It writes its
     // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
-    if (requiredLoweringPassSet.coverageTracing)
+    // Placement options are read OUTSIDE the gate below, and the bindless
+    // index is fully validated here -- value kind, value range, and target
+    // support alike.
+    //
+    // The gate is `requiredLoweringPassSet.coverageTracing`, derived from
+    // coverage marker ops present in the IR, so a module with nothing
+    // instrumentable never opens it. Validating the bindless index inside
+    // would mean an empty or declaration-only translation unit accepted an
+    // unsupported option set in total silence: the user asks for the shared
+    // descriptor array, gets no diagnostic, and finds out from a
+    // pipeline-layout mismatch at runtime.
+    //
+    // `-trace-coverage-binding` gets no equivalent checks here -- its values
+    // are consumed by `instrumentCoverage` inside the gate, and an
+    // unsatisfiable binding surfaces there. It is read alongside the index
+    // only because the two describe one placement and are cheaper to read
+    // together than to split across the gate.
+    int explicitBinding = -1;
+    int explicitSpace = -1;
+    int bindlessIndex = -1;
+    // One option set, read both here and inside the gate below.
+    auto& coverageOpts = codeGenContext->getTargetReq()->getOptionSet();
     {
-        // Pull explicit binding values from `-trace-coverage-binding`
-        // here; pass -1 for either side to request auto-allocation in
-        // the synthesis routine.
-        int explicitBinding = -1;
-        int explicitSpace = -1;
-        List<int> reservedSpaces;
-        auto& opts = codeGenContext->getTargetReq()->getOptionSet();
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
+        if (auto values =
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
         {
             if (values->getCount() > 0)
             {
@@ -1122,7 +1179,80 @@ Result linkAndOptimizeIR(
                 explicitSpace = (int)(*values)[0].intValue2;
             }
         }
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
+        // `-trace-coverage-bindless-index <index>`. -1 leaves the ordinary
+        // single-buffer form; >= 0 selects the unbounded-descriptor-array
+        // form. WHERE the array lives is a separate decision that stays with
+        // `-trace-coverage-binding` (or auto-allocation), because the host's
+        // descriptor set layout is the host's to choose and the compiler
+        // cannot see it.
+        if (auto values =
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBindlessIndex))
+        {
+            if (values->getCount() > 0)
+            {
+                // A host setting this through the API can supply any value
+                // kind. Reading `intValue` off a string-valued entry would
+                // yield 0 and quietly select array element 0, so reject the
+                // wrong kind rather than acting on a value that was never
+                // meant as an index. Matches the reserved-space handling
+                // below.
+                //
+                // Reported as an internal "unexpected" diagnostic rather
+                // than a registered one, unlike the range check just below:
+                // a wrong value *kind* means the caller mis-built the option
+                // entry itself, which no CLI input can produce and which the
+                // option's own type contract already forbids. A negative
+                // index is a well-formed option carrying an out-of-range
+                // value, so it gets a user-facing code (E45117).
+                if ((*values)[0].kind != CompilerOptionValueKind::Int)
+                {
+                    if (sink)
+                    {
+                        SLANG_DIAGNOSE_UNEXPECTED(
+                            sink,
+                            SourceLoc(),
+                            "TraceCoverageBindlessIndex option value must be an integer");
+                    }
+                    return SLANG_FAIL;
+                }
+                // The CLI parser rejects negatives, but a host setting this
+                // through the API bypasses it, and a negative index would
+                // silently fall back to the single-buffer form -- one binding
+                // per shader, the opposite of what the caller asked for.
+                int requestedIndex = (int)(*values)[0].intValue;
+                if (requestedIndex < 0)
+                {
+                    if (sink)
+                        sink->diagnose(Diagnostics::CoverageBindlessNegativeIndex{});
+                    return SLANG_FAIL;
+                }
+                bindlessIndex = requestedIndex;
+            }
+        }
+        // Target support is validated here rather than inside
+        // `instrumentCoverage` for the same reason the value checks are: the
+        // pass only runs when `requiredLoweringPassSet.coverageTracing` is
+        // set, and that flag is derived from coverage marker ops present in
+        // the IR. A module with nothing instrumentable in it -- an empty or
+        // declaration-only translation unit -- never opens that gate, so a
+        // request for the bindless form on a target that cannot express it
+        // would compile clean and report nothing. The host would then learn
+        // it did not get the shared binding it asked for from a
+        // pipeline-layout mismatch at runtime, which is precisely the failure
+        // this option exists to remove.
+        if (bindlessIndex >= 0 && !isKhronosTarget(targetRequest))
+        {
+            if (sink)
+                sink->diagnose(Diagnostics::CoverageBindlessTargetNotSupported{});
+            return SLANG_FAIL;
+        }
+    }
+
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        List<int> reservedSpaces;
+        if (auto values =
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
         {
             for (auto value : *values)
             {
@@ -1160,7 +1290,7 @@ Result linkAndOptimizeIR(
         int counterByteWidth = kDefaultCoverageCounterByteWidth;
         bool hasExplicitCounterByteWidth = false;
         if (auto values =
-                opts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
         {
             if (values->getCount() > 0)
             {
@@ -1201,7 +1331,8 @@ Result linkAndOptimizeIR(
         // verified against the Metal compiler — so the requested width is
         // honored there.
         bool coverageBoolean = false;
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
+        if (auto values =
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
         {
             if (values->getCount() > 0)
                 coverageBoolean = (*values)[0].intValue != 0;
@@ -1222,6 +1353,7 @@ Result linkAndOptimizeIR(
             (int)reservedSpaces.getCount(),
             counterByteWidth,
             coverageBoolean,
+            bindlessIndex,
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);
@@ -1336,6 +1468,12 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.lValueCast)
         SLANG_PASS(lowerLValueCast, targetProgram);
 
+    // Fill in the default matrix layout where the source left it unspecified. Must run before
+    // specialization, so `row_major float4x4` and `float4x4` match as one type, and before
+    // `lowerEnumType`, which erases the `MatrixLayoutMode` type this pass looks for.
+    if (requiredLoweringPassSet.unresolvedMatrixLayout)
+        SLANG_PASS(specializeMatrixLayout, targetProgram);
+
     // Lower enum types early since enums and enum casts may appear in
     // specialization & not resolving them here would block specialization.
     //
@@ -1361,9 +1499,6 @@ Result linkAndOptimizeIR(
         if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
     }
-
-    // Fill in default matrix layout into matrix types that left layout unspecified.
-    SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     // It's important that this takes place before defunctionalization as we
     // want to be able to easily discover the cooperate and fallback funcitons
@@ -1422,6 +1557,13 @@ Result linkAndOptimizeIR(
     }
 
     if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    // The linker can resolve an external type to a definition containing resources or an unsized
+    // array. We need to validate mutable storage after those fields become available.
+    // We check the linked IR at the specialization checkpoint, before resource legalization
+    // assumes that each mutable global has a supported type.
+    if (!validateMutableGlobalVariableTypes(irModule, sink))
         return SLANG_FAIL;
 
     if (requiredLoweringPassSet.higherOrderFunc)
@@ -1550,7 +1692,12 @@ Result linkAndOptimizeIR(
         SLANG_PASS(checkForOutOfBoundAccess, sink);
 
         if (requiredLoweringPassSet.missingReturn)
-            SLANG_PASS(checkForMissingReturns, sink, target, false);
+            SLANG_PASS(
+                checkForMissingReturns,
+                sink,
+                SlangLanguageVersion::SLANG_LANGUAGE_VERSION_UNKNOWN,
+                target,
+                false);
 
         // For some targets, we are more restrictive about what types are allowed
         // to be used as shader parameters in ConstantBuffer/ParameterBlock.
@@ -1608,14 +1755,17 @@ Result linkAndOptimizeIR(
             requiredLoweringPassSet.reinterpret = true;
     }
 
-    SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
+    if (requiredLoweringPassSet.untaggedUnion)
+        SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
     if (requiredLoweringPassSet.reinterpret)
         SLANG_PASS(lowerReinterpret, targetProgram, sink);
 
     SLANG_PASS(lowerSequentialIDTagCasts, codeGenContext->getLinkage(), sink);
-    SLANG_PASS(lowerTagInsts, sink);
-    SLANG_PASS(lowerTagTypes);
+    if (requiredLoweringPassSet.tagOps)
+        SLANG_PASS(lowerTagInsts, sink);
+    if (requiredLoweringPassSet.tagType)
+        SLANG_PASS(lowerTagTypes);
 
     SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
 
@@ -1642,6 +1792,12 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // Must run before the getStringHash check below. `performTypeInlining` inlines a call into its
+    // caller but leaves the original callee behind, and that leftover body still holds a
+    // getStringHash on its own unfolded parameter. Checking first would reject legal code on the
+    // strength of a function that is about to be deleted here.
+    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
         targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
@@ -1650,11 +1806,17 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(SLANG_PASS(checkGetStringHashInsts, sink));
     }
 
-    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
-
     SLANG_PASS(lowerTuples, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
+
+    // Expand captured parameters for CUDA (including PTX and OptiX) and Metal after tuple
+    // lowering, before aggregate parameters are converted to references. Keep the other target
+    // pipelines unchanged until this optimization is validated for them.
+    if (target == CodeGenTarget::CUDASource || isMetalTarget(target))
+    {
+        SLANG_PASS(expandAutodiffParameterContexts);
+    }
 
     SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
     if (sink->getErrorCount() != 0)
@@ -1722,6 +1884,19 @@ Result linkAndOptimizeIR(
     else
     {
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
+    }
+
+    // Must run after SSA construction (so the switch selector is a phi) and
+    // before any target-specific structured-CFG legalization (so the rewritten
+    // CFG is what those passes consume). Registered outside the branch above so
+    // it runs at every optimization level: at `-O0` the selector is made a phi
+    // by the SCCP + DCE step, at higher levels by `simplifyIR`. When the
+    // selector is not yet a phi the pass finds nothing to thread and is a no-op.
+    SLANG_PASS(threadSwitchOnConstantPhi);
+
+    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+    {
+        SLANG_PASS(legalizeOptiXReportIntersectionsForCUDA, sink);
     }
 
     // Report checkpointing information.
@@ -1801,6 +1976,13 @@ Result linkAndOptimizeIR(
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
+        // Give empty ray/callable payloads physical storage at native interfaces before type
+        // legalization erases their logical values, and wrap non-struct D3D payloads and hit
+        // attributes in structs.
+        // Ordinary helper signatures/copies are left untouched. CPU/CUDA require no artificial
+        // payload and skip this legalization block.
+        SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
+
         if (isMetalTarget(targetRequest))
         {
             // Metal is a special target in that we want to legalize constant buffer
@@ -1844,34 +2026,6 @@ Result linkAndOptimizeIR(
         //  we need to replace it with just an `X`, after which we
         //  will have (more) legal shader code.
         //
-        // For DXIL/HLSL with NVAPI and SPIRV: add dummy fields to empty ray payloads
-        if (isD3DTarget(targetRequest) || isSPIRV(targetRequest->getTarget()))
-        {
-            SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
-        }
-
-        // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
-        // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
-        if (isD3DTarget(targetRequest))
-        {
-            SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
-
-            // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
-            // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
-            // only covers payload structs reached through a `TraceRay`-style call, so a
-            // user-authored struct with one-sided PAQ that only reaches a hit shader
-            // (e.g. a per-stage-compiled shader library) would slip through. Fill any
-            // missing per-side PAQs structurally on every `[raypayload]` struct.
-            auto profile = getEffectiveTargetProfile(
-                targetProgram->getTargetReq(),
-                targetProgram->getOptionSet());
-            if (profile.getFamily() == ProfileFamily::DX &&
-                profile.getVersion() >= ProfileVersion::DX_6_7)
-            {
-                SLANG_PASS(legalizeRayPayloadAccessQualifiersForHLSL);
-            }
-        }
-
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
             SLANG_PASS(legalizeExistentialTypeLayout, targetProgram, sink);
@@ -1914,6 +2068,37 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
+    // Global varying translation materializes input parameters and their assignments before
+    // cloning an entry point. The ordinary clone must contain that same input setup.
+    if (requiredLoweringPassSet.globalVaryingVar)
+        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
+
+    // We separate launch functions from ordinary callees before injecting initialization. The
+    // ordinary clone must use its caller's globals rather than reinitialize them at each call.
+    // This ordering applies independently of the globals' types and also lets later CUDA active-
+    // mask synthesis distinguish a launch from a call inside divergent control flow.
+    SLANG_PASS(fixEntryPointCallsites);
+
+    // Resource- and empty-type legalization selected for the target has completed. We move all
+    // initializers required by the target or by resource-global replacement in one module-order
+    // traversal, before any pass replaces their storage. HLSL globals whose initializers can stay
+    // at module scope remain there; the initializer mover owns that target policy.
+    SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    // Selected resource globals still represent one IR value and now have no initializer bodies.
+    // We replace their storage with locals and generated parameters before resource specialization
+    // attempts to eliminate forms that the target cannot emit. The generated-local uninitialized-
+    // value check uses the same validation option as the pre-link module-wide check.
+    SLANG_PASS(
+        legalizeResourceGlobalVars,
+        targetRequest->getTargetCaps(),
+        targetProgram->getOptionSet().shouldRunNonEssentialValidation(),
+        sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     if (isCPUTargetViaLLVM(targetRequest))
     {
         // The LLVM targets are special in that we always lower all matrices
@@ -1931,13 +2116,14 @@ Result linkAndOptimizeIR(
             bufferElementTypeLoweringOptions);
     }
 
-    SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
-
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
     // to see if we can clean up any temporaries created by legalization.
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
+    //
+    // Matrix types are the exception: `legalizeMatrixTypes` runs later, after
+    // `lowerBufferElementTypeToStorageType`, so int/uint/bool matrices are still matrices here.
     if (fastIRSimplificationOptions.minimalOptimization)
         SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     else
@@ -1957,15 +2143,13 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // After type legalization and subsequent SSA cleanup we expect
-    // that any resource types passed to functions are exposed
-    // as their own top-level parameters (which might have
-    // resource or array-of-...-resource types).
-    //
-    // Many of our targets place restrictions on how certain
-    // resource types can be used, so that having them as
-    // function parameters, reults, etc. is invalid.
-    // We clean up the usages of resource values here.
+    // On targets that require resource-type legalization, that pass has separated resources from
+    // the aggregates that contained them. Each remaining resource parameter on those paths
+    // represents one resource value or one resource array. CPU and CUDA paths retain aggregates
+    // because their target representations can contain resource values.
+    // Some targets cannot pass those values through ordinary function parameters or results.
+    // `specializeResourceUsage` specializes calls that it can rewrite into a supported form; later
+    // target validation diagnoses any addressable resource storage that still cannot be emitted.
     SLANG_PASS(specializeResourceUsage, codeGenContext);
 
     // Specialize calls to functions with values loaded from an immutable location,
@@ -2091,6 +2275,8 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             byteAddressBufferOptions.useBitCastFromUInt = true;
+            byteAddressBufferOptions.minimumStoreScalarSize = 4;
+            byteAddressBufferOptions.loadHalfFrom32BitWords = true;
             break;
         }
 
@@ -2183,17 +2369,13 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // Specialization can expose references to global varying builtins that were
-    // previously hidden behind generic/interface dispatch. Translate all global
-    // varying inputs/outputs now, after specialization, but before target
-    // entry-point legalization.
-    if (requiredLoweringPassSet.globalVaryingVar)
-        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
-
+    // Resource specialization can inline a helper containing interpolation operations into an
+    // entry point. We resolve varying-input references after those calls have been inlined, while
+    // varying parameters still have their original address representation. Ordinary entry-point
+    // clones can contain the same operations, so the resolver visits them as well as launch
+    // functions.
     if (requiredLoweringPassSet.resolveVaryingInputRef)
         SLANG_PASS(resolveVaryingInputRef);
-
-    SLANG_PASS(fixEntryPointCallsites);
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
@@ -2319,15 +2501,9 @@ Result linkAndOptimizeIR(
     {
     default:
         break;
-    case CodeGenTarget::HLSL:
-    case CodeGenTarget::GLSL:
-    case CodeGenTarget::WGSL:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
-        break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             SLANG_PASS(introduceExplicitGlobalContext, target);
@@ -2341,18 +2517,11 @@ Result linkAndOptimizeIR(
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with
         // direct pointers
         SLANG_PASS(undoParameterCopy);
-        // Transform struct parameters to use ConstRef for better performance
-        if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
-            isMetalTarget(targetRequest))
-        {
-            SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
-        }
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         SLANG_PASS(introduceExplicitGlobalContext, target);
         if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
         {
@@ -2449,11 +2618,6 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.bitcast)
         SLANG_PASS(lowerBitCast, targetProgram, sink);
 
-    // Rewrite functions that return arrays to return them via `out` parameter,
-    // since our target languages doesn't allow returning arrays.
-    if (!isMetalTarget(targetRequest) && !isSPIRV(target))
-        SLANG_PASS(legalizeArrayReturnType);
-
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {
         SLANG_PASS(legalizeUniformBufferLoad);
@@ -2480,6 +2644,46 @@ Result linkAndOptimizeIR(
         lowerBufferElementTypeToStorageType,
         targetProgram,
         bufferElementTypeLoweringOptions);
+
+    // Loading a whole struct that has an int/uint/bool matrix member copies the buffer storage
+    // type into the logical type with a `CopyLogical` inst. SPIR-V has `OpCopyLogical` for it,
+    // but GLSL has no such operation, so we lower it into element-wise copies here.
+    if (target == CodeGenTarget::GLSL)
+        SLANG_PASS(lowerCopyLogical);
+
+    // On SPIR-V, GLSL, WGSL and Metal, `legalizeMatrixTypes` rewrites an int/uint/bool matrix into
+    // an array of row vectors, because the int/uint/bool types are not allowed as the matrix
+    // element type on those targets. The vector types no longer keep the information of
+    // matrix-major-ness. `lowerBufferElementTypeToStorageType()` needs the information of the
+    // matrix-major-ness and it must run before `legalizeMatrixTypes()` removes the information.
+    //
+    // Consider this example:
+    //
+    //     struct S { column_major int2x3 m; int tail; }
+    //     RWStructuredBuffer<S> b;
+    //
+    // `lowerBufferElementTypeToStorageType` sees `m` as a matrix and stores it as three column
+    // vectors, which is the layout that reflection reports. If this pass ran first, it would
+    // change `m` into two row vectors, and `tail` would be at a different offset than reflection
+    // says.
+    SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
+
+    // Transform struct and array parameters to use ConstRef for better performance on Metal, C++
+    // and CUDA. This runs after `legalizeMatrixTypes`, because the pass transforms struct and
+    // array parameters but not matrix parameters. A parameter of an int/uint/bool matrix type is
+    // an array only after `legalizeMatrixTypes`, and Metal requires an array parameter to be
+    // passed by reference. SPIR-V does the same transformation earlier, because the pass changes
+    // how `lowerBufferElementTypeToStorageType` sees array parameters.
+    if ((isCPUTarget(targetRequest) && !isCPUTargetViaLLVM(targetRequest)) ||
+        isCUDATarget(targetRequest) || isMetalTarget(targetRequest))
+        SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+
+    // Rewrite functions that return arrays to return them via `out` parameter,
+    // since our target languages doesn't allow returning arrays. This runs after
+    // `legalizeMatrixTypes`, because a function that returns an int/uint/bool matrix returns an
+    // array once the matrix is lowered.
+    if (!isMetalTarget(targetRequest) && !isSPIRV(target))
+        SLANG_PASS(legalizeArrayReturnType);
 
     // If we are generating code for glsl or metal, perform address space propagation now.
     // For SPIRV, we will do that during spirv legalization that happens after
@@ -2543,6 +2747,12 @@ Result linkAndOptimizeIR(
     // to make it more narrowly scoped.
     //
     SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
+
+    // Empty-type legalization can introduce new void fields and constructor arguments.
+    // Consider `struct Empty {}; struct Pair { uint value; Empty differential; };`.
+    // Legalization keeps a void placeholder for `differential` to preserve field positions.
+    // The earlier void cleanup has already run, so remove these new placeholders before emit.
+    SLANG_PASS(cleanUpVoidType);
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
@@ -2612,9 +2822,10 @@ Result linkAndOptimizeIR(
         }
     }
 
-    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    if (isKhronosTarget(targetRequest) && emitSpirvDirectly &&
+        requiredLoweringPassSet.rayTracingLocationOperand)
     {
-        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, targetProgram, sink);
+        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, sink);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -2738,6 +2949,9 @@ Result linkAndOptimizeIR(
     }
     SLANG_PASS(collectMetadata, targetProgram, *metadata);
 
+    // We check D3D and Metal resource locals after all passes that can create mutable storage.
+    // Minimum-optimization mode must still reject storage that its target cannot represent.
+    SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
@@ -2903,7 +3117,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         // passes have been performed, we can emit target code from
         // the IR module.
         //
+        const Index errorCountBeforeEmit = sink->getErrorCount();
         sourceEmitter->emitModule(irModule, sink);
+        if (sink->getErrorCount() > errorCountBeforeEmit)
+            return SLANG_FAIL;
     }
 
     String code = sourceWriter.getContent();
@@ -3117,10 +3334,14 @@ private:
     List<SpvWord> m_headerWords;
 };
 
-// Helper function that takes an artifact populated with SPIRV instructions
-// after the spirv-opt step, and a previously created but empty
-// strippedArtifact. The artifact is unmodified, and the strippedArtifact
-// will contain all the artifact's instructions except for debug instructions.
+// Helper function that takes an artifact populated with the final SPIRV module
+// (natively emitted, linked or optimized) and a previously created but empty
+// strippedArtifact. The artifact's contents are unmodified, but it is renamed to
+// the module's debug build identifier. The strippedArtifact will contain all the
+// artifact's instructions except for debug instructions, apart from the
+// `DebugBuildIdentifier` instruction, the `OpString` it refers to and the
+// `NonSemantic.Shader.DebugInfo.100` import, which are kept so the stripped
+// module can be paired with its debug module.
 static SlangResult stripDbgSpirvFromArtifact(
     ComPtr<IArtifact>& artifact,
     ComPtr<IArtifact>& strippedArtifact)
@@ -3141,6 +3362,7 @@ static SlangResult stripDbgSpirvFromArtifact(
     // to check if the instruction number is for a debug instruction as
     // listed in slang-emit-spirv-ops-debug-info-ext.h
     static const uint32_t debugExtInstVals[] = {
+        NonSemanticShaderDebugInfo100DebugInfoNone,
         NonSemanticShaderDebugInfo100DebugCompilationUnit,
         NonSemanticShaderDebugInfo100DebugTypeBasic,
         NonSemanticShaderDebugInfo100DebugTypePointer,
@@ -3151,6 +3373,7 @@ static SlangResult stripDbgSpirvFromArtifact(
         NonSemanticShaderDebugInfo100DebugTypeComposite,
         NonSemanticShaderDebugInfo100DebugTypeMember,
         NonSemanticShaderDebugInfo100DebugFunction,
+        NonSemanticShaderDebugInfo100DebugLexicalBlock,
         NonSemanticShaderDebugInfo100DebugScope,
         NonSemanticShaderDebugInfo100DebugNoScope,
         NonSemanticShaderDebugInfo100DebugInlinedAt,
@@ -3291,7 +3514,12 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
 }
 
 // Helper function to create an artifact from IR used internally by
-// emitSPIRVForEntryPointsDirectly.
+// emitSPIRVForEntryPointsDirectly. The caller passes in an empty `artifact` of
+// the SPIR-V target type; on success it holds the final main module, which may
+// be a replacement artifact from linking, optimization or the debug split. When
+// separate debug info is requested and the function returns SLANG_OK,
+// `dbgArtifact` holds the full module, named after its debug build identifier;
+// otherwise it is left unset.
 static SlangResult createArtifactFromIR(
     CodeGenContext* codeGenContext,
     IRModule* irModule,
@@ -3328,14 +3556,14 @@ static SlangResult createArtifactFromIR(
     // already a complete, valid module. The downstream `slang-glslang` compiler is only needed
     // to: (a) run the SPIRV-Tools optimizer when an optimization level above `None` is
     // requested; (b) link multiple SPIR-V modules together when separately compiled / embedded
-    // downstream modules are present; (c) validate the result when SPIR-V validation is enabled;
-    // or (d) emit separate debug info, which is produced as a side effect of the downstream
-    // compile step. When none of these apply -- for example a single-module `-O0 -target spirv`
-    // compile -- the natively emitted SPIR-V is the final output, so we skip loading
-    // `slang-glslang` entirely and leave the artifact as-is. This keeps a default `-O0` SPIR-V
-    // compile free of any dependency on the `slang-glslang` module (issue #11662); without this
-    // gate the load was unconditional and a build without `slang-glslang` failed with E00100
-    // even though no downstream work was needed.
+    // downstream modules are present; or (c) validate the result when SPIR-V validation is
+    // enabled. Separate debug info is not on this list: Slang splits the final module itself
+    // (`stripDbgSpirvFromArtifact`). When none of these apply -- for example a single-module
+    // `-O0 -target spirv` compile -- the natively emitted SPIR-V is the final output, so this
+    // function does not load `slang-glslang` and leaves the artifact as-is. A build without
+    // `slang-glslang` can therefore still produce `-O0` SPIR-V, with or without separate debug
+    // info (issues #11662 and #13795). (With separate debug info, the build-identifier hash may
+    // still open the library to read its version, but it does not require it.)
     bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::EmbedDownstreamIR);
 
@@ -3383,8 +3611,10 @@ static SlangResult createArtifactFromIR(
     const bool needsLink = downstreamLinkingAllowed && spirvFiles.getCount() > 1;
     // `-Xspirv-opt <flag>` selects individual optimizer passes explicitly, so it must run the
     // optimizer even at `-O0` (where the preset is empty). Detecting them here also keeps a plain
-    // `-O0` compile -- with no such flags, and no link/validation/separate-debug-info -- from
-    // loading `slang-glslang` (issue #11662).
+    // `-O0` compile -- with no such flags, and no link/validation -- from loading `slang-glslang`
+    // (issue #11662). The same flag decides whether a compiler loaded only to link or validate is
+    // asked to optimize: without it the optimizer has no passes and returns its input unchanged
+    // (`glslang_optimizeSPIRV`), so skipping the call drops no bytes and no diagnostics.
     List<String> spirvOptArgs =
         codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt");
     const bool needsOptimization =
@@ -3392,9 +3622,7 @@ static SlangResult createArtifactFromIR(
             OptimizationLevel::None ||
         spirvOptArgs.getCount() != 0;
     const bool needsValidation = shouldRunSPIRVValidation(codeGenContext);
-    const bool needsSeparateDebugInfo = targetCompilerOptions.shouldEmitSeparateDebugInfo();
-    const bool needsDownstreamCompiler =
-        needsLink || needsOptimization || needsValidation || needsSeparateDebugInfo;
+    const bool needsDownstreamCompiler = needsLink || needsOptimization || needsValidation;
 
     artifact->addRepresentationUnknown(
         needsDownstreamCompiler ? ListBlob::create(spirv) : ListBlob::moveCreate(spirv));
@@ -3455,69 +3683,84 @@ static SlangResult createArtifactFromIR(
             }
             else if (SLANG_FAILED(validationResult))
             {
-                // Whether a rejected module reaches the caller must not depend on the diagnostic's
-                // severity, so fail here rather than leaving it to the sink's abort.
+                // Disassemble the rejected SPIR-V into the diagnostic so the failure is legible,
+                // then report it. `SpirvValidationFailed` is `internal` severity, so this
+                // `diagnose()` aborts the compile by throwing; the abort unwinds to the
+                // API-boundary guard that catches it. The `return SLANG_FAIL` below is reached
+                // only if that severity is ever lowered below `Severity::Fatal`.
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                 codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
                 return SLANG_FAIL;
             }
         }
 
-        ComPtr<IArtifact> optimizedArtifact;
-        DownstreamCompileOptions downstreamOptions;
-        downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
-        downstreamOptions.targetType = SLANG_SPIRV;
-        downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+        if (needsOptimization)
+        {
+            ComPtr<IArtifact> optimizedArtifact;
+            DownstreamCompileOptions downstreamOptions;
+            downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
+            downstreamOptions.targetType = SLANG_SPIRV;
+            downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
 
-        // Forward the `-Xspirv-opt` args (collected above) to the downstream optimizer, where they
-        // register on top of the `-OX` preset -- or as the only passes at `-O0`, whose preset is
-        // empty. The allocator owns the copied arg strings and slice array, so it must outlive the
-        // compile() call below.
-        SliceAllocator allocator;
-        downstreamOptions.compilerSpecificArguments = allocator.allocate(spirvOptArgs);
-        switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
-        {
-        case OptimizationLevel::None:
-            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
-            break;
-        case OptimizationLevel::Default:
-            downstreamOptions.optimizationLevel =
-                DownstreamCompileOptions::OptimizationLevel::Default;
-            break;
-        case OptimizationLevel::High:
-            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;
-            break;
-        case OptimizationLevel::Maximal:
-            downstreamOptions.optimizationLevel =
-                DownstreamCompileOptions::OptimizationLevel::Maximal;
-            break;
-        default:
-            SLANG_ASSERT(!"Unhandled optimization level");
-            break;
-        }
-        auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-        if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
-        {
-            // Check if we need to output a separate SPIRV file containing debug info. If so
-            // then strip all debug instructions from the artifact. The dbgArtifact will still
-            // contain all instructions.
-            if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+            // Forward the `-Xspirv-opt` args (collected above) to the downstream optimizer, where
+            // they register on top of the `-OX` preset -- or as the only passes at `-O0`, whose
+            // preset is empty. The allocator owns the copied arg strings and slice array, so it
+            // must outlive the compile() call below.
+            SliceAllocator allocator;
+            downstreamOptions.compilerSpecificArguments = allocator.allocate(spirvOptArgs);
+            switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
             {
-                auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
-                SLANG_RETURN_ON_FAIL(
-                    stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
-                artifact = _Move(strippedArtifact);
-                dbgArtifact = _Move(optimizedArtifact);
+            case OptimizationLevel::None:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::None;
+                break;
+            case OptimizationLevel::Default:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::Default;
+                break;
+            case OptimizationLevel::High:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::High;
+                break;
+            case OptimizationLevel::Maximal:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::Maximal;
+                break;
+            default:
+                SLANG_ASSERT(!"Unhandled optimization level");
+                break;
             }
-            else
+            auto downstreamStartTime = std::chrono::high_resolution_clock::now();
+            if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
+            {
                 artifact = _Move(optimizedArtifact);
-        }
-        auto downstreamElapsedTime =
-            (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
-        codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
+            }
+            auto downstreamElapsedTime =
+                (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() *
+                0.000000001;
+            codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        SLANG_RETURN_ON_FAIL(
-            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+            SLANG_RETURN_ON_FAIL(
+                passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+        }
+    }
+
+    // Separate debug info splits whichever module is final -- natively emitted, linked or
+    // optimized -- into a stripped main output and the full module as the debug output. The split
+    // is Slang's own word filter, so it needs no downstream compiler, and it runs after the
+    // optimizer's diagnostics have been reported so that a failed optimization is not masked by
+    // a failed split.
+    //
+    // If a required downstream compiler could not be loaded, E00100 is already in the sink and
+    // the natively emitted module is final. The split still runs, so a split compile ends the same
+    // way as a non-split one: the end-to-end compile fails on the reported error, and an API
+    // caller receives the unprocessed module alongside the diagnostic.
+    if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+    {
+        auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
+        SLANG_RETURN_ON_FAIL(stripDbgSpirvFromArtifact(artifact, strippedArtifact));
+        dbgArtifact = _Move(artifact);
+        artifact = _Move(strippedArtifact);
     }
 
     return SLANG_OK;
@@ -3554,6 +3797,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     // and produce a .dbg.spv file for this child artifact.
     if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
     {
+        SLANG_RELEASE_ASSERT(dbgArtifact);
         artifact->addAssociated(dbgArtifact);
 
         auto artifactPostEmitMetadata =

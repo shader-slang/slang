@@ -332,9 +332,14 @@ static SlangResult _findVersionsWithVSWhere(
 
     // Add other args
     {
-        // TODO(JS):
-        // For arm targets will probably need something different for tooling
+        // We pass `-products *` because vswhere otherwise lists only Community, Professional and
+        // Enterprise, which misses a Build Tools install. The `-requires` filter still limits the
+        // results to installs that have the VC tools.
+        //
+        // TODO(JS): For arm targets the `-requires` component will probably need to be different.
         String args[] = {
+            "-products",
+            "*",
             "-format",
             "json",
             "-utf8",
@@ -540,7 +545,17 @@ static SlangResult _findVersionsWithRegistery(List<WinVisualStudioUtil::VersionP
     cmdLine.addArg("&&");
     cmdLine.addArg(Path::combine(versionPath.vcvarsPath, "vcvarsall.bat"));
 
-#if SLANG_PTR_IS_32
+    // The downstream cl.exe/link.exe produce a DLL that this process loads
+    // in-process via LoadLibrary (see slang-shared-library.cpp), so the
+    // vcvarsall.bat architecture must match the architecture Slang itself
+    // is currently running as, not just "32 vs 64-bit". SLANG_PTR_IS_32/64
+    // collapse x64 and arm64 into the same 64-bit case, which previously
+    // selected the x64 toolchain unconditionally on 64-bit hosts: on a
+    // native arm64 host that produced an x64 DLL, which LoadLibrary then
+    // fails to load into a native arm64 process.
+#if SLANG_PROCESSOR_ARM_64
+    cmdLine.addArg("arm64");
+#elif SLANG_PTR_IS_32
     cmdLine.addArg("x86");
 #else
     cmdLine.addArg("x86_amd64");

@@ -40,6 +40,11 @@ on:
         type: boolean
         default: false
         description: "Restrict slang-test to CPU and LLVM backends via -api cpu+llvm"
+      slang-user-skills:
+        required: false
+        type: boolean
+        default: false
+        description: "Validate the bundled Slang user skills and their examples"
       gpu-api-only:
         required: false
         type: boolean
@@ -50,16 +55,15 @@ on:
         type: string
         default: ""
         description: "GPU tier label (e.g., 't4', 'sm80plus'). Used to apply tier-specific skip lists."
-      api:
-        required: false
-        type: string
-        default: ""
-        description: "Override the -api expression passed to slang-test (e.g. 'dx11+dx12' or 'vk+cuda+cpu+llvm'). Overrides cpu-only and gpu-api-only when set."
+      run-via-glsl:
+        required: true
+        type: boolean
+        description: "Run the via-glsl pass on pull requests."
 
 jobs:
   test-slang:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 80
+    timeout-minutes: 120
     defaults:
       run:
         shell: bash
@@ -92,6 +96,16 @@ jobs:
           git submodule sync -- external/optix-dev
           git submodule update --init --depth=1 external/optix-dev
 
+      - name: Checkout Slang user skills
+        if: inputs.slang-user-skills
+        run: |
+          git submodule sync -- external/slang-user-skills
+          git submodule update --init --depth=1 external/slang-user-skills
+
+      - name: Test user-skills package verifier
+        if: inputs.slang-user-skills
+        run: python3 extras/tests/test_verify_user_skills_package.py
+
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
         with:
@@ -100,6 +114,13 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
+          cpu-only: ${{ inputs.cpu-only }}
+
+      - name: Validate Slang user-skill examples
+        if: inputs.slang-user-skills
+        run: >-
+          python3 external/slang-user-skills/scripts/validate-examples.py
+          --slangc "$bin_dir/slangc"
 
       # slang-test's CUDA pass-through compiles through NVRTC, so the
       # offline (non-NVRTC) branch of the prelude is never compiled by the
@@ -116,8 +137,6 @@ jobs:
           -I prelude -o "${{ runner.temp }}/cuda-prelude-vec1-make.obj"
 
       - name: Test Slang
-        env:
-          API_INPUT: ${{ inputs.api }}
         run: |
           # Fail fast on mutually exclusive inputs — both would accumulate
           # -api filters and produce an empty test partition.
@@ -154,11 +173,7 @@ jobs:
           # slang-test accepts only a single -api option (a later one silently
           # overrides an earlier one), so select exactly one expression.
           # "-api all" is equivalent to the default (all APIs enabled).
-          if [[ -n "$API_INPUT" ]]; then
-            # Explicit override: caller supplies the exact -api expression,
-            # e.g. "dx11+dx12" or "vk+cuda+cpu+llvm" for a per-engine split.
-            api_expr="$API_INPUT"
-          elif [[ "${{ inputs.cpu-only }}" == "true" ]]; then
+          if [[ "${{ inputs.cpu-only }}" == "true" ]]; then
             # Restrict to CPU / LLVM backends; tests requiring any GPU API get
             # ignored by the test filter rather than run-and-failed.
             api_expr="cpu+llvm"
@@ -240,8 +255,8 @@ jobs:
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
-        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Run GLSL backend tests for pull requests, and not on merge_group, to reduce CI load.
+        if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.run-via-glsl && github.event_name == 'pull_request'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -256,6 +271,10 @@ jobs:
           if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
             via_glsl_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
           fi
+          # Skip most neural tests in debug builds to reduce CI time
+          if [[ "${{ inputs.config }}" == "debug" ]]; then
+            via_glsl_args+=("-skip-list" "tests/skip-list-debug.txt")
+          fi
           printf '+ %q' "$bin_dir/slang-test"
           printf ' %q' "${via_glsl_args[@]}"
           printf '\n'
@@ -263,8 +282,8 @@ jobs:
           "$bin_dir/slang-test" "${via_glsl_args[@]}"
 
       - name: Check via-glsl slang-test worktree cleanliness
-        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: always() && inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Run GLSL backend tests for pull requests, and not on merge_group, to reduce CI load.
+        if: always() && inputs.os != 'macos' && inputs.full-gpu-tests && inputs.run-via-glsl && github.event_name == 'pull_request'
         run: |
           status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
           if [[ -n "$status" ]]; then

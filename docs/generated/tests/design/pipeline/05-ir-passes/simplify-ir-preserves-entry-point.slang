@@ -15,7 +15,7 @@
 // in the dump and confirm that `func %main` is visible in the final
 // such block.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after simplifyIR -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-after simplifyIR -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

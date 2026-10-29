@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#ifelse
-//META: doc_section_digest=9107af33a205c736447b4c02d66c4032cb7ffae2ebc1f3e72dc1132780edf3e5
+//META: doc_section_digest=8e8ff9867878750c6e494dc89c9ad99cc9c750ba3dbe5e5c6e752d1886d3e399
 //META: purpose=Stress: five nested if-statements produce five distinct structured ifElse terminators in the same function, each with the four-operand cond/true/false/merge tuple.
 //META: intent=stress
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // pass emits five ifElse terminators back-to-back without collapsing
 // any of them (uniforms defeat constant folding).
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform int b;

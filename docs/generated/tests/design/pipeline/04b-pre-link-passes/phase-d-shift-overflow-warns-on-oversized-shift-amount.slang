@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-d-non-essential-validation-stripping-and-finalization
-//META: doc_section_digest=d5cc2044547103fad1def230cd84b372ec52583c6c1c9461da97d1ff06c46f52
+//META: doc_section_digest=e3c7922976a98da21daee6faebad4ef0647c4f9a2febd876436b3aaff10a665f
 //META: purpose=Phase D's checkForOperatorShiftOverflow (D7) flags a left-shift whose constant shift count exceeds the width of the shifted operand.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

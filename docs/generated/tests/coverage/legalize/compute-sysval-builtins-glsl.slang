@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T17:00:00Z
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name
-//META: doc_section_digest=b4c8d3637c56a76592380b5850772aac25face32ea591824cb9bbf293ce90b35
+//META: doc_section_digest=f8f9c6c9ed941a5154d83b06809c18c71fb5d69313dfbb7b6096dcb44af0485e
 //META: purpose=Verifies the four compute-stage thread-id system values map to their GLSL gl_* builtins (GlobalInvocationID/LocalInvocationID/WorkGroupID/LocalInvocationIndex).
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-glsl-legalize.cpp

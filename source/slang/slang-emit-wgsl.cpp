@@ -122,6 +122,21 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
         typeLayout = parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
     }
 
+    // A push-constant buffer (`[[vk::push_constant]]`) maps to WGSL immediate data: a
+    // `var<immediate>` with no `@group`/`@binding`, enabled by the
+    // `immediate_address_space` language extension.
+    // https://www.w3.org/TR/WGSL/#address-spaces-immediate
+    if (containerChain.varLayout->findOffsetAttr(LayoutResourceKind::PushConstantBuffer))
+    {
+        m_requiresImmediateAddressSpace = true;
+        m_writer->emit("var<immediate> ");
+        m_writer->emit(getName(varDecl));
+        m_writer->emit(" : ");
+        emitType(type->getElementType());
+        m_writer->emit(";\n");
+        return;
+    }
+
     for (auto attr : containerChain.varLayout->getOffsetAttrs())
     {
         const LayoutResourceKind kind = attr->getResourceKind();
@@ -268,6 +283,14 @@ void WGSLSourceEmitter::emitMatrixType(
 void WGSLSourceEmitter::emitStructDeclarationSeparatorImpl()
 {
     m_writer->emit(",");
+}
+
+// WGSL cannot use a texture or a sampler as an `array` element; an array of them is a
+// `binding_array`. Tint accepts a sized `binding_array` of sampled textures (the
+// `sized_binding_array` language feature); naga also accepts unsized ones and samplers.
+static bool isBindingArrayElementType(IRInst* elementType)
+{
+    return as<IRTextureTypeBase>(elementType) || as<IRSamplerStateTypeBase>(elementType);
 }
 
 static bool isPowerOf2(const uint32_t n)
@@ -616,6 +639,8 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     case kIROp_ArrayType:
         {
+            if (isBindingArrayElementType(type->getOperand(0)))
+                m_writer->emit("binding_");
             m_writer->emit("array<");
             emitType((IRType*)type->getOperand(0));
             m_writer->emit(", ");
@@ -625,6 +650,8 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_UnsizedArrayType:
         {
+            if (isBindingArrayElementType(type->getOperand(0)))
+                m_writer->emit("binding_");
             m_writer->emit("array<");
             emitType((IRType*)type->getOperand(0));
             m_writer->emit(">");
@@ -723,6 +750,16 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_ConstantBufferType:
         {
             emitType((IRType*)type->getOperand(0));
+            return;
+        }
+    case kIROp_AttributedType:
+        {
+            // An attribute (`unorm`/`snorm`, `no_diff`) is a semantic marker that
+            // does not change representation and has no WGSL spelling, so the type
+            // is emitted as its base. Without this, a `unorm float` used as a
+            // struct member or structured-buffer element type reaches here and the
+            // `default` arm emits nothing, producing invalid WGSL (`array<>`).
+            emitType(cast<IRAttributedType>(type)->getBaseType());
             return;
         }
     default:
@@ -891,8 +928,18 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         type->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
         type->getOp() == kIROp_HLSLRWByteAddressBufferType)
     {
+        // A GLSL `readonly buffer` reaches here as an RWStructuredBuffer (the SSBO lowering keeps
+        // the binding a UAV for the other targets); WGSL forbids read_write storage in vertex
+        // shaders, so honour its `readonly` qualifier with the `read` access mode.
+        bool readOnly = false;
+        if (auto qualifiers = varDecl->findDecoration<IRMemoryQualifierSetDecoration>())
+        {
+            const auto flags = qualifiers->getMemoryQualifierBit();
+            readOnly = (flags & MemoryQualifierSetModifier::Flags::kReadOnly) &&
+                       !(flags & MemoryQualifierSetModifier::Flags::kWriteOnly);
+        }
         m_writer->emit("<");
-        m_writer->emit("storage, read_write");
+        m_writer->emit(readOnly ? "storage, read" : "storage, read_write");
         m_writer->emit(">");
     }
     else if (
@@ -1419,34 +1466,6 @@ void WGSLSourceEmitter::emitCallArg(IRInst* inst)
 
 bool WGSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
-    // WGSL emits MakeArray/MakeStruct as constructor expressions, valid in any expression context
-    // (the base class never folds them because C/HLSL initializer lists are not). Fold a
-    // module-scope aggregate constant inline when it is used only as a constituent of another
-    // aggregate, so a nested `static const` (e.g. `int g[2][3]`) does not emit its inner arrays as
-    // separate named decls that the outermost array's `var<private>` initializer would illegally
-    // reference; the outermost (used directly, e.g. runtime-indexed) one stays a declaration.
-    switch (inst->getOp())
-    {
-    case kIROp_MakeArray:
-    case kIROp_MakeStruct:
-    case kIROp_MakeArrayFromElement:
-        if (inst->getParent() && inst->getParent()->getOp() == kIROp_ModuleInst)
-        {
-            bool onlyConstituent = inst->firstUse != nullptr;
-            for (auto use = inst->firstUse; onlyConstituent && use; use = use->nextUse)
-            {
-                auto userOp = use->getUser()->getOp();
-                onlyConstituent = userOp == kIROp_MakeArray || userOp == kIROp_MakeStruct ||
-                                  userOp == kIROp_MakeArrayFromElement;
-            }
-            if (onlyConstituent)
-                return true;
-        }
-        break;
-    default:
-        break;
-    }
-
     bool result = CLikeSourceEmitter::shouldFoldInstIntoUseSites(inst);
     if (result)
     {
@@ -1652,6 +1671,23 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             return true;
         }
+    case kIROp_Less:
+    case kIROp_Greater:
+    case kIROp_Leq:
+    case kIROp_Geq:
+        {
+            // WGSL template-list discovery reads `ident <` as opening a template list that a later
+            // `>` or `>=` at the same parenthesis depth closes, even across a `,`, so in
+            // `f(a < b, a > b)` the text `a<b, a>` is a templated identifier and parsing fails.
+            // A `)` discards any candidate opened inside it, so we always parenthesize relational
+            // comparisons; inside those parentheses the operands need only `General` precedence.
+            // `<=` cannot open a template list, but we treat all four operators alike so the rule
+            // stays simple. https://www.w3.org/TR/WGSL/#template-lists-sec
+            m_writer->emit("(");
+            defaultEmitInstExpr(inst, getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_BitXor:
     case kIROp_BitOr:
     case kIROp_BitAnd:
@@ -1708,7 +1744,9 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_GetStringHash:
         {
             auto getStringHashInst = as<IRGetStringHash>(inst);
-            auto stringLit = getStringHashInst->getStringLit();
+            // Checked, unlike `getStringLit()`, so a non-literal operand reaches the
+            // unhandled-inst path below instead of being read as string data.
+            auto stringLit = as<IRStringLit>(getStringHashInst->getOperand(0));
 
             if (stringLit)
             {
@@ -1774,12 +1812,20 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto opType = inst->getOperand(0)->getDataType();
             if (as<IRMatrixType>(opType) || as<IRVectorType>(opType))
             {
-                // WGSL does not support negate operator on matrices and vectors,
-                // we should emit "(type(0) - op0)" instead.
+                // Lower every vector/matrix negation uniformly to "(type(0) - op0)". (WGSL has a
+                // native unary '-' only for signed float/int vectors; matrices and unsigned
+                // vectors have none, and the subtraction matches '-x' for the signed cases too.)
+                // The explicit parentheses wrap the whole subtraction, so its outer context is
+                // effectively lowest-precedence: pass EmitOp::General (not the incoming outerPrec)
+                // and emit op0 as the subtraction's right-hand side. This wraps an operand that
+                // binds no tighter than '-' -- the additive "a + b" (its left-associative RHS, at
+                // equal precedence) -- but not a multiplicative "a * b" or an atomic.
                 m_writer->emit("(");
                 emitType(inst->getDataType());
                 m_writer->emit("(0) - ");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitOperand(
+                    inst->getOperand(0),
+                    rightSide(getInfo(EmitOp::General), getInfo(EmitOp::Sub)));
                 m_writer->emit(")");
                 return true;
             }
@@ -1818,6 +1864,11 @@ void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
     StringBuilder builder;
     m_extensionTracker->appendExtensionRequireLinesForWGSL(builder);
     m_writer->emit(builder.getUnownedSlice());
+
+    if (m_requiresImmediateAddressSpace)
+    {
+        m_writer->emit("requires immediate_address_space;\n");
+    }
 }
 
 void WGSLSourceEmitter::emitIntrinsicCallExprImpl(
@@ -1899,15 +1950,10 @@ void WGSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     {
         if (const auto extensionDecoration = as<IRRequireWGSLExtensionDecoration>(decoration))
         {
+            // Subgroup operations on f16 values need only `enable f16;` and
+            // `enable subgroups;`. WGSL has no separate `subgroups_f16` extension
+            // (it was folded into `subgroups`), and validators reject it.
             _requireExtension(extensionDecoration->getExtensionName());
-
-            // TODO: Make this cleaner and only enable this extension if f16 is actually used on the
-            // subgroup intrinsic. Check float type in meta file.
-            if (m_f16ExtensionEnabled && extensionDecoration->getExtensionName() == "subgroups")
-            {
-                String extName = "subgroups_f16";
-                _requireExtension(extName.getUnownedSlice());
-            }
         }
     }
 }

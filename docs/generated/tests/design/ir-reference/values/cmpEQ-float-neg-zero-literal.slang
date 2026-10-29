@@ -13,7 +13,7 @@
 // formatter (matches the IEEE-754 distinct bit pattern), even
 // though `+0.0 == -0.0` is true at the value level.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<int> buf;

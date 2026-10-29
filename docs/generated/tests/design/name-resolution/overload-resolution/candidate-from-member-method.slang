@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: generated_at=2026-08-13T00:00:00+00:00
+//META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#probe-phase-where-candidates-come-from
-//META: doc_section_digest=dfd7b5878428e66d4c6b22b8ce6a609a70c3ed9c74c32c1f56d5d54a8a3e67d5
+//META: doc_section_digest=fd6b141e684f15a00cb062b04ca96b050f6b3c8c740707d6c23327611bd617b5
 //META: purpose=AddDeclRefOverloadCandidates turns each member of a lookup result into a candidate, so a member call resolves to the same-name method whose parameter list matches.
 //META: intent=functional
 //META: pipeline_stage=check

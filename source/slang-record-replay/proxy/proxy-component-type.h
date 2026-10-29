@@ -5,8 +5,6 @@
 #include "proxy-macros.h"
 #include "slang-com-helper.h"
 #include "slang.h"
-#include "slang/slang-ast-type.h"
-#include "slang/slang-compiler-api.h"
 
 namespace SlangRecord
 {
@@ -41,7 +39,6 @@ public:
         , m_module(nullptr)
         , m_entryPoint(nullptr)
         , m_typeConformance(nullptr)
-        , m_hasRegisteredCoreModule(false)
     {
 
         // Each queryInterface below addRef's the returned pointer. The immediate
@@ -72,31 +69,6 @@ public:
         // Clear returned entry points to release references before the component is released
         SuppressRefCountRecording guard;
         m_returnedEntryPoints.clear();
-    }
-
-    // Uses Slang AST internals to discover the core module so it can be wrapped
-    // for replay handle tracking. There is currently no public API on IGlobalSession
-    // or ISession to retrieve builtin/core modules (getLoadedModule only returns
-    // user-loaded modules).
-    void tryRegisterCoreModule()
-    {
-        if (!m_module || m_hasRegisteredCoreModule)
-            return;
-        auto layout = m_module->getLayout(0, nullptr);
-        if (layout)
-        {
-            slang::TypeReflection* coreType = layout->findTypeByName("int");
-            Slang::DeclRefType* declRefType =
-                Slang::as<Slang::DeclRefType>(Slang::asInternal(coreType));
-            SLANG_ASSERT(declRefType);
-            if (!declRefType)
-                return;
-            IModule* owningModule = Slang::getModule(declRefType->getDeclRef().getDecl());
-            if (!owningModule)
-                return;
-            wrapObject(owningModule);
-            m_hasRegisteredCoreModule = true;
-        }
     }
 
     // Record addRef/release for lifetime tracking during replay
@@ -610,7 +582,6 @@ private:
     slang::IModule* m_module;                   // May be null
     slang::IEntryPoint* m_entryPoint;           // May be null
     slang::ITypeConformance* m_typeConformance; // May be null
-    bool m_hasRegisteredCoreModule;
     List<ComPtr<slang::IEntryPoint>> m_returnedEntryPoints;
 };
 

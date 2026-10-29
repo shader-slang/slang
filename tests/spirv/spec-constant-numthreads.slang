@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -allow-glsl
 //TEST:SIMPLE(filecheck=GLSL): -target glsl
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -allow-glsl
+//TEST:SIMPLE(filecheck=GLSL): -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // CHECK-DAG: OpExecutionModeId %computeMain1 LocalSizeId %[[C0:[0-9A-Za-z_]+]] %[[C1:[0-9A-Za-z_]+]] %[[C2:[0-9A-Za-z_]+]]

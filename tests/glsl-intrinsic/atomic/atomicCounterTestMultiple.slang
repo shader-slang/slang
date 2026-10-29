@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
+//DIAGNOSTIC_TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/atomic/atomicCounterTestMultiple.slang -stage compute -entry computeMain -target glsl -DTARGET_GLSL
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer

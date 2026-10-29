@@ -39,6 +39,20 @@ namespace slang
 namespace wgsl
 {
 
+// JavaScript objects that mirror the C++ descriptor structs. Each is an emscripten::val, read
+// field by field at run time; the types exist so that interface.d.ts names them (see
+// register_type in slang-wasm-bindings.cpp) instead of declaring `any`.
+namespace js
+{
+EMSCRIPTEN_DECLARE_VAL_TYPE(CompilerOptionValue);
+EMSCRIPTEN_DECLARE_VAL_TYPE(CompilerOptionEntry);
+EMSCRIPTEN_DECLARE_VAL_TYPE(PreprocessorMacroDesc);
+EMSCRIPTEN_DECLARE_VAL_TYPE(TargetDesc);
+EMSCRIPTEN_DECLARE_VAL_TYPE(SessionDesc);
+// The argument of GlobalSession.createSession: a SessionDesc, or a compile target number.
+EMSCRIPTEN_DECLARE_VAL_TYPE(SessionDescOrTarget);
+} // namespace js
+
 std::string getVersionString();
 
 class TypeLayoutReflection;
@@ -330,7 +344,48 @@ public:
     {
     }
 
-    Session* createSession(int compileTarget);
+    // `desc` is either a compile target (a number, as returned by getCompileTargets()), or a
+    // js::SessionDesc object, which mirrors slang::SessionDesc. A number gives a session with
+    // that one target.
+    //
+    // These are the fields that are read; other C++ fields and other properties are ignored.
+    // (This list is the reference: the reader in slang-wasm.cpp and the TypeScript types in
+    // slang-wasm-bindings.cpp follow it.)
+    //   SessionDesc: targets, defaultMatrixLayoutMode, searchPaths, preprocessorMacros,
+    //                compilerOptionEntries.
+    //   TargetDesc:  format (required), profile, flags, floatingPointMode, lineDirectiveMode,
+    //                forceGLSLScalarBufferLayout, compilerOptionEntries.
+    //   PreprocessorMacroDesc: name (required), value.
+    //   CompilerOptionEntry: name (required), value: {kind (required), intValue0, intValue1,
+    //                stringValue0, stringValue1}.
+    // Fields that are left out keep the C++ defaults, so a SessionDesc without `targets` gives
+    // a session with no targets, as in C++. The exception: an HLSL target without a profile
+    // gets sm_6_6, in both forms. A profile is a SlangProfileID from findProfile().
+    //
+    // Enum fields take the integer values from include/slang.h (for example
+    // CompilerOptionName::MacroDefine is 0), as `format` always has.
+    //
+    // Returns null and sets getLastError() (type "USER", SLANG_E_INVALID_ARG, with a message
+    // that names the field by its path, such as `targets[1].format`) when:
+    //   - `desc` is neither a number nor an object (an array is not accepted);
+    //   - `desc` is a number that is not a SlangCompileTarget;
+    //   - a required field is missing, a field has the wrong JavaScript type, a number field is
+    //     not an integer in the int32 range, a list is not an array, or a list item is not an
+    //     object;
+    //   - a `format` is not a SlangCompileTarget, an option `name` is outside the
+    //     CompilerOptionName range, a `value.kind` is not 0 (Int) or 1 (String), or the Int value
+    //     of a Capability entry is not a capability atom.
+    // Other enum and option values are passed on without checks, as in C++.
+    Session* createSession(js::SessionDescOrTarget desc);
+
+    // Returns the SlangProfileID for a profile name such as "sm_6_6" or "glsl_460", or 0
+    // (SLANG_PROFILE_UNKNOWN) if the name is not a known profile.
+    int findProfile(const std::string& name);
+
+    // Returns the source of the builtin module "core" or "glsl". The name is matched by prefix,
+    // so "core-extra" also selects core. Any other name returns an empty string and does not
+    // set an error, so an empty result cannot be told apart from a failure via getLastError().
+    std::string getBuiltinModuleSource(const std::string& moduleName);
 
     slang::IGlobalSession* interface() const { return m_interface; }
 

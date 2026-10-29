@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#blockstmt-and-seqstmt
-//META: doc_section_digest=286b56c30cbbe8b637fe3e2feda9744698b33bf0a2434728ce750ab093cc9caf
+//META: doc_section_digest=74085b8937a2f64c1cc81b32d872d42eeb0f485c431b126cafe3c352926dd739
 //META: purpose=A `switch` introduces no scope of its own and takes its lexical scope from the block the parser builds for its body, so a variable declared under one case label is in scope under the following case labels.
 //META: intent=regression
 //META: pipeline_stage=check

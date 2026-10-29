@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T14:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#type-flow-specialization
-//META: doc_section_digest=3336b3eca9be44409095a66507ff80c6aa09351d36bfe0e1b016252f5eb2c95d
+//META: doc_section_digest=a0da5034c97141463a251249840f37c0d6aa044577502ebd7d9fcd6fdd7241fa
 //META: purpose=Bit-casting to an interface (existential, non-concrete) target type is rejected with E41204.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-typeflow-specialize.cpp

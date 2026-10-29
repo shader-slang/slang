@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#rwstructuredbuffergetelementptr
-//META: doc_section_digest=1109150b01fc6cb7960b788c7bb9ca3bbae1748af0ae3a77abc2970881ef9206
+//META: doc_section_digest=79a3f90a07e564c3a6781f28bec380af53c172ad701f8d621623d248c4edee79
 //META: purpose=Writing `rwbuf[-1] = v` (signed-underflow index literal) still surfaces the documented `rwstructuredBufferGetElementPtr(%base, -1 : Int)` opcode shape.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // signed-underflow corner. The doc states no runtime behavior at this
 // boundary (see Doc gaps observed in README.md).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> rwbuf;
 

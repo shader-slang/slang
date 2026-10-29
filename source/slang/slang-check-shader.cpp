@@ -27,6 +27,69 @@ enum class SemanticDirection
     Output,
 };
 
+struct EntryPointParamDirections
+{
+    bool isInput = false;
+    bool isOutput = false;
+};
+
+/// Check the passing mode of entry-point parameter `param`, and return whether the parameter is a
+/// stage input, a stage output, or both.
+static EntryPointParamDirections checkEntryPointParamPassingMode(
+    ParamDecl* param,
+    DiagnosticSink* sink)
+{
+    EntryPointParamDirections directions;
+    const auto mode = getParamPassingMode(param);
+    switch (mode)
+    {
+    case ParamPassingMode::In:
+    case ParamPassingMode::BorrowIn:
+        directions.isInput = true;
+        break;
+    case ParamPassingMode::Out:
+        directions.isOutput = true;
+        break;
+    case ParamPassingMode::BorrowInOut:
+        directions.isInput = true;
+        directions.isOutput = true;
+        break;
+
+    // An entry point receives values from the previous pipeline stage and passes values to the
+    // next one, so there is no caller's memory location for a reference parameter to bind to. A
+    // borrow such as `__constref` has value semantics and may be implemented by copying, so only
+    // the reference modes are rejected. We still give each one the direction its access implies,
+    // so that the remaining entry-point checks report their own problems with the parameter.
+    case ParamPassingMode::RefReadWrite:
+        sink->diagnose(Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
+        directions.isInput = true;
+        directions.isOutput = true;
+        break;
+    case ParamPassingMode::RefReadOnly:
+        sink->diagnose(Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
+        directions.isInput = true;
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        sink->diagnose(Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
+        directions.isOutput = true;
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled entry-point parameter passing mode");
+        break;
+    }
+
+    // Mesh output types encode stage-output direction even when passed with mode In.
+    Type* type = param->getType();
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    if (as<MeshOutputType>(type))
+    {
+        directions.isInput = false;
+        directions.isOutput = true;
+    }
+    return directions;
+}
+
 // Maximum nesting depth when recursively walking a declaration's type for system-value
 // semantics. Shared by validateSystemValueSemantic and collectDepthOutputSemantics so the two
 // walks provably use the same bound: collectDepthOutputSemantics can return silently at the
@@ -158,6 +221,46 @@ static SemanticDecl* lookUpSemanticDecl(
     return as<SemanticDecl>(lookupResult.item.declRef.getDecl());
 }
 
+// True when `stageProjectedCaps` (an accessor requirement already projected onto `stage`) is
+// equivalent to the bare stage and so adds nothing to enforce. Tested by implication in *both*
+// directions: one-way `{stage} implies req` also holds when `req` is strictly stronger than the
+// stage (e.g. adds a target restriction), so requiring `req implies {stage}` too keeps genuinely
+// stage-only requirements out while letting stronger ones through.
+static bool isStageOnlyRequirement(const CapabilitySet& stageProjectedCaps, Stage stage)
+{
+    if (stageProjectedCaps.isEmpty() || stageProjectedCaps.isInvalid())
+        return true;
+    CapabilityAtom stageAtom = getAtomFromStage(stage);
+    if (stageAtom == CapabilityAtom::Invalid)
+        return false;
+    CapabilitySet stageCaps((CapabilityName)stageAtom);
+    return stageCaps.implies(stageProjectedCaps) && stageProjectedCaps.implies(stageCaps);
+}
+
+// Fold a matched semantic accessor's `[require]` into the entry point's `*outCaps`, so the profile
+// check enforces a capability the semantic carries but general inference misses (it does not look
+// through a semantic to its accessor). Project the requirement onto the entry point's stage first
+// and join only what is strictly stronger than that stage context: a multi-stage requirement's
+// off-stage alternatives must not leak in (a fragment use of a getter declared for
+// `[require(fragment)] [require(geometry)]` must not pull in `geometry`), and a requirement equal
+// to the stage is already implied by the profile. Example: `SV_Barycentrics`, whose getter is
+// `[require(fragment, fragmentshaderbarycentric)]`, contributes `fragmentshaderbarycentric`.
+static void collectSemanticAccessorRequirement(Decl* member, Stage stage, CapabilitySet* outCaps)
+{
+    SLANG_ASSERT(outCaps);
+    auto requireAttr = member->findModifier<RequireCapabilityAttribute>();
+    if (!requireAttr || !requireAttr->capabilitySet)
+        return;
+    CapabilityAtom stageAtom = getAtomFromStage(stage);
+    if (stageAtom == CapabilityAtom::Invalid)
+        return;
+    CapabilitySet stageProjectedCaps{requireAttr->capabilitySet};
+    stageProjectedCaps.join(CapabilitySet((CapabilityName)stageAtom));
+    if (isStageOnlyRequirement(stageProjectedCaps, stage))
+        return;
+    outCaps->nonDestructiveJoin(stageProjectedCaps);
+}
+
 // Validate that type being used for a system value semantic is compatible with the semantic.
 static void validateSystemValueSemanticForType(
     SemanticsVisitor* visitor,
@@ -167,7 +270,8 @@ static void validateSystemValueSemanticForType(
     HLSLSimpleSemantic* semantic,
     Stage stage,
     SemanticDirection direction,
-    Scope* scope)
+    Scope* scope,
+    CapabilitySet* outInferredCaps)
 {
     if (!semantic || !type)
         return;
@@ -270,6 +374,7 @@ static void validateSystemValueSemanticForType(
         if (isSemanticTypeCompatible(accessorType, type))
         {
             foundMatchingAccessor = true;
+            collectSemanticAccessorRequirement(member, stage, outInferredCaps);
             break;
         }
 
@@ -286,6 +391,7 @@ static void validateSystemValueSemanticForType(
                             typeArrayType->getElementType()))
                     {
                         foundMatchingAccessor = true;
+                        collectSemanticAccessorRequirement(member, stage, outInferredCaps);
                         break;
                     }
                 }
@@ -392,8 +498,12 @@ static void validateNoPerPrimitiveSemanticsInType(
 }
 
 
-// Validate system value semantics on a declaration recursively.
-// and validates any SV_ semantic against the SemanticDecl definitions in core module.
+// Validate `decl`'s SV_ semantics against the SemanticDecl definitions in the core module,
+// recursing through struct fields. Also folds each matched accessor's capability requirement into
+// `outInferredCaps` (non-destructive join), so the entry point enforces a requirement the semantic
+// carries but the general capability inference misses — e.g. `fragmentshaderbarycentric` for
+// `SV_Barycentrics`. `outInferredCaps` is the entry point's accumulating requirement set and is
+// always non-null.
 static void validateSystemValueSemantic(
     SemanticsVisitor* visitor,
     DiagnosticSink* sink,
@@ -401,6 +511,7 @@ static void validateSystemValueSemantic(
     Stage stage,
     SemanticDirection direction,
     Scope* scope,
+    CapabilitySet* outInferredCaps,
     UInt recursionDepth = 0)
 {
     if (!decl)
@@ -489,6 +600,7 @@ static void validateSystemValueSemantic(
                     stage,
                     direction,
                     scope,
+                    outInferredCaps,
                     recursionDepth + 1);
             }
         }
@@ -507,7 +619,8 @@ static void validateSystemValueSemantic(
         semantic,
         stage,
         direction,
-        scope);
+        scope,
+        outInferredCaps);
 }
 
 // Return true if `semanticName` is one of the fragment depth-output system values
@@ -1692,6 +1805,176 @@ static void collectGenericStructTypeUses(
     }
 }
 
+// Check a selected entry point's effective requirements against each requested target.
+// Both initial selection and later specialization use this check; the latter must not write
+// its requirements onto the base EntryPoint, which can have other independent specializations.
+// Previously checked requirements contribute to the profile baseline, so later specialization
+// reports only additional profile requirements. Target/stage compatibility uses the full set.
+static void validateEntryPointCapabilities(
+    EntryPoint* entryPoint,
+    const CapabilitySet& entryPointInferredCaps,
+    const List<Decl*>& referencedDecls,
+    const List<GenericStructTypeUse>& signatureStructUses,
+    DiagnosticSink* sink,
+    const CapabilitySetVal* previouslyCheckedCaps = nullptr)
+{
+    auto linkage = entryPoint->getLinkage();
+    auto entryPointFuncDecl = entryPoint->getFuncDecl();
+    for (auto target : linkage->targets)
+    {
+        auto targetCaps = target->getTargetCaps();
+        auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
+        targetCaps.join(stageCapabilitySet);
+        if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
+        {
+            // Incompatable means we don't support a set of abstract atoms.
+            // Diagnose that we lack support for 'stage' and 'target' atoms with our provided
+            // entry-point
+            auto compileTarget = target->getTargetCaps().getCompileTarget();
+            auto stageTarget = stageCapabilitySet.getTargetStage();
+            maybeDiagnose(
+                sink,
+                linkage->m_optionSet,
+                DiagnosticCategory::Capability,
+                Diagnostics::EntryPointUsesUnavailableCapability{
+                    .stage = capabilityNameToString((CapabilityName)stageTarget),
+                    .target = capabilityNameToString((CapabilityName)compileTarget),
+                    .decl = entryPointFuncDecl});
+
+            // Find out what is incompatible (ancestor missing a super set of 'target+stage')
+            CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
+            if (targetCaps.isIncompatibleWith(
+                    CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}))
+                diagnoseMissingCapabilityProvenance(
+                    linkage->m_optionSet,
+                    sink,
+                    entryPointFuncDecl,
+                    failedSet);
+
+            // Generic arguments belong to this selection, so their provenance cannot be stored
+            // on the shared function declaration. Continue the ordinary provenance walk from
+            // each contributing declaration whose requirements reject this target.
+            for (auto decl : referencedDecls)
+            {
+                if (targetCaps.isIncompatibleWith(
+                        CapabilitySet{decl->inferredCapabilityRequirements}))
+                    diagnoseMissingCapabilityProvenance(
+                        linkage->m_optionSet,
+                        sink,
+                        decl,
+                        failedSet);
+            }
+
+            // The provenance walk above follows `capabilityRequirementProvenance`,
+            // which does not record generic struct signature types. Point at any
+            // such struct whose requirement is itself incompatible with the
+            // target, mirroring the notes emitted for non-generic structs.
+            for (auto& use : signatureStructUses)
+            {
+                if (!targetCaps.isIncompatibleWith(
+                        CapabilitySet{use.structDecl->inferredCapabilityRequirements}))
+                    continue;
+                maybeDiagnose(
+                    sink,
+                    linkage->m_optionSet,
+                    DiagnosticCategory::Capability,
+                    Diagnostics::SeeUsingOf{.decl = use.structDecl, .location = use.useLoc});
+                maybeDiagnose(
+                    sink,
+                    linkage->m_optionSet,
+                    DiagnosticCategory::Capability,
+                    Diagnostics::SeeDefinitionOf{.decl = use.structDecl});
+                if (auto requireAttr = use.structDecl->findModifier<RequireCapabilityAttribute>())
+                    maybeDiagnose(
+                        sink,
+                        linkage->m_optionSet,
+                        DiagnosticCategory::Capability,
+                        Diagnostics::SeeDeclarationOfModifier{.modifier = requireAttr});
+            }
+        }
+        else
+        {
+            auto& targetOptionSet = target->getOptionSet();
+            bool specificProfileRequested =
+                targetOptionSet.hasOption(CompilerOptionName::Profile) &&
+                (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
+                 SLANG_PROFILE_UNKNOWN);
+            bool specificCapabilityRequested = false;
+            for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+            {
+                switch (atomVal.kind)
+                {
+                case CompilerOptionValueKind::Int:
+                    if (atomVal.intValue != SLANG_CAPABILITY_UNKNOWN)
+                        specificCapabilityRequested = true;
+                    break;
+                case CompilerOptionValueKind::String:
+                    // User made a specific capability request
+                    specificCapabilityRequested = true;
+                    break;
+                }
+                if (specificCapabilityRequested)
+                    break;
+            }
+
+            if (auto declaredCapsMod =
+                    entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>())
+            {
+                // If the entry point has an explicitly declared capability, then we
+                // will merge that with the target capability set before checking if
+                // there is an implicit upgrade.
+                targetCaps.nonDestructiveJoin(declaredCapsMod->declaredCapabilityRequirements);
+            }
+
+            // For a body requiring sm_6_6 and requested profile sm_6_0, initial validation has
+            // already reported the upgrade to sm_6_6. Specializing with int needs no further
+            // upgrade, while an argument requiring sm_6_7 must still produce a diagnostic.
+            targetCaps.join(previouslyCheckedCaps);
+
+            // Only attempt to error if a specific profile or capability is requested
+            if ((specificCapabilityRequested || specificProfileRequested) &&
+                targetCaps.atLeastOneSetImpliedInOther(entryPointInferredCaps) ==
+                    CapabilitySet::ImpliesReturnFlags::NotImplied)
+            {
+                CapabilitySet combinedSets = targetCaps;
+                combinedSets.join(entryPointInferredCaps);
+                CapabilityAtomSet addedAtoms{};
+                if (auto targetCapSet = targetCaps.getAtomSets())
+                {
+                    if (auto combinedSet = combinedSets.getAtomSets())
+                    {
+                        CapabilityAtomSet::calcSubtract(
+                            addedAtoms,
+                            (*combinedSet),
+                            (*targetCapSet));
+                    }
+                }
+                StringBuilder entryPointNameSb;
+                printDiagnosticArg(entryPointNameSb, entryPointFuncDecl);
+                auto atoms = addedAtoms.getElements<CapabilityAtom>();
+                StringBuilder capsSb;
+                printDiagnosticArg(capsSb, atoms);
+                maybeDiagnoseWarningOrError(
+                    sink,
+                    target->getOptionSet(),
+                    DiagnosticCategory::Capability,
+                    Diagnostics::ProfileImplicitlyUpgraded{
+                        .entryPoint = entryPointNameSb.produceString(),
+                        .profile = target->getOptionSet().getProfile().getName(),
+                        .capabilities = capsSb.produceString(),
+                        .location = entryPointFuncDecl->loc,
+                    },
+                    Diagnostics::ProfileImplicitlyUpgradedRestrictive{
+                        .entryPoint = entryPointNameSb.produceString(),
+                        .profile = target->getOptionSet().getProfile().getName(),
+                        .capabilities = capsSb.produceString(),
+                        .location = entryPointFuncDecl->loc,
+                    });
+            }
+        }
+    }
+}
+
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
@@ -1729,14 +2012,36 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
 
+    // An entry point is invoked by the pipeline, which has no channel for returning an error, so
+    // it cannot declare `throws`. `getErrorCodeType` is used rather than reading `errorType`
+    // directly because it applies the declaration reference's substitutions, which matters for a
+    // generic entry point. Two sentinel types both mean "nothing was declared": the bottom type
+    // for an absent clause, and the error type for a clause whose type failed to check -- the
+    // latter has already been diagnosed, so reporting this as well would only add noise.
+    {
+        auto astBuilder = linkage->getASTBuilder();
+        auto errorCodeType = getErrorCodeType(astBuilder, entryPoint->getFuncDeclRef());
+        if (!errorCodeType->equals(astBuilder->getBottomType()) &&
+            !errorCodeType->equals(astBuilder->getErrorType()))
+        {
+            sink->diagnose(Diagnostics::EntryPointCannotThrow{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+    }
+
     // Check if the return type is valid for a shader entry point
     auto returnType = entryPointFuncDecl->returnType.type;
     if (returnType)
     {
         // Use the existing getTypeTags functionality to check for resource types
         // Create a temporary SemanticsVisitor to access getTypeTags
-        SharedSemanticsContext shared(linkage, module, sink);
-        SemanticsVisitor visitor(&shared);
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            module,
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
 
         auto typeTags = visitor.getTypeTags(returnType);
         bool hasResourceOrUnsizedTypes = (((int)typeTags & (int)TypeTag::Opaque) != 0) ||
@@ -1772,6 +2077,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         sink->diagnose(Diagnostics::EntryPointHasNoStage{
             .entryPoint = entryPointName->text,
             .location = entryPointFuncDecl->loc});
+
+        // The remaining entry-point contract cannot be validated without a concrete stage.
+        // In particular, system-semantic accessor resolution maps this value through
+        // `getAtomFromStage()`, where `Stage::Unknown` is an internal error, while later parameter
+        // classification and profile validation also use the stage to select their rules. Stop
+        // after the prerequisite diagnostic instead of emitting secondary diagnostics from an
+        // invented stage or entering those out-of-contract paths.
+        return;
     }
 
     if (stage == Stage::Hull)
@@ -1910,10 +2223,30 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
-    // Validate system value semantics against SemanticDecl definitions in core module
+    // The checks from here on classify each parameter as a stage input, output, or both.
+    List<ParamDecl*> params;
+    List<EntryPointParamDirections> paramDirections;
+    for (auto param : entryPointFuncDecl->getParameters())
     {
-        SharedSemanticsContext shared(linkage, module, sink);
-        SemanticsVisitor visitor(&shared);
+        params.add(param);
+        paramDirections.add(checkEntryPointParamPassingMode(param, sink));
+    }
+
+    // Collect the requirements that depend on the entry point's stage and signature.
+    // The checked reference's generic arguments are joined after these base requirements below.
+    CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
+
+    // Validate system value semantics, and collect the capabilities their accessors require:
+    // general capability inference does not look through a semantic to the `[require]` on the
+    // accessor it resolves to, so a need like `fragmentshaderbarycentric` on `SV_Barycentrics`
+    // must be gathered here.
+    {
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            module,
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
 
         // Use the session's coreLanguageScope which contains the SemanticDecl definitions
         // The module's own scope may not include the core module (e.g., when loading from
@@ -1921,9 +2254,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         if (auto scope = linkage->getSessionImpl()->coreLanguageScope)
         {
             // Validate system value semantics for entry point parameters
-            for (const auto& param : entryPointFuncDecl->getParameters())
+            for (Index i = 0; i < params.getCount(); ++i)
             {
-                if (param->hasModifier<InOutModifier>())
+                const auto param = params[i];
+                const auto directions = paramDirections[i];
+                if (directions.isInput && directions.isOutput)
                 {
                     validateSystemValueSemantic(
                         &visitor,
@@ -1931,16 +2266,18 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Input,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                     validateSystemValueSemantic(
                         &visitor,
                         sink,
                         param,
                         stage,
                         SemanticDirection::Output,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
-                else if (param->hasModifier<OutModifier>())
+                else if (directions.isOutput)
                 {
                     validateSystemValueSemantic(
                         &visitor,
@@ -1948,7 +2285,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Output,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
                 else
                 {
@@ -1958,7 +2296,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Input,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
             }
 
@@ -1969,7 +2308,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 entryPointFuncDecl,
                 stage,
                 SemanticDirection::Output,
-                scope);
+                scope,
+                &entryPointInferredCaps);
         }
     }
 
@@ -1985,13 +2325,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         auto astBuilder = getCurrentASTBuilder();
         List<HLSLSimpleSemantic*> depthOutputSemantics;
-        for (const auto& param : entryPointFuncDecl->getParameters())
+        for (Index i = 0; i < params.getCount(); ++i)
         {
             // Depth semantics are output-only (setter-only in the core module; any input use
-            // is already rejected), so only `out`/`inout` parameters can carry one.
-            // InOutModifier derives from OutModifier, so this catches both.
-            if (param->hasModifier<OutModifier>())
-                collectDepthOutputSemantics(astBuilder, param, depthOutputSemantics);
+            // is already rejected), so only output parameters can carry one.
+            if (paramDirections[i].isOutput)
+                collectDepthOutputSemantics(astBuilder, params[i], depthOutputSemantics);
         }
         // The return value is also an output of the entry point.
         collectDepthOutputSemantics(astBuilder, entryPointFuncDecl, depthOutputSemantics);
@@ -2006,6 +2345,31 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 .conflictingSemantic = String(depthOutputSemantics[1]->name.getContent()),
                 .earlierSemantic = String(depthOutputSemantics[0]->name.getContent()),
                 .location = depthOutputSemantics[1]->loc});
+        }
+    }
+
+    // GLSL puts `layout(early_fragment_tests) in;` on a standalone EmptyDecl beside the entry
+    // point, not on the function; lift it onto the fragment entry point as the canonical
+    // EarlyDepthStencilAttribute (as the local_size_* -> NumThreadsAttribute lift below does).
+    // Resolve the scope with getParentDecl, not the raw parentDecl: a *specialized* generic
+    // fragment entry point's immediate parent is the GenericDecl, not the module scope holding the
+    // EmptyDecl, so the raw parentDecl would miss the marker and silently drop the mode. Require
+    // the `in` direction: the qualifier is input-only, so `out;`/bare forms stay inert.
+    if (stage == Stage::Fragment && !entryPointFuncDecl->findModifier<EarlyDepthStencilAttribute>())
+    {
+        if (auto parentDecl = getParentDecl(entryPointFuncDecl))
+        {
+            for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+            {
+                if (emptyDecl->findModifier<GLSLLayoutEarlyFragmentTestsAttribute>() &&
+                    emptyDecl->findModifier<InModifier>())
+                {
+                    addModifier(
+                        entryPointFuncDecl,
+                        getCurrentASTBuilder()->create<EarlyDepthStencilAttribute>());
+                    break;
+                }
+            }
         }
     }
 
@@ -2235,8 +2599,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
         // Validate each parameter that would be treated as varying. Parameters
         // that were auto-marked uniform by the loop above are skipped here.
-        for (const auto& param : entryPointFuncDecl->getParameters())
+        for (Index i = 0; i < params.getCount(); ++i)
         {
+            const auto param = params[i];
             if (param->hasModifier<HLSLUniformModifier>())
                 continue;
             if (isUniformParameterType(param->getType()))
@@ -2247,12 +2612,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.sink = sink;
             ctx.entryPointName = entryPointName;
             ctx.loc = param->loc;
-            // Note: `InOutModifier` inherits from `OutModifier`, so it must be
-            // checked first to avoid mislabeling `inout` parameters as "output".
-            ctx.direction = param->hasModifier<InOutModifier>() ? "input/output"
-                            : param->hasModifier<OutModifier>() ? "output"
-                            : param->hasModifier<RefModifier>() ? "input/output"
-                                                                : "input";
+            const auto directions = paramDirections[i];
+            ctx.direction =
+                directions.isOutput ? (directions.isInput ? "input/output" : "output") : "input";
 
             StringBuilder contextSb;
             auto paramName = param->getName();
@@ -2296,12 +2658,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
         if (!hasSvPosition)
         {
-            for (const auto& param : entryPointFuncDecl->getParameters())
+            for (Index i = 0; i < params.getCount(); ++i)
             {
                 // Only outputs (or in/out) of the entry point can carry
                 // SV_Position for the rasterizer.
-                if (!param->hasModifier<OutModifier>() && !param->hasModifier<InOutModifier>())
+                if (!paramDirections[i].isOutput)
                     continue;
+                const auto param = params[i];
                 hasOutputs = true;
                 if (_outputDeclHasSemantic(astBuilder, param, param->getType(), svPosition))
                 {
@@ -2376,7 +2739,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // for both spellings. `signatureStructUses` keeps each contributing struct and
     // its use location so we can point the diagnostic at the exact use site (the
     // non-generic case is reported by `diagnoseMissingCapabilityProvenance`).
-    CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
     List<GenericStructTypeUse> signatureStructUses;
     {
         auto astBuilder = linkage->getASTBuilder();
@@ -2418,138 +2780,36 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
 
-    for (auto target : linkage->targets)
-    {
-        auto targetCaps = target->getTargetCaps();
-        auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
-        targetCaps.join(stageCapabilitySet);
-        if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
-        {
-            // Incompatable means we don't support a set of abstract atoms.
-            // Diagnose that we lack support for 'stage' and 'target' atoms with our provided
-            // entry-point
-            auto compileTarget = target->getTargetCaps().getCompileTarget();
-            auto stageTarget = stageCapabilitySet.getTargetStage();
-            maybeDiagnose(
-                sink,
-                linkage->m_optionSet,
-                DiagnosticCategory::Capability,
-                Diagnostics::EntryPointUsesUnavailableCapability{
-                    .stage = capabilityNameToString((CapabilityName)stageTarget),
-                    .target = capabilityNameToString((CapabilityName)compileTarget),
-                    .decl = entryPointFuncDecl});
+    // For `void genericMain<T>() {}` selected with `-entry genericMain<MetalOnly>`,
+    // entryPoint->getFuncDeclRef() identifies genericMain<MetalOnly>. If MetalOnly has
+    // [require(metal)], include that requirement even though T is unused.
+    //
+    // Add argument requirements after the body, stage, and signature requirements collected above.
+    // For example, a Metal-only argument and an HLSL-only signature must produce a conflict.
+    // The earlier collectors use nonDestructiveJoin(), which can ignore conflicting requirements;
+    // using join() here ensures target validation sees the conflict.
+    List<Decl*> referencedDecls;
+    auto shared = SharedSemanticsContext::createForOptionalModule(
+        linkage,
+        module,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
+    SemanticsVisitor visitor(shared);
+    entryPointInferredCaps.join(
+        getDeclRefCapabilityRequirements(&visitor, entryPoint->getFuncDeclRef(), referencedDecls));
 
-            // Find out what is incompatible (ancestor missing a super set of 'target+stage')
-            CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
-            diagnoseMissingCapabilityProvenance(
-                linkage->m_optionSet,
-                sink,
-                entryPointFuncDecl,
-                failedSet);
+    // The entry point's stage-specific requirements belong to the `EntryPoint`, not the
+    // stage-agnostic `FuncDecl`; store the finalized set there as the source of truth for
+    // downstream entry-point consumers.
+    entryPoint->setInferredCapabilityRequirements(
+        entryPointInferredCaps.freeze(linkage->getASTBuilder()));
 
-            // The provenance walk above follows `capabilityRequirementProvenance`,
-            // which does not record generic struct signature types. Point at any
-            // such struct whose requirement is itself incompatible with the
-            // target, mirroring the notes emitted for non-generic structs.
-            for (auto& use : signatureStructUses)
-            {
-                if (!targetCaps.isIncompatibleWith(
-                        CapabilitySet{use.structDecl->inferredCapabilityRequirements}))
-                    continue;
-                maybeDiagnose(
-                    sink,
-                    linkage->m_optionSet,
-                    DiagnosticCategory::Capability,
-                    Diagnostics::SeeUsingOf{.decl = use.structDecl, .location = use.useLoc});
-                maybeDiagnose(
-                    sink,
-                    linkage->m_optionSet,
-                    DiagnosticCategory::Capability,
-                    Diagnostics::SeeDefinitionOf{.decl = use.structDecl});
-                if (auto requireAttr = use.structDecl->findModifier<RequireCapabilityAttribute>())
-                    maybeDiagnose(
-                        sink,
-                        linkage->m_optionSet,
-                        DiagnosticCategory::Capability,
-                        Diagnostics::SeeDeclarationOfModifier{.modifier = requireAttr});
-            }
-        }
-        else
-        {
-            auto& targetOptionSet = target->getOptionSet();
-            bool specificProfileRequested =
-                targetOptionSet.hasOption(CompilerOptionName::Profile) &&
-                (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
-                 SLANG_PROFILE_UNKNOWN);
-            bool specificCapabilityRequested = false;
-            for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
-            {
-                switch (atomVal.kind)
-                {
-                case CompilerOptionValueKind::Int:
-                    if (atomVal.intValue != SLANG_CAPABILITY_UNKNOWN)
-                        specificCapabilityRequested = true;
-                    break;
-                case CompilerOptionValueKind::String:
-                    // User made a specific capability request
-                    specificCapabilityRequested = true;
-                    break;
-                }
-                if (specificCapabilityRequested)
-                    break;
-            }
-
-            if (auto declaredCapsMod =
-                    entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>())
-            {
-                // If the entry point has an explicitly declared capability, then we
-                // will merge that with the target capability set before checking if
-                // there is an implicit upgrade.
-                targetCaps.nonDestructiveJoin(declaredCapsMod->declaredCapabilityRequirements);
-            }
-
-            // Only attempt to error if a specific profile or capability is requested
-            if ((specificCapabilityRequested || specificProfileRequested) &&
-                targetCaps.atLeastOneSetImpliedInOther(entryPointInferredCaps) ==
-                    CapabilitySet::ImpliesReturnFlags::NotImplied)
-            {
-                CapabilitySet combinedSets = targetCaps;
-                combinedSets.join(entryPointInferredCaps);
-                CapabilityAtomSet addedAtoms{};
-                if (auto targetCapSet = targetCaps.getAtomSets())
-                {
-                    if (auto combinedSet = combinedSets.getAtomSets())
-                    {
-                        CapabilityAtomSet::calcSubtract(
-                            addedAtoms,
-                            (*combinedSet),
-                            (*targetCapSet));
-                    }
-                }
-                StringBuilder entryPointNameSb;
-                printDiagnosticArg(entryPointNameSb, entryPointFuncDecl);
-                auto atoms = addedAtoms.getElements<CapabilityAtom>();
-                StringBuilder capsSb;
-                printDiagnosticArg(capsSb, atoms);
-                maybeDiagnoseWarningOrError(
-                    sink,
-                    target->getOptionSet(),
-                    DiagnosticCategory::Capability,
-                    Diagnostics::ProfileImplicitlyUpgraded{
-                        .entryPoint = entryPointNameSb.produceString(),
-                        .profile = target->getOptionSet().getProfile().getName(),
-                        .capabilities = capsSb.produceString(),
-                        .location = entryPointFuncDecl->loc,
-                    },
-                    Diagnostics::ProfileImplicitlyUpgradedRestrictive{
-                        .entryPoint = entryPointNameSb.produceString(),
-                        .profile = target->getOptionSet().getProfile().getName(),
-                        .capabilities = capsSb.produceString(),
-                        .location = entryPointFuncDecl->loc,
-                    });
-            }
-        }
-    }
+    validateEntryPointCapabilities(
+        entryPoint,
+        entryPointInferredCaps,
+        referencedDecls,
+        signatureStructUses,
+        sink);
 }
 
 bool resolveStageOfProfileWithEntryPoint(
@@ -2693,11 +2953,45 @@ Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
     return paramType;
 }
 
+ParamInfo getParamInfo(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
+{
+    ParamInfo result;
+    result.type = getParamValueType(astBuilder, paramDeclRef);
+    result.mode = getParamPassingMode(paramDeclRef.getDecl());
+    return result;
+}
+
 Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
-    auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
-    auto paramMode = getParamPassingMode(paramDeclRef.getDecl());
-    return getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
+    return getParamTypeWithModeWrapper(astBuilder, getParamInfo(astBuilder, paramDeclRef));
+}
+
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, ParamInfo const& paramInfo)
+{
+    SLANG_RELEASE_ASSERT(paramInfo.type);
+    // The mode is encoded by the wrapper this function adds; accepting a wrapped value type would
+    // give one parameter two independently encoded modes.
+    SLANG_RELEASE_ASSERT(!as<ParamPassingModeType>(paramInfo.type));
+    switch (paramInfo.mode)
+    {
+    case ParamPassingMode::In:
+        return paramInfo.type;
+    case ParamPassingMode::BorrowIn:
+        return astBuilder->getConstRefParamType(paramInfo.type);
+    case ParamPassingMode::Out:
+        return astBuilder->getOutParamType(paramInfo.type);
+    case ParamPassingMode::BorrowInOut:
+        return astBuilder->getBorrowInOutParamType(paramInfo.type);
+    case ParamPassingMode::RefReadWrite:
+        return astBuilder->getRefParamType(paramInfo.type);
+    case ParamPassingMode::RefReadOnly:
+        return astBuilder->getRefReadOnlyParamType(paramInfo.type);
+    case ParamPassingMode::RefWriteOnly:
+        return astBuilder->getRefWriteOnlyParamType(paramInfo.type);
+    default:
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        UNREACHABLE_RETURN(paramInfo.type);
+    }
 }
 
 Type* getParamTypeWithModeWrapper(
@@ -2705,22 +2999,7 @@ Type* getParamTypeWithModeWrapper(
     Type* paramValueType,
     ParamPassingMode paramMode)
 {
-    switch (paramMode)
-    {
-    case ParamPassingMode::In:
-        return paramValueType;
-    case ParamPassingMode::BorrowIn:
-        return astBuilder->getConstRefParamType(paramValueType);
-    case ParamPassingMode::Out:
-        return astBuilder->getOutParamType(paramValueType);
-    case ParamPassingMode::BorrowInOut:
-        return astBuilder->getBorrowInOutParamType(paramValueType);
-    case ParamPassingMode::Ref:
-        return astBuilder->getRefParamType(paramValueType);
-    default:
-        SLANG_UNEXPECTED("unhandled parameter-passing mode");
-        UNREACHABLE_RETURN(paramValueType);
-    }
+    return getParamTypeWithModeWrapper(astBuilder, ParamInfo{paramValueType, paramMode});
 }
 
 void Module::_collectShaderParams(DiagnosticSink* sink)
@@ -3402,7 +3681,10 @@ static void _extractSpecializationArgs(
 {
     auto linkage = componentType->getLinkage();
 
-    SharedSemanticsContext semanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext semanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor semanticsVisitor(&semanticsContext);
 
     auto argCount = argExprs.getCount();
@@ -3447,20 +3729,28 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     // primary module's own extensions come along -- this is the same
     // point-of-view an in-body generic call has.
     //
-    // When the entry point has no owning module (`getModule()` is null) we pass
-    // `nullptr` and fall back to the prior module-less behavior.
+    // When the entry point has no owning module (`getModule()` is null), retain the prior
+    // module-less behavior and use the linkage's effective language version.
     auto entryPointModule = getModule();
-    SharedSemanticsContext sharedSemanticsContext(getLinkage(), entryPointModule, sink);
+    RefPtr<SharedSemanticsContext> sharedSemanticsContext;
     if (entryPointModule)
     {
+        sharedSemanticsContext = new SharedSemanticsContext(getLinkage(), entryPointModule, sink);
         for (auto module : getModuleDependencies())
         {
             auto moduleDecl = module->getModuleDecl();
-            if (sharedSemanticsContext.importedModulesSet.add(moduleDecl))
-                sharedSemanticsContext.importedModulesList.add(moduleDecl);
+            if (sharedSemanticsContext->importedModulesSet.add(moduleDecl))
+                sharedSemanticsContext->importedModulesList.add(moduleDecl);
         }
     }
-    SemanticsVisitor visitor(&sharedSemanticsContext);
+    else
+    {
+        sharedSemanticsContext = new SharedSemanticsContext(
+            getLinkage(),
+            getLinkage()->m_optionSet.getLanguageVersion(),
+            sink);
+    }
+    SemanticsVisitor visitor(sharedSemanticsContext);
 
     // The last N arguments will be for the implicit existential arguments
     // of the entry point (if it has any).
@@ -3578,6 +3868,27 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     }
 
     info->specializedFuncDeclRef = specializedFuncDeclRef;
+
+    // The generic arguments supplied through -specialize or IComponentType::specialize are now
+    // bound to the entry point's generic parameters. For example, specializing genericMain<T>
+    // with MetalOnly makes specializedFuncDeclRef identify genericMain<MetalOnly>.
+    // Add the concrete arguments' capability requirements, even if the body never uses them,
+    // to the base entry point's requirements, then check the combined set against each target.
+    List<Decl*> referencedDecls;
+    CapabilitySet specializedCaps{getInferredCapabilityRequirements()};
+    specializedCaps.join(
+        getDeclRefCapabilityRequirements(&visitor, specializedFuncDeclRef, referencedDecls));
+    info->inferredCapabilityRequirements = specializedCaps.freeze(getLinkage()->getASTBuilder());
+    // validateEntryPoint already checked the base entry point's requirements. Pass them as the
+    // last argument so the profile check reports only requirements added by the concrete generic
+    // arguments, without repeating the base entry point's profile-upgrade warnings.
+    validateEntryPointCapabilities(
+        this,
+        specializedCaps,
+        referencedDecls,
+        {},
+        sink,
+        getInferredCapabilityRequirements());
 
     // Once the generic parameters (if any) have been dealt with,
     // any remaining specialization arguments are for existential/interface
@@ -3721,7 +4032,10 @@ void parseSpecializationArgStrings(
     auto linkage = endToEndReq->getLinkage();
     auto sink = endToEndReq->getSink();
 
-    SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor semantics(&sharedSemanticsContext);
 
     // We will be looping over the generic argument strings
@@ -3757,7 +4071,7 @@ Type* Linkage::specializeType(
     // TODO: We should cache and re-use specialized types
     // when the exact same arguments are provided again later.
 
-    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(this, m_optionSet.getLanguageVersion(), sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     SpecializationParams specializationParams;
@@ -3800,7 +4114,6 @@ Type* Linkage::specializeType(
 
 /// Shared implementation logic for the `_createSpecializedProgram*` entry points.
 static RefPtr<ComponentType> _createSpecializedProgramImpl(
-    Linkage* linkage,
     ComponentType* unspecializedProgram,
     List<Expr*> const& specializationArgExprs,
     DiagnosticSink* sink)
@@ -3827,8 +4140,6 @@ static RefPtr<ComponentType> _createSpecializedProgramImpl(
     // We have an appropriate number of arguments for the global specialization parameters,
     // and now we need to check that the arguments conform to the declared constraints.
     //
-    SharedSemanticsContext visitor(linkage, nullptr, sink);
-
     List<SpecializationArg> specializationArgs;
     _extractSpecializationArgs(
         unspecializedProgram,
@@ -3899,7 +4210,6 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
     // global or entry-point generic parameters.
     //
     auto unspecializedProgram = endToEndReq->getUnspecializedGlobalComponentType();
-    auto linkage = endToEndReq->getLinkage();
     auto sink = endToEndReq->getSink();
 
     // First, let's parse the specialization argument strings that were
@@ -3920,11 +4230,8 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
     // applying the global generic arguments (if any) to the
     // unspecialized program.
     //
-    auto specializedProgram = _createSpecializedProgramImpl(
-        linkage,
-        unspecializedProgram,
-        globalSpecializationArgs,
-        sink);
+    auto specializedProgram =
+        _createSpecializedProgramImpl(unspecializedProgram, globalSpecializationArgs, sink);
 
     // If anything went wrong with the global generic
     // arguments, then bail out now.
@@ -4035,6 +4342,11 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
 
     SLANG_ASSERT(foundEntryPointCount >= specifiedEntryPointCount);
 
+    // Checking an unspecialized generic is valid when no code will be emitted. Only the
+    // code-generation path needs concrete entry points that IR linking can turn into functions.
+    const bool requireSpecializedEntryPoints =
+        !endToEndReq->getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen);
+
     // For any entry points that were specified, we can use the specialization
     // argument information provided via API or command line.
     //
@@ -4056,7 +4368,8 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
         // declRef's generic args against the defaults, so it correctly accepts
         // name-bound args (and nested-generic entry points) while still flagging
         // a genuinely unbound generic.
-        if (!endToEndReq->getLinkage()->isSpecialized(unspecializedEntryPoint->getFuncDeclRef()) &&
+        if (requireSpecializedEntryPoints &&
+            !endToEndReq->getLinkage()->isSpecialized(unspecializedEntryPoint->getFuncDeclRef()) &&
             entryPointInfo.specializationArgStrings.getCount() == 0)
         {
             diagnoseGenericEntryPoint(unspecializedEntryPoint, endToEndReq->getSink());
@@ -4091,7 +4404,8 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
         // specialized and must be rejected (#10209). `isSpecialized` is false
         // only when the generic args are still the defaults (a discovered
         // `[shader]` entry point can't bind args via its name either).
-        if (!endToEndReq->getLinkage()->isSpecialized(unspecializedEntryPoint->getFuncDeclRef()))
+        if (requireSpecializedEntryPoints &&
+            !endToEndReq->getLinkage()->isSpecialized(unspecializedEntryPoint->getFuncDeclRef()))
         {
             diagnoseGenericEntryPoint(unspecializedEntryPoint, endToEndReq->getSink());
             continue;

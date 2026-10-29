@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#typeequalitywitness
-//META: doc_section_digest=8b9321d5fc11256733e140059a9240bd777786127c16a340d2f1f2a723772da4
+//META: doc_section_digest=ae0256db7c6caf32ee7e4a47cbd236446d0b2a84b81a63e27c4674a88e24c42e
 //META: purpose=A constraint discharged by a type-equality fact lowers to TypeEqualityWitness(subType, superType) typed witness_table_t of that type.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // int` clause is discharged for `T = S` because `S.A` is `int`, so the witness
 // is an equality fact; the CHECK pins its two type operands and its
 // `witness_table_t(Int)` result type.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IHasA { associatedtype A; A get(); };
 struct S : IHasA { typealias A = int; int get() { return 7; } };

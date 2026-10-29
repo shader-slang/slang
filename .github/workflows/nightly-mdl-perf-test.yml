@@ -67,6 +67,10 @@ jobs:
     # step at the boundary.
     runs-on:
       labels: [Windows, X64, nvrgfx-perf-kernelvm-bridge]
+    outputs:
+      # Consumed by the analyze job, which runs elsewhere. The label pins the
+      # trend judgement to the point THIS run registered.
+      perf_label: ${{ steps.sweep.outputs.perf_label }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -143,7 +147,7 @@ jobs:
           repository: "shader-slang/MDL-SDK"
           # Pin to a known-good commit so corpus drift doesn't silently shift
           # mdl_dxr timings. Update this pin intentionally when refreshing the
-          # corpus, then resync history (compile-perf-release-sweep force=true).
+          # corpus, then resync history (perf-compile-release-sweep force=true).
           ref: "446562493bed1b175e7cf105425ca3596764652f"
           path: "external/MDL-SDK"
           persist-credentials: false
@@ -161,6 +165,7 @@ jobs:
           token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
 
       - name: Run nightly sweep + update tracking
+        id: sweep
         shell: bash
         # Inputs arrive via env and are never interpolated into the script, so a
         # value with shell metacharacters can't break out — it's just an argv item.
@@ -193,6 +198,10 @@ jobs:
           # (daily labels share the swept commit's DATE, so several points can
           # share a date and series order alone cannot identify this run's).
           echo "PERF_LABEL=$LABEL" >> "$GITHUB_ENV"
+          echo "PERF_OBSERVED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          # Also a job OUTPUT, not only job-scoped env: the analyze job runs on
+          # a different machine and cannot see this job's $GITHUB_ENV.
+          echo "perf_label=$LABEL" >> "$GITHUB_OUTPUT"
 
           # publish=false: measure only — write results to a workspace dir that
           # the artifact step uploads; no tracking registration.
@@ -223,6 +232,27 @@ jobs:
               --commit-time "$COMMIT_TIME"
           fi
 
+      # Confirmation must reuse this host and compiler, before publishing. A
+      # failed confirmation still needs to be archived and pushed; the analyze
+      # job reports it as an evaluation failure, never as a cleared regression.
+      - name: Confirm warning and regression candidates
+        if: env.PUBLISH == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SUITE"
+          python3 confirm.py measure --results "$GITHUB_WORKSPACE/perf-results" \
+            --label "${PERF_LABEL:?}" --slangc "$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
+
+      - name: Archive original and confirmation measurements
+        if: always() && env.PUBLISH == 'true' && steps.sweep.outputs.perf_label != ''
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: perf-confirmation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: perf-results/daily/${{ steps.sweep.outputs.perf_label }}/
+          if-no-files-found: warn
+
       - name: Upload results artifact (publish=false)
         if: always() && env.PUBLISH != 'true'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -231,13 +261,40 @@ jobs:
           path: bench-results/
           if-no-files-found: ignore
 
+      - name: Check BenchView tooling support
+        id: benchview_tools
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "daily=false" >> "$GITHUB_OUTPUT"
+          echo "releases=false" >> "$GITHUB_OUTPUT"
+          if [[ ! -f "$SUITE/benchview.py" ]]; then
+            echo "::warning::Selected suite has no BenchView exporter; release discovery is deferred."
+            exit 0
+          fi
+          help=$(python3 "$SUITE/benchview.py" --help)
+          if [[ "$help" != *"--output"* || "$help" != *"--branch"* ]]; then
+            echo "::warning::Selected suite lacks host-collector export support; release discovery is deferred."
+            exit 0
+          fi
+          echo "daily=true" >> "$GITHUB_OUTPUT"
+          release_help=$(python3 "$SUITE/new_release_check.py" --help)
+          if [[ "$help" == *"--completed-releases"* && "$release_help" == *"--completed"* ]]; then
+            echo "releases=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Selected suite supports daily export only; release discovery is deferred."
+          fi
+
       # New releases (majors + patch releases from v2026.13 on) are swept into
-      # the tracked history the night they ship, riding the same results push
-      # below. continue-on-error: a failing new-release sweep must not cost the
+      # the tracked history on non-sweep runs with release-export support.
+      # Deferring keeps tags new until a capable nightly can measure and export them.
+      # continue-on-error: a failing new-release sweep must not cost the
       # night's own point — the script removes partial baselines and the next
       # nightly retries.
       - name: Sweep newly published releases
-        if: env.PUBLISH == 'true'
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview_tools.outputs.releases == 'true'
         continue-on-error: true
         shell: bash
         env:
@@ -247,7 +304,8 @@ jobs:
           set -euo pipefail
           cd "$SUITE"
           python3 new_release_check.py --results "$GITHUB_WORKSPACE/perf-results" \
-            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES"
+            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES" \
+            --completed "$GITHUB_WORKSPACE/benchview-completed-releases.json"
 
       - name: Push results
         if: env.PUBLISH == 'true'
@@ -261,6 +319,48 @@ jobs:
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -m "nightly ToT $(date -u +%Y-%m-%d) ($(cd "$GITHUB_WORKSPACE" && git rev-parse --short HEAD))"
           git push
+
+      # The benchmark host owns collection, credentials and delivery.
+      # Complexity sweeps stay in the existing reports, not BenchView.
+      - name: Export nightly results for BenchView
+        id: benchview
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview_tools.outputs.daily == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          EXPORT_RELEASES: ${{ steps.benchview_tools.outputs.releases }}
+        run: |
+          set -euo pipefail
+          # Use the measured checkout's branch, not the workflow or suite ref.
+          # Detached commits and tags have no unambiguous branch.
+          branch=$(git -C "$GITHUB_WORKSPACE" symbolic-ref --quiet --short HEAD || true)
+          args=()
+          if [[ -n "$branch" ]]; then args+=(--branch "$branch"); fi
+          if [[ "$EXPORT_RELEASES" == "true" ]]; then
+            args+=(--completed-releases "$GITHUB_WORKSPACE/benchview-completed-releases.json"
+                   --release-results "$GITHUB_WORKSPACE/perf-results/releases")
+          fi
+          python3 "$SUITE/benchview.py" \
+            --results "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/results.json" \
+            --meta "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/meta.json" \
+            --os Windows --observed-at "$PERF_OBSERVED_AT" \
+            --execution-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            "${args[@]}" \
+            --output "$GITHUB_WORKSPACE/benchview-export"
+
+      - name: Archive BenchView submission payloads
+        if: always() && env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: benchview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/benchview-export/
+          if-no-files-found: warn
+
+      - name: Report BenchView export failure
+        if: always() && steps.benchview.outcome == 'failure'
+        shell: bash
+        run: echo "::warning::BenchView export failed; see the BenchView step and payload artifact"
 
       # Remove the PAT credential that actions/checkout baked into perf-results'
       # .git/config — on a persistent self-hosted runner this would otherwise
@@ -362,29 +462,111 @@ jobs:
           git -C "$GITHUB_WORKSPACE/perf-pages" remote set-url origin \
             "https://github.com/${{ env.PERF_RESULTS_REPO }}.git" 2>/dev/null || true
 
-      # Runs AFTER the push so the data is stored even when this step fails the
-      # job. trend.py exits non-zero (job red + ::error:: annotations) when a
-      # primary timer drifts past threshold vs the trailing median. --label
-      # pins the judgement to the point THIS run registered: daily labels are
-      # keyed by the swept commit's date, so several points can share a date
-      # and the series' last point may be a sibling, not this run's.
-      - name: Check trend (fail on regression)
-        id: trend
+  # Analysis and notification, deliberately NOT on the perf runner.
+  #
+  # Nothing below measures anything: the trend check and the Slack message
+  # only need the results repo, which the nightly job has already pushed. The
+  # perf pool sits behind an egress proxy (192.168.240.1:3128) that denies
+  # CONNECT to hooks.slack.com, so every notification from there failed with
+  # "Tunnel connection failed: 403 Forbidden" while the step still exited 0 by
+  # design. A GitHub-hosted runner has unrestricted egress, so moving the
+  # notification here fixes it without asking anyone to change a proxy ACL we
+  # do not own.
+  #
+  # It is also the first split of the suite along the line we want long term:
+  # the quiesced machine measures, and anything that merely reads results runs
+  # where it is cheap and unrestricted.
+  # No setup-python here, deliberately: ubuntu-latest ships Python 3, the suite
+  # is stdlib-only, and check-python-core.yml already exercises these same
+  # scripts against the system interpreter on ubuntu-22.04/24.04 (its step is
+  # named "Verify using system Python (no setup-python)"). Pinning an
+  # interpreter here would add a network-dependent download to a job whose
+  # value is being cheap and reliable, and would test a version the suite is
+  # not otherwise verified against. The nightly job keeps its own setup-python
+  # because the Windows perf runner does need it.
+  analyze:
+    needs: nightly
+    # always(): a failed sweep is exactly when the notification matters most.
+    if: always() && needs.nightly.result != 'skipped'
+    runs-on: ubuntu-latest
+    env:
+      # PERF_RESULTS_REPO and PUBLISH are workflow-level and inherited; only
+      # the label has to cross the job boundary, because it is computed during
+      # the sweep rather than declared up front.
+      PERF_LABEL: ${{ needs.nightly.outputs.perf_label }}
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          # Same suite-ref/ref priority the nightly job uses, so measurement
+          # and analysis run the SAME suite revision. A backfill dispatch
+          # (ref=<old commit>, suite-ref=<new suite>) would otherwise measure
+          # with one trend.py and judge with another — and the tracking format
+          # is exactly the kind of thing that drifts between them.
+          ref: ${{ github.event.inputs['suite-ref'] || github.event.inputs.ref || github.ref }}
+          persist-credentials: false
+          # The suite scripts only; no submodules and no history needed.
+          fetch-depth: "1"
+
+      - name: Checkout perf results repo
         if: env.PUBLISH == 'true'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ env.PERF_RESULTS_REPO }}
+          path: "perf-results"
+          token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+
+      # Read the archived confirmation against its frozen baseline. Only a
+      # counter that crosses the threshold in both batches can raise an alarm.
+      # Missing, failed or stale confirmation is an evaluation failure.
+      - name: Report confirmed trend (fail on confirmed regression)
+        id: trend
+        # A failed sweep can publish a label without completing confirmation.
+        # Report that as an evaluation failure. Only EXIT_REGRESSION from the
+        # shared renderer means a change was confirmed in both valid batches;
+        # the step outcome alone cannot distinguish it from an operational error.
+        if: env.PUBLISH == 'true' && needs.nightly.outputs.perf_label != ''
         shell: bash
         run: |
-          set -euo pipefail
-          cd "$SUITE"
-          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
+          # No `set -e`: the exit code has to be published BEFORE it propagates,
+          # and `exit "$code"` at the end is what keeps the job red either way.
+          set -uo pipefail
+          cd "$GITHUB_WORKSPACE/tools/compile-perf"
+          code=0
+          python3 confirm.py report --results "$GITHUB_WORKSPACE/perf-results" \
+            --label "${PERF_LABEL:?}" || code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
 
       - name: Notify Slack
         if: always() && (github.event_name == 'schedule' || github.event.inputs['notify-slack'] == 'true')
         shell: bash
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_COMPILE_PERF }}
+          # 'skipped' means trend analysis did not run, which has two causes:
+          # publish=false (a measurement-only dispatch, where the sweep DID
+          # succeed) and an empty label (a sweep that failed before minting
+          # one). JOB_STATUS is what separates them — classify() reaches its
+          # quiet "trend did not run" line only when the job also succeeded,
+          # so the failed-sweep case still reports as a job failure.
           TREND_OUTCOME: ${{ steps.trend.outcome }}
+          TREND_JUDGED_COUNT: ${{ steps.trend.outputs.judged_count }}
           TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
-          JOB_STATUS: ${{ job.status }}
+          # Empty when the trend step was skipped, or when it died before
+          # publishing a code. Only trend.py's EXIT_REGRESSION produces the
+          # regression line, so an absent or unrecognised value reports "could
+          # not evaluate" — a red job and an alert either way, just an honest
+          # sentence.
+          TREND_EXIT: ${{ steps.trend.outputs.exit_code || '' }}
+          # THIS job's status, as distinct from the measurement job's above. A
+          # step `if:` carries an implicit success(), so a failure before the
+          # trend step (a checkout, say) SKIPS it while JOB_STATUS stays
+          # 'success' — which classified as the quiet "trend did not run" line
+          # on a job that is red.
+          ANALYZE_STATUS: ${{ job.status }}
+          # The MEASUREMENT job's result, not this job's: a regression is
+          # reported by TREND_OUTCOME, while JOB_STATUS answers "did the
+          # sweep itself fail", which now happens in a different job.
+          JOB_STATUS: ${{ needs.nightly.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$SLACK_WEBHOOK" ]; then
@@ -392,7 +574,7 @@ jobs:
             exit 0
           fi
           export DATE=$(date -u +%Y-%m-%d)
-          # The five-way classification lives in slack_status.py rather than
+          # The classification lives in slack_status.py rather than
           # here. Its branch ORDER is load-bearing — a regression drives
           # job.status to failure too, so testing JOB_STATUS first would report
           # every regression as a generic "job failed" — and as bash in a
@@ -403,7 +585,7 @@ jobs:
           # but one process is cheaper and there is no second place to keep in
           # step. A failure warns rather than reds the run, matching the
           # webhook-failure contract below.
-          if ! CLASSIFIED=$(python3 "$SUITE/slack_status.py"); then
+          if ! CLASSIFIED=$(python3 "$GITHUB_WORKSPACE/tools/compile-perf/slack_status.py"); then
             echo "::warning title=Slack notification skipped::slack_status.py failed"
             exit 0
           fi
@@ -416,8 +598,7 @@ jobs:
                   f'{os.environ[\"ICON\"]} *Compile-perf nightly — {os.environ[\"DATE\"]}*\n'
                   f'{os.environ[\"STATUS\"]}\n'
                   f'• Run: {os.environ[\"RUN_URL\"]}\n'
-                  f'• Report: https://shader-slang.org/slang-compile-perf/ '
-                  f'(may take a few minutes to update after the run)'
+                  f'• Report: https://shader-slang.org/slang-compile-perf/'
               )
           }
           req = urllib.request.Request(

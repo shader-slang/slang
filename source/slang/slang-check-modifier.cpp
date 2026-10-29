@@ -1570,6 +1570,8 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
         return modifierType;
     case ASTNodeType::OutModifier:
     case ASTNodeType::RefModifier:
+    case ASTNodeType::RefReadOnlyModifier:
+    case ASTNodeType::RefWriteOnlyModifier:
     case ASTNodeType::BorrowModifier:
     case ASTNodeType::InOutModifier:
         return ASTNodeType::OutModifier;
@@ -1645,13 +1647,17 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::HLSLUniformModifier:
         return ASTNodeType::HLSLStaticModifier;
 
+    // An interpolation mode and a sampling location combine (HLSL `noperspective centroid`,
+    // `linear sample`), so they are two conflict groups.
     case ASTNodeType::HLSLNoInterpolationModifier:
     case ASTNodeType::HLSLNoPerspectiveModifier:
     case ASTNodeType::HLSLLinearModifier:
-    case ASTNodeType::HLSLSampleModifier:
-    case ASTNodeType::HLSLCentroidModifier:
     case ASTNodeType::PerVertexModifier:
         return ASTNodeType::InterpolationModeModifier;
+
+    case ASTNodeType::HLSLSampleModifier:
+    case ASTNodeType::HLSLCentroidModifier:
+        return ASTNodeType::HLSLSampleModifier;
 
     case ASTNodeType::PrefixModifier:
     case ASTNodeType::PostfixModifier:
@@ -1701,6 +1707,10 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::GLSLPatchModifier:
         return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
                as<GLSLInterfaceBlockDecl>(decl);
+
+    case ASTNodeType::RefReadOnlyModifier:
+    case ASTNodeType::RefWriteOnlyModifier:
+        return as<ParamDecl>(decl);
     case ASTNodeType::RayPayloadAccessSemantic:
     case ASTNodeType::RayPayloadReadSemantic:
     case ASTNodeType::RayPayloadWriteSemantic:
@@ -1953,11 +1963,21 @@ Modifier* SemanticsVisitor::checkModifier(
 
     if (auto decl = as<Decl>(syntaxNode))
     {
-        auto moduleDecl = getModuleDecl(decl);
-        bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
+        // These modifiers bind a declaration to compiler-internal type / requirement
+        // registration and are valid only in the core module; drop them on a user declaration
+        // here at `ModifiersChecked`, before any `Type` for the declaration can be formed, so no
+        // downstream consumer sees them. (`__intrinsic_type` is not in this set: it only records
+        // an IR opcode and is valid user syntax.)
+        if ((as<MagicTypeModifier>(m) || as<BuiltinTypeModifier>(m) ||
+             as<BuiltinRequirementModifier>(m)) &&
+            !isFromCoreModule(decl))
+        {
+            if (!ignoreUnallowedModifier)
+                getSink()->diagnose(Diagnostics::BuiltinOnlyModifierOnNonCoreDecl{.modifier = m});
+            return nullptr;
+        }
 
-        if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
-            isGLSLInput = true;
+        bool isGLSLInput = getShared()->isGLSLSourceLanguage();
         if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
         {
             if (!ignoreUnallowedModifier)
@@ -1967,6 +1987,19 @@ Modifier* SemanticsVisitor::checkModifier(
             }
             return m;
         }
+
+        // Reference parameters are a core-module mechanism, so the `__ref_readonly` and
+        // `__ref_writeonly` keywords are intended for the core module, and user code opts in to
+        // them as an experimental feature. The legacy alias `const __ref` remains available to
+        // user code.
+        if ((as<RefReadOnlyModifier>(m) || as<RefWriteOnlyModifier>(m)) &&
+            !ignoreUnallowedModifier &&
+            !getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature) &&
+            !isFromCoreModule(decl))
+        {
+            getSink()->diagnose(
+                Diagnostics::RefAccessKeywordRequiresExperimentalFeature{.modifier = m});
+        }
     }
 
     if (as<ConstExprModifier>(m))
@@ -1975,10 +2008,8 @@ Modifier* SemanticsVisitor::checkModifier(
         // "must be a compile-time constant at the call site". On a variable
         // declaration it is not supported — warn and treat it as `const` so
         // that common idioms like `static constexpr uint N = 4` compile.
-        // On a function declaration, `constexpr` is silently accepted and
-        // ignored (no warning), intentionally: warning on function-level
-        // constexpr is out of scope for this PR and would be a separate
-        // diagnostic with its own discussion.
+        // On a callable declaration Slang does not evaluate the callable at
+        // compile time, so the modifier is a no-op — warn and leave it in place.
         if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
         {
             // Reject `constexpr T* p;` — C-style pointer const is disallowed
@@ -2001,8 +2032,25 @@ Modifier* SemanticsVisitor::checkModifier(
             constMod->keywordName = getSession()->getNameObj("const");
             return constMod;
         }
+        // A `constexpr` parameter (`ParamDecl : VarDeclBase`) is a supported feature and is
+        // matched by neither branch, so it stays silent; `CallableDecl` is disjoint from
+        // `VarDeclBase`, so this branch cannot also fire for it.
+        else if (as<CallableDecl>(syntaxNode))
+        {
+            getSink()->diagnose(Diagnostics::ConstexprOnCallableIgnored{.modifier = m});
+        }
     }
-    if (as<ConstModifier>(m))
+    if (as<CppStyleTrailingReceiverParamConstModifier>(m))
+    {
+        // We leave trailing `const` attached after the diagnostic so receiver checking can
+        // interpret the method as nonmutating while checking its body.
+        if (getSourceLanguage() != SourceLanguage::HLSL)
+        {
+            getSink()->diagnose(
+                Diagnostics::CppStyleTrailingReceiverParamConstRequiresHlsl{.modifier = m});
+        }
+    }
+    else if (as<ConstModifier>(m))
     {
         if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
         {
@@ -2532,6 +2580,37 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         }
     }
 
+    // On a parameter, `const __ref` is the legacy spelling of `__ref_readonly`, so `const`
+    // alongside `__ref_readonly` or `__ref_writeonly` spells a second passing mode. `const` keeps
+    // its own conflict group because it is not a passing mode on any other parameter.
+    if (as<ParamDecl>(syntaxNode))
+    {
+        Modifier* constModifier = nullptr;
+        Modifier* refAccessModifier = nullptr;
+        for (modifier = resultModifiers; modifier; modifier = modifier->next)
+        {
+            Modifier* existingModifier = nullptr;
+            if (as<ConstModifier>(modifier) && !constModifier)
+            {
+                constModifier = modifier;
+                existingModifier = refAccessModifier;
+            }
+            else if (
+                (as<RefReadOnlyModifier>(modifier) || as<RefWriteOnlyModifier>(modifier)) &&
+                !refAccessModifier)
+            {
+                refAccessModifier = modifier;
+                existingModifier = constModifier;
+            }
+            if (existingModifier)
+            {
+                getSink()->diagnose(Diagnostics::DuplicateModifier{
+                    .existingModifier = existingModifier,
+                    .modifier = modifier});
+            }
+        }
+    }
+
     // Whether we actually re-wrote anything or note, lets
     // install the new list of modifiers on the declaration
     syntaxNode->modifiers.first = resultModifiers;
@@ -2563,6 +2642,9 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     }
 
     postProcessingOnModifiers(m_astBuilder, syntaxNode->modifiers);
+
+    if (auto decl = as<Decl>(syntaxNode))
+        checkReceiverParamModeSpecifiers(decl);
 }
 
 void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)

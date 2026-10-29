@@ -953,6 +953,7 @@ static LegalVal legalizeDebugVar(
                 originalInst->getSource(),
                 originalInst->getLine(),
                 originalInst->getCol(),
+                originalInst->getScope(),
                 originalInst->getArgIndex());
             copyNameHintAndDebugDecorations(legalVal, originalInst);
             return LegalVal::simple(legalVal);
@@ -1561,6 +1562,16 @@ static LegalVal legalizeGetElement(
             }
 
             return LegalVal::tuple(resTupleInfo);
+        }
+
+    case LegalVal::Flavor::implicitDeref:
+        {
+            // Index the backing value and restore the `implicitDeref` so the element's logical
+            // level of indirection is preserved. Mirrors the same case in `legalizeGetElementPtr`.
+            auto valueType = getPointedToType(context, type);
+            auto implicitDerefVal = legalPtrOperand.getImplicitDeref();
+            return LegalVal::implicitDeref(
+                legalizeGetElement(context, valueType, implicitDerefVal, indexOperand));
         }
 
     default:
@@ -2892,6 +2903,10 @@ static LegalVal declareSimpleVar(
             auto globalParam = builder->createGlobalParam(type);
             globalParam->removeFromParent();
             globalParam->insertBefore(context->insertBeforeGlobal);
+            // The new parameter replaces part of the original global parameter, which is the
+            // instruction we insert before, so it keeps that parameter's source location for
+            // diagnostics that later passes report about it.
+            globalParam->sourceLoc = context->insertBeforeGlobal->sourceLoc;
 
             // Add originating entry point decoration if original global param
             // comes from an entry point parameter. This is required in cases where the global

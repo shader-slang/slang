@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#namespacedecl-moduledecl-filedecl
-//META: doc_section_digest=c5234f45139405663f0d08b212b0f8f44c973502776fde1ad540f5109d04cabb
+//META: doc_section_digest=0c426eaac3adce684d6e1bcd65a3863432d05ffa3258277a4308ff2a6c6f3c36
 //META: purpose=A NamespaceDecl introduces a named scope; its members are reached with the namespace-qualified name.
 //META: intent=functional
 //META: pipeline_stage=check

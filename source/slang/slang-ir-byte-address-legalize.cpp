@@ -11,6 +11,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -244,8 +245,8 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    // Validate the explicit `alignment`/`location` contract of a `LoadAligned`/`StoreAligned` call
-    // (issue #11545). Checks, short-circuiting so one call reports at most one diagnostic:
+    // Validate the explicit `alignment`/`location` contract of a `LoadAligned`/`StoreAligned` call.
+    // Checks, short-circuiting so one call reports at most one diagnostic:
     //   - `alignment == 0`: the plain `Load`/`Store` "no promise" sentinel; nothing to validate.
     //   - `alignment` is a power of two, else E41301.
     //   - `alignment` is at least the access type's scalar-component alignment, else E41300.
@@ -310,12 +311,11 @@ struct ByteAddressBufferLegalizationContext
     //
     // `promisedAlignment` is the `alignment` argument of `LoadAligned`/`Store`, which is a
     // `constexpr` and therefore always an `IRIntLit`. A non-zero promise is the sole input to the
-    // wide-vs-scalarized decision, so a constant `location` and a runtime `location` carrying the
-    // same promise legalize identically (issue #11545's consistency goal). `promise == 0` is the
-    // "no promise" sentinel of the plain `Load`/`Store` forms; those fall back to a
-    // compile-time-constant base offset (a runtime no-promise access cannot be proven aligned and
-    // stays scalarized). This predicate is pure: it never diagnoses (the alignment contract is
-    // validated separately).
+    // access-width decision, so a constant `location` and a runtime `location` carrying the same
+    // promise legalize identically. `promise == 0` is the "no promise" sentinel of the plain
+    // `Load`/`Store` forms; those fall back to a compile-time-constant base offset (a runtime
+    // no-promise access cannot be proven aligned). This predicate is pure: it never diagnoses (the
+    // alignment contract is validated separately).
     bool isWideAccessAligned(
         IRInst* baseOffset,
         IRIntegerValue immediateOffset,
@@ -341,29 +341,178 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    IRType* getDescriptorHandleStorageType()
+    // A *group* is a run of adjacent components of a vector that is accessed as one sub-vector;
+    // its *width* is its component count. Return the widest group width in {4, 2} that fits in
+    // `remaining` components and whose byte size (`width * elementStride`) `isWideAccessAligned`
+    // accepts at `groupOffset` (it divides the promised alignment and `groupOffset`, or, with no
+    // promise, a constant base offset plus `groupOffset`), or 1 when none does, in which case the
+    // caller accesses a single component.
+    //
+    // A `bool` vector is never grouped. `bool` has no fixed in-buffer width: SPIR-V cannot place a
+    // `bool` vector in a storage buffer, and on CPU a `vector<bool, 2>` is 2 bytes wide while each
+    // `bool` in a byte-address buffer occupies 4 bytes. Its components are therefore accessed one
+    // at a time, which those targets already legalize.
+    IRIntegerValue chooseGroupWidth(
+        IRInst* baseOffset,
+        IRIntegerValue groupOffset,
+        IRInst* alignment,
+        IRType* elementType,
+        IRIntegerValue elementStride,
+        IRIntegerValue remaining)
+    {
+        if (as<IRBoolType>(elementType))
+            return 1;
+
+        for (IRIntegerValue width = 4; width >= 2; width /= 2)
+        {
+            if (width <= remaining &&
+                isWideAccessAligned(baseOffset, groupOffset, alignment, width * elementStride))
+                return width;
+        }
+        return 1;
+    }
+
+    // Load a vector of `elementCount` elements of `elementType` from `buffer` as a sequence of
+    // groups chosen left to right by `chooseGroupWidth`, then reassemble the full vector. For
+    // example, a `half4` promised alignment 4 is loaded as two `half2` groups, and a `float3`
+    // promised alignment 8 as a `float2` group followed by a single `float`.
+    //
+    // The caller has already ruled out a single access of the whole vector, and the target keeps
+    // typed vector accesses (neither `scalarizeVectorLoadStore` nor `useBitCastFromUInt`). A group
+    // of width 2 or more passed `isWideAccessAligned` in `chooseGroupWidth`, so it is emitted
+    // directly as one typed sub-vector access; a single component goes back through `emitLegalLoad`
+    // for the per-target scalar handling (such as splitting a misaligned 64-bit scalar).
+    IRInst* emitLegalGroupedVectorLoad(
+        IRType* vecType,
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment,
+        IRType* elementType,
+        IRIntegerValue elementStride,
+        IRIntegerValue elementCount)
+    {
+        SLANG_ASSERT(!m_options.scalarizeVectorLoadStore && !m_options.useBitCastFromUInt);
+        List<IRInst*> components;
+        for (IRIntegerValue firstComponent = 0; firstComponent < elementCount;)
+        {
+            IRIntegerValue groupOffset = immediateOffset + firstComponent * elementStride;
+            IRIntegerValue width = chooseGroupWidth(
+                baseOffset,
+                groupOffset,
+                alignment,
+                elementType,
+                elementStride,
+                elementCount - firstComponent);
+
+            if (width == 1)
+            {
+                auto elementVal =
+                    emitLegalLoad(elementType, buffer, baseOffset, groupOffset, alignment);
+                if (!elementVal)
+                    return nullptr;
+                components.add(elementVal);
+            }
+            else
+            {
+                auto groupType = m_builder.getVectorType(elementType, width);
+                auto groupVal = emitSimpleLoad(groupType, buffer, baseOffset, groupOffset);
+                if (!groupVal)
+                    return nullptr;
+                for (IRIntegerValue i = 0; i < width; ++i)
+                    components.add(m_builder.emitElementExtract(groupVal, i));
+            }
+
+            firstComponent += width;
+        }
+
+        return m_builder.emitMakeVector(vecType, components);
+    }
+
+    // Store a vector `value` of `elementCount` elements of `elementType` as the same sequence of
+    // groups that `emitLegalGroupedVectorLoad` would load, under the same precondition.
+    Result emitLegalGroupedVectorStore(
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment,
+        IRInst* value,
+        IRType* elementType,
+        IRIntegerValue elementStride,
+        IRIntegerValue elementCount)
+    {
+        SLANG_ASSERT(!m_options.scalarizeVectorLoadStore && !m_options.useBitCastFromUInt);
+        for (IRIntegerValue firstComponent = 0; firstComponent < elementCount;)
+        {
+            IRIntegerValue groupOffset = immediateOffset + firstComponent * elementStride;
+            IRIntegerValue width = chooseGroupWidth(
+                baseOffset,
+                groupOffset,
+                alignment,
+                elementType,
+                elementStride,
+                elementCount - firstComponent);
+
+            if (width == 1)
+            {
+                auto elementVal = m_builder.emitElementExtract(value, firstComponent);
+                SLANG_RETURN_ON_FAIL(emitLegalStore(
+                    elementType,
+                    buffer,
+                    baseOffset,
+                    groupOffset,
+                    alignment,
+                    elementVal));
+            }
+            else
+            {
+                auto groupType = m_builder.getVectorType(elementType, width);
+                List<IRInst*> groupComponents;
+                for (IRIntegerValue i = 0; i < width; ++i)
+                    groupComponents.add(m_builder.emitElementExtract(value, firstComponent + i));
+                auto groupVal = m_builder.emitMakeVector(groupType, groupComponents);
+                SLANG_RETURN_ON_FAIL(
+                    emitSimpleStore(groupType, buffer, baseOffset, groupOffset, groupVal));
+            }
+
+            firstComponent += width;
+        }
+
+        return SLANG_OK;
+    }
+
+    // The storage type / cast opcode a `DescriptorHandle` field packs into must match the handle's
+    // SPIR-V representation, which is per-kind under `spvBindlessTextureNV` (uint64 for
+    // texture/sampler kinds, uint2 for buffers and acceleration structures), so each of these takes
+    // the handle type rather than deciding capability-wide.
+    bool isDescriptorHandleUInt64(IRDescriptorHandleType* handleType)
+    {
+        bool hasBindlessTextureNV =
+            m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV);
+        return isDescriptorHandleRepresentedAsUInt64(handleType, hasBindlessTextureNV);
+    }
+
+    IRType* getDescriptorHandleStorageType(IRDescriptorHandleType* handleType)
     {
         if (!m_options.translateToStructuredBufferOps)
             return nullptr;
 
-        if (m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        if (isDescriptorHandleUInt64(handleType))
             return m_builder.getUInt64Type();
 
         return m_builder.getVectorType(m_builder.getUIntType(), 2);
     }
 
-    IROp getCastDescriptorHandleToStorageOp()
+    IROp getCastDescriptorHandleToStorageOp(IRDescriptorHandleType* handleType)
     {
-        return m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV)
-                   ? kIROp_CastDescriptorHandleToUInt64
-                   : kIROp_CastDescriptorHandleToUInt2;
+        return isDescriptorHandleUInt64(handleType) ? kIROp_CastDescriptorHandleToUInt64
+                                                    : kIROp_CastDescriptorHandleToUInt2;
     }
 
-    IROp getCastStorageToDescriptorHandleOp()
+    IROp getCastStorageToDescriptorHandleOp(IRDescriptorHandleType* handleType)
     {
-        return m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV)
-                   ? kIROp_CastUInt64ToDescriptorHandle
-                   : kIROp_CastUInt2ToDescriptorHandle;
+        return isDescriptorHandleUInt64(handleType) ? kIROp_CastUInt64ToDescriptorHandle
+                                                    : kIROp_CastUInt2ToDescriptorHandle;
     }
 
     SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
@@ -519,7 +668,7 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto descriptorHandleType = as<IRDescriptorHandleType>(type))
         {
-            if (auto storageType = getDescriptorHandleStorageType())
+            if (auto storageType = getDescriptorHandleStorageType(descriptorHandleType))
             {
                 auto storageVal =
                     emitLegalLoad(storageType, buffer, baseOffset, immediateOffset, alignment);
@@ -528,7 +677,7 @@ struct ByteAddressBufferLegalizationContext
                 IRInst* args[] = {storageVal};
                 return m_builder.emitIntrinsicInst(
                     descriptorHandleType,
-                    getCastStorageToDescriptorHandleOp(),
+                    getCastStorageToDescriptorHandleOp(descriptorHandleType),
                     1,
                     args);
             }
@@ -601,8 +750,6 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                // Emit an aligned vector load operation when using a LoadAligned inst.
-                // Else, fallback to scalarizing the loads.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
@@ -610,8 +757,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (m_options.scalarizeVectorLoadStore ||
-                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (m_options.scalarizeVectorLoadStore)
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -623,10 +769,34 @@ struct ByteAddressBufferLegalizationContext
                         elementCountInst->getValue(),
                         alignment);
                 }
-                else
+                if (isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
                 }
+                // On `useBitCastFromUInt` targets (HLSL with a DX 5.0 or earlier profile; WGSL
+                // already scalarized above) every component of a partially covered vector is
+                // loaded as a `uint` and bit-cast, rather than grouped into typed sub-vector loads.
+                if (m_options.useBitCastFromUInt)
+                {
+                    return emitLegalSequenceLoad(
+                        type,
+                        buffer,
+                        baseOffset,
+                        immediateOffset,
+                        kIROp_MakeVector,
+                        vecType->getElementType(),
+                        elementCountInst->getValue(),
+                        alignment);
+                }
+                return emitLegalGroupedVectorLoad(
+                    vecType,
+                    buffer,
+                    baseOffset,
+                    immediateOffset,
+                    alignment,
+                    vecType->getElementType(),
+                    elementStride,
+                    elementCountInst->getValue());
             }
 
             // If we aren't scalarizing a vetor load then we next need
@@ -707,6 +877,24 @@ struct ByteAddressBufferLegalizationContext
             //
             if (m_options.useBitCastFromUInt)
             {
+                if (m_options.loadHalfFrom32BitWords && basicType->getOp() == kIROp_HalfType)
+                {
+                    // Load a `half` on a target without 16-bit integer types: the containing
+                    // word is shifted as for any value smaller than 4 bytes
+                    // (`emitLoadContainingWordShifted`), but the last step is a bitcast of the
+                    // whole word to `vector<half, 2>` rather than a mask and a cast to a 16-bit
+                    // integer. This relies on WGSL's `bitcast<vec2<f16>>(u32)` placing bits 0..15
+                    // in element 0, and on `lowerBitCast` leaving that bitcast intact on WGPU
+                    // targets (see `isWGSLHalfVectorBitCast`); otherwise it would be split back
+                    // into 16-bit integers.
+                    SLANG_ASSERT(
+                        m_options.lowerBasicTypeOps && !m_options.translateToStructuredBufferOps);
+                    auto offset = emitOffsetAddIfNeeded(baseOffset, immediateOffset);
+                    auto shifted = emitLoadContainingWordShifted(buffer, offset);
+                    auto halfPair =
+                        m_builder.emitBitCast(m_builder.getVectorType(basicType, 2), shifted);
+                    return m_builder.emitElementExtract(halfPair, (IRIntegerValue)0);
+                }
                 if (auto unsignedType = getSameSizeUIntType(basicType))
                 {
                     auto unsignedVal =
@@ -930,25 +1118,7 @@ struct ByteAddressBufferLegalizationContext
             }
             else if (sizeAlignment.size < 4)
             {
-                auto alignedOffset = m_builder.emitDiv(
-                    offset->getDataType(),
-                    offset,
-                    m_builder.getIntValue(offset->getDataType(), 4));
-                alignedOffset = m_builder.emitMul(
-                    offset->getDataType(),
-                    alignedOffset,
-                    m_builder.getIntValue(offset->getDataType(), 4));
-                IRInst* loadArgs[] = {buffer, alignedOffset};
-                auto val = m_builder.emitIntrinsicInst(
-                    m_builder.getUIntType(),
-                    kIROp_ByteAddressBufferLoad,
-                    2,
-                    loadArgs);
-                auto shiftAmount = m_builder.emitSub(offset->getDataType(), offset, alignedOffset);
-                shiftAmount = m_builder.emitMul(
-                    offset->getDataType(),
-                    shiftAmount,
-                    m_builder.getIntValue(offset->getDataType(), 8));
+                auto shift = emitLoadContainingWordShifted(buffer, offset);
                 IRInst* mask = nullptr;
                 switch (sizeAlignment.size)
                 {
@@ -962,7 +1132,6 @@ struct ByteAddressBufferLegalizationContext
                     SLANG_ASSERT(!"Unexpected size");
                     break;
                 }
-                auto shift = m_builder.emitShr(m_builder.getUIntType(), val, shiftAmount);
                 auto masked = m_builder.emitBitAnd(m_builder.getUIntType(), shift, mask);
                 IRInst* casted = nullptr;
                 switch (sizeAlignment.size)
@@ -988,6 +1157,32 @@ struct ByteAddressBufferLegalizationContext
             IRInst* loadArgs[] = {buffer, offset};
             return m_builder.emitIntrinsicInst(type, kIROp_ByteAddressBufferLoad, 2, loadArgs);
         }
+    }
+
+    // Loads the 32-bit word that contains the byte at `offset` and shifts it right so that this
+    // byte is the lowest byte of the result; the bits above hold the following bytes of the same
+    // word, then zeros. Loads of values smaller than 4 bytes start here. The value at `offset` must
+    // fit inside the containing word, i.e. a 2-byte value must be at a 2-byte aligned offset.
+    // Callers that mask the result read only the low bytes; the `half` load reads element 0 of
+    // the result bit-cast to `vector<half, 2>`, which is the low 16 bits.
+    IRInst* emitLoadContainingWordShifted(IRInst* buffer, IRInst* offset)
+    {
+        auto offsetType = offset->getDataType();
+        auto alignedOffset = m_builder.emitMul(
+            offsetType,
+            m_builder.emitDiv(offsetType, offset, m_builder.getIntValue(offsetType, 4)),
+            m_builder.getIntValue(offsetType, 4));
+        IRInst* loadArgs[] = {buffer, alignedOffset};
+        auto word = m_builder.emitIntrinsicInst(
+            m_builder.getUIntType(),
+            kIROp_ByteAddressBufferLoad,
+            2,
+            loadArgs);
+        auto shiftAmount = m_builder.emitMul(
+            offsetType,
+            m_builder.emitSub(offsetType, offset, alignedOffset),
+            m_builder.getIntValue(offsetType, 8));
+        return m_builder.emitShr(m_builder.getUIntType(), word, shiftAmount);
     }
 
     IRInst* emitOffsetAddIfNeeded(IRInst* baseOffset, IRIntegerValue immediateOffset)
@@ -1366,6 +1561,33 @@ struct ByteAddressBufferLegalizationContext
     // of byte-address buffer stores, which mostly parallels code we've
     // already discussed.
 
+    // Returns true if `type` is or contains a non-`bool` scalar smaller than `minSize` bytes.
+    bool containsScalarSmallerThan(IRType* type, IRIntegerValue minSize)
+    {
+        if (auto vectorType = as<IRVectorType>(type))
+            return containsScalarSmallerThan(vectorType->getElementType(), minSize);
+        if (auto matrixType = as<IRMatrixType>(type))
+            return containsScalarSmallerThan(matrixType->getElementType(), minSize);
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+            return containsScalarSmallerThan(arrayType->getElementType(), minSize);
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                if (containsScalarSmallerThan(field->getFieldType(), minSize))
+                    return true;
+            }
+            return false;
+        }
+        if (as<IRBasicType>(type) && !as<IRBoolType>(type))
+        {
+            IRSizeAndAlignment sizeAlignment;
+            if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment)))
+                return sizeAlignment.size < minSize;
+        }
+        return false;
+    }
+
     void processStore(IRInst* store)
     {
         // Just as for loads, the logic for stores is base on the type
@@ -1379,6 +1601,21 @@ struct ByteAddressBufferLegalizationContext
         // Validate the store's `location`/`alignment` contract up front so the diagnostic
         // fires regardless of whether the stored type happens to need legalization.
         validateExplicitAlignment(store->getOperand(1), store->getOperand(2), type);
+
+        // On targets that can't store a scalar this small on its own (WGSL writes whole
+        // 32-bit words), the store would have to read-modify-write the containing unit, which
+        // can lose a concurrent write to the other bytes. Report it here, where the store
+        // still has its source location, instead of failing later on the 8/16-bit types.
+        if (m_options.minimumStoreScalarSize > 0 &&
+            containsScalarSmallerThan(type, m_options.minimumStoreScalarSize))
+        {
+            m_sink->diagnose(Diagnostics::ByteAddressBufferSubWordStoreNotSupportedInWgsl{
+                .type = type,
+                .location = store->sourceLoc,
+            });
+            store->removeAndDeallocate();
+            return;
+        }
 
         // Types that are already legal to use don't require any processing.
         //
@@ -1482,14 +1719,14 @@ struct ByteAddressBufferLegalizationContext
                 }
             }
         }
-        else if (as<IRDescriptorHandleType>(type))
+        else if (auto descriptorHandleType = as<IRDescriptorHandleType>(type))
         {
-            if (auto storageType = getDescriptorHandleStorageType())
+            if (auto storageType = getDescriptorHandleStorageType(descriptorHandleType))
             {
                 IRInst* args[] = {value};
                 auto storageVal = m_builder.emitIntrinsicInst(
                     storageType,
-                    getCastDescriptorHandleToStorageOp(),
+                    getCastDescriptorHandleToStorageOp(descriptorHandleType),
                     1,
                     args);
                 return emitLegalStore(
@@ -1559,9 +1796,6 @@ struct ByteAddressBufferLegalizationContext
         {
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                // Emit an aligned vector store operation when using a StoreAligned inst.
-                // Else, fallback to scalarizing the stores.
-
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
@@ -1569,8 +1803,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (m_options.scalarizeVectorLoadStore ||
-                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (m_options.scalarizeVectorLoadStore)
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1581,7 +1814,7 @@ struct ByteAddressBufferLegalizationContext
                         elementCountInst->getValue(),
                         alignment);
                 }
-                else
+                if (isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitSimpleStore(
                         value->getDataType(),
@@ -1590,6 +1823,26 @@ struct ByteAddressBufferLegalizationContext
                         immediateOffset,
                         value);
                 }
+                if (m_options.useBitCastFromUInt)
+                {
+                    return emitLegalSequenceStore(
+                        buffer,
+                        baseOffset,
+                        immediateOffset,
+                        value,
+                        vecType->getElementType(),
+                        elementCountInst->getValue(),
+                        alignment);
+                }
+                return emitLegalGroupedVectorStore(
+                    buffer,
+                    baseOffset,
+                    immediateOffset,
+                    alignment,
+                    value,
+                    vecType->getElementType(),
+                    elementStride,
+                    elementCountInst->getValue());
             }
 
             if (m_options.useBitCastFromUInt)

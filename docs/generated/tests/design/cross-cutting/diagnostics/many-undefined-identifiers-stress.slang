@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#diagnosticsink
-//META: doc_section_digest=83632b726fecd52003cb9a007e201049bb33c66f077ab6265b07278009caca02
+//META: doc_section_digest=969ca4caf68f403a893def98e7ed795e3b49ea96059129edfb3f246dc1cdcd15
 //META: purpose=Stress: the sink's output buffer accumulates every diagnostic of a long run of undefined-identifier errors; none is dropped.
 //META: intent=stress
 //META: pipeline_stage=check

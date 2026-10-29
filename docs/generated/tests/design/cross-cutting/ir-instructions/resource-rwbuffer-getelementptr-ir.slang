@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#memory-instructions
-//META: doc_section_digest=4311a2734c94c89f3951c5e93e111cd25e64443cd00a56d067df242df4d2fb08
+//META: doc_section_digest=88ac9c5bf3929b2eb7c6c8eba693545ca9ae827a013044241007c9ad7639db78
 //META: purpose=A write through a subscript into an RWStructuredBuffer lowers to `rwstructuredBufferGetElementPtr` plus a `store`.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -15,7 +15,7 @@
 // `store`s the value through it. A non-constant `uniform` index keeps
 // the pointer arithmetic in the IR.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int i;
 uniform int v;

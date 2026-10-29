@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#simple-modifiers
-//META: doc_section_digest=c20a44348c0739e8c347913c83450bf1d0dc3c34d664be2becfd728a37d9b098
+//META: doc_section_digest=56c06b08f61a5eac3a9a9fa44d74ee850f8a6841b9cad895376978a437f1148f
 //META: purpose=`public` and `private` are simple visibility modifiers; a `private` member is still reachable from another member of the same type.
 //META: intent=functional
 //META: pipeline_stage=parse

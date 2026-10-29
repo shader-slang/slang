@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#live-but-unproduced-opcodes
-//META: doc_section_digest=f400c3e3d85c3f3a43b09285b54b24ce8a795e0f2ad77f193abf0d754c940045
+//META: doc_section_digest=3f1264cb5d0c1e6c84489b26c61fc018866b21660aa0790de531bd78b4b94ead
 //META: purpose=`castToVoid` is declared but never constructed: a `(void)expr` cast is intercepted and yields the unique `void_constant` value instead, and the operand's side effects survive as their own instructions.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,7 +18,7 @@
 // call together show the interception preserves semantics without
 // introducing a second spelling of the `void` value.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

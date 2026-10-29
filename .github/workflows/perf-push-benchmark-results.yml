@@ -1,0 +1,65 @@
+name: Push MDL Benchmark Results
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: [Windows, self-hosted, benchmark]
+    # Use Git Bash rather than PowerShell: the common-setup action writes LLVM_DIR and
+    # Clang_DIR as MSYS paths (/c/...), which only Git Bash converts when it launches cmake.exe.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          submodules: "true"
+          fetch-depth: "0"
+      - name: Common setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: windows
+          compiler: cl
+          platform: x86_64
+          config: release
+          build-llvm: true
+      - name: Build Slang
+        run: |
+          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --workflow --preset release
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: "shader-slang/MDL-SDK"
+          path: "external/MDL-SDK"
+          sparse-checkout: |
+            ./examples/mdl_sdk/dxr/content/slangified
+      - name: Run benchmark
+        run: |
+          cd tools/benchmark
+          cp ../../external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang .
+          # Pin prettytable; argparse is in the stdlib (3.2+) so it is dropped.
+          pip install prettytable==3.17.0
+          python compile.py --samples 16 --target dxil
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: "shader-slang/slang-material-modules-benchmark"
+          path: "external/slang-material-modules-benchmark"
+          token: ${{ secrets.SLANG_MDL_BENCHMARK_RESULTS_PAT }}
+      - name: Push results
+        run: |
+          commit_subject="$(git log -1 --pretty=%s)"
+          commit_hash="$(git log -1 --pretty=%H)"
+          cp tools/benchmark/benchmarks.json external/slang-material-modules-benchmark/
+          printf '%s\n%s\n' "${commit_subject}" "${commit_hash}" > external/slang-material-modules-benchmark/current
+          cd external/slang-material-modules-benchmark
+          ls
+          git add benchmarks.json current
+          git commit -m "${commit_subject}" -m "https://github.com/shader-slang/slang/commit/${commit_hash}"
+          git log
+          git push

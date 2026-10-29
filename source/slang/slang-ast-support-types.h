@@ -238,6 +238,10 @@ FIDDLE() namespace Slang
         IBwdCallable,
         NullDifferential,
         OperatorAddressOf,
+        WaveIsFirstLane,
+        WaveReadLaneFirst,
+        CallShader,
+        ReportHit = 16,
         COUNT
     };
 
@@ -629,7 +633,27 @@ FIDDLE() namespace Slang
         FIDDLE() Type* type = nullptr;
         FIDDLE() bool isLeftValue = false;
         FIDDLE() bool hasReadOnlyOnTarget = false;
+
+        /// The expression denotes storage declared with the GLSL `writeonly` memory qualifier.
         FIDDLE() bool isWriteOnly = false;
+
+        /// The expression denotes a memory location that it cannot write, such as a
+        /// `__ref_readonly` parameter, or a field or element of one. A `__constref` parameter is
+        /// not one, because a borrow may be a temporary holding the argument's value. It is never
+        /// set together with `isLeftValue`, which means a writable abstract storage location
+        /// (a property with a setter is one, but not a memory location). Together the two
+        /// flags play the role of C++'s modifiable and non-modifiable l-values, so an argument
+        /// for a `__ref_readonly` parameter may be either.
+        ///
+        /// TODO: This flag combines two properties of an expression that we want to record
+        /// independently: its value category (a pure value, an abstract storage location such
+        /// as a `property` reference, or a memory location) and the access it permits
+        /// (read-only, write-only, or read-write). `isLeftValue` and `isWriteOnly` each encode
+        /// part of the same two properties. We expect `QualType` to become an `ExprInfo` that
+        /// stores the value category and the access as separate fields. We added only this flag
+        /// because restructuring `QualType` is a larger change than adding `__ref_readonly`
+        /// needs.
+        FIDDLE() bool isReadOnlyMemoryLocation = false;
 
         QualType() = default;
 
@@ -1361,28 +1385,18 @@ FIDDLE() namespace Slang
             // instead.
             SuperType,
 
-            // The lookup process considered a member of an
-            // enclosing type as being in scope, so that any
-            // reference to that member needs to use a `this`
-            // expression as appropriate.
-            This,
+            // A member of an enclosing type is referenced through an implicit `this` expression.
+            // Expression checking determines its type and mutability, including for
+            // constructor-local `this`.
+            ThisExpr,
+
+            // A member of an enclosing type is referenced through its `This` type, as in a
+            // static method or a reference from a nested type to an enclosing type's member.
+            ThisType,
         };
 
         // The kind of lookup step that was performed
         Kind kind;
-
-        // For the `Kind::This` case, what does the implicit
-        // `this` or `This` parameter refer to?
-        //
-        enum class ThisParameterMode : uint8_t
-        {
-            ImmutableValue, // An immutable `this` value
-            MutableValue,   // A mutable `this` value
-            Type,           // A `This` type
-
-            Default = ImmutableValue,
-        };
-        ThisParameterMode thisParameterMode = ThisParameterMode::Default;
 
         // As needed, a reference to the declaration that faciliated
         // the lookup step.
@@ -1406,18 +1420,28 @@ FIDDLE() namespace Slang
             DeclRef<Decl> declRef,
             Val* val,
             RefPtr<LookupResultItem_Breadcrumb> next,
-            ThisParameterMode thisParameterMode = ThisParameterMode::Default)
-            : kind(kind)
-            , thisParameterMode(thisParameterMode)
-            , declRef(declRef)
-            , val(val)
-            , next(next)
+            Scope* thisExprScope = nullptr)
+            : kind(kind), declRef(declRef), val(val), next(next), thisExprScope(thisExprScope)
         {
+            SLANG_RELEASE_ASSERT((kind == Kind::ThisExpr) == (thisExprScope != nullptr));
+        }
+
+        Scope* getThisExprScope() const
+        {
+            SLANG_RELEASE_ASSERT(kind == Kind::ThisExpr);
+            SLANG_RELEASE_ASSERT(thisExprScope);
+            return thisExprScope;
         }
 
     protected:
         // Needed for serialization
         LookupResultItem_Breadcrumb() = default;
+
+    private:
+        // The scope where lookup began for a `Kind::ThisExpr` step. `ConstructLookupResultExpr`
+        // checks an implicit `ThisExpr` in this scope to determine its type and mutability.
+        // Other breadcrumb kinds leave this field null.
+        Scope* thisExprScope = nullptr;
     };
 
     // Represents one item found during lookup
@@ -1632,7 +1656,64 @@ FIDDLE() namespace Slang
         Val* m_val = nullptr;
     };
 
+    /// Identifies one requirement entry in a specific, already known interface witness table.
+    ///
+    /// The key intentionally carries no substitution context: the table's interface type provides
+    /// that context. Under the current AST representation a generic requirement is stored under
+    /// its innermost non-generic declaration rather than its wrapping `GenericDecl`; construction
+    /// performs that normalization in one place. Code that identifies a requirement independently
+    /// of one known table must keep its `DeclRef` instead of using this key.
+    struct InterfaceRequirementKey
+    {
+        explicit InterfaceRequirementKey(Decl* requirementDecl);
+
+        /// Creates a key and reports how many generic wrappers were removed from its declaration.
+        static InterfaceRequirementKey createWithGenericWrapperCount(
+            Decl* requirementDecl,
+            UCount& outGenericWrapperCount);
+
+        Decl* getDecl() const { return m_decl; }
+
+    private:
+        InterfaceRequirementKey(Decl* requirementDecl, UCount* outGenericWrapperCount);
+
+        Decl* m_decl;
+    };
+
     typedef OrderedDictionary<Decl*, RequirementWitness> RequirementDictionary;
+
+    /// Records the semantic-checking state of one requirement in a witness table.
+    ///
+    /// Ordinary checking follows `Unchecked -> Checking -> Succeeded|Failed`. An inherited-
+    /// interface requirement may instead follow `Unchecked -> WitnessReady -> Checking` so that
+    /// lookup can traverse its nested table before every requirement in that table has been
+    /// validated. A `Succeeded` or `WitnessReady` requirement always has a dictionary entry;
+    /// `Failed` never does. `Unchecked` may already have an entry synthesized by another semantic
+    /// operation, which the per-requirement checker adopts as a successful result.
+    ///
+    /// This state cannot be encoded by `RequirementWitness::Flavor`: `Flavor::none` is also the
+    /// valid dictionary value of a successfully satisfied optional requirement.
+    /// `ConformanceInterfaceCheckStatus` separately records whole-table traversal. Its state is not
+    /// an aggregate of these entry states: on-demand checking may finish entries while the table is
+    /// still `Unchecked`, and a failed whole-table traversal retains entries that succeeded before
+    /// another requirement failed so later diagnostics can keep using those structural answers.
+    enum class RequirementCheckState
+    {
+        /// No per-requirement check has started.
+        Unchecked,
+
+        /// An inherited-interface table is available for lookup but has not been validated.
+        WitnessReady,
+
+        /// One semantic operation owns the attempt to produce or validate this entry.
+        Checking,
+
+        /// The requirement was satisfied and its dictionary entry is final.
+        Succeeded,
+
+        /// The requirement could not be satisfied and has no dictionary entry.
+        Failed,
+    };
 
     FIDDLE()
     class WitnessTable : public RefObject
@@ -1640,7 +1721,27 @@ FIDDLE() namespace Slang
         FIDDLE(...)
         const RequirementDictionary& getRequirementDictionary() { return m_requirementDictionary; }
 
-        void add(Decl* decl, RequirementWitness const& witness);
+        /// Adds a witness while normalizing `requirementDecl` to its table-local requirement key.
+        void add(Decl* requirementDecl, RequirementWitness const& witness);
+
+        /// Adds the witness for an already-normalized table-local requirement key.
+        void add(InterfaceRequirementKey key, RequirementWitness const& witness);
+
+        /// Returns whether this table contains a witness for `key`.
+        bool containsRequirement(InterfaceRequirementKey key) const
+        {
+            return m_requirementDictionary.containsKey(key.getDecl());
+        }
+
+        /// Looks up the witness for `key` without performing semantic checking.
+        bool tryGetRequirementWitness(InterfaceRequirementKey key, RequirementWitness& outWitness)
+            const
+        {
+            return m_requirementDictionary.tryGetValue(key.getDecl(), outWitness);
+        }
+
+        /// Removes a requirement witness and forgets its semantic-checking state.
+        void removeRequirement(InterfaceRequirementKey key);
 
         // The type that the witness table witnesses conformance to (e.g. an Interface)
         FIDDLE() Type* baseType;
@@ -1653,6 +1754,24 @@ FIDDLE() namespace Slang
 
         // Cached dictionary for looking up satisfying values.
         FIDDLE() RequirementDictionary m_requirementDictionary;
+
+        /// Returns the semantic-checking state for `key`.
+        RequirementCheckState getRequirementCheckState(InterfaceRequirementKey key) const
+        {
+            if (auto state = m_requirementCheckStates.tryGetValue(key.getDecl()))
+                return *state;
+            return RequirementCheckState::Unchecked;
+        }
+
+        /// Updates the semantic-checking state for `key`.
+        void setRequirementCheckState(InterfaceRequirementKey key, RequirementCheckState state)
+        {
+            m_requirementCheckStates[key.getDecl()] = state;
+        }
+
+        // Semantic-checking state is deliberately not serialized. A serialized witness table is
+        // already complete, while a specialized copy can derive completion from its entries.
+        Dictionary<Decl*, RequirementCheckState> m_requirementCheckStates;
 
         RefPtr<WitnessTable> specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst);
     };
@@ -1755,9 +1874,8 @@ FIDDLE() namespace Slang
 
         /// Pass a reference to a borrowed immutable value.
         ///
-        /// Indicated by using the `borrow` modifier on a parameter,
-        /// or the combination of `borrow` and `in` (while not also
-        /// using `out`).
+        /// Indicated by the `__borrow` modifier on a parameter, or by
+        /// its legacy alias `__constref`.
         ///
         /// May semantically be implemented by directly passing a
         /// reference to the argument, or a reference to a temporary
@@ -1809,8 +1927,128 @@ FIDDLE() namespace Slang
         /// This parameter-passing mode is more-or-less just syntactic
         /// sugar for a parameter of an explicit pointer type (`Ptr<T>`).
         ///
-        Ref,
+        RefReadWrite,
+
+        /// Pass a reference to a memory location that the callee may only read.
+        ///
+        /// Indicated by the `__ref_readonly` modifier on a parameter, or by
+        /// its legacy alias `const __ref` (or `__ref const`).
+        ///
+        /// The same rules as `RefReadWrite` apply to the argument and to
+        /// aliasing access paths; only the callee's access through the
+        /// parameter is restricted.
+        ///
+        RefReadOnly,
+
+        /// Pass a reference to a memory location that the callee may only write.
+        ///
+        /// Indicated by the `__ref_writeonly` modifier on a parameter.
+        ///
+        RefWriteOnly,
     };
+
+    /// Is `mode` one of the `Ref*` modes, which always pass the address of
+    /// the argument's memory location?
+    inline bool isByReferenceParamPassingMode(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /// Get the access qualifier that an `IRRefParamType` records for a `Ref*` mode.
+    ///
+    AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode);
+
+    /// Combined semantic information about a parameter's type and parameter-passing mode.
+    ///
+    /// The two fields deliberately use the same decomposition as a parameter type with a
+    /// parameter-passing-mode wrapper: `type` is the value type *inside* that wrapper, while
+    /// `mode` identifies the wrapper. Thus `type` never contains an `OutParamType`,
+    /// `BorrowInOutParamType`, `BorrowInParamType`, or `RefParamType`.
+    ///
+    /// Other modifiers that are part of the parameter's semantic value type remain encoded in
+    /// `type`. In particular, a `no_diff` parameter uses a `ModifiedType` carrying
+    /// `NoDiffModifierVal`. Producers and consumers must preserve this decomposition so that a
+    /// `ParamInfo` and its wrapped parameter-type representation encode the same information.
+    FIDDLE()
+    struct ParamInfo
+    {
+        FIDDLE(...)
+
+        /// The effective parameter value type, including semantic type modifiers such as
+        /// `no_diff`, but excluding any parameter-passing-mode wrapper.
+        FIDDLE() Type* type = nullptr;
+
+        /// The effective parameter-passing mode, stored separately from `type`.
+        FIDDLE() ParamPassingMode mode = ParamPassingMode::In;
+    };
+
+    /// Returns whether `mode` passes writable storage to the callee.
+    inline bool doesParamPassingModeIndicateWritableStorage(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::Out:
+        case ParamPassingMode::BorrowInOut:
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefWriteOnly:
+            return true;
+
+        case ParamPassingMode::In:
+        case ParamPassingMode::BorrowIn:
+        case ParamPassingMode::RefReadOnly:
+            return false;
+
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN(false);
+        }
+    }
+
+    /// Get the keyword that the compiler prints to name `mode`, such as `"inout"`.
+    ///
+    /// Each keyword is the modifier that declares the mode, with any leading `__` removed, so a
+    /// `__ref_readonly` parameter prints as `ref_readonly`. A `__constref` parameter prints as
+    /// `borrow`, because `__constref` is the legacy alias of `__borrow`.
+    inline const char* getParamPassingModeKeyword(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::In:
+            return "in";
+        case ParamPassingMode::Out:
+            return "out";
+        case ParamPassingMode::BorrowInOut:
+            return "inout";
+        case ParamPassingMode::BorrowIn:
+            return "borrow";
+        case ParamPassingMode::RefReadWrite:
+            return "ref";
+        case ParamPassingMode::RefReadOnly:
+            return "ref_readonly";
+        case ParamPassingMode::RefWriteOnly:
+            return "ref_writeonly";
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN("");
+        }
+    }
+
+    /// Print the keyword for `mode` followed by a space, as it appears before a parameter in a
+    /// function signature or an inlay hint. An `in` parameter prints nothing, because `in` is
+    /// the default and labeling it would add noise to most signatures.
+    inline void printParamPassingModePrefix(StringBuilder & sb, ParamPassingMode mode)
+    {
+        if (mode != ParamPassingMode::In)
+            sb << getParamPassingModeKeyword(mode) << " ";
+    }
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 

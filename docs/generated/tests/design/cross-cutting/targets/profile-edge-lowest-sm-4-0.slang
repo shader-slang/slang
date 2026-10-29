@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#profiles
-//META: doc_section_digest=e5b9757f49d35cc72a9566431514fc5b19482718219a34a0a4240001ec32891e
+//META: doc_section_digest=469973558ae9131458179def57cec815ce506922c2ef82e0e161360ad76f32c5
 //META: purpose=The lowest documented HLSL profile (`sm_4_0` — the floor of the DX_4_0 family in slang-profile-defs.h) compiles a vanilla compute shader; the profile-driven capability set is satisfied by the trivial kernel.
 //META: intent=boundary
 //META: pipeline_stage=check

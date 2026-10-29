@@ -1,4 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry fragmentMain -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry fragmentMain -Wno-119
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_DIAG): -no-codegen
 
 //CHECK_GLSL: layout(location = 0)
 //CHECK_GLSL: out vec4 entryPointParam_fragmentMain_cd_out1_0;
@@ -16,6 +17,10 @@
 //CHECK_GLSL: in vec4 vd_inner_texcoord_2_0;
 
 import glsl;
+/*CHECK_DIAG:
+       ^^^^ redundant import of the builtin `glsl` module
+       ^^^^ GLSL input already imports the builtin `glsl` module implicitly
+*/
 
 #version 400
 

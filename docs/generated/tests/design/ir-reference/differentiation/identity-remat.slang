@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#synthesized-derivative-witnesses
-//META: doc_section_digest=d0d372acea2ddd87761f403b676bd55520cc30b10f78ab301fc5cad68440e053
+//META: doc_section_digest=78050e8840112aefbd29c4d742e5c6beb9ffb31026048eaa31338aaf55782a36
 //META: purpose=A user-provided __apply whose minimal context is its BwdCallable gets a remat member built from IdentityRemat over the apply_bwd member.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // requires `remat` to be `IdentityRemat` over that same value, with a signature
 // whose full-context and minimal-context parameters are the same user type.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -experimental-feature
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -experimental-feature
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

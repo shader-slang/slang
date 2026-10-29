@@ -97,7 +97,13 @@ EndToEndCompileRequest::queryInterface(SlangUUID const& uuid, void** outObject)
     return SLANG_E_NO_INTERFACE;
 }
 
-// Try to infer a single common source language for a request
+// Infer a common input language only for slangc's convenience target selection.
+//
+// This deliberately uses the request-level language available before preprocessing. The
+// command-line tool's target inference is a best-effort DWIM policy layered above the compiler,
+// not part of source-language resolution. A later `#version` or `#language` compatibility override
+// therefore does not revise an already inferred target; users relying on such an override should
+// select their target explicitly.
 static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 {
     SourceLanguage language = SourceLanguage::Unknown;
@@ -124,6 +130,16 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
     SLANG_PROFILE_SECTION(endToEndActions);
+
+    // `-allow-glsl` used to enable an independent collection of parser, semantic, and IR
+    // behaviors without changing the declared language of any translation unit. Reduce it to the
+    // single meaning that this request's input translation units are GLSL. The compatibility bit
+    // is request-local because source modules loaded during semantic checking share the linkage
+    // but are not additional inputs governed by this option. `parseTranslationUnit()` separately
+    // handles the session-owned spelling stored in the front-end option set; the front-end
+    // request's once-only diagnostic guard makes both paths safe when a session supplies both.
+    if (getLegacyAllowGLSLInput())
+        getFrontEndReq()->applyLegacyAllowGLSLInputOptionToAllTranslationUnits();
 
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.
@@ -205,19 +221,37 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_OK;
     }
 
+    // Parse, bind, and check the supplied generic arguments before the -no-codegen return below.
+    // For example, if MetalOnly has [require(metal)], then
+    // `-entry main -specialize MetalOnly -target hlsl -no-codegen` must reject that argument.
+    // These calls record the checked arguments in component types. The post-link IR specialization
+    // pass runs later during code generation.
+    if (m_passThrough == PassThroughMode::None)
+    {
+        m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
+        if (getSink()->getErrorCount() != 0)
+            return SLANG_FAIL;
+
+        m_specializedGlobalAndEntryPointsComponentType =
+            createSpecializedGlobalAndEntryPointsComponentType(this, m_specializedEntryPoints);
+        if (getSink()->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
     // If command line specifies to skip codegen, we exit here.
     // Note: this is a debugging option.
     //
     if (getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
     {
-        // We will use the program (and matching layout information)
-        // that was computed in the front-end for all subsequent
-        // reflection queries, etc.
-        //
-        m_specializedGlobalComponentType = getUnspecializedGlobalComponentType();
-        m_specializedGlobalAndEntryPointsComponentType =
-            getUnspecializedGlobalAndEntryPointsComponentType();
-        m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
+        // Keep the checked specialization available for reflection. Pass-through requests have
+        // no Slang specialization to check and retain their front-end components.
+        if (m_passThrough != PassThroughMode::None)
+        {
+            m_specializedGlobalComponentType = getUnspecializedGlobalComponentType();
+            m_specializedGlobalAndEntryPointsComponentType =
+                getUnspecializedGlobalAndEntryPointsComponentType();
+            m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
+        }
 
         SLANG_RETURN_ON_FAIL(maybeCreateContainer());
 
@@ -261,20 +295,8 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         }
     }
 
-    // If codegen is enabled, we need to move along to
-    // apply any generic specialization that the user asked for.
-    //
     if (m_passThrough == PassThroughMode::None)
     {
-        m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
-        if (getSink()->getErrorCount() != 0)
-            return SLANG_FAIL;
-
-        m_specializedGlobalAndEntryPointsComponentType =
-            createSpecializedGlobalAndEntryPointsComponentType(this, m_specializedEntryPoints);
-        if (getSink()->getErrorCount() != 0)
-            return SLANG_FAIL;
-
         // For each code generation target, we will generate specialized
         // parameter binding information (taking global generic
         // arguments into account at this time).
@@ -1013,6 +1035,12 @@ SlangResult EndToEndCompileRequest::maybeCreateContainer()
             return res;
         }
 
+        // Emit only for command-line compiles. maybeCreateContainer() is also reached by the
+        // programmatic compile API, where adding a diagnostic to every module compile would be
+        // unexpected output for an embedder and could trip a diagnostic-count assertion.
+        if (m_isCommandLineCompile)
+            getSink()->diagnose(Diagnostics::ModuleFormatNotFinalized{});
+
         // Need to turn into a blob
         List<uint8_t> blobData;
         stream.swapContents(blobData);
@@ -1102,7 +1130,14 @@ SlangResult EndToEndCompileRequest::maybeWriteContainer(const String& fileName)
     // Only write if there is something to write
     if (writeArtifact)
     {
-        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(writeArtifact, fileName));
+        // Report write failures here, so that callers that ignore the result still fail the compile
+        // through the sink's error count.
+        const SlangResult res = ArtifactContainerUtil::writeContainer(writeArtifact, fileName);
+        if (SLANG_FAILED(res))
+        {
+            getSink()->diagnose(Diagnostics::CannotWriteOutputFile{.path = fileName});
+            return res;
+        }
     }
 
     return SLANG_OK;
@@ -1894,7 +1929,7 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
 
 void EndToEndCompileRequest::setAllowGLSLInput(bool value)
 {
-    getOptionSet().set(CompilerOptionName::AllowGLSL, value);
+    setLegacyAllowGLSLInput(value);
 }
 
 SlangResult EndToEndCompileRequest::compile()
@@ -1919,11 +1954,12 @@ SlangResult EndToEndCompileRequest::compile()
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         // This situation indicates a fatal (but not necessarily internal) error
@@ -1956,6 +1992,7 @@ SlangResult EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
     }
+#endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
 
 #else

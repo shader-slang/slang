@@ -1,8 +1,14 @@
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull -allow-glsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull
 
 // SPIRV: OpDecorate %entryPointParam_hullMain_pos Location 0
 // SPIRV: OpDecorate %entryPointParam_hullMain_hm Location 1
+// SPIRV: OpDecorate %gl_TessLevelOuter BuiltIn TessLevelOuter
+// SPIRV: OpDecorate %gl_TessLevelOuter Patch
+// SPIRV: OpDecorate %gl_TessLevelInner BuiltIn TessLevelInner
+// SPIRV: OpDecorate %gl_TessLevelInner Patch
 // SPIRV: OpDecorate %entryPointParam_constants_instanceId Location 2
+// SPIRV: OpDecorate %entryPointParam_constants_instanceId Patch
+
 
 struct HsOut
 {

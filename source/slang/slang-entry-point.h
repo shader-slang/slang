@@ -216,6 +216,21 @@ public:
     /// Get the stage that the entry point is for.
     Stage getStage() { return m_profile.getStage(); }
 
+    /// Get the requirements for this entry-point selection, including generic arguments already
+    /// applied to its declaration reference and stage-dependent requirements such as semantics.
+    /// A later `specialize()` operation stores its requirements in EntryPointSpecializationInfo,
+    /// preserving this base entry point for other specializations. Null only for pass-through or
+    /// deserialized dummies that carry no FuncDecl.
+    CapabilitySetVal* getInferredCapabilityRequirements()
+    {
+        return m_inferredCapabilityRequirements;
+    }
+
+    void setInferredCapabilityRequirements(CapabilitySetVal* caps)
+    {
+        m_inferredCapabilityRequirements = caps;
+    }
+
     /// Get the module that contains the entry point.
     Module* getModule();
 
@@ -285,6 +300,8 @@ public:
     {
     public:
         DeclRef<FuncDecl> specializedFuncDeclRef;
+        // Requirements for this selection, including those introduced by specialization.
+        CapabilitySetVal* inferredCapabilityRequirements = nullptr;
         List<ExpandedSpecializationArg> existentialSpecializationArgs;
     };
 
@@ -337,6 +354,11 @@ private:
     // intrinsic to the entry point.
     //
     Profile m_profile;
+
+    // The capability requirements inferred for the entry point as a whole (see
+    // `getInferredCapabilityRequirements`). Seeded from the function declaration's own
+    // requirements and finalized during `validateEntryPoint`.
+    CapabilitySetVal* m_inferredCapabilityRequirements = nullptr;
 };
 
 } // namespace Slang

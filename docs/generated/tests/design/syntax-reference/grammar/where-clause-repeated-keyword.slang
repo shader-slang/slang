@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#generics-and-where-clauses
-//META: doc_section_digest=9fa528801fe0f265a456b36eb8381148d65db73060d29e10a33ff9ce384104ac
+//META: doc_section_digest=9f7b958fb06af2133f1ee3e2412be63c482681598203ef131595bab232b76842
 //META: purpose=`WhereClause ::= ('where' WhereTerm)+` — each `where` keyword introduces exactly one term; several constraints repeat the keyword.
 //META: intent=functional
 //META: pipeline_stage=parse

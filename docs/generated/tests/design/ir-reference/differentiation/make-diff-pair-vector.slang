@@ -17,7 +17,7 @@
 // same line as the `MakeDiffPair(%a, %d)` producer so the element type and the
 // producing opcode are asserted together.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float3 a;
 uniform float3 d;

@@ -2,9 +2,12 @@
 
 #include "core/slang-blob.h"
 #include "core/slang-exception.h"
+#include "slang/slang-capability.h"
 #include "slang/slang-language-server.h"
 
+#include <deque>
 #include <slang.h>
+#include <stdint.h>
 #include <vector>
 
 using namespace slang;
@@ -71,31 +74,405 @@ GlobalSession* createGlobalSession()
     return new GlobalSession(globalSession);
 }
 
-Session* GlobalSession::createSession(int compileTarget)
+// True if `object` has an own property `name` whose value is neither `undefined` nor `null`.
+// - Own property: a descriptor is read like a plain object literal. Properties inherited from a
+//   prototype, including getters on a class, are not read.
+// - `undefined` and `null` count as leaving the field out, so a caller can build a descriptor
+//   with `{ profile: maybeProfile }` and get the C++ default when `maybeProfile` is not set.
+static bool hasOwnValue(const emscripten::val& object, const char* name)
 {
-    Slang::ComPtr<ISession> session;
+    return object.hasOwnProperty(name) && !object[name].isUndefined() && !object[name].isNull();
+}
+
+static bool isArray(const emscripten::val& value)
+{
+    return emscripten::val::global("Array").call<bool>("isArray", value);
+}
+
+// True for a JavaScript object that is not `null` and not an array.
+static bool isObject(const emscripten::val& value)
+{
+    return !value.isNull() && !value.isUndefined() &&
+           value.typeOf().as<std::string>() == "object" && !isArray(value);
+}
+
+static void setCreateSessionError(const std::string& message)
+{
+    g_error.type = std::string("USER");
+    g_error.result = SLANG_E_INVALID_ARG;
+    g_error.message = "createSession: " + message;
+}
+
+// An HLSL target with no profile gets sm_6_6. This is the one departure from the C++ defaults.
+// A session created from a number has always had it, and existing callers (slang-playground)
+// rely on it; the SessionDesc form applies it too, so the two forms give the same target. An
+// explicit `profile: 0` (SLANG_PROFILE_UNKNOWN) counts as no profile.
+static void applyLegacyHlslDefaultProfile(IGlobalSession* globalSession, TargetDesc& target)
+{
+    if (target.format == SLANG_HLSL && target.profile == SLANG_PROFILE_UNKNOWN)
+        target.profile = globalSession->findProfile("sm_6_6");
+}
+
+static bool isCompileTarget(int format)
+{
+    return format > SLANG_TARGET_UNKNOWN && format < SLANG_TARGET_COUNT_OF;
+}
+
+// Reads `value` as an int if it is a JavaScript number that is an integer in the int32 range.
+// Converting anything else (NaN, 1.5, 2**40) to int would be undefined behaviour.
+static bool readInt32(const emscripten::val& value, int& out)
+{
+    if (!value.isNumber() || !emscripten::val::global("Number").call<bool>("isInteger", value))
+        return false;
+    const double number = value.as<double>();
+    if (number < double(INT32_MIN) || number > double(INT32_MAX))
+        return false;
+    out = int(number);
+    return true;
+}
+
+namespace
+{
+// Converts a js::SessionDesc into a slang::SessionDesc. The C++ descriptors point into this
+// object, so it must outlive the IGlobalSession::createSession call.
+//
+// What the reader accepts:
+// - The fields it reads are the ones listed for createSession in slang-wasm.h. Any other
+//   property is ignored, as JavaScript APIs usually do, so a descriptor that sets a field this
+//   version doesn't read yet still works.
+// - Every malformed field it reads gives the same result: createSession returns null and
+//   getLastError() is a USER error with SLANG_E_INVALID_ARG and a message that names the field
+//   by its path (for example `targets[1].format`). That covers a missing required field, a
+//   field of the wrong JavaScript type, a number field that is not an int32 integer, an item
+//   that is not an object, and a list that is not an array.
+// - Some values are also range-checked. The rule: a value is checked when it decides how the
+//   rest of the descriptor is read, or when the compiler uses it as a table index without a
+//   check of its own. So `format` must be a SlangCompileTarget, an option `name` must be inside
+//   the CompilerOptionName range, `value.kind` must be Int or String, and the Int value of a
+//   Capability entry must be a capability atom (the compiler indexes its capability table with
+//   it). The range check on `name` does not reject the retired and sentinel values inside the
+//   range, which the C++ API also accepts.
+// - Other enum values (profile, flags, floatingPointMode, lineDirectiveMode,
+//   defaultMatrixLayoutMode) and the other option values are passed on without checks, as the
+//   C++ API passes them.
+//
+// Every `read...` function returns false after setting g_error; the caller then returns null
+// without touching g_error again.
+struct SessionDescReader
+{
+    IGlobalSession* globalSession;
+
+    // A deque, so the c_str() pointers stay valid while more strings are added.
+    std::deque<std::string> strings;
+    std::vector<const char*> searchPaths;
+    std::vector<PreprocessorMacroDesc> macros;
+    std::vector<CompilerOptionEntry> options;
+    std::vector<TargetDesc> targets;
+    // One list per target. It is sized before it is filled, so the inner vectors don't move.
+    std::vector<std::vector<CompilerOptionEntry>> targetOptions;
+
+    // Stores a copy of `string` that lives as long as the reader, and returns its c_str().
+    const char* internString(std::string string)
     {
-        SessionDesc sessionDesc = {};
-        sessionDesc.structureSize = sizeof(sessionDesc);
-        constexpr SlangInt targetCount = 1;
-        TargetDesc target = {};
-        target.format = (SlangCompileTarget)compileTarget;
-        if (compileTarget == SLANG_HLSL)
-        {
-            target.profile = spFindProfile(m_interface, "sm_6_6");
-        }
-        sessionDesc.targets = &target;
-        sessionDesc.targetCount = targetCount;
-        SlangResult result = m_interface->createSession(sessionDesc, session.writeRef());
-        if (result != SLANG_OK)
-        {
-            g_error.type = std::string("USER");
-            g_error.result = result;
-            return nullptr;
-        }
+        strings.push_back(std::move(string));
+        return strings.back().c_str();
     }
 
+    static std::string fieldPath(const std::string& path, const char* name)
+    {
+        return path.empty() ? std::string(name) : path + "." + name;
+    }
+
+    static std::string itemPath(const std::string& path, const char* name, size_t index)
+    {
+        return fieldPath(path, name) + "[" + std::to_string(index) + "]";
+    }
+
+    bool fail(const std::string& path, const char* problem)
+    {
+        setCreateSessionError("'" + path + "' " + problem);
+        return false;
+    }
+
+    // Each of these reads an optional field: if it is left out, `out` is unchanged and the
+    // result is true. If it is present but has the wrong type, the result is false.
+    bool readInt(const emscripten::val& object, const std::string& path, const char* name, int& out)
+    {
+        if (!hasOwnValue(object, name))
+            return true;
+        const emscripten::val value = object[name];
+        if (!value.isNumber())
+            return fail(fieldPath(path, name), "must be a number");
+        if (!readInt32(value, out))
+            return fail(fieldPath(path, name), "must be an integer in the int32 range");
+        return true;
+    }
+
+    bool readBool(
+        const emscripten::val& object,
+        const std::string& path,
+        const char* name,
+        bool& out)
+    {
+        if (!hasOwnValue(object, name))
+            return true;
+        if (!object[name].isTrue() && !object[name].isFalse())
+            return fail(fieldPath(path, name), "must be a boolean");
+        out = object[name].isTrue();
+        return true;
+    }
+
+    bool readString(
+        const emscripten::val& object,
+        const std::string& path,
+        const char* name,
+        const char*& out)
+    {
+        if (!hasOwnValue(object, name))
+            return true;
+        if (!object[name].isString())
+            return fail(fieldPath(path, name), "must be a string");
+        out = internString(object[name].as<std::string>());
+        return true;
+    }
+
+    // Reads an optional array field.
+    bool readArray(
+        const emscripten::val& object,
+        const std::string& path,
+        const char* name,
+        std::vector<emscripten::val>& out)
+    {
+        out.clear();
+        if (!hasOwnValue(object, name))
+            return true;
+        if (!isArray(object[name]))
+            return fail(fieldPath(path, name), "must be an array");
+        out = emscripten::vecFromJSArray<emscripten::val>(object[name]);
+        return true;
+    }
+
+    // Reads `object.compilerOptionEntries`: [{name, value: {kind, intValue0?, intValue1?,
+    // stringValue0?, stringValue1?}}], as slang::CompilerOptionEntry. Values that are left out
+    // keep the C++ defaults: 0 for the ints and nullptr for the strings.
+    bool readCompilerOptionEntries(
+        const emscripten::val& object,
+        const std::string& path,
+        std::vector<CompilerOptionEntry>& out)
+    {
+        std::vector<emscripten::val> entries;
+        if (!readArray(object, path, "compilerOptionEntries", entries))
+            return false;
+        for (size_t i = 0; i < entries.size(); i++)
+        {
+            const emscripten::val& entry = entries[i];
+            const std::string entryPath = itemPath(path, "compilerOptionEntries", i);
+            const std::string valuePath = fieldPath(entryPath, "value");
+            if (!isObject(entry))
+                return fail(entryPath, "must be an object");
+            if (!hasOwnValue(entry, "name"))
+                return fail(fieldPath(entryPath, "name"), "is required");
+            if (!hasOwnValue(entry, "value"))
+                return fail(valuePath, "is required");
+            const emscripten::val value = entry["value"];
+            if (!isObject(value))
+                return fail(valuePath, "must be an object");
+            if (!hasOwnValue(value, "kind"))
+                return fail(fieldPath(valuePath, "kind"), "is required");
+
+            int name = 0;
+            int kind = 0;
+            if (!readInt(entry, entryPath, "name", name) ||
+                !readInt(value, valuePath, "kind", kind))
+                return false;
+            // A name outside the enum can't be an option; reject it instead of storing an entry
+            // that nothing reads.
+            if (name < 0 || name >= int(CompilerOptionName::CountOf))
+                return fail(
+                    fieldPath(entryPath, "name"),
+                    "is outside the CompilerOptionName range");
+            if (kind != int(CompilerOptionValueKind::Int) &&
+                kind != int(CompilerOptionValueKind::String))
+                return fail(fieldPath(valuePath, "kind"), "must be 0 (Int) or 1 (String)");
+
+            CompilerOptionEntry option = {};
+            option.name = CompilerOptionName(name);
+            option.value.kind = CompilerOptionValueKind(kind);
+            if (!readInt(value, valuePath, "intValue0", option.value.intValue0) ||
+                !readInt(value, valuePath, "intValue1", option.value.intValue1) ||
+                !readString(value, valuePath, "stringValue0", option.value.stringValue0) ||
+                !readString(value, valuePath, "stringValue1", option.value.stringValue1))
+                return false;
+            // getTargetCaps indexes the capability table with this value, with only a debug
+            // assert on its range.
+            if (option.name == CompilerOptionName::Capability &&
+                option.value.kind == CompilerOptionValueKind::Int &&
+                (option.value.intValue0 < 0 ||
+                 option.value.intValue0 >= int(Slang::CapabilityName::Count)))
+                return fail(fieldPath(valuePath, "intValue0"), "is not a capability atom");
+            out.push_back(option);
+        }
+        return true;
+    }
+
+    // Reads `object` into targets[index] and targetOptions[index]. `read` sizes both vectors
+    // before it calls this.
+    bool readTarget(const emscripten::val& object, size_t index)
+    {
+        const std::string path = itemPath("", "targets", index);
+        if (!isObject(object))
+            return fail(path, "must be an object");
+        if (!hasOwnValue(object, "format"))
+            return fail(fieldPath(path, "format"), "is required");
+        TargetDesc& target = targets[index];
+        int format = 0;
+        int profile = int(target.profile);
+        int flags = int(target.flags);
+        int floatingPointMode = int(target.floatingPointMode);
+        int lineDirectiveMode = int(target.lineDirectiveMode);
+        if (!readInt(object, path, "format", format) ||
+            !readInt(object, path, "profile", profile) || !readInt(object, path, "flags", flags) ||
+            !readInt(object, path, "floatingPointMode", floatingPointMode) ||
+            !readInt(object, path, "lineDirectiveMode", lineDirectiveMode) ||
+            !readBool(
+                object,
+                path,
+                "forceGLSLScalarBufferLayout",
+                target.forceGLSLScalarBufferLayout))
+            return false;
+        if (!isCompileTarget(format))
+            return fail(fieldPath(path, "format"), "is not a SlangCompileTarget");
+        target.format = SlangCompileTarget(format);
+        target.profile = SlangProfileID(profile);
+        target.flags = SlangTargetFlags(flags);
+        target.floatingPointMode = SlangFloatingPointMode(floatingPointMode);
+        target.lineDirectiveMode = SlangLineDirectiveMode(lineDirectiveMode);
+        applyLegacyHlslDefaultProfile(globalSession, target);
+        if (!readCompilerOptionEntries(object, path, targetOptions[index]))
+            return false;
+        target.compilerOptionEntries = targetOptions[index].data();
+        target.compilerOptionEntryCount = (uint32_t)targetOptions[index].size();
+        return true;
+    }
+
+    bool read(const emscripten::val& desc, SessionDesc& sessionDesc)
+    {
+        std::vector<emscripten::val> items;
+
+        if (!readArray(desc, "", "targets", items))
+            return false;
+        targets.resize(items.size());
+        targetOptions.resize(items.size());
+        for (size_t i = 0; i < items.size(); i++)
+        {
+            if (!readTarget(items[i], i))
+                return false;
+        }
+
+        if (!readArray(desc, "", "searchPaths", items))
+            return false;
+        for (size_t i = 0; i < items.size(); i++)
+        {
+            if (!items[i].isString())
+                return fail(itemPath("", "searchPaths", i), "must be a string");
+            searchPaths.push_back(internString(items[i].as<std::string>()));
+        }
+
+        if (!readArray(desc, "", "preprocessorMacros", items))
+            return false;
+        for (size_t i = 0; i < items.size(); i++)
+        {
+            const std::string macroPath = itemPath("", "preprocessorMacros", i);
+            if (!isObject(items[i]))
+                return fail(macroPath, "must be an object");
+            if (!hasOwnValue(items[i], "name"))
+                return fail(fieldPath(macroPath, "name"), "is required");
+            // A macro with no `value` is defined as empty, as `-D NAME` is.
+            PreprocessorMacroDesc macro = {nullptr, ""};
+            if (!readString(items[i], macroPath, "name", macro.name) ||
+                !readString(items[i], macroPath, "value", macro.value))
+                return false;
+            macros.push_back(macro);
+        }
+
+        if (!readCompilerOptionEntries(desc, "", options))
+            return false;
+
+        int matrixLayoutMode = int(sessionDesc.defaultMatrixLayoutMode);
+        if (!readInt(desc, "", "defaultMatrixLayoutMode", matrixLayoutMode))
+            return false;
+        sessionDesc.defaultMatrixLayoutMode = SlangMatrixLayoutMode(matrixLayoutMode);
+        sessionDesc.targets = targets.data();
+        sessionDesc.targetCount = (SlangInt)targets.size();
+        sessionDesc.searchPaths = searchPaths.data();
+        sessionDesc.searchPathCount = (SlangInt)searchPaths.size();
+        sessionDesc.preprocessorMacros = macros.data();
+        sessionDesc.preprocessorMacroCount = (SlangInt)macros.size();
+        sessionDesc.compilerOptionEntries = options.data();
+        sessionDesc.compilerOptionEntryCount = (uint32_t)options.size();
+        return true;
+    }
+};
+} // namespace
+
+Session* GlobalSession::createSession(js::SessionDescOrTarget desc)
+{
+    SessionDesc sessionDesc = {};
+    SessionDescReader reader = {m_interface};
+
+    // A number is a compile target: the session has that one target, with the C++ defaults and
+    // applyLegacyHlslDefaultProfile. `numberTarget` is declared here, outside the `if`, because
+    // `sessionDesc.targets` points at it until createSession returns.
+    TargetDesc numberTarget = {};
+    if (desc.isNumber())
+    {
+        int format = 0;
+        if (!readInt32(desc, format) || !isCompileTarget(format))
+        {
+            setCreateSessionError("the compile target number is not a SlangCompileTarget");
+            return nullptr;
+        }
+        numberTarget.format = SlangCompileTarget(format);
+        applyLegacyHlslDefaultProfile(m_interface, numberTarget);
+        sessionDesc.targets = &numberTarget;
+        sessionDesc.targetCount = 1;
+    }
+    else if (!isObject(desc))
+    {
+        setCreateSessionError("expected a compile target number or a SessionDesc object");
+        return nullptr;
+    }
+    else if (!reader.read(desc, sessionDesc))
+    {
+        return nullptr;
+    }
+
+    Slang::ComPtr<ISession> session;
+    SlangResult result = m_interface->createSession(sessionDesc, session.writeRef());
+    if (result != SLANG_OK)
+    {
+        g_error.type = std::string("USER");
+        g_error.result = result;
+        return nullptr;
+    }
     return new Session(session);
+}
+
+int GlobalSession::findProfile(const std::string& name)
+{
+    return (int)m_interface->findProfile(name.c_str());
+}
+
+std::string GlobalSession::getBuiltinModuleSource(const std::string& moduleName)
+{
+    Slang::ComPtr<ISlangBlob> blob;
+    SlangResult result = Slang::getBuiltinModuleSource(
+        Slang::UnownedStringSlice(moduleName.c_str()),
+        blob.writeRef());
+    // The callee always succeeds: an unrecognized name yields an empty blob, not a failure.
+    SLANG_ASSERT(result == SLANG_OK);
+    SLANG_UNUSED(result);
+    return std::string((const char*)blob->getBufferPointer(), blob->getBufferSize());
 }
 
 Session::~Session()

@@ -3,6 +3,7 @@
 
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
+#include "slang-ir-check-push-constant-blocks.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
@@ -1767,19 +1768,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void processDefaultConstruct(IRInst* inst)
     {
         // Handle DefaultConstruct for DescriptorHandleType.
-        // In SPIRV, DescriptorHandle is lowered to uint64 (spvBindlessTextureNV) or uint2.
-        // A default-constructed handle should be a zero value.
+        // In SPIRV, DescriptorHandle is lowered to uint64 (spvBindlessTextureNV, texture/sampler
+        // kinds only) or uint2. A default-constructed handle should be a zero value.
         auto type = inst->getDataType();
         if (type && type->getOp() == kIROp_DescriptorHandleType)
         {
             IRBuilder builder(m_module);
             builder.setInsertBefore(inst);
             auto targetCaps = m_sharedContext->m_targetProgram->getTargetReq()->getTargetCaps();
+            bool hasBindlessTextureNV = targetCaps.implies(CapabilityAtom::spvBindlessTextureNV);
 
             IRInst* castInst = nullptr;
-            if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+            if (isDescriptorHandleRepresentedAsUInt64(type, hasBindlessTextureNV))
             {
-                // spvBindlessTextureNV: DescriptorHandle is uint64_t
+                // uint64 form (texture/sampler kinds under spvBindlessTextureNV)
                 auto uint64Type = builder.getUInt64Type();
                 auto zero64 = builder.getIntValue(uint64Type, 0);
                 castInst =
@@ -1961,8 +1963,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         SLANG_ASSERT(paramTypes.getCount() >= 4);
 
+        // Consider `matrix.MapElement((..., value) => value * scale)`. The map instruction passes
+        // the lambda's capture struct as an optional operand. The callback must accept that same
+        // struct value so SPIR-V sees identical operand and parameter types.
         IRType* tempTypes[4];
-        tempTypes[3] = builder.getPtrType(paramTypes[0]);
+        tempTypes[3] = paramTypes[0];
         tempTypes[0] = paramTypes[1];
         tempTypes[1] = paramTypes[2];
         tempTypes[2] = paramTypes[3];
@@ -1987,7 +1992,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
 
         IRInst* tempParams[4];
-        tempParams[0] = builder.emitLoad(params[3]);
+        tempParams[0] = params[3];
         tempParams[1] = params[0];
         tempParams[2] = params[1];
         tempParams[3] = params[2];
@@ -2014,6 +2019,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // a struct instead of an int.
         if (inst->hasIFuncThis())
         {
+            SLANG_ASSERT(ifuncCall->getParamType(0) == inst->getIFuncThis()->getDataType());
             auto funcSynth = createWrapperFunctionForPerElement(builder, ifuncCall);
             inst->setIFuncCall(funcSynth);
         }
@@ -2339,8 +2345,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return;
         }
 
-        // Unsupported type, remove the DebugValue.
-        if (!isSimpleDataType(valueType))
+        // Keep the DebugValue only when its value is representable as an OpDebugValue operand: a
+        // plain data value, or a leaf opaque handle (texture/sampler). A combined texture-sampler
+        // is an OpTypeSampledImage value, which SPIR-V does not permit as an OpDebugValue operand,
+        // so drop it — the variable is left without a current location rather than binding a
+        // forbidden value.
+        bool representable = valueType && isSimpleDataType(valueType);
+        if (auto textureType = as<IRTextureTypeBase>(valueType))
+            representable = !textureType->isCombined();
+        else if (as<IRSamplerStateTypeBase>(valueType))
+            representable = true;
+        if (!representable)
             inst->removeAndDeallocate();
     }
 
@@ -2562,16 +2577,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         auto atomDecor = as<IRRequireCapabilityAtomDecoration>(decor);
                         switch (atomDecor->getAtom())
                         {
-                        case CapabilityName::spirv_1_3:
+                        case CapabilityName::_spirv_1_3:
                             m_sharedContext->requireSpirvVersion(0X10300);
                             break;
-                        case CapabilityName::spirv_1_4:
+                        case CapabilityName::_spirv_1_4:
                             m_sharedContext->requireSpirvVersion(0X10400);
                             break;
-                        case CapabilityName::spirv_1_5:
+                        case CapabilityName::_spirv_1_5:
                             m_sharedContext->requireSpirvVersion(0X10500);
                             break;
-                        case CapabilityName::spirv_1_6:
+                        case CapabilityName::_spirv_1_6:
                             m_sharedContext->requireSpirvVersion(0X10600);
                             break;
                         }
@@ -3024,7 +3039,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Specalize address space for all pointers.
         SpirvAddressSpaceAssigner addressSpaceAssigner;
-        specializeAddressSpace(m_module, &addressSpaceAssigner);
+        specializeAddressSpace(m_module, &addressSpaceAssigner, m_sink);
 
         // For SPIR-V, we don't skip this validation, because we might then be generating
         // invalid SPIR-V.
@@ -3093,14 +3108,8 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     {
         return snippet.Ptr();
     }
-    snippet = SpvSnippet::parse(*m_grammarInfo, intrinsic->getDefinition());
-    if (!snippet)
-    {
-        m_sink->diagnose(Diagnostics::SnippetParsingFailed{
-            .snippet = intrinsic->getDefinition(),
-            .location = intrinsic->sourceLoc});
-        return nullptr;
-    }
+    snippet =
+        SpvSnippet::parse(*m_grammarInfo, intrinsic->getDefinition(), intrinsic->sourceLoc, m_sink);
     m_parsedSpvSnippets[intrinsic] = snippet;
     return snippet;
 }
@@ -3344,6 +3353,83 @@ static void removeUnreachableCodeAfterDiscardForOpKill(
     }
 }
 
+// Widen a sub-32-bit access-chain index/offset to a 32-bit integer of the same signedness.
+// An OpAccessChain / OpPtrAccessChain index is interpreted as signed, so a narrow *unsigned* index
+// (e.g. a uint16_t of 40000) reads as negative and addresses out of bounds. Widening to 32 bits
+// preserves the value -- emitIntCast then picks OpUConvert (unsigned) or OpSConvert (signed) --
+// while indices already 32 bits or wider are left alone, so the 64-bit indexing path (#11967) is
+// unaffected. Open: a 32-bit unsigned index with bit 31 set has the same hazard and needs 64-bit
+// widening (a wide-index-capability follow-up); it is unreachable for logical-pointer arrays.
+static void widenNarrowAccessChainIndex(
+    IRInst* accessChainInst,
+    UInt indexOperand,
+    TargetRequest* targetReq)
+{
+    IRInst* index = accessChainInst->getOperand(indexOperand);
+    IRType* indexType = index->getDataType();
+    // These ops carry an integer index/offset by construction; the non-integral guard is defensive
+    // and simply leaves an unexpected operand unchanged rather than asserting during codegen.
+    if (!indexType || !isIntegralType(indexType))
+        return;
+    const IntInfo info = getIntTypeInfo(targetReq, indexType);
+    if (info.width >= 32)
+        return;
+    IRBuilder builder(accessChainInst);
+    builder.setInsertBefore(accessChainInst);
+    IRType* widenedType = info.isSigned ? static_cast<IRType*>(builder.getIntType())
+                                        : static_cast<IRType*>(builder.getUIntType());
+    auto widened = builder.emitCast(widenedType, index);
+    // propagateNonUniformDecorations runs before this sweep and marks a bindless index operand
+    // with IRSPIRVNonUniformResourceDecoration; it does not look through the cast we insert here,
+    // so we carry that marker onto the widened value to preserve the non-uniform invariant (the
+    // resulting descriptor pointer's NonUniform requirement, VUID-RuntimeSpirv-None-10148,
+    // depends on it).
+    if (index->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+        builder.addSPIRVNonUniformResourceDecoration(widened);
+    builder.replaceOperand(accessChainInst->getOperands() + indexOperand, widened);
+}
+
+// Enforce the invariant that no OpAccessChain / OpPtrAccessChain is emitted with a sub-32-bit index
+// (see widenNarrowAccessChainIndex). All four access-chain-forming ops carry the index/offset as
+// operand 1 ({base, index} / {base, offset}). This op list tracks the emitters that forward that
+// operand into an access chain -- emitGetElementPtr, emitStructuredBufferGetElementPtr,
+// emitMeshOutputRef, and emitGetOffsetPtr in slang-emit-spirv.cpp -- and must stay in sync with
+// them.
+static void widenNarrowAccessChainIndices(IRModule* module, TargetRequest* targetReq)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto code = as<IRGlobalValueWithCode>(globalInst);
+        if (!code)
+            continue;
+        for (auto block : code->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_GetElementPtr:
+                case kIROp_RWStructuredBufferGetElementPtr:
+                case kIROp_MeshOutputRef:
+                case kIROp_GetOffsetPtr:
+                    widenNarrowAccessChainIndex(inst, 1, targetReq);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/// Return true if `globalParam` was legalized into a `PushConstant` variable, which is how the
+/// SPIR-V emitter decides its storage class.
+static bool isPushConstantGlobalForSPIRV(IRInst* globalParam)
+{
+    auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType());
+    return ptrType && ptrType->getAddressSpace() == AddressSpace::PushConstant;
+}
+
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
@@ -3353,6 +3439,12 @@ void legalizeIRForSPIRV(
     SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
+
+    // Widen any sub-32-bit access-chain index to 32 bits now that every producer -- including the
+    // simplifier's redundancy removal, which can rematerialize a GetElementPtr from a narrow index
+    // -- has run, so no OpAccessChain / OpPtrAccessChain is emitted with a signedness-ambiguous
+    // sub-32-bit index.
+    widenNarrowAccessChainIndices(module, context->m_targetProgram->getTargetReq());
 
     // Remove unreachable code after discard for SPIRV versions that emit OpKill.
     // This is necessary because OpKill is a terminator and cannot have instructions
@@ -3364,6 +3456,16 @@ void legalizeIRForSPIRV(
     eliminateDeadCode(module);
 
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
+
+    // `m_referencingEntryPoints` records which globals each entry point's call tree uses, which is
+    // the static use that Vulkan limits to one push-constant block per entry point. We count blocks
+    // here, after the last dead-code elimination that can remove a block's only use.
+    checkForMultiplePushConstantBlocksPerEntryPoint(
+        module,
+        context->m_referencingEntryPoints,
+        isPushConstantGlobalForSPIRV,
+        codeGenContext->getSink());
+
     insertFragmentShaderInterlock(context, module);
 }
 

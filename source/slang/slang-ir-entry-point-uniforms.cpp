@@ -556,7 +556,14 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             //
             IRType* layoutType = nullptr;
 
-            if (m_options.targetReq->getOptionSet().shouldUseScalarLayout())
+            if (isWGPUTarget(m_options.targetReq))
+            {
+                // WGSL has no scalar or C layout for the `uniform` address space (arrays need
+                // a 16-byte stride), so keep the default std140 layout, which is also what
+                // reflection reports for WGSL entry-point parameters.
+                layoutType = builder.getType(kIROp_DefaultBufferLayoutType);
+            }
+            else if (m_options.targetReq->getOptionSet().shouldUseScalarLayout())
                 layoutType = builder.getType(kIROp_ScalarBufferLayoutType);
             else if (m_options.targetReq->getOptionSet().shouldUseCLayout())
                 layoutType = builder.getType(kIROp_CBufferLayoutType);
@@ -582,6 +589,13 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         builder.addNameHintDecoration(
             collectedParam,
             UnownedTerminatedStringSlice("entryPointParams"));
+
+        // The collected parameter has no declaration of its own; it stands for the entry
+        // point's `uniform` parameters, so it takes the entry point's location. A diagnostic
+        // about it then points at the entry point, and
+        // `checkForMultiplePushConstantBlocksPerEntryPoint` recognizes an entry point's own
+        // block by that shared location.
+        collectedParam->sourceLoc = m_entryPoint.func->sourceLoc;
     }
 };
 
@@ -631,6 +645,7 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
 
             builder->setInsertBefore(entryPointFunc);
             auto globalParam = builder->createGlobalParam(paramType);
+            globalParam->sourceLoc = param->sourceLoc;
 
             param->transferDecorationsTo(globalParam);
 

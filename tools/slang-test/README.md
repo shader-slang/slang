@@ -90,8 +90,19 @@ Available APIs:
 - `-generate-hlsl-baselines`: Generate HLSL test baselines
 - `-emit-spirv-via-glsl`: Emit SPIR-V through GLSL instead of directly
 - `-expected-failure-list <file>`: Specify file containing expected failures
-- `-skip-list <file>`: Specify file containing tests to skip (path prefixes)
-- `-exclude-prefix <prefix>`: Exclude tests with specified path prefix
+- `-skip-list <file>`: Specify file containing tests to skip. Each line is
+  either a source-path prefix, or the name of one expanded subtest
+  (`<path>.<n>`, e.g. `tests/compute/parameter-block.slang.6`).
+- `-exclude-prefix <prefix>`: Exclude tests, with the same two forms as
+  `-skip-list`.
+
+Both forms are matched by the same rule: an entry of the form `<path>.<n>`
+selects that subtest only — `foo.slang.6` never matches `foo.slang.60` —
+and anything else is a path prefix matching every subtest of a matching
+file. Subtest exclusion happens _before_ the subtest is dispatched, which is
+what makes it usable for a variant that crashes the worker; an
+`-expected-failure-list` entry cannot help there, because it reclassifies a
+result only after the test returns.
 
 ## Test Types
 
@@ -106,9 +117,9 @@ Available test types:
 - `COMPARE_COMPUTE`: Runs render-test to execute a compute shader and writes the result to a text file. The test passes if the output matches the expected content
 - `COMPARE_COMPUTE_EX`: Same as COMPARE_COMPUTE, but supports additional parameter specifications
 - `COMPARE_RENDER_COMPUTE`: Runs render-test with "-slang -gcompute" options and compares text file outputs
-- `LANG_SERVER`: Tests Language Server Protocol features by sending requests (like completion, hover, signatures) and comparing responses with expected outputs
+- `LANG_SERVER`: Tests Language Server Protocol features by sending requests (like completion, hover, signatures) and comparing responses with expected outputs. See [Language server tests](#language-server-tests)
 
-Deprecated test types (do not create new tests of these kinds, and we need to slowly migrate existing tests to use SIMPLE, COMPARE_COMPUTE(_EX) or COMPARE_RENDER_COMPUTE instead):
+Deprecated test types (do not create new tests of these kinds, and we need to slowly migrate existing tests to use SIMPLE, COMPARE_COMPUTE(\_EX) or COMPARE_RENDER_COMPUTE instead):
 
 - `COMPARE_HLSL`: Runs the slangc compiler with forced DXBC output and compares with a file having the '.expected' extension
 - `COMPARE_HLSL_RENDER`: Runs render-test to generate two images - one using HLSL (expected) and one using Slang, saving both as .png files. The test passes if the images match
@@ -117,6 +128,25 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 - `COMPARE_GLSL`: Runs the slangc compiler both through Slang and directly, then compares the SPIR-V assembly output
 - `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
 - `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
+
+## Language server tests
+
+A `LANG_SERVER` test opens the test file in `slangd` and runs the `//` directives in the file from top to bottom. Every `LANG_SERVER` test shares one `slangd` process. `initialize` replaces the workspace, but formatting, inlay-hint, commit-character and trace options carry over, so a test that changes one of them sets it back to its default before it ends.
+
+Request directives print a `--------` separator followed by the result:
+
+- `//COMPLETE:<line>,<col>`, `//SIGNATURE:<line>,<col>`, `//HOVER:<line>,<col>` (1-based) print the completion items, signature help or hover, or `null`.
+- `//INLAY` prints every inlay hint in the document as `<line>,<col> <label>`.
+- `//ON_TYPE_FORMAT:<line>,<col>` prints whether on-type formatting is `enabled` or `disabled`.
+- `//DIAGNOSTICS` prints the diagnostics published for the document.
+
+Configuration directives:
+
+- `//CONFIG:<key>=<json>` sends `workspace/didChangeConfiguration` with one flat key, for example `//CONFIG:slang.inlayHints.deducedTypes=true` or `=null`, and prints `config: <key>=<json>`.
+- `//CONFIG_REPULL` sends `workspace/didChangeConfiguration` with `settings: null`, which makes `slangd` request its settings again, and answers that request from the `//CONFIG_REPLY:` lines.
+- `//CONFIG_REPLY:<section>=<json>` declares the value the test client returns for one section when `slangd` sends `workspace/configuration`. These lines are collected before the test runs, so their position does not matter. Every other section is answered with JSON null, which is what LSP requires from a client that cannot provide a setting.
+
+Options in the `LANG_SERVER(...)` list choose the `initialize` handshake. `config-pull` sends `initialized` after `initialize` and answers the configuration request that follows. It is required by `//CONFIG_REPLY:` and `//CONFIG_REPULL`.
 
 ## Compiler Optimization in Tests
 

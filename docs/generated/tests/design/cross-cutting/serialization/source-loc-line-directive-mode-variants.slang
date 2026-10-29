@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#source-location-serialization
-//META: doc_section_digest=0b9df2a75e79b7e8b6026192b354673f12b076885b33df7d9612c34bd2b3f441
+//META: doc_section_digest=c3e541277e1a118f0563d54ebc7447a80c95e6db1fca53bafa9002c1df39445a
 //META: purpose=The emitted #line directives are the rendering of the retained source locations, not a fixed preamble: -line-directive-mode none drops them entirely while the glsl mode renders the same locations with a file number instead of a path.
 //META: intent=negative
 //META: pipeline_stage=emit

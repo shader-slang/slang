@@ -13,7 +13,7 @@
 // (`cmpGT` is in the cross-cutting bundle, `cmpEQ`/`cmpNE` are in
 // the sibling equality test).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;

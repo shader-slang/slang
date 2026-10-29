@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#compiletimeforstmt
-//META: doc_section_digest=e6b1411878ad1410d1a25b47fb11f2d5bfdbd0f414a7e77f7f2b914774e3bc68
+//META: doc_section_digest=b830cb9d7a4474794ded574f3685c7c52f984f5f5edfcb84dd550dbf0d9ef1ae
 //META: purpose=A compile-time `for` accepts a two-argument `Range(begin, end)` whose begin bound is used, whereas the one-argument `Range(end)` form leaves the begin bound implicit.
 //META: intent=boundary
 //META: pipeline_stage=check

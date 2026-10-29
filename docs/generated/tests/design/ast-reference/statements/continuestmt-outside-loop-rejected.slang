@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#labelstmt-breakstmt-continuestmt-and-discardstmt
-//META: doc_section_digest=7c61fa1b4009ab648f41bc90151176c2c3ef804455b39f0ca18a8fb8d9a62d07
+//META: doc_section_digest=56973ad8752f95b6b4fe0b0a37cc16997d4bb7b6f6cfc8bddd18361e81252484
 //META: purpose=A ContinueStmt is a ChildStmt whose target must be an enclosing LoopStmt; used outside any loop the checker rejects it because no matching enclosing loop exists.
 //META: intent=negative
 //META: pipeline_stage=check

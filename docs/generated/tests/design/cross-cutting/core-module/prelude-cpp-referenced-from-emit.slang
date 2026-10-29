@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#preludes
-//META: doc_section_digest=2ee29be32e5ff124c3382011f81838f97168cb1d820c38d6cd432c675f3663c7
+//META: doc_section_digest=a7e8e82107afcf2792c8394b7f5dff917197cf8708f197b2045955821e3cb62b
 //META: purpose=The C++ prelude is referenced from -target cpp output: the emitted text pulls in slang-cpp-prelude.h and uses its SLANG_PRELUDE_EXPORT macro on the entry point.
 //META: intent=functional
 //META: pipeline_stage=emit

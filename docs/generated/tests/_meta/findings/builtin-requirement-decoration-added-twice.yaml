@@ -1,0 +1,60 @@
+schema_version: 1
+id: builtin-requirement-decoration-added-twice
+bundle: design/ir-reference/decorations
+suspected_kind: wrong-codegen
+title: "[decorations] builtinRequirementKey carries its role decoration twice"
+observed_at: "2026-09-11T00:00:00+00:00"
+scope: ir
+evidence:
+  command: "build/Release/bin/slangc repro.slang -target spirv-asm -dump-ir -o /dev/null -entry main -stage compute"
+  source_slang: docs/generated/tests/design/ir-reference/decorations/builtin-requirement-key-decoration.slang
+  observed_summary: |
+    Every hoisted `builtinRequirementKey` inst carries its
+    `BuiltinRequirementDecoration` twice. An eleven-line shader is enough:
+
+      [Differentiable]
+      float f(float x) { return x * x; }
+      RWStructuredBuffer<float> gOut;
+      [shader("compute")][numthreads(1,1,1)]
+      void main() { gOut[0] = f(2.0); }
+
+    The LOWER-TO-IR dump shows, for each key:
+
+      [BuiltinRequirementDecoration(25 : Int)]
+      [BuiltinRequirementDecoration(25 : Int)]
+      let  %1 : _ = builtinRequirementKey(25 : Int)
+      [BuiltinRequirementDecoration(26 : Int)]
+      [StaticRequirementDecoration]
+      [BuiltinRequirementDecoration(26 : Int)]
+      let  %2 : _ = builtinRequirementKey(26 : Int)
+
+    Both decorations precede the `let`, so they are two decorations on one
+    inst rather than two insts; for key 26 an unrelated
+    `StaticRequirementDecoration` sits between the duplicates, which rules out
+    the dump simply echoing a line.
+
+    This is visible pre-link, in the first `-dump-ir` snapshot, so it is
+    produced during AST-to-IR lowering rather than by linking or specialization.
+expected:
+  claim: |
+    The key is hoistable and deduplicated by its `kind` operand, so one logical
+    requirement resolves to one key inst carrying one role decoration.
+    `lowerInterfaceRequirementKey` says so explicitly -- "The key is shared, so
+    add the decoration only once" -- and guards the add with
+    `if (!requirementKey->findDecoration<IRBuiltinRequirementDecoration>())`
+    (source/slang/slang-lower-to-ir.cpp:1819-1820). That guard is the only
+    caller of `addBuiltinRequirementDecoration` in the tree, so a second
+    decoration should be unreachable.
+  citation_kind: doc
+  citation: docs/generated/design/ir-reference/decorations.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 9aafdeb00d07a0c932c2136db0f04f51a337061a
+  doc_anchor: docs/generated/design/ir-reference/decorations.md#builtinrequirementdecoration
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Dump artifact rather than real duplication: ruled out -- for kind 26 a StaticRequirementDecoration is interleaved between the two copies, which a repeated print of one decoration could not produce."
+    - "Two distinct keys printing adjacently: ruled out -- both decoration lines precede a single 'let %N = builtinRequirementKey(...)' line, and the dump prints an inst's decorations immediately before it."
+    - "Guard works but something later clones decorations onto the shared key: plausible and not excluded here. The duplication is already present in the first LOWER-TO-IR snapshot, which narrows the producer to lowering, but the precise second writer was not identified -- addBuiltinRequirementDecoration has exactly one caller, so a decoration-copying path (rather than a second add) is the more likely mechanism."
+    - "Harmless cosmetic issue: not assumed. Consumers scan for the role decoration (autodiff's getInterfaceEntryByBuiltinRequirement); a duplicate is at best redundant work and at worst a double-visit, and it blocks any CHECK-NEXT assertion against the key."

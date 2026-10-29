@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -allow-glsl -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/compute-shader-layout.slang -target spirv -stage compute -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/compute-shader-layout.slang -target spirv -stage compute -entry main -emit-spirv-directly
 #version 430
 precision highp float;
 precision highp int;

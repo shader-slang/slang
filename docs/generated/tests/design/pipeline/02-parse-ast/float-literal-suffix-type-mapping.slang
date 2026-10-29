@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#failure-modes
-//META: doc_section_digest=f0771e16a4cd3fa366077436469b559fb6852160c25c69aae5f00e8413738f6b
+//META: doc_section_digest=917434add55b557b228b443846eefc5d6962c4a14daa202ebe626eecee22d1ca
 //META: purpose=The parser maps a floating-point literal's classification onto the literal expression's suffix type, so `h` yields half, `f` yields float, `lf` yields double, and an unsuffixed literal yields float.
 //META: intent=functional
 //META: pipeline_stage=parse

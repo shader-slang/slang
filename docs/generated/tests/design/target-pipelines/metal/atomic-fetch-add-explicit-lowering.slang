@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=2a4c97aeaacd2a9728a83c1944ef99c7efe30fe3fe60ef075d8d47044f03eefc
+//META: doc_section_digest=8c75e285954fdccd137cc39333dbb7fd00df278f649c17f835f709926aac9f94
 //META: purpose=`InterlockedAdd` on a device buffer lowers to `atomic_fetch_add_explicit` through an `(atomic_uint device*)` cast with `memory_order_relaxed`.
 //META: intent=functional
 //META: pipeline_stage=emit

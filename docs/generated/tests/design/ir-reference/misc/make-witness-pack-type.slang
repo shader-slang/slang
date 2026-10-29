@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#makewitnesspack
-//META: doc_section_digest=99dbe256ba50c3094f94012201dfec474408118031a5841f5f3f728991acc65e
+//META: doc_section_digest=29b5dd3e7d7b5f608a70e1da2fdc738c186422e1bb5d97cbd275318463ccaf0e
 //META: purpose=`MakeWitnessPack` is typed as a `TypePack` of the individual witness-table types, i.e. a pack of witness tables rather than one witness table over a pack.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -16,7 +16,7 @@
 // requires the inst's type to spell out two `witness_table_t` entries inside a
 // `TypePack`, not a single `witness_table_t` over a pack type.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IBar { int getValue(); }
 struct BarA : IBar { int v; int getValue() { return v; } }

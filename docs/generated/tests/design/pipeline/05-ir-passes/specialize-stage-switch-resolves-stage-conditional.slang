@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#specialization-and-generics
-//META: doc_section_digest=4af16ce22c9a66bc00390c870ab8fa13bdbb68c7437a11e64d86f8f9c02cdbe4
+//META: doc_section_digest=ad41019b62f65b8926fb421c96faf20ade0eadeccc6562a5b0ee3bfcf86755bd
 //META: purpose=The specialize-stage-switch pass selects the branch matching the active shader stage — a `__stage_switch` returns the chosen branch's value at the call site.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

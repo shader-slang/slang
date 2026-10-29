@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#attr-family
-//META: doc_section_digest=2da76dd4726862c0040f126154c48b23ed2237c18f88f175659ae9d45c2fec5d
+//META: doc_section_digest=d04af1d542b300e2a0bbb935e77e3c2a63823444c7ee62a2765c374e4959f38b
 //META: purpose=The MemoryScope attribute records the memory scope of a coherent store, sitting after the Aligned attribute in the store's operand tail.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
@@ -15,7 +15,7 @@
 // emitted `store` to carry both ids, in that order, after its pointer and
 // value operands.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry computeMain -stage compute -capability vk_mem_model
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry computeMain -stage compute -capability vk_mem_model
 
 uniform int* inputBuffer;
 uniform int* outputBuffer;

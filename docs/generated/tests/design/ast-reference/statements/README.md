@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: f5a3a5c0a0093bf208330c4637f6c9cc22f6f4012354e22ddcc99fd22b8723c4
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: 779d1fe5a276f7b28bdb31b97503a410e81a3d052f4efac724ff5174adcc3df2
 source_doc: docs/generated/design/ast-reference/statements.md
-source_doc_digest: 4e597736ed12cea622617913db3922b14f1c4dbba25b90c2c98d747909741f62
+source_doc_digest: c541a2a8e41d3a177a92e5cff0ff2301d09419489f9b9d114f60e9a65142d9e0
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -43,10 +43,71 @@ faithfully by the interpreter, so CPU compute runs it), and
 `__target_switch` / `__stage_switch` (the whole point is that the
 selected body differs per target, so those fan out across targets).
 
+## Claims
+
+Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md), grouped by
+the document's own headings.
+
+**`#nodes` (the class table)**
+
+1. `SeqStmt` is a flat sequence used where a single statement is required.
+2. `BlockStmt` introduces a `ScopeDecl` for block-scoped declarations.
+3. `EmptyStmt` is a bare `;`.
+4. `DeclStmt` is a declaration used where a statement is expected.
+5. `IfStmt` holds predicate and both branches, and is also what `if (let x = ...)` desugars into.
+6. `TargetCaseStmt::capability` holds a `CapabilityName` code.
+7. `ContinueStmt` takes no label, unlike `break`.
+8. `ReturnStmt::expression` is null for a bare `return` in a `void` function.
+9. `CatchStmt` with `errorVar == null` is a catch-all.
+10. `UniqueStmtIDNode` is synthesized rather than parsed as a statement.
+
+**`#blockstmt-and-seqstmt`**
+
+11. Only `BlockStmt`, the scoped `for`, `__GPU_FOREACH` and the compile-time `for` are given a `ScopeDecl`; `WhileStmt` / `DoWhileStmt` introduce no scope of their own.
+12. `SwitchStmt` leaves `scopeDecl` null and takes its lexical scope from the `BlockStmt` the parser builds for its body, so the whole switch body is a single scope: a variable declared under `case 1:` is still in scope under `case 2:` and `default:`.
+13. That same variable shadows a same-named variable declared outside the `switch` for the rest of the body.
+14. A block's first statement becomes `body` directly; a second one causes a `SeqStmt` to be created and both moved into it.
+15. An empty block gets an `EmptyStmt` body rather than a null one.
+
+**`#unparsedstmt`**
+
+16. A function body is first captured as raw tokens in an `UnparsedStmt`, together with the two scopes in effect, and re-parsed on demand with exactly the lookup environment it had at its original position.
+17. An `UnparsedStmt` is not expected to survive into later phases; the re-parse yields a normal `BlockStmt`.
+
+**`#ifstmt`**
+
+18. `negativeStatement` is null for an `if` without an `else`.
+19. There is no dedicated node for `if let`: it desugars at parse time into a `SeqStmt` holding a `DeclStmt` for a synthesized binding followed by an ordinary `IfStmt`.
+
+**`#switchstmt-casestmt-defaultstmt`**
+
+20. `SwitchStmt::body` is always a `BlockStmt`.
+21. Case labels are not the parents of the statements under them — each `CaseStmt` / `DefaultStmt` is a marker in the sequence and the following statements are siblings.
+
+**`#loop-family`**
+
+22. Every loop is `break`-able, but only `for` is given a `ScopeDecl` of its own.
+23. `ForStmt::initialStatement` is parsed as a statement so a `DeclStmt` can introduce loop variables.
+24. Anything other than a `DeclStmt` or `ExpressionStmt` in the init position is `E20001`, "unexpected statement, expected expression", and the loop node is kept so parsing can recover.
+25. `UnscopedForStmt` is produced instead of `ForStmt` when the source language is HLSL — which follows the input file's extension and cannot be selected with `-lang` — and it fills in `scopeDecl` but never pushes the scope, so the loop variable leaks into the surrounding scope.
+26. `do` parses its body first and then decides: a following `while` produces a `DoWhileStmt`, a following `catch` produces a `CatchStmt`, and anything else is an error.
+
+**`#compiletimeforstmt`**
+
+27. The bounds must be compile-time constants, and the loop is unrolled at compile time, emitting no runtime loop.
+28. `Range` is a required literal keyword; any other identifier there is `E20004`, "unexpected identifier, expected 'Range'".
+29. `$for (i in Range(4))` iterates 0 through 3 and `$for (i in Range(2, 5))` iterates 2 through 4 — the range is half-open in both spellings.
+30. The loop variable is added to the statement's own `ScopeDecl`, so the body can refer to it.
+
+**`#targetswitchstmt-stageswitchstmt-targetcasestmt`**
+
+31. A `TargetSwitchStmt` dispatches statically by capability and a `StageSwitchStmt` by pipeline stage; the two share a parser and differ only in the node allocated.
+
 ## Functional coverage
 
 | Claim                                                                                                                                                                                                                                  | Intent                 | Anchor                                                                                                                                               | Tests                                                                                                                                                                      |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C25: `UnscopedForStmt` is produced for HLSL input and leaks the loop variable into the surrounding scope. | needs-cli-test         | [#loop-family](../../../../design/ast-reference/statements.md#loop-family) | The unscoped form is selected by `getSourceLanguage()`, which follows the **input file extension**: the same source compiles and reads the loop variable after the loop when named `.hlsl`, and reports `E30015 undefined identifier 'i'` when named `.slang`. `-lang hlsl` on a `.slang` file does *not* select it. Every file in this suite is `.slang`, so the claim has no reachable form here. |
 | A BlockStmt containing a single statement executes that statement and introduces a scope; a local declared inside is not visible after the block closes.                                                                               | boundary               | [#blockstmt-and-seqstmt](../../../../design/ast-reference/statements.md#blockstmt-and-seqstmt)                                                       | [`blockstmt-single-statement.slang`](blockstmt-single-statement.slang)                                                                                                     |
 | A BlockStmt is a ScopeStmt; a local declared inside `{ ... }` is not visible outside the block, so a same-named outer variable retains its outer value after the block closes.                                                         | functional             | [#blockstmt-and-seqstmt](../../../../design/ast-reference/statements.md#blockstmt-and-seqstmt)                                                       | [`blockstmt-introduces-scope.slang`](blockstmt-introduces-scope.slang)                                                                                                     |
 | A SeqStmt bundles several statements where a single Stmt slot is required; the canonical surface form is multiple declarators in one declaration (`int a, b;`) used in statement position.                                             | functional             | [#blockstmt-and-seqstmt](../../../../design/ast-reference/statements.md#blockstmt-and-seqstmt)                                                       | [`seqstmt-multi-declarator.slang`](seqstmt-multi-declarator.slang)                                                                                                         |
