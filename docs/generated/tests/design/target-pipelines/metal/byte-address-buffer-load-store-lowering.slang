@@ -14,7 +14,9 @@
 // to be reinterpreted rather than loaded as a typed element, which on MSL
 // is spelled `as_type<T>`. The kernel loads a word and stores a modified
 // word so both directions stay live; CHECK asserts both the load-side and
-// store-side `as_type<...>` wrappers appear.
+// store-side `as_type<...>` wrappers appear. The load has a single use, so it
+// may be emitted inside the store's `as_type<uint32_t>(...)`, and the two
+// patterns are unordered.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 
@@ -29,5 +31,5 @@ void main(uint3 tid : SV_DispatchThreadID)
     dst.Store<uint>(tid.x * 4, v + 1);
 }
 
-// CHECK: as_type<uint>
-// CHECK: as_type<uint32_t>
+// CHECK-DAG: as_type<uint>
+// CHECK-DAG: as_type<uint32_t>
