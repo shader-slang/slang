@@ -27,9 +27,13 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     // A load with one use is written inside that use.
     // METAL: half [[H:[a-zA-Z0-9_]+]] = as_type<half>(ushort((as_type<uint>({{.*}}[(0U)>>2]) >> 16U) & 65535U));
 
-    // 8- and 16-bit fields are stored on their own, not by a read-modify-write of their word.
+    // 8- and 16-bit fields are stored on their own, not by a read-modify-write of their word, so
+    // no 32-bit store to word 128 may appear before, between or after them.
+    // METAL-NOT: [(128U)>>2] =
     // METAL: ((device uchar*)({{.*}}))[(128U)] = uchar((as_type<uint>({{.*}}[(0U)>>2]) >> 0U) & 255U);
+    // METAL-NOT: [(128U)>>2] =
     // METAL: ((device ushort*)({{.*}}))[(130U)>>1] = as_type<ushort>([[H]]);
+    // METAL-NOT: [(128U)>>2] =
     buffer.Store(128, buffer.Load<TestStruct>(0));
 
     // METAL: {{.*}}[(256U)>>2] = as_type<uint32_t>(4294967295U);
