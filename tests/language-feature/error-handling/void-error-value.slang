@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
-//TEST:SIMPLE: -entry computeMain -stage compute -target spirv
-//TEST:SIMPLE: -entry computeMain -stage compute -target dxil -profile sm_6_0
+//TEST:SIMPLE(filecheck=SPIRV): -entry computeMain -stage compute -target spirv
+//TEST:SIMPLE(filecheck=HLSL): -entry computeMain -stage compute -target hlsl
 
 // Regression for #14066. Keep the throwing calls out of line so the test exercises extraction
 // from the physical Result<void, E> representation, rather than folding the throw into its catch.
@@ -9,6 +9,11 @@
 // CHECK-NEXT: 17
 // CHECK-NEXT: 165
 // CHECK-NEXT: 7B
+
+// SPIRV: OpCompositeExtract
+// SPIRV: OpFunction {{.*}} DontInline
+// HLSL: struct ResultType
+// HLSL: unpackAnyValue
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
