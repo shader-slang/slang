@@ -9,10 +9,10 @@
 //TEST:SIMPLE(filecheck=LOOP): -target metal -stage compute -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=WAR): -target metal -stage compute -entry computeMain -line-directive-mode none
 //TEST:SIMPLE(filecheck=ROV): -target metal -stage fragment -entry fragMain -line-directive-mode none
-//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry metallibMain
 //TEST:SIMPLE(filecheck=METALLIB_ROV): -target metallib -stage fragment -entry fragMain
 
-// METALLIB: define void @computeMain
+// METALLIB: define void @metallibMain
 // METALLIB_ROV: define {{.*}} @fragMain
 
 RWTexture2D<float4> img;
@@ -21,7 +21,7 @@ RWBuffer<float> texels;
 RWBuffer<uint2> pairs;
 RWTexture2D<uint> counters;
 RWTexture2D<float4> channels;
-RWTexture2D<float4> tiles[4];
+RWTexture2D<float4> tiles[2];
 RWTexture2D<uint> flags;
 WTexture2D<float4> writeOnly;
 Texture2D<float4> readOnly;
@@ -97,7 +97,7 @@ void computeMain(uint3 id: SV_DispatchThreadID)
     uint2 p = id.xy;
 
     accumulate(p, id.z);
-    writeTile(id.z & 3, p);
+    writeTile(id.z & 1, p);
     uint seen = markSeen(p);
 
     // The read-modify-write from the issue: the second read must see the write.
@@ -170,6 +170,29 @@ void computeMain(uint3 id: SV_DispatchThreadID)
 
     outputBuffer[0] = float4(layers[uint3(p, 1)], texels[p.x], float(counters[p]), channels[p].y)
                       + targets.color[p] + float(seen) + readOnly.Load(int3(p, 0));
+}
+
+// Apple's compiler accepts at most 8 `access::read_write` textures in one kernel, and
+// `computeMain` has 11, so the metallib lane compiles this smaller kernel. It still covers each
+// kind of fenced write: a `texture2d` (including a read-modify-write in a loop and a partial
+// texel store), a `texture2d_array`, a `texture_buffer`, texture atomics, an element of a texture
+// array, and textures reached through a parameter block.
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void metallibMain(uint3 id: SV_DispatchThreadID)
+{
+    uint2 p = id.xy;
+    accumulate(p, id.z);
+    writeTile(id.z & 1, p);
+    writeLayer(p);
+    img[p].x = 1.0;
+    texels[p.x] = 3.0;
+    uint previous;
+    InterlockedAdd(counters[p], 1, previous);
+    InterlockedCompareExchange(counters[p], 1, 2, previous);
+    targets.color[p] = float4(4.0);
+    InterlockedAdd(targets.counter[p], 1, previous);
+    outputBuffer[0] = img[p] + layers[uint3(p, 1)] + texels[p.x] + float(previous);
 }
 
 // Rasterizer-ordered textures are `access::read_write` too.
