@@ -4,6 +4,7 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
 
 // GLSL: layout(constant_id = 0)
 // GLSL-NEXT: const int kTile_0 = 4;
