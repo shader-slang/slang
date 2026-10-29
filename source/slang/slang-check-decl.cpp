@@ -22291,17 +22291,28 @@ struct CapabilityDeclReferenceVisitor
               CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>>(outer)
     {
     }
+    // Return the inferred capability requirements of `decl`, first bringing it to
+    // `CapabilityChecked`. The field stays null until `decl` itself is checked, and a reference
+    // can be visited before that, for example when a conformance checks a witness before the
+    // witness's callees. A decl that is already being checked is a cyclic reference, which
+    // `_propagateRequirement` ignores.
+    const CapabilitySetVal* getCheckedCapabilityRequirements(Decl* decl)
+    {
+        if (!decl->checkState.isBeingChecked())
+            this->ensureDecl(decl, DeclCheckState::CapabilityChecked);
+        return decl->inferredCapabilityRequirements;
+    }
     virtual void processReferencedDecl(Decl* decl) override
     {
         SourceLoc loc = SourceLoc();
         if (Base::sourceLocStack.getCount())
             loc = Base::sourceLocStack.getLast();
-        handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
+        handleProcessFunc(decl, getCheckedCapabilityRequirements(decl), loc);
     }
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
     {
         if (decl)
-            handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
+            handleProcessFunc(decl, getCheckedCapabilityRequirements(decl), refLoc);
     }
     // Join a user-defined derivative's capability requirements into the differentiating
     // function, gated on the derivative carrying an explicit `[require]`. The gate is
