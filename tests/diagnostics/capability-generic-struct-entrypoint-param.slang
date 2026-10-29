@@ -1,5 +1,6 @@
 // Entry-point signature validation must honor the capability `[require(...)]`
-// of a *generic* struct type the same way it does for a non-generic struct.
+// of a *generic* struct type the same way it does for a non-generic struct, wherever
+// the struct appears in the signature (parameter, return type or field).
 //
 // Regression test for https://github.com/shader-slang/slang/issues/9489:
 // `Foo<int>` used as a `vertex` entry-point parameter, where `Foo` requires the
@@ -27,7 +28,8 @@
 // A generic entry point whose specialization argument is a requiring generic struct.
 //DIAGNOSTIC_TEST:SIMPLE(diag=SPECIALIZE): -target spirv -emit-spirv-directly -entry mainSpecialize -stage vertex -specialize Foo<int>
 // Same generic struct on two parameters: both use sites must be reported (the
-// hash-consed `Val` for `Foo<int>` must not collapse to a single note).
+// hash-consed `Val` for `Foo<int>` must not collapse to a single note). Each use also
+// carries its own "see definition" and "see declaration of 'require'" notes.
 //DIAGNOSTIC_TEST:SIMPLE(diag=DUP): -target spirv -emit-spirv-directly -entry mainDup -stage vertex
 // Generic struct nested inside a builtin generic wrapper (`ConstantBuffer<...>`).
 //DIAGNOSTIC_TEST:SIMPLE(diag=CB,non-exhaustive): -target spirv -emit-spirv-directly -entry mainCB -stage vertex
@@ -53,7 +55,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEEP,non-exhaustive): -target spirv -emit-spirv-directly -entry mainDeep -stage vertex
 // A requiring generic struct used only in the body of a clean-signature entry
 // point (passed to a helper) is diagnosed by general capability inference rather
-// than by the signature check, so its only note points at the helper call.
+// than by the signature check, so its only "see using of" note points at the helper call:
+// the callee's function type is visited before the argument.
 // generic-struct-require-in-body.slang covers other body uses.
 //DIAGNOSTIC_TEST:SIMPLE(diag=BODYONLY): -target spirv -emit-spirv-directly -entry mainBodyOnly -stage vertex
 // Positive case: the cpp requirement is satisfied for the cpp target, so the same

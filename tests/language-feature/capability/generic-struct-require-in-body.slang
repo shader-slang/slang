@@ -31,8 +31,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=NESTED): -target hlsl -profile sm_6_5 -entry mainNested -stage compute -no-codegen
 // A requiring generic struct nested in a non-generic parent (`Holder.In<3>`).
 //DIAGNOSTIC_TEST:SIMPLE(diag=NESTEDGEN): -target hlsl -profile sm_6_5 -entry mainNestedGeneric -stage compute -no-codegen
-// The struct appears only in a non-entry-point helper's signature; the value is
-// never constructed, so no synthesized `init` carries the requirement.
+// The struct appears in a non-generic helper's parameter type (`helper(MetalOnly<3> a)`). The
+// caret on `helper` pins the path through the callee's signature, where GENERIC's caret pins the
+// generic argument.
 //DIAGNOSTIC_TEST:SIMPLE(diag=HELPERSIG): -target hlsl -profile sm_6_5 -entry mainHelperSig -stage compute -no-codegen
 // A static member accessed through the specialized struct (`MetalOnly<3>.make()`).
 //DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -target hlsl -profile sm_6_5 -entry mainStatic -stage compute -no-codegen
