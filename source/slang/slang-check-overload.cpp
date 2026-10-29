@@ -26,6 +26,8 @@ static bool doesExistentialBoxPackingLoseRequiredReferenceStorage(
     // required storage, and a value parameter does not require reference storage.
     if (!coercedArgument)
         return false;
+    if (as<ErrorType>(coercedArgument->type))
+        return false;
     if (coercedArgument->type.isLeftValue)
         return false;
     if (!parameterType.isLeftValue)
@@ -3121,7 +3123,13 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
     // from a value of the same type. There is no need in Slang for
     // "copy constructors" but the core module currently has to define
     // some just to make code that does, e.g., `float(1.0f)` work.)
-    LookupResult initializers = lookupConstructorsInType(type, context.sourceScope);
+    // Constructor lookup needs a data type. For an interface `IFoo`, lookup targets `dyn IFoo`
+    // before Slang 202c. Candidate discovery is speculative, so a rejected type adds no candidates;
+    // `ResolveInvoke` diagnoses proper-type errors once a constructor target is selected.
+    auto properType = tryCoerceToProperType(TypeExp(type)).type;
+    if (!properType)
+        return;
+    LookupResult initializers = lookupConstructorsInType(properType, context.sourceScope);
     AddOverloadCandidates(initializers, context);
 }
 
@@ -3589,9 +3597,21 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             bool skipCoercionFastPath =
                 isDeclRefTypeOf<ClassDecl>(targetType) &&
                 (as<NewExpr>(expr) || !targetType->equals(expr->arguments[0]->type));
-            if ((isDeclRefTypeOf<AggTypeDeclBase>(targetType) && !skipCoercionFastPath) ||
-                isDeclRefTypeOf<EnumDecl>(targetType))
+            bool shouldTryExplicitCoercion = false;
+            if (as<ExistentialBoxType>(targetType))
+                shouldTryExplicitCoercion = true;
+            else if (isDeclRefTypeOf<EnumDecl>(targetType))
+                shouldTryExplicitCoercion = true;
+            else if (isDeclRefTypeOf<AggTypeDeclBase>(targetType))
+                shouldTryExplicitCoercion = !skipCoercionFastPath;
+            if (shouldTryExplicitCoercion)
             {
+                // As with `(IFoo)value`, the target of `IFoo(value)` must be a proper type.
+                // Generic declaration callees are not coercion targets: overload resolution
+                // still needs to infer their arguments before proper-type checking can apply.
+                targetType = CoerceToProperType(TypeExp(funcExpr, targetType)).type;
+                if (as<ErrorType>(targetType))
+                    return CreateErrorExpr(expr);
                 Expr* resultExpr = nullptr;
                 ConversionCost conversionCost = kConversionCost_None;
 
@@ -3972,6 +3992,13 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
     if (auto typetype = as<TypeType>(typeExpr->type))
     {
+        // Consider `NativeRef<IFoo>(IFoo())` for a COM interface. Before Slang 202c, the inner
+        // constructor must produce a boxed interface value. Initializing a raw interface instead
+        // would create a value of a non-proper type and make the outer conversion pack it again.
+        auto targetType = CoerceToProperType(TypeExp(typeExpr, typetype->getType())).type;
+        if (as<ErrorType>(targetType))
+            return CreateErrorExpr(expr);
+
         // We allow a special case when `funcExpr` represents a composite type,
         // in which case we will try to construct the type via memberwise assignment from the
         // arguments.
@@ -3981,7 +4008,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         initListExpr->args.addRange(expr->arguments);
         initListExpr->type = m_astBuilder->getInitializerListType();
         Expr* outExpr = nullptr;
-        if (_coerceInitializerList(typetype->getType(), &outExpr, initListExpr))
+        if (_coerceInitializerList(targetType, &outExpr, initListExpr))
         {
             // If there is a coercion error, make sure we return a valid original expr
             // for language server to use.

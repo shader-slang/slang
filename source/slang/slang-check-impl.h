@@ -2282,15 +2282,32 @@ public:
         FuncType* originalType,
         std::optional<ParamInfo> thisParamInfo = std::nullopt);
 
-    /// Registers a type as conforming to IDifferentiable, along with a witness
-    /// describing the relationship.
+    /// Record available autodiff metadata for `type` and its component types.
     ///
+    /// Writes to the non-null `m_parentDifferentiableAttr`. For existential boxes, uses
+    /// `ExistentialBoxDifferentiabilityWitness` and records a separately boxed differential type,
+    /// such as `dyn IDifferentiable`.
+    /// This operation does not establish ordinary interface conformance. Boxed pointer
+    /// differentiation is unsupported.
     void maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* builder, Type* type);
 
     // Construct the differential for 'type', if it exists.
     Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
+
+    /// Return the differential type of `type`, or null if one is unavailable.
+    ///
+    /// For an existential box, returns a box type for the built-in interface selected by
+    /// `isTypeDifferentiable`, preferring `IDifferentiable` to `IDifferentiablePtrType`. A boxed
+    /// `IDifferentiablePtrType` result is not supported by
+    /// `maybeRegisterDifferentiableTypeImplRecursive`.
     Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
+
+    /// Return the value differential type of `type`, or null if one is unavailable.
+    ///
+    /// For `dyn IFoo` with `IFoo : IDifferentiable`, returns `dyn IDifferentiable` under the
+    /// autodiff compatibility convention.
     Type* tryGetDifferentialValueType(ASTBuilder* builder, Type* type);
+
     Type* tryGetDifferentialPtrType(ASTBuilder* builder, Type* type);
 
 
@@ -4125,6 +4142,10 @@ public:
         List<QualType>* innerParameterTypes = nullptr,
         GenericArgumentInferenceFailure* outFailure = nullptr);
 
+    /// Add constructor candidates after speculative proper-type conversion of `type`.
+    ///
+    /// A rejected type contributes no candidates or diagnostics; `ResolveInvoke` diagnoses the
+    /// selected type's conversion errors. Generic declaration inference is handled separately.
     void AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context);
 
     void AddDeclRefOverloadCandidates(
