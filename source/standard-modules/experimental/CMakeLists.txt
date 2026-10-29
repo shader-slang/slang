@@ -70,6 +70,10 @@ list(APPEND SLANG_STANDARD_MODULE_FILES ${workgraph_module_file})
 set(SLANG_STANDARD_MODULE_FILES "${SLANG_STANDARD_MODULE_FILES}"
     CACHE INTERNAL "Built standard .slang-module files"
 )
+list(APPEND SLANG_STANDARD_MODULE_TARGETS slang-workgraph-module)
+set(SLANG_STANDARD_MODULE_TARGETS "${SLANG_STANDARD_MODULE_TARGETS}"
+    CACHE INTERNAL "Producer targets for standard .slang-module files"
+)
 
 if(NOT SLANG_EMBED_STANDARD_MODULES)
     install(

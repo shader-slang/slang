@@ -88,6 +88,10 @@ list(APPEND SLANG_STANDARD_MODULE_FILES ${neural_module_file})
 set(SLANG_STANDARD_MODULE_FILES "${SLANG_STANDARD_MODULE_FILES}"
     CACHE INTERNAL "Built standard .slang-module files"
 )
+list(APPEND SLANG_STANDARD_MODULE_TARGETS slang-neural-module)
+set(SLANG_STANDARD_MODULE_TARGETS "${SLANG_STANDARD_MODULE_TARGETS}"
+    CACHE INTERNAL "Producer targets for standard .slang-module files"
+)
 
 # Install the neural directory to the configured location in the release package
 # Installs into <install-dir>/slang/ to match the `import slang.neural;` convention.

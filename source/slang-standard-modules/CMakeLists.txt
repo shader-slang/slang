@@ -13,6 +13,7 @@
 # directory scope:
 #   SLANG_STANDARD_MODULE_BUILD_SUBDIR  cache: build-tree subdir the producers write
 #   SLANG_STANDARD_MODULE_FILES         cache: the built .slang-module files (manifest)
+#   SLANG_STANDARD_MODULE_TARGETS       cache: the producer targets (manifest)
 #   SLANG_VERSION_NUMERIC               project version
 #   slang_BINARY_DIR                    project binary dir
 

@@ -56,6 +56,11 @@ set(SLANG_STANDARD_MODULE_BUILD_SUBDIR "${slang_library_dir}/${SLANG_STANDARD_MO
 # force-writes); each module subdirectory appends its own outputs.
 set(SLANG_STANDARD_MODULE_FILES "" CACHE INTERNAL "Built standard .slang-module files")
 
+# Companion manifest of the targets that produce those files. The embedding
+# library DEPENDS on these so Visual Studio orders the embed step after every
+# producer; cleared here each configure, appended by each module subdirectory.
+set(SLANG_STANDARD_MODULE_TARGETS "" CACHE INTERNAL "Producer targets for standard .slang-module files")
+
 #
 # Generate the standard module configuration header, this is used by the slang compiler to find the standard module
 #
