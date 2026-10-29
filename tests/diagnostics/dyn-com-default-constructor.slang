@@ -6,7 +6,7 @@
 public interface IFoo {}
 typealias Box = dyn IFoo;
 
-// Proper-type conversion must preserve the existing prohibition on default interface values.
+// Slang 2026 and 202c reject default initialization of existential boxes.
 export __extern_cpp NativeRef<Box> makeNull()
 {
 #if CTOR_KIND == 0

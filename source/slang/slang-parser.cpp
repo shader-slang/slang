@@ -125,8 +125,9 @@ public:
 
     /// Return the module's effective version, or the caller-supplied version for a term snippet.
     ///
-    /// Term parsing has no `ModuleDecl`; its grammar still needs a version for parentheses and
-    /// type modifiers. Source parsing reads the module so language-version upgrades stay visible.
+    /// Term parsing has no `ModuleDecl`; we use the caller-supplied version to parse parentheses
+    /// and type modifiers. When parsing source modules, we read the module's current version so
+    /// language-version upgrades stay visible.
     SlangLanguageVersion getLanguageVersion()
     {
         return currentModule ? currentModule->languageVersion

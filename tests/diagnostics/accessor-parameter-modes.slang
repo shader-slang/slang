@@ -64,5 +64,5 @@ int exerciseInvalidSubscriptRecovery()
     ConcreteIndex index;
     return storage[index];
 //diag:           ^ concrete type passed to an existential box reference parameter
-//diag:           ^ parameter 'index' requires storage of type 'dyn IIndex', but argument has concrete type 'ConcreteIndex'
+//diag:           ^ parameter 'index' has type 'dyn IIndex' and is passed by reference, but the argument has concrete storage type 'ConcreteIndex'
 }

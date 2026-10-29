@@ -17,7 +17,7 @@
 
 /////////////////////////////////////////////////////
 
-// Interfaces with `[anyValueSize]` cannot be generic.
+// An interface declaration with `[anyValueSize(...)]` must not have generic parameters.
 // CHECK_2026-DAG: error[E33072]
 [anyValueSize(64)]
 interface interface1<T>
@@ -25,7 +25,7 @@ interface interface1<T>
 	static const int member;
 };
 
-// Interfaces with `[anyValueSize]` must not define any associated types.
+// Associated types must not be declared in an interface declaration with `[anyValueSize(...)]`.
 // CHECK_2026-DAG: error[E33073]
 interface IBase1
 {
@@ -36,7 +36,8 @@ interface interface2
     associatedtype IBase1;
 };
 
-// Interfaces with `[anyValueSize]` must not define any generic methods.
+// Methods with generic parameters must not be declared in an interface declaration with
+// `[anyValueSize(...)]`.
 // CHECK_2026-DAG: error[E33074]
 [anyValueSize(64)]
 interface interface3
@@ -47,7 +48,8 @@ interface interface3
 	}
 };
 
-// Interfaces with `[anyValueSize]` must not define any mutating methods.
+// Methods with `[mutating]` must not be declared in an interface declaration with
+// `[anyValueSize(...)]`.
 // CHECK_2026-DAG: error[E33075]
 [anyValueSize(64)]
 interface interface4
@@ -56,7 +58,8 @@ interface interface4
 	void mutate(int val);
 };
 
-// Interfaces with `[anyValueSize]` can only inherit interfaces that also specify the attribute.
+// An interface declaration with `[anyValueSize(...)]` must only refine interfaces whose
+// declarations also have that attribute.
 // CHECK_2026-DAG: error[E33077]
 
 interface IBase2
@@ -86,7 +89,8 @@ interface interface6 : IBase3
 	}
 };
 
-// Interfaces with `[anyValueSize]` cannot have requirements marked with `[Differentiable]`.
+// Methods with `[Differentiable]` must not be declared in an interface declaration with
+// `[anyValueSize(...)]`.
 // CHECK_2026-DAG: error[E33076]
 [anyValueSize(64)]
 interface interface7
@@ -98,7 +102,8 @@ interface interface7
 	}
 };
 
-// A type declaring a conformance to an interface with `[anyValueSize]` cannot be generic.
+// An inheritance clause in a generic type declaration must not name an interface whose
+// declaration has an `[anyValueSize(...)]` attribute.
 // CHECK_2026-DAG: error[E33082]
 // CHECK_2026-DAG: error[E33082]
 [anyValueSize(64)]
@@ -124,7 +129,8 @@ interface genericInterface1<T : IArithmetic> : IBase4
 	}
 };
 
-// An extension cannot add a conformance to an interface with `[anyValueSize]`.
+// An extension must not add a conformance to an interface whose declaration has
+// an `[anyValueSize(...)]` attribute.
 // CHECK_2026-DAG: error[E33078]
 [anyValueSize(64)]
 interface IBase5
@@ -142,8 +148,8 @@ extension<T:interface9> T : IBase5
 	}
 };
 
-// A type conforming to an interface with `[anyValueSize]` cannot contain opaque, non-copyable,
-// or unsized fields because those fields cannot be packed into AnyValue storage.
+// Direct variable members of a type conforming to an interface whose declaration has
+// an `[anyValueSize(...)]` attribute must not have opaque, non-copyable, or unsized types.
 // CHECK_2026-DAG: error[E33079]
 // CHECK_2026-DAG: error[E33080]
 // CHECK_2026-DAG: error[E33081]
@@ -186,7 +192,8 @@ struct structWithNonCopyable2 : IBase6
     NonCopyableStruct2<int> v;
 };
 
-// Interfaces with `[anyValueSize]` cannot have methods with `some IFoo` result or parameter types.
+// Methods with `some IFoo` result or parameter types must not be declared in an interface
+// whose declaration has an `[anyValueSize(...)]` attribute.
 // TODO-INTERFACE-QUALIFIERS-ADDITION-OF-SOME
 //
 

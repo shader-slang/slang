@@ -802,8 +802,9 @@ extern "C"
         SlangReflectionGeneric* generic);
     /** Resolve `func` as a call with arguments of `argTypes`, returning null on failure.
 
-        Interface arguments implicitly become existential-box types through Slang 2026;
-        Slang 202c requires explicit `dyn` types. Call inference opens existential arguments.
+        Through Slang 2026, the compiler implicitly converts interface metadata to its
+        existential-box type. In Slang 202c, callers must supply explicit `dyn` types.
+        Call inference opens existential arguments.
      */
     SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(
         SlangReflectionFunction* func,
@@ -987,7 +988,7 @@ extern "C"
         char const* name);
     /** Get the layout of `reflectionType`.
 
-        Interface types follow the conversion rules described by `ISession::getTypeLayout`.
+        This function applies the interface conversion rules described by `ISession::getTypeLayout`.
         Returns null if `reflectionType` cannot be used as a data type. This function does not
         return diagnostics.
     */
@@ -1039,7 +1040,8 @@ extern "C"
 
         Payload arguments must be concrete conforming types or the dynamic-dispatch marker
         returned by `ISession::getDynamicType`.
-        The base uses the same interface conversion rules as `spReflection_GetTypeLayout`.
+        This function applies the interface conversion rules of `spReflection_GetTypeLayout`
+        to the base.
         Interface contracts and existential boxes cannot be concrete payload arguments.
         Returns null on failure, with diagnostics in `outDiagnostics` when requested.
      */
@@ -1052,9 +1054,9 @@ extern "C"
 
     /** Specialize a generic declaration with explicit arguments.
 
-        Type arguments follow the session's data-type conversion rules: interface metadata
-        implicitly becomes its existential-box type through Slang 2026; Slang 202c requires
-        explicit `dyn` types. Constraints apply directly to the resulting explicit type arguments.
+        Through Slang 2026, the compiler implicitly converts interface metadata supplied as a
+        type argument to its existential-box type. In Slang 202c, callers must supply an explicit
+        box type, such as `dyn IFoo`. Constraints apply directly to the resulting type arguments.
         `spReflectionFunction_specializeWithArgTypes` performs call inference, which can open
         existential boxes to infer their payload types.
         Returns null for semantic errors or when specialization does not produce a completed
@@ -1417,8 +1419,9 @@ struct ICompileRequest : public ISlangUnknown
     /** Specify the concrete type to be used for a global "existential slot."
 
     Every shader parameter (or leaf field of a `struct`-type shader parameter)
-    that has an interface or array-of-interface type introduces an existential
-    slot. The number of slots consumed by a shader parameter, and the starting
+    that has an existential box type, or an array of boxes, introduces a slot
+    for the concrete type stored in those boxes.
+    The number of slots consumed by a shader parameter, and the starting
     slot of each parameter can be queried via the reflection API using
     `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM`.
 
@@ -1433,8 +1436,9 @@ struct ICompileRequest : public ISlangUnknown
     /** Specify the concrete type to be used for an entry-point "existential slot."
 
     Every shader parameter (or leaf field of a `struct`-type shader parameter)
-    that has an interface or array-of-interface type introduces an existential
-    slot. The number of slots consumed by a shader parameter, and the starting
+    that has an existential box type, or an array of boxes, introduces a slot
+    for the concrete type stored in those boxes.
+    The number of slots consumed by a shader parameter, and the starting
     slot of each parameter can be queried via the reflection API using
     `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM`.
 

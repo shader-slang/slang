@@ -1274,8 +1274,8 @@ SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
     auto type = convert(inType);
     auto targetReq = context->getTargetReq();
 
-    // This API requests data layout, so interface metadata needs the same version-aware
-    // proper-type checking as the session layout API. This entry point has no diagnostic output.
+    // We apply the session layout API's version-aware proper-type checking before computing
+    // data layout. This entry point has no diagnostic output.
     type = checkProperType(targetReq->getLinkage(), TypeExp(type), nullptr);
     if (as<ErrorType>(type))
         return nullptr;

@@ -152,7 +152,7 @@ SLANG_UNIT_TEST(findTypeByNameExtensionTypeAlias)
 }
 
 // Reflection preserves box identity through full names and container elements, while interface
-// names remain declaration metadata. Payload specialization also requires a proper value type.
+// names remain declaration metadata. Callers supply proper value types for payload specialization.
 SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
 {
     const char* source = R"(
@@ -175,7 +175,8 @@ SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
     SLANG_CHECK_ABORT(
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
-    // In 202c a bare interface cannot silently become a box when a full name is looked up again.
+    // In 202c, looking up `IFoo` must return the interface, and looking up `dyn IFoo`
+    // must return its box type.
     slang::CompilerOptionEntry languageVersion = {};
     languageVersion.name = slang::CompilerOptionName::LanguageVersion;
     languageVersion.value.kind = slang::CompilerOptionValueKind::Int;
@@ -254,8 +255,9 @@ SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
     SLANG_CHECK(!layout->isSubType(interfaceType, boxType));
     SLANG_CHECK(layout->isSubType(boxType, boxType));
 
-    // A real container needs a value-type element. In 202c, callers must supply the explicit box;
-    // the `None` query still preserves bare interface metadata without constructing a container.
+    // `getContainerType` applies the session's rules for value types before constructing a
+    // container. For these interface arguments in 202c, callers must supply the explicit box. With
+    // `ContainerType::None`, the function returns the interface metadata unchanged.
     slang::ContainerType containerKinds[] = {
         slang::ContainerType::UnsizedArray,
         slang::ContainerType::StructuredBuffer,
@@ -385,7 +387,8 @@ SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
             SLANG_CHECK(
                 strstr(
                     (const char*)diagnostics->getBufferPointer(),
-                    "existential box specialization requires a value type") != nullptr);
+                    "expected a value type for an existential box specialization argument") !=
+                nullptr);
         }
 
         // API arguments have no expression, so a failed conformance refers to the parameter.
@@ -464,7 +467,8 @@ SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
         SLANG_CHECK(session->getTypeLayout(specialized) != nullptr);
     }
 
-    // Legacy API layout requests still form boxes implicitly; metadata lookup itself stays bare.
+    // Legacy API layout requests still form boxes implicitly; type lookup still returns the
+    // interface.
     languageVersion.value.intValue0 = SLANG_LANGUAGE_VERSION_LEGACY;
     ComPtr<slang::ISession> legacySession;
     SLANG_CHECK_ABORT(
@@ -485,8 +489,9 @@ SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
     SLANG_CHECK_ABORT(legacyInterface != nullptr);
     SLANG_CHECK_ABORT(legacyBox != nullptr);
     SLANG_CHECK(legacyInterface != legacyBox);
-    // Older versions box a bare interface at the element-construction boundary. The result must
-    // be the same canonical container as one explicitly constructed with `dyn IFoo`.
+    // In older versions, the compiler converts interface metadata to a box type before
+    // constructing a container. The result must be the same canonical container as one explicitly
+    // constructed with `dyn IFoo`.
     SLANG_CHECK(
         legacySession->getContainerType(legacyInterface, slang::ContainerType::None) ==
         legacyInterface);
@@ -502,7 +507,8 @@ SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
     SLANG_CHECK(legacySession->getTypeLayout(legacyInterface) != nullptr);
     SLANG_CHECK(legacyLayout->getTypeLayout(legacyInterface) != nullptr);
 
-    // A bare interface parameter is implicitly boxed in legacy code and still has an RTTI name.
+    // In legacy source, the compiler treats `IFoo value` as a boxed parameter; RTTI lookup
+    // still returns the interface's name.
     auto legacyFunction = legacyLayout->findFunctionByName("consume");
     SLANG_CHECK_ABORT(legacyFunction != nullptr);
     SLANG_CHECK_ABORT(legacyFunction->getParameterCount() == 1);
@@ -679,7 +685,7 @@ SLANG_UNIT_TEST(existentialBoxReflectionMetadataAndNestedLayout)
             "dyn IFoo");
         SLANG_CHECK(raw != box);
 
-        // Generic arguments need proper types even when the outer lookup is metadata.
+        // The compiler checks type arguments as proper types even when lookup returns metadata.
         auto implicitWrapper = layout->findTypeByName("Wrapper<IFoo>");
         auto explicitWrapper = layout->findTypeByName("Wrapper<dyn IFoo>");
         SLANG_CHECK_ABORT(explicitWrapper != nullptr);
@@ -818,7 +824,8 @@ SLANG_UNIT_TEST(existentialBoxReflectionMetadataAndNestedLayout)
     }
 }
 
-// Proper-type API arguments form canonical boxes through 2026 and require explicit `dyn` in 202c.
+// Through 2026, the compiler converts interface metadata to box types at these API boundaries.
+// In 202c, callers must supply explicit `dyn` types where a box is expected.
 SLANG_UNIT_TEST(existentialBoxReflectionProperTypeConsumers)
 {
     for (auto version : kExistentialReflectionVersions)
@@ -996,7 +1003,8 @@ SLANG_UNIT_TEST(existentialBoxReflectionBaseSpecialization)
     }
 }
 
-// Conformance creation interprets its target as an interface role, but needs a real implementation.
+// For conformance creation, the caller supplies an implementation type and a target identifying
+// the interface.
 SLANG_UNIT_TEST(existentialBoxReflectionConformanceComponents)
 {
     for (auto version : kExistentialReflectionVersions)
