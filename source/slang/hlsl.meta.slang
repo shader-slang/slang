@@ -5197,10 +5197,13 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             static_assert(false, "Unsupported 'Load' of 'texture' for 'cuda' target");
             __intrinsic_asm "<invalid intrinsic>";
         case metal:
-            // The strings below are numbered for a plain texture, so a combined receiver forwards
-            // to the extracted texture, as on HLSL. Taking the texture out first works whether or
-            // not type legalization later splits the `{texture, sampler}` struct; inside a
-            // `ParameterBlock` (a Metal argument buffer) the struct stays whole.
+            // A combined receiver forwards to the extracted texture, as on HLSL, so the strings
+            // below only ever receive a plain texture as `$0`. Inside a `ParameterBlock` (a Metal
+            // argument buffer) type legalization does not split the `{texture, sampler}` struct,
+            // so a string reading `$0` as the texture received the whole struct and aborted or
+            // emitted invalid MSL; taking the texture out first works whether or not the struct
+            // is split. The multisample `Load` and the generated `GetDimensions` forward the same
+            // way.
             if (isCombined != 0)
                 return __loadTexture(__extractImage(this), location);
             switch (Shape.flavor)
@@ -5294,7 +5297,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             // receiver gains; see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`. WGSL does
             // not forward to `__extractImage` like HLSL and Metal: for a bindless
             // `Sampler2D.Handle`, the forwarded call aborts `legalizeInst` in
-            // slang-ir-legalize-types.cpp with "non-simple operand(s)!".
+            // slang-ir-legalize-types.cpp with "non-simple operand(s)!". That legalization gap
+            // also aborts `Sample` on such a handle, so `$q` stays until it is fixed.
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
             static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)

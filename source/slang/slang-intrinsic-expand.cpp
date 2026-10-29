@@ -482,14 +482,16 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // numbered as if the receiver were a plain texture. This comment is the canonical
             // description of `$q`; other comments point here.
             //
+            // A `$q` string relies on the combined receiver reaching the call already split:
             // `lowerCombinedTextureSamplers` rewrites a combined texture-sampler as a
-            // `{texture, sampler}` struct, and on WGSL `legalizeResourceTypes`
-            // (`LegalCallBuilder::addArg`) splits that struct into two call arguments, so a
-            // combined receiver reaches the string as the texture followed by the sampler as
-            // argument 1. A plain texture reaches it alone. HLSL, CPU and Metal forward a combined
-            // receiver to the extracted texture instead, so their strings only see a plain
-            // texture; on Metal the struct is not split inside an argument buffer, and the WGSL
-            // case of `Load` in hlsl.meta.slang says why WGSL does not forward.
+            // `{texture, sampler}` struct, and `legalizeResourceTypes` (`LegalCallBuilder::addArg`)
+            // splits that struct into two call arguments, the texture and then the sampler as
+            // argument 1. A plain texture reaches the string alone. WGSL always splits, so only
+            // WGSL strings use `$q`. HLSL, CPU and Metal forward a combined receiver to the
+            // extracted texture before any string sees it: the HLSL member-form strings cannot
+            // skip an argument, and on CPU and Metal the struct is not always split (C and C++
+            // keep it, and so does a Metal argument buffer). The WGSL case of `Load` in
+            // hlsl.meta.slang says why WGSL does not forward.
             //
             // When the split-out sampler is present, `emit` sets `m_skipsSplitSamplerArg` and
             // each bare `$N` (N >= 1) reads argument N + 1; other indexed accessors such as `$TN`
