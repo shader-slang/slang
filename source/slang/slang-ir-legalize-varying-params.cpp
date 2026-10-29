@@ -5156,7 +5156,13 @@ protected:
                     varType = ptrType->getValueType();
                 auto arrayType = as<IRArrayType>(varType);
                 auto count = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
-                if (arrayType && count && count->getValue() >= 1 && count->getValue() <= 8 &&
+                // WGSL allows a single clip_distances output, so only semantic index 0 maps to
+                // it; a second array (`SV_ClipDistance1`) is reported as unsupported instead of
+                // emitting a second `@builtin(clip_distances)`.
+                bool isFirstSemanticIndex =
+                    semanticIndex.getLength() == 0 || semanticIndex == toSlice("0");
+                if (isFirstSemanticIndex && arrayType && count && count->getValue() >= 1 &&
+                    count->getValue() <= 8 &&
                     arrayType->getElementType()->getOp() == kIROp_FloatType)
                 {
                     result.systemValueName = toSlice("clip_distances");
@@ -5172,7 +5178,7 @@ protected:
                 else
                 {
                     // A scalar or vector SV_ClipDistance would have to be packed into the
-                    // array; not supported.
+                    // array, and a second array combined with the first; not supported.
                     result.isUnsupported = true;
                 }
             }
