@@ -22292,10 +22292,16 @@ struct CapabilityDeclReferenceVisitor
     {
     }
     // Return the inferred capability requirements of `decl`, first bringing it to
-    // `CapabilityChecked`. The field stays null until `decl` itself is checked, and a reference
-    // can be visited before that, for example when a conformance checks a witness before the
-    // witness's callees. A decl that is already being checked is a cyclic reference, which
-    // `_propagateRequirement` ignores.
+    // `CapabilityChecked`. The field is not final until `decl` itself is checked, and a reference
+    // can be visited before that. Consider `StructuredBuffer<T>.getCount()`: checking the
+    // `IArray<T>` conformance of `StructuredBuffer<T>` capability-checks the `getCount` witness,
+    // whose body calls `GetDimensions` before the checker has reached it. Reading the field then
+    // would see null and drop the requirements of `GetDimensions`.
+    //
+    // If `decl` is already being checked, the reference is cyclic (for example, a recursive
+    // function) and `ensureDecl` would report a cyclic-reference error. We return the field as it
+    // is stored in that case, which can be null or partial; `_propagateRequirement` ignores such a
+    // reference.
     const CapabilitySetVal* getCheckedCapabilityRequirements(Decl* decl)
     {
         if (!decl->checkState.isBeingChecked())

@@ -198,7 +198,8 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     [BackwardDerivative(linearTransformBwd)]
     [require(cuda)]
     [require(metal)]
-    // The SPIR-V tiled path converts weight tiles of type `T` to the half-precision MatrixA.
+    // On SPIR-V the tiled path can convert weight tiles of type `T` to the half-precision MatrixA.
+    // Capability inference does not depend on `T` or the layout, so every SPIR-V caller needs this.
     [require(spirv, spvCooperativeMatrixConversionsNV)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress)
@@ -247,7 +248,8 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     [BackwardDerivative(linearTransformBwd)]
     [require(cuda)]
     [require(metal)]
-    // The SPIR-V tiled path converts weight tiles of type `T` to the half-precision MatrixA.
+    // On SPIR-V the tiled path can convert weight tiles of type `T` to the half-precision MatrixA.
+    // Capability inference does not depend on `T` or the layout, so every SPIR-V caller needs this.
     [require(spirv, spvCooperativeMatrixConversionsNV)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)

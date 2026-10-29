@@ -26048,8 +26048,9 @@ struct HitObject
         {
         case hlsl:
             {
-                // The helper chooses between NVAPI and the native DXR 1.3
-                // `GetAttributes(out attr)`, so one HLSL case serves both.
+                // Same-target cases must have nested capability sets (E36120), so both HLSL
+                // paths share this case. The helper chooses between NVAPI and the native
+                // DXR 1.3 `GetAttributes(out attr)`.
                 attr_t v;
                 __hlslGetAttributesFromHitObject(v);
                 return v;
