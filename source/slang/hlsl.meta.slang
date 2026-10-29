@@ -6405,7 +6405,8 @@ void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
     }
 }
 
-/// Atomic min reduction. On CUDA, uses PTX `red.min` instruction.
+/// Atomic min reduction. On CUDA, uses PTX `red.min` instruction for integer types and a
+/// compare-and-swap loop for floating-point types.
 /// @param val The target memory location.
 /// @param value The value to compare.
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
@@ -6421,7 +6422,8 @@ void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
     }
 }
 
-/// Atomic max reduction. On CUDA, uses PTX `red.max` instruction.
+/// Atomic max reduction. On CUDA, uses PTX `red.max` instruction for integer types and a
+/// compare-and-swap loop for floating-point types.
 /// @param val The target memory location.
 /// @param value The value to compare.
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
