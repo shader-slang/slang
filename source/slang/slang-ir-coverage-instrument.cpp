@@ -5,6 +5,7 @@
 #include "compiler-core/slang-source-loc.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
@@ -223,6 +224,14 @@ static void collectUsedBindingsFromVarLayout(
         localBinding += offsetAttr->getOffset();
         localSpace += offsetAttr->getSpace();
 
+        UInt rangeBinding = localBinding;
+        UInt rangeSpace = localSpace;
+        if (auto containerAttr = findParameterGroupContainerOffsetAttr(varLayout, kind))
+        {
+            rangeBinding += containerAttr->getOffset();
+            rangeSpace += containerAttr->getSpace();
+        }
+
         bool isUnbounded = false;
         UInt count = getResourceCount(typeLayout, kind, isUnbounded);
         // If a layout carries an explicit resource-kind offset but
@@ -232,7 +241,7 @@ static void collectUsedBindingsFromVarLayout(
             count = 1;
         if (isUnsizedArrayResourceSource(source))
             isUnbounded = true;
-        addUsedBindingRange(outRanges, localSpace, localBinding, count, isUnbounded, source);
+        addUsedBindingRange(outRanges, rangeSpace, rangeBinding, count, isUnbounded, source);
     }
 
     if (auto groupLayout = as<IRParameterGroupTypeLayout>(typeLayout))

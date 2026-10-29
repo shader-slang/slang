@@ -2280,7 +2280,18 @@ struct ExtendedTypeLayoutContext
                 // (If the contents of a group consume whole spaces/sets, then
                 // those resources will be accounted for separately).
                 //
-                Int descriptorSetIndex = _findOrAddDescriptorSet(0);
+                // The container's offsets are relative to the parameter group. They are
+                // non-zero only for the default constant buffer of the global scope, whose
+                // binding `generateParameterBindings` records there, and which
+                // `-fvk-bind-globals` can place in a set of its own.
+                //
+                auto containerVarLayout = parameterGroupTypeLayout->containerVarLayout;
+                ExtendedBindingRangePath containerPath(path, containerVarLayout);
+                Int containerSpace = 0;
+                if (auto containerResInfo = containerVarLayout->FindResourceInfo(kind))
+                    containerSpace = Int(containerResInfo->space);
+
+                Int descriptorSetIndex = _findOrAddDescriptorSet(containerSpace);
                 auto descriptorSet = m_extendedInfo->m_descriptorSets[descriptorSetIndex];
                 auto firstDescriptorRangeIndex = descriptorSet->descriptorRanges.getCount();
 
@@ -2303,8 +2314,7 @@ struct ExtendedTypeLayoutContext
                         // usage of the "container" should be reflected as descriptor
                         // ranges in the parent scope.
                         //
-                        for (auto resInfo : parameterGroupTypeLayout->containerVarLayout->typeLayout
-                                                ->resourceInfos)
+                        for (auto resInfo : containerVarLayout->typeLayout->resourceInfos)
                         {
                             switch (resInfo.kind)
                             {
@@ -2321,7 +2331,7 @@ struct ExtendedTypeLayoutContext
                                 _calcBindingType(typeLayout, resInfo.kind);
                             descriptorRange.count = multiplier;
                             descriptorRange.indexOffset =
-                                _calcIndexOffset(path.primary, resInfo.kind);
+                                _calcIndexOffset(containerPath.primary, resInfo.kind);
                             descriptorSet->descriptorRanges.add(descriptorRange);
                         }
                     }

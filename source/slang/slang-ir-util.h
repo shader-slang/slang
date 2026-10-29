@@ -620,6 +620,19 @@ IRBlock* getBlock(IRInst* inst);
 
 IRVarLayout* findVarLayout(IRInst* value);
 
+/// Find the offset of `kind` resources on the container of the parameter group that
+/// `varLayout` lays out, or return null when `varLayout` is not for a parameter group or its
+/// container uses no `kind` resources.
+///
+/// The resources of a parameter group itself (the buffer of a `ConstantBuffer<T>`) are at
+/// `varLayout`'s offset plus this offset. The offset is zero for every group except the default
+/// constant buffer of the global scope: the global-scope parameters keep absolute bindings, so
+/// `generateParameterBindings` leaves the scope variable at offset zero and records the buffer's
+/// binding on the container.
+IRVarOffsetAttr* findParameterGroupContainerOffsetAttr(
+    IRVarLayout* varLayout,
+    LayoutResourceKind kind);
+
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
 KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);
 

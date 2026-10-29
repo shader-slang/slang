@@ -3601,6 +3601,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             UInt index = rr->getOffset();
             UInt space = rr->getSpace();
+            if (auto containerAttr =
+                    findParameterGroupContainerOffsetAttr(layout, rr->getResourceKind()))
+            {
+                index += containerAttr->getOffset();
+                space += containerAttr->getSpace();
+            }
             switch (rr->getResourceKind())
             {
             case LayoutResourceKind::Uniform:
