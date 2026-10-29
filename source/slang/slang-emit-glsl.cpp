@@ -3054,8 +3054,13 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         if (isFloatingType(inst->getDataType()))
         {
-            // GL_EXT_shader_atomic_float defines the 32/64-bit float atomics other than min/max;
-            // float min/max and every 16-bit float atomic are in GL_EXT_shader_atomic_float2.
+            // This mirrors typeRequireChecks_atomic_using_float{1,2}_tier in glsl.meta.slang, which
+            // the GLSL-syntax overloads use. HLSL-style and Atomic<T> atomics reach the emitter as
+            // bodyless IR ops, so the emitter picks the extension itself.
+            // GL_EXT_shader_atomic_float2 defines float min/max and every scalar half atomic;
+            // GL_EXT_shader_atomic_float defines 32/64-bit float add and exchange (sub, inc and dec
+            // are emitted as atomicAdd). Float compare-exchange is in neither extension and keeps
+            // the first one, as before.
             const bool isMinMax =
                 inst->getOp() == kIROp_AtomicMin || inst->getOp() == kIROp_AtomicMax;
             if (isMinMax || inst->getDataType()->getOp() == kIROp_HalfType)
