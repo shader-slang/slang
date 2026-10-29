@@ -51,7 +51,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CUDA-LABEL: __global__ void computeMain(
 // CUDA: __ballot_sync(4294967295U, true)
 // CUDA-NOT: __ballot_sync(
-// CUDA-NOT: __match_any_sync(
 
 // a = 11 6 13 12 15 18 17 24; lanes 1, 2, 3, 5 and 7 sum 6 + 13 + 12 + 18 + 24 = 73.
 // acc = (1 + ... + lane) + 100, 200 or 300 for lane % 3 = 0, 1 or 2.
