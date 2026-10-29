@@ -108,7 +108,7 @@ struct SchemaCounts<S : rt::ITraceProgramSchema> : rt::ITraceProgramSchema
     static const int callableCount = S.CallableShaders.count;
 }
 
-[require(structural_raytracing_closesthit)]
+[require(portable_raytracing_closesthit)]
 export int hitListCount()
 {
     typealias Counts =
@@ -119,14 +119,14 @@ export int hitListCount()
     return entries.getCount() - 1;
 }
 
-[require(structural_raytracing_closesthit)]
+[require(portable_raytracing_closesthit)]
 export int hitSchemaCount()
 {
     typealias Counts = SchemaCounts<Schema>;
     return Counts.hitCount;
 }
 
-[require(structural_raytracing_miss)]
+[require(portable_raytracing_miss)]
 export int missListCount()
 {
     typealias Counts =
@@ -137,14 +137,14 @@ export int missListCount()
     return entries.getCount() - 1;
 }
 
-[require(structural_raytracing_miss)]
+[require(portable_raytracing_miss)]
 export int missSchemaCount()
 {
     typealias Counts = SchemaCounts<Schema>;
     return Counts.missCount;
 }
 
-[require(structural_raytracing_callable)]
+[require(portable_raytracing_callable)]
 export int callableListCount()
 {
     typealias Counts =
@@ -155,7 +155,7 @@ export int callableListCount()
     return entries.getCount() - 1;
 }
 
-[require(structural_raytracing_callable)]
+[require(portable_raytracing_callable)]
 export int callableSchemaCount()
 {
     typealias Counts = SchemaCounts<Schema>;

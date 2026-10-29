@@ -36,7 +36,7 @@ internal struct EmptyTracePayload
 /// @par Constraints
 /// Requires a Metal trace stage and `Schema.TraceContext.Motion == NoMotion`.
 /// @todo Lower this operation to Metal intersector dispatch in the backend adapter slice.
-[require(metal, structural_raytracing_trace)]
+[require(metal, portable_raytracing_trace)]
 __intrinsic_op(metalTraceRay)
 internal void __metalTraceRay<Schema, Payload>(
     Schema.TraceContext.AccelerationStructure accelerationStructure,
@@ -78,7 +78,7 @@ internal void __metalTraceRay<Schema, Payload>(
 /// Requires Metal 2.4 and a trace stage. `Schema.TraceContext.Motion : IEnabledRayMotion`
 /// admits primitive motion, instance motion, and their combination.
 /// @todo Lower this operation to Metal intersector dispatch in the backend adapter slice.
-[require(metallib_2_4, structural_raytracing_trace)]
+[require(metallib_2_4, portable_raytracing_trace)]
 __intrinsic_op(metalTraceRay)
 internal void __metalTraceRayMotion<Schema, Payload>(
     Schema.TraceContext.AccelerationStructure accelerationStructure,
@@ -122,7 +122,7 @@ public struct RayTracer<Schema>
 /// Extends `RayTracer<Schema>` with these constraints:
 /// - `Schema : ITraceProgramSchema` supplies the trace context and shader lists.
 /// - `Schema.TraceContext.Motion == NoMotion` disables motion during traversal.
-[require(structural_raytracing_trace)]
+[require(portable_raytracing_trace)]
 public extension<Schema> RayTracer<Schema>
     where Schema : ITraceProgramSchema
     where Schema.TraceContext.Motion == NoMotion
@@ -206,7 +206,7 @@ public extension<Schema> RayTracer<Schema>
 ///   and `PrimitiveAndInstanceMotion`. `NoMotion` uses the other extension.
 /// The selected motion type retains its own target requirements: primitive and combined motion
 /// require Metal 2.4, while instance motion also supports native motion-blur targets.
-[require(structural_raytracing_trace, structural_raytracing_instance_motion)]
+[require(portable_raytracing_trace, portable_raytracing_instance_motion)]
 public extension<Schema> RayTracer<Schema>
     where Schema : ITraceProgramSchema
     where Schema.TraceContext.Motion : IEnabledRayMotion
@@ -295,7 +295,7 @@ public extension<Schema> RayTracer<Schema>
 /// @par Specialization
 /// Extends `RayTracer<Schema>` with these constraints:
 /// - `Schema : ITraceProgramSchema` supplies the trace context and shader lists.
-[require(structural_raytracing_call_shader)]
+[require(portable_raytracing_call_shader)]
 public extension<Schema> RayTracer<Schema>
     where Schema : ITraceProgramSchema
 {

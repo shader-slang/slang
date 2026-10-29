@@ -46,8 +46,8 @@ public struct PrimitiveMotion : IEnabledRayMotion {}
 /// programs use `NoMotion` instead; this capability requirement excludes D3D.
 ///
 /// @par Constraints
-/// Conforms to `IEnabledRayMotion` and requires `structural_raytracing_instance_motion`.
-[require(structural_raytracing_instance_motion)]
+/// Conforms to `IEnabledRayMotion` and requires `portable_raytracing_instance_motion`.
+[require(portable_raytracing_instance_motion)]
 public struct InstanceMotion : IEnabledRayMotion {}
 
 /// Selects Metal traversal with both primitive and instance motion enabled.
@@ -259,12 +259,12 @@ public struct TriangleData
     /// Reads the two barycentric coordinates supplied for the triangle hit.
     ///
     /// @par Constraints
-    /// Requires `structural_raytracing_anyhit_closesthit`, so access is available only in supported
+    /// Requires `portable_raytracing_anyhit_closesthit`, so access is available only in supported
     /// any-hit and closest-hit stages. The coordinates describe built-in triangle intersection
     /// state, rather than application-defined procedural attributes.
     ///
     /// @todo A following PR must connect this getter to native hit attributes or Metal stage state.
-    [require(structural_raytracing_anyhit_closesthit)]
+    [require(portable_raytracing_anyhit_closesthit)]
     public property float2 barycentricCoord
     {
         get;
@@ -273,11 +273,11 @@ public struct TriangleData
     /// Reports whether the ray hit the triangle's front face according to native face orientation.
     ///
     /// @par Constraints
-    /// Requires `structural_raytracing_anyhit_closesthit`, so access is available only in supported
+    /// Requires `portable_raytracing_anyhit_closesthit`, so access is available only in supported
     /// any-hit and closest-hit stages. Reads built-in triangle state for the current hit.
     ///
     /// @todo A following PR must synthesize Metal's candidate or committed-hit facing value.
-    [require(structural_raytracing_anyhit_closesthit)]
+    [require(portable_raytracing_anyhit_closesthit)]
     public property bool frontFacing
     {
         get

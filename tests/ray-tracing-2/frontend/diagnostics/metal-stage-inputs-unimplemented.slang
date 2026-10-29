@@ -32,7 +32,7 @@ struct ProceduralContext : rt::IHitContext
 // native Metal entry-point check prevents us from testing the pending implementations themselves.
 // The packaged library supplies no source locations for these errors or call notes. Keep the
 // message checks beside the calls that reach each unfinished operation.
-[require(structural_raytracing_closesthit)]
+[require(portable_raytracing_closesthit)]
 export float readClosestHitState(rt::ClosestHitInput<HitContext> input)
 {
     return float(input.rayFlags) + input.objectSpaceRay.Origin.x;
@@ -44,7 +44,7 @@ export float readClosestHitState(rt::ClosestHitInput<HitContext> input)
 //METAL: see call to 'rt.ClosestHitInput.objectSpaceRay.get'
 }
 
-[require(structural_raytracing_anyhit)]
+[require(portable_raytracing_anyhit)]
 export void handleAnyHit(rt::AnyHitInput<HitContext> input)
 {
     if (input.objectSpaceRay.Origin.x < 0.0)
@@ -62,7 +62,7 @@ export void handleAnyHit(rt::AnyHitInput<HitContext> input)
 //METAL: see call to 'rt.AnyHitInput.acceptHitAndEndSearch'
 }
 
-[require(structural_raytracing_intersection)]
+[require(portable_raytracing_intersection)]
 export bool reportIntersection(rt::IntersectionInput<ProceduralContext> input)
 {
     return input.reportHit(1.0, float2(0.0));
@@ -71,7 +71,7 @@ export bool reportIntersection(rt::IntersectionInput<ProceduralContext> input)
 //METAL: see call to 'rt.IntersectionInput.reportHit'
 }
 
-[require(structural_raytracing_intersection)]
+[require(portable_raytracing_intersection)]
 export bool reportIntersectionWithKind(rt::IntersectionInput<ProceduralContext> input)
 {
     return input.reportHit(2.0, 7, float2(0.0));
@@ -81,7 +81,7 @@ export bool reportIntersectionWithKind(rt::IntersectionInput<ProceduralContext> 
 }
 
 // A direct use of the empty triangle view must also reject its pending Metal getter.
-[require(structural_raytracing_anyhit_closesthit)]
+[require(portable_raytracing_anyhit_closesthit)]
 export bool readFrontFacing()
 {
     rt::TriangleData attributes = {};
@@ -108,7 +108,7 @@ struct MotionHitContext : rt::IHitContext
 
 // CUDA also has two pending inputs. Keep their exported uses out of the HLSL success case, whose
 // traversal API does not provide InstanceMotion.
-[require(structural_raytracing_closesthit)]
+[require(portable_raytracing_closesthit)]
 export uint readGeometryIndex(rt::ClosestHitInput<HitContext> input)
 {
     return input.geometryIndex;
@@ -117,7 +117,7 @@ export uint readGeometryIndex(rt::ClosestHitInput<HitContext> input)
 //CUDA: see call to 'geometryIndex.get'
 }
 
-[require(cuda, structural_raytracing_closesthit)]
+[require(cuda, portable_raytracing_closesthit)]
 export float readRayTime(rt::ClosestHitInput<MotionHitContext> input)
 {
     return input.time;

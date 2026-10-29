@@ -54,7 +54,7 @@ struct TestProceduralContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-[require(structural_raytracing_intersection_payload)]
+[require(portable_raytracing_intersection_payload)]
 void intersectionHelper(in rt::IntersectionInput<TestProceduralContext> input)
 {
     let local = input;

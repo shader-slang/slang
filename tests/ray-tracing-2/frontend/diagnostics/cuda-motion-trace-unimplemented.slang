@@ -10,7 +10,7 @@ import slang.raytracing.portable;
 // The packaged library reports these errors without source locations, so each message check
 // is placed beside the call that reaches the assertion.
 #ifdef TEST_NO_PAYLOAD
-[require(cuda, structural_raytracing_trace)]
+[require(cuda, portable_raytracing_trace)]
 export void traceWithoutPayload<Schema : rt::ITraceProgramSchema>(
     rt::RayTraversalDesc desc,
     Schema.TraceContext.AccelerationStructure scene,
@@ -23,7 +23,7 @@ export void traceWithoutPayload<Schema : rt::ITraceProgramSchema>(
 //NO_PAYLOAD: CUDA structural ray-tracing motion is not implemented
 }
 #else
-[require(cuda, structural_raytracing_trace)]
+[require(cuda, portable_raytracing_trace)]
 export void traceWithPayload<Schema : rt::ITraceProgramSchema, Payload>(
     rt::RayTraversalDesc desc,
     Schema.TraceContext.AccelerationStructure scene,

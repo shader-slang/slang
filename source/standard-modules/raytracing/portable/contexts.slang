@@ -52,9 +52,6 @@ public interface IStageContext
 
     /// Describes the host-supplied record bytes that this stage reads through `input.record`.
     ///
-    /// The compiler records this type for later generation of shader-record access. The
-    /// `StageRecord` annotation identifies this requirement even if its name changes.
-    ///
     /// @par Constraints
     /// This associated type has no conformance constraint. Use `void` when the stage has no
     /// record data. For a non-void type, the application must supply matching record data using
@@ -73,15 +70,12 @@ public interface IPayloadContext : IStageContext
 {
     /// Describes the mutable ray payload exchanged between a trace call and its hit or miss stage.
     ///
-    /// The compiler records this type for later generation of native stage functions and payload
-    /// access. The `PayloadContextPayload` annotation keeps that lookup independent of its name.
-    ///
     /// @par Constraints
     /// This associated type has no conformance constraint. An explicit trace payload and the
     /// receiving stage's payload must have the same type. The no-payload trace overload supplies
     /// an internal empty value; post-link lowering must normalize it with the reached stages'
     /// empty payload types. Intersection-stage access additionally requires
-    /// `structural_raytracing_intersection_payload` (Metal or CUDA/OptiX). Empty structs are valid
+    /// `portable_raytracing_intersection_payload` (Metal or CUDA/OptiX). Empty structs are valid
     /// payload types; the target ABI determines their physical storage.
     associatedtype Payload;
 }

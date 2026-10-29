@@ -22,7 +22,7 @@ struct HitContext : rt::IHitContext
 // these assertions. All three public operations must fail instead of producing placeholder IDs.
 // The packaged library reports errors and call notes without source locations; keep each
 // message check beside the corresponding call.
-[require(metal, structural_raytracing_closesthit)]
+[require(metal, portable_raytracing_closesthit)]
 export uint readInstanceCount(rt::ClosestHitInput<HitContext> input)
 {
     return input.instanceCount;
@@ -31,7 +31,7 @@ export uint readInstanceCount(rt::ClosestHitInput<HitContext> input)
 //CHECK: see call to 'rt.ClosestHitInput.instanceCount.get'
 }
 
-[require(metal, structural_raytracing_anyhit)]
+[require(metal, portable_raytracing_anyhit)]
 export uint readInstanceIndex(rt::AnyHitInput<HitContext> input, uint level)
 {
     return input.getInstanceIndex(level);
@@ -40,7 +40,7 @@ export uint readInstanceIndex(rt::AnyHitInput<HitContext> input, uint level)
 //CHECK: see call to 'rt.AnyHitInput.getInstanceIndex'
 }
 
-[require(metal, structural_raytracing_intersection)]
+[require(metal, portable_raytracing_intersection)]
 export uint readInstanceID(rt::IntersectionInput<HitContext> input, uint level)
 {
     return input.getInstanceID(level);

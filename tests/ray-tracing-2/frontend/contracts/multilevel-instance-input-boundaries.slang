@@ -31,7 +31,7 @@ struct MultiLevelContext : rt::IHitContext
 }
 
 // The path accessors are specific to multilevel contexts on all three hit inputs.
-[require(structural_raytracing_closesthit)]
+[require(portable_raytracing_closesthit)]
 void checkPortableClosestHit(rt::ClosestHitInput<PortableContext> input)
 {
     let limit = input.maxInstanceCount;
@@ -56,7 +56,7 @@ void checkPortableClosestHit(rt::ClosestHitInput<PortableContext> input)
 */
 }
 
-[require(structural_raytracing_anyhit)]
+[require(portable_raytracing_anyhit)]
 void checkPortableAnyHit(rt::AnyHitInput<PortableContext> input)
 {
     let limit = input.maxInstanceCount;
@@ -81,7 +81,7 @@ void checkPortableAnyHit(rt::AnyHitInput<PortableContext> input)
 */
 }
 
-[require(structural_raytracing_intersection)]
+[require(portable_raytracing_intersection)]
 void checkPortableIntersection(rt::IntersectionInput<PortableContext> input)
 {
     let limit = input.maxInstanceCount;
@@ -107,7 +107,7 @@ void checkPortableIntersection(rt::IntersectionInput<PortableContext> input)
 }
 
 // No instance level is silently selected for the existing scalar properties.
-[require(structural_raytracing_closesthit)]
+[require(portable_raytracing_closesthit)]
 void checkMultiLevelScalars(rt::ClosestHitInput<MultiLevelContext> input)
 {
     let index = input.instanceIndex;
@@ -123,7 +123,7 @@ void checkMultiLevelScalars(rt::ClosestHitInput<MultiLevelContext> input)
 }
 
 // A miss has no hit path, even when its trace context uses multilevel traversal.
-[require(structural_raytracing_miss)]
+[require(portable_raytracing_miss)]
 void checkMiss(rt::MissInput<MultiLevelContext> input)
 {
     let limit = input.maxInstanceCount;

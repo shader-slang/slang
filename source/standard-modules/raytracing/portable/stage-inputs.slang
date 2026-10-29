@@ -611,7 +611,7 @@ public extension<Input : ICommonHitInput> Input
 /// parameter. Copying the view does not duplicate its payload or record storage.
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
-[require(structural_raytracing_closesthit)]
+[require(portable_raytracing_closesthit)]
 [KnownBuiltin("RayTracingClosestHitInput")]
 public struct ClosestHitInput<Context> : ICommonHitInput
     where Context : IHitContext
@@ -834,7 +834,7 @@ public extension<Context> ClosestHitInput<Context>
 /// parameter. Copying the view does not duplicate its payload or record storage.
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
-[require(structural_raytracing_anyhit)]
+[require(portable_raytracing_anyhit)]
 [KnownBuiltin("RayTracingAnyHitInput")]
 public struct AnyHitInput<Context> : ICommonHitInput
     where Context : IHitContext
@@ -1105,7 +1105,7 @@ public extension<Context> AnyHitInput<Context>
 /// as a global shader parameter or field, or return one from a function.
 /// An `IIntersectionShader` implementation additionally requires
 /// `Context.Primitive : ICustomIntersectionPrimitive`.
-[require(structural_raytracing_intersection)]
+[require(portable_raytracing_intersection)]
 [KnownBuiltin("RayTracingIntersectionInput")]
 public struct IntersectionInput<Context> : ICommonHitInput
     where Context : IHitContext
@@ -1114,10 +1114,10 @@ public struct IntersectionInput<Context> : ICommonHitInput
     /// @todo Synthesize access to Metal's `ray_data` payload or OptiX payload state.
     ///
     /// @par Constraints
-    /// Requires `structural_raytracing_intersection_payload` (Metal or CUDA/OptiX).
+    /// Requires `portable_raytracing_intersection_payload` (Metal or CUDA/OptiX).
     /// The `[nonmutating] ref` accessor leaves the view unchanged and exposes `Context.Payload`
     /// for mutation through an `in` parameter or immutable local copy.
-    [require(structural_raytracing_intersection_payload)]
+    [require(portable_raytracing_intersection_payload)]
     public property Context.Payload payload
     {
         [nonmutating]
@@ -1353,7 +1353,7 @@ public extension<Context> IntersectionInput<Context>
 /// parameter. Copying the view does not duplicate its payload or record storage.
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
-[require(structural_raytracing_miss)]
+[require(portable_raytracing_miss)]
 [KnownBuiltin("RayTracingMissInput")]
 public struct MissInput<Context>
     where Context : IPayloadContext
@@ -1487,7 +1487,7 @@ public extension<Context> MissInput<Context>
 /// parameter. Copying the view does not duplicate its callable-data or record storage.
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
-[require(structural_raytracing_callable)]
+[require(portable_raytracing_callable)]
 [KnownBuiltin("RayTracingCallableInput")]
 public struct CallableInput<Context>
     where Context : ICallableContext
