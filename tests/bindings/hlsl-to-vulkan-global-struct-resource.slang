@@ -1,9 +1,9 @@
 // Regression test for shader-slang/slang#14013.
 //
 // `-fvk-bind-globals 5 9` places the default constant buffer for global uniforms at
-// set 9, binding 5. The texture inside the global uniform `s` is not part of that
-// buffer: it is allocated in the default set (set 0, binding 1), and the SPIR-V must
-// use that location after legalization splits it out of the buffer.
+// set 9, binding 5. The texture `s.t` is declared through that buffer's element (the
+// global uniform `s`), but its binding is allocated in the default set (set 0,
+// binding 1), and the SPIR-V must keep that location after legalization splits it out.
 
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry main -stage compute -fvk-bind-globals 5 9
 //TEST:REFLECTION(filecheck=REFL): -target spirv -entry main -stage compute -fvk-bind-globals 5 9 -no-codegen

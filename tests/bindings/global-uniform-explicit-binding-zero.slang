@@ -1,10 +1,10 @@
 // Regression test for shader-slang/slang#14013.
 //
 // `result` takes binding 0 explicitly, so the default constant buffer that holds the
-// global uniforms (`globalParams`) is allocated binding 1. The resources inside the
-// global uniform `s` are split out of that buffer during legalization, and they must
-// keep the bindings that reflection reports for them: `s.t` at 2 and `u` at 3, and
-// reflection reports the default constant buffer itself at 1.
+// global uniforms (`globalParams`) is allocated binding 1. The texture `s.t` inside the
+// global uniform `s` is split out of that buffer during legalization and must keep the
+// binding reflection reports for it (2), next to the ordinary global texture `u` (3).
+// Reflection reports the default constant buffer itself at 1.
 
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage compute -line-directive-mode none

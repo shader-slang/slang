@@ -65,6 +65,19 @@ static ComPtr<slang::IComponentType> _linkProgram(
     return linkedProgram;
 }
 
+// Ask the post-emit metadata whether descriptor slot (`space`, `index`) is used. A failed query
+// fails the test instead of leaving a stale answer for the caller to check.
+static bool _isDescriptorSlotUsed(slang::IMetadata* metadata, SlangUInt space, SlangUInt index)
+{
+    bool isUsed = false;
+    SLANG_CHECK(SLANG_SUCCEEDED(metadata->isParameterLocationUsed(
+        SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
+        space,
+        index,
+        isUsed)));
+    return isUsed;
+}
+
 SLANG_UNIT_TEST(globalConstantBufferBindingAfterExplicitVulkanBinding)
 {
     const char* source = R"(
@@ -107,6 +120,8 @@ SLANG_UNIT_TEST(globalConstantBufferBindingAfterExplicitVulkanBinding)
     SLANG_CHECK_ABORT(globalsTypeLayout->getDescriptorSetCount() == 1);
     SlangInt rangeCount = globalsTypeLayout->getDescriptorSetDescriptorRangeCount(0);
     SLANG_CHECK(rangeCount == 2);
+    bool foundConstantBuffer = false;
+    bool foundResult = false;
     for (SlangInt r = 0; r < rangeCount; ++r)
     {
         auto offset = globals->getOffset(slot) +
@@ -114,10 +129,11 @@ SLANG_UNIT_TEST(globalConstantBufferBindingAfterExplicitVulkanBinding)
         switch (globalsTypeLayout->getDescriptorSetDescriptorRangeType(0, r))
         {
         case slang::BindingType::ConstantBuffer:
+            foundConstantBuffer = true;
             SLANG_CHECK(offset == 1);
             break;
         case slang::BindingType::MutableRawBuffer:
-        case slang::BindingType::MutableTypedBuffer:
+            foundResult = true;
             SLANG_CHECK(offset == 0);
             break;
         default:
@@ -125,16 +141,15 @@ SLANG_UNIT_TEST(globalConstantBufferBindingAfterExplicitVulkanBinding)
             break;
         }
     }
+    SLANG_CHECK(foundConstantBuffer);
+    SLANG_CHECK(foundResult);
 
-    // Post-emit metadata reports the location the constant buffer is emitted at.
+    // Post-emit metadata reports `result` at slot 0 and the constant buffer at slot 1.
     ComPtr<slang::IMetadata> metadata;
     program->getTargetMetadata(0, metadata.writeRef(), nullptr);
     SLANG_CHECK_ABORT(metadata != nullptr);
-    bool isUsed = false;
-    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 0, isUsed);
-    SLANG_CHECK(isUsed);
-    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, isUsed);
-    SLANG_CHECK(isUsed);
+    SLANG_CHECK(_isDescriptorSlotUsed(metadata, 0, 0));
+    SLANG_CHECK(_isDescriptorSlotUsed(metadata, 0, 1));
 }
 
 SLANG_UNIT_TEST(globalConstantBufferBindingWithoutExplicitBinding)
@@ -262,6 +277,7 @@ SLANG_UNIT_TEST(globalConstantBufferBindingWithVulkanBindGlobals)
     // `result` and `s.t` stay in set 0.
     bool foundConstantBuffer = false;
     bool foundTexture = false;
+    bool foundResult = false;
     for (SlangInt i = 0; i < globalsTypeLayout->getDescriptorSetCount(); ++i)
     {
         auto space = globalsTypeLayout->getDescriptorSetSpaceOffset(i);
@@ -278,25 +294,66 @@ SLANG_UNIT_TEST(globalConstantBufferBindingWithVulkanBindGlobals)
                 foundTexture = true;
                 SLANG_CHECK(space == 0 && index == 1);
                 break;
-            default:
+            case slang::BindingType::MutableRawBuffer:
+                foundResult = true;
                 SLANG_CHECK(space == 0 && index == 0);
+                break;
+            default:
+                SLANG_CHECK(!"unexpected descriptor range");
                 break;
             }
         }
     }
     SLANG_CHECK(foundConstantBuffer);
     SLANG_CHECK(foundTexture);
+    SLANG_CHECK(foundResult);
 
     ComPtr<slang::IMetadata> metadata;
     program->getTargetMetadata(0, metadata.writeRef(), nullptr);
     SLANG_CHECK_ABORT(metadata != nullptr);
-    bool isUsed = false;
-    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 9, 5, isUsed);
-    SLANG_CHECK(isUsed);
-    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, isUsed);
-    SLANG_CHECK(isUsed);
-    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 9, 6, isUsed);
-    SLANG_CHECK(!isUsed);
-    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 9, 0, isUsed);
-    SLANG_CHECK(!isUsed);
+    SLANG_CHECK(_isDescriptorSlotUsed(metadata, 9, 5));
+    SLANG_CHECK(_isDescriptorSlotUsed(metadata, 0, 1));
+    // `s.t` must not pick up the buffer's set and binding (set 9, binding 5 + 1), and nothing
+    // but the buffer belongs in set 9.
+    SLANG_CHECK(!_isDescriptorSlotUsed(metadata, 9, 6));
+    SLANG_CHECK(!_isDescriptorSlotUsed(metadata, 9, 0));
+}
+
+SLANG_UNIT_TEST(globalConstantBufferBindingWithVulkanBindGlobalsAndNoUniforms)
+{
+    // `-fvk-bind-globals 5 9` reserves set 9, binding 5, but no global has ordinary data, so
+    // no default constant buffer exists and nothing records that binding on the scope.
+    const char* source = R"(
+        RWStructuredBuffer<float> result;
+        Texture2D t;
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID)
+        {
+            result[0] = t.Load(int3(0)).x;
+        }
+    )";
+
+    slang::CompilerOptionEntry bindGlobals = {};
+    bindGlobals.name = slang::CompilerOptionName::VulkanBindGlobals;
+    bindGlobals.value.kind = slang::CompilerOptionValueKind::Int;
+    bindGlobals.value.intValue0 = 5;
+    bindGlobals.value.intValue1 = 9;
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    ComPtr<slang::ISession> session;
+    auto program =
+        _linkProgram(globalSession, SLANG_SPIRV, "spirv_1_5", &bindGlobals, 1, source, session);
+
+    const auto slot = slang::ParameterCategory::DescriptorTableSlot;
+
+    auto programLayout = program->getLayout();
+    auto globals = programLayout->getGlobalParamsVarLayout();
+    SLANG_CHECK(globals->getTypeLayout()->getKind() == slang::TypeReflection::Kind::Struct);
+    SLANG_CHECK(globals->getOffset(slot) == 0);
+    SLANG_CHECK(globals->getBindingSpace(slot) == 0);
+    SLANG_CHECK(programLayout->getGlobalConstantBufferBinding() == 0);
 }
