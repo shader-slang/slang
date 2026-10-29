@@ -37,11 +37,12 @@ void main(uint3 tid : SV_DispatchThreadID)
 // The remaining shader text targets accept the same two queries and
 // lower them to their own wave/subgroup vocabulary, so the alias is
 // not a GLSL/SPIR-V-only affordance. HLSL reaches the wave size with
-// the `WaveGetLaneCount()` intrinsic, Metal takes the SIMD-group
-// index and width in as entry-point attributes, and WGSL has to turn
-// the `subgroups` extension on and take the subgroup index
+// the `WaveGetLaneCount()` intrinsic and Metal takes the SIMD-group
+// index and width in as entry-point attributes; both derive the number
+// of waves from the workgroup size and that width. WGSL has to turn
+// the `subgroups` extension on and takes the subgroup index
 // (`subgroup_id`) and the number of subgroups in the workgroup
-// (`num_subgroups`) as `@builtin` inputs.
+// (`num_subgroups`) directly as `@builtin` inputs.
 
 // HLSL: WaveGetLaneCount()
 

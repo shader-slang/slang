@@ -14,9 +14,10 @@
 // to be reinterpreted rather than loaded as a typed element, which on MSL
 // is spelled `as_type<T>`. The kernel loads a word and stores a modified
 // word so both directions stay live; CHECK asserts both the load-side and
-// store-side `as_type<...>` wrappers appear. The load has a single use, so it
-// may be emitted inside the store's `as_type<uint32_t>(...)`, and the two
-// patterns are unordered.
+// store-side `as_type<...>` wrappers appear. A byte-address load has no side
+// effects, so the emitter folds this single-use load into the store's
+// `as_type<uint32_t>(...)`. The CHECKs are unordered so that they also pass
+// when the load is kept in a temporary.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 
