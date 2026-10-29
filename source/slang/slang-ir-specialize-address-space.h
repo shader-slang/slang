@@ -26,8 +26,10 @@ struct InitialAddressSpaceAssigner
 
     /// Return the address space for a still-`Generic` pointer parameter of an exported function.
     /// Ordinary functions get parameter address spaces from their call sites, but an exported
-    /// function may have no caller. A concrete result makes `specializeAddressSpace` visit
-    /// exported functions and apply it; the base `Generic` leaves them untouched.
+    /// function may have no caller. A concrete result makes `specializeAddressSpace` treat every
+    /// exported function as a root, applying the result to its parameters and specializing the
+    /// calls in its body. The base `Generic` turns both off, leaving exported functions to be
+    /// reached only through calls.
     virtual AddressSpace getDefaultAddressSpaceForExportedFunctionParam();
 };
 
@@ -40,7 +42,9 @@ struct NoOpInitialAddressSpaceAssigner : public InitialAddressSpaceAssigner
 
 /// Propagate address space information through the IR module.
 /// Specialize functions with reference/pointer parameters to use the correct address space
-/// based on the address space of the arguments.
+/// based on the address space of the arguments. Entry points are the roots of this
+/// specialization; when `addrSpaceAssigner` supplies a default for exported-function parameters,
+/// exported functions are roots too.
 ///
 /// When `sink` is non-null, additionally runs the local-pointer-slot reconciliation pre-pass and
 /// reports `inconsistent-pointer-address-space` if a single local pointer slot is written pointer

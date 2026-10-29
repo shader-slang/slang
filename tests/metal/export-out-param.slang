@@ -22,11 +22,8 @@ export void advance(inout uint state)
 }
 
 // An exported function calling another exported out-param function with local
-// `thread` variables must emit the call against a matching `thread*` callee,
-// and `onb` must be defined exactly once (see the DEDUP prefix below) so the
-// seeded signature is reused rather than duplicated. Emitted MSL cannot say
-// which IR node survived — specialization clones copy the export decoration
-// and name — so the invariant here is call + single definition, not identity.
+// `thread` variables must emit the call against a matching `thread*` callee;
+// the DEDUP prefix below checks that `onb` is defined only once.
 // CHECK-DAG: float3 buildFrame_{{[A-Za-z0-9_]*}}(
 // CHECK: onb_{{[A-Za-z0-9_]*}}({{.*}}&{{.*}}, {{.*}}&{{.*}})
 export float3 buildFrame(float3 n)

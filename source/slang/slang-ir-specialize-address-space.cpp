@@ -97,6 +97,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         HashCode getHashCode() const { return hashCode; }
     };
 
+    // Maps a function and the address spaces of a call's arguments to the function that call
+    // should target: a clone made by `specializeFunc`, or, for an exported function registered by
+    // `seedExportedFunc`, the function itself.
     Dictionary<FuncSpecializationKey, IRFunc*> functionSpecializations;
 
     // Maps each clone created by `specializeFunc` to the unspecialized function it was cloned
@@ -124,13 +127,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return func;
     }
 
-    // The caller fixes up the function type after retyping its parameters.
-    void setPointerParamAddrSpace(
-        IRBuilder& builder,
-        IRParam* param,
-        IRPtrTypeBase* ptrType,
-        AddressSpace addrSpace)
+    // Retypes the pointer parameter `param` to point into `addrSpace` and records `addrSpace` for
+    // it in `mapInstToAddrSpace`. The caller fixes up the function type once all of the function's
+    // parameters are retyped.
+    void setPointerParamAddrSpace(IRBuilder& builder, IRParam* param, AddressSpace addrSpace)
     {
+        auto ptrType = as<IRPtrTypeBase>(param->getFullType());
+        SLANG_ASSERT(ptrType);
         param->setFullType(builder.getPtrType(
             ptrType->getOp(),
             ptrType->getValueType(),
@@ -158,12 +161,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         Index paramIndex = 0;
         for (auto param : specializedFunc->getParams())
         {
-            if (auto ptrType = as<IRPtrTypeBase>(param->getFullType()))
-                setPointerParamAddrSpace(
-                    builder,
-                    param,
-                    ptrType,
-                    key.getArgAddrSpaces()[paramIndex]);
+            if (as<IRPtrTypeBase>(param->getFullType()))
+                setPointerParamAddrSpace(builder, param, key.getArgAddrSpaces()[paramIndex]);
             paramIndex++;
         }
 
@@ -435,8 +434,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
     }
 
-    // An exported function may have no call site to infer parameter address spaces from.
-    // Registering it as its own specialization lets matching calls reuse it instead of cloning it.
+    // Retypes every `Generic` pointer parameter of the exported function `func` in place to
+    // `defaultAddrSpace`, fixes up its function type, and registers `func` as its own
+    // specialization. An exported function may have no call site to infer parameter address spaces
+    // from. The registered key holds the address space each parameter now has, as
+    // `getAddressSpaceFromVarType` reports it, so a call whose arguments are in the same address
+    // spaces targets `func` itself instead of a new clone.
     void seedExportedFunc(IRFunc* func, AddressSpace defaultAddrSpace)
     {
         IRBuilder builder(module);
@@ -444,11 +447,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         List<AddressSpace> paramAddrSpaces;
         for (auto param : func->getParams())
         {
-            auto addrSpace = getAddressSpaceFromVarType(param->getDataType());
-            auto ptrType = as<IRPtrTypeBase>(param->getFullType());
-            if (ptrType && addrSpace == AddressSpace::Generic)
+            auto paramType = param->getFullType();
+            auto addrSpace = getAddressSpaceFromVarType(paramType);
+            if (as<IRPtrTypeBase>(paramType) && addrSpace == AddressSpace::Generic)
             {
-                setPointerParamAddrSpace(builder, param, ptrType, defaultAddrSpace);
+                setPointerParamAddrSpace(builder, param, defaultAddrSpace);
                 addrSpace = defaultAddrSpace;
                 changed = true;
             }
@@ -456,7 +459,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
         if (changed)
             fixUpFuncType(func);
-        functionSpecializations.addIfNotExists(FuncSpecializationKey(func, paramAddrSpaces), func);
+        functionSpecializations.add(FuncSpecializationKey(func, paramAddrSpaces), func);
     }
 
     // Returns the concrete address space of a pointer-typed value once specialization has
@@ -713,9 +716,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             }
         }
 
-        // An exported function is kept alive even when no entry point reaches it, so the target's
-        // default address space is applied to every export here. Exports without pointer
-        // parameters are visited too, because their bodies may call functions that have them.
+        // An exported function (one with `IRHLSLExportDecoration`) is emitted even when no entry
+        // point reaches it, so it is a root of the work list and its `Generic` pointer parameters
+        // take the target's default. Exports without pointer parameters are visited too, because
+        // their bodies may call functions that have them. A declaration without a body has no
+        // parameters to retype. An export that nothing calls is never a removal candidate, while
+        // the sweep at the end removes a called export once all of its calls target clones, so a
+        // called export is emitted only in the specializations its calls use.
         if (exportedParamDefaultAddrSpace != AddressSpace::Generic)
         {
             for (auto globalInst : module->getGlobalInsts())

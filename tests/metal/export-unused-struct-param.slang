@@ -2,9 +2,10 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry cmain -stage compute
 
 // An exported function that no entry point calls is still emitted, but nothing specializes the
-// address spaces of its reference parameters. On Metal, a by-value struct or array parameter is a
-// `const thread*` (see `transformParamsToConstRef`), and `out`/`inout` parameters are pointers, so
-// each must get the `thread` address space even when the function has no call site.
+// address spaces of its reference parameters. On Metal, a by-value struct or array parameter is
+// passed by const reference (see `transformParamsToConstRef`), and `out`/`inout` parameters are
+// pointers, so each must get an address space even when the function has no call site. Address-
+// space specialization gives them `thread`.
 
 struct S
 {

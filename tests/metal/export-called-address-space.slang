@@ -24,8 +24,8 @@ export void bumpGroupShared(inout int x)
     x = x + 1;
 }
 
-// The buffer parameter already has the `device` address space, so the call reuses the exported
-// function rather than emitting an identical copy.
+// The buffer parameter already has the `device` address space and the `out` argument is a local,
+// so exactly one copy is emitted, with the same signature as the uncalled export would have.
 // READ-NOT: void readBuffer_{{[0-9]+}}(
 // READ: void readBuffer_{{[0-9]+}}(int device* {{[A-Za-z0-9_]+}}, int thread* {{[A-Za-z0-9_]+}})
 // READ-NOT: void readBuffer_{{[0-9]+}}(
@@ -34,7 +34,7 @@ export void readBuffer(RWStructuredBuffer<int> b, out int r)
     r = b[0];
 }
 
-// A `thread` call reuses the exported function and a `threadgroup` call specializes a copy of it.
+// A `thread` call and a `threadgroup` call each need their own copy, so exactly two are emitted.
 // MIX-DAG: void bumpBoth_{{[0-9]+}}(int thread* {{[A-Za-z0-9_]+}})
 // MIX-DAG: void bumpBoth_{{[0-9]+}}(int threadgroup* {{[A-Za-z0-9_]+}})
 // MIXCOUNT-COUNT-2: void bumpBoth_{{[0-9]+}}(
