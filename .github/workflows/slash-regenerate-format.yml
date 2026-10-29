@@ -65,7 +65,7 @@ jobs:
     needs: format
     if: always() && needs.format.result != 'skipped'
     permissions:
-      contents: read
+      contents: write
       issues: write
       pull-requests: write
     uses: ./.github/workflows/slash-regenerate-publish.yml
@@ -74,6 +74,3 @@ jobs:
       commit-message: "format code"
       generate-result: ${{ needs.format.result }}
       changed: ${{ needs.format.outputs.changed }}
-    secrets:
-      app-client-id: ${{ secrets.SLANG_CI_APP_CLIENT_ID }}
-      app-private-key: ${{ secrets.SLANG_CI_APP_PRIVATE_KEY }}
