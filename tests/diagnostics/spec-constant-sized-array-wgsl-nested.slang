@@ -9,11 +9,11 @@ const int kTile = 4;
 groupshared float allowed[kTile];
 
 groupshared float bothSized[kTile][kTile];
-//CHECK:          ^^^^^^^^^ error E55219
+//CHECK:          ^^^^^^^^^ error E55222
 //CHECK:          ^^^^^^^^^ cannot size an array with a specialization constant
 
 groupshared float innerSized[4][kTile];
-//CHECK:          ^^^^^^^^^^ error E55219
+//CHECK:          ^^^^^^^^^^ error E55222
 //CHECK:          ^^^^^^^^^^ cannot size an array with a specialization constant
 
 RWStructuredBuffer<float> outputBuffer;

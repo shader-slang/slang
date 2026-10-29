@@ -8,20 +8,20 @@
 const int kTile = 4;
 
 static float privateArray[kTile];
-//CHECK:     ^^^^^^^^^^^^ error E55219
+//CHECK:     ^^^^^^^^^^^^ error E55222
 //CHECK:     ^^^^^^^^^^^^ cannot size an array with a specialization constant
 
 struct Data
 {
     float values[kTile];
-//CHECK:  ^^^^^^ error E55219
+//CHECK:  ^^^^^^ error E55222
 //CHECK:  ^^^^^^ cannot size an array with a specialization constant
 }
 
 RWStructuredBuffer<Data> outputBuffer;
 
 void fill(out float result[kTile])
-//CHECK:            ^^^^^^ error E55219
+//CHECK:            ^^^^^^ error E55222
 //CHECK:            ^^^^^^ cannot size an array with a specialization constant
 {
     for (int i = 0; i < kTile; i++)
@@ -33,7 +33,7 @@ void fill(out float result[kTile])
 void computeMain(uint tid: SV_DispatchThreadID)
 {
     float local[kTile];
-//CHECK:  ^^^^^ error E55219
+//CHECK:  ^^^^^ error E55222
 //CHECK:  ^^^^^ cannot size an array with a specialization constant
     fill(local);
 

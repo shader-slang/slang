@@ -8,13 +8,13 @@
 const int kTile = 4;
 
 groupshared float tile[kTile];
-//CHECK:          ^^^^ error E55219
+//CHECK:          ^^^^ error E55222
 //CHECK:          ^^^^ cannot size an array with a specialization constant
 
 struct Data
 {
     float values[kTile];
-//CHECK:  ^^^^^^ error E55219
+//CHECK:  ^^^^^^ error E55222
 //CHECK:  ^^^^^^ cannot size an array with a specialization constant
 }
 
@@ -23,7 +23,7 @@ struct Box<T>
 {
     T value;
 /*CHECK:
-      ^^^^^ error E55219
+      ^^^^^ error E55222
       ^^^^^ cannot size an array with a specialization constant
 */
 }
@@ -35,7 +35,7 @@ RWStructuredBuffer<Data> outputBuffer;
 void computeMain(uint gi: SV_GroupIndex)
 {
     float local[kTile];
-//CHECK:  ^^^^^ error E55219
+//CHECK:  ^^^^^ error E55222
 //CHECK:  ^^^^^ cannot size an array with a specialization constant
     for (int i = 0; i < kTile; i++)
         local[i] = i;

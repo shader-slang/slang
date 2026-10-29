@@ -3,7 +3,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute -warnings-disable 39019
 
-// CHECK-NOT: E55219
+// CHECK-NOT: E55222
 // CHECK: [numthreads(1, 1, 1)]
 
 [SpecializationConstant]
