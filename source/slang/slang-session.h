@@ -297,6 +297,11 @@ public:
 
     Expr* parseTermString(String str, Scope* scope);
 
+    /// Specializes the existential payload slots in a reflected type.
+    ///
+    /// Forms a proper base type using the session's language-version rules before collecting slots.
+    /// Payloads must be concrete conforming types or the dynamic-dispatch marker.
+    /// Returns null with diagnostics in `sink` when conversion or payload conformance fails.
     Type* specializeType(
         Type* unspecializedType,
         Int argCount,
@@ -423,11 +428,21 @@ public:
 
     void setFileSystem(ISlangFileSystem* fileSystem);
 
+    /// Applies checked arguments to a reflected generic declaration.
+    ///
+    /// Returns the declaration reference selected by checking, or an empty reference for a
+    /// non-declaration result. Semantic errors are reported to `sink`; a returned reference
+    /// may be a recovery result.
     DeclRef<Decl> specializeGeneric(
         DeclRef<Decl> declRef,
         List<Expr*> argExprs,
         DiagnosticSink* sink);
 
+    /// Resolves a reflected function as a call with hypothetical arguments of the given types.
+    ///
+    /// Forms proper argument types using the session's language-version rules, then uses normal
+    /// call inference, including opening existential arguments. Returns an empty reference on
+    /// error.
     DeclRef<Decl> specializeWithArgTypes(
         Expr* funcExpr,
         List<Type*> argTypes,

@@ -800,6 +800,11 @@ extern "C"
     SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(
         SlangReflectionFunction* func,
         SlangReflectionGeneric* generic);
+    /** Resolve `func` as a call with arguments of `argTypes`, returning null on failure.
+
+        Interface arguments implicitly become existential-box types through Slang 2026;
+        Slang 202c requires explicit `dyn` types. Call inference opens existential arguments.
+     */
     SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(
         SlangReflectionFunction* func,
         SlangInt argTypeCount,
@@ -1030,6 +1035,14 @@ extern "C"
      */
     SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
 
+    /** Specialize the existential payload slots in `type`.
+
+        Payload arguments must be concrete conforming types or the dynamic-dispatch marker
+        returned by `ISession::getDynamicType`.
+        The base uses the same interface conversion rules as `spReflection_GetTypeLayout`.
+        Interface contracts and existential boxes cannot be concrete payload arguments.
+        Returns null on failure, with diagnostics in `outDiagnostics` when requested.
+     */
     SLANG_API SlangReflectionType* spReflection_specializeType(
         SlangReflection* reflection,
         SlangReflectionType* type,
@@ -1037,6 +1050,16 @@ extern "C"
         SlangReflectionType* const* specializationArgs,
         ISlangBlob** outDiagnostics);
 
+    /** Specialize a generic declaration with explicit arguments.
+
+        Type arguments follow the session's data-type conversion rules: interface metadata
+        implicitly becomes its existential-box type through Slang 2026; Slang 202c requires
+        explicit `dyn` types. Constraints apply directly to the resulting explicit type arguments.
+        `spReflectionFunction_specializeWithArgTypes` performs call inference, which can open
+        existential boxes to infer their payload types.
+        Returns null for semantic errors or when specialization does not produce a completed
+        declaration. Semantic errors are reported in `outDiagnostics` when requested.
+     */
     SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
         SlangReflection* inProgramLayout,
         SlangReflectionGeneric* generic,

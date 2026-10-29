@@ -931,6 +931,7 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
         linkage->m_optionSet.getLanguageVersion(),
         sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
+    auto errorCountBefore = sink->getErrorCount();
     type = visitor.TranslateTypeNode(typeExpr);
     // Type lookup also supplies interface metadata to conformance APIs. Default completion must
     // preserve that category; callers that need stored data perform proper-type coercion
@@ -938,6 +939,11 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
     Type* completedType = nullptr;
     if (visitor.coerceToAliasableTypeImpl(TypeExp(typeExpr, type), &completedType, nullptr))
         type = completedType;
+
+    // Generic checking can retain an error argument in a recovery type. We return and cache
+    // a type only when this query adds no semantic errors.
+    if (sink->getErrorCount() > errorCountBefore)
+        return nullptr;
 
     if (type)
     {

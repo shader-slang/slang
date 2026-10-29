@@ -527,3 +527,541 @@ SLANG_UNIT_TEST(existentialBoxReflectionIdentityAndSpecialization)
             (const char*)legacyInterfaceRTTIName->getBufferPointer(),
             (const char*)legacyParameterRTTIName->getBufferPointer()) == 0);
 }
+
+namespace
+{
+// Each case uses a fresh session so language-version policy cannot leak through reflection caches.
+static const SlangLanguageVersion kExistentialReflectionVersions[] = {
+    SLANG_LANGUAGE_VERSION_LEGACY,
+    SLANG_LANGUAGE_VERSION_2025,
+    SLANG_LANGUAGE_VERSION_2026,
+    SLANG_LANGUAGE_VERSION_202C};
+
+// A session and module containing both interface contracts and proper existential types.
+struct ExistentialReflectionFixture
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    ComPtr<slang::ISession> session;
+    slang::IModule* module = nullptr;
+    slang::ProgramLayout* layout = nullptr;
+
+    // Loads the same declarations under `version`; only proper-type consumers apply its policy.
+    void initialize(SlangLanguageVersion version)
+    {
+        const char* source = R"(
+            public interface IFoo {}
+            public interface IRefined : IFoo {}
+            public interface IGeneric<T> {}
+            public struct Foo : IFoo {}
+            public struct NotFoo {}
+            public struct Wrapper<T> { T value; }
+            public struct GenericBox<T> { dyn IGeneric<T> value; }
+            public typealias Alias = IFoo;
+            public void consume(dyn IFoo value) {}
+            public T identity<T>(T value) { return value; }
+            public int constrained<T : IFoo>(T value) { return 0; }
+        )";
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+        slang::CompilerOptionEntry languageVersion = {};
+        languageVersion.name = slang::CompilerOptionName::LanguageVersion;
+        languageVersion.value.kind = slang::CompilerOptionValueKind::Int;
+        languageVersion.value.intValue0 = version;
+        slang::TargetDesc target = {};
+        target.format = SLANG_HLSL;
+        target.profile = globalSession->findProfile("sm_5_0");
+        slang::SessionDesc desc = {};
+        desc.targetCount = 1;
+        desc.targets = &target;
+        desc.compilerOptionEntryCount = 1;
+        desc.compilerOptionEntries = &languageVersion;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->createSession(desc, session.writeRef())));
+
+        ComPtr<slang::IBlob> diagnostics;
+        module = session->loadModuleFromSourceString(
+            "existentialReflectionConsumers",
+            "existential-reflection-consumers.slang",
+            source,
+            diagnostics.writeRef());
+        if (!module)
+        {
+            if (diagnostics)
+            {
+                fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+            }
+        }
+        SLANG_CHECK_ABORT(module != nullptr);
+        layout = module->getLayout();
+        SLANG_CHECK_ABORT(layout != nullptr);
+    }
+};
+
+// Checks classification and names together, including reconstruction from the public full name.
+static void checkExistentialReflectionType(
+    slang::ProgramLayout* layout,
+    slang::TypeReflection* type,
+    slang::TypeReflection::Kind kind,
+    const char* name,
+    const char* fullName)
+{
+    SLANG_CHECK_ABORT(type != nullptr);
+    SLANG_CHECK(type->getKind() == kind);
+    SLANG_CHECK_ABORT(type->getName() != nullptr);
+    SLANG_CHECK(strcmp(type->getName(), name) == 0);
+    ComPtr<slang::IBlob> reflectedName;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(type->getFullName(reflectedName.writeRef())));
+    SLANG_CHECK_ABORT(reflectedName != nullptr);
+    auto text = (const char*)reflectedName->getBufferPointer();
+    SLANG_CHECK(strcmp(text, fullName) == 0);
+    SLANG_CHECK(layout->findTypeByName(text) == type);
+}
+
+// Checks that inference opens an existential argument and uses that payload consistently.
+// Each call creates its own opening, so we compare the return and parameter within one call.
+static void checkExistentialArgumentInference(
+    slang::ProgramLayout* layout,
+    slang::TypeReflection* argumentType)
+{
+    SLANG_CHECK_ABORT(argumentType != nullptr);
+    auto contract = layout->findTypeByName("IFoo");
+    auto box = layout->findTypeByName("dyn IFoo");
+    auto intType = layout->findTypeByName("int");
+    SLANG_CHECK_ABORT(contract != nullptr);
+    SLANG_CHECK_ABORT(box != nullptr);
+    SLANG_CHECK_ABORT(intType != nullptr);
+    slang::TypeReflection* arguments[] = {argumentType};
+    auto identity = layout->findFunctionByName("identity");
+    auto constrained = layout->findFunctionByName("constrained");
+    SLANG_CHECK_ABORT(identity != nullptr);
+    SLANG_CHECK_ABORT(constrained != nullptr);
+    auto resolvedIdentity = identity->specializeWithArgTypes(1, arguments);
+    SLANG_CHECK_ABORT(resolvedIdentity != nullptr);
+    auto openedType = resolvedIdentity->getReturnType();
+    SLANG_CHECK_ABORT(openedType != nullptr);
+    SLANG_CHECK_ABORT(resolvedIdentity->getParameterCount() == 1);
+    auto parameter = resolvedIdentity->getParameterByIndex(0);
+    SLANG_CHECK_ABORT(parameter != nullptr);
+    SLANG_CHECK(openedType == parameter->getType());
+    SLANG_CHECK(openedType != argumentType);
+    SLANG_CHECK(openedType != contract);
+    SLANG_CHECK(openedType != box);
+    SLANG_CHECK(layout->isSubType(openedType, contract));
+
+    // The opened payload supplies conformance for calls without making the box itself conform.
+    auto resolvedConstrained = constrained->specializeWithArgTypes(1, arguments);
+    SLANG_CHECK_ABORT(resolvedConstrained != nullptr);
+    SLANG_CHECK(resolvedConstrained->getReturnType() == intType);
+}
+} // namespace
+
+// Interface declaration queries agree for raw and boxed types without erasing box identity.
+// Nested `Optional` types additionally distinguish semantic types from physical layout types.
+SLANG_UNIT_TEST(existentialBoxReflectionMetadataAndNestedLayout)
+{
+    for (auto version : kExistentialReflectionVersions)
+    {
+        ExistentialReflectionFixture fixture;
+        fixture.initialize(version);
+        auto layout = fixture.layout;
+        auto raw = layout->findTypeByName("IFoo");
+        auto box = layout->findTypeByName("dyn IFoo");
+        checkExistentialReflectionType(
+            layout,
+            raw,
+            slang::TypeReflection::Kind::Interface,
+            "IFoo",
+            "IFoo");
+        checkExistentialReflectionType(
+            layout,
+            box,
+            slang::TypeReflection::Kind::Interface,
+            "IFoo",
+            "dyn IFoo");
+        SLANG_CHECK(raw != box);
+
+        // Generic arguments need proper types even when the outer lookup is metadata.
+        auto implicitWrapper = layout->findTypeByName("Wrapper<IFoo>");
+        auto explicitWrapper = layout->findTypeByName("Wrapper<dyn IFoo>");
+        SLANG_CHECK_ABORT(explicitWrapper != nullptr);
+        if (version == SLANG_LANGUAGE_VERSION_202C)
+        {
+            SLANG_CHECK(implicitWrapper == nullptr);
+            SLANG_CHECK(layout->findTypeByName("Wrapper<IFoo>") == nullptr);
+        }
+        else
+        {
+            SLANG_CHECK(implicitWrapper == explicitWrapper);
+        }
+
+        // Alias lookup preserves the contract/box distinction and the corresponding semantic type.
+        auto rawAlias = layout->findTypeByName("Alias");
+        auto boxedAlias = layout->findTypeByName("dyn Alias");
+        SLANG_CHECK_ABORT(rawAlias != nullptr);
+        SLANG_CHECK_ABORT(boxedAlias != nullptr);
+        SLANG_CHECK(rawAlias->getKind() == slang::TypeReflection::Kind::Interface);
+        SLANG_CHECK(boxedAlias->getKind() == slang::TypeReflection::Kind::Interface);
+        SLANG_CHECK(layout->isSubType(rawAlias, raw));
+        SLANG_CHECK(layout->isSubType(raw, rawAlias));
+        SLANG_CHECK(layout->isSubType(boxedAlias, box));
+        SLANG_CHECK(layout->isSubType(box, boxedAlias));
+        SLANG_CHECK(!layout->isSubType(boxedAlias, rawAlias));
+
+        // Generic-container queries project to the interface declaration but keep its arguments.
+        auto intType = layout->findTypeByName("int");
+        SLANG_CHECK_ABORT(intType != nullptr);
+        auto genericRaw = layout->findTypeByName("IGeneric<int>");
+        auto genericBox = layout->findTypeByName("dyn IGeneric<int>");
+        checkExistentialReflectionType(
+            layout,
+            genericRaw,
+            slang::TypeReflection::Kind::Interface,
+            "IGeneric",
+            "IGeneric<int>");
+        checkExistentialReflectionType(
+            layout,
+            genericBox,
+            slang::TypeReflection::Kind::Interface,
+            "IGeneric",
+            "dyn IGeneric<int>");
+        SLANG_CHECK(genericRaw != genericBox);
+        slang::TypeReflection* genericTypes[] = {genericRaw, genericBox};
+        for (auto type : genericTypes)
+        {
+            auto generic = type->getGenericContainer();
+            SLANG_CHECK_ABORT(generic != nullptr);
+            SLANG_CHECK_ABORT(generic->getName() != nullptr);
+            SLANG_CHECK(strcmp(generic->getName(), "IGeneric") == 0);
+            SLANG_CHECK_ABORT(generic->getTypeParameterCount() == 1);
+            SLANG_CHECK(generic->getConcreteType(generic->getTypeParameter(0)) == intType);
+        }
+
+        // Substituting `T` inside `dyn IGeneric<T>` preserves the box around the interface.
+        auto genericWrapper = layout->findTypeByName("GenericBox");
+        SLANG_CHECK_ABORT(genericWrapper != nullptr);
+        SLANG_CHECK_ABORT(genericWrapper->getFieldCount() == 1);
+        auto genericField = genericWrapper->getFieldByIndex(0);
+        SLANG_CHECK_ABORT(genericField != nullptr);
+        auto unspecializedBox = genericField->getType();
+        SLANG_CHECK_ABORT(unspecializedBox != nullptr);
+        slang::GenericArgType argKind = slang::GenericArgType::SLANG_GENERIC_ARG_TYPE;
+        slang::GenericArgReflection intArgument = {intType};
+        auto specializedGeneric = layout->specializeGeneric(
+            genericWrapper->getGenericContainer(),
+            1,
+            &argKind,
+            &intArgument,
+            nullptr);
+        SLANG_CHECK_ABORT(specializedGeneric != nullptr);
+        SLANG_CHECK(unspecializedBox->applySpecializations(specializedGeneric) == genericBox);
+
+        // `Optional<dyn IFoo>` remains a struct type even though layout uses the nullable box.
+        auto optional = layout->findTypeByName("Optional<dyn IFoo>");
+        auto nestedOptional = layout->findTypeByName("Optional<Optional<dyn IFoo>>");
+        auto wrapper = layout->findTypeByName("Wrapper<Optional<dyn IFoo>>");
+        checkExistentialReflectionType(
+            layout,
+            optional,
+            slang::TypeReflection::Kind::Struct,
+            "Optional",
+            "Optional<dyn IFoo>");
+        checkExistentialReflectionType(
+            layout,
+            nestedOptional,
+            slang::TypeReflection::Kind::Struct,
+            "Optional",
+            "Optional<Optional<dyn IFoo>>");
+        checkExistentialReflectionType(
+            layout,
+            wrapper,
+            slang::TypeReflection::Kind::Struct,
+            "Wrapper",
+            "Wrapper<Optional<dyn IFoo>>");
+        SLANG_CHECK(optional->getElementType() == nullptr);
+        auto optionalGeneric = optional->getGenericContainer();
+        SLANG_CHECK_ABORT(optionalGeneric != nullptr);
+        SLANG_CHECK_ABORT(optionalGeneric->getTypeParameterCount() == 1);
+        SLANG_CHECK(optionalGeneric->getConcreteType(optionalGeneric->getTypeParameter(0)) == box);
+        SLANG_CHECK_ABORT(wrapper->getFieldCount() == 1);
+        auto wrapperField = wrapper->getFieldByIndex(0);
+        SLANG_CHECK_ABORT(wrapperField != nullptr);
+        SLANG_CHECK(wrapperField->getType() == optional);
+
+        auto boxLayout = layout->getTypeLayout(box);
+        auto optionalLayout = layout->getTypeLayout(optional);
+        SLANG_CHECK_ABORT(boxLayout != nullptr);
+        SLANG_CHECK_ABORT(optionalLayout != nullptr);
+        SLANG_CHECK(boxLayout->getType() == box);
+        SLANG_CHECK(boxLayout->getKind() == slang::TypeReflection::Kind::Interface);
+        SLANG_CHECK_ABORT(boxLayout->getName() != nullptr);
+        SLANG_CHECK(strcmp(boxLayout->getName(), "IFoo") == 0);
+        SLANG_CHECK(optionalLayout->getType() == box);
+        SLANG_CHECK(optionalLayout->getKind() == slang::TypeReflection::Kind::Interface);
+        SLANG_CHECK_ABORT(optionalLayout->getName() != nullptr);
+        SLANG_CHECK(strcmp(optionalLayout->getName(), "IFoo") == 0);
+        SLANG_CHECK(optionalLayout->getSize() == boxLayout->getSize());
+        SLANG_CHECK(optionalLayout->getAlignment() == boxLayout->getAlignment());
+        SLANG_CHECK(
+            optionalLayout->getSize(SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM) ==
+            boxLayout->getSize(SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM));
+        SLANG_CHECK(
+            optionalLayout->getSize(SLANG_PARAMETER_CATEGORY_EXISTENTIAL_OBJECT_PARAM) ==
+            boxLayout->getSize(SLANG_PARAMETER_CATEGORY_EXISTENTIAL_OBJECT_PARAM));
+        auto wrapperLayout = layout->getTypeLayout(wrapper);
+        SLANG_CHECK_ABORT(wrapperLayout != nullptr);
+        SLANG_CHECK_ABORT(wrapperLayout->getFieldCount() == 1);
+        auto wrapperFieldLayout = wrapperLayout->getFieldByIndex(0);
+        SLANG_CHECK_ABORT(wrapperFieldLayout != nullptr);
+        SLANG_CHECK(wrapperFieldLayout->getType() == optional);
+        auto optionalFieldLayout = wrapperFieldLayout->getTypeLayout();
+        SLANG_CHECK_ABORT(optionalFieldLayout != nullptr);
+        SLANG_CHECK(optionalFieldLayout->getType() == box);
+    }
+}
+
+// Proper-type API arguments form canonical boxes through 2026 and require explicit `dyn` in 202c.
+SLANG_UNIT_TEST(existentialBoxReflectionProperTypeConsumers)
+{
+    for (auto version : kExistentialReflectionVersions)
+    {
+        ExistentialReflectionFixture fixture;
+        fixture.initialize(version);
+        auto layout = fixture.layout;
+        auto raw = layout->findTypeByName("IFoo");
+        auto box = layout->findTypeByName("dyn IFoo");
+        SLANG_CHECK_ABORT(raw != nullptr);
+        SLANG_CHECK_ABORT(box != nullptr);
+
+        // Function calls open boxed arguments; raw metadata must enter through the same rule.
+        auto refined = layout->findTypeByName("IRefined");
+        auto refinedBox = layout->findTypeByName("dyn IRefined");
+        SLANG_CHECK_ABORT(refined != nullptr);
+        SLANG_CHECK_ABORT(refinedBox != nullptr);
+        checkExistentialArgumentInference(layout, box);
+        checkExistentialArgumentInference(layout, refinedBox);
+        slang::TypeReflection* contracts[] = {raw, refined};
+        for (auto contract : contracts)
+        {
+            if (version == SLANG_LANGUAGE_VERSION_202C)
+            {
+                slang::TypeReflection* arguments[] = {contract};
+                auto identity = layout->findFunctionByName("identity");
+                SLANG_CHECK_ABORT(identity != nullptr);
+                SLANG_CHECK(identity->specializeWithArgTypes(1, arguments) == nullptr);
+            }
+            else
+            {
+                checkExistentialArgumentInference(layout, contract);
+            }
+        }
+
+        // Layout and all four container kinds use the same proper-type policy.
+        auto rawLayout = layout->getTypeLayout(raw);
+        auto sessionRawLayout = fixture.session->getTypeLayout(raw);
+        if (version == SLANG_LANGUAGE_VERSION_202C)
+        {
+            SLANG_CHECK(rawLayout == nullptr);
+            SLANG_CHECK(sessionRawLayout == nullptr);
+        }
+        else
+        {
+            SLANG_CHECK_ABORT(rawLayout != nullptr);
+            SLANG_CHECK_ABORT(sessionRawLayout != nullptr);
+            SLANG_CHECK(rawLayout->getType() == box);
+            SLANG_CHECK(sessionRawLayout->getType() == box);
+        }
+        SLANG_CHECK(fixture.session->getContainerType(raw, slang::ContainerType::None) == raw);
+        slang::ContainerType containers[] = {
+            slang::ContainerType::UnsizedArray,
+            slang::ContainerType::StructuredBuffer,
+            slang::ContainerType::ConstantBuffer,
+            slang::ContainerType::ParameterBlock};
+        for (auto container : containers)
+        {
+            auto explicitContainer = fixture.session->getContainerType(box, container);
+            auto implicitContainer = fixture.session->getContainerType(raw, container);
+            SLANG_CHECK_ABORT(explicitContainer != nullptr);
+            SLANG_CHECK(explicitContainer->getElementType() == box);
+            auto containerLayout = fixture.session->getTypeLayout(explicitContainer);
+            SLANG_CHECK_ABORT(containerLayout != nullptr);
+            auto elementLayout = containerLayout->getElementTypeLayout();
+            SLANG_CHECK_ABORT(elementLayout != nullptr);
+            SLANG_CHECK(elementLayout->getType() == box);
+            if (version == SLANG_LANGUAGE_VERSION_202C)
+            {
+                SLANG_CHECK(implicitContainer == nullptr);
+            }
+            else
+            {
+                SLANG_CHECK(implicitContainer == explicitContainer);
+            }
+        }
+
+        // Explicit generic arguments pass through the same rule before their substitution is kept.
+        auto wrapper = layout->findTypeByName("Wrapper");
+        SLANG_CHECK_ABORT(wrapper != nullptr);
+        slang::GenericArgType argKind = slang::GenericArgType::SLANG_GENERIC_ARG_TYPE;
+        slang::GenericArgReflection rawArg = {raw};
+        auto specializedGeneric =
+            layout
+                ->specializeGeneric(wrapper->getGenericContainer(), 1, &argKind, &rawArg, nullptr);
+        if (version == SLANG_LANGUAGE_VERSION_202C)
+        {
+            SLANG_CHECK(specializedGeneric == nullptr);
+        }
+        else
+        {
+            SLANG_CHECK_ABORT(specializedGeneric != nullptr);
+            auto specializedWrapper = wrapper->applySpecializations(specializedGeneric);
+            SLANG_CHECK_ABORT(specializedWrapper != nullptr);
+            SLANG_CHECK_ABORT(specializedWrapper->getFieldCount() == 1);
+            auto field = specializedWrapper->getFieldByIndex(0);
+            SLANG_CHECK_ABORT(field != nullptr);
+            SLANG_CHECK(field->getType() == box);
+        }
+
+        // Explicit generic arguments do not use call-site opening to satisfy a constraint.
+        auto constrained = layout->findFunctionByName("constrained");
+        SLANG_CHECK_ABORT(constrained != nullptr);
+        slang::TypeReflection* invalidGenericArguments[] = {raw, refined, box, refinedBox};
+        for (auto type : invalidGenericArguments)
+        {
+            slang::GenericArgReflection argument = {type};
+            SLANG_CHECK(
+                layout->specializeGeneric(
+                    constrained->getGenericContainer(),
+                    1,
+                    &argKind,
+                    &argument,
+                    nullptr) == nullptr);
+        }
+    }
+}
+
+// Both public type-specialization APIs convert the base before finding its concrete payload slot.
+SLANG_UNIT_TEST(existentialBoxReflectionBaseSpecialization)
+{
+    for (auto version : kExistentialReflectionVersions)
+    {
+        ExistentialReflectionFixture fixture;
+        fixture.initialize(version);
+        auto layout = fixture.layout;
+        auto raw = layout->findTypeByName("IFoo");
+        auto box = layout->findTypeByName("dyn IFoo");
+        auto concrete = layout->findTypeByName("Foo");
+        SLANG_CHECK_ABORT(raw != nullptr);
+        SLANG_CHECK_ABORT(box != nullptr);
+        SLANG_CHECK_ABORT(concrete != nullptr);
+        auto argument = slang::SpecializationArg::fromType(concrete);
+        slang::TypeReflection* arguments[] = {concrete};
+        ComPtr<slang::IBlob> diagnostics;
+        auto sessionExplicit = fixture.session->specializeType(box, &argument, 1);
+        auto programExplicit = layout->specializeType(box, 1, arguments, nullptr);
+        SLANG_CHECK_ABORT(sessionExplicit != nullptr);
+        SLANG_CHECK_ABORT(programExplicit != nullptr);
+        SLANG_CHECK(sessionExplicit == programExplicit);
+        SLANG_CHECK(sessionExplicit->getKind() == slang::TypeReflection::Kind::Specialized);
+        auto reflected = (SlangReflectionType*)sessionExplicit;
+        SLANG_CHECK(spReflectionType_getSpecializedTypeArgCount(reflected) == 1);
+        SLANG_CHECK(
+            spReflectionType_getSpecializedTypeArgType(reflected, 0) ==
+            (SlangReflectionType*)concrete);
+        SLANG_CHECK(fixture.session->getTypeLayout(sessionExplicit) != nullptr);
+        SLANG_CHECK(layout->getTypeLayout(programExplicit) != nullptr);
+
+        auto sessionImplicit =
+            fixture.session->specializeType(raw, &argument, 1, diagnostics.writeRef());
+        auto programImplicit = layout->specializeType(raw, 1, arguments, nullptr);
+        if (version == SLANG_LANGUAGE_VERSION_202C)
+        {
+            SLANG_CHECK(sessionImplicit == nullptr);
+            SLANG_CHECK(programImplicit == nullptr);
+            SLANG_CHECK(diagnostics != nullptr);
+        }
+        else
+        {
+            SLANG_CHECK(sessionImplicit == sessionExplicit);
+            SLANG_CHECK(programImplicit == programExplicit);
+        }
+
+        // A converted base does not relax payload conformance: boxes and unrelated structs fail.
+        slang::TypeReflection* invalidPayloads[] = {raw, box, layout->findTypeByName("NotFoo")};
+        for (auto payload : invalidPayloads)
+        {
+            SLANG_CHECK_ABORT(payload != nullptr);
+            auto invalidArgument = slang::SpecializationArg::fromType(payload);
+            slang::TypeReflection* invalidArguments[] = {payload};
+            SLANG_CHECK(fixture.session->specializeType(box, &invalidArgument, 1) == nullptr);
+            SLANG_CHECK(layout->specializeType(box, 1, invalidArguments, nullptr) == nullptr);
+        }
+    }
+}
+
+// Conformance creation interprets its target as an interface role, but needs a real implementation.
+SLANG_UNIT_TEST(existentialBoxReflectionConformanceComponents)
+{
+    for (auto version : kExistentialReflectionVersions)
+    {
+        ExistentialReflectionFixture fixture;
+        fixture.initialize(version);
+        auto layout = fixture.layout;
+        auto raw = layout->findTypeByName("IFoo");
+        auto box = layout->findTypeByName("dyn IFoo");
+        auto concrete = layout->findTypeByName("Foo");
+        auto unrelated = layout->findTypeByName("NotFoo");
+        auto consume = layout->findFunctionByName("consume");
+        SLANG_CHECK_ABORT(raw != nullptr);
+        SLANG_CHECK_ABORT(box != nullptr);
+        SLANG_CHECK_ABORT(concrete != nullptr);
+        SLANG_CHECK_ABORT(unrelated != nullptr);
+        SLANG_CHECK_ABORT(consume != nullptr);
+        SLANG_CHECK_ABORT(consume->getParameterCount() == 1);
+        auto parameter = consume->getParameterByIndex(0);
+        SLANG_CHECK_ABORT(parameter != nullptr);
+        auto parameterType = parameter->getType();
+        SLANG_CHECK_ABORT(parameterType != nullptr);
+        SLANG_CHECK(parameterType == box);
+
+        // Hosts can recover the target from lookup, an alias, or a shader function parameter.
+        slang::TypeReflection* targets[] =
+            {raw, box, layout->findTypeByName("dyn Alias"), parameterType};
+        for (auto target : targets)
+        {
+            SLANG_CHECK_ABORT(target != nullptr);
+            ComPtr<slang::ITypeConformance> conformance;
+            SLANG_CHECK(SLANG_SUCCEEDED(fixture.session->createTypeConformanceComponentType(
+                concrete,
+                target,
+                conformance.writeRef(),
+                -1,
+                nullptr)));
+            SLANG_CHECK(conformance != nullptr);
+            conformance = nullptr;
+            SLANG_CHECK(SLANG_FAILED(fixture.session->createTypeConformanceComponentType(
+                unrelated,
+                target,
+                conformance.writeRef(),
+                -1,
+                nullptr)));
+            SLANG_CHECK(conformance == nullptr);
+        }
+
+        // Contract equality and refinement do not supply runtime implementation witnesses.
+        slang::TypeReflection* invalidImplementations[] =
+            {raw, layout->findTypeByName("IRefined"), box, layout->findTypeByName("dyn IRefined")};
+        for (auto implementation : invalidImplementations)
+        {
+            SLANG_CHECK_ABORT(implementation != nullptr);
+            ComPtr<slang::ITypeConformance> conformance;
+            SLANG_CHECK(SLANG_FAILED(fixture.session->createTypeConformanceComponentType(
+                implementation,
+                raw,
+                conformance.writeRef(),
+                -1,
+                nullptr)));
+            SLANG_CHECK(conformance == nullptr);
+        }
+        SLANG_CHECK(layout->isSubType(concrete, raw));
+        SLANG_CHECK(!layout->isSubType(concrete, box));
+        SLANG_CHECK(!layout->isSubType(box, raw));
+    }
+}
