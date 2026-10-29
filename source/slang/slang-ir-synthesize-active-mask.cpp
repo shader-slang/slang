@@ -695,6 +695,97 @@ struct SynthesizeActiveMaskForFunctionContext
                 }
             }
         }
+
+        // Reachability alone is not enough. Consider this example:
+        //
+        //      for (uint k = 0; k < 4; k++)
+        //      {
+        //          if (tid.x < 4)
+        //              sum++;
+        //          else
+        //              break;
+        //          sum += WaveActiveSum(tid.x);
+        //      }
+        //      GroupMemoryBarrierWithGroupSync();
+        //
+        // The `else` block cannot reach a use of the active mask, but its lanes
+        // still leave the `if` region, whose `then` block reconverges into the
+        // rest of the loop body with `waveMaskBallot(activeMaskOnEntry, true)`.
+        // The exit ballots of a region are one collective spread over all of the
+        // edges that leave it: every lane that entered the region executes exactly
+        // one of them, and a lane waits in its ballot until every other lane of
+        // `activeMaskOnEntry` has executed one. If we skipped the `else` block,
+        // lanes 0-3 would wait in their ballot for lanes that are waiting at the
+        // barrier, and the kernel would never finish.
+        //
+        // We therefore also mark every block inside a structured region whose entry
+        // is marked, so that the region walk emits an exit ballot on every edge that
+        // leaves the region. Marking can make a block a new region entry, so we keep
+        // going until no block is added.
+        //
+        List<IRBlock*> workList;
+        for (auto block : m_func->getBlocks())
+        {
+            if (m_blocksNeedingActiveMask.contains(block))
+                workList.add(block);
+        }
+        for (Index i = 0; i < workList.getCount(); ++i)
+        {
+            markBlocksInStructuredRegion(workList[i], workList);
+        }
+    }
+
+    // If `block` ends in a structured control-flow instruction, mark every
+    // reachable block inside the region that the instruction introduces, and
+    // add each newly marked block to `ioNewlyMarked`.
+    //
+    // The region is the same one that `transformRegion()` builds for the
+    // terminator: blocks dominated by the region's entry but not by its merge
+    // block. For a `loop`, the region starts at the loop header and the `break`
+    // label is its merge block; the region for a single iteration is nested
+    // inside it and needs no separate handling. We do not look at the merge
+    // blocks of the enclosing regions, so the set can include extra blocks after
+    // an enclosing merge point. Marking such a block does not affect correctness;
+    // it only means the region walk processes code that it could have skipped.
+    //
+    void markBlocksInStructuredRegion(IRBlock* block, List<IRBlock*>& ioNewlyMarked)
+    {
+        IRBlock* regionEntry = nullptr;
+        IRBlock* mergeBlock = nullptr;
+        auto terminator = block->getTerminator();
+        switch (terminator->getOp())
+        {
+        case kIROp_IfElse:
+            regionEntry = block;
+            mergeBlock = cast<IRIfElse>(terminator)->getAfterBlock();
+            break;
+        case kIROp_Switch:
+            regionEntry = block;
+            mergeBlock = cast<IRSwitch>(terminator)->getBreakLabel();
+            break;
+        case kIROp_Loop:
+            regionEntry = cast<IRLoop>(terminator)->getTargetBlock();
+            mergeBlock = cast<IRLoop>(terminator)->getBreakBlock();
+            break;
+        default:
+            return;
+        }
+
+        List<IRBlock*> stack;
+        stack.add(regionEntry);
+        while (stack.getCount())
+        {
+            auto candidate = stack.getLast();
+            stack.removeLast();
+            if (dominates(mergeBlock, candidate))
+                continue;
+
+            if (m_blocksNeedingActiveMask.add(candidate))
+                ioNewlyMarked.add(candidate);
+
+            for (auto child : m_dominatorTree->getImmediatelyDominatedBlocks(candidate))
+                stack.add(child);
+        }
     }
 
     // As described previously, our main goal in this pass is to associated an
@@ -2036,8 +2127,18 @@ struct SynthesizeActiveMaskForFunctionContext
         // need or use the active mask (even to pass along to their
         // successors).
         //
+        // `markBlocksNeedingActiveMask()` marks every reachable block inside a
+        // structured region whose entry is marked, so an unmarked block is either
+        // unreachable (such as the `continue` block of a loop that never
+        // continues) or outside of all structured regions, where the merge block
+        // is the null one of the function body. Skipping a reachable block inside
+        // a structured region would leave that region's exit ballots incomplete.
+        //
         if (!doesBlockNeedActiveMask(regionEntry))
+        {
+            SLANG_ASSERT(!parentRegion->mergeBlock || m_dominatorTree->isUnreachable(regionEntry));
             return;
+        }
 
         // An important invariant of our approach is that before a child
         // region is processed, an active mask value will have been
