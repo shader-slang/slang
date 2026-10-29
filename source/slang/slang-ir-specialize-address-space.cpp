@@ -17,10 +17,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     HashSet<IRFunc*> functionsToConsiderRemoving;
     DiagnosticSink* sink = nullptr;
 
-    // Exported originals whose parameters were given the target's default address space. The
-    // dead-function sweep keeps them; clones are not in this set.
-    HashSet<IRFunc*> seededExportedFuncs;
-
     // Reconciled contained address space of each local pointer slot (`Var`/`DebugVar`). A
     // load of one slot stored into another resolves to the source slot's *reconciled* space
     // (see `getStoredValueAddrSpace`), so the slot-reconciliation fixpoint converges
@@ -440,42 +436,31 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
     }
 
-    static bool isExportedFunc(IRFunc* func)
-    {
-        return func->findDecoration<IRHLSLExportDecoration>() != nullptr ||
-               func->findDecoration<IRPublicDecoration>() != nullptr;
-    }
-
-    // An exported function may lack a call site from which to infer pointer address spaces.
-    bool assignDefaultAddressSpaceToExportedParams(IRFunc* func, AddressSpace defaultAddrSpace)
+    // Gives every `Generic` pointer parameter of the exported function `func` the address space
+    // `defaultAddrSpace`, and registers `func` as its own specialization for the address spaces
+    // of its parameters. An exported function may have no call site to infer those address
+    // spaces from. Because of the registration, a call whose arguments have the same address
+    // spaces reuses `func` instead of cloning an identical copy of it.
+    void seedExportedFunc(IRFunc* func, AddressSpace defaultAddrSpace)
     {
         IRBuilder builder(module);
         bool changed = false;
+        List<AddressSpace> paramAddrSpaces;
         for (auto param : func->getParams())
         {
-            if (mapInstToAddrSpace.containsKey(param))
-                continue;
+            auto addrSpace = getAddressSpaceFromVarType(param->getDataType());
             auto ptrType = as<IRPtrTypeBase>(param->getFullType());
-            if (!ptrType || ptrType->getAddressSpace() != AddressSpace::Generic)
-                continue;
-            setPointerParamAddrSpace(builder, param, ptrType, defaultAddrSpace);
-            changed = true;
+            if (ptrType && addrSpace == AddressSpace::Generic)
+            {
+                setPointerParamAddrSpace(builder, param, ptrType, defaultAddrSpace);
+                addrSpace = defaultAddrSpace;
+                changed = true;
+            }
+            paramAddrSpaces.add(addrSpace);
         }
         if (changed)
             fixUpFuncType(func);
-        return changed;
-    }
-
-    // Register a seeded exported function as its own specialization for the address spaces its
-    // parameters now carry, so that a call passing matching arguments reuses the exported
-    // function instead of cloning an identical copy of it.
-    void registerExportedFuncAsOwnSpecialization(IRFunc* func)
-    {
-        List<AddressSpace> paramAddrSpaces;
-        for (auto param : func->getParams())
-            paramAddrSpaces.add(getAddrSpace(param));
-        FuncSpecializationKey key(func, paramAddrSpaces);
-        functionSpecializations.addIfNotExists(key, func);
+        functionSpecializations.addIfNotExists(FuncSpecializationKey(func, paramAddrSpaces), func);
     }
 
     // Returns the concrete address space of a pointer-typed value once specialization has
@@ -732,22 +717,18 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             }
         }
 
-        // An export may be unreachable from entry points, so seed it independently.
-        // We visit value-only exports as well, because their bodies may call helpers with pointer
-        // parameters. Only an export whose own parameters were defaulted is registered and kept
-        // alive, because a clone made by an earlier pass can carry a copied export decoration.
+        // An exported function is kept alive even when no entry point reaches it, so the target's
+        // default address space is applied to every export here. Exports without pointer
+        // parameters are visited too, because their bodies may call functions that have them.
         if (exportedParamDefaultAddrSpace != AddressSpace::Generic)
         {
             for (auto globalInst : module->getGlobalInsts())
             {
                 auto func = as<IRFunc>(globalInst);
-                if (!func || !func->getFirstBlock() || !isExportedFunc(func))
+                if (!func || !func->getFirstBlock() ||
+                    !func->findDecoration<IRHLSLExportDecoration>())
                     continue;
-                if (assignDefaultAddressSpaceToExportedParams(func, exportedParamDefaultAddrSpace))
-                {
-                    registerExportedFuncAsOwnSpecialization(func);
-                    seededExportedFuncs.add(func);
-                }
+                seedExportedFunc(func, exportedParamDefaultAddrSpace);
                 workList.add(func);
             }
         }
@@ -799,10 +780,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         for (IRFunc* func : functionsToConsiderRemoving)
         {
             SLANG_ASSERT(!func->findDecoration<IREntryPointDecoration>());
-            // A seeded export is kept even when its only call now targets a clone. A clone is never
-            // in the set, so an unused clone is still removed.
-            if (seededExportedFuncs.contains(func))
-                continue;
             if (!func->hasUses())
                 func->removeAndDeallocate();
         }
