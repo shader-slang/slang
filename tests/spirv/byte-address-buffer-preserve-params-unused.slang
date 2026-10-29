@@ -3,8 +3,8 @@
 //TEST:SIMPLE(filecheck=OPT):-target spirv-asm -entry computeMain -stage compute -preserve-params
 
 // At -O0 with -preserve-params, every byte-address buffer that the shader declares but never
-// accesses is still declared in the SPIR-V, as the structured buffer that SPIR-V emission
-// translates it to. The shapes covered are a plain buffer, a read-write one, a
+// accesses is still declared in the SPIR-V, as the structured buffer that byte-address buffer
+// legalization translates it to. The shapes covered are a plain buffer, a read-write one, a
 // `globallycoherent` one, sized and unsized arrays, a field of a `ParameterBlock`, a field of a
 // global struct, and an entry-point `uniform` parameter. An indexed array is declared once, as
 // its translation, with no leftover byte-address buffer array (#14039).
@@ -69,8 +69,7 @@ uniform BufferAndValue bufferAndValue;
 // NEG-NOT: "usedArray"
 // NEG-NOT: OpDecorate %unusedRWBuffer NonWritable
 
-// With optimizations, the shader compiles. The optimizer removes unused variables, so only
-// the accessed buffers remain.
+// With optimizations, the shader still compiles and declares the indexed array.
 
 // OPT: OpEntryPoint GLCompute %computeMain "main"
 // OPT: %usedArray = OpVariable
