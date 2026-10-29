@@ -798,7 +798,7 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
-            if (inst->getDataType()->getOp() == kIROp_FloatType)
+            if (isFloatingType(inst->getDataType()))
             {
                 diagnoseFloatAtomic();
             }
@@ -816,7 +816,7 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
-            if (inst->getDataType()->getOp() == kIROp_FloatType)
+            if (isFloatingType(inst->getDataType()))
             {
                 diagnoseFloatAtomic();
             }

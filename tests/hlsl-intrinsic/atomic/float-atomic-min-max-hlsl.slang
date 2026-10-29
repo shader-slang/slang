@@ -1,5 +1,6 @@
 // HLSL has no floating-point atomic min/max, so float, half and double InterlockedMin/Max and
-// Atomic<T>.min/max report a Slang error instead of emitting HLSL that DXC rejects.
+// Atomic<T>.min/max report a Slang error instead of emitting HLSL that DXC rejects. Half and
+// double atomic add/sub get the same error that float add/sub already had.
 // https://github.com/shader-slang/slang/issues/14026
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -profile cs_6_6
@@ -47,6 +48,13 @@ void computeMain(uint tid: SV_DispatchThreadID)
     atomicFloatBuffer[2].reduceMin(float(tid));
 //CHECK:                          ^ error E55204
 //CHECK:                          ^ intrinsic operation 'floating point atomic operation' is not supported for the current target.
+
+    InterlockedAdd(halfBuffer[1], half(tid));
+//CHECK:          ^ error E55204
+//CHECK:          ^ intrinsic operation 'floating point atomic operation' is not supported for the current target.
+    atomicDoubleBuffer[1].sub(double(tid));
+//CHECK:                     ^ error E55204
+//CHECK:                     ^ intrinsic operation 'floating point atomic operation' is not supported for the current target.
 
     // Integer min/max are valid HLSL and must not be diagnosed.
     InterlockedMin(intBuffer[0], int(tid));
