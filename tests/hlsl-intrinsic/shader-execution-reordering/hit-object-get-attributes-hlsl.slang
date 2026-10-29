@@ -1,5 +1,7 @@
 // DXR 1.3 declares `template<attr_t> void dx::HitObject::GetAttributes(out attr_t Attributes)`;
-// NVAPI uses `NvGetAttributesFromHitObject(hitObject, attributes)`.
+// NVAPI uses `NvGetAttributesFromHitObject(hitObject, attributes)`. The DXR row checks the
+// out-parameter member call, the DXIL row checks that DXC accepts it, and the NVAPI row checks
+// that NVAPI still uses its free function.
 
 //TEST:SIMPLE(filecheck=DXR): -target hlsl -entry rayGenerationMain -stage raygeneration -profile sm_6_9 -capability ser_dxr
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-asm -entry rayGenerationMain -stage raygeneration -profile sm_6_9 -capability ser_dxr
@@ -23,7 +25,7 @@ void rayGenerationMain()
     MyPayload payload = { float4(0) };
     HitObject hit = HitObject::TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
 
-    // DXR: [[HIT:[a-zA-Z0-9_]+]].GetAttributes([[ATTR:[a-zA-Z0-9_]+]]);
+    // DXR: {{[a-zA-Z0-9_]+}}.GetAttributes({{[a-zA-Z0-9_]+}});
     // NVAPI: NvGetAttributesFromHitObject(({{.*}}), ({{.*}}));
     // DXIL: call void @dx.op.hitObject_Attributes
     MyAttributes attributes = hit.GetAttributes<MyAttributes>();

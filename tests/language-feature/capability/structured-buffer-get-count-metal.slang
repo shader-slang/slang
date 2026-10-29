@@ -1,4 +1,8 @@
-// Metal lowers structured buffers to bare device pointers without length metadata.
+// Capability inference must check a callee before it reads the callee's requirements.
+// sbGetCount (Metal lowers structured buffers to bare device pointers without length metadata)
+// and callsLaterSibling depend on that order; rwsbGetCount and sbGetDimensions are controls that
+// do not. Buffer<T>.getCount() compiles on Metal, where it lowers to get_width(), and is rejected
+// on C++, which has no implementation.
 // non-exhaustive: the "see definition of" notes point into hlsl.meta.slang.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=SB_COUNT,non-exhaustive): -target metal -entry sbGetCount -stage compute
@@ -6,6 +10,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=SB_DIMS,non-exhaustive): -target metal -entry sbGetDimensions -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=LATER_SIBLING,non-exhaustive): -target metal -entry callsLaterSibling -stage compute
 //TEST:SIMPLE(filecheck=METAL_BUFFER): -target metal -entry bufferGetCount -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CPP_BUFFER,non-exhaustive): -target cpp -entry bufferGetCount -stage compute
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry sbGetCount -stage compute
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry sbGetCount -stage compute
@@ -66,7 +71,9 @@ void sbGetDimensions(uint3 tid: SV_DispatchThreadID)
         output[tid.x] = input[tid.x];
 }
 
-// A method can call a sibling that the checker has not capability-checked yet.
+// A method can call a sibling that the checker has not capability-checked yet. `Box` is generic
+// because only a generic member reference reaches `second` through processDeclModifiers alone; a
+// non-generic `Box` reaches it through processReferencedDecl first and does not test that order.
 struct Box<T>
 {
     uint first() { return this.second(); }
@@ -88,6 +95,11 @@ void callsLaterSibling()
 
 [numthreads(1, 1, 1)]
 void bufferGetCount()
+/*CPP_BUFFER:
+     ^^^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^^^ entrypoint 'bufferGetCount' uses features that are not available in 'compute' stage for 'cpp' compilation target.
+*/
 {
     output[0] = typedInput.getCount();
+//CPP_BUFFER:              ^^^^^^^^ see using of 'getCount'
 }

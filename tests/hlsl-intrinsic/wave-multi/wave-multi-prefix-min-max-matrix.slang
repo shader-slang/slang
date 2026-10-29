@@ -4,13 +4,14 @@
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -capability cuda_sm_7_0 -compute -shaderobj
 
 // The matrix overloads of WaveMultiPrefix{Inclusive,Exclusive}{Min,Max} and WaveMaskPrefixMin/Max
-// apply the vector operation to each row.
+// apply the vector operation to each row. The -cuda row checks that the matrix overloads are
+// available on CUDA, like their scalar and vector forms.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 // The CUDA target has no matrix `==`, so compare row by row.
-bool equal(int2x3 a, int2x3 b)
+bool areEqual(int2x3 a, int2x3 b)
 {
     return all(a[0] == b[0]) & all(a[1] == b[1]);
 }
@@ -36,13 +37,13 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     let maskMin = WaveMaskPrefixMin(mask.x, value);
     let maskMax = WaveMaskPrefixMax(mask.x, value);
 
-    bool ok = equal(inclusiveMin, offset) & equal(inclusiveMax, value);
+    bool ok = areEqual(inclusiveMin, offset) & areEqual(inclusiveMax, value);
 
     // Lane 0 has no lower lanes, so its exclusive results are identity values that depend on `T`.
     if (lane > 0)
     {
-        ok = ok & equal(exclusiveMin, offset) & equal(exclusiveMax, previous) &
-             equal(maskMin, offset) & equal(maskMax, previous);
+        ok = ok & areEqual(exclusiveMin, offset) & areEqual(exclusiveMax, previous) &
+             areEqual(maskMin, offset) & areEqual(maskMax, previous);
     }
 
     outputBuffer[lane] = ok ? 1 : 0;
