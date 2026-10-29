@@ -250,9 +250,14 @@ class ResourceType : public BuiltinType
     SlangResourceShape getBaseShape();
     SlangResourceShape getShape();
     SlangResourceAccess getAccess();
-    /// Returns the original texel type argument, including any explicit format descriptor.
-    Type* getTexelType();
-    /// Returns the data type produced by loads and accepted by stores.
+    /// Returns the original first texture argument, Texel, which conforms to ITexelFormat.
+    /// For Texture2D<RGBA16F> this is RGBA16F; for Texture2D<float4> it is float4.
+    Type* getTexelFormatType();
+    /// Returns Texel.DataType, which satisfies ITexelElement and describes the whole
+    /// declared value type for loads and stores, including any type modifiers.
+    /// For Texture2D<RGBA16F> and Texture2D<float4>, this is float4, whereas
+    /// ITexelElement.Element is the scalar float. An ordinary unorm float4 argument
+    /// stays unorm float4 because its DataType is the original argument.
     Type* getElementType();
     void _toTextOverride(StringBuilder& out);
 };

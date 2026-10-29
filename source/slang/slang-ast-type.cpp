@@ -2380,17 +2380,16 @@ Type* BuiltinGenericType::getElementType() const
     return as<Type>(_getGenericTypeArg(getDeclRefBase(), 0));
 }
 
-Type* ResourceType::getTexelType()
+Type* ResourceType::getTexelFormatType()
 {
     return as<Type>(_getGenericTypeArg(this, 0));
 }
 
 Type* ResourceType::getElementType()
 {
-    // Consider `Texture2D<RGBA16F>`. Its first generic argument remains `RGBA16F` so
-    // generic inference can recover the public type argument. The checked `_Texture.T`
-    // alias holds `Texel.DataType`; substituting it through this texture declaration
-    // resolves the payload to `float4` using the ordinary conformance witness.
+    // Evaluate the checked _Texture.T = Texel.DataType alias using this resource's arguments.
+    // For example, Texel = RGBA16F makes T = float4. The alias supplies this mapping,
+    // so we do not need to repeat the library's format definitions here.
     auto astBuilder = getCurrentASTBuilder();
     auto elementTypeDecl =
         as<TypeDefDecl>(astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
@@ -2469,11 +2468,11 @@ void ResourceType::_toTextOverride(StringBuilder& out)
             return false;
         if (isShadow())
             return false;
-        auto texelType = getTexelType();
-        if (texelType)
+        auto texelFormatType = getTexelFormatType();
+        if (texelFormatType)
         {
             resultSB << "<";
-            resultSB << texelType->toString();
+            resultSB << texelFormatType->toString();
             auto sampleCount = _getGenericTypeArg(this, 4);
             if (auto constIntVal = as<ConstantIntVal>(sampleCount))
             {
