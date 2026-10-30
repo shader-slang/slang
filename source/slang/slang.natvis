@@ -274,7 +274,6 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SwitchStmt">(Slang::SwitchStmt*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::LoopStmt">(Slang::LoopStmt*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ForStmt">(Slang::ForStmt*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::UnscopedForStmt">(Slang::UnscopedForStmt*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::WhileStmt">(Slang::WhileStmt*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DoWhileStmt">(Slang::DoWhileStmt*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GpuForeachStmt">(Slang::GpuForeachStmt*)&amp;astNodeType</ExpandedItem>
