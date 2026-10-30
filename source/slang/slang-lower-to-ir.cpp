@@ -1569,14 +1569,24 @@ static String getLinkageName(IRGenContext* context, Decl* decl)
 
 /// Return the location to report a problem with `importedModuleDecl` at: the `import` in the
 /// module being lowered that brings it in, or `fallback` when it is only imported indirectly.
+/// The `import`s of an `__include`d file are members of that file's `FileDecl`, and every
+/// `FileDecl` is a direct member of the module, so those two levels hold every direct `import`.
 static SourceLoc findImportLoc(
     IRGenContext* context,
     ModuleDecl* importedModuleDecl,
     SourceLoc fallback)
 {
-    if (auto mainModuleDecl = context->getMainModuleDecl())
+    auto mainModuleDecl = context->getMainModuleDecl();
+    if (!mainModuleDecl)
+        return fallback;
+
+    List<ContainerDecl*> containers;
+    containers.add(mainModuleDecl);
+    for (auto fileDecl : mainModuleDecl->getMembersOfType<FileDecl>())
+        containers.add(fileDecl);
+    for (auto container : containers)
     {
-        for (auto importDecl : mainModuleDecl->getMembersOfType<ImportDecl>())
+        for (auto importDecl : container->getMembersOfType<ImportDecl>())
         {
             if (importDecl->importedModuleDecl == importedModuleDecl)
                 return importDecl->loc;
