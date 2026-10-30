@@ -34,12 +34,49 @@ U twice<U : IArithmetic>(U x) { return x.add(x); }
 T twiceFloat<T>(T a) where optional T : IFloat { return twice(a); }
 //CHECK:                                                     ^ type argument doesn't conform to interface
 
-// Only a check of the optional constraint itself counts: `T is IArithmetic` does not show
-// that the `T : IFloat` witness the operator would be looked up through exists.
+// Only a check of the optional constraint itself counts, because the operator would be looked
+// up through the `T : IFloat` witness, which a check of `IArithmetic` does not establish. (The
+// condition `T is IArithmetic` itself is folded to `true` here, a known limitation.)
 T divGuardedOnSuper<T>(T a, T b) where optional T : IFloat
 {
     if (T is IArithmetic)
         return a / b;
 //CHECK:         ^ no overload for '/'
     return a;
+}
+
+// An initializer is looked up through the constraint as well, so `T(1)` and `(T)1` need the same
+// check, whether the constraint names `IArithmetic` (which declares `__init(int)`) or inherits it.
+T makeDirect<T>(T a) where optional T : IArithmetic { return T(1); }
+//CHECK:                                                     ^ expected a function
+T castDirect<T>(T a) where optional T : IArithmetic { return (T)1; }
+//CHECK:                                                      ^ expected a function
+T makeFloat<T>(T a) where optional T : IFloat { return T(1); }
+//CHECK:                                               ^ expected a function
+T castFloat<T>(T a) where optional T : IFloat { return (T)1; }
+//CHECK:                                                ^ expected a function
+
+// Two optional constraints that both lead to `IArithmetic`: the facet keeps the proof through the
+// first one written, so only a check of that constraint makes `add` usable. This is a known
+// limitation; writing the constraints in the other order makes this body compile.
+T addTwoOptional<T>(T a, T b) where optional T : IFloat where optional T : IInteger
+{
+    if (T is IInteger)
+        return a.add(b);
+//CHECK:         ^^^ the constraint providing 'add' is optional
+    return a;
+}
+
+// Extensions are applied when a type's conformances are computed, with no enclosing statements,
+// so an extension that needs a conformance an optional constraint only inherits never applies to
+// `T`, even inside `if (T is IFloat)`. Naming the extension's interface directly in an optional
+// constraint behaves the same way.
+interface IOne { int one(); }
+extension<U : IArithmetic> U : IOne { int one() { return 1; } }
+int oneIfFloat<T>(T t) where optional T : IFloat
+{
+    if (T is IFloat)
+        return t.one();
+//CHECK:         ^^^ member not found
+    return 0;
 }

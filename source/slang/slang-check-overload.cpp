@@ -3092,7 +3092,12 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
     // from a value of the same type. There is no need in Slang for
     // "copy constructors" but the core module currently has to define
     // some just to make code that does, e.g., `float(1.0f)` work.)
-    LookupResult initializers = lookupConstructorsInType(type, context.sourceScope);
+    //
+    // An initializer reached through an `optional` constraint that is not checked here, as in
+    // `T(1)` under `where optional T : IArithmetic`, is dropped like any other member lookup
+    // through that constraint.
+    LookupResult initializers =
+        filterLookupResultByCheckedOptional(lookupConstructorsInType(type, context.sourceScope));
     AddOverloadCandidates(initializers, context);
 }
 

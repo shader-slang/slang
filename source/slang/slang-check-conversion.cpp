@@ -697,7 +697,10 @@ bool SemanticsVisitor::createCtorInvokeExprForAbstractType(
     if (!_canLookupConstructorsThroughAbstractType(toType))
         return false;
 
-    auto ctors = lookupConstructorsInType(toType, m_outerScope);
+    // Initializers reached through an unchecked `optional` constraint are dropped, as they are
+    // for `T(...)` in `AddTypeOverloadCandidates`.
+    auto ctors =
+        filterLookupResultByCheckedOptional(lookupConstructorsInType(toType, m_outerScope));
     if (!ctors.isValid())
         return false;
 
