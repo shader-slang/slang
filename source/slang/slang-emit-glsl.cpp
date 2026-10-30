@@ -2266,12 +2266,13 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
         return;
     _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference"));
 
+    // A block member cannot be `void`, so the buffer-reference block of a `void*` holds a `uint`,
+    // as direct SPIR-V does.
+    auto valueType = getPointerValueTypeForLayout(ptrType);
+
     auto ptrTypeName = getName(ptrType);
     IRSizeAndAlignment sizeAlignment;
-    getNaturalSizeAndAlignment(
-        m_codeGenContext->getTargetReq(),
-        ptrType->getValueType(),
-        &sizeAlignment);
+    getNaturalSizeAndAlignment(m_codeGenContext->getTargetReq(), valueType, &sizeAlignment);
     auto alignment = sizeAlignment.alignment;
     m_writer->emit("layout(buffer_reference, std430, buffer_reference_align = ");
     m_writer->emitInt64(alignment);
@@ -2280,7 +2281,7 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
     m_writer->emit("\n");
     m_writer->emit("{\n");
     m_writer->indent();
-    emitType((IRType*)ptrType->getValueType(), "_data");
+    emitType(valueType, "_data");
     m_writer->emit(";\n");
     m_writer->dedent();
     m_writer->emit("};\n");
@@ -2980,10 +2981,21 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_PtrLit:
         {
+            // GLSL has no null literal for a buffer reference, so we construct one from address
+            // zero. Only a user pointer is a buffer reference; any other pointer, such as a
+            // `groupshared` one, has no GLSL type to construct, so its null stays `0`.
             auto ptrType = as<IRPtrType>(inst->getDataType());
             if (ptrType)
             {
-                m_writer->emit("0");
+                SLANG_RELEASE_ASSERT(as<IRPtrLit>(inst)->getValue() == nullptr);
+                if (!isUserPointerType(ptrType))
+                {
+                    m_writer->emit("0");
+                    return true;
+                }
+                _requireBaseType(BaseType::UInt64);
+                emitType(ptrType);
+                m_writer->emit("(0UL)");
                 return true;
             }
             break;

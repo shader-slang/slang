@@ -5445,7 +5445,16 @@ void CLikeSourceEmitter::ensureGlobalInst(
     if (as<IRBasicType>(inst))
         return;
     if (as<IRPtrLit>(inst))
+    {
+        // A pointer literal is written inline at each use and has no declaration of its own. Only
+        // null pointer literals reach emission. `GLSLSourceEmitter::tryEmitInstExprImpl` spells a
+        // null user pointer as a constructor on its buffer-reference type, such as
+        // `BufferPointer_X(0UL)`, so on GLSL every use depends on that type. Other targets spell
+        // a null pointer `nullptr`, which names no type.
+        if (getSourceLanguage() == SourceLanguage::GLSL)
+            ensureInstOperand(ctx, inst->getFullType());
         return;
+    }
     // Certain inst ops will always emit as definition.
     switch (inst->getOp())
     {

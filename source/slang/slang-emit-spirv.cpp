@@ -2009,21 +2009,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return getTypeLayoutRuleForBuffer(m_targetProgram, ptrType);
     }
 
-    // SPIR-V pointer types require a concrete pointee. Emit IR void* as uint*
-    // for OpTypePointer emission and pointer-stride computation, while leaving
-    // the source IR type intact so emitDebugType reports the original void* in
-    // debug info.
-    IRType* getSpvPointerValueType(IRPtrTypeBase* ptrType)
-    {
-        auto valueType = ptrType->getValueType();
-        if (as<IRVoidType>(valueType))
-        {
-            IRBuilder builder(m_irModule);
-            return builder.getUIntType();
-        }
-        return valueType;
-    }
-
     IRIntegerValue getArrayElementStrideValue(IRArrayTypeBase* arrayType, IRTypeLayoutRules* rule)
     {
         auto elementType = arrayType->getElementType();
@@ -2052,7 +2037,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             storageClass != SpvStorageClassStorageBuffer)
             return 0;
 
-        auto valueType = getSpvPointerValueType(ptrType);
+        auto valueType = getPointerValueTypeForLayout(ptrType);
         auto rule = getPointerArrayStrideLayoutRule(ptrType, valueType);
 
         // Array pointees only ever serve element indexing, so use the element
@@ -2578,7 +2563,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     break;
                 }
 
-                auto valueType = getSpvPointerValueType(ptrType);
+                auto valueType = getPointerValueTypeForLayout(ptrType);
 
                 // Check for 8/16-bit storage capabilities when emitting pointer types
                 requireCapabilitiesForType(valueType, storageClass);
