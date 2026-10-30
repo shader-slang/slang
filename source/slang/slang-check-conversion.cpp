@@ -689,6 +689,20 @@ static bool _canLookupConstructorsThroughAbstractType(Type* type)
            as<LastPackElementType>(type) || as<PackBranchType>(type);
 }
 
+bool SemanticsVisitor::canTypeConformThroughOptionalConstraint(Type* type)
+{
+    // Only an abstract type gets conformances from its constraints, and the facets of its
+    // linearization carry the witnesses that lookups through them go through.
+    if (!_canLookupConstructorsThroughAbstractType(type))
+        return false;
+    for (auto facet : getShared()->getInheritanceInfo(type).facets)
+    {
+        if (findOptionalConstraintWitness(facet->subtypeWitness))
+            return true;
+    }
+    return false;
+}
+
 bool SemanticsVisitor::createCtorInvokeExprForAbstractType(
     Type* toType,
     InitializerListExpr* fromInitializerListExpr,
@@ -697,8 +711,8 @@ bool SemanticsVisitor::createCtorInvokeExprForAbstractType(
     if (!_canLookupConstructorsThroughAbstractType(toType))
         return false;
 
-    // Initializers reached through an unchecked `optional` constraint are dropped, as they are
-    // for `T(...)` in `AddTypeOverloadCandidates`.
+    // ResolveInvoke can retry `T(args...)` as an initializer-list coercion, so we filter here too,
+    // or that retry could call an initializer behind an unchecked `optional` constraint.
     auto ctors =
         filterLookupResultByCheckedOptional(lookupConstructorsInType(toType, m_outerScope));
     if (!ctors.isValid())
@@ -2721,8 +2735,18 @@ bool SemanticsVisitor::_coerce(
 
     // Since the lookup and resolution of all possible implicit conversions
     // can be very costly, we use a cache to store the checking results.
+    // A conversion from or to a type that conforms through an `optional` constraint can get a
+    // different answer inside and outside an `if (T is I)` check, so its result is not cached.
     ImplicitCastMethodKey implicitCastKey = ImplicitCastMethodKey(fromType, toType, fromExpr);
-    ImplicitCastMethod* cachedMethod = getShared()->tryGetImplicitCastMethod(implicitCastKey);
+    bool canCacheImplicitCast = !canTypeConformThroughOptionalConstraint(toType) &&
+                                !canTypeConformThroughOptionalConstraint(fromType.type);
+    auto cacheImplicitCast = [&](ImplicitCastMethod const& method)
+    {
+        if (canCacheImplicitCast)
+            getShared()->cacheImplicitCastMethod(implicitCastKey, method);
+    };
+    ImplicitCastMethod* cachedMethod =
+        canCacheImplicitCast ? getShared()->tryGetImplicitCastMethod(implicitCastKey) : nullptr;
 
     if (cachedMethod)
     {
@@ -2786,7 +2810,7 @@ bool SemanticsVisitor::_coerce(
         {
             if (!cachedMethod)
             {
-                getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
+                cacheImplicitCast(ImplicitCastMethod{});
             }
             return _failedCoercion(toType, outToExpr, fromExpr, sink);
         }
@@ -2839,7 +2863,7 @@ bool SemanticsVisitor::_coerce(
         {
             method.isAmbiguous = true;
             method.cost = bestCost;
-            getShared()->cacheImplicitCastMethod(implicitCastKey, method);
+            cacheImplicitCast(method);
         }
 
         if (outWitnessOfConversion)
@@ -2864,7 +2888,7 @@ bool SemanticsVisitor::_coerce(
         {
             if (!cachedMethod)
             {
-                getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
+                cacheImplicitCast(ImplicitCastMethod{});
             }
             return _failedCoercion(toType, outToExpr, fromExpr, sink);
         }
@@ -3083,16 +3107,14 @@ bool SemanticsVisitor::_coerce(
                 getDeclVisibility(overloadContext.bestCandidate->item.declRef.getDecl()) ==
                     DeclVisibility::Public)
             {
-                getShared()->cacheImplicitCastMethod(
-                    implicitCastKey,
-                    ImplicitCastMethod{*overloadContext.bestCandidate, cost});
+                cacheImplicitCast(ImplicitCastMethod{*overloadContext.bestCandidate, cost});
             }
         }
         return true;
     }
     if (!cachedMethod)
     {
-        getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
+        cacheImplicitCast(ImplicitCastMethod{});
     }
     return _failedCoercion(toType, outToExpr, fromExpr, sink);
 }

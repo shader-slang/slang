@@ -1432,6 +1432,39 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
     return result;
 }
 
+void SemanticsVisitor::diagnoseDefaultInitializerBehindOptionalConstraint(
+    VarDeclBase* varDecl,
+    Type* type)
+{
+    // Resolve the zero-argument initializer call again without the optional-constraint filter.
+    // If that finds an applicable initializer, the filter is what removed it.
+    OverloadResolveContext context;
+    context.loc = varDecl->nameAndLoc.loc;
+    context.mode = OverloadResolveContext::Mode::JustTrying;
+    context.sourceScope = m_outerScope;
+    List<Expr*> args;
+    context.args = &args;
+    AddOverloadCandidates(lookupConstructorsInType(type, m_outerScope), context);
+    // Two optional constraints can each provide a default initializer, which leaves an
+    // ambiguous set rather than one best candidate.
+    if (context.bestCandidate)
+        context.bestCandidates.add(*context.bestCandidate);
+    for (auto& candidate : context.bestCandidates)
+    {
+        if (candidate.status != OverloadCandidate::Status::Applicable)
+            continue;
+        LookupResult candidateResult;
+        AddToLookupResult(candidateResult, candidate.item);
+        bool diagnosed = false;
+        filterLookupResultByCheckedOptionalAndDiagnose(
+            candidateResult,
+            varDecl->nameAndLoc.loc,
+            diagnosed);
+        if (diagnosed)
+            return;
+    }
+}
+
 LookupResult SemanticsVisitor::resolveOverloadedLookup(
     LookupResult const& inResult,
     Type* targetType)

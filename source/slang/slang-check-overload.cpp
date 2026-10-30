@@ -3092,10 +3092,11 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
     // from a value of the same type. There is no need in Slang for
     // "copy constructors" but the core module currently has to define
     // some just to make code that does, e.g., `float(1.0f)` work.)
-    //
+
     // An initializer reached through an `optional` constraint that is not checked here, as in
-    // `T(1)` under `where optional T : IArithmetic`, is dropped like any other member lookup
-    // through that constraint.
+    // `T(1)` under `where optional T : IArithmetic`, is not a candidate. Speculative probes call
+    // this function too, so it filters without a diagnostic; `ResolveInvoke` reports the
+    // constraint when nothing else can be called.
     LookupResult initializers =
         filterLookupResultByCheckedOptional(lookupConstructorsInType(type, context.sourceScope));
     AddOverloadCandidates(initializers, context);
@@ -3992,6 +3993,23 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         {
             diagnoseAmbiguousReference(funcExpr);
             return CreateErrorExpr(expr);
+        }
+    }
+    // When `funcExpr` names a type whose only initializers are reached through an `optional`
+    // constraint that is not checked here (`T(1)` under `where optional T : IArithmetic`),
+    // `AddTypeOverloadCandidates` dropped them, and we report that constraint as member lookup
+    // does.
+    if (auto typeType = as<TypeType>(funcExpr->type))
+    {
+        bool diagnosed = false;
+        filterLookupResultByCheckedOptionalAndDiagnose(
+            lookupConstructorsInType(typeType->getType(), m_outerScope),
+            funcExpr->loc,
+            diagnosed);
+        if (diagnosed)
+        {
+            expr->type = QualType(m_astBuilder->getErrorType());
+            return expr;
         }
     }
     getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});

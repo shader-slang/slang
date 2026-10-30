@@ -1930,6 +1930,13 @@ public:
     DeclRefType* getExprDeclRefType(Expr* expr);
     LookupResult lookupConstructorsInType(Type* type, Scope* sourceScope);
 
+    /// Return true if `type` is an abstract type with a conformance that depends on an `optional`
+    /// constraint, as `T` has under `where optional T : IFloat`. Whether a lookup through that
+    /// conformance may be used depends on the enclosing `if (T is I)` checks, so a result that
+    /// involves `type`, such as a default initializer or an implicit conversion, must not be
+    /// cached per type.
+    bool canTypeConformThroughOptionalConstraint(Type* type);
+
     /// Is `decl` usable as a static member?
     bool isDeclUsableAsStaticMember(Decl* decl);
 
@@ -2065,10 +2072,17 @@ public:
     /// Return true if `witness` is, or is looked up through, the witness for an `optional`
     /// constraint `sub : sup` (see `findOptionalConstraintWitness`), and no enclosing statement
     /// in `m_outerStmts` is an `if (sub is sup)` for that same constraint. Member lookup,
-    /// overload resolution, the constraint solver and the builtin-operator fast path all use the
-    /// answer to refuse a conformance that has not been checked at this point.
+    /// overload resolution, the constraint solver and the builtin-operator fast path use the
+    /// answer to tell an unchecked conformance from a proven one: lookup and the fast path
+    /// refuse it, and the overload gate and the solver accept it only for an `optional`
+    /// constraint of the callee.
     bool isWitnessUncheckedOptional(SubtypeWitness* witness);
     LookupResult filterLookupResultByCheckedOptional(const LookupResult& lookupResult);
+
+    /// Report `RequiredConstraintIsNotChecked` for `T x;` (`varDecl` of type `type`) when the
+    /// only applicable default initializer is reached through an `optional` constraint that is
+    /// not checked here, such as `__init()` under `where optional T : IDefaultInitializable`.
+    void diagnoseDefaultInitializerBehindOptionalConstraint(VarDeclBase* varDecl, Type* type);
     LookupResult filterLookupResultByCheckedOptionalAndDiagnose(
         const LookupResult& lookupResult,
         SourceLoc loc,
