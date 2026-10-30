@@ -29,10 +29,14 @@
 // SAMPLED-NOT: OpUndef %[[SI]]
 // SAMPLED: OpFunctionEnd
 
-// PROJECTION: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage %float 2D 2 0 0 1
+// PROJECTION-DAG: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage %float 2D 2 0 0 1
+// PROJECTION-DAG: %[[SMP:[A-Za-z0-9_]+]] = OpTypeSampler
+// PROJECTION-NOT: OpUndef %[[IMG]]
+// PROJECTION-NOT: OpUndef %[[SMP]]
 // PROJECTION: %[[TEX:[A-Za-z0-9_]+]] = OpLoad %[[IMG]] %gTexture
 // PROJECTION-NEXT: OpImageFetch %v4float %[[TEX]]
 // PROJECTION-NOT: OpUndef %[[IMG]]
+// PROJECTION-NOT: OpUndef %[[SMP]]
 // PROJECTION: OpFunctionEnd
 
 // SAMPLER: %[[SMP:[A-Za-z0-9_]+]] = OpTypeSampler
