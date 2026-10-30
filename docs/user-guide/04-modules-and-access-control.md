@@ -106,7 +106,7 @@ import YourLibrary;
 
 This `import` declaration will cause the compiler to look for a module named `YourLibrary` and make its declarations visible in the current scope. Similar to `__include`, `import` also supports both the identifier-token and the file-name string syntax.
 
-A module name is not a qualifier: after `import YourLibrary;`, refer to its declarations by their own names, as in `foo()`, not `YourLibrary.foo()`. To give a library's declarations a qualified name, declare them inside a `public namespace` and use `NamespaceName.foo()`.
+A module name is not a qualifier: after `import YourLibrary;`, refer to its declarations by their own names, as in `foo()`, not `YourLibrary.foo()`. To give a library's declarations a qualified name, declare them inside a [namespace](03-convenience-features.md#namespaces), mark each of them `public`, and use `NamespaceName.foo()`.
 
 You can only `import` a primary source file of a module. For example, given:
 ```
