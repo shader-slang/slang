@@ -4342,10 +4342,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             emitLocalInst(spvBlock, inst);
                             break;
                         case kIROp_DebugVar:
-                            // Declare an ordinary local variable for debugDeclare association
-                            // of a debug variable. This variable is what we will actually write
-                            // values to upon a `kIROp_DebugValue` inst.
-                            emitDebugVarBackingLocalVarDeclaration(spvBlock, as<IRDebugVar>(inst));
+                            // A debug variable described by `DebugValue`s gets an ordinary local
+                            // variable for debugDeclare association, which is what we will
+                            // actually write values to upon a `kIROp_DebugValue` inst. A debug
+                            // variable with a `DebugDeclare` is declared on its own storage.
+                            if (!hasDebugDeclare(as<IRDebugVar>(inst)))
+                                emitDebugVarBackingLocalVarDeclaration(
+                                    spvBlock,
+                                    as<IRDebugVar>(inst));
                             break;
                         }
                     }
@@ -4753,6 +4757,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return spvDebugLocalVar;
     }
 
+    // Returns true if a `DebugDeclare` ties `debugVar` to its storage.
+    static bool hasDebugDeclare(IRDebugVar* debugVar)
+    {
+        for (auto use = debugVar->firstUse; use; use = use->nextUse)
+        {
+            if (as<IRDebugDeclare>(use->getUser()))
+                return true;
+        }
+        return false;
+    }
+
+    // Emit an OpDebugDeclare that ties the OpDebugLocalVariable of the declared variable to its
+    // storage, which SPIR-V legalization has left as an OpVariable or OpFunctionParameter.
+    SpvInst* emitDebugDeclare(SpvInstParent* parent, IRDebugDeclare* debugDeclare)
+    {
+        SpvInst* spvDebugLocalVar = nullptr;
+        if (!m_mapIRInstToSpvDebugInst.tryGetValue(debugDeclare->getDebugVar(), spvDebugLocalVar))
+            return nullptr;
+        return emitOpDebugDeclare(
+            parent,
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            spvDebugLocalVar,
+            debugDeclare->getStorage(),
+            getDwarfExpr(),
+            List<SpvInst*>());
+    }
+
     // Returns true if the given type is allowed to emit for a `DebugVar`.
     // Other types may not be illegal, but Slang currently does not support
     // emitting these other DebugVar types.
@@ -4941,6 +4974,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugValue:
             if (shouldEmitExtendedDebugInfo)
                 *emittedSpvInst = emitDebugValue(parent, as<IRDebugValue>(inst));
+            return true;
+
+        case kIROp_DebugDeclare:
+            if (shouldEmitExtendedDebugInfo)
+                *emittedSpvInst = emitDebugDeclare(parent, as<IRDebugDeclare>(inst));
             return true;
 
         case kIROp_DebugFunction:
@@ -5882,6 +5920,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugLine:
         case kIROp_DebugVar:
         case kIROp_DebugValue:
+        case kIROp_DebugDeclare:
         case kIROp_DebugFunction:
         case kIROp_DebugLexicalBlock:
         case kIROp_DebugInlinedAt:

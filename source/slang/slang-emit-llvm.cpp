@@ -101,6 +101,20 @@ static bool maybeGetName(CharSlice* linkageNameOut, CharSlice* prettyNameOut, IR
     return true;
 }
 
+// Returns true if a `DebugDeclare` names `inst` as the storage of a debug variable.
+static bool isDebugDeclareStorage(IRInst* inst)
+{
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        if (auto debugDeclare = as<IRDebugDeclare>(use->getUser()))
+        {
+            if (debugDeclare->getStorage() == inst)
+                return true;
+        }
+    }
+    return false;
+}
+
 static bool isPtrVolatile(IRInst* value)
 {
     if (auto memoryQualifier = value->findDecoration<IRMemoryQualifierSetDecoration>())
@@ -1609,8 +1623,9 @@ struct LLVMEmitter
                     // TODO: This is a bit of a hack. DebugVar fails to get
                     // linked to the actual Var sometimes, which is why we
                     // automatically create a debug var for each Slang IR var if
-                    // it has a name.:/
-                    if (debug)
+                    // it has a name.:/ A var with a `DebugDeclare` is already
+                    // described by the declared debug variable.
+                    if (debug && !isDebugDeclareStorage(var))
                     {
                         auto varType =
                             types->getDebugType(ptrType->getValueType(), defaultPointerRules);
@@ -2257,6 +2272,21 @@ struct LLVMEmitter
                     return nullptr;
                 auto value = findValue(debugValueInst->getValue());
                 builder->emitDebugValue(instToDebugLLVM.getValue(debugVar), value);
+            }
+            return nullptr;
+
+        case kIROp_DebugDeclare:
+            debugInsts.add(inst);
+            if (debug)
+            {
+                // LLVM declares a variable on its stack slot, so only storage that lowers to an
+                // alloca can back the declaration.
+                auto debugDeclareInst = static_cast<IRDebugDeclare*>(inst);
+                auto debugVar = debugDeclareInst->getDebugVar();
+                auto storage = debugDeclareInst->getStorage();
+                if (!as<IRVar>(storage) || !instToDebugLLVM.containsKey(debugVar))
+                    return nullptr;
+                builder->emitDebugValue(instToDebugLLVM.getValue(debugVar), findValue(storage));
             }
             return nullptr;
 
