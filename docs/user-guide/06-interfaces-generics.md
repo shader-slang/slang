@@ -173,6 +173,8 @@ int myGenericMethod<T>(T arg) where optional T: IFoo
 }
 ```
 
+The check also covers what `IFoo` inherits. If `IFoo : IBar` and the optional constraint is the only proof that `T : IBar`, then `IBar`'s members and initializers, and operators or generic functions that require `T : IBar`, need an `if (T is IFoo)` check too; a required constraint that also proves `T : IBar` allows them without one. An `extension` that requires `IFoo`, or an interface `IFoo` inherits, does not apply to `T` through the optional constraint alone, even inside the `if`.
+
 ### Using Generic Parameters in Attributes
 
 Slang allows referencing generic parameters in bracket attributes. This is particularly useful for shader entry points where you want to control attributes like workgroup sizes at compile time.

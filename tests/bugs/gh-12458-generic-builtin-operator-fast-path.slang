@@ -35,10 +35,10 @@
 // the companion `gh-12458-generic-builtin-operator-fast-path-decline.slang`: a plain,
 // unconstrained generic parameter must yield no conformance witness to any of the three sealed
 // interfaces and fall through to ordinary overload resolution, which then fails to find a
-// matching `operator+` and reports a normal diagnostic. That file also explains why the stronger
-// negative case the fix's own `isWitnessUncheckedOptional` guard exists for -- a `where optional
-// T : __BuiltinFloatingPointType` constraint used outside an `if (T is ...)` check -- is not
-// covered anywhere yet: see that file for the full explanation and the tracking issue
+// matching `operator+` and reports a normal diagnostic. The stronger negative case the fix's own
+// `isWitnessUncheckedOptional` guard exists for -- a `where optional T :
+// __BuiltinFloatingPointType` constraint used outside an `if (T is ...)` check -- is covered by
+// `tests/language-feature/generics/where-optional-inherited-requirement*.slang`
 // (shader-slang/slang#13061).
 //
 // A THIRD negative case -- `vector<T,N> == vector<T,N>` specifically -- is covered separately by
