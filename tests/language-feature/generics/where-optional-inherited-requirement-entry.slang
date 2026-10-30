@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -entry main -stage compute
 
-// The shader from shader-slang/slang#13011. `+` comes from `IArithmetic`, which the optional
+// The shader from shader-slang/slang#13011. `+` needs `T : IArithmetic`, which the optional
 // constraint only inherits, so the unchecked use is diagnosed before `compute<NotFloat>` is
 // specialized and code is emitted for an entry point.
 

@@ -11,7 +11,7 @@ struct NotArithmetic
     int x;
 }
 
-// `+` is an `IArithmetic` requirement that `IFloat` inherits.
+// `+` resolves to an overload that needs `T : IArithmetic`, which `IFloat` inherits.
 T addIfFloat<T>(T a, T b) where optional T : IFloat
 {
     if (T is IFloat)

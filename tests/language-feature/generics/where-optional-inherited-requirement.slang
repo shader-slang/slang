@@ -2,10 +2,10 @@
 
 // A `where optional T : I` constraint does not prove `T : I` outside an `if (T is I)` check,
 // and so it does not prove `T` conforms to the interfaces `I` inherits either. Each function
-// below uses a requirement that lives on an interface the optional constraint only inherits
-// (`+`, `-`, `%`, `*`, `/` and `add` are `IArithmetic` requirements), so each use must be
-// rejected the same way a use through `where optional T : IArithmetic` is
-// (shader-slang/slang#13011, shader-slang/slang#13061).
+// below needs a conformance the optional constraint only inherits: `add` is an `IArithmetic`
+// requirement, and `+`, `-`, `%`, `*` and `/` resolve to core-module overloads constrained on
+// `IArithmetic` or `__BuiltinArithmeticType`. Each use must be rejected the same way a use
+// through `where optional T : IArithmetic` is (shader-slang/slang#13011, shader-slang/slang#13061).
 
 interface IA { This plus(This o); }
 interface IB : IA {}
