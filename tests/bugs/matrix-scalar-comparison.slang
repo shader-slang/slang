@@ -31,6 +31,12 @@ RWStructuredBuffer<float> inputBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+// One bit per element, in row-major order, so a misplaced row or column changes the value.
+int bits(bool2x2 b)
+{
+    return int(b[0][0]) | (int(b[0][1]) << 1) | (int(b[1][0]) << 2) | (int(b[1][1]) << 3);
+}
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
@@ -38,21 +44,24 @@ void computeMain()
     int3x2 n = int3x2(int(inputBuffer[3]));
     n[1][0] = -2;
 
-    // Matrix on the left: 0.5, 2 and 3 are greater than 0; -1 is not.
+    // m is (0.5, -1; 2, 3).
+    // Matrix on the left: every element but m[0][1] = -1 is greater than 0 (bits 0, 2, 3).
     // BUF: type: int32_t
-    // BUF-NEXT: 3
-    bool2x2 positive = m > 0.0;
-    outputBuffer[0] = int(positive[0][0]) + int(positive[0][1]) + int(positive[1][0]) + int(positive[1][1]);
+    // BUF-NEXT: 13
+    outputBuffer[0] = bits(m > 0.0);
 
-    // Scalar on the left.
-    // BUF-NEXT: 1
-    bool2x2 isTwo = 2.0 == m;
-    outputBuffer[1] = int(isTwo[0][0]) + int(isTwo[0][1]) + int(isTwo[1][0]) + int(isTwo[1][1]);
+    // Scalar on the left: only m[1][0] is 2 (bit 2).
+    // BUF-NEXT: 4
+    outputBuffer[1] = bits(2.0 == m);
 
-    // An integer matrix, which is lowered itself, against a scalar.
-    // BUF-NEXT: 1
+    // An integer matrix, which is lowered itself, against a scalar: only n[1][0] = -2 is
+    // negative (row 1, column 0, so 1 << (1 * 2 + 0)).
+    // BUF-NEXT: 4
     bool3x2 negative = n < 0;
-    outputBuffer[2] = int(any(negative[0])) + int(any(negative[1])) + int(any(negative[2]));
+    int negativeBits = 0;
+    for (int r = 0; r < 3; r++)
+        negativeBits |= (int(negative[r][0]) | (int(negative[r][1]) << 1)) << (r * 2);
+    outputBuffer[2] = negativeBits;
 
     // BUF-NEXT: 1
     outputBuffer[3] = (all(m > -2.0) && !any(m > 5.0)) ? 1 : 0;
