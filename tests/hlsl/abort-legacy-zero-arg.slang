@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute
 
 // Verify that the bare zero-argument abort() call still resolves to the
 // pre-existing HLSL SM 4.0 builtin declaration, without triggering the
