@@ -214,3 +214,30 @@ SLANG_UNIT_TEST(parseCommandLineArgsReportsParseErrors)
             SLANG_CHECK(sessionDesc.targets[0].format == SLANG_SPIRV);
     }
 }
+
+// Target options given without `-target` are not an error for this API: the session desc carries
+// them as session options, so they apply to every target the caller adds to the session.
+SLANG_UNIT_TEST(parseCommandLineArgsKeepsTargetOptionsWithoutTarget)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const char* argv[] = {"-floating-point-mode", "precise"};
+    slang::SessionDesc sessionDesc{};
+    ComPtr<ISlangUnknown> allocation;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->parseCommandLineArguments(
+        SLANG_COUNT_OF(argv),
+        argv,
+        &sessionDesc,
+        allocation.writeRef())));
+    SLANG_CHECK(sessionDesc.targetCount == 0);
+
+    bool hasPreciseFloatingPointMode = false;
+    for (uint32_t i = 0; i < sessionDesc.compilerOptionEntryCount; ++i)
+    {
+        const auto& entry = sessionDesc.compilerOptionEntries[i];
+        if (entry.name == slang::CompilerOptionName::FloatingPointMode &&
+            entry.value.intValue0 == SLANG_FLOATING_POINT_MODE_PRECISE)
+            hasPreciseFloatingPointMode = true;
+    }
+    SLANG_CHECK(hasPreciseFloatingPointMode);
+}

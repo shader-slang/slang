@@ -4638,11 +4638,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         }
         else
         {
-            // If the "default" target has had a profile (or other state)
-            // specified, but there is != 1 taget, then that state doesn't
-            // apply to anythign and we should give the user an error.
+            // If the "default" target has had a profile (or other state) specified and
+            // that state doesn't apply to anything, we give the user an error. With
+            // multiple targets the state is always dropped. With no target on the command
+            // line, only a command-line compile drops it: an API caller keeps it for the
+            // targets it adds (see `m_optionSetForDefaultTarget` below).
             //
-            if (m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
+            const bool isDefaultTargetStateDropped =
+                m_rawTargets.getCount() != 0 || m_requestImpl->m_isCommandLineCompile;
+
+            if (isDefaultTargetStateDropped &&
+                m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
             {
                 if (m_rawTargets.getCount() == 0)
                 {
@@ -4659,7 +4665,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
             }
 
-            if (defaultTargetFloatingPointMode != FloatingPointMode::Default)
+            if (isDefaultTargetStateDropped &&
+                defaultTargetFloatingPointMode != FloatingPointMode::Default)
             {
                 if (m_rawTargets.getCount() == 0)
                 {
