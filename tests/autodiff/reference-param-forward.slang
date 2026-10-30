@@ -1,8 +1,7 @@
 // A differentiable function may forward its reference parameter to a differentiable callee.
-// Autodiff passes the reference argument by copy-in/copy-out, as it does for `inout`, so the
-// callee's writes reach the caller's storage and values read before a write are the ones used
-// for the derivative. Shared memory cannot be passed this way: the errors are covered by
-// tests/diagnostics/groupshared-autodiff/warns.slang.
+// Autodiff passes the reference through to the callee, so the callee's writes reach the caller's
+// storage, and the backward derivative saves the values read before a write for use in the
+// derivative.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj

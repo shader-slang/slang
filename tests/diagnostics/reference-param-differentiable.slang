@@ -2,9 +2,7 @@
 // `__ref_writeonly`, `groupshared`, or `const groupshared` -- names storage that the caller, and
 // for `groupshared` other invocations, may also access. Autodiff propagates no derivative through
 // a reference, so the parameter is treated as `no_diff`. Because a user may not expect that, we
-// warn unless the parameter is explicitly marked `no_diff`, its type has no derivative to lose,
-// or it is `groupshared`. Differentiating a function with a `groupshared` parameter is an error
-// at the call, so the function's derivative never exists to lose one.
+// warn unless the parameter is explicitly marked `no_diff` or its type has no derivative to lose.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute -experimental-feature
 
@@ -38,16 +36,19 @@ float refWriteOnlyParam(__ref_writeonly float a, float x)
     return x;
 }
 
-// Not warned: `groupshared` parameters, read-write and read-only, with a differentiable element
-// type.
+// Warned: `groupshared` parameters, read-write and read-only, with a differentiable element type.
 [Differentiable]
 float readWrite(uint tid, groupshared float s[N])
+//CHECK:                                    ^ parameter 's' is passed by reference, so a differentiable function treats it as 'no_diff'
+//CHECK:                                    ^ no derivative is propagated through a reference parameter; mark it 'no_diff' to make that explicit.
 {
     return s[tid];
 }
 
 [Differentiable]
 float readOnly(uint tid, const groupshared float s[N])
+//CHECK:                                         ^ parameter 's' is passed by reference, so a differentiable function treats it as 'no_diff'
+//CHECK:                                         ^ no derivative is propagated through a reference parameter; mark it 'no_diff' to make that explicit.
 {
     return s[tid];
 }

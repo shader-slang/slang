@@ -3,9 +3,8 @@
 // component write into a read-modify-write of the whole variable, so each invocation stores back
 // stale copies of the other invocations' parts. Each case below writes part of shared memory in a
 // differentiable function without a custom derivative. A write through the function's own
-// `groupshared` parameter is not reported, because such a function is never differentiated. A
-// whole-variable write and an atomic stay in place; they are in silent.slang. A write in a
-// `[ForceInline]` helper is in write-in-force-inline-helper.slang.
+// `groupshared` parameter, a whole-variable write, and an atomic stay in place; they are in
+// silent.slang. A write in a `[ForceInline]` helper is in write-in-force-inline-helper.slang.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
 
@@ -96,13 +95,6 @@ float nestedWrite(uint i, float x)
     return x;
 }
 
-[Differentiable]
-float writeThroughOwnParameter(no_diff groupshared float a[4], uint i, float x)
-{
-    a[i] = 1.0;
-    return x;
-}
-
 [numthreads(4, 1, 1)]
 void computeMain(uint i : SV_GroupIndex)
 {
@@ -110,5 +102,5 @@ void computeMain(uint i : SV_GroupIndex)
     bwd_diff(elementWrite)(i, x, 1.0);
     outputBuffer[i] = x.d + compoundElementWrite(i, 1.0) + incrementElement(i, 1.0) +
                       fieldWrite(1.0) + vectorIndexWrite(i, 1.0) + swizzleWrite(1.0) +
-                      nestedWrite(i, 1.0) + writeThroughOwnParameter(g, i, 1.0);
+                      nestedWrite(i, 1.0);
 }

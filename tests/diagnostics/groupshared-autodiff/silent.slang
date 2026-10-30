@@ -1,14 +1,15 @@
 // Thread-group-shared memory used with autodiff in the ways that stay correct. A direct read in a
 // differentiable function saves its value for the backward pass, and an argument passed by value
 // is expected to be a copy. A write of a whole variable and an atomic both stay in place, and so
-// does a partial write in a non-differentiable function, which autodiff does not rewrite. A whole `groupshared` variable passed to a `__ref_readonly` parameter
-// keeps its address and is only read. A `fwd_diff`/`bwd_diff` call outside a differentiated body
-// passes its arguments' addresses unchanged, and a `__constref` argument may be a copy whether or
-// not autodiff is involved. A function with custom derivatives for both modes is called by
-// autodiff rather than rewritten, so its primal and derivative bodies may write shared memory and
-// synchronize, as long as the derivative does not depend on the primal's side effects. A call
-// outside differentiated code is not copied. The cases that warn are in warns.slang and
-// writes.slang.
+// does a partial write in a non-differentiable function, which autodiff does not rewrite. Autodiff
+// passes a reference argument through to the callee, so shared memory passed by reference, whole
+// or in part, and to a differentiable callee or under `no_diff`, is accessed in place by the
+// callee. A function with a `groupshared` parameter can be differentiated, and its writes through
+// the parameter stay in place. A `__constref` argument may be a copy whether or not autodiff is
+// involved. A function with custom derivatives for both modes is called by autodiff rather than
+// rewritten, so its primal and derivative bodies may write shared memory and synchronize, as long
+// as the derivative does not depend on the primal's side effects. The cases that are reported are
+// in writes.slang.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
 
@@ -77,6 +78,49 @@ float wholeArrayToReadOnly(float x)
 float elementToBorrow(uint i, float x)
 {
     return no_diff(readBorrowed(g[i])) * x;
+}
+
+float bump(__ref float a)
+{
+    a += 1.0;
+    return a;
+}
+
+[Differentiable]
+float sumAllWritable(no_diff __ref float a[4], float x)
+{
+    return (a[0] + a[1] + a[2] + a[3]) * x;
+}
+
+[Differentiable]
+float writeThroughOwnParameter(no_diff groupshared float a[4], uint i, float x)
+{
+    a[i] = 1.0;
+    return a[i] * x;
+}
+
+[Differentiable]
+float elementToDifferentiable(uint i, float x)
+{
+    return scale(g[i], x);
+}
+
+[Differentiable]
+float elementUnderNoDiff(uint i, float x)
+{
+    return x * no_diff(bump(g[i]));
+}
+
+[Differentiable]
+float wholeArrayToWritable(float x)
+{
+    return sumAllWritable(g, x);
+}
+
+[Differentiable]
+float callWithGroupSharedParameter(uint i, float x)
+{
+    return writeThroughOwnParameter(g, i, x);
 }
 
 [Differentiable]
@@ -182,7 +226,13 @@ void computeMain(uint i : SV_GroupIndex)
     float d = fwd_diff(scale)(g[i], diffPair(1.0, 1.0)).d;
     var w = diffPair(3.0);
     bwd_diff(sumAll)(g, w, 1.0);
-    outputBuffer[i] = x.d + y.d + z.d + d + w.d + readShared(i, 1.0) + sharedByValue(i, 1.0) +
+    var v = diffPair(3.0);
+    bwd_diff(writeThroughOwnParameter)(g, i, v, 1.0);
+    float e = fwd_diff(sumAllWritable)(g, diffPair(1.0, 1.0)).d;
+    outputBuffer[i] = x.d + y.d + z.d + d + w.d + v.d + e + readShared(i, 1.0) +
+                      sharedByValue(i, 1.0) + elementToDifferentiable(i, 1.0) +
+                      elementUnderNoDiff(i, 1.0) + wholeArrayToWritable(1.0) +
+                      callWithGroupSharedParameter(i, 1.0) +
                       wholeArrayToReadOnly(1.0) + elementToBorrow(i, 1.0) +
                       wholeVariableWrite(1.0) + atomicOnShared(1.0) +
                       writeInNonDifferentiableFunction(i, 1.0) +

@@ -1,15 +1,14 @@
 // Each invocation passes its neighbor's element of a thread-group-shared array to a
 // `__ref_readonly` parameter from differentiated code, and the callee reads it after a barrier at
 // which every invocation has written its own element. A reference reads the memory when it is
-// accessed, so invocations 0 to 3 should read 101, 102, 103 and 100 in each mode.
-//
-// Disabled: address elimination, which prepares a function for differentiation, copies the
-// element into a temporary before the call whatever the parameter's access, so the callee reads
-// the values from before the call: 1, 2, 3 and 0. It also stores the copy back after the call,
-// overwriting other invocations' writes, even though the parameter is read-only.
+// accessed, so invocations 0 to 3 should read 101, 102, 103 and 100 in each mode. Address
+// elimination, which prepares a function for differentiation, passes the element's address
+// through to the reference parameter. A copy taken before the call would give the values from
+// before the barrier, 1, 2, 3 and 0, and storing the copy back after the call would overwrite the
+// other invocations' writes.
 
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -Xslang -experimental-feature
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -output-using-type -Xslang -experimental-feature
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -Xslang -experimental-feature
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -output-using-type -Xslang -experimental-feature
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

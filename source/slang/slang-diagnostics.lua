@@ -4842,28 +4842,6 @@ warning(
 )
 
 err(
-    "differentiating-function-with-groupshared-parameter",
-    38055,
-    "cannot differentiate '~callee:Decl' because its parameter '~param:Decl' is 'groupshared'",
-    span { loc = "call:Expr", message = "a derivative of '~callee' is generated here" },
-    note { message = "declare the groupshared variable as a global and access it directly instead of passing it as a parameter", span { loc = "param:Decl" } }
-)
-
-err(
-    "groupshared-variable-passed-to-writable-reference-of-differentiated-function",
-    38056,
-    "passing thread-group-shared memory to a writable reference parameter of '~callee:Decl' introduces a race condition when '~callee:Decl' is differentiated",
-    span { loc = "arg:Expr", message = "give '~callee' a custom derivative, or move the access into a function that is not differentiable" }
-)
-
-err(
-    "groupshared-element-passed-by-reference-in-differentiated-body",
-    38049,
-    "passing part of thread-group-shared memory by reference introduces a race condition when this function is differentiated",
-    span { loc = "arg:Expr", message = "move the access into a function that is not differentiable or has a custom derivative" }
-)
-
-err(
     "groupshared-partial-write-in-differentiated-body",
     38039,
     "writing part of thread-group-shared variable '~var:Decl' introduces a race condition when this function is differentiated",

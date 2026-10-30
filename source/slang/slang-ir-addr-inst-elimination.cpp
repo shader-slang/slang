@@ -104,11 +104,20 @@ struct AddressInstEliminationContext
             return;
         }
 
+        // A reference parameter names the argument's storage, so the callee accesses that storage
+        // in place and decides itself how to read, write, and synchronize it. We pass the address
+        // through rather than a copy, because a copy that is stored back after the call would
+        // overwrite writes that other invocations or aliases made during it.
+        auto calleeType = as<IRFuncType>(call->getCallee()->getDataType());
+        SLANG_RELEASE_ASSERT(calleeType);
+        auto argIndex = UInt(use - call->getArgs());
+        if (as<IRRefParamType>(calleeType->getParamType(argIndex)))
+        {
+            return;
+        }
+
         builder.setInsertBefore(call);
-        auto addrType = addr->getFullType();
-        if (auto rateQualifiedType = as<IRRateQualifiedType>(addrType))
-            addrType = rateQualifiedType->getValueType();
-        auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addrType)->getValueType());
+        auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
 
         // Store the initial value of the mutable argument into temp var.
         // If this is an `out` var, the initial value will be undefined,
@@ -130,7 +139,11 @@ struct AddressInstEliminationContext
         {
             for (auto inst : block->getChildren())
             {
-                if (as<IRBorrowInParamType>(getRootAddr(inst)->getDataType()))
+                // A borrow is read-only, and a reference names storage that other invocations or
+                // aliases may access during the function, so both stay in memory and each access
+                // through them stays an access to just the element it names.
+                auto rootType = getRootAddr(inst)->getDataType();
+                if (as<IRBorrowInParamType>(rootType) || as<IRRefParamType>(rootType))
                     continue;
                 if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
                 {

@@ -323,8 +323,9 @@ struct UnzippingContext
                 {
                     // For inout and reference parameters, we need to store the original value into
                     // the cloned var at the beginning of the function, and then load from the
-                    // cloned var at every use. Address elimination has already turned a reference
-                    // argument into a copy-in/copy-out temporary, like an inout argument.
+                    // cloned var at every use. A reference argument reaches here only when it is a
+                    // local variable of the function being differentiated, which no other
+                    // invocation can access, so the clone is a private copy.
                     if (auto use = findUniqueStoredVal(var))
                         primalBuilder->emitStore(
                             clonedVar,
