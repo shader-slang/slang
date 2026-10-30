@@ -28,16 +28,18 @@ void main(uint tid : SV_DispatchThreadID)
     output[0] = processStruct(local);
 }
 
-// -O0: both the local and parameter structs use DebugDeclare and per-member DebugValue.
+// -O0: the local struct keeps its storage, so one DebugDeclare ties it to its OpVariable
+// and no store is mirrored into a per-member DebugValue. The by-value parameter is
+// described by per-member DebugValues of its value.
 // CHECK_O0-DAG: [[LOCAL_STR:%[0-9]+]] = OpString "local"
 // CHECK_O0-DAG: [[PARAM_STR:%[0-9]+]] = OpString "param"
 // CHECK_O0-DAG: DebugTypeComposite
 // CHECK_O0-DAG: [[LOCAL:%[A-Za-z_0-9]+]] = OpExtInst %void {{.*}} DebugLocalVariable [[LOCAL_STR]]
 // CHECK_O0-DAG: [[PARAM:%[A-Za-z_0-9]+]] = OpExtInst %void {{.*}} DebugLocalVariable [[PARAM_STR]]
-// CHECK_O0-DAG: DebugDeclare [[LOCAL]]
+// CHECK_O0-DAG: [[LOCAL_VAR:%local]] = OpVariable %_ptr_Function_MyStruct Function
+// CHECK_O0-DAG: DebugDeclare [[LOCAL]] [[LOCAL_VAR]]
+// CHECK_O0-NOT: DebugValue [[LOCAL]]
 // CHECK_O0-DAG: DebugDeclare [[PARAM]]
-// CHECK_O0-DAG: DebugValue [[LOCAL]] {{.*}} %int_0{{$}}
-// CHECK_O0-DAG: DebugValue [[LOCAL]] {{.*}} %int_1{{$}}
 // CHECK_O0-DAG: DebugValue [[PARAM]] {{.*}} %int_0{{$}}
 // CHECK_O0-DAG: DebugValue [[PARAM]] {{.*}} %int_1{{$}}
 
