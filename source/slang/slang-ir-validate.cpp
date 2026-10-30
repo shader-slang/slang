@@ -384,7 +384,7 @@ void validateCodeBody(IRValidateContext* context, IRGlobalValueWithCode* code)
 }
 
 // Check the contract of a `DebugVarStorage` decoration (see `slang-ir-insts.lua`): it sits on a
-// var or pointer parameter of a function and names a debug variable of that same function.
+// var or pointer-typed parameter of a function and names a debug variable of that same function.
 static void validateDebugVarStorageDecoration(IRValidateContext* context, IRInst* inst)
 {
     auto decor = as<IRDebugVarStorageDecoration>(inst);
@@ -397,7 +397,7 @@ static void validateDebugVarStorageDecoration(IRValidateContext* context, IRInst
         func && (as<IRVar>(storage) ||
                  (as<IRParam>(storage) && as<IRPtrTypeBase>(storage->getDataType()))),
         inst,
-        "debug variable storage must be a var or pointer parameter of a function");
+        "debug variable storage must be a var or pointer-typed parameter of a function");
     auto debugVar = as<IRDebugVar>(decor->getDebugVar());
     validate(
         context,

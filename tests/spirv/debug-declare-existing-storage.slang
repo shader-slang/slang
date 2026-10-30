@@ -1,8 +1,9 @@
 // Regression test for https://github.com/shader-slang/slang/issues/13841
-// When a source variable has program storage, its `DebugDeclare` names that storage instead of a
-// separate `_dbgvar_*` copy. Program storage is a local's own Function-storage `OpVariable`, a
-// pointer parameter (`inout`, `out`, `__constref`), or the proxy variable of a by-value
-// parameter that the function modifies. Variables without such storage keep the copy.
+// When the value of a source variable already lives in memory that the program reads and writes,
+// its `DebugDeclare` names that storage instead of a separate `_dbgvar_*` copy. Such storage is a
+// local's own Function-storage `OpVariable`, a pointer-typed parameter (`inout`, `out`,
+// `__constref`), or the proxy variable of a by-value parameter that the function modifies.
+// Variables without such storage keep the copy.
 //
 // Note: -g2 embeds the entire source as one OpString, so the CHECK lines anchor on the real
 // `= OpString "<name>"` and on `OpName %id "<name>"` (the source blob escapes quotes as \").
@@ -81,8 +82,8 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // CHECK-DAG: [[VALS_STR:%[0-9]+]] = OpString "vals"
 // CHECK-DAG: [[HELD_STR:%[0-9]+]] = OpString "held"
 
-// `tid` (an entry-point input) and the loop counter `i` (promoted to SSA) have no program
-// storage, so they keep the `_dbgvar_` copy.
+// `tid` (an entry-point input) and the loop counter `i` (promoted to SSA) have no such storage,
+// so they keep the `_dbgvar_` copy.
 // CHECK-DAG: OpName %_dbgvar_tid "_dbgvar_tid"
 // CHECK-DAG: OpName %_dbgvar_i "_dbgvar_i"
 
@@ -127,7 +128,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // CHECK: [[HELD_PARAM:%[A-Za-z_0-9]+]] = OpFunctionParameter %_ptr_Function_S
 // CHECK: DebugDeclare [[HELD_DBG]] [[HELD_PARAM]] {{%[0-9]+}}{{$}}
 
-// No variable with program storage has a `_dbgvar_` copy anywhere in the module.
+// No variable with such storage has a `_dbgvar_` copy anywhere in the module.
 // NOCOPY: OpEntryPoint
 // NOCOPY-NOT: %_dbgvar_{{(acc|st|f|r|s|scale|result|vals|held)(_[0-9]+)?[^A-Za-z_0-9]}}
 

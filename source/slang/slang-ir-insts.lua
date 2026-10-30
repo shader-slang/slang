@@ -2408,7 +2408,7 @@ local insts = {
 			{ InParamProxyVar = { struct_name = "InParamProxyVarDecoration", min_operands = 1 } },
 			{
 				DebugVarStorage = {
-					-- Placed on the program storage of a source variable: a `var` or pointer `param`
+					-- Placed on the storage of a source variable: a `var` or pointer-typed `param`
 					-- through which the program reads and writes the variable described by the
 					-- `DebugVar` operand. A backend declares the debug variable on this storage
 					-- instead of on a separate copy, so the storage holds the variable's value at every
