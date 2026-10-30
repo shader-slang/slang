@@ -16,13 +16,13 @@
 // The NOT lines reject a 64-bit integer declaration, conversion, vector or literal, any of
 // which would request the extension by itself and hide a regression in the bit_cast arms.
 // GLSL_U: #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
-// GLSL_U-NOT: {{int64_t [_a-zA-Z]|int64_t\([^d]|64vec|[0-9]U?L[^a-zA-Z0-9_]}}
+// GLSL_U-NOT: {{int64_t [_a-zA-Z]|int64_t\(([^d]|d[^o])|64vec|[0-9]U?L[^a-zA-Z0-9_]}}
 // GLSL_U: uint64_t(doubleBitsToUint64(
-// GLSL_U-NOT: {{int64_t [_a-zA-Z]|int64_t\([^d]|64vec|[0-9]U?L[^a-zA-Z0-9_]}}
+// GLSL_U-NOT: {{int64_t [_a-zA-Z]|int64_t\(([^d]|d[^o])|64vec|[0-9]U?L[^a-zA-Z0-9_]}}
 // GLSL_I: #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
-// GLSL_I-NOT: {{int64_t [_a-zA-Z]|int64_t\([^d]|64vec|[0-9]U?L[^a-zA-Z0-9_]}}
+// GLSL_I-NOT: {{int64_t [_a-zA-Z]|int64_t\(([^d]|d[^o])|64vec|[0-9]U?L[^a-zA-Z0-9_]}}
 // GLSL_I: int64_t(doubleBitsToInt64(
-// GLSL_I-NOT: {{int64_t [_a-zA-Z]|int64_t\([^d]|64vec|[0-9]U?L[^a-zA-Z0-9_]}}
+// GLSL_I-NOT: {{int64_t [_a-zA-Z]|int64_t\(([^d]|d[^o])|64vec|[0-9]U?L[^a-zA-Z0-9_]}}
 
 #if SIGNED
 typealias Bits64 = int64_t;
