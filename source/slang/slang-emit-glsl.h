@@ -170,6 +170,14 @@ protected:
         const EmitOpInfo& boolOp,
         const EmitOpInfo& inOuterPrec);
 
+    /// Emit `inst`, which converts its operand to or from a buffer reference (a `T*`), as the
+    /// constructor-style cast `T(operand)`, where `T` is the result type of `inst`.
+    ///
+    /// GLSL spells a conversion between buffer references and their integer address as a
+    /// constructor call; it has no C-style cast.
+    ///
+    void _emitBufferReferenceConversion(IRInst* inst, const EmitOpInfo& inOuterPrec);
+
     void _requireRayTracing();
 
     void _requireRayQuery();

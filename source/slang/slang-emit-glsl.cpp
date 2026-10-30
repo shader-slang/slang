@@ -2182,6 +2182,20 @@ bool GLSLSourceEmitter::_tryEmitBitBinOp(
     return true;
 }
 
+void GLSLSourceEmitter::_emitBufferReferenceConversion(IRInst* inst, const EmitOpInfo& inOuterPrec)
+{
+    auto prec = getInfo(EmitOp::Postfix);
+    EmitOpInfo outerPrec = inOuterPrec;
+    bool needClose = maybeEmitParens(outerPrec, prec);
+
+    emitType(inst->getDataType());
+    m_writer->emit("(");
+    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+    m_writer->emit(")");
+
+    maybeCloseParens(needClose);
+}
+
 void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
 {
     auto ptrType = as<IRPtrType>(type);
@@ -2904,20 +2918,8 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_CastPtrToInt:
     case kIROp_CastIntToPtr:
     case kIROp_PtrCast:
-        {
-            // For GLSL, emit constructor-style casts instead of C-style casts
-            auto prec = getInfo(EmitOp::Postfix);
-            EmitOpInfo outerPrec = inOuterPrec; // Make a mutable copy
-            bool needClose = maybeEmitParens(outerPrec, prec);
-
-            emitType(inst->getDataType());
-            m_writer->emit("(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(")");
-
-            maybeCloseParens(needClose);
-            return true;
-        }
+        _emitBufferReferenceConversion(inst, inOuterPrec);
+        return true;
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
         {
