@@ -1382,8 +1382,6 @@ bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
         }
     }
 
-    // If we got this far, the witness depends on an optional constraint and there's no
-    // statement checking it.
     return true;
 }
 
