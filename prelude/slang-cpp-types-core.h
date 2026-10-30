@@ -676,6 +676,9 @@ SLANG_INT_MATRIX_OPS(uintptr_t)
 
 SLANG_FLOAT_MATRIX_OPS(float)
 SLANG_FLOAT_MATRIX_OPS(double)
+// A matrix comparison gives a bool matrix, and comparing two of those needs these.
+SLANG_MATRIX_BINARY_COMPARE_OP(bool, ==)
+SLANG_MATRIX_BINARY_COMPARE_OP(bool, !=)
 
 #define SLANG_MATRIX_INT_NEG_OP(T)                                        \
     template<int R, int C>                                                \

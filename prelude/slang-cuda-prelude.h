@@ -1349,6 +1349,9 @@ SLANG_FLOAT_MATRIX_OPS(double)
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_FLOAT_MATRIX_OPS(__half)
 #endif
+// A matrix comparison gives a bool matrix, and comparing two of those needs these.
+SLANG_MATRIX_BINARY_COMPARE_OP(bool, ==)
+SLANG_MATRIX_BINARY_COMPARE_OP(bool, !=)
 #define SLANG_MATRIX_INT_NEG_OP(T)                                                        \
     template<int R, int C>                                                                \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, R, C> operator-(Matrix<T, R, C> thisVal) \
