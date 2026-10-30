@@ -2981,11 +2981,17 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_PtrLit:
         {
             // GLSL has no null literal for a buffer reference, so we construct one from address
-            // zero.
+            // zero. Only a user pointer is a buffer reference; any other pointer, such as a
+            // `groupshared` one, has no GLSL type to construct, so its null stays `0`.
             auto ptrType = as<IRPtrType>(inst->getDataType());
             if (ptrType)
             {
                 SLANG_RELEASE_ASSERT(as<IRPtrLit>(inst)->getValue() == nullptr);
+                if (!isUserPointerType(ptrType))
+                {
+                    m_writer->emit("0");
+                    return true;
+                }
                 _requireBaseType(BaseType::UInt64);
                 emitType(ptrType);
                 m_writer->emit("(0UL)");
