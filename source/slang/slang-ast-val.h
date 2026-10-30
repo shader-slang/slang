@@ -1404,8 +1404,8 @@ inline bool isTypeEqualityWitness(Val* witness)
     return false;
 }
 
-/// Return the witness for an `optional` generic constraint that `witness` is, or is derived
-/// from, or null if `witness` does not depend on an optional constraint.
+/// Return the witness for an `optional` generic constraint that `witness` is, or is looked up
+/// through, or null if `witness` has neither shape.
 ///
 /// Consider `T f<T>(T a, T b) where optional T : IFloat { return a + b; }`. The `+` overload
 /// needs `T : IArithmetic`, which `IFloat` inherits, and the witness that
@@ -1414,6 +1414,18 @@ inline bool isTypeEqualityWitness(Val* witness)
 /// witness that mentions the optional constraint, and the derived witness is only as certain
 /// as the witness it is looked up through, so we follow `LookupDeclRef` witnesses until we reach
 /// an optional constraint or a witness that is not looked up through another one.
+///
+/// The walk recognizes one shape, a chain of `DeclaredSubtypeWitness`es linked by
+/// `LookupDeclRef` witnesses, which is how `_specializeInterfaceInheritanceWitness` builds every
+/// facet a generic parameter inherits through an interface constraint. Other shapes, such as a
+/// `TransitiveSubtypeWitness` or the pack wrappers built for a type-pack parameter, are not
+/// followed and return null.
+///
+/// The leaf test accepts any declaration carrying `OptionalConstraintModifier`, not only the
+/// `GenericTypeConstraintDecl` that `DeclaredSubtypeWitness::isOptional()` checks. The two
+/// answer different questions: `isOptional()` decides how `T is I` is folded and lowered, where
+/// treating a derived witness as optional would turn `T is IArithmetic` into a runtime check of
+/// the `T : IFloat` witness instead.
 DeclaredSubtypeWitness* findOptionalConstraintWitness(SubtypeWitness* witness);
 
 bool isValuePack(Val* val);

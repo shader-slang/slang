@@ -1354,9 +1354,6 @@ bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
     if (!optionalWitness)
         return false;
 
-    // Okay, we've found an optional subtype witness. This result needs
-    // to be removed if we're not inside a block that directly checks
-    // if (sub is sup)
     auto sub = optionalWitness->getSub();
     auto sup = optionalWitness->getSup();
 
@@ -1385,8 +1382,8 @@ bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
         }
     }
 
-    // If we got this far, it's both an optional witness and there's no
-    // statement checking its validity.
+    // If we got this far, the witness depends on an optional constraint and there's no
+    // statement checking it.
     return true;
 }
 

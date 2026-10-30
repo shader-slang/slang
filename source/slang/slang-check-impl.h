@@ -2062,6 +2062,11 @@ public:
         SourceLoc loc,
         bool& outDiagnosed);
 
+    /// Return true if `witness` is, or is looked up through, the witness for an `optional`
+    /// constraint `sub : sup` (see `findOptionalConstraintWitness`), and no enclosing statement
+    /// in `m_outerStmts` is an `if (sub is sup)` for that same constraint. Member lookup,
+    /// overload resolution, the constraint solver and the builtin-operator fast path all use the
+    /// answer to refuse a conformance that has not been checked at this point.
     bool isWitnessUncheckedOptional(SubtypeWitness* witness);
     LookupResult filterLookupResultByCheckedOptional(const LookupResult& lookupResult);
     LookupResult filterLookupResultByCheckedOptionalAndDiagnose(
