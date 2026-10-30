@@ -14,8 +14,8 @@ void computeMain(
 //CHECK:                          ^ overlapping entry-point uniform parameters
 //CHECK:                          ^ the uniform data of 'b' overlaps the uniform data of 'a'
     [vk::offset(36)] uniform float4 c)
-//CHECK: ^^^^^^ misaligned 'vk::offset'
-//CHECK: ^^^^^^ '[vk::offset(36)]' is not a multiple of the parameter's alignment, 16
+//CHECK: ^^^^^^ misaligned '[vk::offset]'
+//CHECK: ^^^^^^ '[vk::offset(36)]' must be a multiple of the parameter's alignment, 16
 {
     outputBuffer[0] = a + b + c;
 }

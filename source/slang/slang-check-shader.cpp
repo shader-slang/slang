@@ -2605,10 +2605,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             if (isUniformParameterType(param->getType()))
                 continue;
 
+            // `[vk::offset]` places a parameter's uniform data, and a varying parameter has
+            // none. A `uniform` parameter without ordinary data, such as a texture, accepts the
+            // attribute, and the attribute has no effect on it.
             if (auto offsetAttr = param->findModifier<VkStructOffsetAttribute>())
             {
-                sink->diagnose(
-                    Diagnostics::VkOffsetRequiresUniformEntryPointParameter{.attr = offsetAttr});
+                sink->diagnose(Diagnostics::VkOffsetOnVaryingEntryPointParameter{
+                    .paramName = param->getName(),
+                    .attr = offsetAttr});
             }
 
             VaryingTypeValidationContext ctx;

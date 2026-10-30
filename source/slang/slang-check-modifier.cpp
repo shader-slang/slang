@@ -771,16 +771,20 @@ Modifier* SemanticsVisitor::validateAttribute(
             return nullptr;
         }
 
-        if (as<VkStructOffsetAttribute>(attr) &&
-            (value->getValue() < 0 || value->getValue() > INT32_MAX))
+        // A `[vk::offset]` value is a byte offset, so it cannot be negative, and it must fit
+        // the `int32_t` that stores it below. The other attributes of this branch are indices,
+        // which this range check does not cover.
+        auto intValue = value->getValue();
+        if (as<VkStructOffsetAttribute>(attr) && (intValue < 0 || intValue > INT32_MAX))
         {
             getSink()->diagnose(Diagnostics::VkOffsetOutOfRange{
-                .offset = int64_t(value->getValue()),
+                .maxOffset = INT32_MAX,
+                .offset = intValue,
                 .attr = attr});
             return nullptr;
         }
 
-        simpleLayoutAttr->value = int32_t(value->getValue());
+        simpleLayoutAttr->value = int32_t(intValue);
     }
     else if (auto maxVertexCountAttr = as<MaxVertexCountAttribute>(attr))
     {
