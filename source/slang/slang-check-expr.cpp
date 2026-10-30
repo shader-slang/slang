@@ -1347,19 +1347,18 @@ LookupResult SemanticsVisitor::filterLookupResultByVisibilityAndDiagnose(
 
 bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
 {
-    auto declaredWitness = as<DeclaredSubtypeWitness>(witness);
-    if (!declaredWitness)
-        return false;
-
-    auto decl = declaredWitness->getDeclRef().getDecl();
-    if (!decl || !decl->hasModifier<OptionalConstraintModifier>())
+    // A witness derived from an optional constraint, such as `T : IArithmetic` reached
+    // through `where optional T : IFloat`, is checked exactly when that constraint is, so
+    // the `if (sub is sup)` guard we look for is the one for the optional constraint itself.
+    auto optionalWitness = findOptionalConstraintWitness(witness);
+    if (!optionalWitness)
         return false;
 
     // Okay, we've found an optional subtype witness. This result needs
     // to be removed if we're not inside a block that directly checks
     // if (sub is sup)
-    auto sub = witness->getSub();
-    auto sup = witness->getSup();
+    auto sub = optionalWitness->getSub();
+    auto sup = optionalWitness->getSup();
 
     for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
     {
