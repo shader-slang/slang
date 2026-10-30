@@ -874,8 +874,8 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             const bool isMin = inst->getOp() == kIROp_AtomicMin;
             if (isFloatingType(inst->getDataType()))
             {
-                // CUDA has no floating-point atomicMin/atomicMax, so the prelude implements them
-                // as compare-and-swap loops; the 16-bit atomicCAS behind the half one needs sm_70.
+                // CUDA has no floating-point atomicMin/atomicMax, so the prelude implements them;
+                // the half one is a 16-bit atomicCAS loop, which needs sm_70.
                 if (inst->getDataType()->getOp() == kIROp_HalfType)
                     m_extensionTracker->requireSMVersion(SemanticVersion(7, 0));
                 m_writer->emit(isMin ? "__slang_atomic_min(" : "__slang_atomic_max(");

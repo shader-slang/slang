@@ -6346,8 +6346,9 @@ T __atomic_decrement<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed);
 
 // Atomic Reduction intrinsics (void return).
 // These are in-place atomic operations that don't return the old value.
-// On CUDA, integer reductions map to the `red` PTX instruction, which is faster than `atom`;
-// floating-point min/max use a compare-and-swap loop because `red` has no float min/max.
+// On CUDA, they map to the `red` PTX instruction, which is faster than `atom`. `red` has no
+// floating-point min/max, so float and double min/max use it on their bit pattern, and half min/max
+// use a compare-and-swap loop.
 // On other targets, they fall back to the corresponding atomic operations (ignoring return value).
 
 /// Atomic add reduction. On CUDA, uses PTX `red.add` instruction.
@@ -6406,8 +6407,8 @@ void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
     }
 }
 
-/// Atomic min reduction. On CUDA, uses PTX `red.min` instruction for integer types and a
-/// compare-and-swap loop for floating-point types.
+/// Atomic min reduction. On CUDA, uses PTX `red.min` instruction (on the bit pattern for `float`
+/// and `double`); `half` uses a compare-and-swap loop.
 /// @param val The target memory location.
 /// @param value The value to compare.
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
@@ -6423,8 +6424,8 @@ void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
     }
 }
 
-/// Atomic max reduction. On CUDA, uses PTX `red.max` instruction for integer types and a
-/// compare-and-swap loop for floating-point types.
+/// Atomic max reduction. On CUDA, uses PTX `red.max` instruction (on the bit pattern for `float`
+/// and `double`); `half` uses a compare-and-swap loop.
 /// @param val The target memory location.
 /// @param value The value to compare.
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
@@ -12740,8 +12741,8 @@ $}
 /// `RWByteAddressBuffer.InterlockedAddF32` or `RWByteAddressBuffer.InterlockedAddF16` instead when NVAPI is available.
 /// On SPIR-V (Vulkan), all integer and floating point types are supported.
 /// On Metal and WGSL, all floating-point types are not supported.
-/// On CUDA, floating-point `InterlockedMin` and `InterlockedMax` use a compare-and-swap loop; `half`
-/// requires SM 7.0.
+/// On CUDA, floating-point `InterlockedMin` and `InterlockedMax` use integer atomics on the bit
+/// pattern; `half` uses a compare-and-swap loop and requires SM 7.0.
 /// @category atomic Atomic functions
 [ForceInline]
 __glsl_version(430)
