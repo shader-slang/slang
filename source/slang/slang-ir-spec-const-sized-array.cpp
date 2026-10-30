@@ -181,8 +181,6 @@ void checkSpecializationConstantSizedArrays(
     context.checkValues(module->getModuleInst(), false);
 }
 
-/// Report each `makeArrayFromElement` under `inst` that builds an array sized by a
-/// specialization constant.
 static void checkInitializersUnder(IRInst* inst, DiagnosticSink* sink)
 {
     if (inst->getOp() == kIROp_MakeArrayFromElement &&
