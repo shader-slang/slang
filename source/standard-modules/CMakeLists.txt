@@ -38,20 +38,20 @@ set(SLANG_STANDARD_MODULE_INSTALL_DIR "${slang_library_dir}/${SLANG_STANDARD_MOD
 # producers below actually write the .slang-module tree. This is deliberately
 # kept separate from SLANG_STANDARD_MODULE_INSTALL_DIR: that is the install
 # destination and is user-overridable, so it may point somewhere the build tree
-# never populates. The optional embedding library scans this build-tree root.
+# never populates. The optional monolithic library scans this build-tree root.
 set(SLANG_STANDARD_MODULE_BUILD_SUBDIR "${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}" CACHE INTERNAL "Build-tree subdir of the standard module files")
 
 # The loose slang-standard-module-<version>/ tree is always built below (it is the
-# input to the optional embedding library). When SLANG_EMBED_STANDARD_MODULES is
+# input to the optional monolithic library). When SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY is
 # on, the module subdirectories below skip their install() rules (each guarded on
-# NOT SLANG_EMBED_STANDARD_MODULES), so the install/package contains only the
-# embedding library in place of the loose files. This affects install()/CPack
+# NOT SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY), so the install/package contains only the
+# monolithic library in place of the loose files. This affects install()/CPack
 # packaging only; consumers that copy straight from the build tree (e.g. CI
 # artifact staging) still see the loose tree.
 
 # Shared manifest of the serialized .slang-module files produced by the module
-# subdirectories below. The optional embedding library
-# (source/slang-standard-modules) DEPENDS on these actual outputs so that editing
+# subdirectories below. The optional monolithic library
+# (source/slang-monolithic-standard-module-library) DEPENDS on these actual outputs so that editing
 # a module regenerates its embedded payload. Cleared here each configure (INTERNAL
 # force-writes); each module subdirectory appends its own outputs.
 set(SLANG_STANDARD_MODULE_FILES "" CACHE INTERNAL "Built standard .slang-module files")

@@ -54,19 +54,19 @@ static String findStandardModulePath(String const& stdModuleDirPath, String cons
     return String();
 }
 
-// Optional alternative to the loose standard-module files: if a
-// slang-standard-modules shared library (built with SLANG_EMBED_STANDARD_MODULES)
+// Optional alternative to the loose standard-module files: if the monolithic
+// slang-standard-modules shared library (built with SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY)
 // is deployed beside slang.dll, obtain a serialized module from it by import
 // path. Returns the module's IR bytes, or null if the library is absent or does
 // not contain the requested module.
 //
-// This mirrors tryLoadBuiltinModuleFromDLL in slang-api.cpp (versioned filename
-// on Mac/Linux, unversioned on Windows, build-tag match against slang.dll), but
-// the standard modules stay ordinary on-demand imports -- only their *storage*
-// moves from a directory of files into one library. The experimental-feature
-// gate is unaffected, since it is enforced during import resolution regardless
-// of where the bytes come from.
-static ComPtr<ISlangBlob> tryLoadStandardModuleFromDLL(String const& moduleName)
+// The library filename is versioned on Mac/Linux and unversioned on Windows, and
+// its build tag is matched against slang.dll before use. The standard modules
+// stay ordinary on-demand imports -- only their *storage* moves from a directory
+// of files into one library. The experimental-feature gate is unaffected, since
+// it is enforced during import resolution regardless of where the bytes come
+// from.
+static ComPtr<ISlangBlob> tryLoadStandardModuleFromMonolithicLibrary(String const& moduleName)
 {
     typedef const char*(GetBuildTagFunc)();
     // (importPath, &compressedData, &compressedSize, &uncompressedSize) -> found?
@@ -77,8 +77,7 @@ static ComPtr<ISlangBlob> tryLoadStandardModuleFromDLL(String const& moduleName)
     static GetModuleFunc* s_getModule = []() -> GetModuleFunc*
     {
     // Undecorated library name: versioned off-Windows, matching the filename
-    // slang_add_target produces (see source/slang-standard-modules) and
-    // tryLoadBuiltinModuleFromDLL.
+    // slang_add_target produces (see source/slang-monolithic-standard-module-library).
 #if SLANG_WINDOWS_FAMILY
         String libBaseName = "slang-standard-modules";
 #else
@@ -89,7 +88,7 @@ static ComPtr<ISlangBlob> tryLoadStandardModuleFromDLL(String const& moduleName)
         // Resolve beside the loaded slang library, the same way the loose
         // standard-module directory is resolved (getStandardModuleDirPath), so a
         // Slang loaded by absolute path from a separate SDK directory still finds
-        // its embedding library -- this library is advertised as a drop-in
+        // its monolithic library -- this library is advertised as a drop-in
         // replacement for that directory. SharedLibrary::load() applies the
         // platform prefix/suffix (lib..., .so/.dylib/.dll) to the final path
         // component while keeping the directory.
@@ -114,7 +113,7 @@ static ComPtr<ISlangBlob> tryLoadStandardModuleFromDLL(String const& moduleName)
             "slang_getEmbeddedModuleBuildTagString");
         auto getModule = (GetModuleFunc*)SharedLibrary::findSymbolAddressByName(
             handle,
-            "slang_getEmbeddedStandardModule");
+            "slang_getStandardModuleFromMonolithicLibrary");
 
         // Reject a standard-modules library that does not match this slang build.
         if (!getTag || !getModule || strcmp(getTag(), SLANG_TAG_VERSION) != 0)
@@ -135,7 +134,7 @@ static ComPtr<ISlangBlob> tryLoadStandardModuleFromDLL(String const& moduleName)
         !compressed || uncompressedSize == 0)
         return ComPtr<ISlangBlob>();
 
-    // The embedded modules are LZ4-compressed (see slang-embed-standard-modules);
+    // The embedded modules are LZ4-compressed (see slang-generate-monolithic-standard-module-library);
     // inflate with the same compression system into a managed blob.
     List<unsigned char> decompressed;
     decompressed.setCount(Index(uncompressedSize));
@@ -2052,7 +2051,7 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
     // First, if the optional slang-standard-modules library is deployed beside
     // slang.dll, load the module from it. When that library is not deployed this
     // is a cheap miss and we fall through to the loose-file search below.
-    if (ComPtr<ISlangBlob> embeddedModule = tryLoadStandardModuleFromDLL(moduleName->text))
+    if (ComPtr<ISlangBlob> embeddedModule = tryLoadStandardModuleFromMonolithicLibrary(moduleName->text))
     {
         auto pathInfo = PathInfo::makeFromString(moduleName->text);
         RefPtr<Module> module = loadModuleImpl(

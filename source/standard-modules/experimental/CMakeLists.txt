@@ -65,7 +65,7 @@ add_custom_target(slang-workgraph-module ALL DEPENDS ${workgraph_module_file})
 set_target_properties(slang-workgraph-module PROPERTIES FOLDER generated)
 
 # Record this module's serialized output in the shared manifest consumed by the
-# optional slang-standard-modules embedding library.
+# optional slang-standard-modules monolithic library.
 list(APPEND SLANG_STANDARD_MODULE_FILES ${workgraph_module_file})
 set(SLANG_STANDARD_MODULE_FILES "${SLANG_STANDARD_MODULE_FILES}"
     CACHE INTERNAL "Built standard .slang-module files"
@@ -75,7 +75,7 @@ set(SLANG_STANDARD_MODULE_TARGETS "${SLANG_STANDARD_MODULE_TARGETS}"
     CACHE INTERNAL "Producer targets for standard .slang-module files"
 )
 
-if(NOT SLANG_EMBED_STANDARD_MODULES)
+if(NOT SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY)
     install(
         DIRECTORY ${workgraph_output_dir}/
         DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/experimental
