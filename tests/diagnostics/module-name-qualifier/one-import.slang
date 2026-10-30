@@ -6,6 +6,10 @@
 
 import mod_a;
 
+// `moda` is close in spelling to `ModA` and `mod_a`, but those names name a
+// module, so they get the module-name note and no "did you mean 'moda'?".
+float moda(float x) { return x; }
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uniform float* o)
@@ -31,8 +35,9 @@ void main(uniform float* o)
     // The unqualified call still resolves through the import.
     o[1] = twice(o[1]);
 
-    // A name that is not a module gets no note.
+    // A name that is not a module gets no module-name note, only the usual suggestion.
     o[2] = ModZ.twice(o[2]);
 //CHECK:   ^^^^ error E30015
 //CHECK:   ^^^^ undefined identifier 'ModZ'.
+//CHECK:   ^^^^ did you mean 'moda'?
 }

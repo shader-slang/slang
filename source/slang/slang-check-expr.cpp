@@ -5527,8 +5527,9 @@ static Name* findClosestInScopeName(
                 if (Math::Abs(candidateText.getLength() - target.getLength()) > maxDistance)
                     continue;
 
-                // Skip declarations that lookup never returns, such as a `module`
-                // declaration: suggesting one would name something the user cannot refer to.
+                // Skip declarations that the failed `LookupMask::Default` lookup could not
+                // have returned, such as a `module` declaration: suggesting one would name
+                // something the user cannot refer to.
                 if (!DeclPassesLookupMask(candidateDecl, LookupMask::Default))
                     continue;
 
@@ -5566,12 +5567,16 @@ static Name* findClosestInScopeName(
     return best;
 }
 
-// Return whether `name` names the module that `scope` belongs to or a module imported into it,
-// so that an undefined-identifier error on `name` can explain that a module name cannot be used
-// in code. A module is named both by its declared name (`module ModA;`) and by the path that an
-// `import` spells (`import mod_a;`, `import lib.mod_d;`, `import "lib/StrMod.slang";`); a module
-// without a `module` declaration takes its name from that path. For a path, user code would
-// write the file name without its extension, so that is what we compare `name` with.
+// Return whether `name` names a module that the code at `scope` can see, so that an
+// undefined-identifier error on `name` can explain that a module name cannot be used in code.
+// The modules that count are the module that `scope` belongs to and every module in
+// `importedModulesList`, which holds the modules this checking session imported, including the
+// ones re-exported with `__exported import`. A module is named both by its declared name
+// (`module ModA;`, or for a module without one, the name taken from its file or import path)
+// and by the path that an `import` in this module spells (`import mod_a;`, `import lib.mod_d;`,
+// `import "lib/StrMod.slang";`), including an `import` in a file the module `__include`s. User
+// code would write the last path component without its extension, so that is what we compare
+// `name` with.
 static bool isNameOfCurrentOrImportedModule(SemanticsVisitor* semantics, Name* name, Scope* scope)
 {
     if (!name)
@@ -5659,16 +5664,21 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
         // 'length'?" note to the error; this turns a bare "undefined identifier
         // 'lenght'" into an actionable hint. The note only renders when
         // `suggestionLocation` is valid, so a null suggestion is harmless.
-        auto suggestion =
-            findClosestInScopeName(this, expr->name, expr->scope, getDeclToExcludeFromLookup());
+        // A name that names a module was not misspelled, so its module-name note replaces
+        // the spelling suggestion.
+        const bool namesModule = isNameOfCurrentOrImportedModule(this, expr->name, expr->scope);
+        auto suggestion = namesModule ? nullptr
+                                      : findClosestInScopeName(
+                                            this,
+                                            expr->name,
+                                            expr->scope,
+                                            getDeclToExcludeFromLookup());
         getSink()->diagnose(Diagnostics::UndefinedIdentifier{
             .name = expr->name,
             .suggestion = suggestion,
             .location = expr->loc,
             .suggestionLocation = suggestion ? expr->loc : SourceLoc{},
-            .moduleNameLocation = isNameOfCurrentOrImportedModule(this, expr->name, expr->scope)
-                                      ? expr->loc
-                                      : SourceLoc{}});
+            .moduleNameLocation = namesModule ? expr->loc : SourceLoc{}});
     }
 
     return resultExpr;
