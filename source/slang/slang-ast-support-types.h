@@ -6,7 +6,6 @@
 #include "core/slang-basic.h"
 #include "core/slang-semantic-version.h"
 #include "slang-ast-forward-declarations.h"
-#include "slang-known-builtin-decl-name.h"
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
 #include "slang.h"
@@ -222,6 +221,15 @@ FIDDLE() namespace Slang
     bool findVkImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFormat);
 
     char const* getGLSLNameForImageFormat(ImageFormat format);
+
+    /// Identifies declarations with compiler-defined meaning independently of their source names.
+    enum class KnownBuiltinDeclName : uint32_t
+    {
+#define SLANG_KNOWN_BUILTIN_DECL(NAME, VALUE) NAME = VALUE,
+#include "slang-known-builtin-decl-name-defs.h"
+#undef SLANG_KNOWN_BUILTIN_DECL
+        COUNT
+    };
 
     /// Returns the builtin identified by an exact name, or COUNT if the name is unknown.
     KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name);
