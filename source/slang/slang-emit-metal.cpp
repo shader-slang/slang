@@ -132,6 +132,16 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     m_writer->emit(">");
 }
 
+// Return the resource type of a `DescriptorHandle<T>`, or `type` itself otherwise.
+// A handle is bindless on Metal and has T's layout, so binding attributes are
+// chosen from T.
+static IRType* unwrapDescriptorHandle(IRType* type)
+{
+    if (auto handleType = as<IRDescriptorHandleType>(type))
+        return handleType->getResourceType();
+    return type;
+}
+
 void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
@@ -145,18 +155,26 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     if (!layout)
         return;
 
-    // DescriptorHandle<T> is bindless on Metal and has T's layout, so unwrap
-    // it before the per-kind type tests below.
-    IRType* paramType = param->getDataType();
-    if (auto handleType = as<IRDescriptorHandleType>(paramType))
-        paramType = handleType->getResourceType();
+    IRType* paramType = unwrapDescriptorHandle(param->getDataType());
+
+    // MSL accepts a fixed-size array of textures or samplers as an entry-point
+    // argument and binds it to consecutive slots from one base index (MSL 4.1
+    // section 2.12.1), so the texture and sampler cases test the element type
+    // of such an array. We unwrap only one sized array level, because the
+    // element of an MSL resource array must itself be a texture or sampler and
+    // an unsized array has no direct argument form. Nested and unsized arrays
+    // get no attribute: neither has a correct direct spelling in MSL.
+    IRType* textureOrSamplerType = paramType;
+    if (auto arrayType = as<IRArrayType>(paramType))
+        textureOrSamplerType = unwrapDescriptorHandle(arrayType->getElementType());
 
     for (auto rr : layout->getOffsetAttrs())
     {
         switch (rr->getResourceKind())
         {
         case LayoutResourceKind::MetalTexture:
-            if (as<IRTextureTypeBase>(paramType) || as<IRTextureBufferType>(paramType))
+            if (as<IRTextureTypeBase>(textureOrSamplerType) ||
+                as<IRTextureBufferType>(textureOrSamplerType))
             {
                 m_writer->emit(" [[texture(");
                 m_writer->emit(rr->getOffset());
@@ -164,6 +182,9 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::MetalBuffer:
+            // MSL has no direct kernel-argument form for an array of buffers, so
+            // we test the whole parameter type and leave buffer arrays unbound
+            // until they are routed through an argument buffer (#12291).
             if (as<IRPtrTypeBase>(paramType) || as<IRHLSLStructuredBufferTypeBase>(paramType) ||
                 as<IRByteAddressBufferTypeBase>(paramType) ||
                 as<IRUniformParameterGroupType>(paramType) ||
@@ -175,7 +196,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::SamplerState:
-            if (as<IRSamplerStateTypeBase>(paramType))
+            if (as<IRSamplerStateTypeBase>(textureOrSamplerType))
             {
                 m_writer->emit(" [[sampler(");
                 m_writer->emit(rr->getOffset());
@@ -1414,7 +1435,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_BorrowInParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
-            if (type->getOp() == kIROp_BorrowInParamType)
+            if (type->getOp() == kIROp_BorrowInParamType ||
+                (type->getOp() == kIROp_RefParamType &&
+                 ptrType->getAccessQualifier() == AccessQualifier::Read))
             {
                 m_writer->emit("const ");
             }
@@ -1772,26 +1795,6 @@ void MetalSourceEmitter::emitPostDeclarationAttributesForType(IRInst* type)
     }
 }
 
-static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)
-{
-    switch (mode)
-    {
-    case IRInterpolationMode::PerVertex:
-    case IRInterpolationMode::NoInterpolation:
-        return UnownedStringSlice::fromLiteral("[[flat]]");
-    case IRInterpolationMode::NoPerspective:
-        return UnownedStringSlice::fromLiteral("[[center_no_perspective]]");
-    case IRInterpolationMode::Linear:
-        return UnownedStringSlice::fromLiteral("[[sample_no_perspective]]");
-    case IRInterpolationMode::Sample:
-        return UnownedStringSlice::fromLiteral("[[sample_perspective]]");
-    case IRInterpolationMode::Centroid:
-        return UnownedStringSlice::fromLiteral("[[center_perspective]]");
-    default:
-        return UnownedStringSlice();
-    }
-}
-
 void MetalSourceEmitter::emitInterpolationModifiersImpl(
     IRInst* varInst,
     IRType* valueType,
@@ -1800,20 +1803,59 @@ void MetalSourceEmitter::emitInterpolationModifiersImpl(
     SLANG_UNUSED(layout);
     SLANG_UNUSED(valueType);
 
+    // MSL takes one interpolation attribute that combines the sampling (center, centroid,
+    // sample) and the perspective correction: [[center_perspective]] (the default),
+    // [[centroid_no_perspective]], ..., or [[flat]]. HLSL `linear` is perspective-correct
+    // interpolation; HLSL `noperspective` is the no_perspective one.
+    bool isFlat = false;
+    bool hasInterpolation = false;
+    bool noPerspective = false;
+    const char* sampling = "center";
     for (auto dd : varInst->getDecorations())
     {
         if (dd->getOp() != kIROp_InterpolationModeDecoration)
             continue;
 
         auto decoration = (IRInterpolationModeDecoration*)dd;
-
-        UnownedStringSlice modeText = _getInterpolationModifierText(decoration->getMode());
-        if (modeText.getLength() > 0)
+        switch (decoration->getMode())
         {
-            m_writer->emit(modeText);
-            m_writer->emitChar(' ');
+        case IRInterpolationMode::PerVertex:
+        case IRInterpolationMode::NoInterpolation:
+            isFlat = true;
+            break;
+        case IRInterpolationMode::NoPerspective:
+            noPerspective = true;
+            hasInterpolation = true;
+            break;
+        case IRInterpolationMode::Linear:
+            hasInterpolation = true;
+            break;
+        case IRInterpolationMode::Sample:
+            sampling = "sample";
+            hasInterpolation = true;
+            break;
+        case IRInterpolationMode::Centroid:
+            sampling = "centroid";
+            hasInterpolation = true;
+            break;
+        default:
+            break;
         }
     }
+
+    if (isFlat)
+    {
+        m_writer->emit("[[flat]] ");
+        return;
+    }
+    // Perspective-correct center interpolation is the default.
+    if (!hasInterpolation || (!noPerspective && strcmp(sampling, "center") == 0))
+        return;
+
+    m_writer->emit("[[");
+    m_writer->emit(sampling);
+    m_writer->emit(noPerspective ? "_no_perspective" : "_perspective");
+    m_writer->emit("]] ");
 }
 
 void MetalSourceEmitter::emitPackOffsetModifier(

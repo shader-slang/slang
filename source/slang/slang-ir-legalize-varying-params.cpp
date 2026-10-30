@@ -5194,6 +5194,15 @@ protected:
             }
             break;
 
+        case SystemValueSemanticName::WorkgroupCount:
+            {
+                result.systemValueName = toSlice("num_workgroups");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::UInt),
+                    builder.getIntValue(builder.getIntType(), 3)));
+            }
+            break;
+
         case SystemValueSemanticName::GroupIndex:
             {
                 result.systemValueName = toSlice("local_invocation_index");
@@ -5304,6 +5313,13 @@ protected:
         case SystemValueSemanticName::WaveIndex:
             {
                 result.systemValueName = toSlice("subgroup_id");
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+
+        case SystemValueSemanticName::WaveCount:
+            {
+                result.systemValueName = toSlice("num_subgroups");
                 result.permittedTypes.add(builder.getUIntType());
                 break;
             }

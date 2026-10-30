@@ -1016,6 +1016,14 @@ typedef uint32_t SlangSizeT;
         SLANG_DIAGNOSTIC_COLOR_NEVER = 2,  // Never use color
     };
 
+    // Selects the presentation of human-readable diagnostics. Machine-readable diagnostics
+    // take precedence over this setting.
+    enum SlangDiagnosticFormat
+    {
+        SLANG_DIAGNOSTIC_FORMAT_DEFAULT = 0,
+        SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO = 1,
+    };
+
     // All compiler option names supported by Slang.
     //
     // IMPORTANT: ABI STABILITY POLICY FOR CompilerOptionName
@@ -1031,6 +1039,16 @@ typedef uint32_t SlangSizeT;
     // compiled against an older version of this header.
     namespace slang
     {
+    enum class BitfieldPackingRules
+    {
+        // Uses LSB-first packing; fields may share storage across underlying type sizes.
+        Default = 0,
+        // Uses LSB-first packing; a type-size change starts new storage. Rejects zero-width fields.
+        MSVC = 1,
+        // Uses MSB-first packing and starts new storage on type-size changes. Not recommended.
+        LegacyMSBFirstMSVC = 2,
+    };
+
     enum class CompilerOptionName
     {
         MacroDefine = 0, // stringValue0: macro name;  stringValue1: macro value
@@ -1203,7 +1221,8 @@ typedef uint32_t SlangSizeT;
         DenormalModeFp32 = 126,
         DenormalModeFp64 = 127,
 
-        // Bitfield options
+        // Deprecated. When no BitfieldPackingRules value is supplied, true selects MSB-first
+        // packing and starts new storage on underlying type-size changes.
         UseMSVCStyleBitfieldPacking = 128, // bool
 
         ForceCLayout = 129, // bool
@@ -1333,6 +1352,16 @@ typedef uint32_t SlangSizeT;
         // never stored on an option set; it only drives the print-and-continue handler in the
         // command-line parser.
         GetCompilerPath = 159,
+
+        BitfieldPackingRules = 160, // intValue0: slang::BitfieldPackingRules
+
+        DisableNotes = 161, // stringValue0: comma-separated note codes or names.
+
+        DiagnosticFormat = 162, // intValue0: SlangDiagnosticFormat (default, vs)
+
+        // `bool`: Enables additional backwards-compatibility features for legacy HLSL inputs,
+        // such as using uniform parameters as mutable temporaries. Has no effect on other dialects.
+        EnableExtendedHLSLBackwardsCompatibility = 163,
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
@@ -4417,18 +4446,35 @@ struct TargetDesc
     SlangTargetFlags flags = kDefaultTargetFlags;
 
     /** Default mode to use for floating-point operations on the target.
+        `SLANG_FLOATING_POINT_MODE_DEFAULT` keeps the mode set by the session's
+        `compilerOptionEntries` (`FloatingPointMode`), if any; any other value overrides it.
+        To get the compiler's default mode on this target when the session sets another one, add
+        a `FloatingPointMode` entry with value `SLANG_FLOATING_POINT_MODE_DEFAULT` to this
+        target's `compilerOptionEntries`; that entry takes precedence over this field.
      */
     SlangFloatingPointMode floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
 
     /** The line directive mode for output source code.
+        `SLANG_LINE_DIRECTIVE_MODE_DEFAULT` keeps the mode set by the session's
+        `compilerOptionEntries` (`LineDirectiveMode`), if any; any other value overrides it.
+        To get the compiler's default mode on this target when the session sets another one, add
+        a `LineDirectiveMode` entry with value `SLANG_LINE_DIRECTIVE_MODE_DEFAULT` to this
+        target's `compilerOptionEntries`; that entry takes precedence over this field.
      */
     SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
 
     /** Whether to force `scalar` layout for glsl shader storage buffers.
+        `true` forces it, unless this target's `compilerOptionEntries` set `GLSLForceScalarLayout`
+        to 0. `false` keeps the session's `GLSLForceScalarLayout` option, if any; to turn scalar
+        layout off for this target only when the session turns it on, add a
+        `GLSLForceScalarLayout` entry with value 0 to this target's `compilerOptionEntries`.
      */
     bool forceGLSLScalarBufferLayout = false;
 
     /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
+        They are applied after `floatingPointMode`, `lineDirectiveMode` and
+        `forceGLSLScalarBufferLayout`, so an entry for the same option takes precedence over the
+        field.
      */
     const CompilerOptionEntry* compilerOptionEntries = nullptr;
 
@@ -6047,6 +6093,11 @@ SLANG_EXTERN_C SLANG_API void slang_shutdown();
    - SLANG_RECORD_LAYER=1: Enable recording on startup
    - SLANG_RECORD_PATH=<path>: Use the exact path specified for recording output
      instead of generating a timestamped folder under .slang-replays/
+
+   Thread safety: enable or disable the layer only when no other thread is inside a
+   Slang API call. Enable it once during startup (or via SLANG_RECORD_LAYER) before
+   issuing concurrent calls; changing the mode while other threads are mid-call is
+   not supported.
  */
 SLANG_EXTERN_C SLANG_API void slang_enableRecordLayer(bool enable);
 
@@ -6074,12 +6125,16 @@ SLANG_EXTERN_C SLANG_API const char* slang_getCurrentReplayPath();
    Switches to playback mode on success.
    @param folderPath Path to the replay folder.
    @return SLANG_OK on success, SLANG_E_NOT_FOUND if stream.bin doesn't exist.
+   Returns SLANG_E_NOT_AVAILABLE when Slang is built with the record-replay layer excluded
+   (SLANG_ENABLE_RECORD_REPLAY=OFF).
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadReplay(const char* folderPath);
 
 /* Load the most recent replay from the replay directory.
    Switches to playback mode on success.
    @return SLANG_OK on success, SLANG_E_NOT_FOUND if no replays exist.
+   Returns SLANG_E_NOT_AVAILABLE when Slang is built with the record-replay layer excluded
+   (SLANG_ENABLE_RECORD_REPLAY=OFF).
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadLatestReplay();
 

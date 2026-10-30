@@ -221,19 +221,37 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_OK;
     }
 
+    // Parse, bind, and check the supplied generic arguments before the -no-codegen return below.
+    // For example, if MetalOnly has [require(metal)], then
+    // `-entry main -specialize MetalOnly -target hlsl -no-codegen` must reject that argument.
+    // These calls record the checked arguments in component types. The post-link IR specialization
+    // pass runs later during code generation.
+    if (m_passThrough == PassThroughMode::None)
+    {
+        m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
+        if (getSink()->getErrorCount() != 0)
+            return SLANG_FAIL;
+
+        m_specializedGlobalAndEntryPointsComponentType =
+            createSpecializedGlobalAndEntryPointsComponentType(this, m_specializedEntryPoints);
+        if (getSink()->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
     // If command line specifies to skip codegen, we exit here.
     // Note: this is a debugging option.
     //
     if (getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
     {
-        // We will use the program (and matching layout information)
-        // that was computed in the front-end for all subsequent
-        // reflection queries, etc.
-        //
-        m_specializedGlobalComponentType = getUnspecializedGlobalComponentType();
-        m_specializedGlobalAndEntryPointsComponentType =
-            getUnspecializedGlobalAndEntryPointsComponentType();
-        m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
+        // Keep the checked specialization available for reflection. Pass-through requests have
+        // no Slang specialization to check and retain their front-end components.
+        if (m_passThrough != PassThroughMode::None)
+        {
+            m_specializedGlobalComponentType = getUnspecializedGlobalComponentType();
+            m_specializedGlobalAndEntryPointsComponentType =
+                getUnspecializedGlobalAndEntryPointsComponentType();
+            m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
+        }
 
         SLANG_RETURN_ON_FAIL(maybeCreateContainer());
 
@@ -277,20 +295,8 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         }
     }
 
-    // If codegen is enabled, we need to move along to
-    // apply any generic specialization that the user asked for.
-    //
     if (m_passThrough == PassThroughMode::None)
     {
-        m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
-        if (getSink()->getErrorCount() != 0)
-            return SLANG_FAIL;
-
-        m_specializedGlobalAndEntryPointsComponentType =
-            createSpecializedGlobalAndEntryPointsComponentType(this, m_specializedEntryPoints);
-        if (getSink()->getErrorCount() != 0)
-            return SLANG_FAIL;
-
         // For each code generation target, we will generate specialized
         // parameter binding information (taking global generic
         // arguments into account at this time).
@@ -1124,7 +1130,14 @@ SlangResult EndToEndCompileRequest::maybeWriteContainer(const String& fileName)
     // Only write if there is something to write
     if (writeArtifact)
     {
-        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(writeArtifact, fileName));
+        // Report write failures here, so that callers that ignore the result still fail the compile
+        // through the sink's error count.
+        const SlangResult res = ArtifactContainerUtil::writeContainer(writeArtifact, fileName);
+        if (SLANG_FAILED(res))
+        {
+            getSink()->diagnose(Diagnostics::CannotWriteOutputFile{.path = fileName});
+            return res;
+        }
     }
 
     return SLANG_OK;
@@ -1941,11 +1954,12 @@ SlangResult EndToEndCompileRequest::compile()
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         // This situation indicates a fatal (but not necessarily internal) error
@@ -1978,6 +1992,7 @@ SlangResult EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
     }
+#endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
 
 #else

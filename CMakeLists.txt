@@ -200,6 +200,11 @@ option(
     "Enable development build for standard modules (enables UNIT_TEST macro). Disable for release builds."
     ON
 )
+set(SLANG_DISABLE_NOTE_IDS
+    ""
+    CACHE STRING
+    "Comma-separated note IDs disabled by runtime sessions and module builds"
+)
 
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
@@ -223,13 +228,30 @@ option(
 )
 option(
     SLANG_ENABLE_EXAMPLES
-    "Enable example targets, requires SLANG_ENABLE_SLANG_RHI"
+    "Enable example targets (most require SLANG_ENABLE_SLANG_RHI)"
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
+option(
+    SLANG_ENABLE_RECORD_REPLAY
+    "Build the API record-replay layer and its slang_*RecordLayer/*Replay C API. When OFF, the record-replay sources are excluded and that C API is compiled as exported disabled stubs (ABI preserved)."
+    ON
+)
+
+# The slang-replay tool links the record-replay subsystem, so it cannot be built once that
+# subsystem is excluded. Force it off (rather than erroring) so an existing SLANG_ENABLE_REPLAYER=ON
+# cache entry does not make the two options contradict each other.
+if(NOT SLANG_ENABLE_RECORD_REPLAY AND SLANG_ENABLE_REPLAYER)
+    message(
+        STATUS
+        "SLANG_ENABLE_RECORD_REPLAY is OFF; forcing SLANG_ENABLE_REPLAYER OFF (the slang-replay tool depends on the record-replay subsystem)."
+    )
+    set(SLANG_ENABLE_REPLAYER OFF CACHE BOOL "Enable slang-replay tool" FORCE)
+endif()
 
 advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
+advanced_option(SLANG_USE_SYSTEM_LUA "Build slang-fiddle using system Lua" OFF)
 advanced_option(
     SLANG_USE_SYSTEM_VULKAN_HEADERS
     "Build using system Vulkan headers"
@@ -619,9 +641,18 @@ if(${SLANG_USE_SYSTEM_MINIZ})
 endif()
 
 if(${SLANG_USE_SYSTEM_LZ4})
-    find_package(lz4 REQUIRED)
+    find_package(lz4 CONFIG QUIET)
+    if(NOT TARGET LZ4::lz4 AND NOT TARGET lz4_static)
+        # Homebrew's LZ4 exposes pkg-config metadata but no CMake package.
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(LZ4 REQUIRED IMPORTED_TARGET GLOBAL liblz4)
+    endif()
     if(NOT TARGET lz4_static)
-        add_library(lz4_static ALIAS LZ4::lz4)
+        if(TARGET LZ4::lz4)
+            add_library(lz4_static ALIAS LZ4::lz4)
+        else()
+            add_library(lz4_static ALIAS PkgConfig::LZ4)
+        endif()
     endif()
 endif()
 
@@ -630,13 +661,29 @@ if(${SLANG_USE_SYSTEM_VULKAN_HEADERS})
 endif()
 
 if(${SLANG_USE_SYSTEM_SPIRV_TOOLS})
+    # The wrapper links the opt and link libraries, which are separate CMake packages.
     find_package(SPIRV-Tools REQUIRED)
+    find_package(SPIRV-Tools-opt REQUIRED)
+    find_package(SPIRV-Tools-link REQUIRED)
 endif()
 
 if(${SLANG_USE_SYSTEM_GLSLANG})
     find_package(glslang REQUIRED)
+    if(
+        NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+        AND (TARGET SPIRV-Tools-opt OR TARGET SPIRV-Tools-link)
+    )
+        message(
+            FATAL_ERROR
+            "The installed glslang package imports SPIRV-Tools targets; set SLANG_USE_SYSTEM_SPIRV_TOOLS=ON to avoid conflicting with bundled targets"
+        )
+    endif()
     if(NOT TARGET glslang)
         add_library(glslang ALIAS glslang::glslang)
+    endif()
+    if(NOT TARGET SPIRV)
+        # Keep the wrapper's target name while using the installed glslang library location.
+        add_library(SPIRV ALIAS glslang::SPIRV)
     endif()
 endif()
 
@@ -670,6 +717,26 @@ if(SLANG_SLANG_TINT_BINARY_URL)
 endif()
 
 fetch_or_build_slang_llvm()
+
+# slang-glslang gets mimalloc only through SPIRV-Tools-opt, and an overridden or system
+# SPIRV-Tools-opt may not link it, so we decide from SPIRV-Tools-opt's actual link dependencies.
+# We read INTERFACE_LINK_LIBRARIES because it is what slang-glslang inherits, and an imported
+# SPIRV-Tools-opt has no LINK_LIBRARIES. A static SPIRV-Tools-opt records its private mimalloc
+# dependency there as $<LINK_ONLY:mimalloc-static>; a shared one keeps mimalloc inside its own DLL.
+set(SLANG_GLSLANG_USES_MIMALLOC OFF)
+if(WIN32 AND TARGET SPIRV-Tools-opt AND TARGET mimalloc-static)
+    get_target_property(
+        _spirv_tools_opt_interface
+        SPIRV-Tools-opt
+        INTERFACE_LINK_LIBRARIES
+    )
+    if(
+        mimalloc-static IN_LIST _spirv_tools_opt_interface
+        OR "$<LINK_ONLY:mimalloc-static>" IN_LIST _spirv_tools_opt_interface
+    )
+        set(SLANG_GLSLANG_USES_MIMALLOC ON)
+    endif()
+endif()
 
 #
 # Our targets

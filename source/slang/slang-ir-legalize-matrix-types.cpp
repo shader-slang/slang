@@ -9,6 +9,16 @@
 namespace Slang
 {
 
+/// Return true if the target cannot use some matrix types as they are, so that
+/// `legalizeMatrixTypes` may rewrite them to arrays of row vectors (`vector<T,C>[R]`).
+///
+/// This only says that the target is one of the targets that rewrite matrices. It does not say
+/// that a given matrix is rewritten; `shouldLegalizeMatrixType` decides that per matrix type.
+///
+/// We rewrite matrices on SPIR-V, GLSL, WGSL and Metal because their matrix types have only
+/// floating-point elements, so an `int2x3` has no direct form there. HLSL, CUDA and C++ are not
+/// listed because they keep `int2x3` as a matrix. LLVM is listed for a different reason: it has
+/// no matrix type at all, so every matrix, float included, is rewritten.
 static bool targetLegalizesMatrixTypes(TargetProgram* targetProgram)
 {
     if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
@@ -29,6 +39,29 @@ static bool targetLegalizesMatrixTypes(TargetProgram* targetProgram)
     default:
         return false;
     }
+}
+
+static bool shouldLegalizeMatrixType(TargetProgram* targetProgram, IRMatrixType* matrixType)
+{
+    SLANG_ASSERT(targetLegalizesMatrixTypes(targetProgram));
+
+    if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
+    {
+        // Always lower all matrices on LLVM; we'd need to break them up
+        // like this for data layout reasons anyway.
+        return true;
+    }
+
+    auto elementType = matrixType->getElementType();
+    // None of these targets has integer matrices, whatever the integer width (SPIR-V matrices
+    // need floating-point columns), so integer matrices of every width are lowered.
+    return as<IRBoolType>(elementType) || isIntegralType(elementType);
+}
+
+bool isMatrixTypeLegalizedToVectorArray(TargetProgram* targetProgram, IRMatrixType* matrixType)
+{
+    return targetLegalizesMatrixTypes(targetProgram) &&
+           shouldLegalizeMatrixType(targetProgram, matrixType);
 }
 
 struct MatrixTypeLoweringContext
@@ -64,18 +97,7 @@ struct MatrixTypeLoweringContext
 
     bool shouldLowerMatrixType(IRMatrixType* matrixType)
     {
-        SLANG_ASSERT(targetLegalizesMatrixTypes(targetProgram));
-
-        if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
-        {
-            // Always lower all matrices on LLVM; we'd need to break them up
-            // like this for data layout reasons anyway.
-            return true;
-        }
-
-        auto elementType = matrixType->getElementType();
-        return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
-               as<IRIntType>(elementType);
+        return shouldLegalizeMatrixType(targetProgram, matrixType);
     }
 
     IRInst* legalizeMatrixTypeDeclaration(IRInst* inst)

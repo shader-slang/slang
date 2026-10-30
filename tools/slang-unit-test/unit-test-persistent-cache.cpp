@@ -9,6 +9,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <filesystem>
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -162,6 +163,30 @@ struct PersistentCacheTest
 
     // Get the absolute filename of the cache index file.
     String getIndexFilename() { return cache->m_indexFileName; }
+
+    // Replace the cache index with one that holds `copyCount` entries for the key of `entry`, as an
+    // index written before rewrites were refreshed in place could. The entry file is not touched.
+    void writeIndexWithDuplicateKey(const Entry& entry, Count copyCount)
+    {
+        PersistentCache::CacheIndex index;
+        for (Count i = 0; i < copyCount; ++i)
+            index.add(PersistentCache::CacheEntry{entry.key, uint32_t(i)});
+        SLANG_CHECK(cache->writeIndex(cache->m_indexFileName, index) == SLANG_OK);
+    }
+
+    // Count the entries for the key of `entry` in the cache index on disk.
+    Count countIndexEntries(const Entry& entry)
+    {
+        PersistentCache::CacheIndex index;
+        SLANG_CHECK(cache->readIndex(cache->m_indexFileName, index) == SLANG_OK);
+        Count count = 0;
+        for (const auto& indexEntry : index)
+        {
+            if (indexEntry.key == entry.key)
+                ++count;
+        }
+        return count;
+    }
 };
 
 } // namespace Slang
@@ -308,6 +333,135 @@ struct EvictionTest : public PersistentCacheTest
     }
 };
 
+
+// Tests rewriting an entry that is already in the cache.
+// Rewriting a key must refresh that entry in place: it must not evict an entry (least of all the
+// entry being rewritten, which would delete the file that was just written) and must not add a
+// second index entry for the same key.
+struct RewriteTest : public PersistentCacheTest
+{
+    RewriteTest()
+        : PersistentCacheTest(2)
+    {
+    }
+
+    void run()
+    {
+        List<Entry> entries;
+        for (size_t i = 0; i < 3; ++i)
+        {
+            auto data = createRandomBlob(4096);
+            auto key = SHA1::compute(data->getBufferPointer(), data->getBufferSize());
+            entries.add(Entry{key, data});
+        }
+
+        // Fill the cache. Entry 0 is now the least recently used entry.
+        writeEntry(entries[0]);
+        writeEntry(entries[1]);
+
+        // Rewrite the LRU entry of a full cache with different data. The entry must stay in the
+        // cache and reading it must return the new data.
+        Entry rewritten{entries[0].key, createRandomBlob(4096)};
+        SLANG_CHECK(!isBlobEqual(rewritten.data, entries[0].data));
+        writeEntry(rewritten);
+        SLANG_CHECK(cache->getStats().entryCount == 2);
+        SLANG_CHECK(readEntry(rewritten) == true);
+        SLANG_CHECK(readEntry(entries[1]) == true);
+
+        // Rewriting the same key twice must not create duplicate index entries: if it did, the
+        // two copies would count twice against the entry limit and evicting one would delete the
+        // file the other one refers to.
+        SLANG_CHECK(cache->clear() == SLANG_OK);
+        writeEntry(entries[0]);
+        writeEntry(entries[0]);
+        SLANG_CHECK(cache->getStats().entryCount == 1);
+        writeEntry(entries[1]);
+        SLANG_CHECK(cache->getStats().entryCount == 2);
+        SLANG_CHECK(readEntry(entries[0]) == true);
+        SLANG_CHECK(readEntry(entries[1]) == true);
+
+        // Writing a new key still evicts the LRU entry (entry 0 was read before entry 1).
+        writeEntry(entries[2]);
+        SLANG_CHECK(readEntry(entries[2]) == true);
+        SLANG_CHECK(readEntry(entries[0]) == false);
+        SLANG_CHECK(readEntry(entries[1]) == true);
+
+        // An index written before this fix can already hold the same key twice. Rewriting that
+        // key must leave a single index entry, so that writing a new key into the full cache
+        // cannot evict a leftover copy and delete the file of the rewritten entry.
+        SLANG_CHECK(cache->clear() == SLANG_OK);
+        writeEntry(entries[0]);
+        writeIndexWithDuplicateKey(entries[0], 2);
+        writeEntry(rewritten);
+        SLANG_CHECK(countIndexEntries(rewritten) == 1);
+        SLANG_CHECK(cache->getStats().entryCount == 1);
+        writeEntry(entries[2]);
+        SLANG_CHECK(readEntry(rewritten) == true);
+        SLANG_CHECK(readEntry(entries[2]) == true);
+    }
+};
+
+// Tests a failed index write while an existing key is rewritten. The index on disk still refers to
+// that key, so its entry file must be kept (removing it would leave an index entry without a file);
+// the entry file of a new key must be removed. The index write is made to fail by making the index
+// file read-only, which also prevents writing on Windows. A process that can write read-only files
+// anyway (for example root on Linux) cannot run this test, which is then ignored.
+struct IndexWriteFailureTest : public PersistentCacheTest
+{
+    IndexWriteFailureTest()
+        : PersistentCacheTest(2)
+    {
+    }
+
+    ~IndexWriteFailureTest() { setIndexWritable(true); }
+
+    bool setIndexWritable(bool writable)
+    {
+        namespace fs = std::filesystem;
+        std::error_code error;
+        fs::permissions(
+            fs::path(getIndexFilename().getBuffer()),
+            fs::perms::owner_write | fs::perms::group_write | fs::perms::others_write,
+            writable ? fs::perm_options::add : fs::perm_options::remove,
+            error);
+        return !error;
+    }
+
+    void run()
+    {
+        List<Entry> entries;
+        for (size_t i = 0; i < 2; ++i)
+        {
+            auto data = createRandomBlob(4096);
+            auto key = SHA1::compute(data->getBufferPointer(), data->getBufferSize());
+            entries.add(Entry{key, data});
+        }
+
+        writeEntry(entries[0]);
+        SLANG_CHECK(setIndexWritable(false));
+
+        // Rewrite the existing key with different data. The index write fails, but the entry file
+        // (which now holds the new data) must still exist.
+        Entry rewritten{entries[0].key, createRandomBlob(4096)};
+        if (SLANG_SUCCEEDED(cache->writeEntry(rewritten.key, rewritten.data)))
+        {
+            // The read-only index was written anyway, so the failure path cannot be reached.
+            SLANG_IGNORE_TEST
+        }
+        SLANG_CHECK(File::exists(getEntryFileName(rewritten)));
+
+        // Write a new key. The index write fails and the new entry file must be removed.
+        SLANG_CHECK(cache->writeEntry(entries[1].key, entries[1].data) != SLANG_OK);
+        SLANG_CHECK(!File::exists(getEntryFileName(entries[1])));
+
+        // The index on disk is unchanged: it holds the rewritten key once, whose entry is still
+        // readable, and not the new key.
+        SLANG_CHECK(setIndexWritable(true));
+        SLANG_CHECK(countIndexEntries(rewritten) == 1);
+        SLANG_CHECK(readEntry(rewritten) == true);
+        SLANG_CHECK(readEntry(entries[1]) == false);
+    }
+};
 
 // Tests the cache to be robust against various corruptions.
 // These can happen if the cache files are manipulated externally.
@@ -627,6 +781,18 @@ SLANG_UNIT_TEST(persistentCacheBasic)
 SLANG_UNIT_TEST(persistentCacheEviction)
 {
     EvictionTest test;
+    test.run();
+}
+
+SLANG_UNIT_TEST(persistentCacheRewrite)
+{
+    RewriteTest test;
+    test.run();
+}
+
+SLANG_UNIT_TEST(persistentCacheIndexWriteFailure)
+{
+    IndexWriteFailureTest test;
     test.run();
 }
 

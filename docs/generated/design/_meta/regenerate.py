@@ -80,6 +80,10 @@ from typing import Iterable
 META_DIR = Path(__file__).resolve().parent
 DOCS_ROOT = META_DIR.parent
 REPO_ROOT = DOCS_ROOT.parent.parent.parent
+LANG_REF_PREFIX = "docs/language-reference/"
+SPEC_CHAPTER_DIR = (
+    Path(os.environ.get("SLANG_SPEC_DIR") or REPO_ROOT / "spec-checkout") / "specification"
+)
 MANIFEST_PATH = META_DIR / "manifest.yaml"
 FRESHNESS_PATH = META_DIR / "freshness.json"
 REVIEW_STATE_PATH = META_DIR / "review-state.json"
@@ -882,6 +886,16 @@ def lint_doc(spec: DocSpec) -> list[LintIssue]:
             continue
         # Resolve relative to the document's directory
         candidate = (p.parent / target).resolve()
+        try:
+            candidate_rel = candidate.relative_to(REPO_ROOT.resolve()).as_posix()
+        except ValueError:
+            candidate_rel = ""
+        # The language reference lives in shader-slang/spec; see
+        # LANG_REF_PREFIX in docs/generated/tests/_meta/regenerate.py.
+        if candidate_rel.startswith(LANG_REF_PREFIX) and not candidate.exists():
+            if not SPEC_CHAPTER_DIR.is_dir():
+                continue
+            candidate = SPEC_CHAPTER_DIR / candidate_rel[len(LANG_REF_PREFIX):]
         if not candidate.exists():
             issues.append(
                 LintIssue(
