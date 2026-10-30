@@ -15,7 +15,11 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=CHECK_WGSL): -target wgsl -entry computeMain -stage compute
+//TEST:REFLECTION(filecheck=CHECK_REFL): -target spirv -entry computeMain -stage compute -no-codegen
 
+// The WGSL emitter derives `@align` from the IR-layout offset, so `@align(4)`
+// shows that `second` kept its natural offset 4 on WGSL; with the offset
+// applied it would be `@align(16)`, for offset 32.
 // CHECK_WGSL: struct EntryPointParams
 // CHECK_WGSL-NEXT: {
 // CHECK_WGSL-NEXT: first_0 : i32,
@@ -44,3 +48,13 @@ void computeMain(
     outputBuffer[2] = third;
     outputBuffer[3] = fourth;
 }
+
+// Reflection places the parameters where the SPIR-V does, without a GPU.
+// CHECK_REFL: "name": "first"
+// CHECK_REFL: "binding": {"kind": "uniform", "offset": 0, "size": 4
+// CHECK_REFL: "name": "second"
+// CHECK_REFL: "binding": {"kind": "uniform", "offset": 32, "size": 4
+// CHECK_REFL: "name": "third"
+// CHECK_REFL: "binding": {"kind": "uniform", "offset": 36, "size": 4
+// CHECK_REFL: "name": "fourth"
+// CHECK_REFL: "binding": {"kind": "uniform", "offset": 8, "size": 4

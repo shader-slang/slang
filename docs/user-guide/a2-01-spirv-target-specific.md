@@ -208,8 +208,8 @@ All `uniform` parameters defined in global scope are grouped together and placed
 on the uniform parameter. All push constants follow the std430 layout by default.
 
 Each entry point lays out its own `uniform` parameters starting at byte 0, so a vertex and a fragment entry point that are used in one pipeline share the same push-constant bytes by default.
-To give the stages different bytes, put `[vk::offset(N)]` on an entry-point `uniform` parameter. The parameter starts at byte `N`, which must be a multiple of the parameter's alignment, and the parameters after it follow it.
-Reflection reports these parameter offsets, so a host that writes push constants through reflection writes the bytes that the shader reads.
+To give the stages different bytes, put `[vk::offset(N)]` on an entry-point `uniform` parameter. The parameter starts at byte `N`, and the parameters after it follow it.
+Reflection reports these parameter offsets, so a host that writes push constants through reflection writes the bytes that the shader reads. Reflection does not yet apply `[vk::offset]` to the fields of a struct.
 The attribute has no effect on targets other than SPIR-V and GLSL.
 
 ```hlsl
@@ -223,7 +223,7 @@ float4 fragmentMain(VertexOutput input,
 { ... }
 ```
 
-The compiler reports an error when `[vk::offset]` is on a varying entry-point parameter, when `N` is negative, larger than 2147483647 or not a multiple of the parameter's alignment, or when two parameters of one entry point share bytes.
+The compiler checks the offsets: error 31166 reports `[vk::offset]` on a varying entry-point parameter, error 31167 reports an `N` that is negative or larger than 2147483647, error 31168 reports an `N` that is not a multiple of the parameter's alignment, and error 31169 reports two `uniform` parameters of one entry point that share bytes.
 
 Vulkan allows an entry point to statically use at most one push-constant block.
 The compiler reports error 39033 when an entry point uses more than one, for example when a compute or rasterization entry point reads both a global `[vk::push_constant]` parameter and its own `uniform` parameters.
