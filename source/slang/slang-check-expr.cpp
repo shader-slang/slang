@@ -7444,7 +7444,17 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
     // Check if it's a type cast like float(x), half(x), double(x)
     else if (auto invokeExpr = as<InvokeExpr>(valueExpr))
     {
-        if (invokeExpr->arguments.getCount() == 1)
+        // Only a conversion to the floating-point type can be folded from its argument.
+        // Other one-argument calls, such as `asfloat(0x3F800000u)`, `bit_cast<float>(...)`
+        // or `sqrt(4.0f)`, produce a different value than converting the argument would.
+        bool isConversion = as<TypeCastExpr>(invokeExpr) != nullptr;
+        if (auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
+        {
+            if (as<ConstructorDecl>(funcDeclRefExpr->declRef.getDecl()))
+                isConversion = true;
+        }
+
+        if (isConversion && invokeExpr->arguments.getCount() == 1)
         {
             floatLitExpr = as<FloatingPointLiteralExpr>(invokeExpr->arguments[0]);
             if (!floatLitExpr)
