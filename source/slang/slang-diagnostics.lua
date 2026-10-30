@@ -5557,6 +5557,13 @@ err(
     span { loc = "location", message = "unresolved external symbol '~symbol:IRInst'." }
 )
 
+err(
+    "obfuscate-setting-mismatch-on-import",
+    45002,
+    "cannot link '~decl:Decl' from module '~moduleName:Name': the module and the code importing it were compiled with different `-obfuscate` settings. Modules that are linked together must all be compiled with `-obfuscate`, or all without it; the standard modules, such as `slang.numerics`, are always compiled without it",
+    span { loc = "location", message = "'~moduleName' was compiled with a different `-obfuscate` setting" }
+)
+
 -- 451xx - Coverage instrumentation (-trace-coverage)
 
 err(

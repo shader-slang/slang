@@ -564,6 +564,8 @@ struct SharedIRGenContext
     ModuleDecl* m_mainModuleDecl = nullptr;
     Linkage* m_linkage = nullptr;
 
+    HashSet<Module*> modulesWithObfuscateSettingMismatch;
+
     // List of all string literals used in user code, regardless
     // of how they were used (i.e., whether or not they were hashed).
     //
@@ -1563,6 +1565,24 @@ static String getLinkageName(IRGenContext* context, Decl* decl)
     if (isLinkageNameObfuscated(context, decl))
         return getHashedName(mangledName.getUnownedSlice());
     return mangledName;
+}
+
+/// Return the location to report a problem with `importedModuleDecl` at: the `import` in the
+/// module being lowered that brings it in, or `fallback` when it is only imported indirectly.
+static SourceLoc findImportLoc(
+    IRGenContext* context,
+    ModuleDecl* importedModuleDecl,
+    SourceLoc fallback)
+{
+    if (auto mainModuleDecl = context->getMainModuleDecl())
+    {
+        for (auto importDecl : mainModuleDecl->getMembersOfType<ImportDecl>())
+        {
+            if (importDecl->importedModuleDecl == importedModuleDecl)
+                return importDecl->loc;
+        }
+    }
+    return fallback;
 }
 
 static void addLinkageDecoration(IRGenContext* context, IRInst* inst, Decl* decl)
@@ -12016,12 +12036,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     /// locally. The policy around it differs, and deliberately: that path lowers
     /// the function *and* registers it, gated on the force-inline attribute,
     /// while this one registers *instead of* deriving, for every cross-module
-    /// interface. It also bails out when the linkage name would be obfuscated,
-    /// which the function path does not do -- an asymmetry that is a gap there
-    /// rather than caution here. Compiling a non-core imported
-    /// `[__unsafeForceInlineEarly]` function with `-obfuscate` makes that path
-    /// index an empty symbol list, which is a pre-existing defect on the function
-    /// side and not something this function inherits.
+    /// interface. It also bails out when the linkage name would be obfuscated;
+    /// the function path has no AST fallback, so it looks the function up by its
+    /// linkage name, obfuscated or not.
     bool tryBorrowInterfaceFromOwningModule(InterfaceDecl* decl, LoweredValInfo& outVal)
     {
         if (!isDeclInDifferentModule(context, decl))
@@ -13867,10 +13884,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto importedModule = getModule(decl);
             auto irModule = importedModule->getIRModule();
             SLANG_ASSERT(irModule && "Module containing imported decl does not have an IRModule.");
-            String mangledName = getMangledName(context->astBuilder, decl);
-            auto importedFunc = irModule->findSymbolByMangledName(mangledName);
-            SLANG_ASSERT(importedFunc.getCount() > 0);
-            subContext->shared->externalSymbolsToPrelink.add(importedFunc[0]);
+            auto importedFunc = irModule->findSymbolByMangledName(getLinkageName(context, decl));
+            if (importedFunc.getCount() > 0)
+            {
+                subContext->shared->externalSymbolsToPrelink.add(importedFunc[0]);
+            }
+            else
+            {
+                // A miss means the owning module spelled the name the other way, which happens
+                // when it was compiled with the opposite `-obfuscate` setting. Any other miss is
+                // a compiler bug. One report per module is enough to name the cause.
+                String mangledName = getMangledName(context->astBuilder, decl);
+                String otherName = isLinkageNameObfuscated(context, decl)
+                                       ? mangledName
+                                       : getHashedName(mangledName.getUnownedSlice());
+                SLANG_RELEASE_ASSERT(
+                    irModule->findSymbolByMangledName(otherName).getCount() > 0 &&
+                    "imported [__unsafeForceInlineEarly] function is not exported by its module");
+                if (context->shared->modulesWithObfuscateSettingMismatch.add(importedModule))
+                {
+                    getSink()->diagnose(Diagnostics::ObfuscateSettingMismatchOnImport{
+                        .decl = decl,
+                        .moduleName = importedModule->getNameObj(),
+                        .location = findImportLoc(context, getModuleDecl(decl), decl->loc)});
+                }
+            }
         }
 
         IRGeneric* outerGeneric = nullptr;
