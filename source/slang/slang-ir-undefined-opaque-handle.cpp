@@ -143,7 +143,8 @@ struct UndefinedOpaqueHandleContext
 
     /// Return whether `call`, which passes an undefined handle, may be inlined so that the callee's
     /// accesses through the handle become visible here. We respect `[noinline]`, and a call from a
-    /// function to itself is not inlined; that also bounds inlining through a recursive cycle.
+    /// function to itself is not inlined. A longer recursive cycle is bounded by the round limit in
+    /// `eliminateUsesOfUndefinedOpaqueHandles`.
     static bool canInlineCall(IRCall* call)
     {
         auto callee = as<IRFunc>(call->getCallee());
@@ -196,7 +197,7 @@ struct UndefinedOpaqueHandleContext
                     accessingInst = user;
             }
             else if (
-                doesOpReadResourceContents(user->getOp()) ||
+                doesOpReadResourceContents(user->getOp()) || user->getOp() == kIROp_ImageStore ||
                 doesOpDeriveOpaqueHandle(user->getOp()) ||
                 (doesOpProduceResourceContentAddress(user->getOp()) && use == user->getOperands()))
             {
@@ -223,8 +224,12 @@ void eliminateUsesOfUndefinedOpaqueHandles(IRModule* module)
     context.module = module;
 
     // Inlining a call copies the callee's body, including any undefined handles of its own, into
-    // the caller, so after each round of inlining we look for undefined handles again.
-    for (;;)
+    // the caller, so after each round of inlining we look for undefined handles again. Shaders do
+    // not recurse, but a recursive call that survives validation could otherwise be inlined
+    // forever, so the number of rounds is bounded; a handle left behind is reported by
+    // `diagnoseUndefinedOpaqueHandles`.
+    const int kMaxInliningRounds = 64;
+    for (int round = 0;; round++)
     {
         forEachUndefinedOpaqueHandle(module, [&](IRInst* handle) { context.worklist.add(handle); });
         while (context.worklist.getCount())
@@ -242,7 +247,7 @@ void eliminateUsesOfUndefinedOpaqueHandles(IRModule* module)
                 inlinedAnyCall |= inlineCall(call);
         }
         context.callsToInline.clear();
-        if (!inlinedAnyCall)
+        if (!inlinedAnyCall || round + 1 >= kMaxInliningRounds)
             break;
     }
 }
