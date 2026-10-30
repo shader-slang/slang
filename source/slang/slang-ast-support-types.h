@@ -225,9 +225,31 @@ FIDDLE() namespace Slang
     /// Identifies declarations with compiler-defined meaning independently of their source names.
     enum class KnownBuiltinDeclName : uint32_t
     {
-#define SLANG_KNOWN_BUILTIN_DECL(NAME, VALUE) NAME = VALUE,
-#include "slang-known-builtin-decl-name-defs.h"
-#undef SLANG_KNOWN_BUILTIN_DECL
+        GeometryStreamAppend,
+        GeometryStreamRestart,
+        GetAttributeAtVertex,
+        DispatchMesh,
+        saturated_cooperation,
+        saturated_cooperation_using,
+        IDifferentiable,
+        IDifferentiablePtr,
+        IForwardDifferentiable,
+        IBackwardDifferentiable,
+        IBwdCallable,
+        NullDifferential,
+        OperatorAddressOf,
+        WaveIsFirstLane,
+        WaveReadLaneFirst,
+        CallShader,
+        ReportHit = 16,
+        RayTracingClosestHitInput,
+        RayTracingAnyHitInput,
+        RayTracingIntersectionInput,
+        RayTracingMissInput,
+        RayTracingCallableInput,
+        RayTracingProgramHitGroups,
+        RayTracingProgramMissShaders,
+        RayTracingProgramCallableShaders,
         COUNT
     };
 
