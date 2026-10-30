@@ -1,7 +1,7 @@
 // On GLSL only a user pointer is a buffer reference, so only its null literal is constructed from
 // address zero (https://github.com/shader-slang/slang/issues/14082). A `groupshared` pointer has
 // no GLSL type to construct, so its null is written as `0`, and comparing it with `nullptr` still
-// compiles through glslang. The test covers the GLSL path only.
+// compiles through glslang.
 
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=GLSLSPV):-target spirv-asm -emit-spirv-via-glsl -entry computeMain -stage compute
