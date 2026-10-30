@@ -1537,10 +1537,14 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     // only checking the syntax class. Perform more checks here.
     switch (attr->astNodeType)
     {
-    // Allowed only on struct fields.
+    // Allowed only on struct fields and on function parameters. A function parameter
+    // is accepted here because any function can become an entry point later, through
+    // `-entry` or the API; `validateEntryPoint` rejects the attribute on a varying
+    // entry-point parameter, where it has no uniform data to place.
     case ASTNodeType::VkStructOffsetAttribute:
         auto targetDecl = as<Decl>(effectiveAttrTarget);
-        validTarget = validTarget && targetDecl && as<StructDecl>(getParentDecl(targetDecl));
+        validTarget = validTarget && targetDecl &&
+                      (as<StructDecl>(getParentDecl(targetDecl)) || as<ParamDecl>(targetDecl));
         break;
     };
 

@@ -4223,6 +4223,13 @@ err(
 )
 
 err(
+    "vk-offset-requires-uniform-entry-point-parameter",
+    31166,
+    "invalid 'vk::offset' on a varying entry-point parameter",
+    span { loc = "attr:Modifier", message = "'[vk::offset]' on an entry-point parameter requires a 'uniform' parameter" }
+)
+
+err(
     "accessor-does-not-satisfy-type-constraint-requirements",
     31110,
     "accessor does not satisfy type constraint requirements",

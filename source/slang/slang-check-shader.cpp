@@ -2605,6 +2605,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             if (isUniformParameterType(param->getType()))
                 continue;
 
+            if (auto offsetAttr = param->findModifier<VkStructOffsetAttribute>())
+            {
+                sink->diagnose(
+                    Diagnostics::VkOffsetRequiresUniformEntryPointParameter{.attr = offsetAttr});
+            }
+
             VaryingTypeValidationContext ctx;
             ctx.astBuilder = astBuilder;
             ctx.sink = sink;
