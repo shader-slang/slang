@@ -2176,6 +2176,10 @@ bool SemanticsVisitor::_coerce(
                 auto innerVarDecl = getASTBuilder()->create<VarDecl>();
                 innerVarDecl->nameAndLoc.name = getName("__optInner");
                 innerVarDecl->type.type = fromInner;
+                // The placeholder is complete and has no parent scope. We mark it as checked,
+                // as `moveTemp` does for its temporaries, because the declaration checks that a
+                // later `ensureDecl` would run on it need a parent scope.
+                innerVarDecl->checkState = DeclCheckState::DefinitionChecked;
 
                 auto innerVarExpr = getASTBuilder()->create<VarExpr>();
                 innerVarExpr->type = QualType(fromInner);

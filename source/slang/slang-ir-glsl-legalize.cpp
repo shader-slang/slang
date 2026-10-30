@@ -1082,13 +1082,17 @@ void createVarLayoutForLegalizedGlobalParam(
         }
         if (!foundInterpolationMode)
         {
-            if (auto interpolationModeDecor =
-                    decorParent->findDecoration<IRInterpolationModeDecoration>())
+            // Copy every interpolation decoration of the innermost declaration that has any:
+            // an interpolation mode and a sampling location combine (`noperspective centroid`).
+            for (auto decor : decorParent->getDecorations())
             {
-                builder->addInterpolationModeDecoration(
-                    globalParam,
-                    interpolationModeDecor->getMode());
-                foundInterpolationMode = true;
+                if (auto interpolationModeDecor = as<IRInterpolationModeDecoration>(decor))
+                {
+                    builder->addInterpolationModeDecoration(
+                        globalParam,
+                        interpolationModeDecor->getMode());
+                    foundInterpolationMode = true;
+                }
             }
         }
     }

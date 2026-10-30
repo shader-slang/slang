@@ -6126,10 +6126,19 @@ static void CompleteDecl(
             {
                 for (auto enumCase : enumDecl->getMembersOfType<EnumCaseDecl>())
                 {
+                    // We add one alias per distinct case name. The redeclaration check of the
+                    // `EnumCaseDecl` reports a repeated case, and an alias for it would be
+                    // reported again at the same location.
+                    if (enumDecl->getPrevDirectMemberDeclWithSameName(enumCase))
+                        continue;
                     auto staticConstDecl = parser->astBuilder->create<LetDecl>();
                     staticConstDecl->nameAndLoc = enumCase->nameAndLoc;
                     addModifier(staticConstDecl, parser->astBuilder->create<HLSLStaticModifier>());
                     addModifier(staticConstDecl, parser->astBuilder->create<ConstModifier>());
+                    auto aliasModifier =
+                        parser->astBuilder->create<UnscopedEnumCaseAliasModifier>();
+                    aliasModifier->enumCaseDecl = enumCase;
+                    addModifier(staticConstDecl, aliasModifier);
 
                     // Copy visibility modifiers from the enum declaration
                     if (auto visibilityModifier = modifiers.findModifier<VisibilityModifier>())
@@ -11144,6 +11153,9 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("out", getSyntaxClass<OutModifier>()),
     _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
     _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
+    _makeParseModifier("__ref_readonly", getSyntaxClass<RefReadOnlyModifier>()),
+    _makeParseModifier("__ref_writeonly", getSyntaxClass<RefWriteOnlyModifier>()),
+    _makeParseModifier("__borrow", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),

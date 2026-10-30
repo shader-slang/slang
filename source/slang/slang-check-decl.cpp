@@ -799,8 +799,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
                                            public DeclVisitor<SemanticsDeclRedeclarationVisitor>
 {
-    SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer)
-        : SemanticsDeclVisitorBase(outer)
+    SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer, RedeclarationSeverity severity)
+        : SemanticsDeclVisitorBase(outer), m_severity(severity)
     {
     }
 
@@ -808,15 +808,17 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
 
 #define CASE(TYPE) \
-    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl); }
+    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl, m_severity); }
 
     CASE(EnumCaseDecl)
     CASE(FuncDecl)
-    CASE(VarDeclBase)
     CASE(SimpleTypeDecl)
     CASE(AggTypeDecl)
+    CASE(VarDeclBase)
 
 #undef CASE
+
+    RedeclarationSeverity m_severity;
 };
 
 
@@ -1701,6 +1703,44 @@ QualType getTypeForDeclRef(
         if (varDeclRef.getDecl()->findModifier<ConstModifier>())
             isLValue = false;
 
+        bool isReadOnlyMemoryLocation = false;
+        if (auto paramDecl = as<ParamDecl>(varDeclRef.getDecl()))
+        {
+            // Function parameters declared in the "modern" style
+            // are immutable unless their passing mode is meant to be written.
+            const bool isModernParam = as<ModernParamDecl>(paramDecl) != nullptr;
+
+            // The effective passing mode decides whether the body may write a parameter.
+            switch (getParamPassingMode(paramDecl))
+            {
+            case ParamPassingMode::In:
+                // A legacy (C-style) `in` parameter is a mutable local copy.
+                if (isModernParam)
+                    isLValue = false;
+                break;
+            case ParamPassingMode::BorrowIn:
+                // TODO(#13833): A borrow is an immutable borrow of its argument, so its body should
+                // not be able to write it, and code that does is already incorrect. Making it
+                // read-only is a bug fix that requires updating existing tests, so we leave it to a
+                // separate change. Until then, a borrow follows the rule for `in`.
+                if (isModernParam)
+                    isLValue = false;
+                break;
+            case ParamPassingMode::Out:
+            case ParamPassingMode::BorrowInOut:
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefWriteOnly:
+                // These parameters are meant to be written.
+                break;
+            case ParamPassingMode::RefReadOnly:
+                isLValue = false;
+                isReadOnlyMemoryLocation = true;
+                break;
+            default:
+                SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            }
+        }
+
         // Global-scope shader parameters should not be writable,
         // since they are effectively program inputs.
         //
@@ -1717,20 +1757,6 @@ QualType getTypeForDeclRef(
         // Generic value parameters are always immutable
         if (isGenericValueParam(varDeclRef))
             isLValue = false;
-
-        // Function parameters declared in the "modern" style
-        // are immutable unless they have an `out` or `inout` modifier.
-        if (varDeclRef.is<ModernParamDecl>())
-        {
-            // Note: the `inout` modifier AST class inherits from
-            // the class for the `out` modifier so that we can
-            // make simple checks like this.
-            //
-            if (!varDeclRef.getDecl()->hasModifier<OutModifier>())
-            {
-                isLValue = false;
-            }
-        }
 
         // An explicit `readonly` or `writeonly` qualifier still restricts parameter uses in
         // compatibility mode. The parser keeps these modifiers on the underlying parameter,
@@ -1752,6 +1778,7 @@ QualType getTypeForDeclRef(
         }
 
         qualType.isLeftValue = isLValue;
+        qualType.isReadOnlyMemoryLocation = isReadOnlyMemoryLocation;
         qualType.isWriteOnly = isWriteOnly;
         return qualType;
     }
@@ -2065,6 +2092,20 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
         if (outerScope)
             subContext = subContext.withOuterScope(outerScope);
         _dispatchDeclCheckingVisitor(decl, nextState, subContext);
+
+        // A visitor can advance `decl` past several states at once. Consider `let x = 1;`:
+        // the header visitor infers the type of `x` and marks `x` as `DefinitionChecked`. Of the
+        // skipped steps, only `ReadyForReference` compares `decl` with other declarations, so we
+        // still run it; without it, `int x; let x = 1;` would be accepted while
+        // `let x = 1; int x;` is not. Earlier compiler releases skipped it, so a conflict that it
+        // finds is a warning; Slang 202c may make it an error (shader-slang/slang#13956).
+        //
+        if (nextState < DeclCheckState::ReadyForReference &&
+            decl->checkState.getState() >= DeclCheckState::ReadyForReference)
+        {
+            SemanticsDeclRedeclarationVisitor(subContext, RedeclarationSeverity::Warning)
+                .dispatch(decl);
+        }
 
         // In the common case, the visitor will have done the necessary
         // checking, but will *not* have updated the `checkState` on
@@ -7166,6 +7207,7 @@ static void populateParams(
         synArg->declRef = makeDeclRef(paramDecl);
         synArg->type.type = paramInfo.type;
         synArg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(paramInfo.mode);
+        synArg->type.isReadOnlyMemoryLocation = paramInfo.mode == ParamPassingMode::RefReadOnly;
         synArg->loc = synthesizedLoc;
         synArgs.add(synArg);
     }
@@ -7577,6 +7619,43 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         auto thisVisibility = getDeclVisibility(context->parentDecl);
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
         addVisibilityModifier(synthesized, visibility);
+    }
+}
+
+/// Add the modifiers that spell `mode` to `paramDecl`. A parameter built from a
+/// function type has only its effective mode, and several spellings can produce the
+/// same mode (for example, `__ref_readonly` and its legacy alias `const __ref`), so
+/// we spell each mode one canonical way.
+static void addModifiersForParamPassingMode(
+    ASTBuilder* astBuilder,
+    ParamDecl* paramDecl,
+    ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::In:
+        break;
+    case ParamPassingMode::Out:
+        addModifier(paramDecl, astBuilder->create<OutModifier>());
+        break;
+    case ParamPassingMode::BorrowInOut:
+        addModifier(paramDecl, astBuilder->create<InOutModifier>());
+        break;
+    case ParamPassingMode::BorrowIn:
+        addModifier(paramDecl, astBuilder->create<BorrowModifier>());
+        break;
+    case ParamPassingMode::RefReadWrite:
+        addModifier(paramDecl, astBuilder->create<RefModifier>());
+        break;
+    case ParamPassingMode::RefReadOnly:
+        addModifier(paramDecl, astBuilder->create<RefReadOnlyModifier>());
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        addModifier(paramDecl, astBuilder->create<RefWriteOnlyModifier>());
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        break;
     }
 }
 
@@ -14755,7 +14834,10 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     return SLANG_FAIL;
 }
 
-Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
+Result SemanticsVisitor::checkRedeclaration(
+    Decl* newDecl,
+    Decl* oldDecl,
+    RedeclarationSeverity severity)
 {
     // If either of the declarations being looked at is generic, then
     // we want to consider the "inner" declaration instead when
@@ -14791,6 +14873,22 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
         return SLANG_OK;
     }
 
+    // Consider `[UnscopedEnum] enum Mode { Mode, Other }`. The alias `Mode` that the parser adds
+    // for the case conflicts with the enum, but lookup tells the type and the value apart by where
+    // the name is used, and DXC and earlier Slang releases accept the code, so we warn; Slang 202c
+    // may make it an error (shader-slang/slang#13956). The failure result stops the caller's loop,
+    // so a conflict with an older declaration is reported at the enum. The case is null when user
+    // code attaches the modifier through `syntax`.
+    if (auto aliasModifier = newDecl->findModifier<UnscopedEnumCaseAliasModifier>())
+    {
+        auto caseDecl = aliasModifier->enumCaseDecl;
+        if (caseDecl && caseDecl->parentDecl == oldDecl)
+        {
+            getSink()->diagnose(Diagnostics::UnscopedEnumCaseNamedLikeEnum{.decl = newDecl});
+            return SLANG_FAIL;
+        }
+    }
+
 
     // For all other flavors of declaration, we do not
     // allow duplicate declarations with the same name.
@@ -14805,16 +14903,19 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     //   if their generic parameter lists are sufficient to
     //   tell them apart at a use site.
 
-    // We will diagnose a redeclaration error at the new declaration,
+    // We will diagnose a redeclaration at the new declaration,
     // and point to the old declaration for context.
     //
-    getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
+    if (severity == RedeclarationSeverity::Warning)
+        getSink()->diagnose(Diagnostics::RedeclarationCompatibilityWarning{.decl = newDecl});
+    else
+        getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
     getSink()->diagnose(Diagnostics::SeePreviousDeclarationOf{.decl = oldDecl});
     return SLANG_FAIL;
 }
 
 
-void SemanticsVisitor::checkForRedeclaration(Decl* decl)
+void SemanticsVisitor::checkForRedeclaration(Decl* decl, RedeclarationSeverity severity)
 {
     // We want to consider a "new" declaration in the context
     // of some parent/container declaration, and compare it
@@ -14859,7 +14960,7 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         // whether the redeclaration should be allowed,
         // and emit an appropriate diagnostic if not.
         //
-        Result checkResult = checkRedeclaration(newDecl, oldDecl);
+        Result checkResult = checkRedeclaration(newDecl, oldDecl, severity);
 
         // The `checkRedeclaration` function will return a failure
         // status (whether or not it actually emitted a diagnostic)
@@ -14868,6 +14969,103 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         //
         if (SLANG_FAILED(checkResult))
             break;
+    }
+}
+
+/// Return whether `decl` has an earlier declaration of the same name in `containerDecl` other
+/// than the module's own `module` declaration. `checkForRedeclaration` compares `decl` with
+/// each such declaration.
+///
+static bool hasEarlierSameNameNonModuleSibling(ContainerDecl* containerDecl, Decl* decl)
+{
+    for (auto prevDecl = containerDecl->getPrevDirectMemberDeclWithSameName(decl); prevDecl;
+         prevDecl = containerDecl->getPrevDirectMemberDeclWithSameName(prevDecl))
+    {
+        if (!as<ModuleDeclarationDecl>(prevDecl))
+            return true;
+    }
+    return false;
+}
+
+/// Return the aggregate type whose members lookup finds through the transparent variable
+/// `varDecl`, or null if its type names none. As for any member lookup, lookup takes the
+/// variable's checked type and looks through a pointer-like type such as `ConstantBuffer<T>`
+/// (see `_lookUpMembersInValue` and `_lookUpMembersInSuperTypeImpl`).
+///
+static AggTypeDecl* getAggTypeDeclVisibleThroughTransparentVar(VarDeclBase* varDecl)
+{
+    Type* type = varDecl->getType();
+    if (auto pointedToType = getPointedToTypeIfCanImplicitDeref(type))
+        type = pointedToType;
+    return isDeclRefTypeOf<AggTypeDecl>(type).getDecl();
+}
+
+/// Compare `decl` with the nearest earlier declaration of its name in `visibleDecls`, unless
+/// `checkForRedeclaration` compares it with an earlier sibling, and record `decl` as visible.
+///
+static void compareWithNearestVisibleDecl(
+    SemanticsVisitor* visitor,
+    Dictionary<Name*, Decl*>& visibleDecls,
+    Decl* decl,
+    bool hasEarlierSiblingOfSameName)
+{
+    Decl* prevDecl = nullptr;
+    if (!hasEarlierSiblingOfSameName && visibleDecls.tryGetValue(decl->getName(), prevDecl) &&
+        prevDecl != decl)
+    {
+        visitor->checkRedeclaration(decl, prevDecl, RedeclarationSeverity::Warning);
+    }
+    visibleDecls[decl->getName()] = decl;
+}
+
+/// Check the declarations that lookup in `containerDecl` finds through its transparent
+/// variables against the other declarations that lookup finds there.
+///
+/// Consider this example:
+///
+///     static const int x = 1;
+///     cbuffer CB { int x; }
+///
+/// Lookup of `x` finds both declarations, but the member `x` is not a direct member of the
+/// scope, so `checkForRedeclaration` does not compare them. We treat the members of the type
+/// of each transparent variable as declared at that variable, and compare each declaration
+/// with the nearest earlier one of its name. Earlier compiler releases did not compare these
+/// pairs, so a conflict is a warning; Slang 202c may make it an error (shader-slang/slang#13956).
+///
+void SemanticsVisitor::checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl)
+{
+    if (containerDecl->getTransparentDirectMemberDecls().getCount() == 0)
+        return;
+
+    // For each name, the most recent declaration so far that lookup in `containerDecl` finds.
+    Dictionary<Name*, Decl*> visibleDecls;
+    for (auto memberDecl : containerDecl->getDirectMemberDecls())
+    {
+        if (memberDecl->getName() && !as<ModuleDeclarationDecl>(memberDecl) &&
+            DeclPassesLookupMask(memberDecl, LookupMask::Default))
+        {
+            compareWithNearestVisibleDecl(
+                this,
+                visibleDecls,
+                memberDecl,
+                hasEarlierSameNameNonModuleSibling(containerDecl, memberDecl));
+        }
+
+        auto varDecl = as<VarDeclBase>(memberDecl);
+        if (!varDecl || !varDecl->hasModifier<TransparentModifier>())
+            continue;
+        ensureDecl(varDecl, DeclCheckState::CanUseTypeOfValueDecl);
+        auto aggTypeDecl = getAggTypeDeclVisibleThroughTransparentVar(varDecl);
+        if (!aggTypeDecl)
+            continue;
+        for (auto aggMemberDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+        {
+            compareWithNearestVisibleDecl(
+                this,
+                visibleDecls,
+                aggMemberDecl,
+                aggTypeDecl->getPrevDirectMemberDeclWithSameName(aggMemberDecl) != nullptr);
+        }
     }
 }
 
@@ -14910,6 +15108,21 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         }
     }
 
+    // An `out` or `inout` parameter is meant to be written by its function, so `const` on one
+    // contradicts its passing mode. We reject it even though DXC accepts it. The check precedes
+    // the parameter-pack handling below, which adds `const` to every pack parameter.
+    if (auto constModifier = paramDecl->findModifier<ConstModifier>())
+    {
+        const auto mode = getParamPassingMode(paramDecl);
+        if (mode == ParamPassingMode::Out || mode == ParamPassingMode::BorrowInOut)
+        {
+            getSink()->diagnose(Diagnostics::ConstOnWritableParameter{
+                .mode = mode,
+                .param = paramDecl,
+                .modifier = constModifier});
+        }
+    }
+
     if (isTypePack(paramDecl->type.type))
     {
         // For now, we only allow parameter packs to be `const`.
@@ -14917,7 +15130,8 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         for (auto modifier : paramDecl->modifiers)
         {
             if (as<OutModifier>(modifier) || as<InOutModifier>(modifier) ||
-                as<RefModifier>(modifier) || as<BorrowModifier>(modifier))
+                as<RefModifier>(modifier) || as<RefReadOnlyModifier>(modifier) ||
+                as<RefWriteOnlyModifier>(modifier) || as<BorrowModifier>(modifier))
             {
                 // TODO(tfoley): The diagnostic in this case should probably not refer
                 // to the `const` modifier at all (since that is not actually what is
@@ -15430,23 +15644,7 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
 
         auto param = m_astBuilder->create<ParamDecl>();
         param->type.type = paramType;
-        switch (paramDir)
-        {
-        case ParamPassingMode::BorrowInOut:
-            addModifier(param, m_astBuilder->create<InOutModifier>());
-            break;
-        case ParamPassingMode::Out:
-            addModifier(param, m_astBuilder->create<OutModifier>());
-            break;
-        case ParamPassingMode::Ref:
-            addModifier(param, m_astBuilder->create<RefModifier>());
-            break;
-        case ParamPassingMode::BorrowIn:
-            addModifier(param, m_astBuilder->create<BorrowModifier>());
-            break;
-        default:
-            break;
-        }
+        addModifiersForParamPassingMode(m_astBuilder, param, paramDir);
         decl->addMember(param);
     }
 }
@@ -15970,6 +16168,22 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
     // extension __func_as_type(decl) : IBackwardDifferentiable<__func_as_type(decl)>
     // { /* ..empty.. */ }
     //
+    // For each mode, `__func_as_type(decl)` must have exactly one conformance to the derivative
+    // interface: either the synthesized extension here, or the one that
+    // `translateFwdDerivativeAttributeToAD2` / `translateBwdDerivativeAttributeToAD2` creates later
+    // (at `ReadyForLookup`) from a `[ForwardDerivative]` / `[BackwardDerivative]` on the decl.
+    // Two conformances of the same function type to the same interface get the same witness-table
+    // linkage name in `visitInheritanceDecl`, and the linker keeps only one of them, so calls
+    // through an interface requirement could silently use the synthesized derivative instead of the
+    // user's. We therefore skip the synthesized extension for a mode whose attribute is present.
+    // For the forward mode, that also skips the synthesized higher-order conformances of
+    // `fwd_diff`; a differentiable user derivative provides them instead.
+    //
+    // The guard only sees attributes on the decl itself. A derivative attached from the other side
+    // with `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]`, or one a `[Differentiable]` decl
+    // gets through `[PrimalSubstitute]`, is not visible here, so those spellings can still produce
+    // both conformances.
+    //
 
     if (decl->findModifier<DifferentiableAttribute>())
     {
@@ -16002,8 +16216,9 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
         };
         if (!isInterfaceRequirement(decl))
         {
-            if (decl->findModifier<ForwardDifferentiableAttribute>() ||
-                decl->findModifier<BackwardDifferentiableAttribute>())
+            if ((decl->findModifier<ForwardDifferentiableAttribute>() ||
+                 decl->findModifier<BackwardDifferentiableAttribute>()) &&
+                !decl->findModifier<ForwardDerivativeAttribute>())
             {
                 auto declsToExtend = ShortList<FunctionDeclBase*, 4>{as<FunctionDeclBase>(decl)};
                 for (auto _decl : getCurrentASTBuilder()->m_substituteMap[decl])
@@ -16079,7 +16294,8 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
                 }
             }
 
-            if (decl->findModifier<BackwardDifferentiableAttribute>())
+            if (decl->findModifier<BackwardDifferentiableAttribute>() &&
+                !decl->findModifier<BackwardDerivativeAttribute>())
             {
                 auto declsToExtend = ShortList<FunctionDeclBase*, 4>{as<FunctionDeclBase>(decl)};
                 for (auto _decl : getCurrentASTBuilder()->m_substituteMap[decl])
@@ -17302,7 +17518,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
         auto paramMode = getParamPassingMode(param);
         arg->type.isLeftValue = paramMode == ParamPassingMode::Out ||
                                 paramMode == ParamPassingMode::BorrowInOut ||
-                                paramMode == ParamPassingMode::Ref;
+                                isByReferenceParamPassingMode(paramMode);
         arg->type.type = param->getType();
         arg->loc = decl->loc;
         fakeArgs.add(arg);
@@ -17331,7 +17547,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
                 thisArg->type.type = thisArgType;
                 thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
                                             thisArgDirection == ParamPassingMode::BorrowInOut ||
-                                            thisArgDirection == ParamPassingMode::Ref;
+                                            isByReferenceParamPassingMode(thisArgDirection);
                 thisArg->loc = decl->loc;
                 fakeArgs.insert(0, thisArg);
             }
@@ -17618,7 +17834,7 @@ static std::optional<ParamPassingMode> _calcReceiverParamModeFromSpecifiers(Decl
     if (as<ConstRefAttribute>(specifier))
         return ParamPassingMode::BorrowIn;
     if (as<RefAttribute>(specifier))
-        return ParamPassingMode::Ref;
+        return ParamPassingMode::RefReadWrite;
     if (as<NonmutatingAttribute>(specifier))
         return ParamPassingMode::In;
     if (as<CppStyleTrailingReceiverParamConstModifier>(specifier))
@@ -19324,7 +19540,7 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
                 SemanticsDeclHeaderVisitor(shared).synthesizeDifferentiabilityRequirements(
                     functionDecl);
             }
-            SemanticsDeclRedeclarationVisitor(shared).dispatch(decl);
+            SemanticsDeclRedeclarationVisitor(shared, RedeclarationSeverity::Error).dispatch(decl);
         }
         break;
 
@@ -19348,6 +19564,11 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 
     case DeclCheckState::DefinitionChecked:
         SemanticsDeclBodyVisitor(shared).dispatch(decl);
+        // Lookup in a container also finds the members of its transparent variables, which
+        // `checkForRedeclaration` does not compare. We compare them once per container, after
+        // its own members are checked.
+        if (auto containerDecl = as<ContainerDecl>(decl))
+            SemanticsVisitor(shared).checkForRedeclarationOfTransparentMembers(containerDecl);
         break;
 
     case DeclCheckState::CapabilityChecked:
@@ -22442,6 +22663,35 @@ void visitReferencedDecls(
         visitor.dispatchIfNotNull(expr);
     if (auto decl = as<Decl>(node))
         visitor.dispatchIfNotNull(decl);
+}
+
+CapabilitySet getDeclRefCapabilityRequirements(
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef,
+    List<Decl*>& outReferencedDecls)
+{
+    // Consider this example:
+    //     [require(metal)] struct MetalOnly {}
+    //     void main<T>() {}
+    // Selecting main<MetalOnly> retains MetalOnly in the checked reference even though the body
+    // never uses T. Use the ordinary reference walk so selection has the same requirements as
+    // calling main<MetalOnly>() in a function body. As in visitDeclRefExpr, include the selected
+    // declaration itself as well as its operands.
+    CapabilitySet requirements{declRef.getDecl()->inferredCapabilityRequirements};
+    visitReferencedDecls(
+        *visitor,
+        declRef.declRefBase,
+        declRef.getDecl()->loc,
+        nullptr,
+        [&](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc)
+        {
+            requirements.join(nodeCaps);
+            if (auto decl = as<Decl>(node);
+                decl && decl != declRef.getDecl() && nodeCaps && !nodeCaps->isEmpty())
+                outReferencedDecls.add(decl);
+        },
+        [](DiagnosticCategory) {});
+    return requirements;
 }
 
 CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
