@@ -1,5 +1,6 @@
 // Entry-point signature validation must honor the capability `[require(...)]`
-// of a *generic* struct type the same way it does for a non-generic struct.
+// of a *generic* struct type the same way it does for a non-generic struct, wherever
+// the struct appears in the signature (parameter, return type or field).
 //
 // Regression test for https://github.com/shader-slang/slang/issues/9489:
 // `Foo<int>` used as a `vertex` entry-point parameter, where `Foo` requires the
@@ -8,21 +9,31 @@
 //
 // Each entry point uses its own diag tag because a `DIAGNOSTIC_TEST` invocation
 // must match every annotation for its tag, and only the compiled entry point's
-// diagnostics fire. All error invocations are non-exhaustive because the entry
-// point also emits "see using/definition of '<entry>'" notes we don't pin.
-// Carets align to the columns of the preceding source line.
+// diagnostics fire. PARAM, DUP, RET, MIXED, NGWRAP, SPECIALIZE and BODYONLY are exhaustive, so each
+// pins exactly one "see using of" note per use site. The other error invocations are
+// non-exhaustive and pin only the notes they are about. Carets align to the
+// columns of the preceding source line.
 
 // Plain generic parameter.
-//DIAGNOSTIC_TEST:SIMPLE(diag=PARAM,non-exhaustive): -target spirv -emit-spirv-directly -entry main -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=PARAM): -target spirv -emit-spirv-directly -entry main -stage vertex
 // Generic parameter nested inside a builtin wrapper (array).
 //DIAGNOSTIC_TEST:SIMPLE(diag=ARR,non-exhaustive): -target spirv -emit-spirv-directly -entry mainArr -stage vertex
 // Multiple contributing generic structs.
 //DIAGNOSTIC_TEST:SIMPLE(diag=MULTI,non-exhaustive): -target spirv -emit-spirv-directly -entry mainMulti -stage vertex
 // Generic return type.
-//DIAGNOSTIC_TEST:SIMPLE(diag=RET,non-exhaustive): -target spirv -emit-spirv-directly -entry mainRet -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=RET): -target spirv -emit-spirv-directly -entry mainRet -stage vertex
+// A generic and a non-generic requiring struct side by side: each is reported at its own
+// parameter.
+//DIAGNOSTIC_TEST:SIMPLE(diag=MIXED): -target spirv -emit-spirv-directly -entry mainMixed -stage vertex
+// A non-generic requiring struct reached only through a field of a non-requiring wrapper.
+//DIAGNOSTIC_TEST:SIMPLE(diag=NGWRAP): -target spirv -emit-spirv-directly -entry mainNgWrap -stage vertex
+// A generic entry point whose specialization argument is a requiring generic struct with a
+// value parameter.
+//DIAGNOSTIC_TEST:SIMPLE(diag=SPECIALIZE): -target spirv -emit-spirv-directly -entry mainSpecialize -stage vertex -specialize MG<3>
 // Same generic struct on two parameters: both use sites must be reported (the
-// hash-consed `Val` for `Foo<int>` must not collapse to a single note).
-//DIAGNOSTIC_TEST:SIMPLE(diag=DUP,non-exhaustive): -target spirv -emit-spirv-directly -entry mainDup -stage vertex
+// hash-consed `Val` for `Foo<int>` must not collapse to a single note). Each use also
+// carries its own "see definition" and "see declaration of 'require'" notes.
+//DIAGNOSTIC_TEST:SIMPLE(diag=DUP): -target spirv -emit-spirv-directly -entry mainDup -stage vertex
 // Generic struct nested inside a builtin generic wrapper (`ConstantBuffer<...>`).
 //DIAGNOSTIC_TEST:SIMPLE(diag=CB,non-exhaustive): -target spirv -emit-spirv-directly -entry mainCB -stage vertex
 // Generic struct nested inside `Optional<...>`.
@@ -45,12 +56,12 @@
 // Multi-level wrapper nesting (`Wrap<Wrap<Foo<int>>>`): both recursion arms must
 // keep descending and the depth guard must not fire too early.
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEEP,non-exhaustive): -target spirv -emit-spirv-directly -entry mainDeep -stage vertex
-// Scoping invariant: a *non-entry-point* function taking a requiring generic
-// struct must NOT be diagnosed (only entry-point signatures are checked). Here
-// `mainScope`'s own signature is clean and it calls `helper(Foo<int>)` in its
-// body; no E36107 must fire.
-//DIAGNOSTIC_TEST:SIMPLE(diag=SCOPE,non-exhaustive): -target spirv -emit-spirv-directly -entry mainScope -stage vertex
-//SCOPE-NOT: E36107
+// A requiring generic struct used only in the body of a clean-signature entry
+// point (passed to a helper) is diagnosed by general capability inference rather
+// than by the signature check, so its only "see using of" note points at the helper call:
+// the callee's function type is visited before the argument.
+// generic-struct-require-in-body.slang covers other body uses.
+//DIAGNOSTIC_TEST:SIMPLE(diag=BODYONLY): -target spirv -emit-spirv-directly -entry mainBodyOnly -stage vertex
 // Positive case: the cpp requirement is satisfied for the cpp target, so the same
 // code must compile. We assert no E36107 *and* that compilation reaches code
 // emission (the entry-point rename warning E40100 only fires on success), so the
@@ -69,10 +80,14 @@
 /*PARAM:
  ^^^^^^^ see declaration of 'require'
 */
+//DUP: see declaration of 'require'
+//DUP: see declaration of 'require'
 struct Foo<T>
 /*PARAM:
        ^^^ see definition of 'Foo'
 */
+//DUP: see definition of 'Foo'
+//DUP: see definition of 'Foo'
 {
     int x;
 }
@@ -81,6 +96,23 @@ struct Foo<T>
 struct Bar<T>
 {
     int y;
+}
+
+[require(cpp)]
+struct Baz
+{
+    int z;
+}
+
+struct BazWrap
+{
+    Baz b;
+}
+
+[require(cpp)]
+struct MG<let N : int>
+{
+    int w;
 }
 
 // A generic wrapper with no capability requirement of its own; used to verify the
@@ -108,6 +140,7 @@ struct NonGenField
 void main(Foo<int> a)
 /*PARAM:
      ^^^^ unavailable features in entry point
+     ^^^^ entrypoint 'main' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
           ^^^ see using of 'Foo'
 */
 {
@@ -136,6 +169,7 @@ void mainMulti(Foo<int> a, Bar<int> b)
 void mainDup(Foo<int> a, Foo<int> b)
 /*DUP:
      ^^^^^^^ unavailable features in entry point
+     ^^^^^^^ entrypoint 'mainDup' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
              ^^^ see using of 'Foo'
                          ^^^ see using of 'Foo'
 */
@@ -215,28 +249,77 @@ void mainDeep(Wrap<Wrap<Foo<int> > > a)
 {
 }
 
-// A non-entry-point function whose parameter is a requiring generic struct. The
-// validation is scoped to entry points, so this signature must not be diagnosed.
 void helper(Foo<int> a)
 {
 }
 
 [shader("vertex")]
-void mainScope(int x)
+void mainBodyOnly(int x)
+/*BODYONLY:
+     ^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^ entrypoint 'mainBodyOnly' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+*/
 {
     helper(Foo<int>());
+/*BODYONLY:
+    ^^^^^^ see using of 'Foo'
+*/
 }
+//BODYONLY: see definition of 'Foo'
+//BODYONLY: see declaration of 'require'
 
 [shader("vertex")]
 Foo<int> mainRet()
 /*RET:
          ^^^^^^^ unavailable features in entry point
+         ^^^^^^^ entrypoint 'mainRet' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+^^^ see using of 'Foo'
 */
-//RET: see using of 'Foo'
 {
     Foo<int> f = { 0 };
     return f;
 }
+//RET: see definition of 'Foo'
+//RET: see declaration of 'require'
+
+[shader("vertex")]
+void mainMixed(Foo<int> a, Baz b)
+/*MIXED:
+     ^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^ entrypoint 'mainMixed' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+               ^^^ see using of 'Foo'
+                           ^^^ see using of 'Baz'
+*/
+{
+}
+//MIXED: see definition of 'Foo'
+//MIXED: see definition of 'Baz'
+//MIXED: see declaration of 'require'
+//MIXED: see declaration of 'require'
+
+[shader("vertex")]
+void mainNgWrap(BazWrap w)
+/*NGWRAP:
+     ^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^ entrypoint 'mainNgWrap' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+                ^^^^^^^ see using of 'Baz'
+*/
+{
+}
+//NGWRAP: see definition of 'Baz'
+//NGWRAP: see declaration of 'require'
+
+[shader("vertex")]
+void mainSpecialize<T>()
+/*SPECIALIZE:
+     ^^^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^^^ entrypoint 'mainSpecialize' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+*/
+{
+}
+//SPECIALIZE: see using of 'MG'
+//SPECIALIZE: see definition of 'MG'
+//SPECIALIZE: see declaration of 'require'
 
 // A generic struct requiring a higher shader model; used to exercise the
 // profile-implicit-upgrade path rather than the hard incompatibility path.

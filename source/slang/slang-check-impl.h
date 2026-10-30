@@ -52,6 +52,12 @@ bool isEffectivelyStatic(Decl* decl);
 
 bool isGlobalDecl(Decl* decl);
 
+/// Return true if `decl` is a core-module type declared with `__magic_type`
+/// (`MagicTypeModifier`) or `__intrinsic_type` (`IntrinsicTypeModifier`). An `__intrinsic_type`
+/// declared outside the core module, in a standard module or in user code, is not included, and
+/// neither is a `__builtin_type` scalar such as `float`.
+bool isCoreModuleIntrinsicTypeDecl(Decl* decl);
+
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);
@@ -4728,11 +4734,19 @@ bool isOpaqueHandleType(Type* type);
 // (or array thereof) that transitively contains an opaque handle field.
 bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
 
+/// Follow `decl`'s capability-provenance chain down to the use that introduced a requirement not
+/// implying `setToFind`, taking the first such entry at each level. The result may be a non-`Decl`
+/// node such as a `__target_switch` statement. If no entry of `decl` fails, the result is `decl`
+/// itself at `decl->loc`.
+ProvenenceNodeWithLoc findMissingCapabilityProvenance(Decl* decl, CapabilitySet const& setToFind);
+
+/// Report `provNode` with a "see using of" note at its use site and, when it is a declaration,
+/// notes for its definition and its `[require]` attribute. A null `referencedNode` reports
+/// nothing.
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
-    Decl* decl,
-    CapabilitySet const& setToFind);
+    ProvenenceNodeWithLoc const& provNode);
 void diagnoseCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,

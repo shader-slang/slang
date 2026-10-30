@@ -1701,48 +1701,43 @@ static bool _allTargetsSupportVkBindingOnEntryPointParameters(Linkage* linkage)
 }
 
 
-// A user-defined generic struct found in an entry-point signature type, paired
-// with the source location of its use.
-struct GenericStructTypeUse
+// A struct found in an entry-point signature type, paired with the source location
+// of its use.
+struct StructTypeUse
 {
     StructDecl* structDecl;
     SourceLoc useLoc;
 };
 
-// Collect every user-defined generic struct (e.g. `Foo<int>`) reachable from an
+// Collect every struct (e.g. `Foo<int>` or `Bar`) reachable from an
 // entry-point signature type `type`, recursing through wrapper/composite types so
 // that `Foo<int>`, `Foo<int>[N]`, `Optional<Foo<int>>`, and
 // `ConstantBuffer<Foo<int>>` are all found. Results are appended to `outUses` and
 // `visited` guards against cycles in the `Val` graph.
 //
-// This is needed because the general capability-inference walk
-// (`SemanticsDeclReferenceVisitor`) records a type's requirements only when its
-// decl-ref is a `DirectDeclRef`; a generic specialization uses a
-// `GenericAppDeclRef` and is skipped, so a `[require(...)]` on a generic struct
-// used in an entry-point signature is otherwise dropped. The non-generic spelling
-// `Foo` is already handled by that walk, so only the generic case is collected
-// here (to avoid duplicate reporting).
+// General capability inference contributes a struct named by a parameter's own type, but it
+// never walks the return type, and a struct's requirements do not include those of its fields.
+// So a struct named only by the return type (`Foo<int> main()`) or reached only through a
+// wrapper's field (`struct Field<T> { Foo<T> f; }` used as `Field<int>`) reaches the entry point
+// only through this walk. The provenance chain of an incompatible entry point also names a single
+// use, and inference records a use only when it adds to the requirement, so with the same
+// `[require]` on both structs the chain of `main(Foo<int> a, Baz b)` never names `Baz`.
+// Collecting every use here lets `validateEntryPoint` report each contributing struct at its own
+// use site.
 //
-// This deliberately lives in entry-point validation rather than in the general
-// inference walk: inferring a generic struct type's requirements for *every*
-// function that names such a type would require many core-module library
-// functions (e.g. the cooperative vector/matrix/tensor `Load`/`Store` helpers,
-// which take `CoopVec<T,N>` etc.) to redeclare those capabilities. Restricting
-// the check to entry-point signatures matches the reported defect without
-// changing library-function inference.
+// Generic and non-generic structs, including member types such as `Outer<3>.In`, are collected
+// alike. Enums are not, so an enum named only by the return type is still missed.
 //
-// Only the struct decl itself is filtered for `MagicTypeModifier`/
-// `IntrinsicTypeModifier`: builtin generic types (e.g. `LineStream<T>`,
-// `OutputPatch<T,N>`) already have dedicated, more specific entry-point
-// diagnostics, so reporting a generic capability error for them would only
-// duplicate those. Wrapper builtins are still recursed *through* so that a
-// user-defined `Foo<int>` nested inside them is found.
-static void collectGenericStructTypeUses(
+// Core-module magic/intrinsic structs are excluded to match general inference (see
+// `isCoreModuleIntrinsicTypeDecl`); those that appear in signatures, such as `LineStream<T>` and
+// `OutputPatch<T,N>`, already get more specific stage diagnostics. Builtin wrappers are still
+// recursed *through* so that a `Foo<int>` nested inside them is found.
+static void collectStructTypeUses(
     ASTBuilder* astBuilder,
     Val* type,
     SourceLoc useLoc,
     HashSet<Val*>& visited,
-    List<GenericStructTypeUse>& outUses,
+    List<StructTypeUse>& outUses,
     UInt recursionDepth = 0)
 {
     if (!type || !visited.add(type))
@@ -1761,9 +1756,7 @@ static void collectGenericStructTypeUses(
     if (auto declRefType = as<DeclRefType>(type))
     {
         auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
-        if (structDeclRef && as<GenericAppDeclRef>(declRefType->getDeclRefBase()) &&
-            !structDeclRef.getDecl()->findModifier<MagicTypeModifier>() &&
-            !structDeclRef.getDecl()->findModifier<IntrinsicTypeModifier>())
+        if (structDeclRef && !isCoreModuleIntrinsicTypeDecl(structDeclRef.getDecl()))
         {
             // Only contribute structs that actually carry a requirement; this keeps
             // both the aggregation and the diagnostic loop free of null/empty sets.
@@ -1780,7 +1773,7 @@ static void collectGenericStructTypeUses(
         {
             for (auto fieldDeclRef :
                  getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
-                collectGenericStructTypeUses(
+                collectStructTypeUses(
                     astBuilder,
                     getType(astBuilder, fieldDeclRef),
                     useLoc,
@@ -1791,11 +1784,11 @@ static void collectGenericStructTypeUses(
     }
 
     // Recurse into the type's `Val` operands (generic arguments, element types,
-    // etc.) so nested user generic structs inside wrappers/arrays are found.
+    // etc.) so structs nested inside wrappers/arrays are found.
     for (Index i = 0; i < type->getOperandCount(); i++)
     {
         if (type->m_operands[i].kind == ValNodeOperandKind::ValNode)
-            collectGenericStructTypeUses(
+            collectStructTypeUses(
                 astBuilder,
                 type->getOperand(i),
                 useLoc,
@@ -1814,7 +1807,7 @@ static void validateEntryPointCapabilities(
     EntryPoint* entryPoint,
     const CapabilitySet& entryPointInferredCaps,
     const List<Decl*>& referencedDecls,
-    const List<GenericStructTypeUse>& signatureStructUses,
+    const List<StructTypeUse>& signatureStructUses,
     DiagnosticSink* sink,
     const CapabilitySetVal* previouslyCheckedCaps = nullptr)
 {
@@ -1843,13 +1836,31 @@ static void validateEntryPointCapabilities(
 
             // Find out what is incompatible (ancestor missing a super set of 'target+stage')
             CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
+
+            // The provenance chain names a single use and cannot see a struct reached only
+            // through the return type or a field, so we also point at every signature struct
+            // whose own requirement is incompatible with the target. When the chain ends at one
+            // of exactly those structs, we report that struct once, at its signature use site,
+            // even when the chain reached it through the body.
+            List<StructTypeUse> incompatibleStructUses;
+            for (auto& use : signatureStructUses)
+            {
+                if (targetCaps.isIncompatibleWith(
+                        CapabilitySet{use.structDecl->inferredCapabilityRequirements}))
+                    incompatibleStructUses.add(use);
+            }
+
             if (targetCaps.isIncompatibleWith(
                     CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}))
-                diagnoseMissingCapabilityProvenance(
-                    linkage->m_optionSet,
-                    sink,
-                    entryPointFuncDecl,
-                    failedSet);
+            {
+                auto provenance = findMissingCapabilityProvenance(entryPointFuncDecl, failedSet);
+                bool isProvenanceAnIncompatibleStruct =
+                    incompatibleStructUses.findFirstIndex(
+                        [&](StructTypeUse const& use)
+                        { return use.structDecl == provenance.referencedNode; }) != -1;
+                if (!isProvenanceAnIncompatibleStruct)
+                    diagnoseMissingCapabilityProvenance(linkage->m_optionSet, sink, provenance);
+            }
 
             // Generic arguments belong to this selection, so their provenance cannot be stored
             // on the shared function declaration. Continue the ordinary provenance walk from
@@ -1861,36 +1872,14 @@ static void validateEntryPointCapabilities(
                     diagnoseMissingCapabilityProvenance(
                         linkage->m_optionSet,
                         sink,
-                        decl,
-                        failedSet);
+                        findMissingCapabilityProvenance(decl, failedSet));
             }
 
-            // The provenance walk above follows `capabilityRequirementProvenance`,
-            // which does not record generic struct signature types. Point at any
-            // such struct whose requirement is itself incompatible with the
-            // target, mirroring the notes emitted for non-generic structs.
-            for (auto& use : signatureStructUses)
-            {
-                if (!targetCaps.isIncompatibleWith(
-                        CapabilitySet{use.structDecl->inferredCapabilityRequirements}))
-                    continue;
-                maybeDiagnose(
-                    sink,
+            for (auto& use : incompatibleStructUses)
+                diagnoseMissingCapabilityProvenance(
                     linkage->m_optionSet,
-                    DiagnosticCategory::Capability,
-                    Diagnostics::SeeUsingOf{.decl = use.structDecl, .location = use.useLoc});
-                maybeDiagnose(
                     sink,
-                    linkage->m_optionSet,
-                    DiagnosticCategory::Capability,
-                    Diagnostics::SeeDefinitionOf{.decl = use.structDecl});
-                if (auto requireAttr = use.structDecl->findModifier<RequireCapabilityAttribute>())
-                    maybeDiagnose(
-                        sink,
-                        linkage->m_optionSet,
-                        DiagnosticCategory::Capability,
-                        Diagnostics::SeeDeclarationOfModifier{.modifier = requireAttr});
-            }
+                    ProvenenceNodeWithLoc{use.structDecl, use.useLoc});
         }
         else
         {
@@ -2730,16 +2719,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     }
 
     // Augment the entry point's inferred requirements with the capability
-    // requirements of the *generic* struct types in its signature (parameters and
-    // return type). The general inference walk records a type's requirements only
-    // when its decl-ref is a `DirectDeclRef`, so a non-generic struct such as
-    // `Foo a` is already covered there, but a generic one such as `Foo<int> a`
-    // (whose decl-ref is a `GenericAppDeclRef`) is not. We gather the missing
-    // generic-struct requirements here so a `[require(...)]` on `Foo` is enforced
-    // for both spellings. `signatureStructUses` keeps each contributing struct and
-    // its use location so we can point the diagnostic at the exact use site (the
-    // non-generic case is reported by `diagnoseMissingCapabilityProvenance`).
-    List<GenericStructTypeUse> signatureStructUses;
+    // requirements of the struct types reachable from its signature
+    // (parameters and return type), including those the general inference walk does
+    // not reach (see `collectStructTypeUses`). `signatureStructUses` keeps
+    // each contributing struct and its use location so we can point a note at each
+    // use site.
+    List<StructTypeUse> signatureStructUses;
     {
         auto astBuilder = linkage->getASTBuilder();
         // Use a fresh `visited` set per signature position. `Val` nodes are
@@ -2754,7 +2739,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // retained.
             SourceLoc useLoc = (param->type.exp) ? param->type.exp->loc : param->loc;
             HashSet<Val*> visited;
-            collectGenericStructTypeUses(
+            collectStructTypeUses(
                 astBuilder,
                 param->getType(),
                 useLoc,
@@ -2768,7 +2753,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                                   ? entryPointFuncDecl->returnType.exp->loc
                                   : entryPointFuncDecl->loc;
         HashSet<Val*> visited;
-        collectGenericStructTypeUses(
+        collectStructTypeUses(
             astBuilder,
             entryPointFuncDecl->returnType.type,
             returnLoc,
@@ -2776,7 +2761,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             signatureStructUses);
     }
     // Every collected use carries a non-empty requirement (filtered in the
-    // collector), so this join is unconditional.
+    // collector), so this join is unconditional. The join is non-destructive: it
+    // narrows the targets the set already lists but drops none that the struct does
+    // not list. With a `[require(cpp)] struct Foo<T>` reached only through
+    // `Field<int>`, `void main(Field<int> w) { buffer[0] = 1; }` therefore still
+    // compiles for SPIR-V, because the body already put SPIR-V in the set.
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
 
