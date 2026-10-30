@@ -13,6 +13,11 @@
 //TEST:SIMPLE(filecheck=SAMPLER):-target spirv -entry sampleWithUndefinedSampler -stage compute
 //TEST:SIMPLE(filecheck=STORAGE):-target spirv -entry writeUndefinedStorageTexture -stage compute
 //TEST:SIMPLE(filecheck=ACCEL):-target spirv -entry traceUndefinedAccelerationStructure -stage compute
+//TEST:SIMPLE(filecheck=SAMPLE):-target spirv -entry passUndefinedTextureToCalleeWithItsOwn -stage compute
+//TEST:SIMPLE(filecheck=SAMPLE):-target spirv -entry gatherFromUndefinedTexture -stage compute
+//TEST:SIMPLE(filecheck=SAMPLE):-target spirv -entry queryUndefinedCombinedSampler -stage compute
+//TEST:SIMPLE(filecheck=COUNTER):-target spirv -entry addToUndefinedStorageTexture -stage compute
+//TEST:SIMPLE(filecheck=SAMPLE):-target spirv -entry passTwoUndefinedTextures -stage compute
 
 // SAMPLE: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage %float 2D 2 0 0 1
 // SAMPLE-NOT: OpUndef %[[IMG]]
@@ -26,12 +31,17 @@
 // STORAGE-NOT: OpUndef %[[IMG]]
 // STORAGE: OpFunctionEnd
 
+// COUNTER: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage %uint 2D 2 0 0 2
+// COUNTER-NOT: OpUndef %[[IMG]]
+// COUNTER: OpFunctionEnd
+
 // ACCEL: %[[AS:[A-Za-z0-9_]+]] = OpTypeAccelerationStructureKHR
 // ACCEL-NOT: OpUndef %[[AS]]
 // ACCEL: OpFunctionEnd
 
 Texture2D<float4> gTexture;
 RWTexture2D<float4> gStorageTexture;
+RWTexture2D<uint> gCounter;
 RaytracingAccelerationStructure gScene;
 SamplerState gSampler;
 RWStructuredBuffer<float4> outputBuffer;
@@ -111,4 +121,78 @@ void traceUndefinedAccelerationStructure()
     if (useUndefined)
         hit = hasHit(scene);
     outputBuffer[0] = hit ? float4(1) : float4(0);
+}
+
+// Inlining `sampleBoth` for the undefined argument also copies its own never-written `u` into the
+// caller, so that copy is rewritten too.
+float4 sampleBoth(Texture2D<float4> t)
+{
+    Texture2D<float4> u;
+    float4 r = 0;
+    if (useUndefined)
+        r += u.SampleLevel(gSampler, float2(0), 0) + t.SampleLevel(gSampler, float2(0), 0);
+    return r;
+}
+
+[numthreads(1, 1, 1)]
+void passUndefinedTextureToCalleeWithItsOwn()
+{
+    Texture2D<float4> t;
+    outputBuffer[0] = sampleBoth(gTexture) + sampleBoth(t);
+}
+
+[numthreads(1, 1, 1)]
+void gatherFromUndefinedTexture()
+{
+    Texture2D<float4> t;
+    float4 r = gTexture.SampleLevel(gSampler, float2(0), 0);
+    if (useUndefined)
+        r = t.GatherRed(gSampler, float2(0), int2(1, 0));
+    outputBuffer[0] = r;
+}
+
+[numthreads(1, 1, 1)]
+void queryUndefinedCombinedSampler()
+{
+    Sampler2D<float4> s;
+    uint width = 0;
+    uint height = 0;
+    float4 r = gTexture.Load(int3(0));
+    if (useUndefined)
+    {
+        s.GetDimensions(width, height);
+        r = s.Load(int3(0));
+    }
+    outputBuffer[0] = r + float4(width, height, 0, 0);
+}
+
+uint addOne(RWTexture2D<uint> counter)
+{
+    uint original;
+    InterlockedAdd(counter[uint2(0, 0)], 1, original);
+    return original;
+}
+
+[numthreads(1, 1, 1)]
+void addToUndefinedStorageTexture()
+{
+    RWTexture2D<uint> t;
+    uint r = addOne(gCounter);
+    if (useUndefined)
+        r += addOne(t);
+    outputBuffer[0] = float4(r);
+}
+
+float4 sampleEither(Texture2D<float4> a, Texture2D<float4> b)
+{
+    return useUndefined ? a.SampleLevel(gSampler, float2(0), 0) : b.SampleLevel(gSampler, float2(0), 0);
+}
+
+// One call that receives two never-written textures is inlined once.
+[numthreads(1, 1, 1)]
+void passTwoUndefinedTextures()
+{
+    Texture2D<float4> t;
+    Texture2D<float4> u;
+    outputBuffer[0] = sampleEither(gTexture, gTexture) + sampleEither(t, u);
 }
