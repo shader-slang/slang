@@ -2428,7 +2428,11 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             case BaseType::Int64:
                 if (fromType == BaseType::Double)
                 {
-                    m_writer->emit("int64_t(doubleBitsToInt64(");
+                    // We spell the result type through `emitType` so that it requests the
+                    // 64-bit integer extension even when no other 64-bit integer type
+                    // appears in the shader.
+                    emitType(inst->getDataType());
+                    m_writer->emit("(doubleBitsToInt64(");
                     emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                     m_writer->emit("))");
                     return true;
@@ -2441,7 +2445,8 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             case BaseType::UInt64:
                 if (fromType == BaseType::Double)
                 {
-                    m_writer->emit("uint64_t(doubleBitsToUint64(");
+                    emitType(inst->getDataType());
+                    m_writer->emit("(doubleBitsToUint64(");
                     emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                     m_writer->emit("))");
                     return true;
