@@ -2425,12 +2425,14 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     emitType(inst->getDataType());
                 }
                 break;
+            // `doubleBitsToInt64` and `doubleBitsToUint64` already return a 64-bit integer, so
+            // the outer conversion in the `Int64` and `UInt64` arms is an identity conversion.
+            // We keep it and spell its type through `emitType` because that is what requests
+            // GL_EXT_shader_explicit_arithmetic_types_int64 when no other 64-bit integer type
+            // appears in the shader.
             case BaseType::Int64:
                 if (fromType == BaseType::Double)
                 {
-                    // We spell the result type through `emitType` so that it requests the
-                    // 64-bit integer extension even when no other 64-bit integer type
-                    // appears in the shader.
                     emitType(inst->getDataType());
                     m_writer->emit("(doubleBitsToInt64(");
                     emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
