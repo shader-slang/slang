@@ -101,14 +101,29 @@ struct ByteAddressBufferLegalizationContext
         List<IRGlobalParam*> unusedParams;
         for (auto inst : m_module->getGlobalInsts())
         {
+            // Only a global parameter is kept alive without uses; any other byte-address
+            // buffer value is reached by the walk through the operations that use it.
+            auto param = as<IRGlobalParam>(inst);
+            if (!param)
+                continue;
+
+            // A parameter with uses was either translated through those uses, or has a use
+            // that this pass does not translate. Translating only its declaration would
+            // leave two parameters at one binding.
+            if (param->hasUses())
+                continue;
+
             // A replaced parameter can have no uses left (for example, one read only
             // through `Load<float>`), and translating it again would declare a second,
             // `uint`, structured buffer at the same binding.
-            auto param = as<IRGlobalParam>(inst);
-            if (!param || param->hasUses() || m_replacedByteAddressBufferParams.contains(param))
+            if (m_replacedByteAddressBufferParams.contains(param))
                 continue;
-            if (as<IRByteAddressBufferTypeBase>(unwrapArray(param->getDataType())))
-                unusedParams.add(param);
+
+            // Only byte-address buffers, and arrays of them, need a structured buffer.
+            if (!as<IRByteAddressBufferTypeBase>(unwrapArray(param->getDataType())))
+                continue;
+
+            unusedParams.add(param);
         }
 
         // Translating a parameter records it as replaced, and the removal loop in
