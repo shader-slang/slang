@@ -352,3 +352,13 @@ struct LambdaBlockLocalAlias<T>
 //CHECK:                                           ^ generic parameter 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
 //CHECK:                                           ^ generic parameter 'T' shadows an outer generic parameter with the same name
 }
+
+struct ValuePackShadow<let each N : int> { int f(int N) { return 0; } }
+//CHECK:                        ^ outer generic parameter 'N' declared here
+//CHECK:                                             ^ parameter 'N' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:                                             ^ parameter 'N' shadows an outer generic parameter with the same name
+
+struct TypePackShadow<each T> { int f<each T>() { return 0; } }
+//CHECK:                   ^ outer generic parameter 'T' declared here
+//CHECK:                                   ^ generic parameter 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:                                   ^ generic parameter 'T' shadows an outer generic parameter with the same name

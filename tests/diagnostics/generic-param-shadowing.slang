@@ -4,13 +4,14 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2018
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2025
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2026
 
 struct MethodGenericShadowsStructGeneric<let N : int>
 //CHECK:                                     ^ outer generic parameter 'N' declared here
 {
     int f<let N : int>() { return N; }
-//CHECK:      ^ generic parameter 'N' shadows a generic parameter from an enclosing scope
+//CHECK:      ^ warning E30515
 //CHECK:      ^ generic parameter 'N' shadows an outer generic parameter with the same name
 }
 
@@ -18,7 +19,7 @@ struct LocalShadowsStructGeneric<let N : int>
 //CHECK:                             ^ outer generic parameter 'N' declared here
 {
     int f() { int N = 5; return N; }
-//CHECK:          ^ local variable 'N' shadows a generic parameter from an enclosing scope
+//CHECK:          ^ warning E30527
 //CHECK:          ^ local variable 'N' shadows an outer generic parameter with the same name
 }
 
@@ -26,13 +27,13 @@ struct ParamShadowsStructGeneric<let N : int>
 //CHECK:                             ^ outer generic parameter 'N' declared here
 {
     int f(int N) { return N; }
-//CHECK:      ^ parameter 'N' shadows a generic parameter from an enclosing scope
+//CHECK:      ^ warning E30527
 //CHECK:      ^ parameter 'N' shadows an outer generic parameter with the same name
 }
 
 int paramShadowsOwnGeneric<let N : int>(int N) { return N; }
 //CHECK:                       ^ outer generic parameter 'N' declared here
-//CHECK:                                    ^ parameter 'N' shadows a generic parameter from an enclosing scope
+//CHECK:                                    ^ warning E30527
 //CHECK:                                    ^ parameter 'N' shadows an outer generic parameter with the same name
 
 // When several generic parameters have the name, the nearest enclosing one is reported.
@@ -40,10 +41,10 @@ struct ParamShadowsMethodAndStructGeneric<let N : int>
 //CHECK:                                      ^ outer generic parameter 'N' declared here
 {
     int f<let N : int>(int N) { return N; }
-//CHECK:      ^ generic parameter 'N' shadows a generic parameter from an enclosing scope
+//CHECK:      ^ warning E30515
 //CHECK:      ^ generic parameter 'N' shadows an outer generic parameter with the same name
 //CHECK:      ^ outer generic parameter 'N' declared here
-//CHECK:                   ^ parameter 'N' shadows a generic parameter from an enclosing scope
+//CHECK:                   ^ warning E30527
 //CHECK:                   ^ parameter 'N' shadows an outer generic parameter with the same name
 }
 
@@ -51,7 +52,7 @@ struct TypeParamShadowsValueParam<let T : int>
 //CHECK:                              ^ outer generic parameter 'T' declared here
 {
     int f<T>() { return 0; }
-//CHECK:  ^ generic parameter 'T' shadows a generic parameter from an enclosing scope
+//CHECK:  ^ warning E30515
 //CHECK:  ^ generic parameter 'T' shadows an outer generic parameter with the same name
 }
 
@@ -59,7 +60,7 @@ struct ValueParamShadowsTypeParam<T>
 //CHECK:                          ^ outer generic parameter 'T' declared here
 {
     int f<let T : int>() { return T; }
-//CHECK:      ^ generic parameter 'T' shadows a generic parameter from an enclosing scope
+//CHECK:      ^ warning E30515
 //CHECK:      ^ generic parameter 'T' shadows an outer generic parameter with the same name
 }
 
@@ -67,7 +68,7 @@ struct TypeParamShadowsTypeParam<T>
 //CHECK:                         ^ outer generic parameter 'T' declared here
 {
     int byType<T>() { return 1; }
-//CHECK:       ^ generic parameter 'T' shadows a generic parameter from an enclosing scope
+//CHECK:       ^ warning E30515
 //CHECK:       ^ generic parameter 'T' shadows an outer generic parameter with the same name
 }
 
@@ -75,7 +76,7 @@ struct LoopVariableShadowsTypeParam<T>
 //CHECK:                            ^ outer generic parameter 'T' declared here
 {
     int f() { int s = 0; for (int T = 0; T < 2; T++) s += T; return s; }
-//CHECK:                          ^ local variable 'T' shadows a generic parameter from an enclosing scope
+//CHECK:                          ^ warning E30527
 //CHECK:                          ^ local variable 'T' shadows an outer generic parameter with the same name
 }
 
@@ -83,7 +84,7 @@ struct LambdaParamShadowsStructGeneric<let N : int>
 //CHECK:                                   ^ outer generic parameter 'N' declared here
 {
     int f() { let g = (int N) => N; return g(1); }
-//CHECK:                   ^ parameter 'N' shadows a generic parameter from an enclosing scope
+//CHECK:                   ^ warning E30527
 //CHECK:                   ^ parameter 'N' shadows an outer generic parameter with the same name
 }
 
@@ -93,13 +94,13 @@ struct LocalTypeAliasShadowsTypeParam<T>
 //CHECK:                              ^ outer generic parameter 'T' declared here
 {
     int f() { typealias T = int; T x = 1; return x; }
-//CHECK:                ^ local type 'T' shadows a generic parameter from an enclosing scope
+//CHECK:                ^ warning E30527
 //CHECK:                ^ local type 'T' shadows an outer generic parameter with the same name
     int unusedAlias() { typealias T = int; return 0; }
-//CHECK:                          ^ local type 'T' shadows a generic parameter from an enclosing scope
+//CHECK:                          ^ warning E30527
 //CHECK:                          ^ local type 'T' shadows an outer generic parameter with the same name
     int unusedTypedef() { typedef int T; return 0; }
-//CHECK:                              ^ local type 'T' shadows a generic parameter from an enclosing scope
+//CHECK:                              ^ warning E30527
 //CHECK:                              ^ local type 'T' shadows an outer generic parameter with the same name
 }
 
@@ -107,7 +108,7 @@ int localStructShadowsValueParam<let N : int>()
 //CHECK:                             ^ outer generic parameter 'N' declared here
 {
     struct N { int v; }
-//CHECK:   ^ local type 'N' shadows a generic parameter from an enclosing scope
+//CHECK:   ^ warning E30527
 //CHECK:   ^ local type 'N' shadows an outer generic parameter with the same name
     N n;
     n.v = 3;
@@ -120,13 +121,13 @@ struct LocalGenericTypesShadowTypeParam<T>
 //CHECK:                                ^ outer generic parameter 'T' declared here
 {
     int unusedGenericAlias() { typealias Inner<T> = T; return 0; }
-//CHECK:                                       ^ generic parameter 'T' shadows a generic parameter from an enclosing scope
+//CHECK:                                       ^ warning E30515
 //CHECK:                                       ^ generic parameter 'T' shadows an outer generic parameter with the same name
     int usedGenericAlias() { typealias Inner<T> = T; Inner<int> x = 1; return x; }
-//CHECK:                                     ^ generic parameter 'T' shadows a generic parameter from an enclosing scope
+//CHECK:                                     ^ warning E30515
 //CHECK:                                     ^ generic parameter 'T' shadows an outer generic parameter with the same name
     int genericAliasNamedLikeTypeParam() { typealias T<U> = U; T<int> x = 1; return x; }
-//CHECK:                                             ^ local type 'T' shadows a generic parameter from an enclosing scope
+//CHECK:                                             ^ warning E30527
 //CHECK:                                             ^ local type 'T' shadows an outer generic parameter with the same name
 }
 
@@ -139,10 +140,10 @@ struct LocalBeforeLaterOuterLocal<let N : int>
     {
         int x = 0;
         { int N = 1; x += N; }
-//CHECK:      ^ local variable 'N' shadows a generic parameter from an enclosing scope
+//CHECK:      ^ warning E30527
 //CHECK:      ^ local variable 'N' shadows an outer generic parameter with the same name
         int N = 2;
-//CHECK:    ^ local variable 'N' shadows a generic parameter from an enclosing scope
+//CHECK:    ^ warning E30527
 //CHECK:    ^ local variable 'N' shadows an outer generic parameter with the same name
         return N + x;
     }
@@ -154,7 +155,7 @@ struct DifferentiableMethodGeneric<T : __BuiltinFloatingPointType>
 {
     [Differentiable]
     T f<T : __BuiltinFloatingPointType>(T x) { return x * x; }
-//CHECK:^ generic parameter 'T' shadows a generic parameter from an enclosing scope
+//CHECK:^ warning E30515
 //CHECK:^ generic parameter 'T' shadows an outer generic parameter with the same name
 }
 
@@ -164,7 +165,7 @@ struct Outer<let N : int>
     struct Inner
     {
         int f(int N) { return N; }
-//CHECK:          ^ parameter 'N' shadows a generic parameter from an enclosing scope
+//CHECK:          ^ warning E30527
 //CHECK:          ^ parameter 'N' shadows an outer generic parameter with the same name
     }
 }
@@ -184,7 +185,7 @@ struct LocalShadowsParamShadowingGeneric<let N : int>
 //CHECK:                                     ^ outer generic parameter 'N' declared here
 {
     int f(int N) { { int N = 1; return N; } }
-//CHECK:      ^ parameter 'N' shadows a generic parameter from an enclosing scope
+//CHECK:      ^ warning E30527
 //CHECK:      ^ parameter 'N' shadows an outer generic parameter with the same name
 }
 
@@ -194,7 +195,7 @@ struct MemberReusesGenericName<let N : int>
 //CHECK:                           ^ outer generic parameter 'N' declared here
 {
     int N;
-//CHECK:^ member 'N' shadows a generic parameter from an enclosing scope
+//CHECK:^ warning E30527
 //CHECK:^ member 'N' shadows an outer generic parameter with the same name
 }
 
@@ -202,7 +203,7 @@ struct StaticMemberShadowsGeneric<let N : int>
 //CHECK:                              ^ outer generic parameter 'N' declared here
 {
     static const int N = 1;
-//CHECK:             ^ member 'N' shadows a generic parameter from an enclosing scope
+//CHECK:             ^ warning E30527
 //CHECK:             ^ member 'N' shadows an outer generic parameter with the same name
 }
 
@@ -210,7 +211,7 @@ struct NestedTypeShadowsGeneric<T>
 //CHECK:                        ^ outer generic parameter 'T' declared here
 {
     struct T { int x; };
-//CHECK:   ^ member 'T' shadows a generic parameter from an enclosing scope
+//CHECK:   ^ warning E30527
 //CHECK:   ^ member 'T' shadows an outer generic parameter with the same name
 }
 
@@ -218,7 +219,7 @@ struct TypeAliasShadowsGeneric<T>
 //CHECK:                       ^ outer generic parameter 'T' declared here
 {
     typealias T = int;
-//CHECK:      ^ member 'T' shadows a generic parameter from an enclosing scope
+//CHECK:      ^ warning E30527
 //CHECK:      ^ member 'T' shadows an outer generic parameter with the same name
 }
 
@@ -226,7 +227,7 @@ struct MethodShadowsGeneric<let N : int>
 //CHECK:                        ^ outer generic parameter 'N' declared here
 {
     int N() { return 1; }
-//CHECK:^ member 'N' shadows a generic parameter from an enclosing scope
+//CHECK:^ warning E30527
 //CHECK:^ member 'N' shadows an outer generic parameter with the same name
 }
 
@@ -234,7 +235,7 @@ struct PropertyShadowsGeneric<let N : int>
 //CHECK:                          ^ outer generic parameter 'N' declared here
 {
     property N : int { get { return 1; } }
-//CHECK:     ^ member 'N' shadows a generic parameter from an enclosing scope
+//CHECK:     ^ warning E30527
 //CHECK:     ^ member 'N' shadows an outer generic parameter with the same name
 }
 
@@ -242,7 +243,7 @@ struct EnumCaseShadowsGeneric<T>
 //CHECK:                      ^ outer generic parameter 'T' declared here
 {
     enum E { T, U };
-//CHECK:     ^ member 'T' shadows a generic parameter from an enclosing scope
+//CHECK:     ^ warning E30527
 //CHECK:     ^ member 'T' shadows an outer generic parameter with the same name
 }
 
@@ -250,7 +251,7 @@ interface IAssociatedTypeShadowsGeneric<T>
 //CHECK:                                ^ outer generic parameter 'T' declared here
 {
     associatedtype T;
-//CHECK:           ^ member 'T' shadows a generic parameter from an enclosing scope
+//CHECK:           ^ warning E30527
 //CHECK:           ^ member 'T' shadows an outer generic parameter with the same name
 }
 
@@ -259,7 +260,7 @@ extension<T> ExtendedGeneric<T>
 //CHECK:  ^ outer generic parameter 'T' declared here
 {
     int T() { return 0; }
-//CHECK:^ member 'T' shadows a generic parameter from an enclosing scope
+//CHECK:^ warning E30527
 //CHECK:^ member 'T' shadows an outer generic parameter with the same name
 }
 
@@ -267,7 +268,7 @@ struct NestedTypeMemberShadowsGeneric<T>
 //CHECK:                              ^ outer generic parameter 'T' declared here
 {
     struct Inner { int T; };
-//CHECK:               ^ member 'T' shadows a generic parameter from an enclosing scope
+//CHECK:               ^ warning E30527
 //CHECK:               ^ member 'T' shadows an outer generic parameter with the same name
 }
 
@@ -275,7 +276,7 @@ void localTypeMemberShadowsGeneric<T>()
 //CHECK:                           ^ outer generic parameter 'T' declared here
 {
     struct S { int T; };
-//CHECK:           ^ member 'T' shadows a generic parameter from an enclosing scope
+//CHECK:           ^ warning E30527
 //CHECK:           ^ member 'T' shadows an outer generic parameter with the same name
 }
 
@@ -284,7 +285,7 @@ struct DifferentiableMemberShadowsGeneric<let N : int> : IDifferentiable
 //CHECK:                                      ^ outer generic parameter 'N' declared here
 {
     float N;
-//CHECK:  ^ member 'N' shadows a generic parameter from an enclosing scope
+//CHECK:  ^ warning E30527
 //CHECK:  ^ member 'N' shadows an outer generic parameter with the same name
 }
 
@@ -300,7 +301,7 @@ int lambdaCapturesShadowingLocal<let N : int>()
 //CHECK:                             ^ outer generic parameter 'N' declared here
 {
     int N = 1;
-//CHECK:^ local variable 'N' shadows a generic parameter from an enclosing scope
+//CHECK:^ warning E30527
 //CHECK:^ local variable 'N' shadows an outer generic parameter with the same name
     let l = (int y) => y + N;
     return l(2);
@@ -355,3 +356,13 @@ struct LambdaBlockLocalAlias<T>
 //CHECK:                                           ^ warning E30515
 //CHECK:                                           ^ generic parameter 'T' shadows an outer generic parameter with the same name
 }
+
+struct ValuePackShadow<let each N : int> { int f(int N) { return 0; } }
+//CHECK:                        ^ outer generic parameter 'N' declared here
+//CHECK:                                             ^ warning E30527
+//CHECK:                                             ^ parameter 'N' shadows an outer generic parameter with the same name
+
+struct TypePackShadow<each T> { int f<each T>() { return 0; } }
+//CHECK:                   ^ outer generic parameter 'T' declared here
+//CHECK:                                   ^ warning E30515
+//CHECK:                                   ^ generic parameter 'T' shadows an outer generic parameter with the same name
