@@ -119,7 +119,8 @@ struct ByteAddressBufferLegalizationContext
             if (m_replacedByteAddressBufferParams.contains(param))
                 continue;
 
-            // Only byte-address buffers, and arrays of them, need a structured buffer.
+            // Other global parameters, such as textures and structured buffers, are
+            // already legal for the target.
             if (!as<IRByteAddressBufferTypeBase>(unwrapArray(param->getDataType())))
                 continue;
 
