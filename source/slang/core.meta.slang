@@ -1189,6 +1189,9 @@ struct $(kBaseTypes[tt].name)
     : __BuiltinType
 
 ${
+    // Each base type declares every builtin marker interface it implements, including those
+    // that its other markers already refine. A declared conformance gives a constraint such as
+    // `T : __BuiltinScalarType` a direct witness, which adds no upcast cost in overload ranking.
     switch (kBaseTypes[tt].tag)
     {
     case BaseType::Half:
@@ -1199,6 +1202,7 @@ $}
     ,  __BuiltinRealType
     ,  __BuiltinSignedArithmeticType
     ,  __BuiltinArithmeticType
+    ,  __BuiltinScalarType
 ${
         break;
     case BaseType::Int8:
@@ -1231,6 +1235,7 @@ ${
     case BaseType::Bool:
 $}
     ,  __BuiltinLogicalType
+    ,  __BuiltinScalarType
 ${
         break;
 
