@@ -3,7 +3,7 @@
 // Requirements an optional constraint inherits stay usable where the constraint is checked or
 // where a required constraint also proves them (shader-slang/slang#13011, #13061).
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 struct NotArithmetic
@@ -90,6 +90,58 @@ int oneRequiredFirst<T>(T t)
     return t.one();
 }
 
+// The required proof of `IBase` comes from an extension, so it is found one round after the
+// optional one, and extensions on `IBase` are considered again with it.
+interface IBase
+{
+    int base();
+}
+
+interface IOptBase : IBase
+{
+}
+
+interface IReq
+{
+}
+
+interface IMid : IBase
+{
+}
+
+extension<U : IReq> U : IMid
+{
+    int base() { return 2; }
+}
+
+interface ITwo
+{
+    int two();
+}
+
+extension<U : IBase> U : ITwo
+{
+    int two() { return 2; }
+}
+
+struct ReqImpl : IReq
+{
+}
+
+int twoThroughExtension<T>(T t)
+    where optional T : IOptBase
+    where T : IReq
+{
+    return t.two();
+}
+
+T twiceRequiredIntegerFirst<T>(T a)
+    where T : __BuiltinIntegerType
+    where optional T : IFloat
+{
+    return twice(a);
+}
+
 // An initializer found through a checked optional constraint stays usable.
 T makeIfArithmetic<T>(T a) where optional T : IArithmetic
 {
@@ -105,6 +157,94 @@ T makeIfFloat<T>(T a) where optional T : IFloat
     if (T is IFloat)
         return T(9);
     return a;
+}
+
+// A checked optional constraint also unlocks what is reached through an associated type, a
+// user-defined base interface, and a default initializer.
+interface IGet
+{
+    int get();
+}
+
+interface IMake
+{
+    associatedtype A : IGet;
+    A make();
+}
+
+interface IMakeSub : IMake
+{
+}
+
+struct GetImpl : IGet
+{
+    int get() { return 3; }
+}
+
+struct MakeImpl : IMakeSub
+{
+    typealias A = GetImpl;
+    GetImpl make() { return GetImpl(); }
+}
+
+int makeIfSub<T>(T t) where optional T : IMakeSub
+{
+    if (T is IMakeSub)
+        return t.make().get();
+    return 0;
+}
+
+int getIfMake<T>(T.A a) where optional T : IMake
+{
+    if (T is IMake)
+        return a.get();
+    return 0;
+}
+
+interface IPlus
+{
+    This plus(This o);
+}
+
+interface IPlusSub : IPlus
+{
+}
+
+struct PlusImpl : IPlusSub
+{
+    int v;
+    This plus(This o) { return { v + o.v }; }
+}
+
+// Only instantiated with a conforming type, for the reason given for `twiceIfFloat`.
+T plusIfSub<T>(T a, T b) where optional T : IPlusSub
+{
+    if (T is IPlusSub)
+        return a.plus(b);
+    return a;
+}
+
+interface IResettable
+{
+    __init();
+    int get();
+}
+
+struct Resettable : IResettable
+{
+    int v;
+    __init() { v = 42; }
+    int get() { return v; }
+}
+
+int resetIfChecked<T>() where optional T : IResettable
+{
+    if (T is IResettable)
+    {
+        T x;
+        return x.get();
+    }
+    return -1;
 }
 
 [numthreads(1, 1, 1)]
@@ -138,4 +278,20 @@ void computeMain()
     outputBuffer[11] = makeIfArithmetic<NotArithmetic>(n).x;
     // CHECK-NEXT: 9
     outputBuffer[12] = int(makeIfFloat<float>(1.0));
+    // CHECK-NEXT: 2
+    outputBuffer[13] = twoThroughExtension<ReqImpl>(ReqImpl());
+    // CHECK-NEXT: 8
+    outputBuffer[14] = twiceRequiredIntegerFirst<int>(4);
+    // CHECK-NEXT: 3
+    outputBuffer[15] = makeIfSub<MakeImpl>(MakeImpl());
+    // CHECK-NEXT: 3
+    outputBuffer[16] = getIfMake<MakeImpl>(GetImpl());
+    PlusImpl p2 = { 2 };
+    PlusImpl p5 = { 5 };
+    // CHECK-NEXT: 7
+    outputBuffer[17] = plusIfSub<PlusImpl>(p2, p5).v;
+    // CHECK-NEXT: 42
+    outputBuffer[18] = resetIfChecked<Resettable>();
+    // CHECK-NEXT: -1
+    outputBuffer[19] = resetIfChecked<NotArithmetic>();
 }

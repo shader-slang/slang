@@ -1,8 +1,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 // A `where optional T : I` constraint does not prove `T : I` outside an `if (T is I)` check,
-// and so it does not prove `T` conforms to the interfaces `I` inherits either. Each function
-// below needs a conformance the optional constraint only inherits: `add` is an `IArithmetic`
+// and so it does not prove `T` conforms to the interfaces `I` inherits either. Most functions
+// below need a conformance the optional constraint only inherits; the rest use a member,
+// initializer or associated type of the constraint itself. `add` is an `IArithmetic`
 // requirement, and `+`, `-`, `%`, `*` and `/` resolve to core-module overloads constrained on
 // `IArithmetic` or `__BuiltinArithmeticType`. Each use must be rejected the same way a use
 // through `where optional T : IArithmetic` is (shader-slang/slang#13011, shader-slang/slang#13061).
@@ -53,13 +54,13 @@ T divGuardedOnSuper<T>(T a, T b) where optional T : IFloat
 // An initializer is looked up through the constraint as well, so `T(1)` and `(T)1` need the same
 // check, whether the constraint names `IArithmetic` (which declares `__init(int)`) or inherits it.
 T makeDirect<T>(T a) where optional T : IArithmetic { return T(1); }
-//CHECK:                                                     ^ expected a function
+//CHECK:                                                     ^ the constraint providing
 T castDirect<T>(T a) where optional T : IArithmetic { return (T)1; }
-//CHECK:                                                      ^ expected a function
+//CHECK:                                                      ^ the constraint providing
 T makeFloat<T>(T a) where optional T : IFloat { return T(1); }
-//CHECK:                                               ^ expected a function
+//CHECK:                                               ^ the constraint providing
 T castFloat<T>(T a) where optional T : IFloat { return (T)1; }
-//CHECK:                                                ^ expected a function
+//CHECK:                                                ^ the constraint providing
 
 // Two optional constraints that both lead to `IArithmetic`: the facet keeps the proof through the
 // first one written, so only a check of that constraint makes `add` usable. This is a known
@@ -84,4 +85,70 @@ int oneIfFloat<T>(T t) where optional T : IFloat
         return t.one();
 //CHECK:         ^^^ member not found
     return 0;
+}
+
+// `T x;` calls `__init()` through the constraint that provides it, so an unchecked optional
+// constraint is reported there too, also after a checked `T y;` of the same type.
+interface IReset { __init(); int get(); }
+int resetUnchecked<T>() where optional T : IReset
+{
+    T x;
+/*CHECK:
+      ^ the constraint providing 'IReset.init' is optional
+*/
+    if (T is IReset)
+        return x.get();
+    return -1;
+}
+int resetAfterChecked<T>() where optional T : IReset
+{
+    if (T is IReset)
+    {
+        T y;
+    }
+    T x;
+/*CHECK:
+      ^ the constraint providing 'IReset.init' is optional
+*/
+    return 0;
+}
+
+// An initializer list for `T` finds no usable initializer either.
+T listDirect<T>(T a) where optional T : IArithmetic { T t = { 1 }; return t; }
+//CHECK:                                                      ^ type mismatch
+
+// When a required constraint also provides initializers, only the optional one's are dropped:
+// here `T(v)` picks `IArithmetic`'s `__init(int)` and converts `v`, where a check of `IFloat`
+// would let `__init(float)` win.
+T fromFloat<T>(float v) where T : IArithmetic where optional T : IFloat { return T(v); }
+//CHECK:                                                                           ^ implicit conversion not recommended
+
+// Two optional constraints that each provide a default initializer still need a check.
+interface IResetA { __init(); }
+interface IResetB { __init(); }
+T resetEither<T>() where optional T : IResetA where optional T : IResetB
+{
+    T x;
+/*CHECK:
+      ^ the constraint providing 'IResetA.init' is optional
+*/
+    return x;
+}
+
+// A conversion from `T` through an initializer that needs a conformance the optional constraint
+// provides is checked at each use, whichever statement comes first.
+struct Wrapped
+{
+    int tag;
+    __implicit_conversion(100) __init<U : IArithmetic>(U value) { tag = 1; }
+}
+Wrapped wrapAfterChecked<T>(T value) where optional T : IFloat
+{
+    if (T is IFloat)
+    {
+        Wrapped checked = value;
+    }
+    Wrapped unchecked = value;
+//CHECK:                ^^^^^ type mismatch
+    return unchecked;
 }

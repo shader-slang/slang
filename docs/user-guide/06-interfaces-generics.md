@@ -163,7 +163,7 @@ int myGenericMethod<T>(T arg) where T: IFoo
     arg.myMethod(1.0);
 }
 
-// ... are equivalent to:
+// ... can be written as one function:
 int myGenericMethod<T>(T arg) where optional T: IFoo
 {
     if (T is IFoo)
@@ -173,7 +173,7 @@ int myGenericMethod<T>(T arg) where optional T: IFoo
 }
 ```
 
-The check also covers what `IFoo` inherits. If `IFoo : IBar` and the optional constraint is the only proof that `T : IBar`, then `IBar`'s members and initializers, and operators or generic functions that require `T : IBar`, need an `if (T is IFoo)` check too; a required constraint that also proves `T : IBar` allows them without one. An `extension` that requires `IFoo`, or an interface `IFoo` inherits, does not apply to `T` through the optional constraint alone, even inside the `if`.
+The check also applies to initializers the constraint provides, including the default initializer that `T x;` calls, and to what `IFoo` inherits. If `IFoo : IBar` and the optional constraint is the only proof that `T : IBar`, then `IBar`'s members and initializers, and operators or generic functions that require `T : IBar`, need an `if (T is IFoo)` check too; `if (T is IBar)` does not count, and a required constraint that also proves `T : IBar` allows them without one. Currently, an `extension` that requires `IFoo`, or an interface `IFoo` inherits, does not apply to `T` through the optional constraint alone, even inside the `if`.
 
 ### Using Generic Parameters in Attributes
 
