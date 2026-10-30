@@ -4230,6 +4230,13 @@ err(
 )
 
 err(
+    "vk-offset-out-of-range",
+    31167,
+    "'vk::offset' out of range",
+    span { loc = "attr:Modifier", message = "'[vk::offset]' requires a byte offset from 0 to 2147483647, but the offset is ~offset:Int" }
+)
+
+err(
     "accessor-does-not-satisfy-type-constraint-requirements",
     31110,
     "accessor does not satisfy type constraint requirements",

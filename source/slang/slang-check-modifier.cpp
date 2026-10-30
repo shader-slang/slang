@@ -771,6 +771,15 @@ Modifier* SemanticsVisitor::validateAttribute(
             return nullptr;
         }
 
+        if (as<VkStructOffsetAttribute>(attr) &&
+            (value->getValue() < 0 || value->getValue() > INT32_MAX))
+        {
+            getSink()->diagnose(Diagnostics::VkOffsetOutOfRange{
+                .offset = int64_t(value->getValue()),
+                .attr = attr});
+            return nullptr;
+        }
+
         simpleLayoutAttr->value = int32_t(value->getValue());
     }
     else if (auto maxVertexCountAttr = as<MaxVertexCountAttribute>(attr))
