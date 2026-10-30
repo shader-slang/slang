@@ -3020,7 +3020,8 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
 
 // Float and double use one integer atomic on the bit pattern. When the sign bit is clear, signed
 // integer order matches floating-point order; for negative values, unsigned order is its reverse.
-// Unlike a compare-and-swap loop this does not retry when another thread wins the race. Integer
+// Unlike a compare-and-swap loop, it does not retry when another thread updates a non-NaN value
+// first. Integer
 // order puts -0.0 below +0.0, which the rules allow, but it does not ignore NaNs, so a NaN operand
 // or stored value is handled before the integer atomic, and the original value it returns is
 // checked for a NaN stored in the meantime.
