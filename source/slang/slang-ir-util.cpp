@@ -207,6 +207,17 @@ bool isUserPointerType(IRInst* type)
     return ptrType->getAddressSpace() == AddressSpace::UserPointer;
 }
 
+IRType* getConcretePointerValueType(IRPtrTypeBase* ptrType)
+{
+    auto valueType = ptrType->getValueType();
+    if (as<IRVoidType>(valueType))
+    {
+        IRBuilder builder(ptrType);
+        return builder.getUIntType();
+    }
+    return valueType;
+}
+
 bool isAddressInst(IRInst* inst)
 {
     switch (inst->getOp())
