@@ -9621,12 +9621,31 @@ static Expr* parsePostfixExpr(Parser* parser)
             break;
         case TokenType::OpMul:
             {
-                // We may have a pointer type expr, e.g. T*, or the `*` is a mul operator.
-                // We can easily disambiguate by looking ahead of `*`, if the token after it
-                // is `,`, `>`, `)` or `>>`, then it must be a type postfix.
-                auto lookahead = peekTokenType(parser, 1);
-                switch (lookahead)
+                // We may have a pointer type expr, e.g. T* or T**, or the `*` is a mul
+                // operator, e.g. `a * *p` or `a * **pp`. We disambiguate by looking at the
+                // token after the whole run of `*` tokens. If it is `,`, `)`, `>`, `>>`, `:`,
+                // `;`, `[`, `.` or the end of the input (a type string such as "int**" passed
+                // to `findTypeByName`), then the run must be a type postfix, because a
+                // multiply would need an operand there.
+                TokenReader lookahead = parser->tokenReader;
+                lookahead.advanceToken();
+                int starCount = 1;
+                while (lookahead.peekTokenType() == TokenType::OpMul)
                 {
+                    lookahead.advanceToken();
+                    starCount++;
+                }
+                switch (lookahead.peekTokenType())
+                {
+                case TokenType::LParent:
+                    // A single `*` before `(` is a multiply. A run of two or more could be
+                    // either a function-style cast such as `int**(p)` or a multiply such as
+                    // `a * *(p + 1)`; we read it as a pointer type so that the cast keeps
+                    // compiling, and the multiply can be written as `a * (*(p + 1))`.
+                    if (starCount == 1)
+                        return expr;
+                    expr = parsePostfixTypeSuffix(parser, expr);
+                    break;
                 case TokenType::Comma:
                 case TokenType::RParent:
                 case TokenType::OpGreater:
@@ -9634,8 +9653,8 @@ static Expr* parsePostfixExpr(Parser* parser)
                 case TokenType::Colon:
                 case TokenType::Semicolon:
                 case TokenType::LBracket:
-                case TokenType::OpMul:
                 case TokenType::Dot:
+                case TokenType::EndOfFile:
                     expr = parsePostfixTypeSuffix(parser, expr);
                     break;
                 default:
