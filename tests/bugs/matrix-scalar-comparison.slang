@@ -1,16 +1,15 @@
 // Comparing a matrix with a scalar compares the scalar with every element. On the targets that
 // lower bool and integer matrices to arrays of vectors (SPIR-V, GLSL, Metal, WGSL), the bool
 // matrix result is lowered by `legalizeComparisonOperation`, which used to assert that both
-// operands were matrices and crash slangc. `clip` on a matrix hits the same path through its
-// `any(x < T(0))` fallback.
+// operands were matrices and crash slangc. `clip` on a matrix hits the same path; see
+// matrix-scalar-comparison-clip.slang.
 
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CLIP): -target spirv-asm -entry fragmentMain -stage fragment
-//TEST:SIMPLE(filecheck=CLIP): -target glsl -entry fragmentMain -stage fragment
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
+// No -cpu lane: slang-test would synthesize a CUDA lane from it, and the CUDA prelude has no
+// matrix comparison operators (matrix-matrix comparisons fail there as well).
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
@@ -25,10 +24,8 @@
 // METAL: computeMain
 // WGSL-NOT: {{error\[E[0-9]+\]}}
 // WGSL: computeMain
-// CLIP-NOT: {{error\[E[0-9]+\]}}
-// CLIP: {{OpKill|OpTerminateInvocation|OpDemoteToHelperInvocation|discard}}
 
-//TEST_INPUT:ubuffer(data=[0.5 -1.0 2.0 3], stride=4):name=inputBuffer
+//TEST_INPUT:ubuffer(data=[0.5 -1.0 2.0 3.0], stride=4):name=inputBuffer
 RWStructuredBuffer<float> inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -59,11 +56,4 @@ void computeMain()
 
     // BUF-NEXT: 1
     outputBuffer[3] = (all(m > -2.0) && !any(m > 5.0)) ? 1 : 0;
-}
-
-[shader("fragment")]
-float4 fragmentMain(float4 pos: SV_Position) : SV_Target
-{
-    clip(float4x4(pos.x - 1.0));
-    return pos;
 }
