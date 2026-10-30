@@ -410,12 +410,16 @@ endif()
 # We build mimalloc-static at assertion level 1 in Debug, which keeps basic heap diagnostics without
 # the cost of mimalloc's internal invariant checks. On its own, mimalloc would use level 2 in a
 # single-config Debug build and level 0 under a multi-config generator, where it normally treats
-# every configuration as a release build.
+# every configuration as a release build. An imported mimalloc-static, such as one that a system
+# SPIRV-Tools package brings in, is already compiled, so its packager chose its assertion level.
 if(SLANG_ENABLE_MIMALLOC AND TARGET mimalloc-static AND NOT MI_DEBUG_FULL)
-    target_compile_definitions(
-        mimalloc-static
-        PRIVATE $<$<CONFIG:Debug>:MI_DEBUG=1>
-    )
+    get_target_property(_mimalloc_static_imported mimalloc-static IMPORTED)
+    if(NOT _mimalloc_static_imported)
+        target_compile_definitions(
+            mimalloc-static
+            PRIVATE $<$<CONFIG:Debug>:MI_DEBUG=1>
+        )
+    endif()
 endif()
 
 if(
