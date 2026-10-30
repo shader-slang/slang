@@ -207,7 +207,7 @@ bool isUserPointerType(IRInst* type)
     return ptrType->getAddressSpace() == AddressSpace::UserPointer;
 }
 
-IRType* getConcretePointerValueType(IRPtrTypeBase* ptrType)
+IRType* getPointerValueTypeForLayout(IRPtrTypeBase* ptrType)
 {
     auto valueType = ptrType->getValueType();
     if (as<IRVoidType>(valueType))

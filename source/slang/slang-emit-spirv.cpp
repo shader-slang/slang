@@ -2037,7 +2037,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             storageClass != SpvStorageClassStorageBuffer)
             return 0;
 
-        auto valueType = getConcretePointerValueType(ptrType);
+        auto valueType = getPointerValueTypeForLayout(ptrType);
         auto rule = getPointerArrayStrideLayoutRule(ptrType, valueType);
 
         // Array pointees only ever serve element indexing, so use the element
@@ -2563,7 +2563,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     break;
                 }
 
-                auto valueType = getConcretePointerValueType(ptrType);
+                auto valueType = getPointerValueTypeForLayout(ptrType);
 
                 // Check for 8/16-bit storage capabilities when emitting pointer types
                 requireCapabilitiesForType(valueType, storageClass);

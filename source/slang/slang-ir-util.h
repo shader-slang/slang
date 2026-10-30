@@ -137,10 +137,10 @@ bool isUserPointerType(IRInst* type);
 
 /// Return the value type of `ptrType`, or `uint` if the value type is `void`.
 ///
-/// SPIR-V `OpTypePointer` and a GLSL buffer-reference block need a concrete pointee, so both
-/// targets lay out a `void*` as a `uint*`, and `void*` arithmetic steps by 4 bytes on both. The IR
-/// type itself keeps `void`, so debug info still reports `void*`.
-IRType* getConcretePointerValueType(IRPtrTypeBase* ptrType);
+/// A SPIR-V `OpTypePointer` and a GLSL buffer-reference block both need a pointee type with a
+/// size, so both targets lay out a `void*` as a `uint*`, with alignment 4. The IR type itself
+/// keeps `void`, so debug info still reports `void*`.
+IRType* getPointerValueTypeForLayout(IRPtrTypeBase* ptrType);
 
 /// Return whether `inst` projects a field, element, or pointer-offset address from operand zero.
 bool isAddressInst(IRInst* inst);

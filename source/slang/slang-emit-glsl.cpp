@@ -2266,8 +2266,9 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
         return;
     _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference"));
 
-    // A block member cannot be `void`, so a `void*` block holds a `uint`, as direct SPIR-V does.
-    auto valueType = getConcretePointerValueType(ptrType);
+    // A block member cannot be `void`, so the buffer-reference block of a `void*` holds a `uint`,
+    // as direct SPIR-V does.
+    auto valueType = getPointerValueTypeForLayout(ptrType);
 
     auto ptrTypeName = getName(ptrType);
     IRSizeAndAlignment sizeAlignment;
