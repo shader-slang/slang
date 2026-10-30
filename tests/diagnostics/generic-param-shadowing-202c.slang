@@ -339,3 +339,16 @@ interface IDefaultBodyTypeParam<T> { int h<T>() { return 0; } }
 //CHECK:                        ^ outer generic parameter 'T' declared here
 //CHECK:                                   ^ generic parameter 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
 //CHECK:                                   ^ generic parameter 'T' shadows an outer generic parameter with the same name
+
+// The body of a lambda is visited twice, so the aliases declared in it must be reported once.
+struct LambdaBlockLocalAlias<T>
+//CHECK:                     ^ outer generic parameter 'T' declared here
+//CHECK:                     ^ outer generic parameter 'T' declared here
+{
+    int f() { let g = (int x) => { typealias T = int; T y = x; return y; }; return g(1); }
+//CHECK:                                     ^ local type 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:                                     ^ local type 'T' shadows an outer generic parameter with the same name
+    int k() { let g = (int x) => { typealias Inner<T> = T; Inner<int> y = x; return y; }; return g(1); }
+//CHECK:                                           ^ generic parameter 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:                                           ^ generic parameter 'T' shadows an outer generic parameter with the same name
+}

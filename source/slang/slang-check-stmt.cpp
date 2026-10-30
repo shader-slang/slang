@@ -113,18 +113,27 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
 
         // A local type alias is checked only when it is used, but shadowing a generic parameter
         // depends only on names, so we check every alias in the block and the generic
-        // parameters of every generic alias.
-        for (auto typeDefDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<TypeDefDecl>())
-            checkForShadowedGenericParam(typeDefDecl);
-        for (auto genericDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<GenericDecl>())
+        // parameters of every generic alias. The body of a lambda is visited twice: first by
+        // `visitLambdaExpr`, with `m_parentLambdaExpr` set, and again as the body of the
+        // synthesized `()` member of the closure type. We check its aliases on the first visit,
+        // where its local variables are also checked.
+        auto parentFunc = getParentFunc();
+        bool isRevisitOfLambdaBody =
+            !m_parentLambdaExpr && parentFunc && as<LambdaDecl>(parentFunc->parentDecl);
+        if (!isRevisitOfLambdaBody)
         {
-            if (!as<TypeDefDecl>(genericDecl->inner))
-                continue;
-            checkForShadowedGenericParam(genericDecl->inner);
-            for (auto member : genericDecl->getDirectMemberDecls())
+            for (auto typeDefDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<TypeDefDecl>())
+                checkForShadowedGenericParam(typeDefDecl);
+            for (auto genericDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<GenericDecl>())
             {
-                if (isGenericParam(member))
-                    checkForShadowedGenericParam(member);
+                if (!as<TypeDefDecl>(genericDecl->inner))
+                    continue;
+                checkForShadowedGenericParam(genericDecl->inner);
+                for (auto member : genericDecl->getDirectMemberDecls())
+                {
+                    if (isGenericParam(member))
+                        checkForShadowedGenericParam(member);
+                }
             }
         }
 
