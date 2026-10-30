@@ -135,6 +135,24 @@ bool isAddressMutable(IRInst* inst)
     return !isPointerToImmutableLocation(rootAddr);
 }
 
+/// Move each `DebugDeclare` on the temporary `var` to just after `storeInst`, the only write to
+/// `var`, so that it still names valid storage once `var` is replaced by the read-only memory the
+/// store copied from. That memory is defined before the store but possibly after the declaration,
+/// and from the store onward it holds exactly what `var` would have held. We move the declaration
+/// rather than turn it into a `DebugValue` of the loaded value, because such a `DebugValue` would
+/// keep the load alive and so let debug information change the generated code.
+static void moveDebugDeclaresAfterStore(IRInst* var, IRInst* storeInst)
+{
+    List<IRDebugDeclare*> declares;
+    for (auto use = var->firstUse; use; use = use->nextUse)
+    {
+        if (auto declare = as<IRDebugDeclare>(use->getUser()))
+            declares.add(declare);
+    }
+    for (auto declare : declares)
+        declare->insertAfter(storeInst);
+}
+
 /// Eliminate redundant temporary variable copies in load-store patterns.
 /// This optimization looks for patterns where a value is loaded from memory
 /// and immediately stored to a temporary variable, which is then only used
@@ -251,6 +269,9 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                         continue; // Check the next use
                     }
 
+                    if (as<IRDebugDeclare>(user))
+                        continue;
+
                     // For function calls, check if the pointer is treated as immutable.
                     if (auto call = as<IRCall>(user))
                     {
@@ -290,6 +311,8 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                 }
 
                 // If we get here, all uses are safe to optimize.
+
+                moveDebugDeclaresAfterStore(destPtr, storeInst);
 
                 // Replace all uses of destPtr with loadedPtr
                 destPtr->replaceUsesWith(loadPtr);

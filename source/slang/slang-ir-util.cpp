@@ -1931,6 +1931,10 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
                     // We are fine with stores into the variable, since store operations
                     // are not dependent on whatever we do in the call here.
                     continue;
+                case kIROp_DebugDeclare:
+                    // A debug declaration does not read the variable, and debug information
+                    // must not decide whether a call can be removed.
+                    continue;
                 default:
                     // Skip the call itself if the var is used as an argument to an out
                     // parameter since we are checking if the call has side effect. We can't
@@ -3522,6 +3526,7 @@ bool isDebugInfoInst(IRInst* inst)
     switch (inst->getOp())
     {
     case kIROp_DebugValue:
+    case kIROp_DebugDeclare:
     case kIROp_DebugVar:
     case kIROp_DebugLine:
     case kIROp_DebugLocationDecoration:

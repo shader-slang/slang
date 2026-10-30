@@ -178,6 +178,7 @@ struct AddressInstEliminationContext
                 case kIROp_FieldAddress:
                 case kIROp_Unmodified:
                 case kIROp_DebugValue:
+                case kIROp_DebugDeclare:
                 case kIROp_GetOffsetPtr:
                     break;
                 default:

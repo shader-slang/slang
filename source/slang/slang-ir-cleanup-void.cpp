@@ -177,7 +177,8 @@ struct CleanUpVoidContext
                     removeDebugVar = true;
                 }
 
-                // Remove the VoidType DebugVar and any DebugValue users of the DebugVar
+                // Remove the VoidType DebugVar and any DebugValue or DebugDeclare users of the
+                // DebugVar
                 if (removeDebugVar)
                 {
                     List<IRInst*> debugValueUsersToRemove;
@@ -185,9 +186,10 @@ struct CleanUpVoidContext
                         true; // Keep the DebugVar if there are non-DebugValue users
                     for (auto use = debugVar->firstUse; use; use = use->nextUse)
                     {
-                        if (auto debugValue = as<IRDebugValue>(use->getUser()))
+                        auto user = use->getUser();
+                        if (as<IRDebugValue>(user) || as<IRDebugDeclare>(user))
                         {
-                            debugValueUsersToRemove.add(debugValue);
+                            debugValueUsersToRemove.add(user);
                         }
                         else
                         {
