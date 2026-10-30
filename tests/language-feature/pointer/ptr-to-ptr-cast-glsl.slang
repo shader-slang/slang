@@ -7,6 +7,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -output-using-type
 //TEST:SIMPLE(filecheck=MULTI):-target spirv-asm -emit-spirv-via-glsl -entry multiLevelMain -stage compute
+//TEST:SIMPLE(filecheck=PACKED_GLSL):-target glsl -entry packedMain -stage compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-vk -compute -output-using-type -emit-spirv-via-glsl -entry packedMain
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-vk -compute -output-using-type -emit-spirv-directly -entry packedMain
 
 struct S
 {
@@ -26,7 +29,7 @@ uniform int* q;
 RWStructuredBuffer<float> outputBuffer;
 
 // GLSL: main(
-// GLSL: BufferPointer_{{[a-zA-Z0-9_]+}}(
+// GLSL: [uint(0)] = {{.*}}BufferPointer_{{[a-zA-Z0-9_]+}}(uint64_t({{.*}}q_0))
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -64,4 +67,47 @@ void multiLevelMain(uniform int** pp)
     int** ip = (int**)q;
     S** sp = (S**)pp;
     outputBuffer[0] = float(**ip) + (*sp)->b;
+}
+
+interface IGetter
+{
+    float get();
+}
+
+struct PtrGetter : IGetter
+{
+    int* p;
+    float get() { return float(p[1]); }
+}
+
+struct ValueGetter : IGetter
+{
+    float v;
+    float get() { return v; }
+}
+
+// A `T*` field of an existential value is packed into, and unpacked from, a `uvec2`. Without a
+// cast elsewhere in the entry point, that `bitCast` reaches the emitter without `lowerBitCast`.
+// PACKED_GLSL: #extension GL_EXT_buffer_reference_uvec2 : require
+// PACKED_GLSL: = BufferPointer_{{[a-zA-Z0-9_]+}}(uvec2(
+// PACKED: 7.0
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void packedMain()
+{
+    IGetter getter;
+    if (q[3] == 5)
+    {
+        PtrGetter a;
+        a.p = q;
+        getter = a;
+    }
+    else
+    {
+        ValueGetter b;
+        b.v = 3.0;
+        getter = b;
+    }
+    outputBuffer[0] = getter.get();
 }

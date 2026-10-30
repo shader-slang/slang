@@ -2184,6 +2184,11 @@ bool GLSLSourceEmitter::_tryEmitBitBinOp(
 
 void GLSLSourceEmitter::_emitBufferReferenceConversion(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
+    // A `T*` packed into an existential is converted to and from the `uvec2` that holds it.
+    if (as<IRVectorType>(inst->getDataType()) ||
+        as<IRVectorType>(inst->getOperand(0)->getDataType()))
+        _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference_uvec2"));
+
     auto prec = getInfo(EmitOp::Postfix);
     EmitOpInfo outerPrec = inOuterPrec;
     bool needClose = maybeEmitParens(outerPrec, prec);
@@ -2378,6 +2383,13 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_BitCast:
         {
+            if (isUserPointerType(inst->getDataType()) ||
+                isUserPointerType(inst->getOperand(0)->getDataType()))
+            {
+                _emitBufferReferenceConversion(inst, inOuterPrec);
+                return true;
+            }
+
             auto toType = extractBaseType(inst->getDataType());
             auto fromType = extractBaseType(inst->getOperand(0)->getDataType());
             switch (toType)
