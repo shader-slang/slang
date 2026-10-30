@@ -2,6 +2,7 @@
 #include "slang-ir-ssa.h"
 
 #include "slang-ir-clone.h"
+#include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
@@ -94,6 +95,18 @@ struct ConstructSSAContext
     // Instructions to remove during cleanup
     List<IRInst*> instsToRemove;
 
+    // The `DebugDeclare`s whose storage is a promotable variable or an access chain into one,
+    // keyed by the variable. Promotion removes the storage, so each declaration is replaced by a
+    // `DebugValue` wherever a new SSA value of its storage comes into being.
+    Dictionary<IRVar*, List<IRDebugDeclare*>> debugDeclaresOfVar;
+
+    // The subset of `debugDeclaresOfVar` whose declarations are not placed right after their
+    // variable, such as the declaration an inlined `inout` parameter leaves on the caller's
+    // variable. Only these need a dominance check, and only they can see an already-initialized
+    // variable at the point of declaration.
+    HashSet<IRDebugDeclare*> laterDebugDeclares;
+    RefPtr<IRDominatorTree> domTree;
+
     IRBuilder builder;
     IRBuilder* getBuilder() { return &builder; }
 
@@ -124,6 +137,13 @@ bool allUsesLeadToLoads(IRInst* inst)
             return false;
 
         case kIROp_Load:
+            break;
+
+        case kIROp_DebugDeclare:
+            // Debug information must not decide whether a variable is promoted; promotion
+            // rewrites the declaration into `DebugValue`s instead.
+            if (u != &user->getOperands()[1])
+                return false;
             break;
 
         case kIROp_GetElementPtr:
@@ -546,6 +566,13 @@ bool isPromotableVar(ConstructSSAContext* context, IRVar* var, HashSet<IRBlock*>
             }
             break;
 
+        case kIROp_DebugDeclare:
+            // Debug information must not decide whether a variable is promoted; promotion
+            // rewrites the declaration into `DebugValue`s instead.
+            if (u != &user->getOperands()[1])
+                return false;
+            break;
+
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             {
@@ -572,6 +599,51 @@ bool isPromotableVar(ConstructSSAContext* context, IRVar* var, HashSet<IRBlock*>
     return true;
 }
 
+/// Returns whether `declare` sits right after its storage `var`, with only other variables and
+/// their debug declarations in between. Such a declaration is reached before anything is stored
+/// into `var`, so it dominates every store and phi of `var`, and the variable has no value yet at
+/// the point of declaration.
+static bool isDeclaredAtDefinition(IRDebugDeclare* declare, IRVar* var)
+{
+    if (declare->getStorage() != var)
+        return false;
+    for (auto inst = declare->getPrevInst(); inst; inst = inst->getPrevInst())
+    {
+        if (inst == var)
+            return true;
+        switch (inst->getOp())
+        {
+        case kIROp_Var:
+        case kIROp_DebugVar:
+        case kIROp_DebugDeclare:
+            continue;
+        default:
+            return false;
+        }
+    }
+    return false;
+}
+
+/// Record every `DebugDeclare` whose storage is `addr`, which is the promotable `var` or an
+/// access chain into it.
+static void collectDebugDeclares(ConstructSSAContext* context, IRVar* var, IRInst* addr)
+{
+    for (auto use = addr->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (auto declare = as<IRDebugDeclare>(user))
+        {
+            context->debugDeclaresOfVar.getOrAddValue(var, List<IRDebugDeclare*>()).add(declare);
+            if (!isDeclaredAtDefinition(declare, var))
+                context->laterDebugDeclares.add(declare);
+        }
+        else if (as<IRGetElementPtr>(user) || as<IRFieldAddress>(user))
+        {
+            collectDebugDeclares(context, var, user);
+        }
+    }
+}
+
 // Identify local variables that can be promoted to SSA form
 void identifyPromotableVars(ConstructSSAContext* context)
 {
@@ -593,9 +665,14 @@ void identifyPromotableVars(ConstructSSAContext* context)
             if (isPromotableVar(context, var, knownBlocks))
             {
                 context->promotableVars.add(var);
+                collectDebugDeclares(context, var, var);
             }
         }
     }
+
+    // breakCriticalEdges has already run, so the dominator tree stays valid while we add phis.
+    if (context->laterDebugDeclares.getCount() != 0)
+        context->domTree = computeDominatorTree(context->globalVal);
 }
 
 /// If `value` is a promotable variable, then cast and return it.
@@ -1155,6 +1232,43 @@ void collectInstsToRemove(ConstructSSAContext* context, IRBlock* block)
     }
 }
 
+/// Emit, with `builder`, a `DebugValue` for each debug declaration of the promoted `var` that
+/// dominates `position`, binding the declared variable to `value`, the new SSA value of `var`
+/// there. A declaration on an access chain into `var` gets the matching part of `value`.
+///
+/// Consider this example, where `bump` is inlined:
+///
+///     float f = 1.0;
+///     bump(f); // void bump(inout float x) { x += 1.0; }
+///
+/// After inlining, `f` carries its own declaration and the one of `x`. The store of `1.0` updates
+/// only `f`, because it comes before `x` is declared; the store of `x + 1.0` updates both.
+static void emitDebugValuesForNewValue(
+    ConstructSSAContext* context,
+    IRBuilder* builder,
+    IRVar* var,
+    IRInst* value,
+    IRInst* position)
+{
+    auto declares = context->debugDeclaresOfVar.tryGetValue(var);
+    if (!declares)
+        return;
+    for (auto declare : *declares)
+    {
+        if (context->laterDebugDeclares.contains(declare))
+        {
+            bool dominates = as<IRBlock>(position) ? context->domTree->properlyDominates(
+                                                         as<IRBlock>(declare->getParent()),
+                                                         as<IRBlock>(position))
+                                                   : context->domTree->dominates(declare, position);
+            if (!dominates)
+                continue;
+        }
+        auto declaredValue = applyAccessChain(context, builder, declare->getStorage(), value);
+        builder->emitDebugValue(declare->getDebugVar(), declaredValue);
+    }
+}
+
 void processBlock(ConstructSSAContext* context, IRBlock* block, SSABlockInfo* blockInfo)
 {
     hoistInstOutOfASMBlocks(block);
@@ -1196,11 +1310,38 @@ void processBlock(ConstructSSAContext* context, IRBlock* block, SSABlockInfo* bl
                     // stored as the value for the given SSA
                     // variable.
                     writeVar(context, blockInfo, var, valArg);
+                    emitDebugValuesForNewValue(
+                        context,
+                        &blockInfo->builder,
+                        var,
+                        valArg,
+                        storeInst);
 
                     // Also eliminate the store instruction,
                     // since it is no longer needed.
                     storeInst->removeAndDeallocate();
                 }
+            }
+            break;
+
+        case kIROp_DebugDeclare:
+            {
+                // A declaration made after a store earlier in the same block binds the declared
+                // variable to the stored value at once; later stores and phis update it. We do
+                // not look further back, because `readVar` would then create phis and
+                // uninitialized values for debug information alone.
+                auto declare = (IRDebugDeclare*)ii;
+                if (!context->laterDebugDeclares.contains(declare))
+                    break;
+                auto storage = declare->getStorage();
+                auto var = asPromotableVarAccessChain(context, storage);
+                SLANG_ASSERT(var);
+                IRInst* val = nullptr;
+                if (!blockInfo->valueForVar.tryGetValue(var, val))
+                    break;
+                val = maybeGetPhiReplacement(context, val);
+                val = applyAccessChain(context, &blockInfo->builder, storage, val);
+                blockInfo->builder.emitDebugValue(declare->getDebugVar(), val);
             }
             break;
 
@@ -1472,6 +1613,21 @@ bool constructSSA(ConstructSSAContext* context)
             // the given block.
             bb->addParam(phiInfo->phi);
 
+            // The phi is a new SSA value of its variable, so declarations that dominate the
+            // block describe it. The `DebugValue` goes after the block's leading location and
+            // scope markers so that it is attributed to the block's scope.
+            if (context->debugDeclaresOfVar.containsKey(phiInfo->var))
+            {
+                auto insertPoint = bb->getFirstOrdinaryInst();
+                while (insertPoint &&
+                       (as<IRDebugScope>(insertPoint) || as<IRDebugNoScope>(insertPoint) ||
+                        as<IRDebugLine>(insertPoint)))
+                    insertPoint = insertPoint->getNextInst();
+                IRBuilder debugBuilder(context->module);
+                debugBuilder.setInsertBefore(insertPoint);
+                emitDebugValuesForNewValue(context, &debugBuilder, phiInfo->var, phiInfo->phi, bb);
+            }
+
             UInt predCounter = 0;
             for (auto pp : bb->getPredecessors())
             {
@@ -1544,6 +1700,14 @@ bool constructSSA(ConstructSSAContext* context)
 
         // Okay, we should be clear to remove the old terminator
         oldTerminator->removeAndDeallocate();
+    }
+
+    // The promoted variables have no storage left to declare, and the declarations may use
+    // access chains that are about to be removed.
+    for (auto& [var, declares] : context->debugDeclaresOfVar)
+    {
+        for (auto declare : declares)
+            declare->removeAndDeallocate();
     }
 
     // Remove all the instructions we marked for deletion along

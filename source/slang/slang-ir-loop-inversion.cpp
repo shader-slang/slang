@@ -41,7 +41,9 @@ static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 };
 
 // Returns whether duplicating the block fits the instruction budget.
-// Location and scope markers do not count toward that budget.
+// Debug instructions do not count toward that budget: duplicating them is always valid, and
+// debug information must not decide whether a loop is inverted (a promoted loop variable gets a
+// DebugValue at its header phi only when debug information is enabled).
 static bool isSmallBlock(IRBlock* c)
 {
     // Somewhat arbitrarily, 4 instructions, enough for:
@@ -51,7 +53,7 @@ static bool isSmallBlock(IRBlock* c)
     // - Terminator
     Int n = 0;
     for (const auto inst : c->getOrdinaryInsts())
-        if (!isDebugLocationOrScopeMarker(inst) && ++n > 4)
+        if (!isDebugInfoInst(inst) && ++n > 4)
             return false;
     return true;
 }
