@@ -3051,6 +3051,11 @@ struct ScopeLayoutBuilder
     RefPtr<StructTypeLayout> m_structLayout;
     UniformLayoutInfo m_structLayoutInfo;
 
+    // The end of the furthest uniform parameter. A `[vk::offset]` can place a parameter
+    // before an earlier one, so the scope's uniform size is the furthest end rather than
+    // the end of the last parameter.
+    LayoutSize m_uniformEnd = 0;
+
     void beginLayout(ParameterBindingContext* context, TypeLayoutContext layoutContext)
     {
         m_context = context;
@@ -3082,8 +3087,21 @@ struct ScopeLayoutBuilder
                 uniformSize,
                 LayoutOffset{varLayout->typeLayout->uniformAlignment});
 
+            // On Vulkan targets, `[vk::offset(N)]` on an entry-point `uniform` parameter
+            // starts the parameter at byte N of the entry point's uniform block. IR layout
+            // honours the attribute by moving its layout cursor to N before it aligns the
+            // field (see `kIROp_StructType` in `slang-ir-layout.cpp`), and we do the same
+            // here so that reflection reports the offsets that the SPIR-V and GLSL use.
+            if (auto offsetAttr =
+                    varLayout->varDecl.getDecl()->findModifier<VkStructOffsetAttribute>();
+                offsetAttr && isKhronosTarget(m_context->getTargetRequest()))
+            {
+                m_structLayoutInfo.size = offsetAttr->value;
+            }
+
             auto rules = m_layoutContext.rules;
             LayoutSize uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
+            m_uniformEnd = maximum(m_uniformEnd, uniformOffset + uniformSize);
 
             varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
                 uniformOffset.getFiniteValue();
@@ -3109,6 +3127,7 @@ struct ScopeLayoutBuilder
         // Finish computing the layout for the ordindary data (if any).
         //
         auto rules = m_layoutContext.rules;
+        m_structLayoutInfo.size = maximum(m_structLayoutInfo.size, m_uniformEnd);
         rules->EndStructLayout(&m_structLayoutInfo);
 
         // Copy the final layout information computed for ordinary data
