@@ -11,7 +11,7 @@
 
 //TEST:SIMPLE(filecheck=HLSL):  -target hlsl  -stage compute -entry computeMain -profile cs_6_6
 //TEST:SIMPLE(filecheck=WGSL):  -target wgsl  -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain -warnings-disable 56113
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CUDA):  -target cuda  -stage compute -entry computeMain
 
@@ -37,6 +37,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // WGSL-NEXT: @workgroup_size(64, 1, 1)
 // WGSL-NEXT: @subgroup_size(32)
 
+// METAL-NOT: WaveSize
 // METAL: {{\[\[kernel\]\]}}
 // METAL-NOT: WaveSize
 
@@ -75,3 +76,24 @@ void wave64Main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     outputBuffer[dispatchThreadID.x] = WaveActiveSum(dispatchThreadID.x);
 }
+
+
+// `[WaveSize]` accepts a link-time constant expression, which is not an integer literal until
+// `simplifyIR` has folded it. The check on the entry point must neither abort on it nor look
+// at the target's wave size, so SPIR-V (which never reads the value) and WGSL still compile.
+//TEST:SIMPLE(filecheck=LINKTIME-SPIRV): -target spirv-asm -stage compute -entry linkTimeWaveSizeMain
+//TEST:SIMPLE(filecheck=LINKTIME-WGSL): -target wgsl -stage compute -entry linkTimeWaveSizeMain
+
+extern static const int kLinkTimeWaveSize = 16;
+
+[shader("compute")]
+[WaveSize(kLinkTimeWaveSize * 2)]
+[numthreads(64, 1, 1)]
+void linkTimeWaveSizeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
+    outputBuffer[dispatchThreadID.x] = WaveActiveSum(dispatchThreadID.x);
+}
+
+// LINKTIME-SPIRV: OpEntryPoint GLCompute
+// LINKTIME-WGSL: @workgroup_size(64, 1, 1)
+// LINKTIME-WGSL-NEXT: @subgroup_size(32)

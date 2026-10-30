@@ -77,17 +77,29 @@ private:
     // silently would let code that sizes its groupshared memory by the requested width compute
     // wrong results, so we warn instead. WGSL needs one more check: the workgroup's x dimension
     // must be a multiple of the subgroup size.
+    //
+    // Only a literal wave size is checked here. Like `[numthreads]`, `[WaveSize]` accepts a
+    // link-time constant expression such as `[WaveSize(W * 2)]`, and its operand stays an
+    // arithmetic instruction until `simplifyIR` folds it, which happens after this pass. The
+    // passes that inspect `[numthreads]` this early (e.g. `emitCalcGroupExtents`) likewise skip
+    // an operand that is not an `IRIntLit`, and the emitters read the folded value later.
     void checkWaveSizeDecoration(IRFunc* entryPoint, IRWaveSizeDecoration* decoration)
     {
-        const Int waveSize = getIntVal(decoration->getOperand(0));
-
+        // Metal drops the attribute whatever its value is.
         if (isMetalTarget(m_target))
         {
             m_sink->diagnose(Diagnostics::WaveSizeUnsupportedOnTarget{
                 .target = getTargetName(),
                 .location = decoration->sourceLoc});
+            return;
         }
-        else if (isCUDATarget(m_target))
+
+        auto waveSizeLiteral = as<IRIntLit>(decoration->getOperand(0));
+        if (!waveSizeLiteral)
+            return;
+        const Int waveSize = Int(waveSizeLiteral->getValue());
+
+        if (isCUDATarget(m_target))
         {
             if (waveSize != kCudaWarpSize)
             {
