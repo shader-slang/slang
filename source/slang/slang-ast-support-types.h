@@ -241,7 +241,7 @@ FIDDLE() namespace Slang
         WaveIsFirstLane,
         WaveReadLaneFirst,
         CallShader,
-        ReportHit = 16,
+        ReportHit,
         RayTracingClosestHitInput,
         RayTracingAnyHitInput,
         RayTracingIntersectionInput,
@@ -249,7 +249,7 @@ FIDDLE() namespace Slang
         RayTracingCallableInput,
         RayTracingProgramHitGroups,
         RayTracingProgramMissShaders,
-        RayTracingProgramCallableShaders,
+        RayTracingProgramCallableShaders = 24,
         COUNT
     };
 
