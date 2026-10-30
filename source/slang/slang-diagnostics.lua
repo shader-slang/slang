@@ -4237,6 +4237,21 @@ err(
 )
 
 err(
+    "vk-offset-misaligned",
+    31168,
+    "misaligned 'vk::offset'",
+    span { loc = "attr:Modifier", message = "'[vk::offset(~offset:Int)]' is not a multiple of the parameter's alignment, ~alignment:Int" }
+)
+
+err(
+    "vk-offset-overlapping-parameters",
+    31169,
+    "overlapping entry-point uniform parameters",
+    span { loc = "param:Decl", message = "the uniform data of '~param' overlaps the uniform data of '~otherParam'" },
+    note { message = "see declaration of '~otherParam'", span { loc = "otherParam:Decl" } }
+)
+
+err(
     "accessor-does-not-satisfy-type-constraint-requirements",
     31110,
     "accessor does not satisfy type constraint requirements",

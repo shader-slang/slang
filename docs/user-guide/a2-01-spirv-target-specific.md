@@ -223,7 +223,7 @@ float4 fragmentMain(VertexOutput input,
 { ... }
 ```
 
-The compiler reports an error when `[vk::offset]` is on a varying entry-point parameter, or when `N` is negative or larger than 2147483647.
+The compiler reports an error when `[vk::offset]` is on a varying entry-point parameter, when `N` is negative, larger than 2147483647 or not a multiple of the parameter's alignment, or when two parameters of one entry point share bytes.
 
 Vulkan allows an entry point to statically use at most one push-constant block.
 The compiler reports error 39033 when an entry point uses more than one, for example when a compute or rasterization entry point reads both a global `[vk::push_constant]` parameter and its own `uniform` parameters.

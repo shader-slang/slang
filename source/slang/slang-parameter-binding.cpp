@@ -3056,6 +3056,18 @@ struct ScopeLayoutBuilder
     // the end of the last parameter.
     LayoutSize m_uniformEnd = 0;
 
+    // The uniform byte range of each parameter laid out so far. Parameters that follow the
+    // layout cursor cannot overlap, so we compare the ranges only once a `[vk::offset]` has
+    // moved the cursor.
+    struct UniformRange
+    {
+        LayoutSize begin;
+        LayoutSize end;
+        Decl* decl;
+    };
+    List<UniformRange> m_uniformRanges;
+    bool m_hasExplicitUniformOffset = false;
+
     void beginLayout(ParameterBindingContext* context, TypeLayoutContext layoutContext)
     {
         m_context = context;
@@ -3096,12 +3108,41 @@ struct ScopeLayoutBuilder
                     varLayout->varDecl.getDecl()->findModifier<VkStructOffsetAttribute>();
                 offsetAttr && isKhronosTarget(m_context->getTargetRequest()))
             {
+                // Direct SPIR-V and reflection would round a misaligned offset up, but glslang
+                // rejects it, so we reject it on every Khronos path.
+                auto alignment = fieldInfo.alignment.getValidValue();
+                if (LayoutOffset::RawValue(offsetAttr->value) % alignment != 0)
+                {
+                    getSink(m_context)->diagnose(Diagnostics::VkOffsetMisaligned{
+                        .offset = int64_t(offsetAttr->value),
+                        .alignment = int64_t(alignment),
+                        .attr = offsetAttr});
+                }
                 m_structLayoutInfo.size = offsetAttr->value;
+                m_hasExplicitUniformOffset = true;
             }
 
             auto rules = m_layoutContext.rules;
             LayoutSize uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
-            m_uniformEnd = maximum(m_uniformEnd, uniformOffset + uniformSize);
+            LayoutSize uniformEnd = uniformOffset + uniformSize;
+            m_uniformEnd = maximum(m_uniformEnd, uniformEnd);
+
+            auto decl = varLayout->varDecl.getDecl();
+            if (m_hasExplicitUniformOffset)
+            {
+                for (auto const& range : m_uniformRanges)
+                {
+                    if (uniformOffset.compare(range.end) == std::partial_ordering::less &&
+                        range.begin.compare(uniformEnd) == std::partial_ordering::less)
+                    {
+                        getSink(m_context)->diagnose(Diagnostics::VkOffsetOverlappingParameters{
+                            .param = decl,
+                            .otherParam = range.decl});
+                        break;
+                    }
+                }
+            }
+            m_uniformRanges.add(UniformRange{uniformOffset, uniformEnd, decl});
 
             varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
                 uniformOffset.getFiniteValue();
