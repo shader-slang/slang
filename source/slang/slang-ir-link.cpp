@@ -2665,7 +2665,8 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     specContext.builder = &sharedContext.builderStorage;
     specContext.env = &sharedContext.globalEnv;
     specContext.shared = &sharedContext;
-    specContext.irModules.add(module->getIRModule());
+    // `module` has no IR attached until lowering returns; its own symbols are registered from
+    // `irModule` below.
     for (auto importedModule : module->getModuleDependencies())
     {
         if (importedModule->getIRModule())
@@ -2708,7 +2709,15 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
         // We should lookup the inst in the current module with the same mangled name,
         // that's the inst we want to remove and replace with the cloned inst.
         auto mangledName = getMangledName(originalInst);
-        auto existingInst = specContext.findSymbols(mangledName)->irGlobalValue;
+        // Lowering queues a definition only after finding it under the linkage name it gave
+        // the declaration, so the declaration is always found. A miss in this module falls
+        // through to the imported modules and finds the definition itself, which must not be
+        // replaced.
+        auto existingSymbol = specContext.findSymbols(mangledName);
+        SLANG_RELEASE_ASSERT(
+            existingSymbol && existingSymbol->irGlobalValue->getModule() == irModule &&
+            "no declaration in this module matches the definition queued for prelinking");
+        auto existingInst = existingSymbol->irGlobalValue;
         specContext.shared->symbols.remove(mangledName);
         specContext.builder->setInsertBefore(existingInst);
 

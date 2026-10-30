@@ -12117,8 +12117,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         context->setGlobalValue(decl, LoweredValInfo::simple(declVal));
 
         // `prelinkIR` pairs the declaration with the queued symbol by mangled name
-        // and dereferences that lookup without a null check, so a name mismatch is
-        // a crash in a later pass rather than a missed optimisation here. Both
+        // and asserts that the lookup succeeds, so a name mismatch would fail in a
+        // later pass rather than show up as a missed optimisation here. Both
         // halves are in hand at this point, which is the only place the failure can
         // still be attributed to the code that caused it.
         SLANG_RELEASE_ASSERT(
