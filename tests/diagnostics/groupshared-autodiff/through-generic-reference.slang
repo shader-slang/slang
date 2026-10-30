@@ -2,7 +2,7 @@
 // unqualified `__ref` parameter, which accepts storage in any address space. Consider `h` passing
 // its shared parameter to `g`, which passes it on to `bwd_diff(f)`. Inside `g`, nothing says that
 // `a` is shared memory, so the `bwd_diff` call cannot be checked locally. The call in `h` is the last
-// place where the argument is visibly shared, so it should warn there.
+// place where the argument is visibly shared, so it should be reported there.
 //
 // Disabled: catching this needs either an address space in the reference parameter's signature,
 // so that the call in `h` is diagnosed as a mismatch, or an analysis across functions. Neither
@@ -30,8 +30,8 @@ float g(__ref float a)
 float h(groupshared float a)
 {
     return g(a);
-//CHECK:     ^ passing thread-group-shared memory by reference introduces a race condition when this call is differentiated
-//CHECK:     ^ access the groupshared variable directly as a global in the callee instead of passing it as an argument
+//CHECK:     ^ passing thread-group-shared memory to a writable reference parameter of 'f' introduces a race condition when 'f' is differentiated
+//CHECK:     ^ give 'f' a custom derivative, or move the access into a function that is not differentiable
 }
 
 [numthreads(4, 1, 1)]

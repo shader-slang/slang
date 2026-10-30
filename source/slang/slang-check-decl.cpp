@@ -16014,13 +16014,16 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
             // passes a pointer-differentiable handle or their own pair type instead. Because a
             // user may not expect the implicit `no_diff`, we warn when they did not write it. A
             // parameter whose type has no derivative was already marked `no_diff` above and loses
-            // nothing, so it gets no warning.
+            // nothing, so it gets no warning. A `groupshared` parameter gets no warning either,
+            // because differentiating a function with one is an error at the call that requests
+            // the derivative.
             if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)) &&
                 !paramDecl->hasModifier<NoDiffModifier>())
             {
-                getSink()->diagnose(
-                    Diagnostics::ReferenceParameterOfDifferentiableFunctionTreatedAsNoDiff{
-                        .param = paramDecl});
+                if (!paramDecl->hasModifier<HLSLGroupSharedModifier>())
+                    getSink()->diagnose(
+                        Diagnostics::ReferenceParameterOfDifferentiableFunctionTreatedAsNoDiff{
+                            .param = paramDecl});
                 auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
                 noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
                 addModifier(paramDecl, noDiffModifier);

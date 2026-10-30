@@ -4184,7 +4184,9 @@ public:
         FuncType* funcType,
         DeclRef<CallableDecl> calleeDeclRef,
         List<DeclRef<ParamDecl>> const& paramDeclRefs);
-    void checkGroupSharedArgumentsCopiedByDifferentiableCall(
+    FunctionDeclBase* getFunctionDifferentiatedByCall(InvokeExpr* invoke);
+    bool checkDifferentiatedCallWithGroupSharedStorage(InvokeExpr* invoke, FuncType* funcType);
+    void checkGroupSharedElementsPassedByReferenceInDifferentiatedBody(
         InvokeExpr* invoke,
         FuncType* funcType);
     void checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target);

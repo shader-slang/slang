@@ -1,7 +1,7 @@
 // A non-differentiable function that receives thread-group-shared memory as a `groupshared`
-// parameter and passes it to a writable reference of `bwd_diff(f)` lets the differentiated `f`
-// write it, which we cannot check from here. We warn at the `bwd_diff` call, even though the
-// calling function is not differentiated.
+// parameter and passes it to a writable reference of `bwd_diff(f)` has the derivative of `f`
+// copy it and store the copy back. We report the `bwd_diff` call, even though the calling
+// function is not differentiated.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
 
@@ -19,8 +19,8 @@ float g(groupshared float a)
 {
     var x = diffPair(2.0);
     bwd_diff(f)(a, x, 1.0);
-//CHECK:        ^ passing thread-group-shared memory by reference introduces a race condition when this call is differentiated
-//CHECK:        ^ access the groupshared variable directly as a global in the callee instead of passing it as an argument
+//CHECK:        ^ passing thread-group-shared memory to a writable reference parameter of 'f' introduces a race condition when 'f' is differentiated
+//CHECK:        ^ give 'f' a custom derivative, or move the access into a function that is not differentiable
     return x.d;
 }
 

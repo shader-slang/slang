@@ -25,7 +25,7 @@ float bumpInline(__ref float a)
 float throughForceInlineNonDifferentiable(uint i, float x)
 {
     return x * no_diff(bumpInline(g[i]));
-//CHECK:                              ^ warning
+//CHECK:                              ^ error
 }
 
 [numthreads(4, 1, 1)]

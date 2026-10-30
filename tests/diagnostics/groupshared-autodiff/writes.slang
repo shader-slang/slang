@@ -2,9 +2,10 @@
 // rewrites races with other invocations: address elimination turns an element, field, or
 // component write into a read-modify-write of the whole variable, so each invocation stores back
 // stale copies of the other invocations' parts. Each case below writes part of shared memory in a
-// differentiable function without a custom derivative, either directly or through the function's
-// own `groupshared` parameter. A whole-variable write and an atomic stay in place; they are in
-// silent.slang. A write in a `[ForceInline]` helper is in write-in-force-inline-helper.slang.
+// differentiable function without a custom derivative. A write through the function's own
+// `groupshared` parameter is not reported, because such a function is never differentiated. A
+// whole-variable write and an atomic stay in place; they are in silent.slang. A write in a
+// `[ForceInline]` helper is in write-in-force-inline-helper.slang.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
 
@@ -32,7 +33,7 @@ float elementWrite(uint i, float x)
     g[i] = float(i);
 /*CHECK:
      ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
-     ^ move the write into a function that is not differentiable or has custom derivatives
+     ^ move the access into a function that is not differentiable or has a custom derivative
 */
     return x;
 }
@@ -43,7 +44,7 @@ float compoundElementWrite(uint i, float x)
     g[i] += 1.0;
 /*CHECK:
      ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
-     ^ move the write into a function that is not differentiable or has custom derivatives
+     ^ move the access into a function that is not differentiable or has a custom derivative
 */
     return x;
 }
@@ -54,7 +55,7 @@ float incrementElement(uint i, float x)
     g[i]++;
 /*CHECK:
      ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
-     ^ move the write into a function that is not differentiable or has custom derivatives
+     ^ move the access into a function that is not differentiable or has a custom derivative
 */
     return x;
 }
@@ -64,7 +65,7 @@ float fieldWrite(float x)
 {
     gPair.b = 1.0;
 //CHECK:  ^ writing part of thread-group-shared variable 'gPair' introduces a race condition when this function is differentiated
-//CHECK:  ^ move the write into a function that is not differentiable or has custom derivatives
+//CHECK:  ^ move the access into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -73,7 +74,7 @@ float vectorIndexWrite(uint i, float x)
 {
     gVector[i] = 1.0;
 //CHECK:   ^ writing part of thread-group-shared variable 'gVector' introduces a race condition when this function is differentiated
-//CHECK:   ^ move the write into a function that is not differentiable or has custom derivatives
+//CHECK:   ^ move the access into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -82,7 +83,7 @@ float swizzleWrite(float x)
 {
     gVector.yz = float2(1.0, 2.0);
 //CHECK:    ^^ writing part of thread-group-shared variable 'gVector' introduces a race condition when this function is differentiated
-//CHECK:    ^^ move the write into a function that is not differentiable or has custom derivatives
+//CHECK:    ^^ move the access into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -91,7 +92,7 @@ float nestedWrite(uint i, float x)
 {
     gNested.pairs[i % 2].a = 1.0;
 //CHECK:                 ^ writing part of thread-group-shared variable 'gNested' introduces a race condition when this function is differentiated
-//CHECK:                 ^ move the write into a function that is not differentiable or has custom derivatives
+//CHECK:                 ^ move the access into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -99,10 +100,6 @@ float nestedWrite(uint i, float x)
 float writeThroughOwnParameter(no_diff groupshared float a[4], uint i, float x)
 {
     a[i] = 1.0;
-/*CHECK:
-     ^ writing part of thread-group-shared variable 'a' introduces a race condition when this function is differentiated
-     ^ move the write into a function that is not differentiable or has custom derivatives
-*/
     return x;
 }
 

@@ -4616,7 +4616,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 funcType,
                 callableDeclRef,
                 paramDeclRefs);
-            checkGroupSharedArgumentsCopiedByDifferentiableCall(invoke, funcType);
+            if (!checkDifferentiatedCallWithGroupSharedStorage(invoke, funcType))
+                checkGroupSharedElementsPassedByReferenceInDifferentiatedBody(invoke, funcType);
             checkGroupSharedPartialWritesByInlinedCall(invoke, funcType, callableDeclRef);
 
             if (!IsErrorExpr(invoke))
@@ -7931,9 +7932,9 @@ struct ModesDifferentiatedFromBody
 
     bool any() const { return forward || backward; }
 
-    const char* getNames() const
+    bool intersects(ModesDifferentiatedFromBody const& other) const
     {
-        return !backward ? "forward" : !forward ? "backward" : "forward or backward";
+        return (forward && other.forward) || (backward && other.backward);
     }
 };
 
@@ -7968,43 +7969,167 @@ static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
     return modes;
 }
 
+// Return the first `groupshared` parameter of `func`, or null if it has none.
+static ParamDecl* findGroupSharedParam(FunctionDeclBase* func)
+{
+    if (!func)
+        return nullptr;
+    for (auto param : func->getParameters())
+    {
+        if (param->hasModifier<HLSLGroupSharedModifier>())
+            return param;
+    }
+    return nullptr;
+}
+
+// Return the modes in which autodiff can differentiate the body of `func`. These are the modes
+// generated from its body, except that a function with a `groupshared` parameter is never
+// differentiated, because `checkDifferentiatedCallWithGroupSharedStorage` rejects every call
+// that would differentiate it. Checks on the body of such a function would only repeat that
+// error.
+static ModesDifferentiatedFromBody getModesBodyCanBeDifferentiated(
+    SharedSemanticsContext* shared,
+    FunctionDeclBase* func)
+{
+    if (findGroupSharedParam(func))
+        return {};
+    return getModesDifferentiatedFromBody(shared, func);
+}
+
+// Return the function of which `invoke` has autodiff generate a derivative, or null if it has
+// none generated. That is the base function of a `fwd_diff` or `bwd_diff` call in a mode that
+// autodiff generates from its body, or a function called from a body that autodiff
+// differentiates, in a mode generated from its body, outside a directly enclosing `no_diff`.
+FunctionDeclBase* SemanticsVisitor::getFunctionDifferentiatedByCall(InvokeExpr* invoke)
+{
+    ModesDifferentiatedFromBody requestedModes;
+    Expr* calleeExpr = invoke->functionExpr;
+    if (auto differentiateExpr = as<DifferentiateExpr>(calleeExpr))
+    {
+        if (as<ForwardDifferentiateExpr>(differentiateExpr))
+            requestedModes.forward = true;
+        else
+            requestedModes.backward = true;
+        calleeExpr = differentiateExpr->baseFunction;
+    }
+    else
+    {
+        auto treatAsDifferentiableExpr = getTreatAsDifferentiableParentExpr();
+        if (treatAsDifferentiableExpr &&
+            treatAsDifferentiableExpr->flavor == TreatAsDifferentiableExpr::Flavor::NoDiff)
+            return nullptr;
+        requestedModes = getModesBodyCanBeDifferentiated(getShared(), m_parentFunc);
+    }
+    if (!requestedModes.any())
+        return nullptr;
+
+    auto calleeDeclRefExpr = as<DeclRefExpr>(calleeExpr);
+    if (!calleeDeclRefExpr)
+        return nullptr;
+    auto callee = calleeDeclRefExpr->declRef.as<FunctionDeclBase>();
+    if (!callee)
+        return nullptr;
+    if (!getModesDifferentiatedFromBody(getShared(), callee.getDecl()).intersects(requestedModes))
+        return nullptr;
+    return callee.getDecl();
+}
+
+// A derivative that autodiff generates works on a private copy of the storage behind each
+// reference parameter, so it misses other invocations' writes during the call and stores the
+// whole copy back afterward, overwriting them. We therefore reject each call that has autodiff
+// generate a derivative of a function with a `groupshared` parameter, or that passes a whole
+// `groupshared` variable to a writable reference parameter of the differentiated function. An
+// element passed this way is copied the same way, but only that element is stored back.
+// Declaring such a function and calling it without differentiating it are both allowed.
+//
+// Consider this example:
+//
+//     groupshared float g[4];
+//     float a(groupshared float f[4], uint i);
+//
+//     [Differentiable]
+//     float b(groupshared float f[4], uint i, float x) { return x * no_diff a(f, i); }
+//
+//     [Differentiable]
+//     float w(no_diff __ref float f[4], uint i, float x) { f[i] = 1.0; return x; }
+//
+//     [Differentiable]
+//     float c(uint i, float x) { return b(g, i, x) + w(g, i, x); }
+//
+//     void k(uint i) { var dpx = diffPair(1.0); bwd_diff(b)(g, i, dpx, 1.0); }
+//
+// We report the calls to `b` and `w` in `c`, and the call to `bwd_diff(b)` in `k`. The call to
+// `a` in `b` is allowed, because autodiff never differentiates `a`.
+//
+// We return true if we rejected the call because the callee has a `groupshared` parameter, since
+// the caller then skips reporting the call's arguments for the same mistake.
+bool SemanticsVisitor::checkDifferentiatedCallWithGroupSharedStorage(
+    InvokeExpr* invoke,
+    FuncType* funcType)
+{
+    auto callee = getFunctionDifferentiatedByCall(invoke);
+    if (!callee)
+        return false;
+
+    if (auto param = findGroupSharedParam(callee))
+    {
+        getSink()->diagnose(Diagnostics::DifferentiatingFunctionWithGroupsharedParameter{
+            .callee = callee,
+            .call = invoke->functionExpr,
+            .param = param});
+        return true;
+    }
+
+    Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
+    for (Index i = 0; i < checkCount; ++i)
+    {
+        auto mode = funcType->getParamInfo(i).mode;
+        if (!isByReferenceParamPassingMode(mode) || mode == ParamPassingMode::RefReadOnly)
+            continue;
+
+        auto argExpr = invoke->arguments[i];
+        if (isArgumentOfFailedCheck(argExpr) || !argumentNamesGroupSharedStorage(argExpr))
+            continue;
+
+        Expr* wholeExpr = argExpr;
+        while (auto parenExpr = as<ParenExpr>(wholeExpr))
+            wholeExpr = parenExpr->base;
+        if (getBaseObjectOfProjection(argExpr) != wholeExpr)
+            continue;
+
+        getSink()->diagnose(
+            Diagnostics::GroupsharedVariablePassedToWritableReferenceOfDifferentiatedFunction{
+                .callee = callee,
+                .arg = argExpr});
+    }
+    return false;
+}
+
 // Autodiff prepares a function body for differentiation by replacing the addresses it computes
-// with values, so a reference argument that is such an address is copied into a temporary before
-// the call and stored back after it. For thread-group-shared memory, the callee then misses other
-// invocations' writes during the call, and the store back overwrites them. A reference argument
-// that names a whole `groupshared` variable keeps its address, but a callee that may write it can
-// itself be differentiated and write part of it, which autodiff widens into a write of the whole
-// variable.
+// with values, so a reference argument that names part of thread-group-shared memory is copied
+// into a temporary before the call and the whole variable is stored back after it. The store
+// back overwrites the parts that other invocations wrote. A reference argument that names a whole
+// `groupshared` variable keeps its address.
 //
 // Consider this example:
 //
 //     groupshared float g[4];
 //     float readAll(__ref_readonly float a[4], uint i);
 //     float readOne(__ref_readonly float a);
-//     void writeAll(__ref float a[4], uint i);
 //
 //     [Differentiable]
 //     float f(float x, uint i)
 //     {
-//         no_diff(writeAll(g, i));
 //         return no_diff(readAll(g, i)) * no_diff(readOne(g[i])) * x;
 //     }
 //
-// In `f`, we warn on `g` passed to `writeAll` and on `g[i]` passed to `readOne`, but not on `g`
-// passed to `readAll`. We would also warn on any of `f`'s own `groupshared` parameters passed by
-// reference, since those are addresses too. At a `fwd_diff(f)` or `bwd_diff(f)` call outside a
-// differentiated body, no argument is copied, so we only warn on a whole `groupshared` variable
-// passed to a writable reference.
-void SemanticsVisitor::checkGroupSharedArgumentsCopiedByDifferentiableCall(
+// In `f`, we report `g[i]` passed to `readOne`, but not `g` passed to `readAll`.
+void SemanticsVisitor::checkGroupSharedElementsPassedByReferenceInDifferentiatedBody(
     InvokeExpr* invoke,
     FuncType* funcType)
 {
-    auto differentiateExpr = as<DifferentiateExpr>(invoke->functionExpr);
-    auto callerModes = getModesDifferentiatedFromBody(getShared(), m_parentFunc);
-    bool callerIsDifferentiated = callerModes.any();
-    if (!callerIsDifferentiated && !differentiateExpr)
+    if (!getModesBodyCanBeDifferentiated(getShared(), m_parentFunc).any())
         return;
-    const char* subject = callerIsDifferentiated ? "this function" : "this call";
 
     // An intrinsic, such as an atomic, operates on the shared memory in place. A non-differentiable
     // callee that is always inlined is inlined before autodiff, so no call remains to copy across.
@@ -8033,31 +8158,11 @@ void SemanticsVisitor::checkGroupSharedArgumentsCopiedByDifferentiableCall(
         Expr* wholeExpr = argExpr;
         while (auto parenExpr = as<ParenExpr>(wholeExpr))
             wholeExpr = parenExpr->base;
-        auto baseExpr = getBaseObjectOfProjection(argExpr);
-        bool isWholeVariable = baseExpr == wholeExpr;
-        auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
-        bool isOwnParam = baseDeclRefExpr && baseDeclRefExpr->declRef.as<ParamDecl>();
+        if (getBaseObjectOfProjection(argExpr) == wholeExpr)
+            continue;
 
-        if (callerIsDifferentiated && (!isWholeVariable || isOwnParam))
-        {
-            String suggestion = String("access the groupshared variable directly as a global "
-                                       "instead of passing it as an argument; if ") +
-                                callerModes.getNames() +
-                                " differentiation of this function is needed, provide a custom "
-                                "derivative";
-            getSink()->diagnose(Diagnostics::GroupsharedArgumentCopiedByDifferentiableCall{
-                .subject = subject,
-                .suggestion = suggestion,
-                .arg = argExpr});
-        }
-        else if (isWholeVariable && mode != ParamPassingMode::RefReadOnly)
-        {
-            getSink()->diagnose(Diagnostics::GroupsharedArgumentCopiedByDifferentiableCall{
-                .subject = subject,
-                .suggestion = "access the groupshared variable directly as a global in the "
-                              "callee instead of passing it as an argument",
-                .arg = argExpr});
-        }
+        getSink()->diagnose(
+            Diagnostics::GroupsharedElementPassedByReferenceInDifferentiatedBody{.arg = argExpr});
     }
 }
 
@@ -8085,7 +8190,7 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* ta
 {
     if (!target || isArgumentOfFailedCheck(target))
         return;
-    if (!getModesDifferentiatedFromBody(getShared(), m_parentFunc).any())
+    if (!getModesBodyCanBeDifferentiated(getShared(), m_parentFunc).any())
         return;
 
     Expr* wholeExpr = target;
