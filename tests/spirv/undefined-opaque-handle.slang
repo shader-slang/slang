@@ -19,7 +19,7 @@
 //TEST:SIMPLE(filecheck=COUNTER):-target spirv -entry addToUndefinedStorageTexture -stage compute
 //TEST:SIMPLE(filecheck=SAMPLE):-target spirv -entry passTwoUndefinedTextures -stage compute
 //TEST:SIMPLE(filecheck=STORAGE):-target spirv -entry writeComponentInCallee -stage compute
-//TEST:SIMPLE(filecheck=SAMPLER):-target spirv -entry projectTextureFromCombined -stage compute
+//TEST:SIMPLE(filecheck=PROJECTION):-target spirv -entry projectTextureFromCombined -stage compute
 
 // SAMPLE: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage %float 2D 2 0 0 1
 // SAMPLE-NOT: OpUndef %[[IMG]]
@@ -28,6 +28,12 @@
 // SAMPLED: %[[SI:[A-Za-z0-9_]+]] = OpTypeSampledImage
 // SAMPLED-NOT: OpUndef %[[SI]]
 // SAMPLED: OpFunctionEnd
+
+// PROJECTION: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage %float 2D 2 0 0 1
+// PROJECTION: %[[TEX:[A-Za-z0-9_]+]] = OpLoad %[[IMG]] %gTexture
+// PROJECTION-NEXT: OpImageFetch %v4float %[[TEX]]
+// PROJECTION-NOT: OpUndef %[[IMG]]
+// PROJECTION: OpFunctionEnd
 
 // SAMPLER: %[[SMP:[A-Za-z0-9_]+]] = OpTypeSampler
 // SAMPLER-NOT: OpUndef %[[SMP]]
