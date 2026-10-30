@@ -15158,12 +15158,38 @@ static const char* getGenericParamShadowingDeclKind(Decl* decl)
     return "member";
 }
 
+/// Return whether `decl` is a parameter or generic parameter in the signature of the copy that
+/// the parser makes of an interface method with a body. Consider this example:
+///
+///     interface IFoo<let N : int> { int f(int N) { return N; } }
+///
+/// `parseInterfaceDefaultCallableAsExplicitGeneric` parses `f` a second time into an
+/// `InterfaceDefaultImplDecl`, so the parameter `int N` exists twice at the same location. The
+/// requirement keeps the signature and the copy keeps the body, so the copy's signature is
+/// skipped and each declaration is reported once.
+static bool isInterfaceDefaultImplSignatureDecl(Decl* decl)
+{
+    if (!as<ParamDecl>(decl) && !isGenericParam(decl))
+        return false;
+    for (auto ancestor = decl->parentDecl; ancestor; ancestor = ancestor->parentDecl)
+    {
+        if (as<InterfaceDefaultImplDecl>(ancestor))
+            return true;
+        if (!as<CallableDecl>(ancestor) && !as<GenericDecl>(ancestor))
+            return false;
+    }
+    return false;
+}
+
 void SemanticsVisitor::checkForShadowedGenericParam(Decl* decl)
 {
     // Declarations that the compiler synthesizes, such as the generic parameters and parameters
     // of a requirement-witness wrapper, copy their names from other declarations. They do not
     // appear in the user's source, so they are never reported as shadowing.
     if (decl->hasModifier<SynthesizedModifier>())
+        return;
+
+    if (isInterfaceDefaultImplSignatureDecl(decl))
         return;
 
     // The members of a synthesized type are synthesized too. For example, the closure type of

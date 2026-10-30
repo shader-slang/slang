@@ -322,3 +322,20 @@ void useMemberwiseCtor()
     MemberReusesGenericName<1> m = { 2 };
     DifferentiableMemberShadowsGeneric<1> d = { 1.0 };
 }
+
+// The parser copies an interface method that has a body into an `InterfaceDefaultImplDecl`, so
+// the method's parameters and generic parameters exist twice; each is reported once.
+interface IDefaultBodyParam<let N : int> { int f(int N) { return N; } }
+//CHECK:                        ^ outer generic parameter 'N' declared here
+//CHECK:                                             ^ parameter 'N' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:                                             ^ parameter 'N' shadows an outer generic parameter with the same name
+
+interface IDefaultBodyGenericMethod { int g<let M : int>(int M) { return M; } }
+//CHECK:                                        ^ outer generic parameter 'M' declared here
+//CHECK:                                                     ^ parameter 'M' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:                                                     ^ parameter 'M' shadows an outer generic parameter with the same name
+
+interface IDefaultBodyTypeParam<T> { int h<T>() { return 0; } }
+//CHECK:                        ^ outer generic parameter 'T' declared here
+//CHECK:                                   ^ generic parameter 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:                                   ^ generic parameter 'T' shadows an outer generic parameter with the same name
