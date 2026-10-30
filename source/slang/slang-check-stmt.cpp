@@ -115,8 +115,9 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
         // depends only on names, so we check every alias in the block and the generic
         // parameters of every generic alias. The body of a lambda is visited twice: first by
         // `visitLambdaExpr`, with `m_parentLambdaExpr` set, and again as the body of the
-        // synthesized `()` member of the closure type. We check its aliases on the first visit,
-        // where its local variables are also checked.
+        // synthesized `()` member of the closure type. Local variables go through the
+        // declaration-checking states, so the second visit does nothing for them, but this loop
+        // has no such gate, so it runs on the first visit only.
         auto parentFunc = getParentFunc();
         bool isRevisitOfLambdaBody =
             !m_parentLambdaExpr && parentFunc && as<LambdaDecl>(parentFunc->parentDecl);

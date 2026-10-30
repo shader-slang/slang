@@ -170,7 +170,7 @@ struct Outer<let N : int>
     }
 }
 
-// In the following cases a declaration does not shadow a generic parameter, so it gets no
+// In the next three cases a declaration does not shadow a generic parameter, so it gets no
 // diagnostic.
 
 // A generic parameter of a declaration that does not enclose the function is not visible there.
@@ -281,7 +281,8 @@ void localTypeMemberShadowsGeneric<T>()
 //CHECK:           ^ member 'T' shadows an outer generic parameter with the same name
 }
 
-// The fields that autodiff synthesizes for the differential type are not reported again.
+// A struct whose fields are all differentiable is its own differential type, so autodiff adds
+// no field that copies `N`, and the field is reported once.
 struct DifferentiableMemberShadowsGeneric<let N : int> : IDifferentiable
 //CHECK:                                      ^ outer generic parameter 'N' declared here
 {
