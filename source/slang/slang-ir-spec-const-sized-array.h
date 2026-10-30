@@ -24,10 +24,6 @@ class DiagnosticSink;
 /// is. A value of such a type that no declaration holds, such as the result of
 /// `ByteAddressBuffer.Load<float[kTile]>`, is reported once per type.
 ///
-/// No target can build such an array from an initializer list (`float a[kTile] = {};`), so such
-/// an initializer is reported even where the declaration is accepted, unless the declaration that
-/// owns it is reported already.
-///
 /// The check runs after specialization and dead-code elimination, so an array that a generic
 /// argument introduces is reported and one in removed code is not. On targets without
 /// specialization constants `collectGlobalUniformParameters` has by then turned `kTile` into a
@@ -37,6 +33,14 @@ void checkSpecializationConstantSizedArrays(
     IRModule* module,
     CodeGenTarget target,
     DiagnosticSink* sink);
+
+/// Report each list initializer, such as the one in `float a[kTile] = {};`, that still builds an
+/// array sized by a specialization constant when optimization has finished. No target can spell
+/// that value: a GLSL or HLSL array constructor needs one argument per element, and SPIR-V's
+/// `OpCompositeConstruct` needs one operand per element. The check runs after the last
+/// optimization pass, because an initializer whose array the optimizer removes, as in
+/// `float a[kTile] = {}; a[0] = 1; return a[0];`, compiles to SPIR-V and GLSL.
+void checkSpecializationConstantSizedArrayInitializers(IRModule* module, DiagnosticSink* sink);
 
 /// Replace each `constexpr*` instruction in `module` with the ordinary instruction for the same
 /// operation, for example `constexprMul(kTile, 2)` with `mul(kTile, 2)`.

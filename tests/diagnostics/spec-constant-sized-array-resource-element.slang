@@ -1,6 +1,6 @@
-// An array sized by a specialization constant as a buffer element type, as the value a buffer
-// load returns, or as a global uniform is reported at the declaration or the load on targets
-// that cannot size an array that way (#14030).
+// An array sized by a specialization constant as a buffer element type (also inside a tuple), as
+// the value a buffer load returns, or as a global uniform is reported at the declaration or the
+// load on targets that cannot size an array that way (#14030).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute -warnings-disable 39019
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -entry computeMain -stage compute
@@ -16,6 +16,10 @@ RWStructuredBuffer<float[kTile]> tiles;
 
 ByteAddressBuffer input;
 
+RWStructuredBuffer<Tuple<float[kTile], int>> counted;
+//CHECK:                                     ^^^^^^^ error E55222
+//CHECK:                                     ^^^^^^^ cannot size an array with a specialization constant
+
 uniform int weights[kTile];
 //CHECK:    ^^^^^^^ error E55222
 //CHECK:    ^^^^^^^ cannot size an array with a specialization constant
@@ -28,10 +32,10 @@ RWStructuredBuffer<float2[kTile]> pairs;
 [numthreads(1, 1, 1)]
 void computeMain(uint tid: SV_DispatchThreadID)
 {
-    tiles[0][tid % kTile] = input.Load<float[kTile]>(0)[tid % kTile];
-//CHECK:                                            ^ error E55222
-//CHECK:                                            ^ cannot size an array with a specialization constant
-    pairs[0][tid % kTile] = input.Load<float2[kTile]>(16)[tid % kTile] * float(weights[tid % kTile]);
-//CHECK:                                             ^ error E55222
-//CHECK:                                             ^ cannot size an array with a specialization constant
+    // The load's `uint[kTile]` type is held by no declaration, so the load itself is reported.
+    tiles[0][tid % kTile] = float(input.Load<uint[kTile]>(0)[tid % kTile]);
+//CHECK:                                                 ^ error E55222
+//CHECK:                                                 ^ cannot size an array with a specialization constant
+    counted[0]._1 = 1;
+    pairs[0][tid % kTile] = float2(1, 2) * float(weights[tid % kTile]);
 }

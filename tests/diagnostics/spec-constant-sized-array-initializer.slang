@@ -22,9 +22,9 @@ void computeMain(uint tid: SV_DispatchThreadID)
 {
     // The default value of `Data.values` is reported at the field.
     Data d = {};
-    float local[kTile] = {};
-//CHECK:                 ^ error E55223
-//CHECK:                 ^ initialized from a list
+    int local[kTile] = {};
+//CHECK:               ^ error E55223
+//CHECK:               ^ initialized from a list
     local[tid % kTile] = 5;
     for (int i = 0; i < kTile; i++)
         outputBuffer[i] = d.values[i] + local[i];

@@ -17,27 +17,31 @@ static bool isSpecConstSizedArrayType(IRType* type)
 }
 
 /// Return true if `type` holds an array sized by a specialization constant without a struct in
-/// between: as the type itself, as the element type of an array, or as the value type of a pointer
-/// or a builtin generic type such as a structured buffer. This is true for `float[kTile]`,
-/// `float[kTile][4]` and `RWStructuredBuffer<float[kTile]>`, and false for `float[4]` and for a
-/// struct that has a `float values[kTile]` field, because that field is checked on its own.
+/// between: as the type itself, as the element type of an array, as the value type of a pointer
+/// or a builtin generic type such as a structured buffer, or as an element of a tuple, which
+/// `lowerTuples` turns into a struct only after this check. This is true for `float[kTile]`,
+/// `float[kTile][4]`, `RWStructuredBuffer<float[kTile]>` and `Tuple<float[kTile], int>`, and false
+/// for `float[4]` and for a struct that has a `float values[kTile]` field, because that field is
+/// checked on its own.
 static bool hasSpecConstSizedArrayLayer(IRType* type)
 {
-    for (;;)
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        return isSpecConstSizedArrayType(arrayType) ||
+               hasSpecConstSizedArrayLayer(arrayType->getElementType());
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+        return hasSpecConstSizedArrayLayer(ptrType->getValueType());
+    if (auto genericType = as<IRBuiltinGenericType>(type))
+        return hasSpecConstSizedArrayLayer(genericType->getElementType());
+    if (auto tupleType = as<IRTupleType>(type))
     {
-        if (auto arrayType = as<IRArrayTypeBase>(type))
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
         {
-            if (isSpecConstSizedArrayType(arrayType))
+            if (auto elementType = as<IRType>(tupleType->getOperand(i));
+                elementType && hasSpecConstSizedArrayLayer(elementType))
                 return true;
-            type = arrayType->getElementType();
         }
-        else if (auto ptrType = as<IRPtrTypeBase>(type))
-            type = ptrType->getValueType();
-        else if (auto genericType = as<IRBuiltinGenericType>(type))
-            type = genericType->getElementType();
-        else
-            return false;
     }
+    return false;
 }
 
 struct SpecConstSizedArrayCheckContext
@@ -100,29 +104,31 @@ struct SpecConstSizedArrayCheckContext
             return;
         }
 
-        reportedTypes.add(storageType);
+        addReportedLayers(storageType);
         sink->diagnose(Diagnostics::SpecializationConstantSizedArrayNotSupported{
             .target = target,
             .location = location,
         });
     }
 
-    /// Report each `makeArrayFromElement` that builds an array sized by a specialization
-    /// constant, as `float a[kTile] = {};` does. No target can spell that value: a GLSL or HLSL
-    /// array constructor needs one argument per element, and SPIR-V's `OpCompositeConstruct` needs
-    /// one operand per element.
-    void checkInitializers(IRInst* inst)
+    /// Record `type` and each type that `hasSpecConstSizedArrayLayer` looks through inside it, so
+    /// that a value of one of them, such as the element address in `buffer[0][i] = 1;` for a
+    /// reported `RWStructuredBuffer<float[kTile]> buffer`, is not reported again.
+    void addReportedLayers(IRType* type)
     {
-        if (inst->getOp() == kIROp_MakeArrayFromElement &&
-            isSpecConstSizedArrayType(inst->getDataType()) &&
-            !reportedTypes.contains(inst->getDataType()))
+        if (!type || !reportedTypes.add(type))
+            return;
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+            addReportedLayers(arrayType->getElementType());
+        else if (auto ptrType = as<IRPtrTypeBase>(type))
+            addReportedLayers(ptrType->getValueType());
+        else if (auto genericType = as<IRBuiltinGenericType>(type))
+            addReportedLayers(genericType->getElementType());
+        else if (auto tupleType = as<IRTupleType>(type))
         {
-            sink->diagnose(Diagnostics::SpecializationConstantSizedArrayInitializerNotSupported{
-                .location = inst->sourceLoc,
-            });
+            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+                addReportedLayers(as<IRType>(tupleType->getOperand(i)));
         }
-        for (auto child : inst->getChildren())
-            checkInitializers(child);
     }
 
     /// Report each value of an unsupported array type that no declaration holds, such as the
@@ -148,7 +154,7 @@ struct SpecConstSizedArrayCheckContext
                 if (reportedTypes.contains(storageType) ||
                     (!callsOnly && allowedTypes.contains(storageType)))
                     continue;
-                reportedTypes.add(storageType);
+                addReportedLayers(storageType);
                 sink->diagnose(Diagnostics::SpecializationConstantSizedArrayNotSupported{
                     .target = target,
                     .location = child->sourceLoc,
@@ -166,17 +172,33 @@ void checkSpecializationConstantSizedArrays(
     CodeGenTarget target,
     DiagnosticSink* sink)
 {
-    SpecConstSizedArrayCheckContext context{target, sink};
-    if (!isKhronosTarget(target))
-    {
-        context.checkInst(module->getModuleInst());
-        context.checkValues(module->getModuleInst(), true);
-        context.checkValues(module->getModuleInst(), false);
-    }
+    if (isKhronosTarget(target))
+        return;
 
-    // An initializer is reported even where the declaration is accepted (SPIR-V, GLSL, a WGSL
-    // `var<workgroup>`), unless its array type has already been reported at a declaration.
-    context.checkInitializers(module->getModuleInst());
+    SpecConstSizedArrayCheckContext context{target, sink};
+    context.checkInst(module->getModuleInst());
+    context.checkValues(module->getModuleInst(), true);
+    context.checkValues(module->getModuleInst(), false);
+}
+
+/// Report each `makeArrayFromElement` under `inst` that builds an array sized by a
+/// specialization constant.
+static void checkInitializersUnder(IRInst* inst, DiagnosticSink* sink)
+{
+    if (inst->getOp() == kIROp_MakeArrayFromElement &&
+        isSpecConstSizedArrayType(inst->getDataType()))
+    {
+        sink->diagnose(Diagnostics::SpecializationConstantSizedArrayInitializerNotSupported{
+            .location = inst->sourceLoc,
+        });
+    }
+    for (auto child : inst->getChildren())
+        checkInitializersUnder(child, sink);
+}
+
+void checkSpecializationConstantSizedArrayInitializers(IRModule* module, DiagnosticSink* sink)
+{
+    checkInitializersUnder(module->getModuleInst(), sink);
 }
 
 /// Return the ordinary opcode for the operation that `constexprOp` performs, or `kIROp_Invalid` if
