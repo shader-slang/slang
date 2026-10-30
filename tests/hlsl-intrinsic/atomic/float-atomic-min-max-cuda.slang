@@ -1,6 +1,7 @@
 // CUDA has no floating-point atomicMin/atomicMax, so Slang lowers float, double and half atomic
-// min/max (InterlockedMin/Max, Atomic<T>.min/max/reduceMin/reduceMax) to compare-and-swap loops
-// in the CUDA prelude. https://github.com/shader-slang/slang/issues/14026
+// min/max (InterlockedMin/Max, Atomic<T>.min/max/reduceMin/reduceMax) to prelude helpers: integer
+// atomics on the bit pattern for float and double, and a compare-and-swap loop for half.
+// https://github.com/shader-slang/slang/issues/14026
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type
 
@@ -17,7 +18,7 @@ RWStructuredBuffer<float> floatBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):name=atomicFloatBuffer
 RWStructuredBuffer<Atomic<float>> atomicFloatBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=8):name=doubleBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=8):name=doubleBuffer
 RWStructuredBuffer<double> doubleBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=8):name=atomicDoubleBuffer
@@ -123,6 +124,13 @@ void computeMain(uint tid: SV_DispatchThreadID)
         InterlockedMax(floatBuffer[3], -2.0, o4);                  // stored NaN -> -2
         bool ok = o1 == 5.0 && o2 == 3.0 && o3 == 3.0 && floatBuffer[2] == 3.0;
         ok = ok && isnan(o4) && floatBuffer[3] == -2.0;
+        // A negative NaN orders below every value as an integer, and a positive NaN above, so
+        // integer min/max alone would keep these.
+        floatBuffer[4] = asfloat(0xFFC00000u);
+        floatBuffer[5] = asfloat(0x7FC00000u);
+        InterlockedMin(floatBuffer[4], 2.0);
+        InterlockedMax(floatBuffer[5], 2.0);
+        ok = ok && floatBuffer[4] == 2.0 && floatBuffer[5] == 2.0;
         outputBuffer[16] = ok ? 1.0 : 0.0;
 
         doubleBuffer[4] = 5.0;
@@ -134,6 +142,11 @@ void computeMain(uint tid: SV_DispatchThreadID)
         InterlockedMax(doubleBuffer[5], -2.0, d4);
         ok = d1 == 5.0 && d2 == 3.0 && d3 == 3.0 && doubleBuffer[4] == 3.0;
         ok = ok && isnan(d4) && doubleBuffer[5] == -2.0;
+        doubleBuffer[6] = asdouble(0x00000000u, 0xFFF80000u);
+        doubleBuffer[7] = asdouble(0x00000000u, 0x7FF80000u);
+        InterlockedMin(doubleBuffer[6], 2.0);
+        InterlockedMax(doubleBuffer[7], 2.0);
+        ok = ok && doubleBuffer[6] == 2.0 && doubleBuffer[7] == 2.0;
         outputBuffer[17] = ok ? 1.0 : 0.0;
 
         halfBuffer[2] = half(5.0);
