@@ -8,8 +8,8 @@
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
-// No -cpu lane: slang-test would synthesize a CUDA lane from it, and the CUDA prelude has no
-// matrix comparison operators (matrix-matrix comparisons fail there as well).
+// slang-test also synthesizes a CUDA lane from the -cpu lane.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type

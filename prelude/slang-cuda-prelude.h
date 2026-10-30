@@ -1292,6 +1292,29 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
                     op _slang_vector_get_element(thisVal.rows[i], j);                              \
         return result;                                                                             \
     }
+#define SLANG_MATRIX_BINARY_COMPARE_OP(T, op)                           \
+    template<int R, int C>                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<bool, R, C> operator op(  \
+        const Matrix<T, R, C>& thisVal,                                 \
+        const Matrix<T, R, C>& other)                                   \
+    {                                                                   \
+        Matrix<bool, R, C> result;                                      \
+        for (int i = 0; i < R; i++)                                     \
+            for (int j = 0; j < C; j++)                                 \
+                *_slang_vector_get_element_ptr(result.rows + i, j) =    \
+                    _slang_vector_get_element(thisVal.rows[i], j)       \
+                        op _slang_vector_get_element(other.rows[i], j); \
+        return result;                                                  \
+    }
+
+#define SLANG_MATRIX_COMPARE_OPS(T)       \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, >)  \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, <)  \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, >=) \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, <=) \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, ==) \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, !=)
+
 #define SLANG_INT_MATRIX_OPS(T)   \
     SLANG_MATRIX_BINARY_OP(T, +)  \
     SLANG_MATRIX_BINARY_OP(T, -)  \
@@ -1304,13 +1327,15 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
     SLANG_MATRIX_BINARY_OP(T, ^)  \
     SLANG_MATRIX_BINARY_OP(T, %)  \
     SLANG_MATRIX_UNARY_OP(T, !)   \
-    SLANG_MATRIX_UNARY_OP(T, ~)
+    SLANG_MATRIX_UNARY_OP(T, ~)   \
+    SLANG_MATRIX_COMPARE_OPS(T)
 #define SLANG_FLOAT_MATRIX_OPS(T) \
     SLANG_MATRIX_BINARY_OP(T, +)  \
     SLANG_MATRIX_BINARY_OP(T, -)  \
     SLANG_MATRIX_BINARY_OP(T, *)  \
     SLANG_MATRIX_BINARY_OP(T, /)  \
-    SLANG_MATRIX_UNARY_OP(T, -)
+    SLANG_MATRIX_UNARY_OP(T, -)   \
+    SLANG_MATRIX_COMPARE_OPS(T)
 SLANG_INT_MATRIX_OPS(int)
 SLANG_INT_MATRIX_OPS(uint)
 SLANG_INT_MATRIX_OPS(short)
@@ -1378,6 +1403,8 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<__half, R, C> operator%(
 #endif
 #undef SLANG_FLOAT_MATRIX_MOD
 #undef SLANG_MATRIX_BINARY_OP
+#undef SLANG_MATRIX_BINARY_COMPARE_OP
+#undef SLANG_MATRIX_COMPARE_OPS
 #undef SLANG_MATRIX_UNARY_OP
 #undef SLANG_INT_MATRIX_OPS
 #undef SLANG_FLOAT_MATRIX_OPS
