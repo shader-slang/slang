@@ -2990,13 +2990,35 @@ __generic<ToType, let N : int> extension vector<ToType,N>
     __intrinsic_op(BuiltinCast)
     __init<FromType>(vector<FromType,N> value) where ToType(FromType) implicit;
 
+    // The scalar-to-vector conversions convert with `__builtin_cast` and never call the coercion
+    // witness, so their sources are limited to builtin scalars and enums, whose conversions
+    // `BuiltinCast` performs. A user-defined conversion such as `float.__init(float3)` therefore
+    // does not make `float3` implicitly convertible to `float4`.
     __implicit_conversion(constraint+)
     [__unsafeForceInlineEarly]
     [__readNone]
     [TreatAsDifferentiable]
-    __init<FromType>(FromType value) where ToType(FromType) implicit
+    __init<FromType : __BuiltinScalarType>(FromType value) where ToType(FromType) implicit
     {
         this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
+    }
+
+    __implicit_conversion(constraint+)
+    [__unsafeForceInlineEarly]
+    [__readNone]
+    [TreatAsDifferentiable]
+    __init<FromType : __EnumType>(FromType value) where ToType(FromType) implicit
+    {
+        this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
+    }
+
+    __implicit_conversion($(kConversionCost_OneVectorToScalar + kConversionCost_ScalarToVector))
+    [__unsafeForceInlineEarly]
+    [__readNone]
+    [TreatAsDifferentiable]
+    __init(vector<ToType,1> value)
+    {
+        this = vector<ToType,N>(value[0]);
     }
 }
 
