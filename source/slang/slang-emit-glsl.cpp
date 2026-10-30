@@ -2182,11 +2182,43 @@ bool GLSLSourceEmitter::_tryEmitBitBinOp(
     return true;
 }
 
+static bool isUVec2Type(IRType* type)
+{
+    auto vectorType = as<IRVectorType>(type);
+    if (!vectorType || vectorType->getElementType()->getOp() != kIROp_UIntType)
+        return false;
+    auto elementCount = as<IRIntLit>(vectorType->getElementCount());
+    return elementCount && elementCount->getValue() == 2;
+}
+
+/// Return true if a GLSL constructor converts `type` to or from a buffer reference: `type` is a
+/// buffer reference, a 64-bit integer (`intptr_t` and `uintptr_t` are 64 bits on GLSL), or a
+/// `uvec2`.
+static bool isBufferReferenceConversionType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_Int64Type:
+    case kIROp_UInt64Type:
+    case kIROp_IntPtrType:
+    case kIROp_UIntPtrType:
+        return true;
+    default:
+        return isUserPointerType(type) || isUVec2Type(type);
+    }
+}
+
 void GLSLSourceEmitter::_emitBufferReferenceConversion(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
-    // A `T*` packed into an existential is converted to and from the `uvec2` that holds it.
-    if (as<IRVectorType>(inst->getDataType()) ||
-        as<IRVectorType>(inst->getOperand(0)->getDataType()))
+    auto resultType = inst->getDataType();
+    auto operandType = inst->getOperand(0)->getDataType();
+    SLANG_RELEASE_ASSERT(isUserPointerType(resultType) || isUserPointerType(operandType));
+    SLANG_RELEASE_ASSERT(
+        isBufferReferenceConversionType(resultType) &&
+        isBufferReferenceConversionType(operandType));
+
+    // GLSL converts a buffer reference to or from a `uvec2` only with this extension.
+    if (isUVec2Type(resultType) || isUVec2Type(operandType))
         _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference_uvec2"));
 
     auto prec = getInfo(EmitOp::Postfix);
@@ -2383,6 +2415,11 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_BitCast:
         {
+            // `extractBaseType` gives `Void` for a pointer, so the switch below has no case for a
+            // bit cast that makes a `T*`. Such bit casts are valid IR: `lowerBitCast` rebuilds a
+            // pointer leaf from a `uint64_t`, and AnyValue marshalling converts a `T*` field to and
+            // from a `uvec2`. We emit both directions here, so the `uvec2` side also gets its
+            // extension.
             if (isUserPointerType(inst->getDataType()) ||
                 isUserPointerType(inst->getOperand(0)->getDataType()))
             {

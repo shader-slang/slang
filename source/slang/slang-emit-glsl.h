@@ -171,12 +171,11 @@ protected:
         const EmitOpInfo& inOuterPrec);
 
     /// Emit `inst`, which converts its operand to or from a buffer reference (a `T*`), as a
-    /// constructor call on its result type, such as `BufferPointer_float(x)` or `uint64_t(p)`.
+    /// constructor call on its result type, such as `uint64_t(p)`.
     ///
-    /// GLSL spells a conversion between buffer references, `uint64_t` and `uvec2` as a
-    /// constructor call; it has no C-style cast. We use this for `CastPtrToInt`,
-    /// `CastIntToPtr` and `PtrCast`, and for a `BitCast` with a buffer reference on either side,
-    /// which `lowerBitCast` and existential packing produce.
+    /// One side of `inst` is a buffer reference, and the other is a buffer reference, a 64-bit
+    /// integer or a `uvec2`; GLSL has no C-style cast for these conversions. A `uvec2` side
+    /// requests `GL_EXT_buffer_reference_uvec2`.
     ///
     void _emitBufferReferenceConversion(IRInst* inst, const EmitOpInfo& inOuterPrec);
 
