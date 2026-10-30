@@ -4514,6 +4514,10 @@ attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 /// Declare offset for a struct field. Applies to all kinds of structs when targeting Vulkan.
 /// Applies only to structs that are directly used as interface blocks (such as push constants and uniforms)
 /// when targeting GLSL, as GLSL does not support the `offset` qualifier on regular structs.
+/// Also declares the byte offset of a `uniform` entry-point parameter inside the entry point's
+/// push-constant block, for example so that a vertex and a fragment entry point can use
+/// different bytes of one push-constant range. The attribute has no effect on a parameter of a
+/// function that is not used as an entry point.
 /// This attribute has no effect on other targets.
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_offset(index: int)] : VkStructOffsetAttribute;
