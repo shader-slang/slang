@@ -15,13 +15,19 @@
 //TEST:SIMPLE(filecheck=ACCEL):-target spirv -entry traceUndefinedAccelerationStructure -stage compute
 //TEST:SIMPLE(filecheck=SAMPLE):-target spirv -entry passUndefinedTextureToCalleeWithItsOwn -stage compute
 //TEST:SIMPLE(filecheck=SAMPLE):-target spirv -entry gatherFromUndefinedTexture -stage compute
-//TEST:SIMPLE(filecheck=SAMPLE):-target spirv -entry queryUndefinedCombinedSampler -stage compute
+//TEST:SIMPLE(filecheck=SAMPLED):-target spirv -entry queryUndefinedCombinedSampler -stage compute
 //TEST:SIMPLE(filecheck=COUNTER):-target spirv -entry addToUndefinedStorageTexture -stage compute
 //TEST:SIMPLE(filecheck=SAMPLE):-target spirv -entry passTwoUndefinedTextures -stage compute
+//TEST:SIMPLE(filecheck=STORAGE):-target spirv -entry writeComponentInCallee -stage compute
+//TEST:SIMPLE(filecheck=SAMPLER):-target spirv -entry projectTextureFromCombined -stage compute
 
 // SAMPLE: %[[IMG:[A-Za-z0-9_]+]] = OpTypeImage %float 2D 2 0 0 1
 // SAMPLE-NOT: OpUndef %[[IMG]]
 // SAMPLE: OpFunctionEnd
+
+// SAMPLED: %[[SI:[A-Za-z0-9_]+]] = OpTypeSampledImage
+// SAMPLED-NOT: OpUndef %[[SI]]
+// SAMPLED: OpFunctionEnd
 
 // SAMPLER: %[[SMP:[A-Za-z0-9_]+]] = OpTypeSampler
 // SAMPLER-NOT: OpUndef %[[SMP]]
@@ -157,7 +163,7 @@ void queryUndefinedCombinedSampler()
     Sampler2D<float4> s;
     uint width = 0;
     uint height = 0;
-    float4 r = gTexture.Load(int3(0));
+    float4 r = gTexture.SampleLevel(gSampler, float2(0), 0);
     if (useUndefined)
     {
         s.GetDimensions(width, height);
@@ -195,4 +201,29 @@ void passTwoUndefinedTextures()
     Texture2D<float4> t;
     Texture2D<float4> u;
     outputBuffer[0] = sampleEither(gTexture, gTexture) + sampleEither(t, u);
+}
+
+void setX(RWTexture2D<float4> t)
+{
+    t[uint2(0, 0)].x = 1;
+}
+
+// A write through a never-written storage texture in an inlined callee is removed.
+[numthreads(1, 1, 1)]
+void writeComponentInCallee()
+{
+    RWTexture2D<float4> t;
+    setX(gStorageTexture);
+    if (useUndefined)
+        setX(t);
+}
+
+// Replacing the combined value of a defined texture and a never-written sampler keeps the texture
+// that is projected back out of it.
+[numthreads(1, 1, 1)]
+void projectTextureFromCombined()
+{
+    SamplerState s;
+    outputBuffer[0] = __makeCombinedTextureSampler(gTexture, s).__getTexture().Load(int3(0)) +
+                      gTexture.SampleLevel(gSampler, float2(0), 0);
 }
