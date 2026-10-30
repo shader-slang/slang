@@ -5,8 +5,12 @@
 
 Sampler2D<float4> stex;
 Sampler2DShadow shtex;
+Sampler2D<int> stexI;
+Sampler2D<uint> stexU;
 uniform float2 uv;
 RWStructuredBuffer<float4> outF;
+RWStructuredBuffer<int4> outI;
+RWStructuredBuffer<uint4> outU;
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -51,4 +55,15 @@ void computeMain()
     // CUDA: tex2Dgather<float4 >((globalParams_0->shtex_0), (([[UV7]])).x, (([[UV7]])).y, 0)
     // PTX: tld4.r.2d.v4.f32.f32
     outF[7] = shtex.Gather(uv);
+
+    // Integer element types keep the four-component tex2Dgather result type on the combined form.
+    // CUDA: [[UV8:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
+    // CUDA: tex2Dgather<int4 >((globalParams_0->stexI_0), (([[UV8]])).x, (([[UV8]])).y, 0)
+    // PTX: tld4.r.2d.v4.s32.f32
+    outI[0] = stexI.Gather(uv);
+
+    // CUDA: [[UV9:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
+    // CUDA: tex2Dgather<uint4 >((globalParams_0->stexU_0), (([[UV9]])).x, (([[UV9]])).y, 0)
+    // PTX: tld4.r.2d.v4.u32.f32
+    outU[0] = stexU.GatherRed(uv);
 }
