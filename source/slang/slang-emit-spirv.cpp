@@ -9743,8 +9743,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitCastPtrToInt(SpvInstParent* parent, IRInst* inst)
     {
-        // `OpConvertPtrToU` requires an unsigned result type, so a cast to a signed integer
-        // converts to the unsigned integer of the same width and then bitcasts to the result.
+        // `OpConvertPtrToU` requires an unsigned result type, so a cast to an unsigned integer
+        // converts directly, and a cast to a signed integer converts to the unsigned integer of
+        // the same width and then bitcasts to the result. `OpConvertUToPtr` accepts an integer
+        // operand of either signedness, so `emitCastIntToPtr` needs no matching step.
         const auto toType = inst->getDataType();
         if (!isSignedType(toType))
         {
