@@ -9743,13 +9743,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitCastPtrToInt(SpvInstParent* parent, IRInst* inst)
     {
-        return emitInst(
+        // `OpConvertPtrToU` requires an unsigned result type, so a cast to a signed integer
+        // converts to the unsigned integer of the same width and then bitcasts to the result.
+        const auto toType = inst->getDataType();
+        if (!isSignedType(toType))
+        {
+            return emitInst(
+                parent,
+                inst,
+                SpvOpConvertPtrToU,
+                inst->getFullType(),
+                kResultID,
+                inst->getOperand(0));
+        }
+
+        IRBuilder builder(inst);
+        const auto unsignedType = getUnsignedTypeFromSignedType(&builder, toType);
+        auto unsignedV = emitInst(
             parent,
-            inst,
+            nullptr,
             SpvOpConvertPtrToU,
-            inst->getFullType(),
+            unsignedType,
             kResultID,
             inst->getOperand(0));
+        return emitOpBitcast(parent, inst, toType, unsignedV);
     }
 
     SpvInst* emitCastPtrToBool(SpvInstParent* parent, IRInst* inst)
