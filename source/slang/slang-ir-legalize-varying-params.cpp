@@ -4243,7 +4243,10 @@ private:
         auto key = builder.createStructKey();
         builder.addNameHintDecoration(key, toSlice("output"));
         builder.addLayoutDecoration(key, resultLayout);
-        builder.createStructField(structType, key, returnType);
+        auto field = builder.createStructField(structType, key, returnType);
+        // The field is generated, so it takes the entry point's location; a diagnostic about the
+        // return value's semantic (e.g. an unsupported system value) then points at the shader.
+        field->sourceLoc = func->sourceLoc;
 
         // The return value's own system-value semantic (`float main() : SV_Depth`,
         // `float4 main() : SV_Target1`). A render target keeps the color-output path below with
