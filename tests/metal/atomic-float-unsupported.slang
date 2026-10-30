@@ -1,6 +1,7 @@
 // Metal has no `atomic_float` load, exchange or compare-exchange in threadgroup memory or on
-// textures, no `atomic_half`, and no floating-point atomic min or max, so these float atomics
-// report E55204. The same operations on device memory compile; see atomic-float-device.slang.
+// textures (including a `RWBuffer`, which is a `texture_buffer` in MSL), no `atomic_half`, and no
+// floating-point atomic min or max, so these float atomics report E55204. The same operations on
+// device memory compile; see atomic-float-device.slang.
 
 // The test is non-exhaustive because reading the uninitialized `sharedAtomic` also warns.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -target metal -entry computeMain -stage compute
@@ -9,6 +10,7 @@ RWStructuredBuffer<float> outputBuffer;
 RWStructuredBuffer<Atomic<float>> floatBuffer;
 RWStructuredBuffer<Atomic<half>> halfBuffer;
 RWTexture2D<float> floatTexture;
+RWBuffer<float> floatTypedBuffer;
 groupshared Atomic<float> sharedAtomic;
 groupshared float sharedFloat;
 
@@ -32,6 +34,9 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     result += original;
 
     InterlockedExchange(floatTexture[uint2(0, 0)], 5.0f, original);
+//CHECK:               ^ intrinsic operation 'floating point atomic operation on a texture' is not supported for the current target.
+    result += original;
+    InterlockedExchange(floatTypedBuffer[0], 5.0f, original);
 //CHECK:               ^ intrinsic operation 'floating point atomic operation on a texture' is not supported for the current target.
     result += original;
 

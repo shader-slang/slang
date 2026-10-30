@@ -1,5 +1,6 @@
 // Checks the values that device float atomic load, exchange and compare-exchange return and
-// store on Metal. CUDA runs the same shader as a reference.
+// store on Metal. In each pair of compare-exchanges the first one matches and stores, and the
+// second one does not. The CUDA run checks the same values on machines without Metal.
 
 //TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type

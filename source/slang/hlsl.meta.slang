@@ -12777,9 +12777,10 @@ $}
 /// HLSL does not allow atomic operations on floating point types. For `InterlockedAdd`, consider using
 /// `RWByteAddressBuffer.InterlockedAddF32` or `RWByteAddressBuffer.InterlockedAddF16` instead when NVAPI is available.
 /// On SPIR-V (Vulkan), all integer and floating point types are supported.
-/// On Metal, only `InterlockedAdd` and `InterlockedExchange` support a floating-point `T`, and only a
-/// 32-bit `float` in device memory, such as a `RWStructuredBuffer` element or a device pointer, not a
-/// texture or a `RWBuffer`. On WGSL, all floating-point types are not supported.
+/// On Metal, `InterlockedAdd` and `InterlockedExchange` are the only functions in this family that
+/// accept a floating-point `T`, and only a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory. On WGSL, floating-point types are not supported.
 /// @category atomic Atomic functions
 [ForceInline]
 __glsl_version(430)
@@ -12822,7 +12823,7 @@ $}
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
-/// memory. On WGSL, all floating-point types are not supported.
+/// memory. On WGSL, floating-point types are not supported.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic

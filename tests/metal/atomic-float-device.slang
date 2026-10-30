@@ -10,6 +10,7 @@ struct Args
     float* results;
 }
 
+// `pad` puts `value` at a nonzero offset inside the buffer element.
 struct AtomicField
 {
     uint pad;
@@ -54,6 +55,9 @@ void computeMain(uniform Args* args, uint3 tid: SV_DispatchThreadID)
     InterlockedCompareStore(floatBuffer[i], 0.0f, 9.0f);
     // CHECK: atomic_compare_exchange_weak_explicit(((atomic_float device*)
     InterlockedCompareStoreFloatBitwise(floatBuffer[i], 0.0f, 10.0f);
+    // CHECK: atomic_fetch_add_explicit(((atomic_float device*)
+    InterlockedAdd(floatBuffer[i], 11.0f, original);
+    result += original;
 
     // CHECK: atomic_load_explicit(
     result += structBuffer[i].value.load();

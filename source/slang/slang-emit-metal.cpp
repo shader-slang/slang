@@ -323,7 +323,8 @@ static IRImageSubscript* isTextureAccess(IRInst* inst)
 // `atomic_float` load, exchange and compare-exchange on device memory only (MSL 4.1 spec,
 // section 6.16.4), no floating-point atomic min or max, and integer-only texture atomics
 // (section 6.13). For example, `Atomic<float>.load` through a device pointer fits, but the same
-// load on a `groupshared Atomic<float>` does not.
+// load on a `groupshared Atomic<float>` does not. Device memory means the `Global` and
+// `UserPointer` address spaces, which `emitSimpleTypeImpl` prints as `device`.
 static const char* getUnsupportedFloatAtomicReason(IRInst* inst)
 {
     auto valueType = inst->getDataType();
