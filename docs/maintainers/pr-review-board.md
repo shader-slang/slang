@@ -39,7 +39,8 @@ sometimes a reviewer). Treat that as a starting point — change it if it's wron
 **How the Community/Bot shepherd is chosen:** linked-issue assignee who is
 source-internal for this repo (same criteria as Source Internal above), else
 whoever on the owners team (`pr-owners` / `bot-pr-owners`) has the strongest
-recent commit signal on the PR's files, else the maintainer fallback.
+recent commit signal on the PR's files, else the maintainer fallback (then the
+`default-reviewer` team).
 
 If the team rosters can't be read, Source and assignee stay blank and the
 nightly sweep retries. Internal membership is org-wide (with optional per-repo

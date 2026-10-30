@@ -146,6 +146,12 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
         }
     }
     checkStmt(stmt->body);
+
+    // A `cbuffer` in a block adds a transparent variable to the block's scope, which does not go
+    // through `_dispatchDeclCheckingVisitor`, so we compare the members that lookup finds through
+    // it here, once the block's declarations are checked.
+    if (stmt->scopeDecl)
+        checkForRedeclarationOfTransparentMembers(stmt->scopeDecl);
 }
 
 void SemanticsStmtVisitor::visitSeqStmt(SeqStmt* stmt)
