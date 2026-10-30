@@ -1421,11 +1421,9 @@ inline bool isTypeEqualityWitness(Val* witness)
 /// `TransitiveSubtypeWitness` or the pack wrappers built for a type-pack parameter, are not
 /// followed and return null.
 ///
-/// The leaf test accepts any declaration carrying `OptionalConstraintModifier`, not only the
-/// `GenericTypeConstraintDecl` that `DeclaredSubtypeWitness::isOptional()` checks. The two
-/// answer different questions: `isOptional()` decides how `T is I` is folded and lowered, where
-/// treating a derived witness as optional would turn `T is IArithmetic` into a runtime check of
-/// the `T : IFloat` witness instead.
+/// `DeclaredSubtypeWitness::isOptional()` stays a test of the witness's own declaration because
+/// it decides how `T is I` is folded and lowered: treating a derived witness as optional there
+/// would turn `T is IArithmetic` into a runtime check of the `T : IFloat` witness.
 DeclaredSubtypeWitness* findOptionalConstraintWitness(SubtypeWitness* witness);
 
 bool isValuePack(Val* val);

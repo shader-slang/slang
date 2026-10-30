@@ -932,8 +932,7 @@ DeclaredSubtypeWitness* findOptionalConstraintWitness(SubtypeWitness* witness)
     // the walk ends after at most as many steps as there are nested lookups.
     while (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
     {
-        auto decl = declaredWitness->getDeclRef().getDecl();
-        if (decl && decl->hasModifier<OptionalConstraintModifier>())
+        if (declaredWitness->isOptional())
             return declaredWitness;
 
         auto lookupDeclRef = as<LookupDeclRef>(declaredWitness->getDeclRef().declRefBase);
