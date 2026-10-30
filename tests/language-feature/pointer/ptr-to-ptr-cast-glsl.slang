@@ -40,7 +40,6 @@ uniform int* q;
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0], stride=4);
 RWStructuredBuffer<float> outputBuffer;
 
-// Each store reads through a buffer-reference constructor, not a C-style cast.
 // GLSL: main(
 // GLSL: [uint(0)] = {{.*}}BufferPointer_{{[a-zA-Z0-9_]+}}(
 // GLSL: [uint(1)] = {{.*}}BufferPointer_{{[a-zA-Z0-9_]+}}(

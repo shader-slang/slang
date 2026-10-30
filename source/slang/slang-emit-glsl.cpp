@@ -2205,7 +2205,6 @@ static bool isBufferReferenceConstructorType(IRType* type)
     }
 }
 
-/// Return true if `type` is a scalar integer or `bool`.
 static bool isScalarIntegerOrBoolType(IRType* type)
 {
     switch (type->getOp())
