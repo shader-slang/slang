@@ -3024,6 +3024,11 @@ local insts = {
 			min_operands = 2,
 		},
 	},
+	{
+		DebugDeclare = {
+			operands = { { "debugVar", "IRDebugVar" }, { "storage" } },
+		},
+	},
 	{ DebugInlinedAt = { min_operands = 5 } },
 	{
 		DebugFunction = {
