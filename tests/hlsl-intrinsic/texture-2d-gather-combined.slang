@@ -15,6 +15,8 @@ SamplerState samp;
 //TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+// Slots 0-15 hold the combined gathers, four per component; slots 16-19 hold the per-component
+// combined == separate flags, and slot 20 holds the location flag.
 void store(int base, float4 combined, float4 separate)
 {
     outputBuffer[base + 0] = combined.x;

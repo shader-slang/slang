@@ -40,13 +40,14 @@ void computeMain()
     // PTX: tld4.a.2d.v4.f32.f32
     outF[4] = stex.GatherAlpha(uv);
 
+    // CUDA ignores the offset, because tex2Dgather has no offset parameter.
     // CUDA: [[UV5:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
-    // CUDA: tex2Dgather<float4 >((globalParams_0->stex_0), (([[UV5]])).x, (([[UV5]])).y
+    // CUDA: tex2Dgather<float4 >((globalParams_0->stex_0), (([[UV5]])).x, (([[UV5]])).y, 0)
     // PTX: tld4.r.2d.v4.f32.f32
     outF[5] = stex.Gather(uv, int2(3, 7));
 
     // CUDA: [[UV6:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
-    // CUDA: tex2Dgather<float4 >((globalParams_0->stex_0), (([[UV6]])).x, (([[UV6]])).y
+    // CUDA: tex2Dgather<float4 >((globalParams_0->stex_0), (([[UV6]])).x, (([[UV6]])).y, 3)
     // PTX: tld4.a.2d.v4.f32.f32
     outF[6] = stex.GatherAlpha(uv, int2(3, 7));
 
