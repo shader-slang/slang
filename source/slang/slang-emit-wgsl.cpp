@@ -225,6 +225,18 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
                 }
                 m_writer->emit(")\n");
             }
+
+            // `[WaveSize(N)]` maps to `@subgroup_size(N)`, which needs both the `subgroups` and
+            // the `subgroup_size_control` extensions.
+            Int waveSize = 0;
+            if (getComputeWaveSize(irFunc, &waveSize))
+            {
+                _requireExtension(toSlice("subgroups"));
+                _requireExtension(toSlice("subgroup_size_control"));
+                m_writer->emit("@subgroup_size(");
+                m_writer->emit(waveSize);
+                m_writer->emit(")\n");
+            }
         }
         break;
 
