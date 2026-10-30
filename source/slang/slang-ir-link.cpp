@@ -2685,10 +2685,7 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     // not change after it is built.
     HashSet<IRModule*> inputModules;
     for (auto inputModule : specContext.irModules)
-    {
-        if (inputModule)
-            inputModules.add(inputModule);
-    }
+        inputModules.add(inputModule);
     for (auto inputModule : builtinModules)
     {
         if (inputModule)

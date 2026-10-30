@@ -564,7 +564,7 @@ struct SharedIRGenContext
     ModuleDecl* m_mainModuleDecl = nullptr;
     Linkage* m_linkage = nullptr;
 
-    HashSet<Module*> modulesWithObfuscateSettingMismatch;
+    HashSet<Module*> modulesReportedForObfuscateSettingMismatch;
 
     // List of all string literals used in user code, regardless
     // of how they were used (i.e., whether or not they were hashed).
@@ -12055,12 +12055,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return false;
 
         // An obfuscated reference to a non-core module derives the interface from
-        // the AST instead of borrowing it; correctness first, and obfuscated builds
-        // are not the workload this optimises.
-        //
-        // The condition is read from `isLinkageNameObfuscated` rather than
-        // restated here, so it cannot drift from the copy inside
-        // `getLinkageName`.
+        // the AST instead of borrowing it. The search below would find an interface
+        // that the same request obfuscated, but borrowing obfuscated interfaces is
+        // untested, and obfuscated builds are not the workload this optimises.
         if (isLinkageNameObfuscated(context, decl))
             return false;
 
@@ -13911,7 +13908,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 SLANG_RELEASE_ASSERT(
                     irModule->findSymbolByMangledName(otherName).getCount() > 0 &&
                     "imported [__unsafeForceInlineEarly] function is not exported by its module");
-                if (context->shared->modulesWithObfuscateSettingMismatch.add(importedModule))
+                if (context->shared->modulesReportedForObfuscateSettingMismatch.add(importedModule))
                 {
                     getSink()->diagnose(Diagnostics::ObfuscateSettingMismatchOnImport{
                         .decl = decl,

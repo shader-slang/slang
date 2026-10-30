@@ -1,5 +1,5 @@
 // Standard modules are always built without `-obfuscate`, so code compiled with
-// it looks up the `[__unsafeForceInlineEarly]` conformance behind `log` under a
+// it looks up the `[__unsafeForceInlineEarly]` wrapper function `log` under a
 // hashed name that `slang.numerics` does not export. That mismatch is reported
 // as an error at the import (shader-slang/slang#14091).
 
