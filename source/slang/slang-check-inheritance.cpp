@@ -1757,19 +1757,34 @@ void SharedSemanticsContext::_mergeFacetLists(
             // We want to prioritize the most direct facet possible, to minimize the levels of
             // indirection in the final linearization.
             //
+            // Before directness, we prefer a facet reached through a base that is not an
+            // `optional` constraint. Given `where optional T : IFloat where T : IInteger`,
+            // both bases lead to `IArithmetic`, but only the path through `IInteger` proves
+            // `T : IArithmetic` outside an `if (T is IFloat)` check, so we keep that proof
+            // whichever order the constraints are written in.
+            //
             Facet::DirectnessVal baseDirectness =
                 Facet::DirectnessVal(foundFacet.getImpl()->directness);
+            bool isFoundBaseOptional =
+                findOptionalConstraintWitness(foundBase->facetImpl.subtypeWitness) != nullptr;
             for (auto base : bases)
             {
                 Facet headFacet = base->facets.getHead();
-                if (originsMatch(foundFacet, headFacet))
+                if (!originsMatch(foundFacet, headFacet))
+                    continue;
+
+                auto headDirectness = Facet::DirectnessVal(headFacet.getImpl()->directness);
+                bool isBaseOptional =
+                    findOptionalConstraintWitness(base->facetImpl.subtypeWitness) != nullptr;
+                bool isPreferred = isBaseOptional != isFoundBaseOptional
+                                       ? !isBaseOptional
+                                       : headDirectness < baseDirectness;
+                if (isPreferred)
                 {
-                    if (Facet::DirectnessVal(headFacet.getImpl()->directness) < baseDirectness)
-                    {
-                        foundFacet = headFacet;
-                        foundBase = base;
-                        baseDirectness = Facet::DirectnessVal(headFacet.getImpl()->directness);
-                    }
+                    foundFacet = headFacet;
+                    foundBase = base;
+                    baseDirectness = headDirectness;
+                    isFoundBaseOptional = isBaseOptional;
                 }
             }
 
