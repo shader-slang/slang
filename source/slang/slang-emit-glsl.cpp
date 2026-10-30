@@ -2980,10 +2980,15 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_PtrLit:
         {
+            // GLSL has no null literal for a buffer reference, so we construct one from address
+            // zero.
             auto ptrType = as<IRPtrType>(inst->getDataType());
             if (ptrType)
             {
-                m_writer->emit("0");
+                SLANG_RELEASE_ASSERT(as<IRPtrLit>(inst)->getValue() == nullptr);
+                _requireBaseType(BaseType::UInt64);
+                emitType(ptrType);
+                m_writer->emit("(0UL)");
                 return true;
             }
             break;
