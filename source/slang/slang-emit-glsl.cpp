@@ -2191,20 +2191,39 @@ static bool isUVec2Type(IRType* type)
     return elementCount && elementCount->getValue() == 2;
 }
 
-/// Return true if a GLSL constructor converts `type` to or from a buffer reference: `type` is a
-/// buffer reference, a 64-bit integer (`intptr_t` and `uintptr_t` are 64 bits on GLSL), or a
-/// `uvec2`.
-static bool isBufferReferenceConversionType(IRType* type)
+/// Return true if a GLSL constructor converts `type` to or from a buffer reference directly: `type`
+/// is a buffer reference, a `uint64_t` (`uintptr_t` is one on GLSL), or a `uvec2`.
+static bool isBufferReferenceConstructorType(IRType* type)
 {
     switch (type->getOp())
     {
-    case kIROp_Int64Type:
     case kIROp_UInt64Type:
-    case kIROp_IntPtrType:
     case kIROp_UIntPtrType:
         return true;
     default:
         return isUserPointerType(type) || isUVec2Type(type);
+    }
+}
+
+/// Return true if `type` is a scalar integer or `bool`.
+static bool isScalarIntegerOrBoolType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_Int8Type:
+    case kIROp_UInt8Type:
+    case kIROp_Int16Type:
+    case kIROp_UInt16Type:
+    case kIROp_IntType:
+    case kIROp_UIntType:
+    case kIROp_Int64Type:
+    case kIROp_UInt64Type:
+    case kIROp_IntPtrType:
+    case kIROp_UIntPtrType:
+    case kIROp_BoolType:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -2213,22 +2232,28 @@ void GLSLSourceEmitter::_emitBufferReferenceConversion(IRInst* inst, const EmitO
     auto resultType = inst->getDataType();
     auto operandType = inst->getOperand(0)->getDataType();
     SLANG_RELEASE_ASSERT(isUserPointerType(resultType) || isUserPointerType(operandType));
-    SLANG_RELEASE_ASSERT(
-        isBufferReferenceConversionType(resultType) &&
-        isBufferReferenceConversionType(operandType));
+    auto otherType = isUserPointerType(resultType) ? operandType : resultType;
+
+    // GLSL converts a buffer reference only to and from a `uint64_t`, a `uvec2` or another buffer
+    // reference. Any other integer, such as the `int64_t` in `Ptr<T>(int64_t(x))`, goes through a
+    // `uint64_t`.
+    bool viaUInt64 = !isBufferReferenceConstructorType(otherType);
+    SLANG_RELEASE_ASSERT(!viaUInt64 || isScalarIntegerOrBoolType(otherType));
+    if (viaUInt64)
+        _requireBaseType(BaseType::UInt64);
 
     // GLSL converts a buffer reference to or from a `uvec2` only with this extension.
-    if (isUVec2Type(resultType) || isUVec2Type(operandType))
+    if (isUVec2Type(otherType))
         _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference_uvec2"));
 
     auto prec = getInfo(EmitOp::Postfix);
     EmitOpInfo outerPrec = inOuterPrec;
     bool needClose = maybeEmitParens(outerPrec, prec);
 
-    emitType(inst->getDataType());
-    m_writer->emit("(");
+    emitType(resultType);
+    m_writer->emit(viaUInt64 ? "(uint64_t(" : "(");
     emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-    m_writer->emit(")");
+    m_writer->emit(viaUInt64 ? "))" : ")");
 
     maybeCloseParens(needClose);
 }
