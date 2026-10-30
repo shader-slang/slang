@@ -7760,6 +7760,9 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
 //
 // Anything reached through a pointer stops the walk, because there the pointer's own type carries
 // the address space.
+//
+// `getValidTypeForAddressOf` would walk these projections itself, but it judges a field access by
+// the field's declaration and so loses the base object's address space (issue #14094).
 static Expr* getBaseObjectOfProjection(Expr* expr)
 {
     for (;;)
