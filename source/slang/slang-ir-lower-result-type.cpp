@@ -156,19 +156,14 @@ struct ResultTypeLoweringContext
     {
         auto loweredResultTypeInfo = getLoweredResultType(builder, resultInst->getDataType());
         SLANG_ASSERT(loweredResultTypeInfo);
-        if (loweredResultTypeInfo->valueType)
-        {
-            auto value = builder->emitFieldExtract(
-                loweredResultTypeInfo->anyValueType,
-                resultInst,
-                loweredResultTypeInfo->anyValueField->getKey());
-            auto unpackInst = builder->emitUnpackAnyValue(loweredResultTypeInfo->errorType, value);
-            return unpackInst;
-        }
-        else
-        {
-            return resultInst;
-        }
+        // A void success type has no value to store, but its result still contains the tag
+        // and packed error. For example, catching `void fail() throws uint` must retrieve
+        // the uint from that storage, not substitute the entire result struct for it.
+        auto value = builder->emitFieldExtract(
+            loweredResultTypeInfo->anyValueType,
+            resultInst,
+            loweredResultTypeInfo->anyValueField->getKey());
+        return builder->emitUnpackAnyValue(loweredResultTypeInfo->errorType, value);
     }
 
     void processGetResultError(IRGetResultError* inst)

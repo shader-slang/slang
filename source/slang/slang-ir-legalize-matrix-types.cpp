@@ -53,7 +53,9 @@ static bool shouldLegalizeMatrixType(TargetProgram* targetProgram, IRMatrixType*
     }
 
     auto elementType = matrixType->getElementType();
-    return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) || as<IRIntType>(elementType);
+    // None of these targets has integer matrices, whatever the integer width (SPIR-V matrices
+    // need floating-point columns), so integer matrices of every width are lowered.
+    return as<IRBoolType>(elementType) || isIntegralType(elementType);
 }
 
 bool isMatrixTypeLegalizedToVectorArray(TargetProgram* targetProgram, IRMatrixType* matrixType)

@@ -4446,18 +4446,35 @@ struct TargetDesc
     SlangTargetFlags flags = kDefaultTargetFlags;
 
     /** Default mode to use for floating-point operations on the target.
+        `SLANG_FLOATING_POINT_MODE_DEFAULT` keeps the mode set by the session's
+        `compilerOptionEntries` (`FloatingPointMode`), if any; any other value overrides it.
+        To get the compiler's default mode on this target when the session sets another one, add
+        a `FloatingPointMode` entry with value `SLANG_FLOATING_POINT_MODE_DEFAULT` to this
+        target's `compilerOptionEntries`; that entry takes precedence over this field.
      */
     SlangFloatingPointMode floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
 
     /** The line directive mode for output source code.
+        `SLANG_LINE_DIRECTIVE_MODE_DEFAULT` keeps the mode set by the session's
+        `compilerOptionEntries` (`LineDirectiveMode`), if any; any other value overrides it.
+        To get the compiler's default mode on this target when the session sets another one, add
+        a `LineDirectiveMode` entry with value `SLANG_LINE_DIRECTIVE_MODE_DEFAULT` to this
+        target's `compilerOptionEntries`; that entry takes precedence over this field.
      */
     SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
 
     /** Whether to force `scalar` layout for glsl shader storage buffers.
+        `true` forces it, unless this target's `compilerOptionEntries` set `GLSLForceScalarLayout`
+        to 0. `false` keeps the session's `GLSLForceScalarLayout` option, if any; to turn scalar
+        layout off for this target only when the session turns it on, add a
+        `GLSLForceScalarLayout` entry with value 0 to this target's `compilerOptionEntries`.
      */
     bool forceGLSLScalarBufferLayout = false;
 
     /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
+        They are applied after `floatingPointMode`, `lineDirectiveMode` and
+        `forceGLSLScalarBufferLayout`, so an entry for the same option takes precedence over the
+        field.
      */
     const CompilerOptionEntry* compilerOptionEntries = nullptr;
 
