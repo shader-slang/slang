@@ -2414,6 +2414,7 @@ void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
         propertyDecl->addMember(getAccessorDecl);
 
         const auto setAccessorDecl = m_astBuilder->create<SetterDecl>();
+        addModifier(setAccessorDecl, m_astBuilder->create<SynthesizedModifier>());
         addModifier(setAccessorDecl, m_astBuilder->create<MutatingAttribute>());
         setAccessorDecl->ownedScope = m_astBuilder->create<Scope>();
         setAccessorDecl->ownedScope->containerDecl = setAccessorDecl;
@@ -9460,6 +9461,7 @@ static DeclRef<ExtensionDecl> extendContainerDecl(
     auto funcAsType = DeclRefType::create(astBuilder, decl->getDefaultDeclRef());
 
     auto extensionDecl = astBuilder->create<ExtensionDecl>();
+    addModifier(extensionDecl, astBuilder->create<SynthesizedModifier>());
     extensionDecl->parentDecl = decl;
     extensionDecl->loc = synthesizedLoc;
     extensionDecl->nameAndLoc.loc = synthesizedLoc;
@@ -15186,7 +15188,8 @@ void SemanticsVisitor::checkForShadowedGenericParam(Decl* decl)
     // Declarations marked as synthesized, such as the generic parameters and parameters of a
     // requirement-witness wrapper, copy their names from other declarations and do not appear in
     // the user's source, so they are not reported. The implicit `newValue` parameter of a setter
-    // is not marked, and it is reported because it hides a generic parameter of that name.
+    // that the user wrote is not marked, and it is reported because it hides a generic parameter
+    // of that name.
     if (decl->hasModifier<SynthesizedModifier>())
         return;
 
@@ -18621,6 +18624,11 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
         newValueParam = m_astBuilder->create<ParamDecl>();
         newValueParam->nameAndLoc.name = getName("newValue");
         newValueParam->nameAndLoc.loc = decl->loc;
+
+        // The implicit parameter of a setter that the compiler made, such as the setter of a
+        // bitfield, is not written by the user either.
+        if (decl->hasModifier<SynthesizedModifier>())
+            addModifier(newValueParam, m_astBuilder->create<SynthesizedModifier>());
 
         decl->addMember(newValueParam);
     }

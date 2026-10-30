@@ -7,7 +7,7 @@ struct MethodGenericShadowsStructGeneric<let N : int>
 //CHECK:                                     ^ outer generic parameter 'N' declared here
 {
     int f<let N : int>() { return N; }
-//CHECK:      ^ generic parameter 'N' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:      ^ error E30528
 //CHECK:      ^ generic parameter 'N' shadows an outer generic parameter with the same name
 }
 
@@ -15,7 +15,7 @@ struct LocalShadowsStructGeneric<let N : int>
 //CHECK:                             ^ outer generic parameter 'N' declared here
 {
     int f() { int N = 5; return N; }
-//CHECK:          ^ local variable 'N' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:          ^ error E30528
 //CHECK:          ^ local variable 'N' shadows an outer generic parameter with the same name
 }
 
@@ -373,3 +373,13 @@ struct TypePackShadow<each T> { int f<each T>() { return 0; } }
 //CHECK:                   ^ outer generic parameter 'T' declared here
 //CHECK:                                   ^ generic parameter 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
 //CHECK:                                   ^ generic parameter 'T' shadows an outer generic parameter with the same name
+
+// Declarations that the compiler makes are not reported: the `result` local of the synthesized
+// `dzero` and `dadd`, the implicit `newValue` of a bitfield's setter, and the `BwdCallable` and
+// `MinimalContext` aliases of the extension that autodiff adds for a differentiable method.
+struct SynthesizedWitnessLocal<let result : int> : IDifferentiable { float x; }
+struct BitfieldSetter<let newValue : int> { uint bits : 3; }
+struct DifferentiableMethodContext<let BwdCallable : int, let MinimalContext : int>
+{
+    [Differentiable] float m(float a) { return a * a; }
+}

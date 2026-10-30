@@ -377,3 +377,13 @@ struct TypePackShadow<each T> { int f<each T>() { return 0; } }
 //CHECK:                   ^ outer generic parameter 'T' declared here
 //CHECK:                                   ^ warning E30515
 //CHECK:                                   ^ generic parameter 'T' shadows an outer generic parameter with the same name
+
+// Declarations that the compiler makes are not reported: the `result` local of the synthesized
+// `dzero` and `dadd`, the implicit `newValue` of a bitfield's setter, and the `BwdCallable` and
+// `MinimalContext` aliases of the extension that autodiff adds for a differentiable method.
+struct SynthesizedWitnessLocal<let result : int> : IDifferentiable { float x; }
+struct BitfieldSetter<let newValue : int> { uint bits : 3; }
+struct DifferentiableMethodContext<let BwdCallable : int, let MinimalContext : int>
+{
+    [Differentiable] float m(float a) { return a * a; }
+}

@@ -212,6 +212,7 @@ DeclStmt* ASTSynthesizer::emitVarDeclStmt(Type* type, Name* name, Expr* initVal)
     varDecl->type.type = type;
     varDecl->nameAndLoc.name = name;
     varDecl->initExpr = initVal;
+    addModifier(varDecl, m_builder->create<SynthesizedModifier>());
     scope.m_scope->containerDecl->addMember(varDecl);
     auto stmt = m_builder->create<DeclStmt>();
     stmt->decl = varDecl;
