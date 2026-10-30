@@ -145,9 +145,10 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             IRIntegerValue lastFieldAlignment = 0;
             IRType* lastFieldType = NULL;
             bool seenFinalUnsizedArrayField = false;
-            // `[vk::offset]` applies only on Vulkan targets. Other targets emit their
-            // structs with the natural layout, which is also what reflection reports.
-            const bool honorVkOffset = targetReq && isKhronosTarget(targetReq);
+            // The target rule covers every struct, not only the entry-point parameter
+            // struct: off SPIR-V and GLSL, a field with `[vk::offset]` keeps the offset that
+            // the layout rules compute, which is where the emitted struct puts it.
+            const bool applyVkOffset = doesTargetHonorVkOffset(targetReq);
             for (auto field : structType->getFields())
             {
                 // If we failed to catch an unsized array earlier in the pipeline,
@@ -162,7 +163,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
                     fieldTypeLayout.size == IRSizeAndAlignment::kIndeterminateSize;
 
                 auto offsetDecor = field->getKey()->findDecoration<IRVkStructOffsetDecoration>();
-                if (offsetDecor && honorVkOffset)
+                if (offsetDecor && applyVkOffset)
                 {
                     offset = offsetDecor->getOffset()->getValue();
                 }
