@@ -2907,6 +2907,14 @@ protected:
 
         bool isUnsupported = false;
         bool isSpecial = false;
+
+        // The target's built-in exists only as a stage output (WGSL `clip_distances`). An input
+        // with this semantic is reported as unsupported by the caller, which knows the direction.
+        bool isOutputOnly = false;
+
+        // A WGSL extension the built-in needs (`enable <name>;`). The caller attaches it to the
+        // inst that gets the target system-value decoration.
+        String requiredWGSLExtension;
     };
 
     struct SystemValLegalizationWorkItem
@@ -3011,7 +3019,9 @@ protected:
             handleSpecialSystemValue(entryPoint, workItem, info, builder);
         }
 
-        if (info.isUnsupported)
+        // This path legalizes entry-point parameters (and fields of a parameter's struct) as
+        // inputs, so an output-only built-in is reported here.
+        if (info.isUnsupported || info.isOutputOnly)
         {
             reportUnsupportedSystemAttribute(var, semanticName);
             return;
@@ -3020,6 +3030,10 @@ protected:
             return;
 
         builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
+        if (info.requiredWGSLExtension.getLength())
+            builder.addRequireWGSLExtensionDecoration(
+                var,
+                info.requiredWGSLExtension.getUnownedSlice());
 
         bool varTypeIsPermitted = false;
         for (auto& permittedType : info.permittedTypes)
@@ -3510,7 +3524,8 @@ private:
                     auto indexAsString = String(UInt(semanticDecor->getEffectiveSemanticIndex()));
                     auto sysValInfo =
                         getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, field);
-                    if (sysValInfo.isUnsupported)
+                    if (sysValInfo.isUnsupported ||
+                        (sysValInfo.isOutputOnly && K != LayoutResourceKind::VaryingOutput))
                     {
                         reportUnsupportedSystemAttribute(field, semanticDecor->getSemanticName());
                     }
@@ -3519,6 +3534,10 @@ private:
                         builder.addTargetSystemValueDecoration(
                             key,
                             sysValInfo.systemValueName.getUnownedSlice());
+                        if (sysValInfo.requiredWGSLExtension.getLength())
+                            builder.addRequireWGSLExtensionDecoration(
+                                key,
+                                sysValInfo.requiredWGSLExtension.getUnownedSlice());
                         semanticDecor->removeAndDeallocate();
                     }
                 }
@@ -5115,6 +5134,26 @@ public:
     }
 
 protected:
+    // The array type of a `float d[N] : SV_ClipDistance` varying with 1 <= N <= 8, the shapes
+    // WGSL's clip_distances built-in accepts, or null for any other type. `var` is a struct field
+    // (a varying struct's member, from ensureStructHasUserSemantic) or an entry-point parameter
+    // or struct key (from legalizeSystemValue, which reports the built-in as an input anyway).
+    static IRArrayType* getClipDistancesArrayType(IRInst* var)
+    {
+        IRType* varType = nullptr;
+        if (auto field = as<IRStructField>(var))
+            varType = field->getFieldType();
+        else
+            varType = var->getDataType();
+        auto arrayType = as<IRArrayType>(varType);
+        if (!arrayType || arrayType->getElementType()->getOp() != kIROp_FloatType)
+            return nullptr;
+        auto count = as<IRIntLit>(arrayType->getElementCount());
+        if (!count || count->getValue() < 1 || count->getValue() > 8)
+            return nullptr;
+        return arrayType;
+    }
+
     SystemValueInfo getSystemValueInfo(
         String inSemanticName,
         String* optionalSemanticIndex,
@@ -5144,41 +5183,26 @@ protected:
         case SystemValueSemanticName::ClipDistance:
             {
                 // WGSL's clip_distances built-in (`enable clip_distances;`, the WebGPU
-                // `clip-distances` feature) is an array<f32, N> with N <= 8: an HLSL
-                // `float d[N] : SV_ClipDistance` maps to it directly.
+                // `clip-distances` feature) is a vertex output of type array<f32, N>, N <= 8, so
+                // an HLSL `float d[N] : SV_ClipDistance` output maps to it directly. WGSL has a
+                // single clip_distances output, so only semantic index 0 maps; a second array
+                // (`SV_ClipDistance1`) is reported instead of emitting a second built-in.
                 // https://www.w3.org/TR/WGSL/#built-in-values-clip_distances
-                IRType* varType = nullptr;
-                if (auto field = as<IRStructField>(parentVar))
-                    varType = field->getFieldType();
-                else if (parentVar)
-                    varType = parentVar->getDataType();
-                if (auto ptrType = as<IRPtrTypeBase>(varType))
-                    varType = ptrType->getValueType();
-                auto arrayType = as<IRArrayType>(varType);
-                auto count = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
-                // WGSL allows a single clip_distances output, so only semantic index 0 maps to
-                // it; a second array (`SV_ClipDistance1`) is reported as unsupported instead of
-                // emitting a second `@builtin(clip_distances)`.
                 bool isFirstSemanticIndex =
                     semanticIndex.getLength() == 0 || semanticIndex == toSlice("0");
-                if (isFirstSemanticIndex && arrayType && count && count->getValue() >= 1 &&
-                    count->getValue() <= 8 &&
-                    arrayType->getElementType()->getOp() == kIROp_FloatType)
+                auto arrayType =
+                    isFirstSemanticIndex ? getClipDistancesArrayType(parentVar) : nullptr;
+                if (arrayType)
                 {
                     result.systemValueName = toSlice("clip_distances");
                     result.permittedTypes.add(arrayType);
-
-                    // The built-in name is attached to the struct key when `parentVar` is a
-                    // field, so the extension requirement is attached to the key as well.
-                    auto decorated = parentVar;
-                    if (auto field = as<IRStructField>(parentVar))
-                        decorated = field->getKey();
-                    builder.addRequireWGSLExtensionDecoration(decorated, toSlice("clip_distances"));
+                    result.isOutputOnly = true;
+                    result.requiredWGSLExtension = toSlice("clip_distances");
                 }
                 else
                 {
-                    // A scalar or vector SV_ClipDistance would have to be packed into the
-                    // array, and a second array combined with the first; not supported.
+                    // Not representable as clip_distances: a scalar or vector, a non-float
+                    // element, a length outside 1..8, or a second array.
                     result.isUnsupported = true;
                 }
             }
