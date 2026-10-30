@@ -18,7 +18,7 @@ RWStructuredBuffer<float> floatBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):name=atomicFloatBuffer
 RWStructuredBuffer<Atomic<float>> atomicFloatBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=8):name=doubleBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=8):name=doubleBuffer
 RWStructuredBuffer<double> doubleBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=8):name=atomicDoubleBuffer
@@ -131,6 +131,13 @@ void computeMain(uint tid: SV_DispatchThreadID)
         InterlockedMin(floatBuffer[4], 2.0);
         InterlockedMax(floatBuffer[5], 2.0);
         ok = ok && floatBuffer[4] == 2.0 && floatBuffer[5] == 2.0;
+        floatBuffer[6] = 3.0;
+        floatBuffer[7] = -4.0;
+        float o5, o6, o7;
+        InterlockedMin(floatBuffer[6], -1.0, o5); // unsigned atomicMax branch: 3 -> -1
+        InterlockedMax(floatBuffer[6], 2.0, o6);  // signed atomicMax branch: -1 -> 2
+        InterlockedMax(floatBuffer[7], -1.0, o7); // unsigned atomicMin branch: -4 -> -1
+        ok = ok && o5 == 3.0 && o6 == -1.0 && o7 == -4.0 && floatBuffer[6] == 2.0 && floatBuffer[7] == -1.0;
         outputBuffer[16] = ok ? 1.0 : 0.0;
 
         doubleBuffer[4] = 5.0;
@@ -147,6 +154,13 @@ void computeMain(uint tid: SV_DispatchThreadID)
         InterlockedMin(doubleBuffer[6], 2.0);
         InterlockedMax(doubleBuffer[7], 2.0);
         ok = ok && doubleBuffer[6] == 2.0 && doubleBuffer[7] == 2.0;
+        doubleBuffer[8] = 3.0;
+        doubleBuffer[9] = -4.0;
+        double d5, d6, d7;
+        InterlockedMin(doubleBuffer[8], -1.0, d5);
+        InterlockedMax(doubleBuffer[8], 2.0, d6);
+        InterlockedMax(doubleBuffer[9], -1.0, d7);
+        ok = ok && d5 == 3.0 && d6 == -1.0 && d7 == -4.0 && doubleBuffer[8] == 2.0 && doubleBuffer[9] == -1.0;
         outputBuffer[17] = ok ? 1.0 : 0.0;
 
         halfBuffer[2] = half(5.0);
