@@ -480,7 +480,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         else
             m_writer->emit(");\n");
     };
-    auto diagnoseUnsupportedFloatAtomic = [&]()
+    auto diagnoseIfUnsupportedFloatAtomic = [&]()
     {
         if (auto reason = getUnsupportedFloatAtomicReason(inst))
             getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
@@ -518,7 +518,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicLoad:
         {
-            diagnoseUnsupportedFloatAtomic();
+            diagnoseIfUnsupportedFloatAtomic();
 
             emitInstResultDecl(inst);
             bool isImageOp = false;
@@ -572,14 +572,14 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicExchange:
         {
-            diagnoseUnsupportedFloatAtomic();
+            diagnoseIfUnsupportedFloatAtomic();
 
             emitAtomicOp("atomic_exchange", "atomic_exchange_explicit");
             return true;
         }
     case kIROp_AtomicCompareExchange:
         {
-            diagnoseUnsupportedFloatAtomic();
+            diagnoseIfUnsupportedFloatAtomic();
 
             bool isImageOp = false;
             auto imageSubscript = isTextureAccess(inst);
@@ -651,14 +651,14 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicMin:
         {
-            diagnoseUnsupportedFloatAtomic();
+            diagnoseIfUnsupportedFloatAtomic();
 
             emitAtomicOp("atomic_fetch_min", "atomic_fetch_min_explicit");
             return true;
         }
     case kIROp_AtomicMax:
         {
-            diagnoseUnsupportedFloatAtomic();
+            diagnoseIfUnsupportedFloatAtomic();
 
             emitAtomicOp("atomic_fetch_max", "atomic_fetch_max_explicit");
             return true;
