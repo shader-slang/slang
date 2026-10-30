@@ -807,6 +807,14 @@ static bool isLocalTypeDecl(Decl* decl)
     return as<ScopeDecl>(parent) != nullptr;
 }
 
+/// Return whether `decl` is a member of a type or extension declaration, possibly generic, such as
+/// the field `N` in `struct A<let N : int> { int N; }`. The generic parameters of a generic member
+/// are not members of the type.
+static bool isTypeMemberDecl(Decl* decl)
+{
+    return !isGenericParam(decl) && as<AggTypeDeclBase>(getParentDecl(decl)) != nullptr;
+}
+
 struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
                                            public DeclVisitor<SemanticsDeclRedeclarationVisitor>
 {
@@ -818,8 +826,18 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
     void visitDecl(Decl*) {}
     void visitDeclGroup(DeclGroup*) {}
 
-#define CASE(TYPE) \
-    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl, m_severity); }
+    // Generic parameters are checked with the rest of their generic in `visitGenericDecl`, and
+    // a type alias in a function body, with its generic parameters, is checked by
+    // `visitBlockStmt` even when it is unused. Globals and namespace members are never inside a
+    // generic, so they are not checked.
+
+#define CASE(TYPE)                               \
+    void visit##TYPE(TYPE* decl)                 \
+    {                                            \
+        checkForRedeclaration(decl, m_severity); \
+        if (isTypeMemberDecl(decl))              \
+            checkForShadowedGenericParam(decl);  \
+    }
 
     CASE(EnumCaseDecl)
     CASE(FuncDecl)
@@ -827,22 +845,23 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
 
 #undef CASE
 
-    // Generic parameters are checked with the rest of their generic in `visitGenericDecl`, and
-    // a type alias in a function body, with its generic parameters, is checked by
-    // `visitBlockStmt` even when it is unused. Members and globals are not covered by the
-    // shadowing rule.
-
     void visitVarDeclBase(VarDeclBase* decl)
     {
         checkForRedeclaration(decl, m_severity);
-        if (as<ParamDecl>(decl) || isLocalVar(decl))
+        if (as<ParamDecl>(decl) || isLocalVar(decl) || isTypeMemberDecl(decl))
             checkForShadowedGenericParam(decl);
     }
 
     void visitAggTypeDecl(AggTypeDecl* decl)
     {
         checkForRedeclaration(decl, m_severity);
-        if (isLocalTypeDecl(decl))
+        if (isLocalTypeDecl(decl) || isTypeMemberDecl(decl))
+            checkForShadowedGenericParam(decl);
+    }
+
+    void visitPropertyDecl(PropertyDecl* decl)
+    {
+        if (isTypeMemberDecl(decl))
             checkForShadowedGenericParam(decl);
     }
 
@@ -15133,8 +15152,10 @@ static const char* getGenericParamShadowingDeclKind(Decl* decl)
         return "parameter";
     if (isLocalVar(decl))
         return "local variable";
-    SLANG_RELEASE_ASSERT(isLocalTypeDecl(decl));
-    return "local type";
+    if (isLocalTypeDecl(decl))
+        return "local type";
+    SLANG_RELEASE_ASSERT(isTypeMemberDecl(decl));
+    return "member";
 }
 
 void SemanticsVisitor::checkForShadowedGenericParam(Decl* decl)
@@ -15143,6 +15164,13 @@ void SemanticsVisitor::checkForShadowedGenericParam(Decl* decl)
     // of a requirement-witness wrapper, copy their names from other declarations. They do not
     // appear in the user's source, so they are never reported as shadowing.
     if (decl->hasModifier<SynthesizedModifier>())
+        return;
+
+    // The members of a synthesized type are synthesized too. For example, the closure type of
+    // `(int y) => y + K` has a field that copies the name and location of each captured
+    // variable, here the generic parameter `K` itself.
+    if (auto parentTypeDecl = as<AggTypeDeclBase>(getParentDecl(decl));
+        parentTypeDecl && parentTypeDecl->hasModifier<SynthesizedModifier>())
         return;
 
     auto name = decl->getName();

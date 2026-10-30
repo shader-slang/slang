@@ -3138,9 +3138,9 @@ public:
 
     /// Diagnose `decl` if it shadows a generic parameter of an enclosing generic.
     ///
-    /// `decl` is a generic parameter, a function parameter, or a variable or type declared in a
-    /// function body. Shadowing is a warning before Slang 202c and an error in Slang 202c and
-    /// later.
+    /// `decl` is a generic parameter, a function parameter, a variable or type declared in a
+    /// function body, or a member of a type or extension. Shadowing is a warning before Slang
+    /// 202c and an error in Slang 202c and later.
     void checkForShadowedGenericParam(Decl* decl);
 
     Expr* checkPredicateExpr(Expr* expr);

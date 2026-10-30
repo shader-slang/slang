@@ -185,8 +185,123 @@ struct LocalShadowsParamShadowingGeneric<let N : int>
 //CHECK:      ^ parameter 'N' shadows an outer generic parameter with the same name
 }
 
-// A member that reuses the name of a generic parameter of its type is not covered.
-struct MemberReusesGenericName<let N : int> { int N; }
+// A member of a type that reuses the name of a generic parameter of the type, or of an
+// enclosing generic, shadows that parameter.
+struct MemberReusesGenericName<let N : int>
+//CHECK:                           ^ outer generic parameter 'N' declared here
+{
+    int N;
+//CHECK:^ member 'N' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:^ member 'N' shadows an outer generic parameter with the same name
+}
+
+struct StaticMemberShadowsGeneric<let N : int>
+//CHECK:                              ^ outer generic parameter 'N' declared here
+{
+    static const int N = 1;
+//CHECK:             ^ member 'N' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:             ^ member 'N' shadows an outer generic parameter with the same name
+}
+
+struct NestedTypeShadowsGeneric<T>
+//CHECK:                        ^ outer generic parameter 'T' declared here
+{
+    struct T { int x; };
+//CHECK:   ^ member 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:   ^ member 'T' shadows an outer generic parameter with the same name
+}
+
+struct TypeAliasShadowsGeneric<T>
+//CHECK:                       ^ outer generic parameter 'T' declared here
+{
+    typealias T = int;
+//CHECK:      ^ member 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:      ^ member 'T' shadows an outer generic parameter with the same name
+}
+
+struct MethodShadowsGeneric<let N : int>
+//CHECK:                        ^ outer generic parameter 'N' declared here
+{
+    int N() { return 1; }
+//CHECK:^ member 'N' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:^ member 'N' shadows an outer generic parameter with the same name
+}
+
+struct PropertyShadowsGeneric<let N : int>
+//CHECK:                          ^ outer generic parameter 'N' declared here
+{
+    property N : int { get { return 1; } }
+//CHECK:     ^ member 'N' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:     ^ member 'N' shadows an outer generic parameter with the same name
+}
+
+struct EnumCaseShadowsGeneric<T>
+//CHECK:                      ^ outer generic parameter 'T' declared here
+{
+    enum E { T, U };
+//CHECK:     ^ member 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:     ^ member 'T' shadows an outer generic parameter with the same name
+}
+
+interface IAssociatedTypeShadowsGeneric<T>
+//CHECK:                                ^ outer generic parameter 'T' declared here
+{
+    associatedtype T;
+//CHECK:           ^ member 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:           ^ member 'T' shadows an outer generic parameter with the same name
+}
+
+struct ExtendedGeneric<T> { int x; }
+extension<T> ExtendedGeneric<T>
+//CHECK:  ^ outer generic parameter 'T' declared here
+{
+    int T() { return 0; }
+//CHECK:^ member 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:^ member 'T' shadows an outer generic parameter with the same name
+}
+
+struct NestedTypeMemberShadowsGeneric<T>
+//CHECK:                              ^ outer generic parameter 'T' declared here
+{
+    struct Inner { int T; };
+//CHECK:               ^ member 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:               ^ member 'T' shadows an outer generic parameter with the same name
+}
+
+void localTypeMemberShadowsGeneric<T>()
+//CHECK:                           ^ outer generic parameter 'T' declared here
+{
+    struct S { int T; };
+//CHECK:           ^ member 'T' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:           ^ member 'T' shadows an outer generic parameter with the same name
+}
+
+// The fields that autodiff synthesizes for the differential type are not reported again.
+struct DifferentiableMemberShadowsGeneric<let N : int> : IDifferentiable
+//CHECK:                                      ^ outer generic parameter 'N' declared here
+{
+    float N;
+//CHECK:  ^ member 'N' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:  ^ member 'N' shadows an outer generic parameter with the same name
+}
+
+// The closure type of a lambda has a field for each captured variable that copies the
+// variable's name and location, so capturing a generic parameter, or a local that shadows
+// one, adds no diagnostic.
+struct LambdaCapturesGenericParam
+{
+    int g<let K : int>(int v) { let l = (int y) => y + K; return l(v); }
+}
+
+int lambdaCapturesShadowingLocal<let N : int>()
+//CHECK:                             ^ outer generic parameter 'N' declared here
+{
+    int N = 1;
+//CHECK:^ local variable 'N' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later
+//CHECK:^ local variable 'N' shadows an outer generic parameter with the same name
+    let l = (int y) => y + N;
+    return l(2);
+}
 
 // Interface conformance can synthesize a wrapper method whose generic parameters and
 // parameters copy the names of the requirement's. Those copies are not written by the
@@ -200,7 +315,10 @@ struct ValueGenericMethodWitness<let N : int> : IValueGenericMethod { int f<let 
 interface IParamMethod { int f(int N); }
 struct ParamMethodWitness<let N : int> : IParamMethod { int f(int x, int extra = 0) { return x; } }
 
+// The parameters of a synthesized memberwise constructor copy the names of the fields, so
+// they are not reported again.
 void useMemberwiseCtor()
 {
     MemberReusesGenericName<1> m = { 2 };
+    DifferentiableMemberShadowsGeneric<1> d = { 1.0 };
 }
