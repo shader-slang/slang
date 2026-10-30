@@ -191,7 +191,9 @@ class ToBeSynthesizedModifier : public Modifier
     FIDDLE(...)
 };
 
-// Marks that the definition of a decl is synthesized.
+// Marks that the definition of a decl is synthesized. A synthesized decl does not appear in the
+// user's source, so checks of user code, such as the shadowing of generic parameters, skip it
+// and the members of a synthesized type.
 FIDDLE()
 class SynthesizedModifier : public Modifier
 {

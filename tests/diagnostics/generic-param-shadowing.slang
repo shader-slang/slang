@@ -170,7 +170,8 @@ struct Outer<let N : int>
     }
 }
 
-// The following declarations do not shadow a generic parameter, so they get no diagnostic.
+// In the following cases a declaration does not shadow a generic parameter, so it gets no
+// diagnostic.
 
 // A generic parameter of a declaration that does not enclose the function is not visible there.
 struct Unrelated<let K : int> {}
@@ -319,12 +320,22 @@ struct ValueGenericMethodWitness<let N : int> : IValueGenericMethod { int f<let 
 interface IParamMethod { int f(int N); }
 struct ParamMethodWitness<let N : int> : IParamMethod { int f(int x, int extra = 0) { return x; } }
 
-// The parameters of a synthesized memberwise constructor copy the names of the fields, so
-// they are not reported again.
+// The parameters of a synthesized memberwise constructor copy the names of the fields. Their
+// walk stops at the field, which is not a generic parameter, so they are not reported.
 void useMemberwiseCtor()
 {
     MemberReusesGenericName<1> m = { 2 };
     DifferentiableMemberShadowsGeneric<1> d = { 1.0 };
+}
+
+// The implicit parameter `newValue` of a setter is not marked synthesized: inside the setter
+// it hides a generic parameter of the same name, so it is reported at the `set` keyword.
+struct SetterNewValueShadowsGeneric<let newValue : int>
+//CHECK:                                ^^^^^^^^ outer generic parameter 'newValue' declared here
+{
+    property int p { get { return 0; } set {} }
+//CHECK:                               ^^^ warning E30527
+//CHECK:                               ^^^ parameter 'newValue' shadows an outer generic parameter with the same name
 }
 
 // The parser copies an interface method that has a body into an `InterfaceDefaultImplDecl`, so

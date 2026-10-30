@@ -15183,9 +15183,10 @@ static bool isInterfaceDefaultImplSignatureDecl(Decl* decl)
 
 void SemanticsVisitor::checkForShadowedGenericParam(Decl* decl)
 {
-    // Declarations that the compiler synthesizes, such as the generic parameters and parameters
-    // of a requirement-witness wrapper, copy their names from other declarations. They do not
-    // appear in the user's source, so they are never reported as shadowing.
+    // Declarations marked as synthesized, such as the generic parameters and parameters of a
+    // requirement-witness wrapper, copy their names from other declarations and do not appear in
+    // the user's source, so they are not reported. The implicit `newValue` parameter of a setter
+    // is not marked, and it is reported because it hides a generic parameter of that name.
     if (decl->hasModifier<SynthesizedModifier>())
         return;
 
