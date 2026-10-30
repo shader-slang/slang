@@ -1822,6 +1822,9 @@ static void validateEntryPointCapabilities(
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
     for (auto target : linkage->targets)
     {
+        // Capability diagnostics for this target follow its options, so an option such as
+        // IgnoreCapabilities set in the target's own compiler option entries applies here.
+        auto& targetOptionSet = target->getOptionSet();
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
         targetCaps.join(stageCapabilitySet);
@@ -1834,7 +1837,7 @@ static void validateEntryPointCapabilities(
             auto stageTarget = stageCapabilitySet.getTargetStage();
             maybeDiagnose(
                 sink,
-                linkage->m_optionSet,
+                targetOptionSet,
                 DiagnosticCategory::Capability,
                 Diagnostics::EntryPointUsesUnavailableCapability{
                     .stage = capabilityNameToString((CapabilityName)stageTarget),
@@ -1846,7 +1849,7 @@ static void validateEntryPointCapabilities(
             if (targetCaps.isIncompatibleWith(
                     CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}))
                 diagnoseMissingCapabilityProvenance(
-                    linkage->m_optionSet,
+                    targetOptionSet,
                     sink,
                     entryPointFuncDecl,
                     failedSet);
@@ -1858,11 +1861,7 @@ static void validateEntryPointCapabilities(
             {
                 if (targetCaps.isIncompatibleWith(
                         CapabilitySet{decl->inferredCapabilityRequirements}))
-                    diagnoseMissingCapabilityProvenance(
-                        linkage->m_optionSet,
-                        sink,
-                        decl,
-                        failedSet);
+                    diagnoseMissingCapabilityProvenance(targetOptionSet, sink, decl, failedSet);
             }
 
             // The provenance walk above follows `capabilityRequirementProvenance`,
@@ -1876,25 +1875,24 @@ static void validateEntryPointCapabilities(
                     continue;
                 maybeDiagnose(
                     sink,
-                    linkage->m_optionSet,
+                    targetOptionSet,
                     DiagnosticCategory::Capability,
                     Diagnostics::SeeUsingOf{.decl = use.structDecl, .location = use.useLoc});
                 maybeDiagnose(
                     sink,
-                    linkage->m_optionSet,
+                    targetOptionSet,
                     DiagnosticCategory::Capability,
                     Diagnostics::SeeDefinitionOf{.decl = use.structDecl});
                 if (auto requireAttr = use.structDecl->findModifier<RequireCapabilityAttribute>())
                     maybeDiagnose(
                         sink,
-                        linkage->m_optionSet,
+                        targetOptionSet,
                         DiagnosticCategory::Capability,
                         Diagnostics::SeeDeclarationOfModifier{.modifier = requireAttr});
             }
         }
         else
         {
-            auto& targetOptionSet = target->getOptionSet();
             bool specificProfileRequested =
                 targetOptionSet.hasOption(CompilerOptionName::Profile) &&
                 (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
