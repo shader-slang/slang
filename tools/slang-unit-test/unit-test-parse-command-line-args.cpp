@@ -137,6 +137,34 @@ struct ParseCommandLineArgsTestContext
     UnitTestContext* m_unitTestContext;
 };
 
+// A failed parse preserves the caller's existing session description so it remains usable;
+// the auxiliary allocation is cleared because no parsed data is returned.
+void checkParseFails(slang::IGlobalSession* globalSession, int argc, const char* const* argv)
+{
+    // Non-default starting values let the checks below tell an untouched output from one that was
+    // written. The allocation value is never dereferenced.
+    const slang::TargetDesc callerTarget{};
+    const slang::CompilerOptionEntry callerEntry{};
+    slang::SessionDesc sessionDesc{};
+    sessionDesc.targets = &callerTarget;
+    sessionDesc.targetCount = 1;
+    sessionDesc.compilerOptionEntries = &callerEntry;
+    sessionDesc.compilerOptionEntryCount = 1;
+    ISlangUnknown* allocation = reinterpret_cast<ISlangUnknown*>(uintptr_t(1));
+
+    const SlangResult result =
+        globalSession->parseCommandLineArguments(argc, argv, &sessionDesc, &allocation);
+    SLANG_CHECK(SLANG_FAILED(result));
+    SLANG_CHECK(allocation == nullptr);
+    SLANG_CHECK(sessionDesc.targets == &callerTarget);
+    SLANG_CHECK(sessionDesc.targetCount == 1);
+    SLANG_CHECK(sessionDesc.compilerOptionEntries == &callerEntry);
+    SLANG_CHECK(sessionDesc.compilerOptionEntryCount == 1);
+
+    if (SLANG_SUCCEEDED(result))
+        allocation->release();
+}
+
 } // namespace
 
 SLANG_UNIT_TEST(parseCommandLineArgs)
@@ -146,4 +174,43 @@ SLANG_UNIT_TEST(parseCommandLineArgs)
     const auto result = context.runTests();
 
     SLANG_CHECK(SLANG_SUCCEEDED(result));
+}
+
+SLANG_UNIT_TEST(parseCommandLineArgsReportsParseErrors)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const char* missingTargetName[] = {"-target"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(missingTargetName), missingTargetName);
+
+    const char* unknownOption[] = {"-bogus-option"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(unknownOption), unknownOption);
+
+    const char* unknownTarget[] = {"-target", "bogus"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(unknownTarget), unknownTarget);
+
+    const char* missingProfileName[] = {"-profile"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(missingProfileName), missingProfileName);
+
+    {
+        slang::SessionDesc sessionDesc{};
+        ComPtr<ISlangUnknown> allocation;
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            globalSession
+                ->parseCommandLineArguments(0, nullptr, &sessionDesc, allocation.writeRef())));
+        SLANG_CHECK(sessionDesc.targetCount == 0);
+    }
+    {
+        const char* argv[] = {"-target", "spirv"};
+        slang::SessionDesc sessionDesc{};
+        ComPtr<ISlangUnknown> allocation;
+        SLANG_CHECK(SLANG_SUCCEEDED(globalSession->parseCommandLineArguments(
+            SLANG_COUNT_OF(argv),
+            argv,
+            &sessionDesc,
+            allocation.writeRef())));
+        SLANG_CHECK(sessionDesc.targetCount == 1);
+        if (sessionDesc.targetCount == 1)
+            SLANG_CHECK(sessionDesc.targets[0].format == SLANG_SPIRV);
+    }
 }
