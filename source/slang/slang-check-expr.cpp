@@ -7871,10 +7871,10 @@ static bool isCallAlwaysInlinedOrIntrinsic(CallableDecl* callee)
            callee->hasModifier<TargetIntrinsicModifier>();
 }
 
-// An `out` or `inout` parameter has copy-in/copy-out semantics, which an implementation may realize
-// by reference only because it assumes the argument is not aliased. Thread-group-shared storage is
-// aliased by every invocation in the group, so either way the callee can miss the other
-// invocations' writes or overwrite them, and we warn. A `groupshared` parameter is a reference
+// An `out` or `inout` parameter has copy-in/copy-out semantics, so the call works on a copy of its
+// argument and stores the copy back when it returns. Thread-group-shared storage is accessible to
+// every invocation in the group, so the callee can miss the other invocations' writes or overwrite
+// them, and we warn. A `groupshared` parameter is a reference
 // rather than an `inout`, so it is never copied. The implicit `this` of a method whose receiver
 // mode is `inout` (a `[mutating]` method) is such a parameter too. A direct argument of a call that
 // is always inlined is not passed across a call boundary, but an implicitly converted one still
@@ -7908,6 +7908,8 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
         if (argumentNamesGroupSharedStorage(addressedExpr))
             getSink()->diagnose(Diagnostics::GroupsharedArgumentToCopiedParameter{
                 .param = getText(paramDecl->getName()),
+                .suggestion = "; if the callee needs to see other invocations' writes, declare "
+                              "the parameter 'groupshared'",
                 .arg = argExpr});
     }
 
@@ -7921,6 +7923,7 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
         if (argumentNamesGroupSharedStorage(memberExpr->baseExpression))
             getSink()->diagnose(Diagnostics::GroupsharedArgumentToCopiedParameter{
                 .param = "this",
+                .suggestion = "",
                 .arg = memberExpr->baseExpression});
     }
 }

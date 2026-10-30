@@ -2,9 +2,10 @@
 
 // Regression guard for https://github.com/shader-slang/slang/issues/10641.
 //
-// An `out`/`inout` parameter that is not `groupshared` has copy-in/copy-out semantics, which an
-// implementation may realize by reference only by assuming the argument is not aliased. Passing
-// thread-group-shared storage, which every invocation in the group can access, is warning 30709.
+// An `out`/`inout` parameter that is not `groupshared` has copy-in/copy-out semantics, so the call
+// works on a copy of its argument and stores the copy back when it returns. Passing
+// thread-group-shared storage, which every invocation in the group can access, is warning 30709,
+// because a write that another invocation makes to that storage during the call is lost.
 // A direct argument of a call that is always inlined crosses no call boundary, which keeps
 // `g[i] += 1` and `g[i]++` silent; an implicitly converted argument still goes through a temporary.
 //
@@ -90,10 +91,17 @@ void computeMain(uint i : SV_GroupIndex)
     setOne(local);
 }
 
-//diag: but 'a' is an 'out' or 'inout' parameter
-//diag: but 'v' is an 'out' or 'inout' parameter
-//diag: but 'v' is an 'out' or 'inout' parameter
-//diag: but 'v' is an 'out' or 'inout' parameter
-//diag: but 'v' is an 'out' or 'inout' parameter
-//diag: but 'v' is an 'out' or 'inout' parameter
-//diag: but 'this' is an 'out' or 'inout' parameter
+//diag: 'a' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
+//diag: 'v' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
+//diag: 'v' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
+//diag: 'v' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
+//diag: 'v' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
+//diag: 'v' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
+//diag: 'this' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
+//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//diag: if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit

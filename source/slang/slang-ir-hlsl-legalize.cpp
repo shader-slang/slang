@@ -106,12 +106,24 @@ void validateGroupSharedParamsForHLSL(
         IRInst* intrinsicInst;
         if (findTargetIntrinsicDefinition(func, targetCaps, intrinsicDef, intrinsicInst))
             continue;
+        // In user code, `export` is what keeps such a function's definition, so we name it when it
+        // is the cause.
+        bool isExported = func->findDecoration<IRHLSLExportDecoration>() != nullptr;
         for (auto param : func->getParams())
         {
             if (as<IRGroupSharedRate>(param->getRate()) &&
                 !param->findDecoration<IRHLSLMeshPayloadDecoration>())
             {
                 sink->diagnose(Diagnostics::GroupsharedParameterNotAllowedOnHlslWithBoundary{
+                    .reason = isExported ? "this function is 'export', so its definition is kept"
+                                         : "this function keeps a call boundary that could not "
+                                           "be inlined away",
+                    .suggestion = isExported
+                                      ? "remove 'export', or have the function access the "
+                                        "'groupshared' variable directly instead of taking it "
+                                        "as a parameter"
+                                      : "have the function access the 'groupshared' variable "
+                                        "directly instead of taking it as a parameter",
                     .location = param->sourceLoc});
             }
         }

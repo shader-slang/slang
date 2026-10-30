@@ -4001,21 +4001,21 @@ err(
     "groupshared-parameter-not-allowed-on-hlsl-with-boundary",
     30708,
     "a 'groupshared' parameter cannot be passed across a function boundary when targeting HLSL",
-    span { loc = "location", message = "this function keeps a call boundary that could not be inlined away, and HLSL cannot pass thread-group-shared memory across one" }
+    span { loc = "location", message = "~reason:String, and HLSL cannot pass thread-group-shared memory across a call; ~suggestion:String" }
 )
 
 warning(
     "groupshared-argument-to-copied-parameter",
     30709,
-    "argument names thread-group-shared memory, which other invocations can access during the call, but '~param' is an 'out' or 'inout' parameter, which assumes its argument is not aliased -- declare the parameter 'groupshared' to pass the shared memory by reference",
-    span { loc = "arg:Expr" }
+    "'~param' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory and stores the copy back when it returns; a write that another invocation makes to the memory during the call is lost",
+    span { loc = "arg:Expr", message = "if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit~suggestion:String" }
 )
 
 err(
     "groupshared-argument-must-be-groupshared-lvalue",
     30711,
     "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a 'groupshared' parameter forwarded on)",
-    span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage" }
+    span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage; pass a 'groupshared' variable or a component of one, or declare '~param' without 'groupshared' if the function does not need thread-group-shared memory" }
 )
 
 err(
