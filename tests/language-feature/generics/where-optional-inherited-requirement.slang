@@ -29,6 +29,11 @@ T plusUser<T>(T a, T b) where optional T : IB { return a.plus(b); }
 int makeAssoc<T>(T t) where optional T : IBar { return t.make().get(); }
 //CHECK:                                                 ^^^^ the constraint providing 'make' is optional
 
+// An associated type's conformance is looked up through the constraint too, so the direct form
+// needs the check for it as well.
+int getAssoc<T>(T.A a) where optional T : IFoo { return a.get(); }
+//CHECK:                                                  ^^^ the constraint providing 'get' is optional
+
 // The same holds when the inherited conformance is needed to call a generic function.
 U twice<U : IArithmetic>(U x) { return x.add(x); }
 T twiceFloat<T>(T a) where optional T : IFloat { return twice(a); }
