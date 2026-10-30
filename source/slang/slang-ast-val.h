@@ -1404,6 +1404,18 @@ inline bool isTypeEqualityWitness(Val* witness)
     return false;
 }
 
+/// Return the witness for an `optional` generic constraint that `witness` is, or is derived
+/// from, or null if `witness` does not depend on an optional constraint.
+///
+/// Consider `T f<T>(T a, T b) where optional T : IFloat { return a + b; }`. The `+` operator
+/// is a requirement of `IArithmetic`, which `IFloat` inherits, so the witness that
+/// `T : IArithmetic` is a `DeclaredSubtypeWitness` on `IFloat`'s inheritance declaration,
+/// looked up through the optional `T : IFloat` witness. The lookup is the only part of that
+/// witness that mentions the optional constraint, and the derived witness is only as certain
+/// as the witness it is looked up through, so we follow `LookupDeclRef` witnesses until we reach
+/// an optional constraint or a witness that is not looked up through another one.
+DeclaredSubtypeWitness* findOptionalConstraintWitness(SubtypeWitness* witness);
+
 bool isValuePack(Val* val);
 bool isAbstractValuePack(Val* val);
 
