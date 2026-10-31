@@ -132,7 +132,7 @@ struct CleanUpVoidContext
                 // DebugVar for removal if it was a VoidType parameter when the
                 // Func was processed.
                 // 2. Detect VoidType DebugVars
-                // 3. Remove VoidType DebugVars and any DebugValue users of the DebugVar
+                // 3. Remove VoidType DebugVars and their debug-info users
                 auto debugVar = as<IRDebugVar>(inst);
                 bool removeDebugVar = false;
 
@@ -177,29 +177,31 @@ struct CleanUpVoidContext
                     removeDebugVar = true;
                 }
 
-                // Remove the VoidType DebugVar and any DebugValue users of the DebugVar
+                // Remove the VoidType DebugVar and its debug-info users: the DebugValues that
+                // update it and the DebugVarStorage decorations of the storage that holds it.
                 if (removeDebugVar)
                 {
-                    List<IRInst*> debugValueUsersToRemove;
-                    bool hasOnlyDebugValueUsers =
-                        true; // Keep the DebugVar if there are non-DebugValue users
+                    List<IRInst*> debugInfoUsersToRemove;
+                    bool hasOnlyDebugInfoUsers =
+                        true; // Keep the DebugVar if there are other users
                     for (auto use = debugVar->firstUse; use; use = use->nextUse)
                     {
-                        if (auto debugValue = as<IRDebugValue>(use->getUser()))
+                        auto user = use->getUser();
+                        if (as<IRDebugValue>(user) || as<IRDebugVarStorageDecoration>(user))
                         {
-                            debugValueUsersToRemove.add(debugValue);
+                            debugInfoUsersToRemove.add(user);
                         }
                         else
                         {
-                            hasOnlyDebugValueUsers = false;
+                            hasOnlyDebugInfoUsers = false;
                         }
                     }
 
-                    for (auto debugValue : debugValueUsersToRemove)
+                    for (auto debugInfoUser : debugInfoUsersToRemove)
                     {
-                        m_instsToRemove.add(debugValue);
+                        m_instsToRemove.add(debugInfoUser);
                     }
-                    if (hasOnlyDebugValueUsers)
+                    if (hasOnlyDebugInfoUsers)
                     {
                         m_instsToRemove.add(debugVar);
                     }
