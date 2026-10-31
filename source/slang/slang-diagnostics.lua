@@ -1334,6 +1334,13 @@ err(
     span { loc = "location", message = "~opcode does not take any operands" }
 )
 
+err(
+    "spirv-result-id-marker-not-result-id-operand",
+    29119,
+    "the result-id marker is not the <result-id> operand",
+    span { loc = "location", message = "'result' can only be the <result-id> operand of an instruction, and this operand of ~opcode is not its <result-id>" }
+)
+
 
 -- Load semantic checking diagnostics (part 1)
 -- (inlined from slang-diagnostics-semantic-checking-1.lua)
