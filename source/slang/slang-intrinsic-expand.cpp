@@ -213,7 +213,7 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
 // do for resources means that there wouldn't be a single f() function any more. But for CUDA and
 // C++ that's not the case or generally desirable.
 
-static IRFormatDecoration* _findImageFormatDecoration(IRInst* resourceInst)
+IRFormatDecoration* findImageFormatDecoration(IRInst* resourceInst)
 {
     // JS(TODO):
     // There could perhaps be other situations, that need to be covered
@@ -233,7 +233,7 @@ static IRFormatDecoration* _findImageFormatDecoration(IRInst* resourceInst)
 
 // Returns true if dataType and imageFormat are compatible - that they have the same representation,
 // and no conversion is required.
-static bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
+bool isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
 {
     int numElems = 1;
 
@@ -264,13 +264,13 @@ static bool _isConvertRequired(ImageFormat imageFormat, IRInst* callee)
 {
     auto textureType = as<IRTextureTypeBase>(callee->getDataType());
     IRType* elementType = textureType ? textureType->getElementType() : nullptr;
-    return elementType && !_isImageFormatCompatible(imageFormat, elementType);
+    return elementType && !isImageFormatCompatible(imageFormat, elementType);
 }
 
 static size_t _calcBackingElementSizeInBytes(IRInst* resourceInst)
 {
     // First see if there is a format associated with the resource
-    if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+    if (IRFormatDecoration* formatDecoration = findImageFormatDecoration(resourceInst))
     {
         return getImageFormatInfo(formatDecoration->getFormat()).sizeInBytes;
     }
@@ -562,7 +562,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             {
                 IRInst* resourceInst = m_callInst->getArg(0);
 
-                if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+                if (IRFormatDecoration* formatDecoration = findImageFormatDecoration(resourceInst))
                 {
                     const ImageFormat imageFormat = formatDecoration->getFormat();
                     if (_isConvertRequired(imageFormat, resourceInst))
@@ -610,7 +610,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             size_t elemSizeInBytes = _calcBackingElementSizeInBytes(resourceInst);
 
             // If we have a format converstion and its a *write* we don't need to scale
-            if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+            if (IRFormatDecoration* formatDecoration = findImageFormatDecoration(resourceInst))
             {
                 const ImageFormat imageFormat = formatDecoration->getFormat();
                 if (_isConvertRequired(imageFormat, resourceInst) && _isResourceWrite(m_callInst))
