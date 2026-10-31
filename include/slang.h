@@ -4355,9 +4355,9 @@ struct IGlobalSession : public ISlangUnknown
      *   @param argv An input array of command line arguments to parse.
      *   @param outSessionDesc A pointer to a SessionDesc struct to receive parsed session desc.
      *   @param outAuxAllocation Auxiliary memory allocated to hold data used in the session desc.
-     *   @return SLANG_OK on success. If the arguments are invalid (for example an unknown option or
-     *   a missing option value), a failure result is returned, `outSessionDesc` is left unchanged
-     *   and `outAuxAllocation` is set to null.
+     *   @return SLANG_OK on success, or a failure result if the arguments are invalid (for example
+     *   an unknown option or a missing option value). On any failure `outSessionDesc` is left
+     *   unchanged and `outAuxAllocation` is set to null. No diagnostic text is returned.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL parseCommandLineArguments(
         int argc,
