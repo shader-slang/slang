@@ -1,13 +1,11 @@
 // A local declared as the unbraced body of a statement is owned by the
 // enclosing scope, but it must stay invisible to code that runs before its
 // declaration, just like a local declared directly in a block (gh-14118).
-// Each function reads `i` before an inner `i` is declared, and must read
-// the parameter.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 int readBeforeIfBody(int i, bool c)
@@ -87,8 +85,18 @@ int forSideEffectBeforeBody(int i)
     return value;
 }
 
-// The predicate of a `do` loop follows its body, so it sees a local declared
-// as the body.
+// A `while` predicate is checked before its body, so it must not see a local
+// declared as the body.
+int whilePredicateBeforeBody(int i)
+{
+    int n = 0;
+    while (n < i)
+        int i = n++;
+    return n;
+}
+
+// An unbraced body's local belongs to the enclosing scope, and the predicate of
+// a `do` loop follows its body, so the predicate sees that local.
 int doPredicateAfterBody()
 {
     int n = 0;
@@ -145,4 +153,6 @@ void computeMain()
     outputBuffer[8] = readBeforeBracedBody(7, true);
     // CHECK-NEXT: 7
     outputBuffer[9] = readBeforeDirectDecl(7);
+    // CHECK-NEXT: 7
+    outputBuffer[10] = whilePredicateBeforeBody(7);
 }
