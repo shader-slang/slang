@@ -2529,7 +2529,21 @@ public:
 
     DeclRef<VarDeclBase> tryGetIntOrEnumSpecializationConstant(Expr* expr);
 
-    AttributeDecl* lookUpAttributeDecl(Name* attributeName, Scope* scope);
+    // Resolve the attribute name written inside `[...]` (a `VarExpr` for `[Name]`, or a
+    // `StaticMemberExpr` chain for `[a::b::Name]`) to the `AttributeDecl` it names, using ordinary
+    // name resolution so a qualified name — including a user-defined attribute declared in a
+    // namespace — resolves like any other qualified reference. Tries the name as written and the
+    // `Foo` -> `FooAttribute` user-defined-attribute convention. Resolution runs under a muting
+    // sink, so a miss is silent and the caller can fall back to the legacy flat lookup. Returns
+    // null when the name does not resolve to a usable attribute.
+    AttributeDecl* lookUpAttributeDeclFromNameExpr(Expr* attributeNameExpr);
+
+    // Resolve an attribute by its legacy underscore-folded name (`vk_binding` for `[vk::binding]`).
+    // Fallback for `lookUpAttributeDeclFromNameExpr`; deprecation in 202c is tracked by
+    // shader-slang/slang#13374.
+    AttributeDecl* lookUpLegacyUnderscoreConcatenatedAttributeDecl(
+        Name* attributeName,
+        Scope* scope);
 
     bool hasFloatArgs(Attribute* attr, int numArgs);
     bool hasIntArgs(Attribute* attr, int numArgs);
