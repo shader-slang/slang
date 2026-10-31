@@ -664,6 +664,11 @@ void calcRequiredLoweringPassSet(
                 result.unresolvedMatrixLayout = true;
         }
         break;
+    case kIROp_PtrType:
+        // `checkUnsupportedPhysicalPointers` walks the values of these types.
+        if (isUserPointerType(inst))
+            result.usePhysicalPointers = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -2946,6 +2951,21 @@ Result linkAndOptimizeIR(
             if (!targetProgram->getOrCreateLayout(sink))
                 return SLANG_FAIL;
         }
+    }
+    // Without this check the HLSL and WGSL emitters abort on `nullptr` or print an invalid pointer
+    // type, so it also runs in minimum-optimization mode. `usePhysicalPointers` is set for every
+    // `T*` type, so it cannot be a false negative: a pass that runs after the last scan and makes a
+    // value this check reports, such as the `p != nullptr` peephole, reuses a `T*` type that the
+    // scan already saw.
+    if (requiredLoweringPassSet.usePhysicalPointers &&
+        (isWGPUTarget(targetRequest) || isD3DTarget(targetRequest)) &&
+        !codeGenContext->shouldSkipSPIRVValidation())
+    {
+        // With `-g`, the check removes pointer values that only debug information observes; the
+        // globals they read, such as an unused `uniform float*`, are dead after that. It runs
+        // before `collectMetadata` so that reflection does not count those globals as used.
+        if (SLANG_PASS(checkUnsupportedPhysicalPointers, sink))
+            SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     }
     SLANG_PASS(collectMetadata, targetProgram, *metadata);
 

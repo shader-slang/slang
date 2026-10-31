@@ -15,4 +15,16 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
 /// This validation is required regardless of the selected optimization mode. Other targets,
 /// including HLSL source output, are not checked by this operation.
 void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
+
+/// Diagnose `T*` values (a `Ptr` in the `UserPointer` address space) that code makes from an
+/// integer or from `nullptr`. The caller runs this only for targets without such pointers (D3D
+/// and WebGPU); the check itself reports unconditionally.
+///
+/// Call it last, after the passes that can still create these values (for example the peephole
+/// that turns `if (p)` into `p != nullptr`). Pointers read from memory are not checked; a pointer
+/// unpacked from an existential (AnyValue) value is made with `BitCast` and is reported.
+///
+/// A value that only debug information observes is removed instead of reported. Returns true if
+/// anything was removed, in which case the caller removes the code that is now dead.
+bool checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang
