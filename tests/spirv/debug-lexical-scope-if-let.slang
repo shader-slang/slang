@@ -5,9 +5,11 @@
 // CHECK-DAG: [[MAIN_NAME:%[0-9]+]] = OpString "computeMain"
 // CHECK-DAG: [[ITEM_NAME:%[0-9]+]] = OpString "item"
 // CHECK-DAG: [[MAIN_FUNC:%[A-Za-z_0-9]+]] = {{.*}} DebugFunction [[MAIN_NAME]] {{.*}} [[SOURCE]]
-// CHECK-DAG: [[IFLET_BLOCK_A:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[MAIN_FUNC]]
+// CHECK-DAG: [[IFLET_STMT_A:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[MAIN_FUNC]]
+// CHECK-DAG: [[IFLET_BLOCK_A:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[IFLET_STMT_A]]
 // CHECK-DAG: [[IFLET_BODY_A:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[IFLET_BLOCK_A]]
-// CHECK-DAG: [[IFLET_BLOCK_B:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[MAIN_FUNC]]
+// CHECK-DAG: [[IFLET_STMT_B:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[MAIN_FUNC]]
+// CHECK-DAG: [[IFLET_BLOCK_B:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[IFLET_STMT_B]]
 // CHECK-DAG: [[IFLET_BODY_B:%[A-Za-z_0-9]+]] = {{.*}} DebugLexicalBlock [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[IFLET_BLOCK_B]]
 // CHECK-DAG: {{.*}} DebugLocalVariable [[ITEM_NAME]] {{%[A-Za-z_0-9]+}} [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[IFLET_BLOCK_A]]
 // CHECK-DAG: {{.*}} DebugLocalVariable [[ITEM_NAME]] {{%[A-Za-z_0-9]+}} [[SOURCE]] {{%uint_[0-9]+}} {{%uint_[0-9]+}} [[IFLET_BLOCK_B]]
