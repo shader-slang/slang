@@ -274,10 +274,15 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
                 }
             }
 
-            // Accumulate over all of the fields
-            for (auto field : structDeclRef.getDecl()->getFields())
+            // We count the same set of fields that `visitAggTypeDecl` puts in the
+            // `IRStructType`. A `static` member is lowered outside the struct (as a
+            // global variable or a constant), so we skip it. Per-field natural sizes
+            // can still differ from IR layout: `bool` is 1 byte here and 4 bytes there.
+            // We read the declared field type without substitution, so a field whose
+            // type depends on a generic parameter is left to IR layout.
+            for (auto field : getFields(m_astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
-                const auto fieldSize = calcSize(field->getType());
+                const auto fieldSize = calcSize(field.getDecl()->getType());
                 if (!fieldSize)
                 {
                     return NaturalSize::makeInvalid();
