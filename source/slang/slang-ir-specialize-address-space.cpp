@@ -97,6 +97,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         HashCode getHashCode() const { return hashCode; }
     };
 
+    // Maps a function and the address spaces of a call's arguments to the function that call
+    // should target: a clone made by `specializeFunc`, or, for an exported function registered by
+    // `seedExportedFunc`, the function itself.
     Dictionary<FuncSpecializationKey, IRFunc*> functionSpecializations;
 
     // Maps each clone created by `specializeFunc` to the unspecialized function it was cloned
@@ -124,6 +127,22 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return func;
     }
 
+    // Retypes the pointer parameter `param` to point into `addrSpace` and records `addrSpace` for
+    // it in `mapInstToAddrSpace`. The caller fixes up the function type once all of the function's
+    // parameters are retyped.
+    void setPointerParamAddrSpace(IRBuilder& builder, IRParam* param, AddressSpace addrSpace)
+    {
+        auto ptrType = as<IRPtrTypeBase>(param->getFullType());
+        SLANG_ASSERT(ptrType);
+        param->setFullType(builder.getPtrType(
+            ptrType->getOp(),
+            ptrType->getValueType(),
+            ptrType->getAccessQualifier(),
+            addrSpace,
+            ptrType->getDataLayout()));
+        mapInstToAddrSpace[param] = addrSpace;
+    }
+
     // Clones `key.getFunc()` with its pointer parameters retyped to the key's address spaces,
     // records the clone in `functionSpecializations` (under `key`) and in `specializationOrigin`,
     // and returns it. `key.getFunc()` must be an unspecialized function, never a clone.
@@ -142,20 +161,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         Index paramIndex = 0;
         for (auto param : specializedFunc->getParams())
         {
-            auto paramType = param->getFullType();
-            auto ptrType = as<IRPtrTypeBase>(paramType);
-            if (ptrType)
-            {
-                auto paramAddrSpace = key.getArgAddrSpaces()[paramIndex];
-                auto newParamType = builder.getPtrType(
-                    ptrType->getOp(),
-                    ptrType->getValueType(),
-                    ptrType->getAccessQualifier(),
-                    paramAddrSpace,
-                    ptrType->getDataLayout());
-                param->setFullType(newParamType);
-                mapInstToAddrSpace[param] = paramAddrSpace;
-            }
+            if (as<IRPtrTypeBase>(param->getFullType()))
+                setPointerParamAddrSpace(builder, param, key.getArgAddrSpaces()[paramIndex]);
             paramIndex++;
         }
 
@@ -164,6 +171,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         functionSpecializations[key] = specializedFunc;
         specializationOrigin[specializedFunc] = func;
+        // A clone exists only to serve calls, so the sweep removes it once its last caller is gone,
+        // e.g. a clone made while processing a seeded export that the sweep removes.
+        functionsToConsiderRemoving.add(specializedFunc);
         return specializedFunc;
     }
 
@@ -272,7 +282,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     case kIROp_FieldAddress:
                     case kIROp_GetOffsetPtr:
                     case kIROp_BitCast:
-                        if (!mapInstToAddrSpace.containsKey(inst))
+                        // A bitcast to a non-pointer, such as `bit_cast<uint64_t>(p)`, has no
+                        // address space.
+                        if (!mapInstToAddrSpace.containsKey(inst) &&
+                            as<IRPtrTypeBase>(inst->getDataType()))
                         {
                             auto addrSpace = getAddrSpace(inst->getOperand(0));
                             if (addrSpace != AddressSpace::Generic)
@@ -425,6 +438,35 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 }
             }
         }
+    }
+
+    // Seeds the exported function `func`: retypes every `Generic` pointer parameter in place to
+    // `defaultAddrSpace`, fixes up its function type, and registers `func` as its own
+    // specialization. An exported function may have no call site to infer parameter address spaces
+    // from. The registered key holds the address space each parameter now has, as
+    // `getAddressSpaceFromVarType` reports it, so a call whose arguments are in the same address
+    // spaces targets `func` itself. A call whose arguments are in other spaces, such as a `Global`
+    // buffer element passed for a `UserPointer` parameter, misses the key and gets a clone.
+    void seedExportedFunc(IRFunc* func, AddressSpace defaultAddrSpace)
+    {
+        IRBuilder builder(module);
+        bool changed = false;
+        List<AddressSpace> paramAddrSpaces;
+        for (auto param : func->getParams())
+        {
+            auto paramType = param->getFullType();
+            auto addrSpace = getAddressSpaceFromVarType(paramType);
+            if (as<IRPtrTypeBase>(paramType) && addrSpace == AddressSpace::Generic)
+            {
+                setPointerParamAddrSpace(builder, param, defaultAddrSpace);
+                addrSpace = defaultAddrSpace;
+                changed = true;
+            }
+            paramAddrSpaces.add(addrSpace);
+        }
+        if (changed)
+            fixUpFuncType(func);
+        functionSpecializations.add(FuncSpecializationKey(func, paramAddrSpaces), func);
     }
 
     // Returns the concrete address space of a pointer-typed value once specialization has
@@ -664,6 +706,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     void processModule()
     {
+        auto exportedParamDefaultAddrSpace =
+            addrSpaceAssigner->getDefaultAddressSpaceForExportedFunctionParam();
+
         for (auto globalInst : module->getGlobalInsts())
         {
             auto addrSpace = getLeafInstAddressSpace(globalInst);
@@ -675,6 +720,26 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             {
                 if (func->findDecoration<IREntryPointDecoration>())
                     workList.add(func);
+            }
+        }
+
+        // An exported function (one with `IRHLSLExportDecoration`) is emitted even when no entry
+        // point reaches it, so it is a root of the work list and its `Generic` pointer parameters
+        // take the target's default. Exports without pointer parameters are visited too, because
+        // their bodies may call functions that have them. A declaration without a body has no
+        // parameters to retype. An export that nothing calls is never a removal candidate, while
+        // the sweep at the end removes a called export once all of its calls target clones, so a
+        // called export is emitted only in the specializations its calls use.
+        if (exportedParamDefaultAddrSpace != AddressSpace::Generic)
+        {
+            for (auto globalInst : module->getGlobalInsts())
+            {
+                auto func = as<IRFunc>(globalInst);
+                if (!func || !func->getFirstBlock() ||
+                    !func->findDecoration<IRHLSLExportDecoration>())
+                    continue;
+                seedExportedFunc(func, exportedParamDefaultAddrSpace);
+                workList.add(func);
             }
         }
 
@@ -722,11 +787,31 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         applyAddressSpaceToInstType();
 
+        // A candidate's body can hold the last call to another candidate, for example an original
+        // `G` that still calls the original `F` after the entry point's calls to both were
+        // redirected to clones. We sweep to a fixpoint so the result does not depend on the order
+        // of the candidates.
+        List<IRFunc*> candidates;
         for (IRFunc* func : functionsToConsiderRemoving)
         {
             SLANG_ASSERT(!func->findDecoration<IREntryPointDecoration>());
-            if (!func->hasUses())
+            candidates.add(func);
+        }
+        for (bool removedAny = true; removedAny;)
+        {
+            removedAny = false;
+            for (Index i = 0; i < candidates.getCount();)
+            {
+                auto func = candidates[i];
+                if (func->hasUses())
+                {
+                    i++;
+                    continue;
+                }
                 func->removeAndDeallocate();
+                candidates.fastRemoveAt(i);
+                removedAny = true;
+            }
         }
     }
 };
@@ -815,6 +900,11 @@ AddressSpace NoOpInitialAddressSpaceAssigner::getAddressSpaceFromVarType(IRInst*
 }
 
 AddressSpace NoOpInitialAddressSpaceAssigner::getLeafInstAddressSpace(IRInst*)
+{
+    return AddressSpace::Generic;
+}
+
+AddressSpace InitialAddressSpaceAssigner::getDefaultAddressSpaceForExportedFunctionParam()
 {
     return AddressSpace::Generic;
 }
