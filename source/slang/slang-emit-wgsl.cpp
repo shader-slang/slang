@@ -214,14 +214,46 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
 
             {
                 Int sizeAlongAxis[kThreadGroupAxisCount];
-                getComputeThreadGroupSize(irFunc, sizeAlongAxis);
+                Int specializationConstantIds[kThreadGroupAxisCount];
+                auto numThreadsDecor =
+                    getComputeThreadGroupSize(irFunc, sizeAlongAxis, specializationConstantIds);
 
+                // A specialization-constant axis names its `override`, so the pipeline can set
+                // the workgroup size. WGSL requires every `@workgroup_size` argument to have the
+                // same type, so we keep literal axes as bare abstract-int literals (which convert
+                // to either i32 or u32) and convert a `u32` override to `i32`.
+                // We pick `i32` because semantic checking canonicalizes `[numthreads]` extents
+                // to `int` and `WorkgroupSize()` returns `int3`. After enum lowering the only
+                // other override type valid in `@workgroup_size` is `u32`, so any other type (a
+                // 64-bit spec constant) is reported as unsupported.
                 m_writer->emit("@workgroup_size(");
                 for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
                 {
                     if (ii != 0)
                         m_writer->emit(", ");
-                    m_writer->emit(sizeAlongAxis[ii]);
+                    if (specializationConstantIds[ii] < 0)
+                    {
+                        m_writer->emit(sizeAlongAxis[ii]);
+                        continue;
+                    }
+                    auto specConst = numThreadsDecor->getOperand(ii);
+                    switch (specConst->getDataType()->getOp())
+                    {
+                    case kIROp_IntType:
+                        m_writer->emit(getName(specConst));
+                        break;
+                    case kIROp_UIntType:
+                        m_writer->emit("i32(");
+                        m_writer->emit(getName(specConst));
+                        m_writer->emit(")");
+                        break;
+                    default:
+                        getSink()->diagnose(
+                            Diagnostics::UnsupportedSpecializationConstantForNumThreads{
+                                .location = numThreadsDecor->sourceLoc});
+                        m_writer->emit(getName(specConst));
+                        break;
+                    }
                 }
                 m_writer->emit(")\n");
             }
@@ -841,6 +873,12 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
+    // A specialization constant is emitted as an `override`, and an expression that reads one is an
+    // override-expression, which a WGSL `const` initializer cannot hold. Both the constant and the
+    // module-scope values computed from it (e.g. `i32(kX)` in a `WorkgroupSize()` vector) carry the
+    // spec-const rate, so this check also comes before the module-scope test below.
+    if (isSpecConstRateType(inst->getFullType()))
+        return false;
     if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
