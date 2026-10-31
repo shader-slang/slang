@@ -771,7 +771,20 @@ Modifier* SemanticsVisitor::validateAttribute(
             return nullptr;
         }
 
-        simpleLayoutAttr->value = int32_t(value->getValue());
+        // A `[vk::offset]` value is a byte offset, so it cannot be negative, and it must fit
+        // the `int32_t` that stores it below. The other attributes of this branch are indices,
+        // which this range check does not cover.
+        auto intValue = value->getValue();
+        if (as<VkStructOffsetAttribute>(attr) && (intValue < 0 || intValue > INT32_MAX))
+        {
+            getSink()->diagnose(Diagnostics::VkOffsetOutOfRange{
+                .maxOffset = INT32_MAX,
+                .offset = intValue,
+                .attr = attr});
+            return nullptr;
+        }
+
+        simpleLayoutAttr->value = int32_t(intValue);
     }
     else if (auto maxVertexCountAttr = as<MaxVertexCountAttribute>(attr))
     {
@@ -1537,10 +1550,14 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     // only checking the syntax class. Perform more checks here.
     switch (attr->astNodeType)
     {
-    // Allowed only on struct fields.
+    // Allowed only on struct fields and on function parameters. A function parameter
+    // is accepted here because any function can become an entry point later, through
+    // `-entry` or the API; `validateEntryPoint` rejects the attribute on a varying
+    // entry-point parameter, where it has no uniform data to place.
     case ASTNodeType::VkStructOffsetAttribute:
         auto targetDecl = as<Decl>(effectiveAttrTarget);
-        validTarget = validTarget && targetDecl && as<StructDecl>(getParentDecl(targetDecl));
+        validTarget = validTarget && targetDecl &&
+                      (as<StructDecl>(getParentDecl(targetDecl)) || as<ParamDecl>(targetDecl));
         break;
     };
 

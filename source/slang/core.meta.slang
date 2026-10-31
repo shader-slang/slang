@@ -4511,10 +4511,16 @@ attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 
-/// Declare offset for a struct field. Applies to all kinds of structs when targeting Vulkan.
-/// Applies only to structs that are directly used as interface blocks (such as push constants and uniforms)
-/// when targeting GLSL, as GLSL does not support the `offset` qualifier on regular structs.
-/// This attribute has no effect on other targets.
+/// Declare the byte offset of a struct field or of an entry-point `uniform` parameter.
+/// On a struct field, the attribute applies to all kinds of structs when targeting Vulkan, and only to
+/// structs that are directly used as interface blocks (such as push constants and uniforms) when
+/// targeting GLSL, as GLSL does not support the `offset` qualifier on regular structs.
+/// On an entry-point `uniform` parameter of ordinary data type, the attribute places the parameter in the
+/// entry point's push constants, or in its shader record for ray-tracing stages, so that, for example, a
+/// vertex and a fragment entry point can use different bytes of one push-constant range. It has no
+/// effect on a parameter without ordinary data, such as a texture, or on a parameter of a function that
+/// is not used as an entry point.
+/// The attribute affects layout only when targeting SPIR-V or GLSL.
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_offset(index: int)] : VkStructOffsetAttribute;
 

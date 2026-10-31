@@ -2862,6 +2862,35 @@ err(
 --
 
 err(
+    "vk-offset-on-varying-entry-point-parameter",
+    31166,
+    "'[vk::offset]' on a varying entry-point parameter",
+    span { loc = "attr:Modifier", message = "'[vk::offset]' places uniform data, so it is not allowed on '~paramName:Name', which is a varying (stage input/output) parameter" }
+)
+
+err(
+    "vk-offset-out-of-range",
+    31167,
+    "'[vk::offset]' out of range",
+    span { loc = "attr:Modifier", message = "'[vk::offset]' requires a byte offset from 0 to ~maxOffset:Int, but the offset is ~offset:Int" }
+)
+
+err(
+    "vk-offset-misaligned",
+    31168,
+    "misaligned '[vk::offset]'",
+    span { loc = "attr:Modifier", message = "'[vk::offset(~offset:Int)]' must be a multiple of the parameter's alignment, ~alignment:Int" }
+)
+
+err(
+    "vk-offset-overlapping-parameters",
+    31169,
+    "overlapping entry-point uniform parameters",
+    span { loc = "param:Decl", message = "the uniform data of '~param' overlaps the uniform data of '~otherParam'" },
+    note { message = "see declaration of '~otherParam'", span { loc = "otherParam:Decl" } }
+)
+
+err(
     "unknown-stage-name",
     31100,
     "unknown stage name",
