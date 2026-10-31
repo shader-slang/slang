@@ -3377,6 +3377,12 @@ public:
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
 
+    /// Finds the higher-order conformance registered for the derivative synthesized by
+    /// `synFuncDecl`, without a recursive subtype search. Returns nullptr when none is registered.
+    SubtypeWitness* findSynthesizedHigherOrderDiffWitness(
+        SynthesizedFuncDecl* synFuncDecl,
+        Type* subType,
+        Type* superType);
     Type* getForwardDiffFuncInterfaceType(Type* baseType);
     Type* getBackwardDiffFuncInterfaceType(Type* baseType);
     Type* getBwdCallableBaseType(Type* baseType);

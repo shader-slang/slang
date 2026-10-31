@@ -13,7 +13,7 @@
 
 namespace Slang
 {
-void unzipDiffInsts(AutoDiffSharedContext* context, IRFunc* func);
+void unzipDiffInsts(AutoDiffSharedContext* context, DiagnosticSink* sink, IRFunc* func);
 
 IRFunc* splitApplyAndPropFuncs(
     AutoDiffSharedContext* autodiffContext,
