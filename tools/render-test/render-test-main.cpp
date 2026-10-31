@@ -696,13 +696,15 @@ struct AssignValsFromLayoutContext
             ComPtr<ITextureView> textureView;
             SLANG_RETURN_ON_FAIL(texture->getDefaultView(textureView.writeRef()));
 
-            // Determine access mode from the shader parameter's resource type
-            auto handleType = dstCursor.getTypeLayout()->getType();
-            auto resourceType = handleType->getElementType();
-            auto resourceAccess =
-                resourceType ? resourceType->getResourceAccess() : SLANG_RESOURCE_ACCESS_READ_WRITE;
+            // The `TEST_INPUT` kind decides the access: an `RWTexture*` input sets `isRWTexture`,
+            // which also chose the `UnorderedAccess` state (and so the texture's usage) above. The
+            // input kind must match the shader's handle type (`Texture2D.Handle` vs
+            // `RWTexture2D.Handle`), and render-test cannot check that here: on SPIR-V and D3D12
+            // the handle is reflected as a plain `uint2`, which carries no resource access.
+            DescriptorHandleAccess access = srcVal->textureDesc.isRWTexture
+                                                ? DescriptorHandleAccess::ReadWrite
+                                                : DescriptorHandleAccess::Read;
             DescriptorHandle handle;
-            DescriptorHandleAccess access = getDescriptorHandleAccess(resourceAccess);
 
             // Try to get descriptor handle - will fail on backends that don't support it
             auto result = textureView->getDescriptorHandle(access, &handle);
