@@ -739,7 +739,7 @@ void HLSLSourceEmitter::ensureCoopVecHlslPreludeForProfile()
 
 bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
-    auto diagnoseFloatAtommic = [&]()
+    auto diagnoseFloatAtomic = [&]()
     {
         getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
             .operation = "floating point atomic operation",
@@ -798,9 +798,9 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
-            if (inst->getDataType()->getOp() == kIROp_FloatType)
+            if (isFloatingType(inst->getDataType()))
             {
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
             }
             m_writer->emit("InterlockedAdd");
             m_writer->emit("(");
@@ -816,9 +816,9 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
-            if (inst->getDataType()->getOp() == kIROp_FloatType)
+            if (isFloatingType(inst->getDataType()))
             {
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
             }
             m_writer->emit("InterlockedAdd");
             m_writer->emit("(");
@@ -876,6 +876,10 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
+            if (isFloatingType(inst->getDataType()))
+            {
+                diagnoseFloatAtomic();
+            }
             m_writer->emit("InterlockedMin");
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
@@ -890,6 +894,10 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
+            if (isFloatingType(inst->getDataType()))
+            {
+                diagnoseFloatAtomic();
+            }
             m_writer->emit("InterlockedMax");
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
