@@ -2723,6 +2723,20 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(performForceInlining);
 
+    // Optionally inline functions that have one call site. This runs after the
+    // last force-inlining so that it sees the final call graph. A compile whose
+    // functions are its interface keeps them: a whole-program or incomplete
+    // library, and IR embedded for a downstream link. (Linking leaves an export
+    // decoration on most functions, so it cannot tell those apart by itself.)
+    auto& inlineOptions = targetProgram->getOptionSet();
+    if (inlineOptions.getBoolOption(CompilerOptionName::InlineSingleCallFunctions) &&
+        !inlineOptions.getBoolOption(CompilerOptionName::GenerateWholeProgram) &&
+        !inlineOptions.getBoolOption(CompilerOptionName::IncompleteLibrary) &&
+        !inlineOptions.getBoolOption(CompilerOptionName::EmbedDownstreamIR))
+    {
+        SLANG_PASS(performSingleCallSiteInlining);
+    }
+
     if (emitSpirvDirectly)
     {
         SLANG_PASS(performIntrinsicFunctionInlining);

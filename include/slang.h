@@ -1363,6 +1363,11 @@ typedef uint32_t SlangSizeT;
         // such as using uniform parameters as mutable temporaries. Has no effect on other dialects.
         EnableExtendedHLSLBackwardsCompatibility = 163,
 
+        // `bool`: Inline every function that has exactly one call site before emitting code, so
+        // downstream compilers (DXC, FXC, Tint) do not clone large bodies once per wrapper level.
+        // Off by default.
+        InlineSingleCallFunctions = 164,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
