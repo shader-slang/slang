@@ -4757,7 +4757,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return spvDebugLocalVar;
     }
 
-    // Returns true if a `DebugDeclare` ties `debugVar` to its storage.
+    // Returns true if a `DebugDeclare` ties `debugVar` to its storage. Such a debug variable is
+    // declared on that real storage, so it needs no `_dbgvar_` backing variable.
     static bool hasDebugDeclare(IRDebugVar* debugVar)
     {
         for (auto use = debugVar->firstUse; use; use = use->nextUse)

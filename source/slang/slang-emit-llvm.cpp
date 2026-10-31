@@ -101,7 +101,8 @@ static bool maybeGetName(CharSlice* linkageNameOut, CharSlice* prettyNameOut, IR
     return true;
 }
 
-// Returns true if a `DebugDeclare` names `inst` as the storage of a debug variable.
+// Returns true if a `DebugDeclare` names `inst` as the storage of a debug variable. Such a `var`
+// already has its debug variable, so we do not create a second local-variable record for it.
 static bool isDebugDeclareStorage(IRInst* inst)
 {
     for (auto use = inst->firstUse; use; use = use->nextUse)
