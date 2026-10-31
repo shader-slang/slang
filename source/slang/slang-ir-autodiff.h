@@ -675,7 +675,10 @@ bool isDiffInst(IRInst* inst);
 
 bool isDifferentialOrRecomputeBlock(IRBlock* block);
 
-void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc);
+// Give `destFunc`, a derivative of `srcFunc`, its own DebugFunction record and re-root the scope
+// tree its body inherited (rooted at `inheritedDebugRoot`, or nothing to re-root when null) onto
+// it. Call it once `destFunc`'s name hint and data type are final and its body is complete.
+void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc, IRInst* inheritedDebugRoot);
 
 void copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc);
 
