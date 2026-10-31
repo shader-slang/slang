@@ -1588,6 +1588,57 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
+    // Whether a store of `type` at this offset is a `half2` or `half4` that `emitLegalStore`
+    // writes as whole 32-bit words (see its vector case), because the offset is known to be a
+    // multiple of 4.
+    bool isWholeWordHalfPairStore(
+        IRType* type,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment)
+    {
+        if (!m_options.storeAlignedHalfPairsAsWords)
+            return false;
+        auto vecType = as<IRVectorType>(type);
+        if (!vecType || vecType->getElementType()->getOp() != kIROp_HalfType)
+            return false;
+        auto elementCount = as<IRIntLit>(vecType->getElementCount());
+        if (!elementCount || (elementCount->getValue() != 2 && elementCount->getValue() != 4))
+            return false;
+        return isWideAccessAligned(baseOffset, immediateOffset, alignment, 4);
+    }
+
+    // Whether storing `type` at this offset stores a scalar smaller than
+    // `minimumStoreScalarSize` on its own. Struct fields are checked at their own offsets, so
+    // a word-aligned `half2` field is written as a whole word. Arrays and matrices are checked
+    // by their element type only.
+    bool needsSubWordStore(
+        IRType* type,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment)
+    {
+        if (isWholeWordHalfPairStore(type, baseOffset, immediateOffset, alignment))
+            return false;
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                IRIntegerValue fieldOffset;
+                if (SLANG_FAILED(getOffset(m_targetProgram, field, &fieldOffset)))
+                    return containsScalarSmallerThan(type, m_options.minimumStoreScalarSize);
+                if (needsSubWordStore(
+                        field->getFieldType(),
+                        baseOffset,
+                        immediateOffset + fieldOffset,
+                        alignment))
+                    return true;
+            }
+            return false;
+        }
+        return containsScalarSmallerThan(type, m_options.minimumStoreScalarSize);
+    }
+
     void processStore(IRInst* store)
     {
         // Just as for loads, the logic for stores is base on the type
@@ -1607,7 +1658,7 @@ struct ByteAddressBufferLegalizationContext
         // can lose a concurrent write to the other bytes. Report it here, where the store
         // still has its source location, instead of failing later on the 8/16-bit types.
         if (m_options.minimumStoreScalarSize > 0 &&
-            containsScalarSmallerThan(type, m_options.minimumStoreScalarSize))
+            needsSubWordStore(type, store->getOperand(1), 0, store->getOperand(2)))
         {
             m_sink->diagnose(Diagnostics::ByteAddressBufferSubWordStoreNotSupportedInWgsl{
                 .type = type,
@@ -1796,6 +1847,35 @@ struct ByteAddressBufferLegalizationContext
         {
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
+                // A `half2` or `half4` at an offset known to be a multiple of 4 covers whole 32-bit
+                // words, so each pair of halves can be stored as one word. Storing the halves one
+                // by one would need a read-modify-write of each word, which races with another
+                // invocation that writes the other half of the same word.
+                const IRIntegerValue elementCount = elementCountInst->getValue();
+                if (isWholeWordHalfPairStore(type, baseOffset, immediateOffset, alignment))
+                {
+                    auto pairType = m_builder.getVectorType(vecType->getElementType(), 2);
+                    for (IRIntegerValue i = 0; i < elementCount; i += 2)
+                    {
+                        IRInst* pair = value;
+                        if (elementCount != 2)
+                        {
+                            IRInst* halves[] = {
+                                m_builder.emitElementExtract(value, i),
+                                m_builder.emitElementExtract(value, i + 1)};
+                            pair = m_builder.emitMakeVector(pairType, 2, halves);
+                        }
+                        auto word = m_builder.emitBitCast(m_builder.getUIntType(), pair);
+                        SLANG_RETURN_ON_FAIL(emitSimpleStore(
+                            m_builder.getUIntType(),
+                            buffer,
+                            baseOffset,
+                            immediateOffset + i * 2,
+                            word));
+                    }
+                    return SLANG_OK;
+                }
+
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,

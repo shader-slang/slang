@@ -20,9 +20,14 @@ struct ByteAddressBufferLegalizationOptions
     /// that support `half` but have no 16-bit integer types (e.g. WGSL). It only affects loads.
     /// It requires `useBitCastFromUInt` and `lowerBasicTypeOps`, and not
     /// `translateToStructuredBufferOps`, because the word is read with a plain
-    /// `ByteAddressBufferLoad` of a `uint`. `half` stores are unchanged: their read-modify-write
-    /// of the containing word starts by bit-casting the `half` to a 16-bit integer.
+    /// `ByteAddressBufferLoad` of a `uint`.
     bool loadHalfFrom32BitWords = false;
+
+    /// Store a `vector<half, 2>` or `vector<half, 4>` whose offset is known to be a multiple of
+    /// 4 as whole 32-bit words: each pair of halves is bit-cast to a `uint` and stored, with no
+    /// read-modify-write. This is for targets whose byte-address buffers are arrays of 32-bit
+    /// words and that have no 16-bit integer types (WGSL). Other `half` stores are unchanged.
+    bool storeAlignedHalfPairsAsWords = false;
 
     /// Causes all calls to `getEquivlentStructuredBuffer` to return a `ByteAddressBuffer` (this)
     /// instead of a `StructuredBuffer`. This option is used for targets that do not distinctly
