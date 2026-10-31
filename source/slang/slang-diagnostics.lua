@@ -6051,6 +6051,20 @@ err(
     span { loc = "location", message = "Specialization constants are not supported in the 'numthreads' attribute for the current target." }
 )
 
+err(
+    "specialization-constant-sized-array-not-supported",
+    55222,
+    "array sized by a specialization constant is not supported on this target",
+    span { loc = "location", message = "target '~target:CodeGenTarget' cannot size an array with a specialization constant; such arrays are supported on SPIR-V and GLSL, and on WGSL only as the outermost dimension of a 'groupshared' variable whose element type has a fixed size." }
+)
+
+err(
+    "specialization-constant-sized-array-initializer-not-supported",
+    55223,
+    "an array sized by a specialization constant cannot be initialized from a list",
+    span { loc = "location", message = "this array is initialized from a list, which would need one value per element, but its size is a specialization constant; no target can express that, so assign the elements in a loop instead." }
+)
+
 fatal(
     "generic-specialization-recursion-cycle",
     55206,

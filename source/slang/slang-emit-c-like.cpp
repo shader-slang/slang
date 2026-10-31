@@ -835,7 +835,11 @@ void CLikeSourceEmitter::emitVal(IRInst* val, EmitOpInfo const& outerPrec)
     }
     else
     {
-        emitInstExpr(val, outerPrec);
+        // A value operand of a type (an array size, a matrix dimension, a generic value argument)
+        // is usually a literal, which `emitOperand` folds exactly as `emitInstExpr` would. It can
+        // also be a declaration, such as the specialization constant `kTile` in `float[kTile]`,
+        // which is printed by name rather than by its definition.
+        emitOperand(val, outerPrec);
     }
 }
 

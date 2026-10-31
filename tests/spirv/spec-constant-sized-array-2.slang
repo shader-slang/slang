@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-via-glsl
 
 // CHECK: %[[C0:[0-9A-Za-z_]+]] = OpSpecConstant %int 32
 // CHECK: %[[I2:[0-9A-Za-z_]+]] = OpConstant %int 2
@@ -8,6 +10,10 @@
 // CHECK: %[[COP2:[0-9A-Za-z_]+]] = OpSpecConstantOp %int IAdd %[[COP0]] %[[COP1]]
 // CHECK: %[[ARR_TYPE:[0-9A-Za-z_]+]] = OpTypeArray %float %[[COP2]]
 // CHECK: %[[PT_TYPE:[0-9A-Za-z_]+]] = OpTypePointer Function %[[ARR_TYPE]]
+
+// GLSL: const int [[SIZE:_S[0-9]+]] = constValue0_0 / 2 + (constValue0_0 >> 2);
+// GLSL: float {{ *}}g_buffer_0{{\[}}[[SIZE]]{{\]}};
+// GLSL: float {{ *}}buffer_0{{\[}}[[SIZE]]{{\]}};
 
 [SpecializationConstant]
 const int constValue0 = 32;
