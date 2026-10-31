@@ -3,8 +3,10 @@
 #include "core/slang-math.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-util.h"
 #include "slang-legalize-types.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-target.h"
 
 namespace Slang
@@ -36,6 +38,12 @@ struct AnyValueMarshallingContext
 {
     IRModule* module;
     TargetProgram* targetProgram;
+    DiagnosticSink* sink;
+
+    // Locations already reported for an unmarshalable type. A pack and its matching unpack
+    // usually share a location, and a user struct is reported at its declaration, so each
+    // place is diagnosed once however many pack/unpack insts lead to it.
+    HashSet<SourceLoc::RawValue> reportedUnmarshalableLocs;
 
     // We will use a single work list of instructions that need
     // to be considered for lowering.
@@ -43,8 +51,12 @@ struct AnyValueMarshallingContext
     InstWorkList workList;
     InstHashSet workListSet;
 
-    AnyValueMarshallingContext(IRModule* module, TargetProgram* targetProgram)
-        : module(module), targetProgram(targetProgram), workList(module), workListSet(module)
+    AnyValueMarshallingContext(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
+        : module(module)
+        , targetProgram(targetProgram)
+        , sink(sink)
+        , workList(module)
+        , workListSet(module)
     {
     }
 
@@ -1337,6 +1349,65 @@ struct AnyValueMarshallingContext
         return funcSet;
     }
 
+    // Return true if `type` holds a combined texture-sampler (`Sampler2D`, or a
+    // `DescriptorHandle` to one) in storage that marshalling would pack into the AnyValue.
+    //
+    // On Metal, `lowerCombinedTextureSamplers` runs after this pass and turns a combined
+    // texture-sampler into a `{ texture, sampler }` struct of two 64-bit resource IDs. Here
+    // it is still one texture type that the IR layout sizes at 8 bytes, so a descriptor
+    // handle to it would be cast to and from a single `ulong`, which is not valid MSL for
+    // that struct. Combined texture-samplers are not supported on Metal (#11540), so we
+    // report the type as unmarshalable instead.
+    bool containsUnmarshalableCombinedTextureSampler(IRType* type)
+    {
+        if (!isMetalTarget(targetProgram->getTargetReq()))
+            return false;
+
+        if (auto descriptorHandleType = as<IRDescriptorHandleType>(type))
+            type = descriptorHandleType->getResourceType();
+
+        if (isCombinedTextureSamplerType(type))
+            return true;
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                if (containsUnmarshalableCombinedTextureSampler(field->getFieldType()))
+                    return true;
+            }
+            return false;
+        }
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+            return containsUnmarshalableCombinedTextureSampler(arrayType->getElementType());
+        return false;
+    }
+
+    // Return whether `type` cannot be marshalled for the current target, reporting E41014
+    // the first time each location is seen. Every AnyValue producer (dynamic dispatch,
+    // `reinterpret`, `Result` lowering) ends in a pack or unpack handled by this pass, so a check
+    // here covers all of them.
+    bool diagnoseIfUnmarshalable(IRType* type, IRInst* useSite)
+    {
+        if (!containsUnmarshalableCombinedTextureSampler(type))
+            return false;
+
+        // A struct declared in user code is reported at its declaration, as `canTypeBeStored`
+        // does for conformers. A type with no location of its own (a bare `Sampler2D.Handle`,
+        // an array of them, or a compiler-synthesized struct) is reported where it is packed
+        // or unpacked.
+        auto location = as<IRStructType>(type) && type->sourceLoc.isValid()
+                            ? type->sourceLoc
+                            : getDiagnosticPos(useSite);
+        if (reportedUnmarshalableLocs.add(location.getRaw()))
+        {
+            sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
+                .type = type,
+                .location = location,
+            });
+        }
+        return true;
+    }
+
     void processPackInst(IRPackAnyValue* packInst)
     {
         auto operand = packInst->getValue();
@@ -1352,6 +1423,9 @@ struct AnyValueMarshallingContext
             packInst->removeAndDeallocate();
             return;
         }
+
+        if (diagnoseIfUnmarshalable(operand->getDataType(), packInst))
+            return;
 
         auto func = ensureMarshallingFunc(operand->getDataType(), cast<IRAnyValueType>(resultType));
         IRBuilder builderStorage(module);
@@ -1376,6 +1450,9 @@ struct AnyValueMarshallingContext
             unpackInst->removeAndDeallocate();
             return;
         }
+
+        if (diagnoseIfUnmarshalable(resultType, unpackInst))
+            return;
 
         auto func = ensureMarshallingFunc(resultType, cast<IRAnyValueType>(operand->getDataType()));
         IRBuilder builderStorage(module);
@@ -1436,9 +1513,12 @@ struct AnyValueMarshallingContext
     }
 };
 
-void generateAnyValueMarshallingFunctions(IRModule* module, TargetProgram* targetProgram)
+void generateAnyValueMarshallingFunctions(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
-    AnyValueMarshallingContext context(module, targetProgram);
+    AnyValueMarshallingContext context(module, targetProgram, sink);
     context.processModule();
 }
 
