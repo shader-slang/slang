@@ -2,6 +2,13 @@
 
 set -euo pipefail
 
+# The documented-compiler-version check is advisory: every path exits 0. The ERR
+# trap turns an unexpected top-level `set -e` abort, which would otherwise fail the
+# CI step with no output (#13041), into a warning that names the failing command.
+# We leave out `set -E` on purpose: `extract_versions` expects `grep` no-matches
+# inside `$(...)`, and an inherited trap would fire on them.
+trap 'status=$?; echo "::warning::Compiler version check skipped: \"$BASH_COMMAND\" (line $LINENO) exited with status $status"; exit 0' ERR
+
 # File paths
 DOCS_FILE="docs/building.md"
 CMAKE_CACHE="build/CMakeCache.txt"
