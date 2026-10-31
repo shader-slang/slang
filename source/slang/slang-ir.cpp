@@ -3569,10 +3569,16 @@ IRInst* IRBuilder::emitDebugBuildIdentifier(
     IRInst* args[] = {getStringValue(buildIdentifier), getIntValue(getUIntType(), flags)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugBuildIdentifier, 2, args);
 }
-IRInst* IRBuilder::emitDebugCompilationUnit(IRInst* source)
+IRInst* IRBuilder::emitDebugCompilationUnit(IRInst* source, ArrayView<IRInst*> includedSources)
 {
-    IRInst* args[] = {source};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugCompilationUnit, 1, args);
+    ShortList<IRInst*> args;
+    args.add(source);
+    args.addRange(includedSources);
+    return emitIntrinsicInst(
+        getVoidType(),
+        kIROp_DebugCompilationUnit,
+        (UInt)args.getCount(),
+        args.getArrayView().getBuffer());
 }
 IRInst* IRBuilder::emitDebugLine(
     IRInst* source,
@@ -5131,6 +5137,9 @@ void ModuleLinkingInfo::_build(IRModule* module)
 
         if (as<IRGlobalParam>(inst))
             m_globalParams.add(inst);
+
+        if (as<IRDebugSource>(inst) || as<IRDebugCompilationUnit>(inst))
+            m_debugSourceRecords.add(inst);
 
         bool isHLSLExported = false;
         bool isKnownBuiltin = false;
