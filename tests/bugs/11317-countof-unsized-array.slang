@@ -14,5 +14,5 @@ void computeMain()
 {
     outBuf[0] = countof(gArr);
     //CHECK: invalid countof argument
-    //CHECK: argument to countof must be a type pack, tuple, value pack, or fixed-size array
+    //CHECK: argument to countof must be a type pack, tuple, value pack, fixed-size array, or enum type
 }
