@@ -61,6 +61,17 @@ base instance on WGSL, unlike on D3D, SPIR-V and Metal. WGSL has no base-instanc
 subtract, and `SV_StartInstanceLocation` is not supported.
 
 
+Diagnostic Filtering
+--------------------
+
+WGSL validators run a uniformity analysis and reject, for example, a subgroup operation that it
+cannot prove to be in uniform control flow. `-wgsl-diagnostic <severity>:<rule>` (API:
+`CompilerOptionName::WGSLDiagnostic`) emits a global `diagnostic(<severity>, <rule>);` directive to
+change the severity of such a rule for the whole module, e.g. `-wgsl-diagnostic
+off:subgroup_uniformity` or `-wgsl-diagnostic warning:derivative_uniformity`. The option can be
+repeated; for a repeated rule the last severity is used.
+
+
 Supported HLSL features when targeting WGSL
 -------------------------------------------
 

@@ -1910,6 +1910,36 @@ void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
     {
         m_writer->emit("requires immediate_address_space;\n");
     }
+
+    // `-wgsl-diagnostic <severity>:<rule>`: global diagnostic directives. Like `enable`, they
+    // must come before every declaration, including the prelude helpers emitted after this front
+    // matter. WGSL rejects two severities for one rule, so the last one given for a rule wins.
+    // Each value holds the rule in `stringValue` and the severity in `stringValue2`.
+    OrderedDictionary<String, String> severityByRule;
+    for (auto& value :
+         getTargetProgram()->getOptionSet().getArray(CompilerOptionName::WGSLDiagnostic))
+    {
+        // The command line validates its operand, but API option entries arrive unchecked.
+        if (!isValidWGSLDiagnosticFilter(
+                value.stringValue2.getUnownedSlice(),
+                value.stringValue.getUnownedSlice()))
+        {
+            getSink()->diagnose(Diagnostics::InvalidWgslDiagnosticFilter{
+                .severity = value.stringValue2,
+                .rule = value.stringValue,
+                .syntax = kWGSLDiagnosticFilterSyntax});
+            continue;
+        }
+        severityByRule[value.stringValue] = value.stringValue2;
+    }
+    for (auto& ruleAndSeverity : severityByRule)
+    {
+        m_writer->emit("diagnostic(");
+        m_writer->emit(ruleAndSeverity.value);
+        m_writer->emit(", ");
+        m_writer->emit(ruleAndSeverity.key);
+        m_writer->emit(");\n");
+    }
 }
 
 void WGSLSourceEmitter::emitIntrinsicCallExprImpl(

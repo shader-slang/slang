@@ -1106,6 +1106,7 @@ meanings of their `CompilerOptionValue` encodings.
 | MacroDefine        | Specifies a preprocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
 | Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
 | Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
+| WGSLDiagnostic     | WGSL only: emits a `diagnostic(<severity>, <rule>);` global directive. `stringValue0` encodes the rule name, an identifier or two separated by a period (e.g. `subgroup_uniformity`), and `stringValue1` the severity (`error`, `warning`, `info` or `off`). Invalid values are reported as errors. Can be repeated; for a repeated rule the last severity is used, and a target's entry overrides the session's. |
 | EnableExtendedHLSLBackwardsCompatibility | Enables [additional backwards-compatibility features for legacy HLSL](#backwards-compatibility-option-for-legacy-hlsl), such as uniform parameter temporaries. `intValue0` encodes a bool value. |
 | MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | MatrixLayoutRow    | Use row major matrix layout as default. `intValue0` encodes a bool value for the setting. |

@@ -87,6 +87,15 @@ struct SerializedOptionsData
 
 class Session;
 
+/// Is `severity`:`rule` a valid WGSL diagnostic filter (`-wgsl-diagnostic`,
+/// CompilerOptionName::WGSLDiagnostic)? The severity is one of `error`, `warning`, `info` or `off`;
+/// the rule is a WGSL identifier, or two identifiers separated by a period (e.g.
+/// `chromium.unreachable_code`).
+bool isValidWGSLDiagnosticFilter(UnownedStringSlice severity, UnownedStringSlice rule);
+
+/// The values `isValidWGSLDiagnosticFilter` accepts, for diagnostics.
+extern const char* const kWGSLDiagnosticFilterSyntax;
+
 struct CompilerOptionSet
 {
     void load(uint32_t count, const slang::CompilerOptionEntry* entries);
