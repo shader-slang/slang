@@ -129,6 +129,7 @@
 #include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-translate.h"
 #include "slang-ir-typeflow-specialize.h"
+#include "slang-ir-undefined-opaque-handle.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
 #include "slang-ir-user-type-hint.h"
@@ -2726,6 +2727,7 @@ Result linkAndOptimizeIR(
     if (emitSpirvDirectly)
     {
         SLANG_PASS(performIntrinsicFunctionInlining);
+        SLANG_PASS(eliminateUsesOfUndefinedOpaqueHandles);
     }
 
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
