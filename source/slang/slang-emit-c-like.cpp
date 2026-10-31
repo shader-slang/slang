@@ -4129,7 +4129,11 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func, const String& name)
 
     // A function declaration doesn't have any IR basic blocks,
     // and as a result it *also* doesn't have the IR `param` instructions,
-    // so we need to emit a declaration entirely from the type.
+    // so we emit the declaration from the type. The parameter names come
+    // from the name hints that header-only emit recorded before it removed
+    // the function's body, or are `_<i>` when there are none. A forward
+    // declaration of a function that keeps its body also uses `_<i>`; only
+    // header prototypes are read as API documentation.
 
     auto funcType = func->getDataType();
     auto resultType = func->getResultType();
@@ -4141,14 +4145,23 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func, const String& name)
 
     m_writer->emit("(");
     auto paramCount = funcType->getParamCount();
+    auto paramNameHints = m_headerFuncParamNameHints.tryGetValue(func);
+    SLANG_RELEASE_ASSERT(!paramNameHints || paramNameHints->getCount() == Index(paramCount));
     for (UInt pp = 0; pp < paramCount; ++pp)
     {
         if (pp != 0)
             m_writer->emit(", ");
 
         String paramName;
-        paramName.append("_");
-        paramName.append(Int32(pp));
+        if (paramNameHints && (*paramNameHints)[pp].getLength())
+        {
+            paramName = _generateUniqueName((*paramNameHints)[pp].getUnownedSlice());
+        }
+        else
+        {
+            paramName.append("_");
+            paramName.append(Int32(pp));
+        }
         auto paramType = funcType->getParamType(pp);
 
         emitParamType(paramType, paramName);
@@ -5515,8 +5528,21 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
         // remove body from all functions when emitting a header
         for (auto inst : module->getGlobalInsts())
         {
-            if (as<IRFunc>(inst))
+            if (auto func = as<IRFunc>(inst))
             {
+                // Removing the body also removes the `IRParam`s, so we record their
+                // name hints for `emitFuncDecl` to name the prototype's parameters.
+                if (func->getFirstBlock())
+                {
+                    List<String> paramNameHints;
+                    for (auto param : func->getParams())
+                    {
+                        auto nameHint = param->findDecoration<IRNameHintDecoration>();
+                        paramNameHints.add(nameHint ? String(nameHint->getName()) : String());
+                    }
+                    m_headerFuncParamNameHints.add(func, _Move(paramNameHints));
+                }
+
                 for (auto child : inst->getModifiableChildren())
                 {
                     if (as<IRBlock>(child))
