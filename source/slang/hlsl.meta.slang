@@ -18138,11 +18138,284 @@ ${
 } // WaveActiveProduct/WaveActiveProductSum.
 $}
 
+//@hidden:
+// Metal helpers for the wave intrinsics that MSL has no direct function for.
+//
+// `simd_ballot` returns one bit per lane in a 64-bit `simd_vote`. On SIMD-groups narrower than 64
+// lanes the bits above the SIMD-group width are undefined (MSL spec 4.1, section 6.10.2), so
+// `__metalBallotInWidth` clears them. Every Metal ballot goes through it, WaveActiveBallot
+// included; `__metal_simd_ballot` is the raw `simd_ballot`, and this is its only caller.
+[ForceInline]
+[require(metal, subgroup_ballot)]
+uint64_t __metalBallotInWidth(bool condition)
+{
+    const uint laneCount = WaveGetLaneCount();
+    const uint64_t validLanes =
+        laneCount >= 64 ? ~uint64_t(0) : ((uint64_t(1) << uint64_t(laneCount)) - uint64_t(1));
+    return __metal_simd_ballot(condition) & validLanes;
+}
+
+// The lanes below `lane` as a 64-bit lane mask. `lane` is a SIMD lane ID, so less than 64, which
+// keeps the shift `1 << lane` defined.
+[ForceInline]
+uint64_t __metalLanesBelow(uint lane)
+{
+    return (uint64_t(1) << uint64_t(lane)) - uint64_t(1);
+}
+
+// A `uint4` wave mask as a 64-bit lane mask. Metal SIMD-groups have at most 64 lanes, so the bits
+// of `.z` and `.w` name lanes that cannot exist; they are dropped, not reported.
+[ForceInline]
+uint64_t __metalWaveMaskToLanes(uint4 mask)
+{
+    return uint64_t(mask.x) | (uint64_t(mask.y) << uint64_t(32));
+}
+
+// The number of lanes set in a 64-bit lane mask, counted as two 32-bit halves so that the emitted
+// `popcount` calls take and return `uint`.
+[ForceInline]
+uint __metalCountLanes(uint64_t lanes)
+{
+    return countbits(uint(lanes & uint64_t(0xFFFFFFFF))) + countbits(uint(lanes >> uint64_t(32)));
+}
+
+// Metal's SIMD-group permute functions take no bool (MSL spec 4.1, section 6.10.2): compare bools
+// as 0/1.
+// These take only `bool`. They are generic so that a caller's `if (__isBool<T>())` branch still
+// type-checks for every `T`; the static_assert rejects a specialization with any other `T` that
+// survives that branch, so a non-bool value can never be converted or truncated silently.
+__generic<T : __BuiltinType>
+[ForceInline]
+[require(metal)]
+uint __metalBoolToUInt(T value)
+{
+    if (!__isBool<T>())
+        static_assert(false, "__metalBoolToUInt takes only bool");
+    return __metalBoolToUIntAsm(value);
+}
+__generic<T : __BuiltinType, let N : int>
+[ForceInline]
+[require(metal)]
+vector<uint, N> __metalBoolToUInt(vector<T, N> value)
+{
+    if (!__isBool<T>())
+        static_assert(false, "__metalBoolToUInt takes only bool");
+    return __metalBoolToUIntAsm(value);
+}
+__generic<T : __BuiltinType>
+[require(metal)]
+uint __metalBoolToUIntAsm(T value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "uint($0)";
+    }
+}
+__generic<T : __BuiltinType, let N : int>
+[require(metal)]
+vector<uint, N> __metalBoolToUIntAsm(vector<T, N> value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "$TR($0)";
+    }
+}
+
+// Metal emulation of WaveMatch (MSL has no partitioned SIMD-group functions).
+// On iteration `lane`, every active thread ballots whether its value equals the value of `lane`.
+// A thread keeps the ballot of the iteration where `lane` is its own lane: that is the set of
+// threads with the same value as itself. When `lane` is inactive, `simd_shuffle` returns an
+// undefined value, but that ballot is always discarded, since `lane == self` only holds for an
+// active thread. The current lane's bit is ORed in, because WaveMatch always includes the current
+// lane and a NaN component compares unequal to itself. The cost is one `simd_shuffle` and one
+// `simd_ballot` per lane of the SIMD-group.
+// Written once, for vectors; the scalar overload forwards through `vector<T, 1>`, which Metal emits
+// as a scalar.
+// Precondition: `T` is not `bool`. Callers convert bools to 0/1 `uint`, and a bool that reached
+// `WaveReadLaneAt` here would be rejected by its `__checkMetalShaderSubgroupType<T>()`.
+__generic<T : __BuiltinType>
+[ForceInline]
+[require(metal, subgroup_ballot)]
+uint4 __metalWaveMatch(T value)
+{
+    return __metalWaveMatch(vector<T, 1>(value));
+}
+__generic<T : __BuiltinType, let N : int>
+[ForceInline]
+[require(metal, subgroup_ballot)]
+uint4 __metalWaveMatch(vector<T, N> value)
+{
+    const uint self = WaveGetLaneIndex();
+    uint64_t result = 0;
+    for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
+    {
+        const uint64_t matching =
+            __metalBallotInWidth(all(value == WaveReadLaneAt(value, int(lane))));
+        if (lane == self)
+            result = matching | (uint64_t(1) << uint64_t(self));
+    }
+    return __metal_simd_vote_mask_to_uint4(result);
+}
+
+// Metal emulation of the WaveMultiPrefix scans.
+// A thread's scan combines the values of the lanes in its partition: the lanes set in `mask` that
+// are also active (`mask` may name inactive lanes, and `simd_shuffle` from an inactive lane is
+// undefined). An exclusive scan combines the partition lanes below the thread's lane; an inclusive
+// scan also combines the thread's own lane. Each helper reads every lane in turn with
+// `simd_shuffle` (through `WaveReadLaneAt`): one `simd_shuffle` per lane of the SIMD-group, plus
+// one `simd_ballot`.
+
+// The operation of a scan. The scan tables (`kWaveMultiPrefixSumProductNames`,
+// `kWaveMultiPrefixBitwiseNames`) select it through their `spirvName` column, which holds the
+// operation's name (the CUDA bitwise path uses that column the same way). Whether a scan is
+// inclusive comes from the tables' own `isInclusive` column.
+enum __MetalScanArithmeticOp
+{
+    Add,
+    Mul,
+};
+enum __MetalScanBitwiseOp
+{
+    And,
+    Or,
+    Xor,
+};
+
+// True if `lane` takes part in the scan of the thread at `currentLane`.
+// Precondition: `partitionLanes` is already intersected with the active lanes
+// (`__metalWaveMaskToLanes(mask) & __metalBallotInWidth(true)`), so the undefined `simd_shuffle`
+// result of an inactive lane never enters the scan.
+[ForceInline]
+bool __metalScanIncludesLane(uint64_t partitionLanes, uint lane, uint currentLane, bool isInclusive)
+{
+    const bool inPartition = ((partitionLanes >> uint64_t(lane)) & uint64_t(1)) != uint64_t(0);
+    return inPartition && (lane < currentLane || (isInclusive && lane == currentLane));
+}
+
+// Each operation's identity and combine step, side by side. The final `else` is the enum's last
+// enumerator, so every enumerator has a case and none falls through to a default.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+vector<T, N> __metalScanArithmeticIdentity(__MetalScanArithmeticOp op)
+{
+    if (op == __MetalScanArithmeticOp.Add)
+        return vector<T, N>(T(0));
+    else // Mul
+        return vector<T, N>(T(1));
+}
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+vector<T, N> __metalScanArithmeticCombine(
+    __MetalScanArithmeticOp op,
+    vector<T, N> a,
+    vector<T, N> b)
+{
+    if (op == __MetalScanArithmeticOp.Add)
+        return a + b;
+    else // Mul
+        return a * b;
+}
+
+// Both scans (arithmetic and bitwise) are written once, for vectors; the scalar overloads forward
+// through `vector<T, 1>`, which Metal emits as a scalar.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(metal, subgroup_shuffle)]
+vector<T, N> __metalWaveMultiPrefixArithmetic(
+    vector<T, N> value,
+    uint4 mask,
+    __MetalScanArithmeticOp op,
+    bool isInclusive)
+{
+    const uint currentLane = WaveGetLaneIndex();
+    const uint64_t partitionLanes = __metalWaveMaskToLanes(mask) & __metalBallotInWidth(true);
+    vector<T, N> result = __metalScanArithmeticIdentity<T, N>(op);
+    for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
+    {
+        const vector<T, N> other = WaveReadLaneAt(value, int(lane));
+        if (__metalScanIncludesLane(partitionLanes, lane, currentLane, isInclusive))
+            result = __metalScanArithmeticCombine(op, result, other);
+    }
+    return result;
+}
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(metal, subgroup_shuffle)]
+T __metalWaveMultiPrefixArithmetic(
+    T value,
+    uint4 mask,
+    __MetalScanArithmeticOp op,
+    bool isInclusive)
+{
+    return __metalWaveMultiPrefixArithmetic(vector<T, 1>(value), mask, op, isInclusive)[0];
+}
+
+// As above: each operation's identity and combine step, side by side, with the final `else` being
+// the enum's last enumerator.
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+vector<T, N> __metalScanBitwiseIdentity(__MetalScanBitwiseOp op)
+{
+    if (op == __MetalScanBitwiseOp.And)
+        return ~vector<T, N>(T(0));
+    else // Or, Xor
+        return vector<T, N>(T(0));
+}
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+vector<T, N> __metalScanBitwiseCombine(__MetalScanBitwiseOp op, vector<T, N> a, vector<T, N> b)
+{
+    if (op == __MetalScanBitwiseOp.And)
+        return a & b;
+    else if (op == __MetalScanBitwiseOp.Or)
+        return a | b;
+    else // Xor
+        return a ^ b;
+}
+
+// `T` is not `bool` here, although `__BuiltinLogicalType` includes it: the public
+// `WaveMultiPrefix*Bit*` functions first run `__shaderSubgroupPartitionedPreamble<T>()`, whose
+// `__checkMetalShaderSubgroupType<T>()` rejects bool with a static_assert. (WaveMatch and
+// WaveActiveAllEqual accept bool and compare it as 0/1, because HLSL defines them for bool.)
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(metal, subgroup_shuffle)]
+vector<T, N> __metalWaveMultiPrefixBitwise(
+    vector<T, N> value,
+    uint4 mask,
+    __MetalScanBitwiseOp op,
+    bool isInclusive)
+{
+    const uint currentLane = WaveGetLaneIndex();
+    const uint64_t partitionLanes = __metalWaveMaskToLanes(mask) & __metalBallotInWidth(true);
+    vector<T, N> result = __metalScanBitwiseIdentity<T, N>(op);
+    for (uint lane = 0; lane < WaveGetLaneCount(); lane++)
+    {
+        const vector<T, N> other = WaveReadLaneAt(value, int(lane));
+        if (__metalScanIncludesLane(partitionLanes, lane, currentLane, isInclusive))
+            result = __metalScanBitwiseCombine(op, result, other);
+    }
+    return result;
+}
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(metal, subgroup_shuffle)]
+T __metalWaveMultiPrefixBitwise(
+    T value,
+    uint4 mask,
+    __MetalScanBitwiseOp op,
+    bool isInclusive)
+{
+    return __metalWaveMultiPrefixBitwise(vector<T, 1>(value), mask, op, isInclusive)[0];
+}
+
+//@public:
+
 /// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_vote)]
 bool WaveActiveAllEqual(T value)
 {
     __target_switch
@@ -18151,6 +18424,14 @@ bool WaveActiveAllEqual(T value)
         __intrinsic_asm "subgroupAllEqual($0)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual";
+    case metal:
+        if (__isBool<T>())
+        {
+            // `simd_broadcast_first` takes no bool: compare as 0/1.
+            const uint asUint = __metalBoolToUInt(value);
+            return WaveActiveAllTrue(asUint == WaveReadLaneFirst(asUint));
+        }
+        return WaveActiveAllTrue(value == WaveReadLaneFirst(value));
     case spirv:
         return spirv_asm
         {
@@ -18165,7 +18446,7 @@ bool WaveActiveAllEqual(T value)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_vote)]
 bool WaveActiveAllEqual(vector<T,N> value)
 {
     __target_switch
@@ -18174,6 +18455,14 @@ bool WaveActiveAllEqual(vector<T,N> value)
         __intrinsic_asm "subgroupAllEqual($0)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual";
+    case metal:
+        if (__isBool<T>())
+        {
+            // `simd_broadcast_first` takes no bool: compare as 0/1.
+            const vector<uint, N> asUint = __metalBoolToUInt(value);
+            return WaveActiveAllTrue(all(asUint == WaveReadLaneFirst(asUint)));
+        }
+        return WaveActiveAllTrue(all(value == WaveReadLaneFirst(value)));
     case spirv:
         return spirv_asm
         {
@@ -18187,11 +18476,24 @@ bool WaveActiveAllEqual(vector<T,N> value)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_hlsl, subgroup_vote)]
+[require(metal, subgroup_vote)]
 bool WaveActiveAllEqual(matrix<T, N, M> value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveActiveAllEqual";
+    case metal:
+        {
+            // Every thread gets the same answer for each row, so all threads run the same votes.
+            // The SIMD-group vote comes first in the `&&` so that it runs for every row: written
+            // as `result && WaveActiveAllEqual(...)`, it would be skipped once a row fails, and a
+            // SIMD-group function must not run conditionally.
+            bool result = true;
+            [ForceUnroll]
+            for (int i = 0; i < N; i++)
+                result = WaveActiveAllEqual(value[i]) && result;
+            return result;
+        }
     default:
         return WaveMaskAllEqual(WaveGetActiveMask(), value);
     }
@@ -18282,7 +18584,7 @@ uint4 WaveActiveBallot(bool condition)
         __intrinsic_asm "subgroupBallot";
     case hlsl:
         __intrinsic_asm "WaveActiveBallot";
-    case metal: return __metal_simd_vote_mask_to_uint4(__metal_simd_ballot(condition));
+    case metal: return __metal_simd_vote_mask_to_uint4(__metalBallotInWidth(condition));
     case spirv:
         return spirv_asm
         {
@@ -19485,7 +19787,7 @@ matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_ballot)]
 uint WavePrefixCountBits(bool value)
 {
     __target_switch
@@ -19493,6 +19795,9 @@ uint WavePrefixCountBits(bool value)
     case glsl:
         __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($0))";
     case hlsl: __intrinsic_asm "WavePrefixCountBits($0)";
+    case metal:
+        return __metalCountLanes(
+            __metalBallotInWidth(value) & __metalLanesBelow(WaveGetLaneIndex()));
     case spirv:
         return spirv_asm
         {
@@ -19543,11 +19848,17 @@ uint4 WaveGetActiveMulti()
 /// @category wave
 __generic<T : __BuiltinType>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(metal, subgroup_ballot)]
 uint4 WaveMatch(T value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
+    case metal:
+        // Metal's `simd_shuffle` takes no bool: compare as 0/1.
+        if (__isBool<T>())
+            return __metalWaveMatch(__metalBoolToUInt(value));
+        return __metalWaveMatch(value);
     case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
     case spirv:
         return spirv_asm
@@ -19563,11 +19874,17 @@ uint4 WaveMatch(T value)
 
 __generic<T : __BuiltinType, let N : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(metal, subgroup_ballot)]
 uint4 WaveMatch(vector<T,N> value)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "WaveMatch";
+    case metal:
+        // Metal's `simd_shuffle` takes no bool: compare as 0/1.
+        if (__isBool<T>())
+            return __metalWaveMatch(__metalBoolToUInt(value));
+        return __metalWaveMatch(value);
     case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
     case spirv:
         return spirv_asm
@@ -19583,6 +19900,7 @@ uint4 WaveMatch(vector<T,N> value)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(metal, subgroup_ballot)]
 uint4 WaveMatch(matrix<T,N,M> value)
 {
     __target_switch
@@ -19590,6 +19908,7 @@ uint4 WaveMatch(matrix<T,N,M> value)
     case hlsl: __intrinsic_asm "WaveMatch";
     case glsl:
     case cuda:
+    case metal:
     case spirv:
         uint4 result = uint4(0xFFFFFFFF);
         [ForceUnroll]
@@ -19603,12 +19922,17 @@ uint4 WaveMatch(matrix<T,N,M> value)
 
 /// @category wave
 [require(cuda_hlsl, subgroup_partitioned)]
+[require(metal, subgroup_ballot)]
 uint WaveMultiPrefixCountBits(bool value, uint4 mask)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "_popc(__ballot_sync(($1).x, $0) & _getLaneLtMask())";
     case hlsl: __intrinsic_asm "WaveMultiPrefixCountBits";
+    case metal:
+        return __metalCountLanes(
+            __metalBallotInWidth(value) & __metalWaveMaskToLanes(mask) &
+            __metalLanesBelow(WaveGetLaneIndex()));
     }
 }
 
@@ -19903,6 +20227,7 @@ ${
 struct WaveMultiPrefixSumProductEntry
 {
     const char* name;
+    // The operation's name; the Metal path also uses it as the `__MetalScanArithmeticOp` enumerator.
     const char* spirvName;
     const char* spirvGroupOperation;
     const char* glslName;
@@ -19914,19 +20239,22 @@ struct WaveMultiPrefixSumProductEntry
     // They are implemented here by calling the exclusive implementation and performing an additional operations
     // with the current invocation's value. This works for all cases except for element-wise matrix multiplication.
     bool cudaMatrixVariantSupport;
+
+    // Whether the scan includes the invocation's own value (used by the Metal path).
+    bool isInclusive;
 };
 
 const WaveMultiPrefixSumProductEntry kWaveMultiPrefixSumProductNames[] =
 {
-    // name               spirvName  spirvGroupOperation         glslName        hlslName                         cudaName     cudaExtraOperation   cudaMatrixVariantSupport
-    { "InclusiveSum",     "Add",     "PartitionedInclusiveScanNV", "InclusiveAdd", "Sum($0, $1) + $0",              "Sum",       "+ $0",            false },
-    { "InclusiveProduct", "Mul",     "PartitionedInclusiveScanNV", "InclusiveMul", "Product($0, $1) * $0",          "Product",   "* $0",            false },
-    { "ExclusiveSum",     "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true  },
-    { "ExclusiveProduct", "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true  },
+    // name               spirvName  spirvGroupOperation         glslName        hlslName                         cudaName     cudaExtraOperation   cudaMatrixVariantSupport isInclusive
+    { "InclusiveSum",     "Add",     "PartitionedInclusiveScanNV", "InclusiveAdd", "Sum($0, $1) + $0",              "Sum",       "+ $0",            false,                   true },
+    { "InclusiveProduct", "Mul",     "PartitionedInclusiveScanNV", "InclusiveMul", "Product($0, $1) * $0",          "Product",   "* $0",            false,                   true },
+    { "ExclusiveSum",     "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true,                    false },
+    { "ExclusiveProduct", "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true,                    false },
 
     // These are HLSL SM 6.5 intrinsics and are equal to the exclusive variants.
-    { "Sum",              "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true  },
-    { "Product",          "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true  },
+    { "Sum",              "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true,                    false },
+    { "Product",          "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true,                    false },
 };
 
 for (auto opName : kWaveMultiPrefixSumProductNames) {
@@ -19936,11 +20264,18 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(metal, subgroup_shuffle)]
 T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case metal:
+        return __metalWaveMultiPrefixArithmetic(
+            value,
+            mask,
+            __MetalScanArithmeticOp.$(opName.spirvName),
+            $(opName.isInclusive ? "true" : "false"));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -19961,11 +20296,18 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(metal, subgroup_shuffle)]
 vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case metal:
+        return __metalWaveMultiPrefixArithmetic(
+            value,
+            mask,
+            __MetalScanArithmeticOp.$(opName.spirvName),
+            $(opName.isInclusive ? "true" : "false"));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -19984,6 +20326,7 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(metal, subgroup_shuffle)]
 matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
@@ -20264,6 +20607,8 @@ ${
 struct WaveMultiPrefixBitwiseEntry
 {
     const char* name;
+    // The operation's name; the CUDA path uses it in the prelude function's name, and the Metal
+    // path as the `__MetalScanBitwiseOp` enumerator.
     const char* spirvName;
     const char* spirvGroupOperation;
     const char* glslName;
@@ -20271,22 +20616,25 @@ struct WaveMultiPrefixBitwiseEntry
     const char* cudaExtraOperation;
 
     bool cudaMatrixVariantSupport;
+
+    // Whether the scan includes the invocation's own value (used by the Metal path).
+    bool isInclusive;
 };
 
 const WaveMultiPrefixBitwiseEntry kWaveMultiPrefixBitwiseNames[] =
 {
-    // name           spirvName     spirvGroupOperation            glslName       hlslName              cudaExtraOperation  cudaMatrixVariantSupport
-    { "InclusiveBitAnd", "And",     "PartitionedInclusiveScanNV", "InclusiveAnd", "And($0, $1) & $0",      "& $0",          false },
-    { "InclusiveBitOr",  "Or",      "PartitionedInclusiveScanNV", "InclusiveOr",  "Or($0, $1) | $0",       "| $0",          false },
-    { "InclusiveBitXor", "Xor",     "PartitionedInclusiveScanNV", "InclusiveXor", "Xor($0, $1) ^ $0",      "^ $0",          false },
-    { "ExclusiveBitAnd", "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true  },
-    { "ExclusiveBitOr",  "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true  },
-    { "ExclusiveBitXor", "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true  },
+    // name           spirvName     spirvGroupOperation            glslName       hlslName              cudaExtraOperation  cudaMatrixVariantSupport isInclusive
+    { "InclusiveBitAnd", "And",     "PartitionedInclusiveScanNV", "InclusiveAnd", "And($0, $1) & $0",      "& $0",          false,                   true },
+    { "InclusiveBitOr",  "Or",      "PartitionedInclusiveScanNV", "InclusiveOr",  "Or($0, $1) | $0",       "| $0",          false,                   true },
+    { "InclusiveBitXor", "Xor",     "PartitionedInclusiveScanNV", "InclusiveXor", "Xor($0, $1) ^ $0",      "^ $0",          false,                   true },
+    { "ExclusiveBitAnd", "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true,                    false },
+    { "ExclusiveBitOr",  "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true,                    false },
+    { "ExclusiveBitXor", "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true,                    false },
 
     // These are HLSL SM 6.5 intrinsics and are equal to the exclusive variants.
-    { "BitAnd",          "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true  },
-    { "BitOr",           "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true  },
-    { "BitXor",          "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true  },
+    { "BitAnd",          "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true,                    false },
+    { "BitOr",           "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true,                    false },
+    { "BitXor",          "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true,                    false },
 };
 
 for (auto opName : kWaveMultiPrefixBitwiseNames) {
@@ -20296,11 +20644,18 @@ __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(metal, subgroup_shuffle)]
 T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case metal:
+        return __metalWaveMultiPrefixBitwise(
+            value,
+            mask,
+            __MetalScanBitwiseOp.$(opName.spirvName),
+            $(opName.isInclusive ? "true" : "false"));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -20319,11 +20674,18 @@ __generic<T : __BuiltinLogicalType, let N : int>
 __spirv_version(1.3)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(metal, subgroup_shuffle)]
 vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case metal:
+        return __metalWaveMultiPrefixBitwise(
+            value,
+            mask,
+            __MetalScanBitwiseOp.$(opName.spirvName),
+            $(opName.isInclusive ? "true" : "false"));
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -20340,6 +20702,7 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[require(metal, subgroup_shuffle)]
 matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
 {
     __target_switch

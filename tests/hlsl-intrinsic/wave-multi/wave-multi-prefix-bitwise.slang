@@ -3,6 +3,8 @@
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -profile sm_6_5 -shaderobj
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -xslang -DCUDA
+// Metal emulates the scans with simd_shuffle; its SIMD-group functions take no 8- or 64-bit integers.
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -xslang -DMETAL
 
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly -xslang -DUSE_GLSL_SYNTAX
 
@@ -105,18 +107,20 @@ bool testBitwise(uint4 mask)
         & testVBitwise<int16_t, 2>(mask)
         & testVBitwise<int16_t, 3>(mask)
         & testVBitwise<int16_t, 4>(mask)
-        & test1Bitwise<int64_t>(mask)
-        & testVBitwise<int64_t, 2>(mask)
-        & testVBitwise<int64_t, 3>(mask)
-        & testVBitwise<int64_t, 4>(mask)
         & test1Bitwise<uint16_t>(mask)
         & testVBitwise<uint16_t, 2>(mask)
         & testVBitwise<uint16_t, 3>(mask)
         & testVBitwise<uint16_t, 4>(mask)
+#if !defined(METAL)
+        & test1Bitwise<int64_t>(mask)
+        & testVBitwise<int64_t, 2>(mask)
+        & testVBitwise<int64_t, 3>(mask)
+        & testVBitwise<int64_t, 4>(mask)
         & test1Bitwise<uint64_t>(mask)
         & testVBitwise<uint64_t, 2>(mask)
         & testVBitwise<uint64_t, 3>(mask)
         & testVBitwise<uint64_t, 4>(mask)
+#endif
 #endif
         ;
 }
