@@ -1,6 +1,7 @@
 // slang-check-conversion.cpp
 #include "slang-ast-synthesis.h"
 #include "slang-check-impl.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-rich-diagnostics.h"
 
 // This file contains semantic-checking logic for dealing
@@ -3457,6 +3458,18 @@ Expr* SemanticsVisitor::coerce(
         //
         return CreateImplicitCastExpr(m_astBuilder->getErrorType(), fromExpr);
     }
+
+    // Check whether the conversion creates a forbidden stage input or stage interface value.
+    //
+    //     void helper(in rt::MissInput<C> input) {}
+    //     helper({}); // Converting {} to MissInput<C> creates a fresh input.
+    //
+    // A fresh input has no invocation's payload or shader record to refer to. Passing an existing
+    // input to helper is allowed. Check the converted expression here, after _coerce succeeds.
+    // Overload resolution also calls _coerce to try conversions for candidates it may discard;
+    // reporting an error there could reject a call whose chosen overload needs no forbidden input.
+    if (PortableRT::diagnoseInvalidExpression(this, expr))
+        return CreateImplicitCastExpr(m_astBuilder->getErrorType(), expr);
 
     return expr;
 }

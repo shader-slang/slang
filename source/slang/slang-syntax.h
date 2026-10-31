@@ -112,6 +112,41 @@ inline int getVectorSize(VectorExpressionType* vecType)
     return 0;
 }
 
+// Unwraps one level of an array, pointer, optional, tuple or concrete type pack, passing each
+// element type to the callback. For a modified type, passes its base type. Stops and returns true
+// when the callback returns true; otherwise returns false.
+//
+// Consider `Optional<Ptr<int>>`: the callback receives `Ptr<int>`, and can call this helper
+// again to inspect `int`. Keeping recursion in the caller lets it stop at a container it accepts.
+// Tuple members come from its concrete type pack. This helper does not expand abstract packs.
+// This helper does not inspect struct fields or start declaration checking. Types outside the
+// cases listed above return false without calling the callback.
+template<typename F>
+bool unwrapTypeElements(Type* type, const F& callback)
+{
+    if (auto modifiedType = as<ModifiedType>(type))
+        return callback(modifiedType->getBase());
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return callback(arrayType->getElementType());
+    if (auto optionalType = as<OptionalType>(type))
+        return callback(optionalType->getValueType());
+    if (auto pointerType = as<PtrTypeBase>(type))
+        return callback(pointerType->getValueType());
+
+    // A tuple stores its members in a type pack, so both cases share the same loop.
+    if (auto tupleType = as<TupleType>(type))
+        type = tupleType->getTypePack();
+    if (auto typePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < typePack->getTypeCount(); ++i)
+        {
+            if (callback(typePack->getElementType(i)))
+                return true;
+        }
+    }
+    return false;
+}
+
 /// Represents what the compiler can currently prove about a variadic pack's cardinality.
 /// This is intentionally coarse-grained: we only track whether a pack is known to be empty,
 /// known to be non-empty, or still unknown.

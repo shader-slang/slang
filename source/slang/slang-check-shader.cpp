@@ -1,5 +1,6 @@
 // slang-check-shader.cpp
 #include "slang-check-impl.h"
+#include "slang-check-portable-ray-tracing.h"
 
 // This file encapsulates semantic checking logic primarily
 // related to shaders, including validating entry points,
@@ -925,7 +926,13 @@ bool isPrimaryDecl(CallableDecl* decl)
     return (!decl->primaryDecl) || (decl == decl->primaryDecl);
 }
 
-DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, DiagnosticSink* sink)
+// Finds a function by name, optionally sending only the not-found diagnostic to a separate sink.
+// Entry-point selection uses that sink while checking for a structural stage selection.
+DeclRef<FuncDecl> findFunctionDeclByName(
+    Module* translationUnit,
+    Name* name,
+    DiagnosticSink* sink,
+    DiagnosticSink* notFoundSink = nullptr)
 {
     DeclRef<FuncDecl> entryPointFuncDeclRef;
 
@@ -960,9 +967,10 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
     if (!entryPointFuncDeclRef)
     {
         auto translationUnitSyntax = translationUnit->getModuleDecl();
-        sink->diagnose(Diagnostics::EntryPointFunctionNotFound{
-            .name = name->text,
-            .location = translationUnitSyntax->loc});
+        (notFoundSink ? notFoundSink : sink)
+            ->diagnose(Diagnostics::EntryPointFunctionNotFound{
+                .name = name->text,
+                .location = translationUnitSyntax->loc});
     }
     return entryPointFuncDeclRef;
 }
@@ -970,6 +978,8 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
 // Is a entry pointer parmaeter of `type` always a uniform parameter?
 bool isUniformParameterType(Type* type)
 {
+    if (as<TraceProgramDescriptorType>(type))
+        return true;
     if (as<ResourceType>(type))
         return true;
     if (as<SubpassInputType>(type))
@@ -1820,13 +1830,28 @@ static void validateEntryPointCapabilities(
 {
     auto linkage = entryPoint->getLinkage();
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
+    CapabilitySet stageCapabilitySet{entryPoint->getProfile().getCapabilityName()};
+    if (entryPoint->isStructuralRayTracingEntryPoint())
+    {
+        // Conformance guarantees one input; read its type with the selected generic arguments.
+        auto astBuilder = linkage->getASTBuilder();
+        auto parameters = getParameters(astBuilder, entryPoint->getFuncDeclRef());
+        SLANG_RELEASE_ASSERT(parameters.getCount() == 1);
+        auto inputType = unwrapModifiedType(getType(astBuilder, parameters[0]));
+
+        // MissInput<C>, for example, declares the source miss-stage capabilities, including
+        // Metal's synthesized miss path. The native miss profile alone does not include Metal.
+        auto inputDecl = isDeclRefTypeOf<AggTypeDecl>(inputType).getDecl();
+        SLANG_RELEASE_ASSERT(inputDecl && inputDecl->inferredCapabilityRequirements);
+        stageCapabilitySet = CapabilitySet{inputDecl->inferredCapabilityRequirements};
+    }
+
     for (auto target : linkage->targets)
     {
         // Capability diagnostics for this target follow its options, so an option such as
         // IgnoreCapabilities set in the target's own compiler option entries applies here.
         auto& targetOptionSet = target->getOptionSet();
         auto targetCaps = target->getTargetCaps();
-        auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
         targetCaps.join(stageCapabilitySet);
         if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
         {
@@ -1978,6 +2003,47 @@ static void validateEntryPointCapabilities(
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 {
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
+    auto linkage = entryPoint->getLinkage();
+
+    if (entryPoint->isStructuralRayTracingEntryPoint())
+    {
+        // Conformance already checks invoke's signature. Its RT input is supplied by the
+        // compiler, so native uniform/varying parameter rules do not apply. The selected
+        // implementation must still support the requested target/profile.
+
+        // GenericMiss<MetalContext> requires Metal when MetalContext has [require(metal)],
+        // even if invoke has an empty body. Collect the selected reference's requirements
+        // with the same traversal used for ordinary generic entry points.
+        List<Decl*> referencedDecls;
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            getModule(entryPointFuncDecl),
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
+        auto entryPointInferredCaps = getDeclRefCapabilityRequirements(
+            &visitor,
+            entryPoint->getFuncDeclRef(),
+            referencedDecls);
+        entryPoint->setInferredCapabilityRequirements(
+            entryPointInferredCaps.freeze(linkage->getASTBuilder()));
+        validateEntryPointCapabilities(
+            entryPoint,
+            entryPointInferredCaps,
+            referencedDecls,
+            {},
+            sink);
+        return;
+    }
+
+    // Reject logical inputs before applying native parameter rules.
+    if (!sink->getErrorCount())
+    {
+        PortableRT::diagnoseInputInNativeEntryPoint(entryPoint, sink);
+        if (sink->getErrorCount())
+            return;
+    }
+
     auto stage = entryPoint->getStage();
 
     // TODO: We currently do minimal checking here, but this is the
@@ -2008,7 +2074,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto entryPointName = entryPointFuncDecl->getName();
 
     auto module = getModule(entryPointFuncDecl);
-    auto linkage = entryPoint->getLinkage();
 
     // An entry point is invoked by the pipeline, which has no channel for returning an error, so
     // it cannot declare `throws`. `getErrorCodeType` is used rather than reading `errorType`
@@ -2870,21 +2935,48 @@ bool resolveStageOfProfileWithEntryPoint(
 //
 RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPointReq)
 {
-    // The first step in validating the entry point is to find
-    // the (unique) function declaration that matches its name.
-    //
-    // TODO: We may eventually want/need to extend this to
-    // account for nested names like `SomeStruct.vsMain`, or
-    // indeed even to handle generics.
-    //
     auto compileRequest = entryPointReq->getCompileRequest();
     auto translationUnit = entryPointReq->getTranslationUnit();
     auto linkage = compileRequest->getLinkage();
     auto sink = compileRequest->getSink();
 
     auto entryPointName = entryPointReq->getName();
+    auto entryPointProfile = entryPointReq->getProfile();
+
+    // Consider `-entry SkyMiss`, where SkyMiss implements rt::IMissShader. Ordinary function
+    // lookup reports that no function has that name, but experimental lookup may still select
+    // the struct's checked invoke implementation. Hold only the not-found diagnostic until
+    // structural lookup has had a chance to recognize the struct. A name such as `SkyMiss.invoke`
+    // can already resolve to a function, but still selects that same structural conformance.
+    // Other lookup diagnostics must reach the real sink: `SkyMiss<1.5>` can warn when converting
+    // a generic argument to int, and structural lookup reuses the cached result without emitting
+    // that warning again.
+    DiagnosticSink notFoundSink(linkage->getSourceManager(), sink->getSourceLocationLexer(), sink);
     DeclRef<FuncDecl> entryPointFuncDeclRef =
-        findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
+        findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink, &notFoundSink);
+    bool foundStructuralStage = false;
+    Type* structuralStageType = nullptr;
+    if (linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+    {
+        auto structuralEntryPointFuncDeclRef = PortableRT::findEntryPointByName(
+            linkage,
+            translationUnit->getModule(),
+            entryPointName,
+            entryPointProfile,
+            sink,
+            &foundStructuralStage,
+            &structuralStageType);
+        if (foundStructuralStage)
+            entryPointFuncDeclRef = structuralEntryPointFuncDeclRef;
+    }
+
+    // A recognized structural type already supplies either the entry point or its own diagnostic.
+    if (!foundStructuralStage && notFoundSink.outputBuffer.getLength())
+    {
+        sink->diagnoseRaw(
+            notFoundSink.getErrorCount() ? Severity::Error : Severity::Warning,
+            notFoundSink.outputBuffer.getUnownedSlice());
+    }
 
     // Did we find a function declaration in our search?
     if (!entryPointFuncDeclRef)
@@ -2897,25 +2989,27 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     // to do at this point to filter out declarations that aren't
     // relevant to the selected profile for the entry point?
 
-    // We found something, and can start doing some basic checking.
-    //
-    // If the entry point specifies a stage via a `[shader("...")]` attribute,
-    // then we might be able to infer a stage for the entry point request if
-    // it didn't have one, *or* issue a diagnostic if there is a mismatch with the profile.
-
-    auto entryPointProfile = entryPointReq->getProfile();
-    resolveStageOfProfileWithEntryPoint(
-        entryPointProfile,
-        linkage->m_optionSet,
-        linkage->targets,
-        entryPointFuncDeclRef.getDecl(),
-        sink);
+    // Structural lookup already selects the stage from the conformance. Native function entries
+    // instead resolve their requested stage against the function's [shader] attribute.
+    if (!foundStructuralStage)
+    {
+        resolveStageOfProfileWithEntryPoint(
+            entryPointProfile,
+            linkage->m_optionSet,
+            linkage->targets,
+            entryPointFuncDeclRef.getDecl(),
+            sink);
+    }
     // TODO: Should we attach a `[shader(...)]` attribute to an
     // entry point that didn't have one, so that we can have
     // a more uniform representation in the AST?
 
     RefPtr<EntryPoint> entryPoint =
         EntryPoint::create(linkage, entryPointFuncDeclRef, entryPointProfile);
+    if (foundStructuralStage)
+    {
+        PortableRT::initializeEntryPoint(entryPoint, entryPointName, structuralStageType);
+    }
 
     // Now that we've *found* the entry point, it is time to validate
     // that it actually meets the constraints for the chosen stage/profile.
@@ -3346,7 +3440,6 @@ void FrontEndCompileRequest::checkEntryPoints()
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
     auto sink = getSink();
-
     // The validation of entry points here will be modal, and controlled
     // by whether the user specified any entry points directly via
     // API or command-line options.

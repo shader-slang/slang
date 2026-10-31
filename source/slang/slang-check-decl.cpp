@@ -17,6 +17,7 @@
 #include "slang-ast-iterator.h"
 #include "slang-ast-print.h"
 #include "slang-ast-synthesis.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-parser.h"
@@ -3097,6 +3098,12 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         validateArraySizeForVariable(varDecl);
     }
 
+    // Inferred variables and initialized unsized arrays finish here and skip body checking.
+    // Therefore, the body visitor will not check them for invalid RT builtin type use.
+    // Run that check here instead, now that their types and initializers are known.
+    if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
+        PortableRT::diagnoseInvalidVariableType(this, varDecl);
+
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
 
@@ -3856,6 +3863,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         //
         OverloadResolveContext overloadContext;
         overloadContext.loc = varDecl->nameAndLoc.loc;
+        // The implicit call has no written callee. Attribute its constructor reference to the
+        // variable too, so diagnostics on the selected constructor have a source location.
+        overloadContext.funcLoc = varDecl->nameAndLoc.loc;
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
         overloadContext.sourceScope = m_outerScope;
 
@@ -3934,6 +3944,10 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             }
         }
     }
+
+    // An input local must receive an existing view. Check after initialization has been chosen:
+    // `let copy = input` is valid, while an inserted default constructor still creates a new input.
+    PortableRT::diagnoseInvalidVariableType(this, varDecl);
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
 
@@ -6760,7 +6774,8 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
 bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
     Type* satisfyingType,
     DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
-    RefPtr<WitnessTable> witnessTable)
+    RefPtr<WitnessTable> witnessTable,
+    SourceLoc satisfyingDeclLoc)
 {
     if (auto declRefType = as<DeclRefType>(satisfyingType))
     {
@@ -6769,6 +6784,14 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
         if (declRefType->getDeclRef().getDecl()->hasModifier<ToBeSynthesizedModifier>())
             return false;
     }
+
+    PortableRT::diagnoseDuplicateSchemaEntries(
+        getASTBuilder(),
+        getSink(),
+        satisfyingType,
+        requiredAssociatedTypeDeclRef.getDecl(),
+        witnessTable->witnessedType,
+        satisfyingDeclLoc);
 
     // Register the satisfying type to the witness table. Any constraints
     // written on this associated type are sibling interface requirements, and
@@ -6881,7 +6904,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesTypeSatisfyAssociatedTypeRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
-                witnessTable);
+                witnessTable,
+                subAggTypeDeclRef.getDecl()->loc);
         }
     }
     else if (auto typedefDeclRef = memberDeclRef.as<TypeDefDecl>())
@@ -6896,7 +6920,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesTypeSatisfyAssociatedTypeRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
-                witnessTable);
+                witnessTable,
+                typedefDeclRef.getDecl()->loc);
         }
     }
     else if (auto propertyDeclRef = memberDeclRef.as<PropertyDecl>())
@@ -11735,6 +11760,11 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     }
 
     interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
+    PortableRT::checkStageRestrictions(
+        this,
+        superInterfaceDeclRef,
+        witnessTable,
+        inheritanceDecl->loc);
     return witnessTable;
 }
 
@@ -16805,7 +16835,10 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
+        PortableRT::diagnoseInvalidVariableType(this, paramDecl);
     }
+
+    PortableRT::diagnoseInvalidReturnType(getSink(), decl);
 
     maybeInferPrefixModifierForOperator(decl);
 
@@ -18238,6 +18271,7 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
 {
     SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
+    PortableRT::diagnoseInvalidPropertyType(getSink(), decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
 }
@@ -22303,6 +22337,34 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
+    // Collect the capabilities of the individual conformances in a type-pack proof.
+    // Consider this example:
+    //
+    //     [require(metal)] interface IMetalItem {}
+    //     struct Items<each T> where expand each T : IMetalItem
+    //     {
+    //         static const int count = countof(T);
+    //     }
+    //     [require(hlsl)] export int emptyCount() { return Items<>.count; }
+    //
+    // SemanticsVisitor::isSubtype uses getSubtypeWitnessPack to represent the empty pack's
+    // vacuously satisfied constraint. That canonical witness retains IMetalItem as its
+    // supertype, but has no element conformances requiring Metal. Visiting every operand
+    // would incorrectly restrict emptyCount to Metal. Visit the element witnesses instead:
+    // nonempty packs still propagate each conformance's capabilities, while an empty pack
+    // contributes none. General declaration-reference collection still visits the supertype
+    // because it remains part of the proof's identity.
+    void visitTypePackSubtypeWitness(TypePackSubtypeWitness* witness)
+    {
+        // Skip this witness if this capability checker has already visited it.
+        if (!this->visitedVals.add(witness))
+            return;
+
+        // Collect requirements from each element's conformance. getCount() excludes the pack
+        // type and constraint interface, so an empty pack adds no capability requirements.
+        for (Index i = 0; i < witness->getCount(); i++)
+            this->dispatchIfNotNull(witness->getWitness(i));
+    }
     // Join a user-defined derivative's capability requirements into the differentiating
     // function, gated on the derivative carrying an explicit `[require]`. The gate is
     // essential rather than cosmetic: the core module differentiates its own builtins
@@ -23344,6 +23406,13 @@ bool isOpaqueHandleType(Type* type)
 {
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
+    // Logical RT inputs are supplied by the compiler, like patch and stream inputs/outputs.
+    // Include them in the ordinary opaque-type checks so Optional cannot store them either.
+    if (PortableRT::getStageInputKind(isDeclRefTypeOf<AggTypeDecl>(type).getDecl()) !=
+        Stage::Unknown)
+        return true;
+    if (as<TraceProgramDescriptorType>(type))
+        return true;
     if (as<ResourceType>(type))
         return true;
     if (as<SamplerStateType>(type))

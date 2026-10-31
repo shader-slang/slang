@@ -5,13 +5,25 @@
 #
 # Neural module configuration
 # SLANG_STANDARD_MODULE_DIR_NAME is the output directory name for all the standard modules
-set(SLANG_STANDARD_MODULE_DIR_NAME "slang-standard-module-${SLANG_VERSION_NUMERIC}" CACHE STRING "Directory name for standard module")
+set(SLANG_STANDARD_MODULE_DIR_NAME
+    "slang-standard-module-${SLANG_VERSION_NUMERIC}"
+    CACHE STRING
+    "Directory name for standard module"
+)
 
 # SLANG_NEURAL_MODULE_FILE_NAME is the file name for the neural module
-set(SLANG_NEURAL_MODULE_FILE_NAME "neural.slang-module" CACHE STRING "module file name for neural module")
+set(SLANG_NEURAL_MODULE_FILE_NAME
+    "neural.slang-module"
+    CACHE STRING
+    "module file name for neural module"
+)
 
 # SLANG_WORKGRAPH_MODULE_FILE_NAME is the file name for the experimental workgraph module
-set(SLANG_WORKGRAPH_MODULE_FILE_NAME "workgraph.slang-module" CACHE STRING "module file name for workgraph module")
+set(SLANG_WORKGRAPH_MODULE_FILE_NAME
+    "workgraph.slang-module"
+    CACHE STRING
+    "module file name for workgraph module"
+)
 
 if(NOT "${SLANG_DISABLE_NOTE_IDS}" STREQUAL "")
     if(NOT SLANG_DISABLE_NOTE_IDS MATCHES "^[0-9]+(,[0-9]+)*$")
@@ -32,7 +44,11 @@ else()
 endif()
 
 # Set install directory using the platform-specific library directory
-set(SLANG_STANDARD_MODULE_INSTALL_DIR "${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}" CACHE STRING "Installation directory for standard modules")
+set(SLANG_STANDARD_MODULE_INSTALL_DIR
+    "${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}"
+    CACHE STRING
+    "Installation directory for standard modules"
+)
 
 #
 # Generate the standard module configuration header, this is used by the slang compiler to find the standard module
@@ -49,7 +65,10 @@ add_custom_target(
     DEPENDS
         "${CMAKE_CURRENT_BINARY_DIR}/slang-standard-module-config-header/slang-standard-module-config.h"
 )
-set_target_properties(generate_standard_module_config_header PROPERTIES FOLDER "generated")
+set_target_properties(
+    generate_standard_module_config_header
+    PROPERTIES FOLDER "generated"
+)
 
 # Build the neural module
 add_subdirectory(neural)
@@ -62,3 +81,6 @@ add_subdirectory(numerics)
 
 # Build the experimental functional module.
 add_subdirectory(functional)
+
+# Build the portable ray-tracing module.
+add_subdirectory(raytracing)

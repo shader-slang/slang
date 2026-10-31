@@ -1,6 +1,7 @@
 // slang-check-modifier.cpp
 #include "core/slang-char-util.h"
 #include "slang-check-impl.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-rich-diagnostics.h"
 
 // This file implements semantic checking behavior for
@@ -1294,13 +1295,29 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
 
-        ConstantIntVal* value = checkConstantEnumVal(attr->args[0]);
-        if (!value)
+        if (auto nameExpr = as<StringLiteralExpr>(attr->args[0]))
         {
-            return nullptr;
-        }
+            auto builtin = getKnownBuiltinDeclNameFromString(nameExpr->value.getUnownedSlice());
+            if (builtin == KnownBuiltinDeclName::COUNT)
+            {
+                getSink()->diagnose(Diagnostics::UnknownBuiltinName{
+                    .name = nameExpr->value,
+                    .location = nameExpr->token.loc});
+                return nullptr;
+            }
 
-        knownBuiltinAttr->name = value;
+            // For example, KnownBuiltin("RayTracingMissInput") stores the same integer ID
+            // as a numeric annotation. Later checks and serialization only need that value.
+            knownBuiltinAttr->name =
+                m_astBuilder->getIntVal(m_astBuilder->getIntType(), IntegerLiteralValue(builtin));
+        }
+        else
+        {
+            auto value = checkConstantEnumVal(attr->args[0]);
+            if (!value)
+                return nullptr;
+            knownBuiltinAttr->name = value;
+        }
     }
     else if (auto pyExportAttr = as<PyExportAttribute>(attr))
     {
@@ -1963,14 +1980,15 @@ Modifier* SemanticsVisitor::checkModifier(
 
     if (auto decl = as<Decl>(syntaxNode))
     {
-        // These modifiers bind a declaration to compiler-internal type / requirement
-        // registration and are valid only in the core module; drop them on a user declaration
-        // here at `ModifiersChecked`, before any `Type` for the declaration can be formed, so no
-        // downstream consumer sees them. (`__intrinsic_type` is not in this set: it only records
-        // an IR opcode and is valid user syntax.)
+        // Core builtin annotations require compiler-owned declaration shapes. Ordinary modules
+        // may instead select a ray-tracing stage interface or descriptor, whose shape is the
+        // checked declaration reference. Reject other builtin annotations before forming a Type,
+        // so downstream consumers never see unsupported shapes. `__intrinsic_type` only records
+        // an IR opcode and remains valid user syntax.
         if ((as<MagicTypeModifier>(m) || as<BuiltinTypeModifier>(m) ||
              as<BuiltinRequirementModifier>(m)) &&
-            !isFromCoreModule(decl))
+            !isFromCoreModule(decl) &&
+            !PortableRT::isBuiltinTypeModifier(as<MagicTypeModifier>(m), decl))
         {
             if (!ignoreUnallowedModifier)
                 getSink()->diagnose(Diagnostics::BuiltinOnlyModifierOnNonCoreDecl{.modifier = m});

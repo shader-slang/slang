@@ -1711,6 +1711,14 @@ A capability describes an optional feature that a target may or may not support.
 * `closesthit` 
 * `callable` 
 * `miss` 
+* `portable_raytracing_closesthit` 
+* `portable_raytracing_anyhit` 
+* `portable_raytracing_anyhit_closesthit` 
+* `portable_raytracing_intersection` 
+* `portable_raytracing_intersection_payload` 
+* `portable_raytracing_miss` 
+* `portable_raytracing_callable` 
+* `portable_raytracing_call_shader` 
 * `mesh` 
 * `task` 
 * `amplification` 
@@ -1721,6 +1729,8 @@ A capability describes an optional feature that a target may or may not support.
 * `anyhit_closesthit` 
 * `anyhit_intersection` 
 * `raygen_closesthit_miss` 
+* `portable_raytracing_trace` 
+* `portable_raytracing_instance_motion` 
 * `anyhit_closesthit_intersection` 
 * `anyhit_closesthit_intersection_miss` 
 * `raygen_closesthit_miss_callable` 

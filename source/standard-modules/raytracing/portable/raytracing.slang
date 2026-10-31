@@ -1,0 +1,15 @@
+/// Provides the experimental portable ray-tracing API.
+///
+/// @par Availability
+/// Requires an explicit `import slang.raytracing.portable` and the `-experimental-feature` option.
+/// Target adapter synthesis is deferred; API declarations remain available for frontend checking.
+[ExperimentalModule]
+module portable;
+
+__include "ray-types";
+__include "contexts";
+__include "stage-inputs";
+__include "stage-contracts";
+__include "program-schema";
+__include "descriptor";
+__include "trace";

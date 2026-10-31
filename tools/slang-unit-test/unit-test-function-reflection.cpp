@@ -18,6 +18,62 @@ static String getTypeFullName(slang::TypeReflection* type)
     return String((const char*)blob->getBufferPointer());
 }
 
+// Lookup on the importing module must find static methods supplied by an imported extension.
+// This uses the same findDeclFromString path as entry-name lookup, without requiring the method
+// to be an entry point declared in the importing module.
+SLANG_UNIT_TEST(functionReflectionImportedExtension)
+{
+    const char* librarySource = R"(
+        namespace Pixel
+        {
+            public struct MyType {}
+
+            public extension MyType
+            {
+                public static float4 Main(float4 color : COLOR) : SV_Target
+                {
+                    return color;
+                }
+            }
+        }
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto library = session->loadModuleFromSourceString(
+        "extensionLibrary",
+        "extensionLibrary.slang",
+        librarySource,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(library != nullptr);
+
+    auto consumer = session->loadModuleFromSourceString(
+        "consumer",
+        "consumer.slang",
+        "import extensionLibrary;",
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(consumer != nullptr);
+
+    auto layout = consumer->getLayout();
+    SLANG_CHECK_ABORT(layout != nullptr);
+    auto function = layout->findFunctionByName("Pixel.MyType.Main");
+    SLANG_CHECK_ABORT(function != nullptr);
+    SLANG_CHECK(UnownedStringSlice(function->getName()) == "Main");
+    SLANG_CHECK(function->getParameterCount() == 1);
+    SLANG_CHECK(getTypeFullName(function->getReturnType()) == "vector<float,4>");
+}
+
 static const char* kLanguageVersionOverloadSource = R"(
     module reflectionVersion;
 
