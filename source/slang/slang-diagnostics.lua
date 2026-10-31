@@ -1219,7 +1219,7 @@ standalone_note(
     "consider adding an OpCopyObject instruction to the end of the spirv_asm expression"
 )
 
-standalone_note(
+err(
     "no-such-address",
     29103,
     "unable to take the address of this address-of asm operand",
