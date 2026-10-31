@@ -137,6 +137,35 @@ struct ParseCommandLineArgsTestContext
     UnitTestContext* m_unitTestContext;
 };
 
+// A failed parse preserves the caller's existing session description so it remains usable;
+// the auxiliary allocation is cleared because no parsed data is returned.
+void checkParseFails(slang::IGlobalSession* globalSession, int argc, const char* const* argv)
+{
+    // Non-default starting values let the checks below tell an untouched output from one that was
+    // written. The allocation sentinel is released only if the call wrongly succeeds, in which case
+    // the call has replaced it with a real allocation.
+    const slang::TargetDesc callerTarget{};
+    const slang::CompilerOptionEntry callerEntry{};
+    slang::SessionDesc sessionDesc{};
+    sessionDesc.targets = &callerTarget;
+    sessionDesc.targetCount = 1;
+    sessionDesc.compilerOptionEntries = &callerEntry;
+    sessionDesc.compilerOptionEntryCount = 1;
+    ISlangUnknown* allocation = reinterpret_cast<ISlangUnknown*>(uintptr_t(1));
+
+    const SlangResult result =
+        globalSession->parseCommandLineArguments(argc, argv, &sessionDesc, &allocation);
+    SLANG_CHECK(SLANG_FAILED(result));
+    SLANG_CHECK(allocation == nullptr);
+    SLANG_CHECK(sessionDesc.targets == &callerTarget);
+    SLANG_CHECK(sessionDesc.targetCount == 1);
+    SLANG_CHECK(sessionDesc.compilerOptionEntries == &callerEntry);
+    SLANG_CHECK(sessionDesc.compilerOptionEntryCount == 1);
+
+    if (SLANG_SUCCEEDED(result))
+        allocation->release();
+}
+
 } // namespace
 
 SLANG_UNIT_TEST(parseCommandLineArgs)
@@ -146,4 +175,89 @@ SLANG_UNIT_TEST(parseCommandLineArgs)
     const auto result = context.runTests();
 
     SLANG_CHECK(SLANG_SUCCEEDED(result));
+}
+
+SLANG_UNIT_TEST(parseCommandLineArgsReportsParseErrors)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const char* missingTargetName[] = {"-target"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(missingTargetName), missingTargetName);
+
+    const char* unknownOption[] = {"-bogus-option"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(unknownOption), unknownOption);
+
+    const char* unknownTarget[] = {"-target", "bogus"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(unknownTarget), unknownTarget);
+
+    const char* missingProfileName[] = {"-profile"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(missingProfileName), missingProfileName);
+
+    // A profile that implies no target is rejected, as slangc rejects it (E00042): the session
+    // desc has no target to carry it, and `createSession` takes each target's profile from its
+    // `TargetDesc`.
+    const char* profileWithoutTarget[] = {"-profile", "spirv_1_6"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(profileWithoutTarget), profileWithoutTarget);
+
+    const char* conflictingProfiles[] = {"-profile", "sm_5_0", "-profile", "glsl_450"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(conflictingProfiles), conflictingProfiles);
+
+    // These errors are reported after all arguments have been read, at the end of the parse.
+    const char* optionBeforeTargets[] =
+        {"-floating-point-mode", "precise", "-target", "hlsl", "-target", "spirv"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(optionBeforeTargets), optionBeforeTargets);
+
+    const char* duplicateTarget[] = {"-target", "spirv", "-target", "hlsl", "-target", "spirv"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(duplicateTarget), duplicateTarget);
+
+    // Valid argument lists, with and without a target, still succeed, so the failures above come
+    // from the invalid arguments rather than from the API itself.
+    {
+        slang::SessionDesc sessionDesc{};
+        ComPtr<ISlangUnknown> allocation;
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            globalSession
+                ->parseCommandLineArguments(0, nullptr, &sessionDesc, allocation.writeRef())));
+        SLANG_CHECK(sessionDesc.targetCount == 0);
+    }
+    {
+        const char* argv[] = {"-target", "spirv"};
+        slang::SessionDesc sessionDesc{};
+        ComPtr<ISlangUnknown> allocation;
+        SLANG_CHECK(SLANG_SUCCEEDED(globalSession->parseCommandLineArguments(
+            SLANG_COUNT_OF(argv),
+            argv,
+            &sessionDesc,
+            allocation.writeRef())));
+        SLANG_CHECK(sessionDesc.targetCount == 1);
+        if (sessionDesc.targetCount == 1)
+            SLANG_CHECK(sessionDesc.targets[0].format == SLANG_SPIRV);
+    }
+}
+
+// A floating-point mode given without `-target` is not an error for this API: the session desc
+// carries it as a session option, so it applies to every target the caller adds to the session.
+SLANG_UNIT_TEST(parseCommandLineArgsKeepsTargetOptionsWithoutTarget)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const char* argv[] = {"-floating-point-mode", "precise"};
+    slang::SessionDesc sessionDesc{};
+    ComPtr<ISlangUnknown> allocation;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->parseCommandLineArguments(
+        SLANG_COUNT_OF(argv),
+        argv,
+        &sessionDesc,
+        allocation.writeRef())));
+    SLANG_CHECK(sessionDesc.targetCount == 0);
+
+    bool hasPreciseFloatingPointMode = false;
+    for (uint32_t i = 0; i < sessionDesc.compilerOptionEntryCount; ++i)
+    {
+        const auto& entry = sessionDesc.compilerOptionEntries[i];
+        if (entry.name == slang::CompilerOptionName::FloatingPointMode &&
+            entry.value.intValue0 == SLANG_FLOATING_POINT_MODE_PRECISE)
+            hasPreciseFloatingPointMode = true;
+    }
+    SLANG_CHECK(hasPreciseFloatingPointMode);
 }

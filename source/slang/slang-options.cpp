@@ -4638,9 +4638,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         }
         else
         {
-            // If the "default" target has had a profile (or other state)
-            // specified, but there is != 1 taget, then that state doesn't
-            // apply to anythign and we should give the user an error.
+            // With zero or multiple targets, state given for the "default" target may not
+            // apply to any target. We report it as an error unless that state is kept for
+            // targets added later, as described for each option below.
+            //
+            // A profile is reported in every mode. With no `-target`, the
+            // `IGlobalSession::parseCommandLineArguments` path cannot keep it, because
+            // `Linkage::addTarget` sets each target's profile from its `TargetDesc`.
             //
             if (m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
             {
@@ -4659,7 +4663,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
             }
 
-            if (defaultTargetFloatingPointMode != FloatingPointMode::Default)
+            // A floating-point mode with no `-target` is reported only for a command-line
+            // compile, which adds no target after parsing. An API caller keeps it: targets
+            // already on the linkage inherit it below, targets added later inherit it from
+            // `m_optionSetForDefaultTarget`, and `parseCommandLineArguments` returns it as a
+            // session option.
+            //
+            const bool isFloatingPointModeIgnored =
+                m_rawTargets.getCount() > 1 || m_requestImpl->m_isCommandLineCompile;
+
+            if (isFloatingPointModeIgnored &&
+                defaultTargetFloatingPointMode != FloatingPointMode::Default)
             {
                 if (m_rawTargets.getCount() == 0)
                 {

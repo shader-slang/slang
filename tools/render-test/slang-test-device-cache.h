@@ -27,6 +27,11 @@ public:
         uint32_t nvapiExtUavSlot;
         bool dx12ExperimentalFeatures;
 
+        // A device compiles with the global session it was created with, so it is reusable only
+        // for that session (render-test makes a separate one for tests that load their own core
+        // module). The device holds a reference to it, so the pointer stays unique while cached.
+        slang::IGlobalSession* slangGlobalSession;
+
         bool operator==(const DeviceCacheKey& other) const;
     };
 
