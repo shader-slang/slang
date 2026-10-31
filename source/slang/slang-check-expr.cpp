@@ -3321,6 +3321,221 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     return nullptr;
 }
 
+// The front end folds floating-point constants only so that reflection can report the
+// floating-point arguments of user-defined attributes, which `validateAttribute` records in
+// `Attribute::floatArgVals`; those arguments are never lowered to IR. Each node computes a
+// `double` from operands that are already exact values of the node's type, then rounds it to that
+// type. If a format has p significand bits, rounding an exact `+`, `-`, `*` or `/` result first to
+// a format with at least 2p + 2 bits and then to p bits gives the correctly rounded result, so
+// `double` (53 bits) is exact enough for `float` (24 bits), and `float` for `half` (11 bits).
+// We round to `half` through `float`, as `IRBuilder::getFloatValue` does for a `half` constant.
+
+/// Return `value` rounded to the precision of the floating-point type `baseType`. For example,
+/// `16777217.0` rounds to `16777216.0` as a `float` but is unchanged as a `double`.
+static FloatingPointLiteralValue roundToFloatingPointType(
+    FloatingPointLiteralValue value,
+    BaseType baseType)
+{
+    switch (baseType)
+    {
+    case BaseType::Half:
+        return HalfToFloat(FloatToHalf(float(value)));
+    case BaseType::Float:
+        return float(value);
+    case BaseType::Double:
+        return value;
+    default:
+        SLANG_UNEXPECTED("not a floating-point base type");
+    }
+}
+
+std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatExpr(
+    SubstExpr<Expr> expr,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
+    while (auto parenExpr = expr.as<ParenExpr>())
+        expr = getBaseExpr(parenExpr);
+
+    auto basicType = as<BasicExpressionType>(getType(m_astBuilder, expr));
+    if (!basicType || !(BaseTypeInfo::getInfo(basicType->getBaseType()).flags &
+                        BaseTypeInfo::Flag::FloatingPoint))
+        return std::nullopt;
+    const auto baseType = basicType->getBaseType();
+
+    std::optional<FloatingPointLiteralValue> value;
+    if (auto floatLitExpr = expr.as<FloatingPointLiteralExpr>())
+    {
+        value = floatLitExpr.getExpr()->value;
+    }
+    else if (auto builtinOpExpr = expr.as<BuiltinOperatorExpr>())
+    {
+        // Every operand of a floating-point arithmetic node has the node's type:
+        // `coerceOperandsOfBuiltinBinaryExpr` converts binary operands, and unary `-` keeps its
+        // operand's type. `convertToBuiltinArithmeticOp` gives `Neg` one operand and every other
+        // operator two, and only the operators below can give a floating-point result:
+        // comparisons give `bool`, and bitwise operators reject floating-point operands. A node
+        // that breaks either rule asserts, and declines to fold when assertions are disabled.
+        auto opExpr = builtinOpExpr.getExpr();
+        const Index operandCount = opExpr->arguments.getCount();
+        if (operandCount != (opExpr->op == BuiltinOperationKind::Neg ? 1 : 2))
+        {
+            SLANG_ASSERT_FAILURE("operand count does not match the builtin operator");
+            return std::nullopt;
+        }
+        FloatingPointLiteralValue operands[2];
+        for (Index i = 0; i < operandCount; ++i)
+        {
+            auto operandValue = tryConstantFoldFloatExpr(
+                SubstExpr<Expr>(opExpr->arguments[i], expr.getSubsts()),
+                circularityInfo);
+            if (!operandValue)
+                return std::nullopt;
+            operands[i] = *operandValue;
+        }
+        switch (opExpr->op)
+        {
+        case BuiltinOperationKind::Neg:
+            value = -operands[0];
+            break;
+        case BuiltinOperationKind::Add:
+            value = operands[0] + operands[1];
+            break;
+        case BuiltinOperationKind::Sub:
+            value = operands[0] - operands[1];
+            break;
+        case BuiltinOperationKind::Mul:
+            value = operands[0] * operands[1];
+            break;
+        case BuiltinOperationKind::Div:
+            value = operands[0] / operands[1];
+            break;
+        case BuiltinOperationKind::Mod:
+            // Floating-point `%` lowers to `FRem`, whose result takes the sign of the dividend.
+            value = std::fmod(operands[0], operands[1]);
+            break;
+        default:
+            SLANG_ASSERT_FAILURE("unexpected operator with a floating-point result");
+            return std::nullopt;
+        }
+    }
+    else if (auto invokeExpr = expr.as<InvokeExpr>())
+    {
+        // Implicit (`INT_VALUE` passed to a `float` parameter), explicit (`(float)x`) and
+        // constructor-style (`float(2)`) conversions all resolve to one of the builtin scalar
+        // `__init`s, which carry `ImplicitConversionModifier`. Unary `+` calls an
+        // `__intrinsic_op(kIROp_Nop)` operator; `__slang_noop_cast` shares that op but changes
+        // the type, so a no-op intrinsic is the identity only when its operand has the result
+        // type.
+        auto calleeExpr = getBaseExpr(invokeExpr).as<DeclRefExpr>();
+        auto calleeDecl = calleeExpr ? getDeclRef(m_astBuilder, calleeExpr).getDecl() : nullptr;
+        if (calleeDecl && getArgCount(invokeExpr) == 1)
+        {
+            auto arg = getArg(invokeExpr, 0);
+            auto intrinsicMod = calleeDecl->findModifier<IntrinsicOpModifier>();
+            if (calleeDecl->hasModifier<ImplicitConversionModifier>())
+                value = tryConstantFoldFloatConversion(arg, baseType, circularityInfo);
+            else if (
+                intrinsicMod && IROp(intrinsicMod->op) == kIROp_Nop &&
+                basicType->equals(getType(m_astBuilder, arg)))
+                value = tryConstantFoldFloatExpr(arg, circularityInfo);
+        }
+    }
+    else if (auto declRefExpr = expr.as<DeclRefExpr>())
+    {
+        if (auto varDeclRef = getDeclRef(m_astBuilder, declRefExpr).as<VarDeclBase>())
+            value = tryConstantFoldFloatDeclRef(varDeclRef, circularityInfo);
+    }
+
+    if (!value)
+        return std::nullopt;
+    return roundToFloatingPointType(*value, baseType);
+}
+
+std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatConversion(
+    SubstExpr<Expr> operand,
+    BaseType toBaseType,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
+    auto operandType = as<BasicExpressionType>(getType(m_astBuilder, operand));
+    if (!operandType)
+        return std::nullopt;
+    const auto& operandInfo = BaseTypeInfo::getInfo(operandType->getBaseType());
+    if (operandInfo.flags & BaseTypeInfo::Flag::FloatingPoint)
+    {
+        auto operandValue = tryConstantFoldFloatExpr(operand, circularityInfo);
+        if (!operandValue)
+            return std::nullopt;
+        return roundToFloatingPointType(*operandValue, toBaseType);
+    }
+    if (!isValidCompileTimeConstantType(operandType))
+        return std::nullopt;
+
+    // The integer folder reports problems such as a division by zero itself, and the integer
+    // contexts that own those diagnostics already fold this operand where it matters: `coerce`
+    // folds an integer converted to `half` to check its range. Folding for reflection therefore
+    // runs on a scratch sink and never adds an integer diagnostic.
+    DiagnosticSink scratchSink(getSourceManager(), nullptr, getSink());
+    SemanticsVisitor scratchVisitor(withSink(&scratchSink));
+    // `tryConstantFoldExpr` computes integer operations in 64 bits and does not narrow their
+    // results to their type, so we narrow the folded operand here: `0u - 1u` converts as
+    // `0xFFFFFFFFu`. Only the outermost result is narrowed, so the `0u - 1u` inside
+    // `(0u - 1u) / 2u` keeps its 64-bit value, exactly as it does for an integer parameter
+    // (#13954).
+    auto intVal = as<ConstantIntVal>(scratchVisitor.tryConstantFoldExpr(
+        operand,
+        ConstantFoldingKind::CompileTime,
+        circularityInfo));
+    if (!intVal)
+        return std::nullopt;
+    intVal =
+        as<ConstantIntVal>(TypeCastIntVal::tryFoldImpl(m_astBuilder, operandType, intVal, nullptr));
+    if (!intVal)
+        return std::nullopt;
+
+    // Converting a 64-bit integer to `double` and then to `float` can round twice, so a `float`
+    // or `half` target converts through `float` directly. Every integer in the finite range of
+    // `half` is exact in `float`, so the `half` rounding that follows is the only one.
+    const auto value = intVal->getValue();
+    const bool isSigned = (operandInfo.flags & BaseTypeInfo::Flag::Signed) != 0;
+    FloatingPointLiteralValue converted;
+    if (toBaseType == BaseType::Double)
+        converted =
+            isSigned ? FloatingPointLiteralValue(value) : FloatingPointLiteralValue(UInt64(value));
+    else
+        converted = isSigned ? FloatingPointLiteralValue(float(value))
+                             : FloatingPointLiteralValue(float(UInt64(value)));
+    return roundToFloatingPointType(converted, toBaseType);
+}
+
+std::optional<FloatingPointLiteralValue> SemanticsVisitor::tryConstantFoldFloatDeclRef(
+    DeclRef<VarDeclBase> const& declRef,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
+    auto decl = declRef.getDecl();
+
+    if (_checkForCircularityInConstantFolding(declRef, circularityInfo))
+        return std::nullopt;
+
+    // Only a `const` variable has its initializer as its value. Specialization constants and
+    // `extern` constants are `const` too, but they receive their values at pipeline creation and
+    // link time, so their initializers are only defaults; `tryConstantFoldDeclRef` declines them
+    // for `ConstantFoldingKind::CompileTime` for the same reason. Interface requirements need no
+    // check here, because a `static const` requirement must have an integer or bool type
+    // (E30306) and so reaches the integer folder instead.
+    if (!decl->hasModifier<ConstModifier>())
+        return std::nullopt;
+    if (decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>() || decl->hasModifier<ExternModifier>())
+        return std::nullopt;
+
+    if (!getInitExpr(m_astBuilder, declRef))
+        return std::nullopt;
+
+    ensureDecl(decl, DeclCheckState::DefinitionChecked);
+    ConstantFoldingCircularityInfo newCircularityInfo(declRef, circularityInfo);
+    return tryConstantFoldFloatExpr(getInitExpr(m_astBuilder, declRef), &newCircularityInfo);
+}
+
 IntVal* SemanticsVisitor::tryFoldIndexExpr(
     SubstExpr<IndexExpr> expr,
     ConstantFoldingKind kind,

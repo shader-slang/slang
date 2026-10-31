@@ -3221,6 +3221,35 @@ public:
         ConstantFoldingKind kind,
         ConstantFoldingCircularityInfo* circularityInfo);
 
+    /// Try to fold `expr` to its compile-time value if it is a `half`, `float` or `double` scalar
+    /// expression, rounded to the precision of its type; any other expression yields an empty
+    /// value. The front-end has no floating-point `Val`, so the value is a plain number. We fold
+    /// literals, parentheses, conversions from scalar types, the builtin unary `-` and `+`, the
+    /// builtin `+`, `-`, `*`, `/` and `%` operators, and references to `const` variables other
+    /// than specialization and `extern` constants; any other floating-point expression, constant
+    /// or not, also yields an empty value. Integer and bool operands of a conversion fold through
+    /// `tryConstantFoldExpr` without reporting its diagnostics, so `INT_VALUE / 4 + 1.5` with
+    /// `INT_VALUE == 6` divides in integer arithmetic and folds to `2.5`. Folding checks the
+    /// referenced declarations and reports a floating-point constant whose definition depends
+    /// on itself.
+    std::optional<FloatingPointLiteralValue> tryConstantFoldFloatExpr(
+        SubstExpr<Expr> expr,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
+    /// Try to fold the scalar `operand` of a conversion, returning its value converted and
+    /// rounded to the floating-point type `toBaseType`, or an empty value if it does not fold.
+    std::optional<FloatingPointLiteralValue> tryConstantFoldFloatConversion(
+        SubstExpr<Expr> operand,
+        BaseType toBaseType,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
+    /// Try to fold a reference to the variable `declRef` to its compile-time floating-point
+    /// value, which is the folded value of its initializer when the variable is a compile-time
+    /// constant.
+    std::optional<FloatingPointLiteralValue> tryConstantFoldFloatDeclRef(
+        DeclRef<VarDeclBase> const& declRef,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
     // Enforce that an expression resolves to an integer constant, and get its value
     enum class IntegerConstantExpressionCoercionType
     {

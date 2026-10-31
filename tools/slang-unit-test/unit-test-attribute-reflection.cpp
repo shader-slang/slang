@@ -34,6 +34,21 @@ SLANG_UNIT_TEST(attributeReflection)
 
         [NormalTexture(E.V1, 6)]
         struct TS {};
+
+        [__AttributeUsage(_AttributeTargets.Struct)]
+        public struct ScaleAttribute
+        {
+            public float value;
+            public double precise;
+        };
+
+        static const float kHalf = 1.0 / 2.0;
+
+        [Scale(kHalf * 3.0, -kHalf)]
+        struct TScale {};
+
+        [maxtessfactor(64.0)]
+        public void hullHelper() {}
         )";
     String userSource = userSourceBody;
     ComPtr<slang::IGlobalSession> globalSession;
@@ -81,4 +96,57 @@ SLANG_UNIT_TEST(attributeReflection)
     float fvalue = 0;
     normalTextureAttribute->getArgumentValueFloat(1, &fvalue);
     SLANG_CHECK(fvalue == 6.0);
+
+    // Constant expressions passed to floating-point parameters are folded during checking.
+    auto scaleType = reflection->findTypeByName("TScale");
+    SLANG_CHECK_ABORT(scaleType != nullptr);
+    auto scaleAttribute = scaleType->findAttributeByName("Scale");
+    SLANG_CHECK_ABORT(scaleAttribute != nullptr);
+    fvalue = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(scaleAttribute->getArgumentValueFloat(0, &fvalue)));
+    SLANG_CHECK(fvalue == 1.5f);
+    fvalue = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(scaleAttribute->getArgumentValueFloat(1, &fvalue)));
+    SLANG_CHECK(fvalue == -0.5f);
+
+    // Builtin attributes are also visible through `findAttributeByName`, and their literal
+    // floating-point arguments are readable even though they are not folded during checking.
+    auto hullHelper = reflection->findFunctionByName("hullHelper");
+    SLANG_CHECK_ABORT(hullHelper != nullptr);
+    auto maxTessFactorAttribute = hullHelper->findAttributeByName(globalSession, "maxtessfactor");
+    SLANG_CHECK_ABORT(maxTessFactorAttribute != nullptr);
+    fvalue = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(maxTessFactorAttribute->getArgumentValueFloat(0, &fvalue)));
+    SLANG_CHECK(fvalue == 64.0f);
+
+    // Folded values are serialized with the module, so they survive a round trip through a
+    // binary module loaded into a fresh session.
+    ComPtr<ISlangBlob> moduleBlob;
+    SLANG_CHECK_ABORT(module->serialize(moduleBlob.writeRef()) == SLANG_OK);
+    ComPtr<slang::ISession> reloadSession;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, reloadSession.writeRef()) == SLANG_OK);
+    auto reloadedModule = reloadSession->loadModuleFromIRBlob(
+        "m",
+        "m.slang-module",
+        moduleBlob,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(reloadedModule != nullptr);
+    auto reloadedScaleType = reloadedModule->getLayout()->findTypeByName("TScale");
+    SLANG_CHECK_ABORT(reloadedScaleType != nullptr);
+    auto reloadedScaleAttribute = reloadedScaleType->findAttributeByName("Scale");
+    SLANG_CHECK_ABORT(reloadedScaleAttribute != nullptr);
+    fvalue = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(reloadedScaleAttribute->getArgumentValueFloat(0, &fvalue)));
+    SLANG_CHECK(fvalue == 1.5f);
+
+    // `[NormalTexture(E.V1, 6)]` stores an empty entry for its enum argument before the folded
+    // `float` one, so this also checks that an empty entry survives serialization.
+    auto reloadedTextureType = reloadedModule->getLayout()->findTypeByName("TS");
+    SLANG_CHECK_ABORT(reloadedTextureType != nullptr);
+    auto reloadedTextureAttribute = reloadedTextureType->findAttributeByName("NormalTexture");
+    SLANG_CHECK_ABORT(reloadedTextureAttribute != nullptr);
+    fvalue = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(reloadedTextureAttribute->getArgumentValueFloat(1, &fvalue)));
+    SLANG_CHECK(fvalue == 6.0f);
+    SLANG_CHECK(SLANG_FAILED(reloadedTextureAttribute->getArgumentValueFloat(0, &fvalue)));
 }
