@@ -926,6 +926,23 @@ void DeclaredSubtypeWitness::_toTextOverride(StringBuilder& out)
         << toSlice(", ") << getDeclRef() << toSlice(")");
 }
 
+DeclaredSubtypeWitness* findOptionalConstraintWitness(SubtypeWitness* witness)
+{
+    // Each step moves to a witness that is an operand of the current witness's decl-ref, so
+    // the walk ends after at most as many steps as there are nested lookups.
+    while (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        if (declaredWitness->isOptional())
+            return declaredWitness;
+
+        auto lookupDeclRef = as<LookupDeclRef>(declaredWitness->getDeclRef().declRefBase);
+        if (!lookupDeclRef)
+            return nullptr;
+        witness = lookupDeclRef->getWitness();
+    }
+    return nullptr;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TransitiveSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Val* TransitiveSubtypeWitness::_substituteImplOverride(
