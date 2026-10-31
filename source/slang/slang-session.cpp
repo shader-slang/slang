@@ -134,8 +134,9 @@ static ComPtr<ISlangBlob> tryLoadStandardModuleFromMonolithicLibrary(String cons
         !compressed || uncompressedSize == 0)
         return ComPtr<ISlangBlob>();
 
-    // The embedded modules are LZ4-compressed (see slang-generate-monolithic-standard-module-library);
-    // inflate with the same compression system into a managed blob.
+    // The embedded modules are LZ4-compressed (see
+    // slang-generate-monolithic-standard-module-library); inflate with the same compression system
+    // into a managed blob.
     List<unsigned char> decompressed;
     decompressed.setCount(Index(uncompressedSize));
     if (SLANG_FAILED(LZ4CompressionSystem::getSingleton()->decompress(
@@ -2051,7 +2052,8 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
     // First, if the optional slang-standard-modules library is deployed beside
     // slang.dll, load the module from it. When that library is not deployed this
     // is a cheap miss and we fall through to the loose-file search below.
-    if (ComPtr<ISlangBlob> embeddedModule = tryLoadStandardModuleFromMonolithicLibrary(moduleName->text))
+    if (ComPtr<ISlangBlob> embeddedModule =
+            tryLoadStandardModuleFromMonolithicLibrary(moduleName->text))
     {
         auto pathInfo = PathInfo::makeFromString(moduleName->text);
         RefPtr<Module> module = loadModuleImpl(
