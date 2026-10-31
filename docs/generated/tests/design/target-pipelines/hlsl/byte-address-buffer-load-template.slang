@@ -28,5 +28,10 @@ void main(uint3 tid : SV_DispatchThreadID)
     outBuf.Store<int>(tid.x * 4, x * 2);
 }
 
-// CHECK: Load<int{{.*}}>(
-// CHECK: .Store(
+// A byte-address load has no side effects, and nothing with side effects
+// lies between this single-use load and its use, so the emitter folds it
+// into the expression that becomes the store's value argument, and
+// `.Store(` comes before `Load<` on the same line. The CHECKs are unordered
+// so that they also pass when the load is kept in a temporary.
+// CHECK-DAG: Load<int{{.*}}>(
+// CHECK-DAG: .Store(
