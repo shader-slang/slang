@@ -354,6 +354,11 @@ void GenericSignatureCloner::cloneParameterMembers()
             typeParam->initType = TypeExp();
         else if (auto valueParam = as<GenericValueParamDecl>(clonedParam))
             valueParam->initExpr = nullptr;
+        // The clone is not written in user source; marking it keeps source-level checks such as
+        // generic-parameter shadowing from reporting the source parameter once per clone.
+        addModifier(
+            clonedParam,
+            m_astCloner.getContext().astBuilder->create<SynthesizedModifier>());
         m_destGenericDecl->addDirectMemberDecl(clonedParam);
 
         if (m_outGenericArgs)

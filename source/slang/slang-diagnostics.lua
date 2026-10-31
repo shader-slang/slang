@@ -3798,6 +3798,22 @@ warning(
     span { loc = "outerParam:Decl", message = "outer generic parameter '~outerParam' declared here" }
 )
 
+warning(
+    "decl-shadows-generic-param",
+    30527,
+    "~kind '~decl:Decl' shadows a generic parameter from an enclosing scope",
+    span { loc = "decl:Decl", message = "~kind '~decl' shadows an outer generic parameter with the same name" },
+    span { loc = "outerParam:Decl", message = "outer generic parameter '~outerParam' declared here" }
+)
+
+err(
+    "generic-param-shadowing-not-allowed-in-slang-202c",
+    30528,
+    "~kind '~decl:Decl' shadows a generic parameter from an enclosing scope, which is not allowed in Slang 202c and later",
+    span { loc = "decl:Decl", message = "~kind '~decl' shadows an outer generic parameter with the same name" },
+    span { loc = "outerParam:Decl", message = "outer generic parameter '~outerParam' declared here" }
+)
+
 err(
     "pack-param-must-be-last",
     30522,

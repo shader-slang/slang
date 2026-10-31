@@ -796,6 +796,25 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void setFuncTypeIntoRequirementDecl(CallableDecl* decl, FuncType* funcType);
 };
 
+/// Return whether `decl` is a struct or type alias declared in a function body, possibly generic.
+static bool isLocalTypeDecl(Decl* decl)
+{
+    if (!as<AggTypeDecl>(decl) && !as<TypeDefDecl>(decl))
+        return false;
+    auto parent = decl->parentDecl;
+    if (auto genericDecl = as<GenericDecl>(parent); genericDecl && genericDecl->inner == decl)
+        parent = genericDecl->parentDecl;
+    return as<ScopeDecl>(parent) != nullptr;
+}
+
+/// Return whether `decl` is a member of a type or extension declaration, possibly generic, such as
+/// the field `N` in `struct A<let N : int> { int N; }`. The generic parameters of a generic member
+/// are not members of the type.
+static bool isTypeMemberDecl(Decl* decl)
+{
+    return !isGenericParam(decl) && as<AggTypeDeclBase>(getParentDecl(decl)) != nullptr;
+}
+
 struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
                                            public DeclVisitor<SemanticsDeclRedeclarationVisitor>
 {
@@ -807,16 +826,44 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
     void visitDecl(Decl*) {}
     void visitDeclGroup(DeclGroup*) {}
 
-#define CASE(TYPE) \
-    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl, m_severity); }
+    // Generic parameters are checked with the rest of their generic in `visitGenericDecl`, and
+    // a type alias in a function body, with its generic parameters, is checked by
+    // `visitBlockStmt` even when it is unused. Globals and namespace members are never inside a
+    // generic, so they are not checked.
+
+#define CASE(TYPE)                               \
+    void visit##TYPE(TYPE* decl)                 \
+    {                                            \
+        checkForRedeclaration(decl, m_severity); \
+        if (isTypeMemberDecl(decl))              \
+            checkForShadowedGenericParam(decl);  \
+    }
 
     CASE(EnumCaseDecl)
     CASE(FuncDecl)
     CASE(SimpleTypeDecl)
-    CASE(AggTypeDecl)
-    CASE(VarDeclBase)
 
 #undef CASE
+
+    void visitVarDeclBase(VarDeclBase* decl)
+    {
+        checkForRedeclaration(decl, m_severity);
+        if (as<ParamDecl>(decl) || isLocalVar(decl) || isTypeMemberDecl(decl))
+            checkForShadowedGenericParam(decl);
+    }
+
+    void visitAggTypeDecl(AggTypeDecl* decl)
+    {
+        checkForRedeclaration(decl, m_severity);
+        if (isLocalTypeDecl(decl) || isTypeMemberDecl(decl))
+            checkForShadowedGenericParam(decl);
+    }
+
+    void visitPropertyDecl(PropertyDecl* decl)
+    {
+        if (isTypeMemberDecl(decl))
+            checkForShadowedGenericParam(decl);
+    }
 
     RedeclarationSeverity m_severity;
 };
@@ -2367,6 +2414,7 @@ void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
         propertyDecl->addMember(getAccessorDecl);
 
         const auto setAccessorDecl = m_astBuilder->create<SetterDecl>();
+        addModifier(setAccessorDecl, m_astBuilder->create<SynthesizedModifier>());
         addModifier(setAccessorDecl, m_astBuilder->create<MutatingAttribute>());
         setAccessorDecl->ownedScope = m_astBuilder->create<Scope>();
         setAccessorDecl->ownedScope->containerDecl = setAccessorDecl;
@@ -5097,35 +5145,15 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
         }
     }
 
-    // Check for generic type parameters that shadow outer generic parameters.
-    for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
+    // `visitBlockStmt` checks the parameters of a local generic type alias, which is otherwise
+    // checked only when it is used.
+    if (!as<TypeDefDecl>(genericDecl->inner) || !isLocalTypeDecl(genericDecl->inner))
     {
-        Decl* m = genericDecl->getDirectMemberDecl(i);
-        if (!as<GenericTypeParamDeclBase>(m))
-            continue;
-        auto paramName = m->getName();
-        if (!paramName)
-            continue;
-        bool found = false;
-        for (auto ancestor = genericDecl->parentDecl; ancestor && !found;
-             ancestor = ancestor->parentDecl)
+        for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
         {
-            auto outerGeneric = as<GenericDecl>(ancestor);
-            if (!outerGeneric)
-                continue;
-            for (auto outerMember : outerGeneric->getMembers())
-            {
-                if (!as<GenericTypeParamDeclBase>(outerMember))
-                    continue;
-                if (outerMember->getName() == paramName)
-                {
-                    getSink()->diagnose(Diagnostics::GenericParamShadowsOuterGeneric{
-                        .param = m,
-                        .outerParam = outerMember});
-                    found = true;
-                    break;
-                }
-            }
+            Decl* m = genericDecl->getDirectMemberDecl(i);
+            if (isGenericParam(m))
+                checkForShadowedGenericParam(m);
         }
     }
 
@@ -7149,6 +7177,11 @@ static void _configureSynthesizedParamDecl(
     auto modeModifier = astBuilder->create<SynthesizedParamPassingModeModifier>();
     modeModifier->mode = paramInfo.mode;
     addModifier(paramDecl, modeModifier);
+
+    // The parameter is made by the compiler, so source-level checks such as generic-parameter
+    // shadowing skip it; when it copies the name of a user-written parameter, that parameter is
+    // checked in its own right.
+    addModifier(paramDecl, astBuilder->create<SynthesizedModifier>());
 }
 
 static void _configureSynthesizedEffectiveThisParam(
@@ -7258,6 +7291,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
                 typeParamDeclBase->astNodeType);
             synTypeParamDeclBase->nameAndLoc = typeParamDeclBase->getNameAndLoc();
             synTypeParamDeclBase->parameterIndex = typeParamDeclBase->parameterIndex;
+            addModifier(synTypeParamDeclBase, m_astBuilder->create<SynthesizedModifier>());
             synGenericDecl->addMember(synTypeParamDeclBase);
 
             // Note: we intentionally do not copy GenericTypeParamDecl::initType here,
@@ -7283,6 +7317,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
         {
             auto synValParamDecl = m_astBuilder->create<GenericValueParamDecl>();
             synValParamDecl->nameAndLoc = valParamDecl->nameAndLoc;
+            addModifier(synValParamDecl, m_astBuilder->create<SynthesizedModifier>());
             synGenericDecl->addMember(synValParamDecl);
             synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
             synValParamDecl->type = valParamDecl->type;
@@ -7306,6 +7341,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
         {
             auto synValPackParamDecl = m_astBuilder->create<GenericValuePackParamDecl>();
             synValPackParamDecl->nameAndLoc = valPackParamDecl->nameAndLoc;
+            addModifier(synValPackParamDecl, m_astBuilder->create<SynthesizedModifier>());
             synGenericDecl->addMember(synValPackParamDecl);
             synValPackParamDecl->parameterIndex = valPackParamDecl->parameterIndex;
             synValPackParamDecl->type = valPackParamDecl->type;
@@ -9425,6 +9461,7 @@ static DeclRef<ExtensionDecl> extendContainerDecl(
     auto funcAsType = DeclRefType::create(astBuilder, decl->getDefaultDeclRef());
 
     auto extensionDecl = astBuilder->create<ExtensionDecl>();
+    addModifier(extensionDecl, astBuilder->create<SynthesizedModifier>());
     extensionDecl->parentDecl = decl;
     extensionDecl->loc = synthesizedLoc;
     extensionDecl->nameAndLoc.loc = synthesizedLoc;
@@ -15069,6 +15106,133 @@ void SemanticsVisitor::checkForRedeclarationOfTransparentMembers(ContainerDecl* 
     }
 }
 
+/// Find the generic parameter that `decl` shadows, or return null if it shadows none.
+///
+/// We walk outward through the declarations that enclose `decl` and stop at the first one with
+/// a member of the same name: `decl` shadows a generic parameter only when that member is a
+/// generic parameter. The walk starts at the grandparent of `decl`, because the parent holds
+/// `decl` itself and any redeclarations of it, which `checkForRedeclaration` reports. Consider
+/// this example:
+///
+///     struct S<let N : int>
+///     {
+///         int f<T>(int N) { { int N = 1; return N; } }
+///     }
+///
+/// For the parameter `int N`, the walk visits the generic of `f`, which has no `N`, then `S`,
+/// and returns the `let N : int` of the generic of `S`. For the local `int N`, the walk stops
+/// at `f`, whose parameter `N` is not a generic parameter, so the local is not reported.
+///
+static Decl* findShadowedGenericParam(Decl* decl, Name* name)
+{
+    // A generic type such as `struct T<U> { ... }` is a member of its scope through the
+    // `GenericDecl` that wraps it, so that wrapper is what sits beside other declarations.
+    Decl* declInScope = decl;
+    if (auto genericDecl = as<GenericDecl>(decl->parentDecl);
+        genericDecl && genericDecl->inner == decl)
+        declInScope = genericDecl;
+    if (!declInScope->parentDecl)
+        return nullptr;
+    for (auto ancestor = declInScope->parentDecl->parentDecl; ancestor;
+         ancestor = ancestor->parentDecl)
+    {
+        for (auto outerDecl : ancestor->getDirectMemberDeclsOfName(name))
+        {
+            if (isLocalVarNotYetDeclared(outerDecl))
+                continue;
+            return isGenericParam(outerDecl) ? outerDecl : nullptr;
+        }
+    }
+    return nullptr;
+}
+
+static const char* getGenericParamShadowingDeclKind(Decl* decl)
+{
+    if (isGenericParam(decl))
+        return "generic parameter";
+    if (as<ParamDecl>(decl))
+        return "parameter";
+    if (isLocalVar(decl))
+        return "local variable";
+    if (isLocalTypeDecl(decl))
+        return "local type";
+    SLANG_RELEASE_ASSERT(isTypeMemberDecl(decl));
+    return "member";
+}
+
+/// Return whether `decl` is a parameter or generic parameter in the signature of the copy that
+/// the parser makes of an interface method with a body. Consider this example:
+///
+///     interface IFoo<let N : int> { int f(int N) { return N; } }
+///
+/// `parseInterfaceDefaultCallableAsExplicitGeneric` parses `f` a second time into an
+/// `InterfaceDefaultImplDecl`, so the parameter `int N` exists twice at the same location. The
+/// requirement keeps the signature and the copy keeps the body, so the copy's signature is
+/// skipped and each declaration is reported once.
+static bool isInterfaceDefaultImplSignatureDecl(Decl* decl)
+{
+    if (!as<ParamDecl>(decl) && !isGenericParam(decl))
+        return false;
+    for (auto ancestor = decl->parentDecl; ancestor; ancestor = ancestor->parentDecl)
+    {
+        if (as<InterfaceDefaultImplDecl>(ancestor))
+            return true;
+        if (!as<CallableDecl>(ancestor) && !as<GenericDecl>(ancestor))
+            return false;
+    }
+    return false;
+}
+
+void SemanticsVisitor::checkForShadowedGenericParam(Decl* decl)
+{
+    // Declarations marked as synthesized, such as the generic parameters and parameters of a
+    // requirement-witness wrapper, copy their names from other declarations and do not appear in
+    // the user's source, so they are not reported. The implicit `newValue` parameter of a setter
+    // that the user wrote is not marked, and it is reported because it hides a generic parameter
+    // of that name.
+    if (decl->hasModifier<SynthesizedModifier>())
+        return;
+
+    if (isInterfaceDefaultImplSignatureDecl(decl))
+        return;
+
+    // The members of a synthesized type are synthesized too. For example, the closure type of
+    // `(int y) => y + K` has a field that copies the name and location of each captured
+    // variable, here the generic parameter `K` itself.
+    if (auto parentTypeDecl = as<AggTypeDeclBase>(getParentDecl(decl));
+        parentTypeDecl && parentTypeDecl->hasModifier<SynthesizedModifier>())
+        return;
+
+    auto name = decl->getName();
+    if (!name)
+        return;
+
+    auto outerParam = findShadowedGenericParam(decl, name);
+    if (!outerParam)
+        return;
+
+    String kind = getGenericParamShadowingDeclKind(decl);
+    if (isSlang202cOrLater(this))
+    {
+        getSink()->diagnose(Diagnostics::GenericParamShadowingNotAllowedInSlang202c{
+            .kind = kind,
+            .decl = decl,
+            .outerParam = outerParam});
+    }
+    else if (isGenericParam(decl))
+    {
+        getSink()->diagnose(
+            Diagnostics::GenericParamShadowsOuterGeneric{.param = decl, .outerParam = outerParam});
+    }
+    else
+    {
+        getSink()->diagnose(Diagnostics::DeclShadowsGenericParam{
+            .kind = kind,
+            .decl = decl,
+            .outerParam = outerParam});
+    }
+}
+
 
 void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 {
@@ -18460,6 +18624,11 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
         newValueParam = m_astBuilder->create<ParamDecl>();
         newValueParam->nameAndLoc.name = getName("newValue");
         newValueParam->nameAndLoc.loc = decl->loc;
+
+        // The implicit parameter of a setter that the compiler made, such as the setter of a
+        // bitfield, is not written by the user either.
+        if (decl->hasModifier<SynthesizedModifier>())
+            addModifier(newValueParam, m_astBuilder->create<SynthesizedModifier>());
 
         decl->addMember(newValueParam);
     }

@@ -98,3 +98,9 @@ Slang language version 202c brings these changes on top of Slang 2026:
   targets that require a return value (SPIR-V, GLSL and WGSL). To migrate, add an explicit `return` at the end
   of the function where required. See GitHub issue
   [#12264](https://github.com/shader-slang/slang/issues/12264) for details.
+- A generic parameter, a function parameter, a variable or type declared in a function body, or a member
+  of a type may not shadow a generic parameter of an enclosing generic. For example,
+  `struct S<let N : int> { int f(int N) { return N; } }` is diagnosed as error E30528 in Slang 202c.
+  Earlier versions report warning E30515 (for a generic parameter) or E30527. To migrate, rename the
+  inner declaration; for the implicit `newValue` parameter of a setter, name the parameter explicitly,
+  as in `set(int v)`. See GitHub issue [#13752](https://github.com/shader-slang/slang/issues/13752) for details.
