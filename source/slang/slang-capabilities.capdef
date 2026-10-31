@@ -980,6 +980,11 @@ def spvBindlessTextureNV : SPV_NV_bindless_texture;
 /// [EXT]
 def spvDescriptorHeapEXT : SPV_EXT_descriptor_heap + SPV_KHR_untyped_pointers;
 
+/// Represents the WGSL `chromium_experimental_resource_table` extension (Chromium/Dawn bindless
+/// resource table). `DescriptorHandle` lookups lower to `getResource<T>(index)`.
+/// [EXT]
+def wgsl_chromium_experimental_resource_table : wgsl;
+
 /// Represents the SPIR-V capability for 64-bit integer indexing of resources and arrays.
 /// [EXT]
 def spvShader64BitIndexingEXT : SPV_EXT_shader_64bit_indexing;

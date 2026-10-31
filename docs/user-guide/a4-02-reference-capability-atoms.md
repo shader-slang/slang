@@ -947,6 +947,10 @@ Extensions
 `spvVulkanMemoryModelKHR`
 > Represents the SPIR-V capability for vulkan memory model.
 
+`wgsl_chromium_experimental_resource_table`
+> Represents the WGSL `chromium_experimental_resource_table` extension (Chromium/Dawn bindless
+> resource table). `DescriptorHandle` lookups lower to `getResource<T>(index)`.
+
 Compound Capabilities
 ----------------------
 *Capabilities to specify capabilities created by other capabilities (`raytracing`, `meshshading`...)*

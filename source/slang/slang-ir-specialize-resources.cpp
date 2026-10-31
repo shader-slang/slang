@@ -17,8 +17,10 @@ namespace Slang
 // supported form. When callers cannot reconstruct a resource output, we try to inline direct calls
 // to the nonrecursive callee, simplify after a successful attempt, and retry specialization. Once
 // that step makes no more progress, D3D targets also try to inline a nonrecursive call when a
-// resource argument has no HLSL form that the emitter can pass directly. Each successful inlining
-// or specialization round is followed by simplification before the process repeats.
+// resource argument has no HLSL form that the emitter can pass directly. WGSL with Chromium's
+// resource table does the same for a texture or sampler argument that has no recognized form,
+// which is how a table lookup arrives. Each successful inlining or specialization round is followed
+// by simplification before the process repeats.
 // On Khronos targets, each specialization round also replaces resource selections from the same
 // heap or array with selections of their indices.
 
@@ -51,6 +53,41 @@ static bool isWritableTextureType(IRType* type)
 static bool isD3DResourceInputInliningCandidateType(IRType* type)
 {
     return isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(type);
+}
+
+/// Return whether `targetRequest` is WGSL with Chromium's resource table enabled.
+static bool isWGSLResourceTableTarget(TargetRequest* targetRequest)
+{
+    return isWGPUTarget(targetRequest) &&
+           targetRequest->getTargetCaps().implies(
+               CapabilityAtom::wgsl_chromium_experimental_resource_table);
+}
+
+/// Return whether a by-value parameter of `type` can require resource-input inlining.
+//
+// With `wgsl_chromium_experimental_resource_table`, a `DescriptorHandle` lookup is a
+// `getResource<T>(index)` call. WGSL accepts texture and sampler parameters, but Tint crashes when
+// a texture from the table reaches a function through one
+// (https://issues.chromium.org/issues/574322344). We inline such calls, so that each lookup stays
+// in the expression that uses it.
+//
+// The caller (`isCallEligibleForResourceInputInlining`) applies the same test as on D3D: the
+// argument is neither a form that `isParamSuitableForSpecialization` recognizes, such as a global
+// texture or sampler, nor forwarded from the caller's own parameter. A table lookup is the case
+// this is for, but any other texture or sampler argument without a recognized form is inlined
+// too, for example one chosen between two globals by control flow.
+// That is harmless: inlining keeps the program's meaning, and WGSL could not pass such a value
+// anyway, because it cannot hold a texture or sampler in a variable or a block parameter.
+static bool isResourceInputInliningCandidateType(TargetRequest* targetRequest, IRType* type)
+{
+    if (isD3DTarget(targetRequest))
+        return isD3DResourceInputInliningCandidateType(type);
+    if (isWGSLResourceTableTarget(targetRequest))
+    {
+        auto valueType = unwrapAttributedType(type);
+        return as<IRTextureTypeBase>(valueType) || as<IRSamplerStateTypeBase>(valueType);
+    }
+    return false;
 }
 
 /// Return whether following direct calls from `func` can reach `target`.
@@ -86,7 +123,7 @@ static bool canReachFunctionThroughDirectCalls(
 
 /// Return whether `func` belongs to a cycle in the current direct-call graph.
 //
-// The resource-output and D3D resource-input inlining steps rescan the module after a successful
+// The resource-output and resource-input inlining steps rescan the module after a successful
 // change. If a selected callee is recursive, inlining an external call copies another call into the
 // same cycle, and every retry can repeat that expansion. Resource-output specialization can also
 // inspect callees recursively before it reaches either inlining step. We therefore exclude
@@ -248,8 +285,8 @@ static bool isResourceArgumentForwardedFromCallerParameter(IRCall* call, IRInst*
     return argumentParameter->getParent() == caller->getFirstBlock();
 }
 
-/// Return whether `call` is eligible for an inlining attempt that may eliminate an unsupported D3D
-/// resource argument.
+/// Return whether `call` is eligible for an inlining attempt that may eliminate a resource
+/// argument with no form the target can pass: on D3D, or on WGSL with the resource table.
 //
 // Consider this example:
 //
@@ -275,7 +312,7 @@ static bool isResourceArgumentForwardedFromCallerParameter(IRCall* call, IRInst*
 // global resource arrays, and descriptor-heap conversions. An `IRLoad` from the generated local
 // does not have one of those recognized forms. When that form remains, we inline `loadSelected`
 // and let SSA simplification substitute the descriptor-heap conversion at each use.
-static bool isD3DCallEligibleForResourceInputInlining(
+static bool isCallEligibleForResourceInputInlining(
     CodeGenContext* codeGenContext,
     ResourceParameterSpecializationCondition& specializationCondition,
     Dictionary<IRFunc*, bool>& isRecursiveByCallee,
@@ -312,8 +349,12 @@ static bool isD3DCallEligibleForResourceInputInlining(
 
         // D3D can pass a resource argument when it is forwarded from the caller's own parameter or
         // when `isParamSuitableForSpecialization` recognizes its IR form. We inline only a by-value
-        // resource argument that satisfies neither condition.
-        if (!isD3DResourceInputInliningCandidateType(parameter->getDataType()))
+        // resource argument that satisfies neither condition. On WGSL with the resource table the
+        // same two conditions apply to texture and sampler arguments; a table lookup satisfies
+        // neither.
+        if (!isResourceInputInliningCandidateType(
+                codeGenContext->getTargetReq(),
+                parameter->getDataType()))
             continue;
         if (specializationCondition.isParamSuitableForSpecialization(parameter, argument) ||
             isResourceArgumentForwardedFromCallerParameter(call, argument))
@@ -324,7 +365,7 @@ static bool isD3DCallEligibleForResourceInputInlining(
         // Inlining a recursive callee would copy another call from the same cycle. Ordinary
         // validation diagnoses that cycle before specialization; when validation is disabled,
         // leaving the call unchanged still guarantees that this inlining step terminates. Several
-        // calls can have the same callee. `collectD3DCallsEligibleForResourceInputInlining` passes
+        // calls can have the same callee. `collectCallsEligibleForResourceInputInlining` passes
         // one cache through the complete module traversal, so we compute each callee's recursion
         // status at most once.
         bool isRecursive;
@@ -338,12 +379,12 @@ static bool isD3DCallEligibleForResourceInputInlining(
     return false;
 }
 
-/// Collect each direct D3D call eligible for resource-input inlining.
+/// Collect each direct call eligible for resource-input inlining.
 //
 // We collect before mutating the IR because inlining can add blocks and clone calls. The outer
 // fixed-point loop rescans the resulting module after simplification, so calls introduced by one
 // inlining step are considered on the next iteration.
-static void collectD3DCallsEligibleForResourceInputInlining(
+static void collectCallsEligibleForResourceInputInlining(
     CodeGenContext* codeGenContext,
     ResourceParameterSpecializationCondition& specializationCondition,
     Dictionary<IRFunc*, bool>& isRecursiveByCallee,
@@ -352,7 +393,7 @@ static void collectD3DCallsEligibleForResourceInputInlining(
 {
     if (auto call = as<IRCall>(inst))
     {
-        if (isD3DCallEligibleForResourceInputInlining(
+        if (isCallEligibleForResourceInputInlining(
                 codeGenContext,
                 specializationCondition,
                 isRecursiveByCallee,
@@ -364,7 +405,7 @@ static void collectD3DCallsEligibleForResourceInputInlining(
 
     for (auto child : inst->getChildren())
     {
-        collectD3DCallsEligibleForResourceInputInlining(
+        collectCallsEligibleForResourceInputInlining(
             codeGenContext,
             specializationCondition,
             isRecursiveByCallee,
@@ -373,15 +414,18 @@ static void collectD3DCallsEligibleForResourceInputInlining(
     }
 }
 
-/// Try to inline eligible D3D calls whose resource arguments cannot be emitted directly as HLSL.
+/// Try to inline eligible calls with a resource argument that has no form the target can pass:
+/// on D3D, one that cannot be emitted directly as HLSL; on WGSL with the resource table, a texture
+/// or sampler such as a table lookup.
 //
 // We return whether at least one call was inlined. Calls that `inlineCall` cannot transform remain
 // unchanged.
-static bool tryInlineD3DCallsWithUnsupportedResourceInputs(
+static bool tryInlineCallsWithUnsupportedResourceInputs(
     CodeGenContext* codeGenContext,
     IRModule* module)
 {
-    if (!isD3DTarget(codeGenContext->getTargetReq()))
+    auto targetRequest = codeGenContext->getTargetReq();
+    if (!isD3DTarget(targetRequest) && !isWGSLResourceTableTarget(targetRequest))
         return false;
 
     ResourceParameterSpecializationCondition specializationCondition;
@@ -394,7 +438,7 @@ static bool tryInlineD3DCallsWithUnsupportedResourceInputs(
         // the complete module traversal, which does not mutate that graph. The inner scope destroys
         // the cache before the loop below invokes `inlineCall`, which can change the graph.
         Dictionary<IRFunc*, bool> isRecursiveByCallee;
-        collectD3DCallsEligibleForResourceInputInlining(
+        collectCallsEligibleForResourceInputInlining(
             codeGenContext,
             specializationCondition,
             isRecursiveByCallee,
@@ -2024,8 +2068,10 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
     //
     // Output specialization records a function when callers cannot reconstruct its resource return
     // or output parameter. We then try to inline direct calls to that function, simplify, and retry
-    // specialization. Once output inlining makes no progress, the D3D resource-input step
-    // tries to inline calls whose resource arguments do not have a recognized HLSL form.
+    // specialization. Once output inlining makes no progress, the resource-input step tries to
+    // inline calls with a resource argument that has no form the target can pass: on D3D, no
+    // recognized HLSL form; on WGSL with the resource table, a texture or sampler such as a table
+    // lookup.
     bool result = false;
     for (;;)
     {
@@ -2073,10 +2119,11 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
             }
         }
 
-        // After output inlining makes no progress, we try to inline the D3D calls whose resource
-        // inputs cannot be emitted directly as HLSL. We simplify each successful inlining round and
-        // then retry selection, input, and output specialization.
-        if (tryInlineD3DCallsWithUnsupportedResourceInputs(codeGenContext, irModule))
+        // After output inlining makes no progress, we try to inline the calls with a resource
+        // argument that the target cannot pass (see `tryInlineCallsWithUnsupportedResourceInputs`).
+        // We simplify each successful inlining round and then retry selection, input, and output
+        // specialization.
+        if (tryInlineCallsWithUnsupportedResourceInputs(codeGenContext, irModule))
         {
             simplifyIR(
                 irModule,
