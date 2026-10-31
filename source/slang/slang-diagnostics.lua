@@ -1405,7 +1405,13 @@ err(
     span { loc = "location", message = "undefined identifier '~name:Name'." },
     -- Optional "did you mean ...?" note, rendered only when `suggestionLocation`
     -- is set to a valid location by the caller (i.e. a close in-scope name exists).
-    note { message = "did you mean '~suggestion:Name'?", span { loc = "suggestionLocation" } }
+    note { message = "did you mean '~suggestion:Name'?", span { loc = "suggestionLocation" } },
+    -- Optional note, rendered only when `moduleNameLocation` is valid: the caller
+    -- sets it when the undefined name is the name of the current or an imported module.
+    note {
+        message = "'~name' names a module; module names cannot be used as qualifiers, types, or values",
+        span { loc = "moduleNameLocation" },
+    }
 )
 
 err(
