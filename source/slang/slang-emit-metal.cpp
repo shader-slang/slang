@@ -142,6 +142,104 @@ static IRType* unwrapDescriptorHandle(IRType* type)
     return type;
 }
 
+// How Metal spells the resource type behind the handle in a cast between a `DescriptorHandle<T>`
+// and its `uint64` bits (kIROp_CastDescriptorHandleToUInt64 / kIROp_CastUInt64ToDescriptorHandle).
+// On Metal these casts come only from AnyValue marshalling of an 8-byte handle.
+enum class MetalHandleBitsCastKind
+{
+    // A buffer, which `emitSimpleTypeImpl` spells as a pointer (`T device*`, `uint32_t device*`,
+    // `T constant*`). A C-style cast converts it to and from `ulong`.
+    Pointer,
+    // A texture, sampler or acceleration structure, which Metal spells as the opaque resource type
+    // itself. Neither a C-style cast nor `as_type` converts it to or from an integer, so its bits
+    // are copied through memory: `*(thread To*)(&from)`.
+    Opaque,
+    // Any other type. None is expected here; it is diagnosed rather than given a cast that may not
+    // be valid MSL.
+    Unexpected,
+};
+
+static MetalHandleBitsCastKind getHandleBitsCastKind(IRInst* inst)
+{
+    IRType* handleType = inst->getOp() == kIROp_CastUInt64ToDescriptorHandle
+                             ? inst->getDataType()
+                             : inst->getOperand(0)->getDataType();
+    auto resourceType = unwrapAttributedType(unwrapDescriptorHandle(handleType));
+    if (as<IRHLSLStructuredBufferTypeBase>(resourceType) ||
+        as<IRByteAddressBufferTypeBase>(resourceType) ||
+        as<IRUniformParameterGroupType>(resourceType))
+        return MetalHandleBitsCastKind::Pointer;
+    if (as<IRTextureTypeBase>(resourceType) || as<IRSamplerStateTypeBase>(resourceType) ||
+        as<IRRaytracingAccelerationStructureType>(resourceType))
+        return MetalHandleBitsCastKind::Opaque;
+    return MetalHandleBitsCastKind::Unexpected;
+}
+
+static bool isOpaqueHandleBitsCast(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_CastDescriptorHandleToUInt64:
+    case kIROp_CastUInt64ToDescriptorHandle:
+        return getHandleBitsCastKind(inst) == MetalHandleBitsCastKind::Opaque;
+    default:
+        return false;
+    }
+}
+
+bool MetalSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
+{
+    if (!Super::shouldFoldInstIntoUseSites(inst))
+        return false;
+    if (getFoldPolicy(inst) == FoldPolicy::Always)
+        return true;
+    // The operand of an opaque handle bits cast has its address taken, so it must be a named
+    // value rather than an expression.
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (user->getOperandCount() > 0 && user->getOperand(0) == inst &&
+            isOpaqueHandleBitsCast(user))
+            return false;
+    }
+    return true;
+}
+
+bool MetalSourceEmitter::tryEmitNonPointerHandleBitsCast(
+    IRInst* inst,
+    const EmitOpInfo& inOuterPrec)
+{
+    switch (getHandleBitsCastKind(inst))
+    {
+    case MetalHandleBitsCastKind::Pointer:
+        return false;
+    case MetalHandleBitsCastKind::Opaque:
+        {
+            // MSL does not document how such a handle is represented in a `thread` value; the
+            // copy relies on it being the 64-bit resource ID (`gpuResourceID`) that a host writes
+            // into an argument buffer, the same assumption behind the 8-byte layout of these
+            // handles. The run-time lanes of
+            // tests/metal/descriptor-handle-texture-dispatch-runtime.slang check the round trip.
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
+            m_writer->emit("*(thread ");
+            emitType(inst->getDataType());
+            m_writer->emit("*)(&");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::Prefix));
+            m_writer->emit(")");
+            maybeCloseParens(needClose);
+            return true;
+        }
+    case MetalHandleBitsCastKind::Unexpected:
+        break;
+    }
+    SLANG_DIAGNOSE_UNEXPECTED(
+        getSink(),
+        inst->sourceLoc,
+        "unhandled resource type in a cast between a descriptor handle and uint64");
+    return true;
+}
+
 void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
@@ -881,7 +979,9 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
     case kIROp_CastDescriptorHandleToUInt64:
         {
-            // Metal: DescriptorHandle is a pointer; emit C-style cast to ulong.
+            if (tryEmitNonPointerHandleBitsCast(inst, inOuterPrec))
+                return true;
+            // Metal: a buffer DescriptorHandle is a pointer; emit C-style cast to ulong.
             // Precedence-wrapped like the kIROp_BitCast case below (#12732).
             EmitOpInfo outerPrec = inOuterPrec;
             bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
@@ -893,7 +993,9 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
     case kIROp_CastUInt64ToDescriptorHandle:
         {
-            // Metal: cast integer back to pointer type.
+            if (tryEmitNonPointerHandleBitsCast(inst, inOuterPrec))
+                return true;
+            // Metal: cast integer back to a buffer handle's pointer type.
             // Precedence-wrapped like the kIROp_BitCast case below (#12732).
             EmitOpInfo outerPrec = inOuterPrec;
             bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
