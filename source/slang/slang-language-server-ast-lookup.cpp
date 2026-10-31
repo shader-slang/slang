@@ -640,9 +640,14 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitDeclStmt(DeclStmt* stmt) { return _findAstNodeImpl(*context, stmt->decl); }
 
+    /// Searches a block's statements for the requested source position.
+    /// Constructor synthesis can wrap an authored body in a generated block to insert member
+    /// initializers. That wrapper has no source range, so only a known range can exclude the
+    /// cursor. Nested authored expressions still match their own source locations.
     bool visitBlockStmt(BlockStmt* stmt)
     {
-        if (!_isLocInRange(context, stmt->loc, stmt->closingSourceLoc))
+        if (stmt->loc.isValid() && stmt->closingSourceLoc.isValid() &&
+            !_isLocInRange(context, stmt->loc, stmt->closingSourceLoc))
             return false;
         return dispatchIfNotNull(stmt->body);
     }
