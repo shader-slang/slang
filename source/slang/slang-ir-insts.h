@@ -2796,8 +2796,10 @@ struct IRDebugValue : IRInst
 };
 
 /// Ties a debug variable to the storage that holds its value, the Slang IR analog of
-/// SPIR-V `DebugDeclare` and LLVM `llvm.dbg.declare`. Storage is a `Var`, `GlobalVar` or
-/// pointer-typed `Param`, so the variable's value is whatever that memory holds; a pass that
+/// SPIR-V `DebugDeclare` and LLVM `llvm.dbg.declare`. Storage is a pointer-typed address,
+/// rooted at a `Var`, `GlobalVar` or pointer-typed `Param`; it may be a derived address (for
+/// example after inlining) until SPIR-V legalization, which keeps only declares on a root. The
+/// variable's value is whatever that memory holds; a pass that
 /// removes or replaces the storage rewrites the declare (SSA construction turns it into a
 /// `DebugValue` per new SSA value).
 FIDDLE()

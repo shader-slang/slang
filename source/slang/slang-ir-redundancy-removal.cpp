@@ -138,9 +138,8 @@ bool isAddressMutable(IRInst* inst)
 /// Move each `DebugDeclare` on the temporary `var` to just after `storeInst`, the only write to
 /// `var`, so that it still names valid storage once `var` is replaced by the read-only memory the
 /// store copied from. That memory is defined before the store but possibly after the declaration,
-/// and from the store onward it holds exactly what `var` would have held. We move the declaration
-/// rather than turn it into a `DebugValue` of the loaded value, because such a `DebugValue` would
-/// keep the load alive and so let debug information change the generated code.
+/// and from the store onward it holds exactly what `var` would have held. Moving the declaration
+/// gives the load no debug-only use, so debug information cannot change the generated code.
 static void moveDebugDeclaresAfterStore(IRInst* var, IRInst* storeInst)
 {
     List<IRDebugDeclare*> declares;
