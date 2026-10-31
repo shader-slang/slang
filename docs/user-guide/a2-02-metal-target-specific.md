@@ -122,6 +122,14 @@ Raster-ordered access resources receive the `[[raster_order_group(0)]]`
 attribute, for example `texture2d<float, access::read_write> tex
 [[raster_order_group(0)]]`.
 
+Device buffers such as `StructuredBuffer<T>` use natural layout: a `float3`
+member is stored as `packed_float3` (12 bytes, 4-byte aligned). A
+`ConstantBuffer<T>` keeps the native MSL layout, where `float3` is 16 bytes,
+unless it is declared as `ConstantBuffer<T, ScalarDataLayout>`, which gives it
+the same natural layout as a device buffer. Reflection reports the offsets of
+whichever layout applies. `-fvk-use-scalar-layout` does not change the layout
+of Metal constant buffers.
+
 ## Array Types
 
 Array types in Metal are declared using the array template:

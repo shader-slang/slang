@@ -519,6 +519,15 @@ enum class SideEffectAnalysisOptions
     UseDominanceTree,
 };
 
+// The layout rules a buffer's contents are lowered with. The values are stored as integer
+// literals in IR (for example in `[SizeAndAlignment]` and `[Offset]` decorations), so new names
+// are appended before `_Count` and existing values do not change.
+//
+// Two names are Metal-specific. `MetalParameterBlock` is the natural layout of an argument
+// buffer, whose resource fields are lowered to descriptor handles. `MetalConstantBuffer` is the
+// native MSL layout of a constant buffer that does not name `ScalarDataLayout` (`float3` is 16
+// bytes). That is the layout of the logical MSL types, so, as under `Natural`, lowering only
+// creates storage types for members that need them, such as a matrix in a non-default layout.
 enum class IRTypeLayoutRuleName
 {
     Natural,
@@ -530,6 +539,7 @@ enum class IRTypeLayoutRuleName
     C,
     CUDA,
     LLVM,
+    MetalConstantBuffer = 8,
     _Count,
 };
 
@@ -2251,8 +2261,10 @@ public:
     // nodes would be decoded as different classes.
     // Version 37 is the earliest module version with the updated AST node numbering, and with
     // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
+    // Version 38 adds the `MetalConstantBufferLayout` IR type. Its stable opcode is appended, so
+    // the reader can continue to load version-37 modules.
     const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 37;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.
