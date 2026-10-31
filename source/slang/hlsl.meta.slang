@@ -27676,6 +27676,713 @@ void ReorderThread( HitObject HitOrMiss )
     }
 }
 
+// Fused SER functions: `ReorderExecute`, `TraceReorderExecute` and `TraceMotionReorderExecute`.
+//
+// Each `__target_switch` lists the NV labels (`_GL_NV_shader_invocation_reorder`,
+// `spvShaderInvocationReorderNV`) with the separate-call sequence, because the NV atoms imply the
+// EXT atoms: a target with only the NV capability then picks the more specific NV case instead of
+// the EXT fused instruction, which is invalid on an NV hit object. `case hlsl` covers both D3D12
+// flavours (DXR 1.3 and NVAPI) unless a function lists `hlsl_nvapi` separately.
+//
+// The checker that validates these switches requires that, for two cases on the same target, one
+// case's capability set is a subset of the other's (E36120). A case's set includes the `[require]`
+// of the free functions its body calls, but not that of a generic static member called as
+// `HitObject::name<T>`. The generic SPIR-V helpers below are free functions for that reason: it
+// gives `case spirv` the same ray-generation-only set as the NV sequence case.
+
+[require(spirv, ser_raygen)]
+void __spirvReorderExecuteShaderEXT<payload_t>(HitObject hitObject, inout payload_t p)
+{
+    spirv_asm
+    {
+        OpExtension "SPV_EXT_shader_invocation_reorder";
+        OpCapability ShaderInvocationReorderEXT;
+        OpHitObjectReorderExecuteShaderEXT &hitObject &p;
+    };
+}
+
+[require(spirv, ser_raygen)]
+void __spirvReorderExecuteShaderEXT<payload_t>(
+    HitObject hitObject,
+    uint coherenceHint,
+    uint numCoherenceHintBitsFromLSB,
+    inout payload_t p)
+{
+    spirv_asm
+    {
+        OpExtension "SPV_EXT_shader_invocation_reorder";
+        OpCapability ShaderInvocationReorderEXT;
+        OpHitObjectReorderExecuteShaderEXT
+            /**/ &hitObject
+            /**/ &p
+            /**/ $coherenceHint
+            /**/ $numCoherenceHintBitsFromLSB;
+    };
+}
+
+[require(spirv, ser_raygen)]
+void __spirvTraceReorderExecuteEXT<payload_t>(
+    out HitObject hitObject,
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint RayFlags,
+    uint InstanceInclusionMask,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    uint MissShaderIndex,
+    float3 origin,
+    float tmin,
+    float3 direction,
+    float tmax,
+    inout payload_t p)
+{
+    spirv_asm
+    {
+        OpExtension "SPV_EXT_shader_invocation_reorder";
+        OpCapability ShaderInvocationReorderEXT;
+        OpHitObjectTraceReorderExecuteEXT
+            /**/ &hitObject
+            /**/ $AccelerationStructure
+            /**/ $RayFlags
+            /**/ $InstanceInclusionMask
+            /**/ $RayContributionToHitGroupIndex
+            /**/ $MultiplierForGeometryContributionToHitGroupIndex
+            /**/ $MissShaderIndex
+            /**/ $origin
+            /**/ $tmin
+            /**/ $direction
+            /**/ $tmax
+            /**/ &p;
+    };
+}
+
+[require(spirv, ser_raygen)]
+void __spirvTraceReorderExecuteEXT<payload_t>(
+    out HitObject hitObject,
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint RayFlags,
+    uint InstanceInclusionMask,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    uint MissShaderIndex,
+    float3 origin,
+    float tmin,
+    float3 direction,
+    float tmax,
+    uint coherenceHint,
+    uint numCoherenceHintBitsFromLSB,
+    inout payload_t p)
+{
+    spirv_asm
+    {
+        OpExtension "SPV_EXT_shader_invocation_reorder";
+        OpCapability ShaderInvocationReorderEXT;
+        OpHitObjectTraceReorderExecuteEXT
+            /**/ &hitObject
+            /**/ $AccelerationStructure
+            /**/ $RayFlags
+            /**/ $InstanceInclusionMask
+            /**/ $RayContributionToHitGroupIndex
+            /**/ $MultiplierForGeometryContributionToHitGroupIndex
+            /**/ $MissShaderIndex
+            /**/ $origin
+            /**/ $tmin
+            /**/ $direction
+            /**/ $tmax
+            /**/ &p
+            /**/ $coherenceHint
+            /**/ $numCoherenceHintBitsFromLSB;
+    };
+}
+
+[require(spirv, ser_motion_raygen)]
+void __spirvTraceMotionReorderExecuteEXT<payload_t>(
+    out HitObject hitObject,
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint RayFlags,
+    uint InstanceInclusionMask,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    uint MissShaderIndex,
+    float3 origin,
+    float tmin,
+    float3 direction,
+    float tmax,
+    float CurrentTime,
+    uint coherenceHint,
+    uint numCoherenceHintBitsFromLSB,
+    inout payload_t p)
+{
+    spirv_asm
+    {
+        OpExtension "SPV_EXT_shader_invocation_reorder";
+        OpCapability ShaderInvocationReorderEXT;
+        OpExtension "SPV_NV_ray_tracing_motion_blur";
+        OpCapability RayTracingMotionBlurNV;
+        OpHitObjectTraceMotionReorderExecuteEXT
+            /**/ &hitObject
+            /**/ $AccelerationStructure
+            /**/ $RayFlags
+            /**/ $InstanceInclusionMask
+            /**/ $RayContributionToHitGroupIndex
+            /**/ $MultiplierForGeometryContributionToHitGroupIndex
+            /**/ $MissShaderIndex
+            /**/ $origin
+            /**/ $tmin
+            /**/ $direction
+            /**/ $tmax
+            /**/ $CurrentTime
+            /**/ &p
+            /**/ $coherenceHint
+            /**/ $numCoherenceHintBitsFromLSB;
+    };
+}
+
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_EXT_buffer_reference_uvec2)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
+[require(glsl, ser_raygen)]
+void __glslReorderExecuteEXT(HitObject hitObject, int payload)
+{
+    __target_switch
+    {
+    case glsl:
+    case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectReorderExecuteEXT";
+    }
+}
+
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_EXT_buffer_reference_uvec2)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
+[require(glsl, ser_raygen)]
+void __glslReorderExecuteEXT(
+    HitObject hitObject,
+    uint coherenceHint,
+    uint numCoherenceHintBitsFromLSB,
+    int payload)
+{
+    __target_switch
+    {
+    case glsl:
+    case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectReorderExecuteEXT";
+    }
+}
+
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_EXT_buffer_reference_uvec2)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
+[require(glsl, ser_raygen)]
+void __glslTraceReorderExecuteEXT(
+    out HitObject hitObject,
+    RaytracingAccelerationStructure accelerationStructure,
+    uint rayFlags,
+    uint cullMask,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    uint missIndex,
+    float3 origin,
+    float Tmin,
+    float3 direction,
+    float Tmax,
+    int payload)
+{
+    __target_switch
+    {
+    case glsl:
+    case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceReorderExecuteEXT";
+    }
+}
+
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_EXT_buffer_reference_uvec2)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
+[require(glsl, ser_raygen)]
+void __glslTraceReorderExecuteEXT(
+    out HitObject hitObject,
+    RaytracingAccelerationStructure accelerationStructure,
+    uint rayFlags,
+    uint cullMask,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    uint missIndex,
+    float3 origin,
+    float Tmin,
+    float3 direction,
+    float Tmax,
+    uint coherenceHint,
+    uint numCoherenceHintBitsFromLSB,
+    int payload)
+{
+    __target_switch
+    {
+    case glsl:
+    case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceReorderExecuteEXT";
+    }
+}
+
+__glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_EXT_buffer_reference_uvec2)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
+[require(glsl, ser_motion_raygen)]
+void __glslTraceMotionReorderExecuteEXT(
+    out HitObject hitObject,
+    RaytracingAccelerationStructure accelerationStructure,
+    uint rayFlags,
+    uint cullMask,
+    uint sbtRecordOffset,
+    uint sbtRecordStride,
+    uint missIndex,
+    float3 origin,
+    float Tmin,
+    float3 direction,
+    float Tmax,
+    float currentTime,
+    uint coherenceHint,
+    uint numCoherenceHintBitsFromLSB,
+    int payload)
+{
+    __target_switch
+    {
+    case glsl:
+    case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceMotionReorderExecuteEXT";
+    }
+}
+
+// HitObject.Invoke has no single overload for both D3D12 SER flavours: NVAPI only has the
+// AccelerationStructure form and DXR 1.3 only has the form without it. This helper takes the
+// AccelerationStructure and drops it for DXR, so `TraceReorderExecute` can keep one `case hlsl`
+// for both. The three-argument HitObject::Invoke overload enters an NVAPI-only switch with no DXR
+// case (E41011); this helper selects the target-specific intrinsic directly.
+[require(nvapi, ser_raygen)]
+[require(hlsl, ser_dxr_raygen)]
+void __hlslInvokeHitObject<payload_t>(
+    RaytracingAccelerationStructure AccelerationStructure,
+    HitObject HitOrMiss,
+    inout payload_t Payload)
+{
+    __target_switch
+    {
+    case hlsl_nvapi: __intrinsic_asm "NvInvokeHitObject";
+    case hlsl: __intrinsic_asm "dx::HitObject::Invoke($1, $2)";
+    }
+}
+
+// The separate-call sequence for `TraceMotionReorderExecute` on targets without a fused form. Its
+// `[require]` gives that function's NV case the motion-blur capabilities of the fused cases, so
+// the case can use the plain NV labels. With motion-only NV labels instead, a target with just
+// `spvShaderInvocationReorderNV` would pick `case spirv` and emit the EXT fused instruction on an
+// NV hit object, which spirv-val rejects.
+[ForceInline]
+[require(cuda_glsl_spirv, ser_motion_raygen)]
+void __traceMotionReorderExecuteSequence<payload_t>(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint RayFlags,
+    uint InstanceInclusionMask,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    uint MissShaderIndex,
+    RayDesc Ray,
+    float CurrentTime,
+    uint CoherenceHint,
+    uint NumCoherenceHintBitsFromLSB,
+    inout payload_t Payload)
+{
+    HitObject hitObj = HitObject::TraceMotionRay(
+        AccelerationStructure,
+        RayFlags,
+        InstanceInclusionMask,
+        RayContributionToHitGroupIndex,
+        MultiplierForGeometryContributionToHitGroupIndex,
+        MissShaderIndex,
+        Ray,
+        CurrentTime,
+        Payload);
+    ReorderThread(hitObj, CoherenceHint, NumCoherenceHintBitsFromLSB);
+    HitObject::Invoke(hitObj, Payload);
+}
+
+// The two-argument `HitObject.Invoke` that `ReorderExecute` lowers to on D3D12 has no NVAPI form,
+// so NVAPI targets get a diagnostic naming the function they called. This helper's
+// `[require(nvapi, ser_raygen)]` makes the NVAPI case compatible with `case hlsl` (E36120).
+[require(nvapi, ser_raygen)]
+void __diagnoseReorderExecuteOnNVAPI()
+{
+    static_assert(false, "ReorderExecute has no NVAPI form, because NVAPI HitObject::Invoke requires "
+        "an AccelerationStructure; call TraceReorderExecute, or ReorderThread followed by "
+        "HitObject::Invoke(accelerationStructure, hitObject, payload).");
+}
+
+    /// Reorders threads by `HitOrMiss` and then invokes its closesthit or miss shader.
+    /// Equivalent to `ReorderThread(HitOrMiss)` followed by `HitObject.Invoke(HitOrMiss, Payload)`,
+    /// so it is not available for NVAPI, whose `Invoke` requires an AccelerationStructure.
+// NVAPI is listed so that NVAPI users get the targeted diagnostic instead of a capability error.
+[ForceInline]
+[require(hlsl, ser_dxr_raygen)]
+[require(nvapi, ser_raygen)]
+[require(cuda_glsl_spirv, ser_raygen)]
+void ReorderExecute<payload_t>(HitObject HitOrMiss, inout payload_t Payload)
+{
+    __target_switch
+    {
+    case hlsl_nvapi:
+        __diagnoseReorderExecuteOnNVAPI();
+    case hlsl:
+    case _GL_NV_shader_invocation_reorder:
+    case cuda:
+    case spvShaderInvocationReorderNV:
+        ReorderThread(HitOrMiss);
+        HitObject::Invoke(HitOrMiss, Payload);
+    case glsl:
+        {
+            [__vulkanRayPayload]
+            static payload_t p;
+            p = Payload;
+            __glslReorderExecuteEXT(HitOrMiss, __rayPayloadLocation(p));
+            Payload = p;
+        }
+    case spirv:
+        {
+            [__vulkanRayPayload]
+            static payload_t p;
+            p = Payload;
+            __spirvReorderExecuteShaderEXT(HitOrMiss, p);
+            Payload = p;
+        }
+    }
+}
+
+    /// Reorders threads by `HitOrMiss` and a coherence hint, and then invokes its closesthit or
+    /// miss shader. Equivalent to `ReorderThread(HitOrMiss, CoherenceHint, NumCoherenceHintBitsFromLSB)`
+    /// followed by `HitObject.Invoke(HitOrMiss, Payload)`, so it is not available for NVAPI, whose
+    /// `Invoke` requires an AccelerationStructure.
+// NVAPI is listed so that NVAPI users get the targeted diagnostic instead of a capability error.
+[ForceInline]
+[require(hlsl, ser_dxr_raygen)]
+[require(nvapi, ser_raygen)]
+[require(cuda_glsl_spirv, ser_raygen)]
+void ReorderExecute<payload_t>(
+    HitObject HitOrMiss,
+    uint CoherenceHint,
+    uint NumCoherenceHintBitsFromLSB,
+    inout payload_t Payload)
+{
+    __target_switch
+    {
+    case hlsl_nvapi:
+        __diagnoseReorderExecuteOnNVAPI();
+    case hlsl:
+    case _GL_NV_shader_invocation_reorder:
+    case cuda:
+    case spvShaderInvocationReorderNV:
+        ReorderThread(HitOrMiss, CoherenceHint, NumCoherenceHintBitsFromLSB);
+        HitObject::Invoke(HitOrMiss, Payload);
+    case glsl:
+        {
+            [__vulkanRayPayload]
+            static payload_t p;
+            p = Payload;
+            __glslReorderExecuteEXT(
+                HitOrMiss,
+                CoherenceHint,
+                NumCoherenceHintBitsFromLSB,
+                __rayPayloadLocation(p));
+            Payload = p;
+        }
+    case spirv:
+        {
+            [__vulkanRayPayload]
+            static payload_t p;
+            p = Payload;
+            __spirvReorderExecuteShaderEXT(HitOrMiss, CoherenceHint, NumCoherenceHintBitsFromLSB, p);
+            Payload = p;
+        }
+    }
+}
+
+    /// Traces a ray, reorders threads by the resulting hit object, and invokes its closesthit or
+    /// miss shader. Equivalent to `HitObject.TraceRay`, `ReorderThread(hitObject)` and
+    /// `HitObject.Invoke` in sequence.
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
+void TraceReorderExecute<payload_t>(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint RayFlags,
+    uint InstanceInclusionMask,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    uint MissShaderIndex,
+    RayDesc Ray,
+    inout payload_t Payload)
+{
+    __target_switch
+    {
+    case hlsl:
+        {
+            HitObject hitObj = HitObject::TraceRay(
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray,
+                Payload);
+            ReorderThread(hitObj);
+            __hlslInvokeHitObject(
+                AccelerationStructure,
+                hitObj,
+                __forceVarIntoRayPayloadStructTemporarily(Payload));
+        }
+    case _GL_NV_shader_invocation_reorder:
+    case cuda:
+    case spvShaderInvocationReorderNV:
+        {
+            HitObject hitObj = HitObject::TraceRay(
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray,
+                Payload);
+            ReorderThread(hitObj);
+            HitObject::Invoke(hitObj, Payload);
+        }
+    case glsl:
+        {
+            [__vulkanRayPayload]
+            static payload_t p;
+            p = Payload;
+            HitObject hitObj;
+            __glslTraceReorderExecuteEXT(
+                hitObj,
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray.Origin,
+                Ray.TMin,
+                Ray.Direction,
+                Ray.TMax,
+                __rayPayloadLocation(p));
+            Payload = p;
+        }
+    case spirv:
+        {
+            [__vulkanRayPayload]
+            static payload_t p;
+            p = Payload;
+            HitObject hitObj;
+            __spirvTraceReorderExecuteEXT(
+                hitObj,
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray.Origin,
+                Ray.TMin,
+                Ray.Direction,
+                Ray.TMax,
+                p);
+            Payload = p;
+        }
+    }
+}
+
+    /// Traces a ray, reorders threads by the resulting hit object and a coherence hint, and invokes
+    /// its closesthit or miss shader. Equivalent to `HitObject.TraceRay`,
+    /// `ReorderThread(hitObject, CoherenceHint, NumCoherenceHintBitsFromLSB)` and `HitObject.Invoke`
+    /// in sequence.
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
+void TraceReorderExecute<payload_t>(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint RayFlags,
+    uint InstanceInclusionMask,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    uint MissShaderIndex,
+    RayDesc Ray,
+    uint CoherenceHint,
+    uint NumCoherenceHintBitsFromLSB,
+    inout payload_t Payload)
+{
+    __target_switch
+    {
+    case hlsl:
+        {
+            HitObject hitObj = HitObject::TraceRay(
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray,
+                Payload);
+            ReorderThread(hitObj, CoherenceHint, NumCoherenceHintBitsFromLSB);
+            __hlslInvokeHitObject(
+                AccelerationStructure,
+                hitObj,
+                __forceVarIntoRayPayloadStructTemporarily(Payload));
+        }
+    case _GL_NV_shader_invocation_reorder:
+    case cuda:
+    case spvShaderInvocationReorderNV:
+        {
+            HitObject hitObj = HitObject::TraceRay(
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray,
+                Payload);
+            ReorderThread(hitObj, CoherenceHint, NumCoherenceHintBitsFromLSB);
+            HitObject::Invoke(hitObj, Payload);
+        }
+    case glsl:
+        {
+            [__vulkanRayPayload]
+            static payload_t p;
+            p = Payload;
+            HitObject hitObj;
+            __glslTraceReorderExecuteEXT(
+                hitObj,
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray.Origin,
+                Ray.TMin,
+                Ray.Direction,
+                Ray.TMax,
+                CoherenceHint,
+                NumCoherenceHintBitsFromLSB,
+                __rayPayloadLocation(p));
+            Payload = p;
+        }
+    case spirv:
+        {
+            [__vulkanRayPayload]
+            static payload_t p;
+            p = Payload;
+            HitObject hitObj;
+            __spirvTraceReorderExecuteEXT(
+                hitObj,
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray.Origin,
+                Ray.TMin,
+                Ray.Direction,
+                Ray.TMax,
+                CoherenceHint,
+                NumCoherenceHintBitsFromLSB,
+                p);
+            Payload = p;
+        }
+    }
+}
+
+    /// Traces a motion ray at `CurrentTime`, reorders threads by the resulting hit object and a
+    /// coherence hint, and invokes its closesthit or miss shader. Equivalent to
+    /// `HitObject.TraceMotionRay`, `ReorderThread(hitObject, CoherenceHint, NumCoherenceHintBitsFromLSB)`
+    /// and `HitObject.Invoke` in sequence.
+[ForceInline]
+[require(cuda_glsl_spirv, ser_motion_raygen)]
+void TraceMotionReorderExecute<payload_t>(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint RayFlags,
+    uint InstanceInclusionMask,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    uint MissShaderIndex,
+    RayDesc Ray,
+    float CurrentTime,
+    uint CoherenceHint,
+    uint NumCoherenceHintBitsFromLSB,
+    inout payload_t Payload)
+{
+    __target_switch
+    {
+    case _GL_NV_shader_invocation_reorder:
+    case cuda:
+    case spvShaderInvocationReorderNV:
+        __traceMotionReorderExecuteSequence(
+            AccelerationStructure,
+            RayFlags,
+            InstanceInclusionMask,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            Ray,
+            CurrentTime,
+            CoherenceHint,
+            NumCoherenceHintBitsFromLSB,
+            Payload);
+    case glsl:
+        {
+            [__vulkanRayPayload]
+            static payload_t p;
+            p = Payload;
+            HitObject hitObj;
+            __glslTraceMotionReorderExecuteEXT(
+                hitObj,
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray.Origin,
+                Ray.TMin,
+                Ray.Direction,
+                Ray.TMax,
+                CurrentTime,
+                CoherenceHint,
+                NumCoherenceHintBitsFromLSB,
+                __rayPayloadLocation(p));
+            Payload = p;
+        }
+    case spirv:
+        {
+            [__vulkanRayPayload]
+            static payload_t p;
+            p = Payload;
+            HitObject hitObj;
+            __spirvTraceMotionReorderExecuteEXT(
+                hitObj,
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray.Origin,
+                Ray.TMin,
+                Ray.Direction,
+                Ray.TMax,
+                CurrentTime,
+                CoherenceHint,
+                NumCoherenceHintBitsFromLSB,
+                p);
+            Payload = p;
+        }
+    }
+}
+
 // DXR 1.3 naming: MaybeReorderThread (alias for ReorderThread for DXR compatibility)
 
     /// DXR 1.3 MaybeReorderThread - reorders threads based on a coherence hint value.
