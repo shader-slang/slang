@@ -93,7 +93,9 @@ void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
 }
 
 /// Hide every local variable that `scopeDecl` owns from lookup until checking reaches its
-/// declaration point, where `checkDeclAtDeclarationPoint` reveals it.
+/// declaration point, where `checkDeclAtDeclarationPoint` reveals it. A hidden local is skipped
+/// by lookup (see `_isUncheckedLocalVar`), so an earlier reference binds an outer declaration of
+/// the same name or is reported as undefined.
 ///
 /// Consider this example:
 /// ```
@@ -104,11 +106,15 @@ void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
 /// }
 /// ```
 /// Body-stage parsing leaves every local in the `ReadyForParserLookup` state, so the check
-/// state alone does not make lookup skip `b`; the `hiddenFromLookup` flag rejects the forward
-/// reference (see `_isUncheckedLocalVar`). The parser gives an unbraced statement body no scope
-/// of its own and adds `b` to the block's scope although its `DeclStmt` is nested in the `if`,
-/// so we hide every variable the scope owns rather than only those declared by the block's
-/// direct statements.
+/// state alone does not make lookup skip `b`. The parser gives an unbraced statement body no
+/// scope of its own and adds `b` to the block's scope although its `DeclStmt` is nested in the
+/// `if`, so we hide every variable the scope owns rather than only those declared by the
+/// block's direct statements.
+///
+/// The caller guarantees that every `VarDecl` the scope owns has a `DeclStmt` that is checked
+/// within the statement owning the scope; otherwise the local would stay hidden. Block and `for`
+/// scopes meet this. `$for` and `__GPU_FOREACH` scopes do not, because their loop variable has
+/// no `DeclStmt`, so we do not call this function for them.
 ///
 static void hideLocalVarsUntilDeclared(ScopeDecl* scopeDecl)
 {
@@ -303,8 +309,9 @@ void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt* stmt)
     WithOuterStmt subContext(this, stmt);
 
     // We check the body before the predicate, in source order, because lookup reveals a
-    // local only once checking reaches its declaration: the predicate of
-    // `do int i = next(); while (i != 0);` refers to the `i` that the body declares.
+    // local only once checking reaches its declaration. Currently an unbraced body has no
+    // scope of its own, so in `do int i = next(); while (i != 0);` the predicate refers to
+    // the `i` that the body declares.
     subContext.checkStmt(stmt->statement);
     stmt->predicate = checkPredicateExpr(stmt->predicate);
     checkLoopInDifferentiableFunc(stmt);
@@ -316,9 +323,11 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
     WithOuterStmt subContext(this, stmt);
     checkModifiers(stmt);
 
-    // The loop's scope owns both the variables of its initial statement and a declaration
-    // used as an unbraced body, as in `for (int k = 0; k < i; k++) int i = 1;`. The predicate
-    // and side-effect expressions are checked before the body and must not see the latter.
+    // A Slang `for` loop's scope owns both the variables of its initial statement and a
+    // declaration used as an unbraced body, as in `for (int k = 0; k < i; k++) int i = 1;`. The
+    // predicate and side-effect expressions precede the body and must not see the latter. For an
+    // HLSL `UnscopedForStmt` the parser does not push this scope, so it is empty and the
+    // enclosing block hides the loop's locals instead.
     hideLocalVarsUntilDeclared(stmt->scopeDecl);
     checkStmt(stmt->initialStatement);
 

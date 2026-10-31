@@ -6166,8 +6166,9 @@ static void CompleteDecl(
         // Note that our lookup logic will ignore all unchecked decls, but during
         // parsing we don't want to ignore them, so we mark them as `ReadyForParserLookup`
         // here, which is a pseudo state that is only used during parsing.
-        // Before checking the decl in semantic checking, we will mark them back as
-        // `Unchecked`.
+        // Semantic checking does not reset this state, so it relies on
+        // `Decl::hiddenFromLookup` to hide a local until its declaration point
+        // (see `hideLocalVarsUntilDeclared` in slang-check-stmt.cpp).
         decl->checkState = DeclCheckState::ReadyForParserLookup;
     }
 }
