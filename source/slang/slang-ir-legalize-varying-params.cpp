@@ -4352,6 +4352,21 @@ private:
     }
 };
 
+// Return true if `var` has a vector type with more than one component. Metal legalization
+// checks both entry-point parameters and fields of the entry-point output struct, and a
+// field keeps its type on the field rather than as its data type.
+static bool isVectorTypedVarying(IRInst* var)
+{
+    IRType* type = nullptr;
+    if (auto field = as<IRStructField>(var))
+        type = field->getFieldType();
+    else
+        type = var->getDataType();
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+        type = ptrType->getValueType();
+    return getIRVectorElementSize(type) > 1;
+}
+
 class LegalizeMetalEntryPointContext : public LegalizeShaderEntryPointContext
 {
 public:
@@ -4390,13 +4405,13 @@ protected:
                 break;
             }
         case SystemValueSemanticName::ClipDistance:
-            {
-                result.isSpecial = true;
-                break;
-            }
         case SystemValueSemanticName::CullDistance:
             {
                 result.isSpecial = true;
+                // Slang does not yet map clip and cull distances to Metal's `[[clip_distance]]`
+                // array (#13934); a vector-typed one is reported rather than declared, so that
+                // its components cannot be silently dropped once scalars are mapped.
+                result.isUnsupported = isVectorTypedVarying(parentVar);
                 break;
             }
         case SystemValueSemanticName::Coverage:
