@@ -4272,7 +4272,9 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     }
 
     /// Atomically computes the maximum of the stored value and the given value
-    /// without returning the original value. On CUDA, maps to the PTX `red` instruction.
+    /// without returning the original value. On CUDA, maps to the PTX `red` instruction for
+    /// integer types; `float` and `double` use an integer atomic on their bit pattern, and `half`
+    /// a compare-and-swap loop.
     [require(atomic_reduce)]
     __cuda_sm_version(7.0)
     [ForceInline]
@@ -4286,7 +4288,9 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     }
 
     /// Atomically computes the minimum of the stored value and the given value
-    /// without returning the original value. On CUDA, maps to the PTX `red` instruction.
+    /// without returning the original value. On CUDA, maps to the PTX `red` instruction for
+    /// integer types; `float` and `double` use an integer atomic on their bit pattern, and `half`
+    /// a compare-and-swap loop.
     [require(atomic_reduce)]
     __cuda_sm_version(7.0)
     [ForceInline]

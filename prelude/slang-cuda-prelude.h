@@ -3036,6 +3036,144 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
     return __int_as_float(old);
 }
 
+// Floating-point atomic min/max
+// CUDA has no native floating-point atomicMin/atomicMax, so the prelude implements them. Both
+// implementations below follow the SPIR-V OpAtomicFMinEXT/OpAtomicFMaxEXT rules and return the
+// original value: a NaN operand is ignored, a stored NaN is replaced, and either zero may win
+// between -0.0 and +0.0. Both write only the exact bits of an operand, never a result of
+// fminf/fmaxf, and both return without a write when the stored value already wins; the initial
+// volatile load is a coherent relaxed load, which makes that a valid min/max at that load. Neither
+// depends on -fp-mode: float and double compare in integer order, and half values widen to normal
+// floats.
+
+// Float and double use integer atomics on the bit pattern. When the sign bit is clear, signed
+// integer order matches floating-point order; for negative values, unsigned order is its reverse.
+// For example, -1.0f is 0xBF800000 and -2.0f is 0xC0000000, so the smaller float is the larger
+// unsigned value, and min with a negative operand is an unsigned atomicMax (a stored positive value
+// is smaller as unsigned and correctly loses). Integer order puts -0.0 below +0.0, which the rules
+// allow, but it does not ignore NaNs, so NaNs are handled around the integer atomic.
+//
+// Each loop iteration starts from `old`, the latest stored bits this thread has seen. A winning
+// update takes one integer atomic and no retry; only a stored NaN goes through atomicCAS, which
+// retries when another kind of write changes the value first.
+template<typename T, typename Bits, typename UBits>
+__device__ __forceinline__ T
+__slang_atomic_min_max_with_integer_atomics(T* address, T val, bool isMin)
+{
+    static_assert(sizeof(T) == sizeof(Bits) && sizeof(Bits) == sizeof(UBits), "size mismatch");
+    Bits* bits = reinterpret_cast<Bits*>(address);
+    const Bits valBits = *reinterpret_cast<const Bits*>(&val);
+    Bits old = *(volatile Bits*)bits;
+    // A NaN operand never changes the stored value, so the loaded value is the result.
+    if (isnan(val))
+        return *reinterpret_cast<const T*>(&old);
+    // A key is the bit pattern with the magnitude bits of a negative value flipped, so that signed
+    // key order is the integer atomics' order for every non-NaN value. Comparing keys rather than
+    // values keeps the early exit exact when float comparisons flush subnormals.
+    const Bits magnitudeMask = Bits(~UBits(0) >> 1);
+    const Bits valKey = valBits >= 0 ? valBits : Bits(valBits ^ magnitudeMask);
+    for (;;)
+    {
+        const T oldValue = *reinterpret_cast<const T*>(&old);
+        if (!isnan(oldValue))
+        {
+            const Bits oldKey = old >= 0 ? old : Bits(old ^ magnitudeMask);
+            if (!(isMin ? valKey < oldKey : valKey > oldKey))
+                return oldValue;
+            const bool signedOrder = valBits >= 0;
+            Bits original;
+            if (signedOrder)
+                original = isMin ? atomicMin(bits, valBits) : atomicMax(bits, valBits);
+            else
+                original = Bits(
+                    isMin ? atomicMax(reinterpret_cast<UBits*>(bits), UBits(valBits))
+                          : atomicMin(reinterpret_cast<UBits*>(bits), UBits(valBits)));
+            const T originalValue = *reinterpret_cast<const T*>(&original);
+            if (!isnan(originalValue))
+                return originalValue;
+            // Another kind of write stored a NaN after our load. If the integer atomic kept it,
+            // replace it below like any stored NaN; if it wrote `val`, it already did.
+            const bool kept = signedOrder ? (isMin ? original <= valBits : original >= valBits)
+                                          : (isMin ? UBits(original) >= UBits(valBits)
+                                                   : UBits(original) <= UBits(valBits));
+            if (!kept)
+                return originalValue;
+            old = original;
+            continue;
+        }
+        const Bits observed =
+            Bits(atomicCAS(reinterpret_cast<UBits*>(bits), UBits(old), UBits(valBits)));
+        if (observed == old)
+            return oldValue;
+        old = observed;
+    }
+}
+
+__device__ __forceinline__ float __slang_atomic_min_max(float* address, float val, bool isMin)
+{
+    return __slang_atomic_min_max_with_integer_atomics<float, int, unsigned int>(
+        address,
+        val,
+        isMin);
+}
+
+__device__ __forceinline__ double __slang_atomic_min_max(double* address, double val, bool isMin)
+{
+    return __slang_atomic_min_max_with_integer_atomics<double, long long, unsigned long long>(
+        address,
+        val,
+        isMin);
+}
+
+#define SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(T)                                             \
+    __device__ __forceinline__ T __slang_atomic_min(T* address, T val)                      \
+    {                                                                                       \
+        return __slang_atomic_min_max(address, val, true);                                  \
+    }                                                                                       \
+    __device__ __forceinline__ T __slang_atomic_max(T* address, T val)                      \
+    {                                                                                       \
+        return __slang_atomic_min_max(address, val, false);                                 \
+    }                                                                                       \
+    __device__ __forceinline__ void __slang_atomic_reduce_min(T* address, T val, int order) \
+    {                                                                                       \
+        __slang_atomic_min_max(address, val, true);                                         \
+    }                                                                                       \
+    __device__ __forceinline__ void __slang_atomic_reduce_max(T* address, T val, int order) \
+    {                                                                                       \
+        __slang_atomic_min_max(address, val, false);                                        \
+    }
+
+SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(float)
+SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(double)
+
+// CUDA has no 16-bit integer atomicMin/atomicMax, so half uses a compare-and-swap loop, comparing
+// in float after an exact widening. 16-bit atomicCAS is only declared for sm_70 and up and for the
+// host pass, which this condition matches.
+#if defined(SLANG_CUDA_ENABLE_HALF) && (!defined(__CUDA_ARCH__) || (__CUDA_ARCH__ >= 700))
+__device__ __forceinline__ __half __slang_atomic_min_max(__half* address, __half val, bool isMin)
+{
+    unsigned short* bits = reinterpret_cast<unsigned short*>(address);
+    const unsigned short valBits = __half_as_ushort(val);
+    const float value = __half2float(val);
+    unsigned short old = *(volatile unsigned short*)bits;
+    for (;;)
+    {
+        const __half oldValue = __ushort_as_half(old);
+        const float stored = __half2float(oldValue);
+        const bool replace =
+            isnan(stored) ? !isnan(value) : (isMin ? value < stored : value > stored);
+        if (!replace)
+            return oldValue;
+        const unsigned short observed = atomicCAS(bits, old, valBits);
+        if (observed == old)
+            return oldValue;
+        old = observed;
+    }
+}
+
+SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(__half)
+#endif
+
 // =====================================================================
 // Atomic Reduction Operations (PTX `red` instruction)
 // These are in-place atomic operations that don't return the old value.
@@ -3044,7 +3182,7 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
 //
 // Supported operations based on PTX ISA:
 // - add: .s32, .u32, .u64, .s64, .f16, .f16x2, .bf16, .bf16x2, .f32, .f64
-// - min/max: .s32, .u32, .s64, .u64, .f32, .f64, .f16, .f16x2
+// - min/max: .s32, .u32, .s64, .u64
 // - and/or/xor: .b32, .b64
 // - inc/dec: .u32
 // =====================================================================
@@ -3148,9 +3286,8 @@ __device__ __forceinline__ void __slang_atomic_reduce_min(uint64_t* addr, uint64
 }
 
 // NOTE: PTX `red` instruction does NOT support min/max for floating-point types.
-// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max.
-// For floating-point min/max atomics, use the regular `atom` instruction via
-// __atomic_min/__atomic_max.
+// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max. The
+// floating-point overloads are defined with __slang_atomic_min_max.
 
 // Atomic reduction MAX operations
 __device__ __forceinline__ void __slang_atomic_reduce_max(int32_t* addr, int32_t val, int order)
@@ -3174,9 +3311,8 @@ __device__ __forceinline__ void __slang_atomic_reduce_max(uint64_t* addr, uint64
 }
 
 // NOTE: PTX `red` instruction does NOT support min/max for floating-point types.
-// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max.
-// For floating-point min/max atomics, use the regular `atom` instruction via
-// __atomic_min/__atomic_max.
+// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max. The
+// floating-point overloads are defined with __slang_atomic_min_max.
 
 // Atomic reduction AND operations (bitwise, integers only)
 __device__ __forceinline__ void __slang_atomic_reduce_and(int32_t* addr, int32_t val, int order)

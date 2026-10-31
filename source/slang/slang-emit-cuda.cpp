@@ -868,19 +868,22 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             return true;
         }
     case kIROp_AtomicMin:
-        {
-            emitInstResultDecl(inst);
-            m_writer->emit("atomicMin(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(", ");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            m_writer->emit(");\n");
-            return true;
-        }
     case kIROp_AtomicMax:
         {
             emitInstResultDecl(inst);
-            m_writer->emit("atomicMax(");
+            const bool isMin = inst->getOp() == kIROp_AtomicMin;
+            if (isFloatingType(inst->getDataType()))
+            {
+                // CUDA has no floating-point atomicMin/atomicMax, so the prelude implements them;
+                // the half one is a 16-bit atomicCAS loop, which needs sm_70.
+                if (inst->getDataType()->getOp() == kIROp_HalfType)
+                    m_extensionTracker->requireSMVersion(SemanticVersion(7, 0));
+                m_writer->emit(isMin ? "__slang_atomic_min(" : "__slang_atomic_max(");
+            }
+            else
+            {
+                m_writer->emit(isMin ? "atomicMin(" : "atomicMax(");
+            }
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
