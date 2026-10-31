@@ -100,6 +100,26 @@ void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     m_writer->emit(":\n");
 }
 
+// A uniform buffer with an explicit std430 or scalar layout has the layout WGSL gives every other
+// host-shareable buffer (16-byte array strides and struct alignment are not required), which
+// `var<uniform>` allows under the `uniform_buffer_standard_layout` language extension.
+// https://www.w3.org/TR/WGSL/#language_extension-uniform_buffer_standard_layout
+void WGSLSourceEmitter::noteUniformBufferLayout(IRUniformParameterGroupType* type)
+{
+    if (auto dataLayout = type->getDataLayout())
+    {
+        switch (dataLayout->getOp())
+        {
+        case kIROp_Std430BufferLayoutType:
+        case kIROp_ScalarBufferLayoutType:
+            m_requiresUniformBufferStandardLayout = true;
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 void WGSLSourceEmitter::emitParameterGroupImpl(
     IRGlobalParam* varDecl,
     IRUniformParameterGroupType* type)
@@ -183,6 +203,8 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
             break;
         }
     }
+
+    noteUniformBufferLayout(type);
 
     auto elementType = type->getElementType();
     m_writer->emit("var<uniform> ");
@@ -905,6 +927,8 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         type->getOperand(0)->getOp() == kIROp_ConstantBufferType)
     {
         // Arrays of constant buffers should use the uniform keyword.
+        if (auto elementGroupType = as<IRUniformParameterGroupType>(type->getOperand(0)))
+            noteUniformBufferLayout(elementGroupType);
         m_writer->emit("<uniform>");
     }
     else if (
@@ -1909,6 +1933,11 @@ void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
     if (m_requiresImmediateAddressSpace)
     {
         m_writer->emit("requires immediate_address_space;\n");
+    }
+
+    if (m_requiresUniformBufferStandardLayout)
+    {
+        m_writer->emit("requires uniform_buffer_standard_layout;\n");
     }
 }
 
