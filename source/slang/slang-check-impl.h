@@ -4153,6 +4153,8 @@ public:
 
     String getCallSignatureString(OverloadResolveContext& context);
 
+    void diagnoseMissingGenericConstraints(OverloadResolveContext& context);
+
     Expr* ResolveInvoke(InvokeExpr* expr);
 
     void AddGenericOverloadCandidate(LookupResultItem baseItem, OverloadResolveContext& context);
