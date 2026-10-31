@@ -3876,6 +3876,10 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
             getSink()->diagnose(Diagnostics::AssignNonLvalue{.expr = expr});
         }
     }
+    else
+    {
+        checkGroupSharedPartialWriteInDifferentiatedBody(expr->left);
+    }
     expr->type = type;
     return expr;
 }
@@ -4389,10 +4393,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 checkThrowingCallIsCovered(invoke);
 
             auto funcDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr);
+            DeclRef<CallableDecl> callableDeclRef;
             List<DeclRef<ParamDecl>> paramDeclRefs;
             if (funcDeclRefExpr)
             {
-                if (auto callableDeclRef = funcDeclRefExpr->declRef.as<CallableDecl>())
+                callableDeclRef = funcDeclRefExpr->declRef.as<CallableDecl>();
+                if (callableDeclRef)
                 {
                     paramDeclRefs =
                         getParametersForCallableSignature(m_astBuilder, callableDeclRef);
@@ -4413,6 +4419,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                         paramDecl = paramDeclRefs[pp].getDecl();
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
+                checkGroupSharedArgumentOfParam(paramDecl, argExpr);
 
                 if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
@@ -4604,6 +4611,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // Warn when the same storage is passed to two parameters that may both be references
             // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
+            checkGroupSharedArgumentsOfCopiedParams(
+                invoke,
+                funcType,
+                callableDeclRef,
+                paramDeclRefs);
+            checkGroupSharedPartialWritesByInlinedCall(invoke, funcType, callableDeclRef);
 
             if (!IsErrorExpr(invoke))
             {
@@ -6053,11 +6066,19 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
         case ParamPassingMode::RefReadOnly:
         case ParamPassingMode::RefWriteOnly:
             {
-                // Not allowed..
-                SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                // Automatic differentiation propagates no derivative through a reference
+                // parameter, so a reference that carries no derivative passes through as a
+                // `no_diff` reference with the same access.
+                if (tryGetDifferentialPairType(paramValType))
+                    SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                paramTypes.add(getParamTypeWithModeWrapper(
+                    m_astBuilder,
+                    m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()}),
+                    paramPassingMode));
+                break;
             }
-
-            break;
         }
     }
 
@@ -7518,6 +7539,11 @@ static PtrType* getValidTypeForAddressOf(
     // block of memory we allow getting the address of.
     if (auto declRefExpr = as<DeclRefExpr>(baseExpr))
     {
+        // Error recovery for an undefined name, and the type-only arguments that
+        // `Linkage::specializeWithArgTypes` builds, are `DeclRefExpr`s that refer to no
+        // declaration. Such an expression names no storage, so it has no address.
+        if (!declRefExpr->declRef)
+            return nullptr;
         visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::DefinitionChecked);
         if (auto varDeclRef = as<VarDeclBase>(declRefExpr->declRef))
         {
@@ -7734,6 +7760,300 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         expr->type = m_astBuilder->getErrorType();
     }
     return expr;
+}
+
+// Strip the projections that read a part of an object -- `.field`, `[i]`, a single-component
+// swizzle such as `.x` or `._m00`, and `(...)` -- to reach the object whose declaration carries the
+// address space. `groupshared` sits on that object, never on the part.
+//
+// Anything reached through a pointer stops the walk, because there the pointer's own type carries
+// the address space.
+//
+// `getValidTypeForAddressOf` would walk these projections itself, but it judges a field access by
+// the field's declaration and so loses the base object's address space (issue #14094).
+static Expr* getBaseObjectOfProjection(Expr* expr)
+{
+    for (;;)
+    {
+        if (auto parenExpr = as<ParenExpr>(expr))
+            expr = parenExpr->base;
+        else if (auto indexExpr = as<IndexExpr>(expr))
+            expr = indexExpr->baseExpression;
+        else if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        {
+            // A multi-element swizzle may be non-contiguous, so it has no address of its own and
+            // the caller materializes a private temporary for it. Stop, so that such an argument is
+            // judged on its own and rejected rather than inheriting the base's address space.
+            if (swizzleExpr->elementIndices.getCount() > 1)
+                return expr;
+            expr = swizzleExpr->base;
+        }
+        else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(expr))
+        {
+            if (matrixSwizzleExpr->elementCount > 1)
+                return expr;
+            expr = matrixSwizzleExpr->base;
+        }
+        else if (auto memberExpr = as<MemberExpr>(expr))
+        {
+            auto memberDecl = memberExpr->declRef.getDecl();
+            if (as<DerefMemberExpr>(memberExpr) || !as<VarDeclBase>(memberExpr->declRef) ||
+                (memberDecl && memberDecl->hasModifier<HLSLStaticModifier>()))
+                return expr;
+            expr = memberExpr->baseExpression;
+        }
+        else
+            return expr;
+    }
+}
+
+// Return whether `arg` is one of the type-only placeholder arguments that
+// `Linkage::specializeWithArgTypes` builds to resolve a call from reflected types: a bare `VarExpr`
+// with a checked type but neither a name nor a declaration. A placeholder stands for some l-value
+// of its type and names no storage, so a check about which storage an argument names has no answer
+// for it. No other expression shape is exempted.
+static bool isTypeOnlyPlaceholderArg(Expr* arg)
+{
+    auto varExpr = as<VarExpr>(arg);
+    return varExpr && varExpr->astNodeType == ASTNodeType::VarExpr && !varExpr->name &&
+           !varExpr->declRef && varExpr->type.type && varExpr->type.isLeftValue;
+}
+
+// Return whether `arg` comes from an expression that already failed to check. Coercion wraps an
+// error-typed operand in an implicit cast to the parameter's type, so we look through that cast; a
+// storage diagnostic for such an argument would only repeat the reported error.
+static bool isArgumentOfFailedCheck(Expr* arg)
+{
+    if (as<ErrorType>(arg->type))
+        return true;
+    auto castExpr = as<ImplicitCastExpr>(arg);
+    return castExpr && as<ErrorType>(castExpr->arguments[0]->type);
+}
+
+// Return whether `arg` names thread-group-shared storage: strip the projections that read a part of
+// an object to reach the addressed object, then ask `getValidTypeForAddressOf` for its addressable
+// pointer type and inspect that pointer's address space. `getValidTypeForAddressOf` already
+// computes the addressable pointer type -- carrying its address space -- for an addressable
+// expression, so it is reused as the source of truth rather than re-deriving addressability here.
+bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
+{
+    if (!arg)
+        return false;
+
+    auto addressedExpr = getBaseObjectOfProjection(arg);
+
+    if (auto ptrType = getValidTypeForAddressOf(
+            this,
+            m_astBuilder,
+            addressedExpr,
+            getType(m_astBuilder, addressedExpr)))
+    {
+        if (auto addrSpaceVal = as<ConstantIntVal>(ptrType->getAddressSpace()))
+            return (AddressSpace)addrSpaceVal->getValue() == AddressSpace::GroupShared;
+    }
+    return false;
+}
+
+// A `groupshared` parameter is a by-reference alias of a single thread-group-shared location, so
+// its argument must itself name thread-group-shared storage. Passing a private local, a copy, or an
+// rvalue would silently alias non-shared memory as shared, breaking the group-shared aliasing
+// semantics HLSL requires (DXC rejects it outright with error 0043).
+void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
+{
+    if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>() ||
+        isTypeOnlyPlaceholderArg(argIn) || isArgumentOfFailedCheck(argIn))
+        return;
+
+    if (!argumentNamesGroupSharedStorage(argIn))
+        getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
+            .param = getText(paramIn->getName()),
+            .arg = argIn});
+}
+
+// Return whether every call to `callee` is replaced by the callee's body or by an intrinsic, so
+// that no call boundary remains at which an `out`/`inout` argument would be copied. The core
+// module's compound assignments and increments (`g[i] += 1`, `g[i]++`) are such calls.
+static bool isCallAlwaysInlinedOrIntrinsic(CallableDecl* callee)
+{
+    return callee->hasModifier<ForceInlineAttribute>() ||
+           callee->hasModifier<UnsafeForceInlineEarlyAttribute>() ||
+           callee->hasModifier<IntrinsicOpModifier>() ||
+           callee->hasModifier<TargetIntrinsicModifier>();
+}
+
+// An `out` or `inout` parameter has copy-in/copy-out semantics, so the call works on a copy of its
+// argument and stores the copy back when it returns. Thread-group-shared storage is accessible to
+// every invocation in the group, so the callee can miss the other invocations' writes or overwrite
+// them, and we warn. A `groupshared` parameter is a reference
+// rather than an `inout`, so it is never copied. The implicit `this` of a method whose receiver
+// mode is `inout` (a `[mutating]` method) is such a parameter too. A direct argument of a call that
+// is always inlined is not passed across a call boundary, but an implicitly converted one still
+// goes through a temporary.
+void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+{
+    if (!calleeDeclRef)
+        return;
+
+    bool callIsInlined = isCallAlwaysInlinedOrIntrinsic(calleeDeclRef.getDecl());
+    Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
+    for (Index i = 0; i < checkCount && i < paramDeclRefs.getCount(); ++i)
+    {
+        auto paramDecl = paramDeclRefs[i].getDecl();
+        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
+            continue;
+
+        auto argExpr = invoke->arguments[i];
+        if (isArgumentOfFailedCheck(argExpr))
+            continue;
+        auto addressedExpr = argExpr;
+        if (auto lValueCast = as<LValueImplicitCastExpr>(argExpr))
+            addressedExpr = lValueCast->arguments[0];
+        else if (callIsInlined)
+            continue;
+
+        if (argumentNamesGroupSharedStorage(addressedExpr))
+            getSink()->diagnose(Diagnostics::GroupsharedArgumentToCopiedParameter{
+                .param = getText(paramDecl->getName()),
+                .suggestion = "; if the callee needs to see other invocations' writes, declare "
+                              "the parameter 'groupshared'",
+                .arg = argExpr});
+    }
+
+    if (callIsInlined)
+        return;
+    auto thisParamInfo = findEffectiveThisParamInfo(calleeDeclRef);
+    if (!thisParamInfo || thisParamInfo->mode != ParamPassingMode::BorrowInOut)
+        return;
+    if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
+    {
+        if (argumentNamesGroupSharedStorage(memberExpr->baseExpression))
+            getSink()->diagnose(Diagnostics::GroupsharedArgumentToCopiedParameter{
+                .param = "this",
+                .suggestion = "",
+                .arg = memberExpr->baseExpression});
+    }
+}
+
+// The modes in which autodiff generates a derivative of a function from its body.
+struct ModesDifferentiatedFromBody
+{
+    bool forward = false;
+    bool backward = false;
+
+    bool any() const { return forward || backward; }
+};
+
+// Return the modes in which autodiff generates a derivative of `func` from its body: those in
+// which `func` is marked differentiable and has no custom derivative. A custom derivative may be
+// attached by an attribute on `func` or by a `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]`
+// attribute on the derivative; we only see the latter when the derivative's module is visible
+// from here.
+static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
+    SharedSemanticsContext* shared,
+    FunctionDeclBase* func)
+{
+    ModesDifferentiatedFromBody modes;
+    if (!func)
+        return modes;
+    bool isBackwardDifferentiable = func->hasModifier<BackwardDifferentiableAttribute>();
+    if (!isBackwardDifferentiable && !func->hasModifier<ForwardDifferentiableAttribute>())
+        return modes;
+
+    bool hasCustomForward = func->hasModifier<ForwardDerivativeAttribute>() ||
+                            func->hasModifier<HasTrivialForwardDerivativeAttribute>();
+    bool hasCustomBackward = func->hasModifier<BackwardDerivativeAttribute>();
+    for (auto assoc : shared->getAssociatedDeclsForDecl(func))
+    {
+        if (assoc->kind == DeclAssociationKind::ForwardDerivativeFunc)
+            hasCustomForward = true;
+        else if (assoc->kind == DeclAssociationKind::BackwardDerivativeFunc)
+            hasCustomBackward = true;
+    }
+    modes.forward = !hasCustomForward;
+    modes.backward = isBackwardDifferentiable && !hasCustomBackward;
+    return modes;
+}
+
+// Autodiff prepares a function body for differentiation by replacing the addresses it computes
+// with values, so a write to part of a thread-group-shared variable becomes a read of the whole
+// variable, an update of the part, and a write of the whole variable. Each invocation then
+// stores back stale copies of the parts other invocations wrote. A write of the whole variable
+// stays a single store. A write through a `groupshared` parameter stays in place, because
+// autodiff leaves the storage behind a reference parameter in memory. A non-differentiable
+// function called from the body keeps its own writes in place, because autodiff does not rewrite
+// it.
+//
+// Consider this example:
+//
+//     groupshared float g[4];
+//     groupshared float4 v;
+//
+//     [Differentiable]
+//     float f(groupshared float a[4], uint i, float x)
+//     {
+//         g[i] = x;       // reported
+//         v.yz += 1.0;    // reported
+//         v = float4(0);  // not reported
+//         a[i] = x;       // not reported
+//         return x;
+//     }
+void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target)
+{
+    if (!target || isArgumentOfFailedCheck(target))
+        return;
+    if (!getModesDifferentiatedFromBody(getShared(), m_parentFunc).any())
+        return;
+
+    Expr* wholeExpr = target;
+    while (auto parenExpr = as<ParenExpr>(wholeExpr))
+        wholeExpr = parenExpr->base;
+
+    // A multi-element swizzle has no address of its own, so we judge the object it selects from.
+    Expr* addressedExpr = wholeExpr;
+    if (auto swizzleExpr = as<SwizzleExpr>(wholeExpr))
+        addressedExpr = swizzleExpr->base;
+    else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(wholeExpr))
+        addressedExpr = matrixSwizzleExpr->base;
+
+    if (!argumentNamesGroupSharedStorage(addressedExpr))
+        return;
+    auto baseExpr = getBaseObjectOfProjection(addressedExpr);
+    if (baseExpr == wholeExpr)
+        return;
+    auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
+    if (!baseDeclRefExpr || as<ParamDecl>(baseDeclRefExpr->declRef.getDecl()))
+        return;
+
+    getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
+        .var = baseDeclRefExpr->declRef.getDecl(),
+        .target = target});
+}
+
+// A call that is always inlined, or to an intrinsic, writes its `out` and `inout` arguments in
+// the calling body, so we check those arguments as writes. Compound assignments and increments,
+// such as `g[i] += 1` and `g[i]++`, are such calls. A call to any other function copies those
+// arguments, which `checkGroupSharedArgumentsOfCopiedParams` already reports.
+void SemanticsVisitor::checkGroupSharedPartialWritesByInlinedCall(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef)
+{
+    if (!calleeDeclRef || !isCallAlwaysInlinedOrIntrinsic(calleeDeclRef.getDecl()))
+        return;
+    Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
+    for (Index i = 0; i < checkCount; ++i)
+    {
+        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
+            continue;
+        auto argExpr = invoke->arguments[i];
+        if (as<LValueImplicitCastExpr>(argExpr))
+            continue;
+        checkGroupSharedPartialWriteInDifferentiatedBody(argExpr);
+    }
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)

@@ -4004,6 +4004,41 @@ err(
     span { loc = "location" }
 )
 
+err(
+    "groupshared-parameter-cannot-have-direction-modifier",
+    30707, -- 30706 reserved for #11885 (duplicate-system-value-semantic)
+    "a 'groupshared' parameter is passed by reference; 'in'/'out'/'inout' cannot be used with 'groupshared' -- use bare 'groupshared' for a read-write reference or 'const groupshared' for a read-only reference",
+    span { loc = "modifier:Modifier" }
+)
+
+err(
+    "groupshared-parameter-not-allowed-on-hlsl-with-boundary",
+    30708,
+    "a 'groupshared' parameter cannot be passed across a function boundary when targeting HLSL",
+    span { loc = "location", message = "~reason:String, and HLSL cannot pass thread-group-shared memory across a call; ~suggestion:String" }
+)
+
+warning(
+    "groupshared-argument-to-copied-parameter",
+    30709,
+    "'~param' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory and stores the copy back when it returns; a write that another invocation makes to the memory during the call is lost",
+    span { loc = "arg:Expr", message = "if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit~suggestion:String" }
+)
+
+err(
+    "groupshared-argument-must-be-groupshared-lvalue",
+    30711,
+    "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a 'groupshared' parameter forwarded on)",
+    span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage; pass a 'groupshared' variable or a component of one, or declare '~param' without 'groupshared' if the function does not need thread-group-shared memory" }
+)
+
+err(
+    "groupshared-parameter-cannot-be-borrow",
+    30712,
+    "'~modifier' cannot be used with 'groupshared' -- use 'const groupshared' for a read-only reference",
+    span { loc = "modifier:Modifier" }
+)
+
 --
 -- 308xx: inheritance
 --
@@ -4811,6 +4846,20 @@ err(
     38034,
     "'borrow in' on differentiable parameter",
     span { loc = "modifier:Modifier", message = "cannot use 'borrow in' on a differentiable parameter." }
+)
+
+warning(
+    "reference-parameter-of-differentiable-function-treated-as-no-diff",
+    38038,
+    "parameter '~param:Decl' is passed by reference, so a differentiable function treats it as 'no_diff'",
+    span { loc = "param:Decl", message = "no derivative is propagated through a reference parameter; mark it 'no_diff' to make that explicit." }
+)
+
+err(
+    "groupshared-partial-write-in-differentiated-body",
+    38039,
+    "writing part of thread-group-shared variable '~var:Decl' introduces a race condition when this function is differentiated",
+    span { loc = "target:Expr", message = "move the access into a function that is not differentiable or has a custom derivative" }
 )
 
 err(

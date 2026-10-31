@@ -2381,19 +2381,8 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
                                                                     : nullptr;
         SLANG_ASSERT(prefix && "Unhandled type of mesh output decoration");
 
-        auto valueType = paramType;
-        if (auto outType = as<IROutParamTypeBase>(valueType))
-        {
-            valueType = outType->getValueType();
-        }
-        else if (auto refType = as<IRRefParamType>(valueType))
-        {
-            valueType = refType->getValueType();
-        }
-        else if (auto constRefType = as<IRBorrowInParamType>(valueType))
-        {
-            valueType = constRefType->getValueType();
-        }
+        auto [directionInfo, valueType] = splitParameterDirectionAndType(paramType);
+        SLANG_UNUSED(directionInfo);
 
         m_writer->emit(prefix);
         emitType(valueType, paramName);

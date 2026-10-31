@@ -23,7 +23,7 @@ int* output;
 
 typealias GroupSharedPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 
-GroupSharedPtr<T> paramGroupShared<T : __BuiltinIntegerType>(out groupshared T[100] ptr)
+GroupSharedPtr<T> paramGroupShared<T : __BuiltinIntegerType>(groupshared T[100] ptr)
 {
     T* ptr1 = __getAddress(ptr[5]);
 //diag:       ^^^^^^^^^^^^ type mismatch in expression

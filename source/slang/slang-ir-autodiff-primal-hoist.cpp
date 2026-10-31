@@ -2651,6 +2651,21 @@ static bool isInstInPrimalOrTransposedParameterBlocks(IRInst* inst)
     return false;
 }
 
+// Return whether `call` is passed the address of storage that is not a local variable of the
+// calling function, such as a reference parameter or a `groupshared` element. Address elimination
+// passes such an address through to a reference parameter, so the callee accesses the storage in
+// place. The backward pass then cannot rerun the call: the propagate function has no address for
+// that storage, and rerunning would access it a second time, after other code may have changed it.
+static bool isPassedReferenceToNonLocalStorage(IRCall* call)
+{
+    for (auto arg : call->getArgsList())
+    {
+        if (asRelevantPtrType(arg->getDataType()) && !as<IRVar>(getRootAddr(arg)))
+            return true;
+    }
+    return false;
+}
+
 static bool shouldStoreInst(IRInst* inst)
 {
     if (!inst->getDataType())
@@ -2752,6 +2767,9 @@ static bool shouldStoreInst(IRInst* inst)
         return false;
     case kIROp_Call:
         {
+            if (isPassedReferenceToNonLocalStorage(as<IRCall>(inst)))
+                return true;
+
             // If the callee has a preference, we should follow it.
             if (getCheckpointPreference(inst->getOperand(0)) ==
                 CheckpointPreference::PreferRecompute)
@@ -2835,14 +2853,19 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
         if (isGlobalOrUnknownMutableAddress(getParentFunc(load), ptr))
             return false;
 
-        // We can't recompute a 'load' from a mutable function parameter.
-        if (as<IRParam>(ptr) || as<IRVar>(ptr))
+        // We can't recompute a 'load' from a mutable function parameter, or from an element of
+        // one: address elimination leaves a reference parameter in memory, so its elements are
+        // loaded through element addresses.
+        auto rootAddr = getRootAddr(ptr);
+        if (as<IRParam>(rootAddr) || as<IRVar>(rootAddr))
         {
             // An exception is a load of a constref parameter, which should
-            // remain constant throughout the function.
-            if (as<IRBorrowInParamType>(getRootAddr(ptr)->getDataType()))
+            // remain constant throughout the function. A `__ref_readonly`
+            // parameter is not an exception: it may be aliased, so its
+            // contents may change.
+            if (as<IRBorrowInParamType>(rootAddr->getDataType()))
                 return true;
-            if (isInstInPrimalOrTransposedParameterBlocks(ptr))
+            if (isInstInPrimalOrTransposedParameterBlocks(rootAddr))
                 return false;
         }
     }

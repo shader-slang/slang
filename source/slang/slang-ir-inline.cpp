@@ -972,6 +972,19 @@ bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedF
     return pass.considerAllCallSites();
 }
 
+// Return whether a call to `callee` may keep its `groupshared` parameters, which are `Workgroup`
+// pointers, across the call boundary instead of being inlined away. Direct SPIR-V allows such a
+// pointer parameter under the `VariablePointers` capability, so we keep the boundary for a
+// `[noinline]` callee when the target already enables `SPV_KHR_variable_pointers`. We never enable
+// the extension only to keep a boundary.
+static bool canKeepGroupSharedParamsAcrossCall(TargetProgram* targetProgram, IRFunc* callee)
+{
+    return targetProgram->shouldEmitSPIRVDirectly() &&
+           callee->findDecoration<IRNoInlineDecoration>() &&
+           targetProgram->getTargetReq()->getTargetCaps().implies(
+               CapabilityAtom::SPV_KHR_variable_pointers);
+}
+
 namespace
 { // anonymous
 
@@ -1121,13 +1134,18 @@ struct TypeInliningPass : InliningPassBase
             return true;
         }
 
-        const auto count = Count(callee->getParamCount());
-        for (Index i = 0; i < count; ++i)
+        bool keepGroupSharedParams = canKeepGroupSharedParamsAcrossCall(targetProgram, callee);
+        Index i = 0;
+        for (auto param : callee->getParams())
         {
-            if (doesTypeRequireInline(callee->getParamType(UInt(i)), info.call->getArg(i), callee))
+            bool isKeptGroupSharedParam =
+                keepGroupSharedParams && as<IRGroupSharedRate>(param->getRate());
+            if (!isKeptGroupSharedParam &&
+                doesTypeRequireInline(callee->getParamType(UInt(i)), info.call->getArg(i), callee))
             {
                 return true;
             }
+            ++i;
         }
 
         return false;

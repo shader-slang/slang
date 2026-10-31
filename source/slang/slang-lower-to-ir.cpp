@@ -3720,9 +3720,16 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
         return ParamPassingMode::RefReadOnly;
     if (paramDecl->hasModifier<RefWriteOnlyModifier>())
         return ParamPassingMode::RefWriteOnly;
-    if (paramDecl->hasModifier<RefModifier>())
+    // On a parameter, `groupshared` names the address space of a reference, so the parameter is a
+    // reference whatever its spelling: a copy would leave a callee that reads after a group barrier
+    // looking at a stale snapshot. An explicit `__ref_readonly` or `__ref_writeonly` above picks
+    // the access; otherwise `groupshared` implies `__ref`, or `__ref_readonly` with `const`.
+    // Semantic checking reports the copy and borrow modes that conflict with it (`in`, `out`,
+    // `inout`, `__borrow`).
+    if (paramDecl->hasModifier<RefModifier>() || paramDecl->hasModifier<HLSLGroupSharedModifier>())
     {
-        // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`.
+        // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`, and
+        // `const groupshared` is a read-only reference.
         if (paramDecl->hasModifier<ConstModifier>())
             return ParamPassingMode::RefReadOnly;
         return ParamPassingMode::RefReadWrite;

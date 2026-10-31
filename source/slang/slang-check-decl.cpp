@@ -5779,6 +5779,13 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto satisfyingParamInfo = getParamInfo(m_astBuilder, satisfyingParam);
             if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
                 return false;
+            // `__ref` and `groupshared` parameters are both read-write references, but a
+            // `groupshared` parameter also requires its argument to be thread-group-shared memory,
+            // so a direct match needs both or neither. A synthesized witness can still forward
+            // between them where the call type-checks.
+            if (requiredParam.getDecl()->hasModifier<HLSLGroupSharedModifier>() !=
+                satisfyingParam.getDecl()->hasModifier<HLSLGroupSharedModifier>())
+                return false;
         }
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
@@ -7703,6 +7710,17 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         paramType.isLeftValue = true;
         if (paramInfo.mode == ParamPassingMode::BorrowIn)
             paramType.isLeftValue = false;
+
+        // The synthesized declaration's passing mode is copied above, but a `groupshared`
+        // parameter also requires its argument to be thread-group-shared memory. The wrapper
+        // forwards its own parameter as that argument, so the parameter keeps `groupshared`
+        // (otherwise the forwarded argument is E30711).
+        if (auto groupShared = paramDeclRef.getDecl()->findModifier<HLSLGroupSharedModifier>())
+        {
+            auto clonedModifier = m_astBuilder->create<HLSLGroupSharedModifier>();
+            clonedModifier->keywordName = groupShared->keywordName;
+            addModifier(synParamDecl, clonedModifier);
+        }
 
         // Create an expression that references the parameter for use in arguments.
         auto synArg = m_astBuilder->create<VarExpr>();
@@ -15164,6 +15182,29 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     maybeApplyLayoutModifier(paramDecl);
 
+    // A `groupshared` parameter names one thread-group-shared memory location, so
+    // `getExplicitlyDeclaredParamPassingMode` gives it a reference mode and the copy-direction
+    // modifiers are not applicable to it. `InOutModifier` derives from `OutModifier`, so it is
+    // checked first to report the most specific keyword.
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    {
+        Modifier* directionModifier = paramDecl->findModifier<InOutModifier>();
+        if (!directionModifier)
+            directionModifier = paramDecl->findModifier<OutModifier>();
+        if (!directionModifier)
+            directionModifier = paramDecl->findModifier<InModifier>();
+        if (directionModifier)
+            getSink()->diagnose(Diagnostics::GroupsharedParameterCannotHaveDirectionModifier{
+                .modifier = directionModifier});
+
+        // Unlike a reference, a borrow may be a copy, which would leave a callee that reads after
+        // a group barrier looking at a stale snapshot, so `__borrow` (or its alias `__constref`)
+        // is an error here.
+        if (auto borrowModifier = paramDecl->findModifier<BorrowModifier>())
+            getSink()->diagnose(
+                Diagnostics::GroupsharedParameterCannotBeBorrow{.modifier = borrowModifier});
+    }
+
     // Only texture types are allowed to have memory qualifiers on parameters
     if (!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
     {
@@ -16099,6 +16140,25 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
                     noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
                     addModifier(paramDecl, noDiffModifier);
                 }
+            }
+            // A reference parameter (`__ref`, `__ref_readonly`, `__ref_writeonly`, or
+            // `groupshared`) names storage that the caller, and for `groupshared` other
+            // invocations, may also access, and only the user knows where its derivative would
+            // live and how updates to it are synchronized. Automatic differentiation therefore
+            // treats the parameter as `no_diff`. A user who needs gradients through such storage
+            // passes a pointer-differentiable handle or their own pair type instead. Because a
+            // user may not expect the implicit `no_diff`, we warn when they did not write it. A
+            // parameter whose type has no derivative was already marked `no_diff` above and loses
+            // nothing, so it gets no warning.
+            if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)) &&
+                !paramDecl->hasModifier<NoDiffModifier>())
+            {
+                getSink()->diagnose(
+                    Diagnostics::ReferenceParameterOfDifferentiableFunctionTreatedAsNoDiff{
+                        .param = paramDecl});
+                auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+                noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
+                addModifier(paramDecl, noDiffModifier);
             }
             if (!paramDecl->hasModifier<NoDiffModifier>())
             {

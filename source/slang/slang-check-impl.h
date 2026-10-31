@@ -4188,6 +4188,19 @@ public:
 
 
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
+
+    bool argumentNamesGroupSharedStorage(Expr* arg);
+    void checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn);
+    void checkGroupSharedArgumentsOfCopiedParams(
+        InvokeExpr* invoke,
+        FuncType* funcType,
+        DeclRef<CallableDecl> calleeDeclRef,
+        List<DeclRef<ParamDecl>> const& paramDeclRefs);
+    void checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target);
+    void checkGroupSharedPartialWritesByInlinedCall(
+        InvokeExpr* invoke,
+        FuncType* funcType,
+        DeclRef<CallableDecl> calleeDeclRef);
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,

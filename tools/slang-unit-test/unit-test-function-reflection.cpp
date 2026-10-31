@@ -463,6 +463,51 @@ SLANG_UNIT_TEST(functionReflectionNoDiffSpecializedReturn)
     SLANG_CHECK(getTypeFullName(snormField) == "float");
 }
 
+SLANG_UNIT_TEST(functionReflectionSpecializeGroupSharedAndOutParams)
+{
+    const char* source = R"(
+        public T readShared<T>(groupshared T x) { return x; }
+        public T readSharedConst<T>(const groupshared T x) { return x; }
+        public T writeBack<T>(T x, out T y) { y = x; return x; }
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diag;
+    auto module = session->loadModuleFromSourceString("m", "m.slang", source, diag.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto layout = module->getLayout();
+    auto floatType = layout->findTypeByName("float");
+    SLANG_CHECK_ABORT(floatType != nullptr);
+    slang::TypeReflection* argTypes[2] = {floatType, floatType};
+
+    const char* groupSharedFuncNames[] = {"readShared", "readSharedConst"};
+    for (auto name : groupSharedFuncNames)
+    {
+        auto func = layout->findFunctionByName(name);
+        SLANG_CHECK_ABORT(func != nullptr);
+        auto specFunc = func->specializeWithArgTypes(1, argTypes);
+        SLANG_CHECK_ABORT(specFunc != nullptr);
+        SLANG_CHECK(getTypeFullName(specFunc->getReturnType()) == "float");
+    }
+
+    auto writeBack = layout->findFunctionByName("writeBack");
+    SLANG_CHECK_ABORT(writeBack != nullptr);
+    auto specWriteBack = writeBack->specializeWithArgTypes(2, argTypes);
+    SLANG_CHECK_ABORT(specWriteBack != nullptr);
+    SLANG_CHECK(getTypeFullName(specWriteBack->getReturnType()) == "float");
+}
+
 // Test that findFunctionByNameInType finds all functions with the same name but different
 // signatures
 SLANG_UNIT_TEST(findFunctionByNameInType)
