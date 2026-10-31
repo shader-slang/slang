@@ -1241,6 +1241,15 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
             case IRConstant::FloatKind::Nan:
                 {
+                    // `0.0 / 0.0` would lose the NaN's sign and payload, so rebuild a `float` NaN
+                    // from its bits. Metal has no `double`, and a `half` NaN keeps `0.0 / 0.0`.
+                    if (constantInst->getDataType()->getOp() == kIROp_FloatType)
+                    {
+                        m_writer->emit("as_type<float>(");
+                        emitHexLiteral(DoubleToFloatBits(constantInst->value.floatVal), 8);
+                        m_writer->emit("U)");
+                        return;
+                    }
                     m_writer->emit("(0.0 / 0.0)");
                     return;
                 }
