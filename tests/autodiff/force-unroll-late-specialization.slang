@@ -12,26 +12,28 @@
 // CHECK: __global__ void __kernel__loss_kernel_loadvec_sum_fwd_diff(uint {{[[:alnum:]_]+}}, float {{[[:alnum:]_]+}}, DiffTensorView_[[#]] {{[[:alnum:]_]+}}, DiffTensorView_[[#]] {{[[:alnum:]_]+}})
 // CHECK: __global__ void __kernel__loss_kernel_loadvec_sum(uint {{[[:alnum:]_]+}}, float {{[[:alnum:]_]+}}, DiffTensorView_[[#]] {{[[:alnum:]_]+}}, DiffTensorView_[[#]] {{[[:alnum:]_]+}})
 
-__generic<T : __BuiltinFloatingPointType, A : IDiffTensorWrapper>
-extension DiffTensorView<T, A>
+__generic<T : __BuiltinFloatingPointType,
+    Offset : __TensorViewOffsetType,
+    A : IDiffTensorWrapper<Offset>>
+extension DiffTensorView<T, Offset, A>
 {
     [Differentiable]
     __generic<let M : int, let R : int, let N : int>
-    vector<T, M> loadVecOnce(vector<uint, N> x)
+    vector<T, M> loadVecOnce(vector<Offset, N> x)
     {
         vector<T, M> result;
         [ForceUnroll]
         for (int j = 0; j < M; j++)
         {
             result[j] = this.loadOnce(x);
-            x[R] += 1;
+            x[R] += Offset(1);
         }
         return result;
     }
 
     [Differentiable]
     __generic<let M : int, let N : int>
-    vector<T, M> loadVecOnce(vector<uint, N> x)
+    vector<T, M> loadVecOnce(vector<Offset, N> x)
     {
         return this.loadVecOnce<M, N - 1, N>(x);
     }
