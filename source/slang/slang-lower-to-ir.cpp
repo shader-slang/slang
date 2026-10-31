@@ -14692,7 +14692,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     kIROp_PreferRecomputeDecoration,
                     getBuilder()->getIntValue(
                         getBuilder()->getIntType(),
-                        attr->sideEffectBehavior));
+                        (IRIntegerValue)attr->sideEffectBehavior));
             }
             else if (auto extensionMod = as<RequiredGLSLExtensionModifier>(modifier))
                 getBuilder()->addRequireGLSLExtensionDecoration(
