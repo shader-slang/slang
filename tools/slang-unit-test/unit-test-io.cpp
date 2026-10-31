@@ -43,7 +43,7 @@ static SlangResult _checkGenerateTemporary()
     for (auto& path : paths)
     {
         String contents;
-        SLANG_RETURN_ON_FAIL(File::readAllText(path, contents))
+        SLANG_RETURN_ON_FAIL(File::readAllText(path, contents));
 
         SLANG_CHECK(contents == path);
     }
