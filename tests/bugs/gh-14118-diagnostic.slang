@@ -64,3 +64,19 @@ void forBody()
 //CHECK:                        ^ undefined identifier 'h'.
         int h = 1;
 }
+
+int record(int value)
+{
+    return value;
+}
+
+// A block whose body is a single declaration statement has no `SeqStmt`, but
+// a later declarator of that statement is still hidden from an earlier one.
+void singleStatementBlock()
+{
+    {
+        int a = record(z), z = 5;
+//CHECK:               ^ undefined identifier
+//CHECK:               ^ undefined identifier 'z'.
+    }
+}
