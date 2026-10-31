@@ -5319,6 +5319,13 @@ err(
 )
 
 err(
+    "target-switch-no-case-for-target",
+    41037,
+    "__target_switch has no case for the current target",
+    span { loc = "location", message = "'~funcName' contains a __target_switch with no case for target '~targetName', so this code cannot be generated" }
+)
+
+err(
     "missing-return-not-allowed-in-slang-202c",
     40025,
     "non-void function must return in Slang 202c and later",

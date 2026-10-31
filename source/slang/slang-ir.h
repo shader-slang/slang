@@ -2251,8 +2251,11 @@ public:
     // nodes would be decoded as different classes.
     // Version 37 is the earliest module version with the updated AST node numbering, and with
     // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
+    // Version 38 adds `IRNoTargetCaseDecoration`. Its stable opcode is appended, so the reader can
+    // continue to load version-37 modules. It only appears in linked IR, which the host VM target
+    // serializes.
     const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 37;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.
