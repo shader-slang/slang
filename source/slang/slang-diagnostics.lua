@@ -2072,7 +2072,7 @@ err(
     "non-static-member-function-not-allowed-as-diff-operand",
     30098,
     "non-static function reference not allowed",
-    span { loc = "expr:Expr", message = "non-static function reference '~func:Decl' is not allowed here." }
+    span { loc = "expr:Expr", message = "non-static function reference '~func:Decl' is not allowed here; differentiate a [Differentiable] function that takes the instance as a parameter and calls it instead." }
 )
 
 -- sizeof/countof diagnostics
