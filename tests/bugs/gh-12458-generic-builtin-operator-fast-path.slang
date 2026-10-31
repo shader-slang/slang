@@ -41,31 +41,12 @@
 // covered anywhere yet: see that file for the full explanation and the tracking issue
 // (shader-slang/slang#13061).
 //
-// A THIRD negative case -- `vector<T,N> == vector<T,N>` specifically -- is covered separately by
-// `gh-12458-generic-vector-equality-decline.slang` (a `COMPARE_COMPUTE` test, not `INTERPRET`:
-// the `all(equal(...))` lowering this case resolves to is not yet supported by the bytecode
-// interpreter's codegen, an unrelated, pre-existing gap). `glsl.meta.slang` declares `bool
-// operator==<T:__BuiltinArithmeticType,N>(vector<T,N>, vector<T,N>)` (`[OverloadRank(15)]`,
-// `[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]` -- visible on every target, not just GLSL
-// scope) that reduces vector equality to a single `bool` via `all(equal(...))`, and real code
-// (`tests/metal/math-vector.slang`'s generic `Test_Vector<T:__BuiltinFloatingPointType,N>`)
-// relies on `vec == vec` type-checking as `bool` directly in a boolean context. Before this PR, a
-// generic element type was never recognized by `classifyBuiltinArithmeticElementType`, so
-// `vector<T,N> == vector<T,N>` for abstract `T` always fell through to that stdlib overload.
-// Widening the classification to recognize generic `T` made the fast path fire here too,
-// producing the RAW per-component `vector<bool,N>` instead -- which fails to coerce to `bool` and
-// broke that real test. Vectors have no declarable stdlib overload for the raw per-component form
-// (it exists only as this fast path's own `BuiltinOperatorExpr` construction), so unlike every
-// other operator, `==`/`!=` on a GENERIC-element-type vector must keep falling through to the
-// stdlib overload instead of taking the fast path; only a CONCRETE element type keeps this
-// function's pre-existing (`isGLSLOperatorScope()`-gated) vector-equality behavior unchanged.
-//
-// `notT` pins a FOURTH case, on unary `!` specifically: `__BuiltinLogicalType` is implemented by
-// `bool` AND every builtin integer type (it also backs bitwise-operator codegen elsewhere), so a
-// `T : __BuiltinLogicalType` parameter may be instantiated with `int`, not just `bool` --
-// `notT<int>(5)` below is exactly that. Unary `!` must still decline the fast path for such a
-// `T`, because its result has to be `bool`-shaped: `classifyBuiltinArithmeticElementType` tracks
-// this with two separate flags, `isBool` (true only for a genuinely concrete `bool` element,
+// `notT` pins another negative case, on unary `!` specifically: `__BuiltinLogicalType` is
+// implemented by `bool` AND every builtin integer type (it also backs bitwise-operator codegen
+// elsewhere), so a `T : __BuiltinLogicalType` parameter may be instantiated with `int`, not just
+// `bool` -- `notT<int>(5)` below is exactly that. Unary `!` must still decline the fast path for
+// such a `T`, because its result has to be `bool`-shaped: `classifyBuiltinArithmeticElementType`
+// tracks this with two separate flags, `isBool` (true only for a genuinely concrete `bool` element,
 // never provable for a generic parameter) and `isLogical` (true for `__BuiltinLogicalType`
 // conformance broadly, safe for `==`/`eqT` above but NOT for `!`). `notT<int>(5)` verifies the
 // result is `0` (5 is truthy, so `!5` is `false`, via normal overload resolution's int-to-bool
@@ -77,6 +58,10 @@
 // now), and unary `~` (bitwise-not) on a constrained generic (the unary path was rewritten to
 // route `-`/`~`/`!` uniformly through `classifyBuiltinArithmeticElementType`, but `negF` above
 // only covers `-`).
+//
+// `veqF`/`vneqI` pin that, outside GLSL operator scope, `vector<T,N> ==/!= vector<T,N>` on a
+// generic `T` yields a per-component `vector<bool,N>` (#13969): `veqF`'s `.y` does not type-check
+// on a scalar `bool`, and `vneqI`'s `.x` would print `1` under a scalar `!all(a == b)` reduction.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
@@ -95,6 +80,8 @@ T vaddMat<T : __BuiltinFloatingPointType>(matrix<T, 2, 2> a, matrix<T, 2, 2> b)
     return (a + b)[0][0];
 }
 T bitNotT<T : __BuiltinIntegerType>(T a) { return ~a; }
+bool veqF<T : __BuiltinFloatingPointType>(vector<T, 3> a, vector<T, 3> b) { return (a == b).y; }
+bool vneqI<T : __BuiltinIntegerType>(vector<T, 2> a, vector<T, 2> b) { return (a != b).x; }
 
 void main()
 {
@@ -124,4 +111,8 @@ void main()
         vaddMat<float>(matrix<float, 2, 2>(1.0), matrix<float, 2, 2>(2.0)));
     // CHECK-NEXT: -6
     printf("%d\n", bitNotT<int>(5));
+    // CHECK-NEXT: 1
+    printf("%d\n", veqF<float>(vector<float, 3>(0.1, 0.0, 0.3), vector<float, 3>(0.0)) ? 1 : 0);
+    // CHECK-NEXT: 0
+    printf("%d\n", vneqI<int>(vector<int, 2>(7, 8), vector<int, 2>(7, 3)) ? 1 : 0);
 }
