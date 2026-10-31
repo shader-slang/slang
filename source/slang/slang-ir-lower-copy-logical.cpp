@@ -8,12 +8,29 @@ namespace Slang
 {
 struct LowerCopyLogicalContext
 {
+    bool onlyUntypedPtrOperand = false;
+
     List<IRCopyLogical*> copyLogicalInsts;
+
+    // A copyLogical through an untyped SPIR-V pointer must be lowered element-wise even on
+    // SPIR-V 1.4+ (see the header comment / #13022); this identifies that case. In the motivating
+    // case the source (`getVal`, the descriptor-heap `ConstantBuffer`) is untyped and the
+    // destination is a function-local. The `getPtr` (destination) disjunct is forward-looking: no
+    // current path produces an untyped copyLogical destination (descriptor-heap RW structured
+    // buffers use typed `StorageBuffer` pointers on 1.4+), but checking both operands keeps the
+    // predicate honest to its name should an untyped destination ever arise.
+    static bool hasUntypedPtrOperand(IRCopyLogical* copyLogicalInst)
+    {
+        return as<IRSPIRVUntypedPtrType>(copyLogicalInst->getVal()->getDataType()) ||
+               as<IRSPIRVUntypedPtrType>(copyLogicalInst->getPtr()->getDataType());
+    }
+
     void findCopyLogicalInsts(IRInst* inst)
     {
         if (auto copyLogicalInst = as<IRCopyLogical>(inst))
         {
-            copyLogicalInsts.add(copyLogicalInst);
+            if (!onlyUntypedPtrOperand || hasUntypedPtrOperand(copyLogicalInst))
+                copyLogicalInsts.add(copyLogicalInst);
             return;
         }
         for (auto child : inst->getChildren())
@@ -81,6 +98,45 @@ struct LowerCopyLogicalContext
         }
     }
 
+    // Build a field/element address that keeps an untyped `SPIRVUntypedPtr` base's flavor. The
+    // auto-deducing `emitFieldAddress`/`emitElementAddress` overloads always build a typed
+    // `IRPtrType`; using them on an untyped descriptor-heap pointer would drop the untyped flavor,
+    // so a nested field/element access derived from it would carry a typed IR pointer and emit a
+    // typed access chain on an untyped base -- invalid SPIR-V (#13022). Only untyped bases are
+    // special-cased; every other pointer flavor keeps the original auto-deduced result.
+    //
+    // This is the same "a field/element pointer of an untyped base is itself untyped" rule that
+    // `processFieldAddress`/`processGetElementPtrImpl` apply in spirv-legalize. It must be
+    // reapplied here because this lowering runs after both `processWorkList()` drains in
+    // `SPIRVLegalizationContext::processModule`, so the addresses it creates are never revisited by
+    // those retype passes and have to carry the untyped flavor up front.
+    static IRInst* emitFieldAddressKeepingFlavor(
+        IRBuilder& builder,
+        IRInst* basePtr,
+        IRStructField* field)
+    {
+        if (auto untypedBase = as<IRSPIRVUntypedPtrType>(basePtr->getDataType()))
+            return builder.emitFieldAddress(
+                builder.getPtrType(field->getFieldType(), untypedBase),
+                basePtr,
+                field->getKey());
+        return builder.emitFieldAddress(basePtr, field->getKey());
+    }
+
+    static IRInst* emitElementAddressKeepingFlavor(
+        IRBuilder& builder,
+        IRInst* basePtr,
+        IRInst* index,
+        IRType* elementType)
+    {
+        if (auto untypedBase = as<IRSPIRVUntypedPtrType>(basePtr->getDataType()))
+            return builder.emitElementAddress(
+                builder.getPtrType(elementType, untypedBase),
+                basePtr,
+                index);
+        return builder.emitElementAddress(basePtr, index);
+    }
+
     void lowerCopyLogicalWithDestImpl(IRBuilder& builder, IRInst* destPtr, IRInst* srcPtr)
     {
         auto destValType = tryGetPointedToType(&builder, destPtr->getDataType());
@@ -97,15 +153,17 @@ struct LowerCopyLogicalContext
                 "Mismatched field count in copy-logical operand struct types.");
             for (Index i = 0; i < srcFields.getCount(); i++)
             {
-                auto srcFieldKey = srcFields[i]->getKey();
-                auto dstFieldKey = dstFields[i]->getKey();
-                auto srcFieldValue = builder.emitFieldAddress(srcPtr, srcFieldKey);
-                auto dstFieldPtr = builder.emitFieldAddress(destPtr, dstFieldKey);
+                auto srcFieldValue = emitFieldAddressKeepingFlavor(builder, srcPtr, srcFields[i]);
+                auto dstFieldPtr = emitFieldAddressKeepingFlavor(builder, destPtr, dstFields[i]);
                 lowerCopyLogicalWithDestImpl(builder, dstFieldPtr, srcFieldValue);
             }
         }
         else if (auto srcArrayType = as<IRArrayType>(srcValType))
         {
+            auto dstArrayType = as<IRArrayTypeBase>(destValType);
+            SLANG_RELEASE_ASSERT(dstArrayType && "Mismatched types in copy-logical inst");
+            auto srcElementType = srcArrayType->getElementType();
+            auto dstElementType = dstArrayType->getElementType();
             auto elementCount = srcArrayType->getElementCount();
             IRIntegerValue elementCountIntLit = 0xFFFFFFFF;
             if (as<IRIntLit>(elementCount))
@@ -117,14 +175,11 @@ struct LowerCopyLogicalContext
                 // If array is small, just unroll the copy for each element.
                 for (IRIntegerValue i = 0; i < elementCountIntLit; i++)
                 {
-                    auto dstArrayType = as<IRArrayTypeBase>(destValType);
-                    SLANG_RELEASE_ASSERT(dstArrayType && "Mismatched types in copy-logical inst");
-                    auto srcElement = builder.emitElementAddress(
-                        srcPtr,
-                        builder.getIntValue(builder.getIntType(), i));
-                    auto dstElementPtr = builder.emitElementAddress(
-                        destPtr,
-                        builder.getIntValue(builder.getIntType(), i));
+                    auto index = builder.getIntValue(builder.getIntType(), i);
+                    auto srcElement =
+                        emitElementAddressKeepingFlavor(builder, srcPtr, index, srcElementType);
+                    auto dstElementPtr =
+                        emitElementAddressKeepingFlavor(builder, destPtr, index, dstElementType);
                     lowerCopyLogicalWithDestImpl(builder, dstElementPtr, srcElement);
                 }
             }
@@ -141,8 +196,10 @@ struct LowerCopyLogicalContext
                     loopBreakBlock);
                 auto afterBlock = splitBlockAt(builder.getInsertLoc());
                 builder.setInsertBefore(loopBodyBlock->getFirstOrdinaryInst());
-                auto srcElement = builder.emitElementAddress(srcPtr, loopParam);
-                auto dstElementPtr = builder.emitElementAddress(destPtr, loopParam);
+                auto srcElement =
+                    emitElementAddressKeepingFlavor(builder, srcPtr, loopParam, srcElementType);
+                auto dstElementPtr =
+                    emitElementAddressKeepingFlavor(builder, destPtr, loopParam, dstElementType);
                 lowerCopyLogicalWithDestImpl(builder, dstElementPtr, srcElement);
                 builder.setInsertInto(loopBreakBlock);
                 builder.emitBranch(afterBlock);
@@ -160,9 +217,10 @@ struct LowerCopyLogicalContext
     }
 };
 
-void lowerCopyLogical(IRModule* module)
+void lowerCopyLogical(IRModule* module, bool onlyUntypedPtrOperand)
 {
     LowerCopyLogicalContext context;
+    context.onlyUntypedPtrOperand = onlyUntypedPtrOperand;
     context.processModule(module);
 }
 } // namespace Slang
