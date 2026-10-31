@@ -14,6 +14,8 @@ namespace Slang
 {
 class EndToEndCompileRequest;
 
+/// Writes the `-depfile` output, if one was requested. Returns failure only when the file cannot
+/// be opened; errors while writing to it are not reported.
 SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest);
 
 
