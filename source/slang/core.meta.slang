@@ -2916,6 +2916,22 @@ __generic<T> __extension vector<T, 4>
     }
 }
 
+// Vectors with more than 4 elements (up to 16) are lowered to arrays on every target; they can be
+// built from a list of all their elements.
+${
+for (int N = 5; N <= 16; ++N)
+{
+    sb << "__generic<T> __extension vector<T, " << N << ">\n{\n";
+    sb << "    __intrinsic_op(" << int(kIROp_MakeVector) << ") __init(";
+    for (int ii = 0; ii < N; ++ii)
+    {
+        if (ii != 0) sb << ", ";
+        sb << "T x" << ii;
+    }
+    sb << ");\n}\n";
+}
+$}
+
 ${
 
 

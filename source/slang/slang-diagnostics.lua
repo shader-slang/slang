@@ -4986,6 +4986,20 @@ err(
 )
 
 err(
+    "large-vector-or-matrix-in-target-intrinsic",
+    38208,
+    "intrinsic does not support vectors or matrices larger than 4",
+    span { loc = "location", message = "'~name' does not support vectors with more than 4 elements or matrices with more than 4 rows or columns on this target" }
+)
+
+err(
+    "large-vector-or-matrix-varying",
+    38209,
+    "vector or matrix larger than 4 used as a shader stage input or output",
+    span { loc = "location", message = "~what contains a vector with more than 4 elements or a matrix with more than 4 rows or columns, which cannot be a shader stage input or output" }
+)
+
+err(
     "unspecialized-global-generic-param-with-uses",
     38207,
     "global generic parameter used in code without a concrete binding",

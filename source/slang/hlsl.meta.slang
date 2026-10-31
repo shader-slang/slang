@@ -8072,23 +8072,49 @@ struct TriangleStream
     }
 };
 
+// The unroll budget of the `*_MAP_*` helpers covers the largest vector or matrix dimension
+// (`kMaxVectorElementCount`, 16). A loop with fewer iterations unrolls the same way under any
+// budget that covers it, so native sizes are unchanged.
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
-    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(16)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
-    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(16)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
-    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(16)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
-    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(16)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
-    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(16)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 #define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
-    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(16)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+
+// Vectors with more than 4 elements and matrices with more than 4 rows or columns have no native
+// type on any target; they are lowered to arrays (see `legalizeLargeVectorMatrixTypes`). An
+// intrinsic that maps to a native target operation starts with one of these guards, so that such
+// sizes are computed element-wise on every target instead. The condition is a constant once the
+// generic is specialized, so for native sizes the guard folds away.
+#define LARGE_VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
+    if (COUNT > 4) { vector<TYPE,COUNT> result; [ForceUnroll] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result; }
+
+#define LARGE_MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
+    if (ROWS > 4 || COLS > 4) { matrix<TYPE,ROWS,COLS> result; [ForceUnroll] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result; }
+
+#define LARGE_VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
+    if (COUNT > 4) { vector<TYPE,COUNT> result; [ForceUnroll] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result; }
+
+#define LARGE_MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
+    if (ROWS > 4 || COLS > 4) { matrix<TYPE,ROWS,COLS> result; [ForceUnroll] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result; }
+
+#define LARGE_VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
+    if (COUNT > 4) { vector<TYPE,COUNT> result; [ForceUnroll] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result; }
+
+#define LARGE_MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
+    if (ROWS > 4 || COLS > 4) { matrix<TYPE,ROWS,COLS> result; [ForceUnroll] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result; }
 
 //@public:
 
@@ -8134,6 +8160,7 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> abs(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, abs, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
@@ -8154,6 +8181,7 @@ __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, abs, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
@@ -8187,6 +8215,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> abs(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, abs, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
@@ -8207,6 +8236,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, abs, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
@@ -8241,6 +8271,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> fabs(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, fabs, x);
     __target_switch
     {
     case metal: __intrinsic_asm "fabs";
@@ -8279,6 +8310,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> acos(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, acos, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "acos";
@@ -8299,6 +8331,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> acos(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, acos, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "acos";
@@ -8338,6 +8371,7 @@ __generic<T : __BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> acosh(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, acosh, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "acosh";
@@ -8356,6 +8390,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> acosh(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, acosh, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "acosh";
@@ -8413,6 +8448,15 @@ bool all(vector<T,N> x)
 {
     if(N == 1)
         return all(x[0]);
+    if (N > 4)
+    {
+        bool result = true;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            if (!all(x[i]))
+                result = false;
+        return result;
+    }
     __target_switch
     {
     case hlsl:
@@ -8472,6 +8516,15 @@ __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool all(matrix<T,N,M> x)
 {
+    if (N > 4 || M > 4)
+    {
+        bool result = true;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            if (!all(x[i]))
+                result = false;
+        return result;
+    }
     __target_switch
     {
     case hlsl: __intrinsic_asm "all";
@@ -8600,6 +8653,15 @@ bool any(vector<T, N> x)
 {
     if(N == 1)
         return any(x[0]);
+    if (N > 4)
+    {
+        bool result = false;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            if (any(x[i]))
+                result = true;
+        return result;
+    }
     __target_switch
     {
     case hlsl:
@@ -8667,6 +8729,15 @@ __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool any(matrix<T, N, M> x)
 {
+    if (N > 4 || M > 4)
+    {
+        bool result = false;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            if (any(x[i]))
+                result = true;
+        return result;
+    }
     __target_switch
     {
     case hlsl: __intrinsic_asm "any";
@@ -8761,6 +8832,7 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<float, N> asfloat(vector< int, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(float, N, asfloat, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "intBitsToFloat";
@@ -8781,6 +8853,7 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(float, N, asfloat, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "uintBitsToFloat";
@@ -8801,6 +8874,7 @@ __generic<let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_5_0)]
 matrix<float,N,M> asfloat(matrix<int,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(float, N, M, asfloat, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat";
@@ -8814,6 +8888,7 @@ __generic<let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_5_0)]
 matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(float, N, M, asfloat, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat";
@@ -8868,6 +8943,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> asin(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T,N,asin,x);
     __target_switch
     {
     case glsl: __intrinsic_asm "asin";
@@ -8888,6 +8964,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> asin(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T,N,M,asin,x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asin";
@@ -8927,6 +9004,7 @@ __generic<T : __BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> asinh(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, asinh, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "asinh";
@@ -8945,6 +9023,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> asinh(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, asinh, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asinh";
@@ -8998,6 +9077,7 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<int, N> asint(vector<float, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(int, N, asint, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "floatBitsToInt";
@@ -9018,6 +9098,7 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<int, N> asint(vector<uint, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(int, N, asint, x);
     if(N == 1)
         return vector<int, N>(asint(x[0]));
     __target_switch
@@ -9040,6 +9121,7 @@ __generic<let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<int, N, M> asint(matrix<float, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(int, N, M, asint, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asint";
@@ -9053,6 +9135,7 @@ __generic<let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<int, N, M> asint(matrix<uint, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(int, N, M, asint, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asint";
@@ -9154,6 +9237,7 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<uint,N> asuint(vector<float,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(uint, N, asuint, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "floatBitsToUint";
@@ -9174,6 +9258,7 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<uint, N> asuint(vector<int, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(uint, N, asuint, x);
     if(N == 1)
         return vector<uint, N>(asuint(x[0]));
     __target_switch
@@ -9196,6 +9281,7 @@ __generic<let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<uint,N,M> asuint(matrix<float,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(uint, N, M, asuint, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asuint";
@@ -9209,6 +9295,7 @@ __generic<let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<uint, N, M> asuint(matrix<int, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(uint, N, M, asuint, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asuint";
@@ -9295,6 +9382,7 @@ uint16_t asuint16(float16_t value)
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(uint16_t, N, asuint16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asuint16";
@@ -9335,6 +9423,7 @@ float16_t asfloat16(uint16_t value)
 [__readNone]
 vector<float16_t,N> asfloat16<let N : int>(vector<uint16_t,N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(float16_t, N, asfloat16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
@@ -9374,6 +9463,7 @@ int16_t asint16(float16_t value)
 [__readNone]
 vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(int16_t, N, asint16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asint16";
@@ -9387,6 +9477,7 @@ vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value)
 [__readNone]
 matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> value)
 {
+    LARGE_MATRIX_MAP_UNARY(int16_t, R, C, asint16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asint16";
@@ -9415,6 +9506,7 @@ float16_t asfloat16(int16_t value)
 [__readNone]
 vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(float16_t, N, asfloat16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
@@ -9431,6 +9523,7 @@ vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
 [__readNone]
 matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> value)
 {
+    LARGE_MATRIX_MAP_UNARY(float16_t, R, C, asfloat16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "asfloat16";
@@ -9467,6 +9560,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> atan(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, atan, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "atan";
@@ -9487,6 +9581,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> atan(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, atan, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "atan";
@@ -9525,6 +9620,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, atan2, y, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "atan($0,$1)";
@@ -9544,6 +9640,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
 {
+    LARGE_MATRIX_MAP_BINARY(T, N, M, atan2, y, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "atan2";
@@ -9583,6 +9680,7 @@ __generic<T : __BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> atanh(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, atanh, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "atanh";
@@ -9601,6 +9699,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> atanh(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, atanh, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "atanh";
@@ -9638,6 +9737,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> ceil(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, ceil, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "ceil";
@@ -9658,6 +9758,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> ceil(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, ceil, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "ceil";
@@ -9731,6 +9832,7 @@ __generic<T : __BuiltinFloatingPointType, let N: int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, copysign, x, y);
     __target_switch
     {
     case metal: __intrinsic_asm "copysign";
@@ -9819,6 +9921,8 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
+    if (N > 4)
+        return min(max(x, minBound), maxBound);
     __target_switch
     {
     case hlsl: __intrinsic_asm "clamp";
@@ -9844,6 +9948,8 @@ __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
+    if (N > 4 || M > 4)
+        return min(max(x, minBound), maxBound);
     __target_switch
     {
     case hlsl: __intrinsic_asm "clamp";
@@ -9876,6 +9982,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
+    if (N > 4)
+        return min(max(x, minBound), maxBound);
     __target_switch
     {
     case hlsl: __intrinsic_asm "clamp";
@@ -9895,6 +10003,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
+    if (N > 4 || M > 4)
+        return min(max(x, minBound), maxBound);
     __target_switch
     {
     case hlsl: __intrinsic_asm "clamp";
@@ -9920,6 +10030,12 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_spirv_wgsl, fragment)]
 void clip(vector<T,N> x)
 {
+    if (N > 4)
+    {
+        if (any(x < T(0)))
+            discard;
+        return;
+    }
     __target_switch
     {
     case hlsl: __intrinsic_asm "clip";
@@ -9932,6 +10048,12 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_spirv_wgsl, fragment)]
 void clip(matrix<T,N,M> x)
 {
+    if (N > 4 || M > 4)
+    {
+        if (any(x < T(0)))
+            discard;
+        return;
+    }
     __target_switch
     {
     case hlsl: __intrinsic_asm "clip";
@@ -9969,6 +10091,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> cos(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T,N, cos, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "cos";
@@ -9989,6 +10112,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> cos(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, cos, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "cos";
@@ -10026,6 +10150,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> cosh(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T,N, cosh, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "cosh";
@@ -10045,6 +10170,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> cosh(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, cosh, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "cosh";
@@ -10076,6 +10202,7 @@ __generic<T : __BuiltinFloatingPointType, let N: int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> cospi(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, cospi, x);
     __target_switch
     {
     case metal: __intrinsic_asm "cospi";
@@ -10181,6 +10308,7 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<uint, N> countbits(vector<T, N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(uint, N, countbits, value);
     // Emulate 8-bit support
     // 8-bit support is not currently supported anywhere natively
     if (T is int8_t || T  is uint8_t)
@@ -10517,6 +10645,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<T, N> degrees(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, degrees, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "degrees";
@@ -10535,6 +10664,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 matrix<T, N, M> degrees(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, degrees, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "degrees";
@@ -10553,6 +10683,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T determinant(matrix<T,N,N> m)
 {
+    static_assert(N <= 4, "determinant is only implemented up to 4x4 matrices");
     __target_switch
     {
     case glsl: __intrinsic_asm "determinant";
@@ -10605,6 +10736,7 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T determinant(matrix<T,N,N> m)
 {
+    static_assert(N <= 4, "determinant is only implemented up to 4x4 matrices");
     __target_switch
     {
     case hlsl: __intrinsic_asm "determinant";
@@ -10695,6 +10827,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T distance(vector<T, N> x, vector<T, N> y)
 {
+    if (N > 4)
+        return length(x - y);
     __target_switch
     {
     case glsl: __intrinsic_asm "distance";
@@ -10749,6 +10883,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, fdim, x, y);
     __target_switch
     {
     case metal: __intrinsic_asm "fdim";
@@ -10780,6 +10915,7 @@ __generic<T : __BuiltinFloatingPointType, let N: int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<T,N> divide(vector<T,N> x, vector<T,N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, divide, x, y);
     __target_switch
     {
     case metal: __intrinsic_asm "divide";
@@ -10837,6 +10973,10 @@ T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
     if (N == 1)
     {
         return x[0] * y[0];
+    }
+    if (N > 4)
+    {
+        return __vectorDotFallback(x, y);
     }
 
     // Follow the builtin signatures defined by each target language. The HLSL `dot` type table and
@@ -10912,6 +11052,10 @@ T dot(vector<T, N> x, vector<T, N> y)
     {
         return x[0] * y[0];
     }
+    if (N > 4)
+    {
+        return __vectorDotFallback(x, y);
+    }
 
     __target_switch
     {
@@ -10942,6 +11086,10 @@ T dot(vector<T, N> x, vector<T, N> y)
     if (N == 1)
     {
         return x[0] * y[0];
+    }
+    if (N > 4)
+    {
+        return __vectorDotFallback(x, y);
     }
 
     __target_switch
@@ -11317,6 +11465,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> exp(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, exp, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "exp";
@@ -11338,6 +11487,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> exp(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, exp, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "exp";
@@ -11391,6 +11541,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> exp2(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, exp2, x);
     __target_switch
     {
     case glsl:
@@ -11412,6 +11563,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> exp2(matrix<T,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, exp2, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "exp2";
@@ -11443,6 +11595,7 @@ __generic<T : __BuiltinFloatingPointType, let N: int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> exp10(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, exp10, x);
     __target_switch
     {
     case metal: __intrinsic_asm "exp10";
@@ -11457,6 +11610,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> exp10(matrix<T,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, exp10, x);
     __target_switch
     {
     default:
@@ -11503,6 +11657,7 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<float, N> f16tof32(vector<uint, N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(float, N, f16tof32, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "f16tof32";
@@ -11557,6 +11712,7 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<uint, N> f32tof16(vector<float, N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(uint, N, f32tof16, value);
     __target_switch
     {
     case hlsl: __intrinsic_asm "f32tof16";
@@ -11606,6 +11762,7 @@ __generic<let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<float, N> f16tof32(vector<float16_t, N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(float, N, f16tof32, value);
     __target_switch
     {
     case cuda: __intrinsic_asm "__half2float";
@@ -11646,6 +11803,7 @@ __generic<let N : int>
 [require(cuda_glsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<float16_t, N> f32tof16_(vector<float, N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(float16_t, N, f32tof16_, value);
     __target_switch
     {
     case cuda: __intrinsic_asm "__float2half";
@@ -11673,6 +11831,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 {
+    if (N > 4)
+        return dot(ng, i) < T(0.0f) ? n : -n;
     __target_switch
     {
     case glsl: __intrinsic_asm "faceforward";
@@ -11827,6 +11987,7 @@ uint firstbithigh<T : __BuiltinIntegerType>(T value)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<uint, N> firstbithigh<T : __BuiltinIntegerType, let N : int>(vector<T, N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
     __target_switch
     {
     case glsl: __intrinsic_asm "findMSB";
@@ -11911,6 +12072,7 @@ uint firstbitlow<T : __BuiltinIntegerType>(T value)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<uint,N> firstbitlow<T : __BuiltinIntegerType, let N : int>(vector<T,N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
     __target_switch
     {
     case glsl: __intrinsic_asm "findLSB";
@@ -11958,6 +12120,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> floor(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, floor, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "floor";
@@ -11978,6 +12141,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> floor(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, floor, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "floor";
@@ -12023,6 +12187,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
 {
+    LARGE_VECTOR_MAP_TRINARY(T, N, fma, a, b, c);
     __target_switch
     {
     case glsl: __intrinsic_asm "fma";
@@ -12043,6 +12208,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 {
+    LARGE_MATRIX_MAP_TRINARY(T, N, M, fma, a, b, c);
     __target_switch
     {
     case hlsl: __intrinsic_asm "fma";
@@ -12138,6 +12304,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, fmod, x, y);
     __target_switch
     {
     case hlsl: __intrinsic_asm "fmod";
@@ -12158,6 +12325,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 {
+    LARGE_MATRIX_MAP_BINARY(T, N, M, fmod, x, y);
     __target_switch
     {
     case hlsl: __intrinsic_asm "fmod";
@@ -12196,6 +12364,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> frac(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, frac, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "fract";
@@ -12292,6 +12461,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, frexp, x, exp);
     __target_switch
     {
     case glsl: __intrinsic_asm "frexp";
@@ -12324,6 +12494,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : Matr
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 {
+    LARGE_MATRIX_MAP_BINARY(T, N, M, frexp, x, exp);
     __target_switch
     {
     case hlsl: __intrinsic_asm "frexp";
@@ -12940,6 +13111,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<bool, N> isfinite(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(bool, N, isfinite, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "isfinite";
@@ -12959,6 +13131,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(bool, N, M, isfinite, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "isfinite";
@@ -13006,6 +13179,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<bool, N> isinf(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(bool, N, isinf, x);
     __target_switch
     {
     case hlsl:
@@ -13030,6 +13204,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<bool, N, M> isinf(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(bool, N, M, isinf, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "isinf";
@@ -13077,6 +13252,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<bool, N> isnan(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(bool, N, isnan, x);
     __target_switch
     {
     case hlsl:
@@ -13101,6 +13277,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<bool, N, M> isnan(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(bool, N, M, isnan, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "isnan";
@@ -13134,6 +13311,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, ldexp, x, exp);
     __target_switch
     {
     case hlsl: __intrinsic_asm "ldexp";
@@ -13149,6 +13327,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
 {
+    LARGE_MATRIX_MAP_BINARY(T, N, M, ldexp, x, exp);
     __target_switch
     {
     case hlsl: __intrinsic_asm "ldexp";
@@ -13182,6 +13361,7 @@ __generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, ldexp, x, exp);
     __target_switch
     {
     case glsl: __intrinsic_asm "ldexp";
@@ -13211,6 +13391,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T length(vector<T, N> x)
 {
+    if (N > 4)
+        return sqrt(dot(x, x));
     __target_switch
     {
     case glsl: __intrinsic_asm "length";
@@ -13269,6 +13451,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 vector<T, N> lerp(vector<T, N> x, vector<T, N> y, vector<T, N> s)
 {
+    if (N > 4)
+        return x + (y - x) * s;
     __target_switch
     {
     case glsl: __intrinsic_asm "mix";
@@ -13287,6 +13471,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
 {
+    LARGE_MATRIX_MAP_TRINARY(T, N, M, lerp, x, y, s);
     __target_switch
     {
     case hlsl: __intrinsic_asm "lerp";
@@ -13347,6 +13532,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> log(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, log, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "log";
@@ -13367,6 +13553,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> log(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, log, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "log";
@@ -13409,6 +13596,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> log10(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, log10, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "log10";
@@ -13434,6 +13622,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 matrix<T,N,M> log10(matrix<T,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, log10, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "log10";
@@ -13471,6 +13660,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> log2(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, log2, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "log2";
@@ -13491,6 +13681,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> log2(matrix<T,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, log2, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "log2";
@@ -13530,6 +13721,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
+    LARGE_VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
     __target_switch
     {
     case glsl: __intrinsic_asm "fma";
@@ -13550,6 +13742,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_5_0)]
 matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N, M> bvalue)
 {
+    LARGE_MATRIX_MAP_TRINARY(T, N, M, mad, mvalue, avalue, bvalue);
     __target_switch
     {
     case hlsl: __intrinsic_asm "mad";
@@ -13582,6 +13775,7 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
+    LARGE_VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
     __target_switch
     {
     case glsl: __intrinsic_asm "fma";
@@ -13599,6 +13793,7 @@ __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N, M> bvalue)
 {
+    LARGE_MATRIX_MAP_TRINARY(T, N, M, mad, mvalue, avalue, bvalue);
     __target_switch
     {
     case hlsl: __intrinsic_asm "mad";
@@ -13744,6 +13939,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> __vectorMaxImpl(vector<T, N> x, vector<T, N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, __max_impl, x, y);
     __target_switch
     {
     case hlsl: __intrinsic_asm "max";
@@ -13804,6 +14000,13 @@ __generic<
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M, L> __matrixMaxImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
+    if (N > 4 || M > 4)
+    {
+        matrix<T, N, M, L> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = __vectorMaxImpl(x[i], y[i]);
+        return result;
+    }
     __target_switch
     {
     case hlsl: __intrinsic_asm "max";
@@ -13949,6 +14152,7 @@ __generic<T : __BuiltinFloatingPointType, let N: int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> max3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
+    LARGE_VECTOR_MAP_TRINARY(T, N, max3, x, y, z);
     __target_switch
     {
     case metal: __intrinsic_asm "max3";
@@ -13984,6 +14188,7 @@ __generic<T : __BuiltinFloatingPointType, let N: int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fmax(vector<T,N> x, vector<T,N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, fmax, x, y);
     __target_switch
     {
     case metal: __intrinsic_asm "fmax";
@@ -14019,6 +14224,7 @@ __generic<T : __BuiltinFloatingPointType, let N: int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
+    LARGE_VECTOR_MAP_TRINARY(T, N, fmax3, x, y, z);
     __target_switch
     {
     case metal: __intrinsic_asm "fmax3";
@@ -14093,6 +14299,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> __vectorMinImpl(vector<T, N> x, vector<T, N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, __min_impl, x, y);
     __target_switch
     {
     case hlsl: __intrinsic_asm "min";
@@ -14153,6 +14360,13 @@ __generic<
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M, L> __matrixMinImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
+    if (N > 4 || M > 4)
+    {
+        matrix<T, N, M, L> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = __vectorMinImpl(x[i], y[i]);
+        return result;
+    }
     __target_switch
     {
     case hlsl: __intrinsic_asm "min";
@@ -14354,6 +14568,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> min3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
+    LARGE_VECTOR_MAP_TRINARY(T, N, min3, x, y, z);
     __target_switch
     {
     case metal: __intrinsic_asm "min3";
@@ -14389,6 +14604,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fmin(vector<T,N> x, vector<T,N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, fmin, x, y);
     __target_switch
     {
     case metal: __intrinsic_asm "fmin";
@@ -14424,6 +14640,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fmin3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
+    LARGE_VECTOR_MAP_TRINARY(T, N, fmin3, x, y, z);
     __target_switch
     {
     case metal: __intrinsic_asm "fmin3";
@@ -14473,6 +14690,7 @@ __generic<T : __BuiltinFloatingPointType, let N: int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> median3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
+    LARGE_VECTOR_MAP_TRINARY(T, N, median3, x, y, z);
     __target_switch
     {
     case metal: __intrinsic_asm "median3";
@@ -14515,6 +14733,7 @@ __generic<T : __BuiltinFloatingPointType, let N: int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fmedian3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
+    LARGE_VECTOR_MAP_TRINARY(T, N, fmedian3, x, y, z);
     __target_switch
     {
     case metal: __intrinsic_asm "fmedian3";
@@ -14572,6 +14791,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, modf, x, ip);
     __target_switch
     {
     case hlsl: __intrinsic_asm "modf";
@@ -14604,6 +14824,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : Matr
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 {
+    LARGE_MATRIX_MAP_BINARY(T, N, M, modf, x, ip);
     __target_switch
     {
     case hlsl: __intrinsic_asm "modf";
@@ -14641,6 +14862,46 @@ uint4 msad4(uint reference, uint2 source, uint4 accum)
         result += mask.w & abs(bytesRef - int4(bytesX.x, bytesX.y, bytesX.z, bytesX.w));
         return result;
     }
+}
+
+// Matrix products computed with scalar arithmetic, used for vectors and matrices with more than
+// 4 elements, rows or columns, which no target has a native operation for.
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[__readNone]
+[ForceInline]
+vector<T, M> __mulVectorMatrixFallback(vector<T, N> left, matrix<T, N, M> right)
+{
+    vector<T, M> result;
+    for (int j = 0; j < M; ++j)
+    {
+        T sum = T(0);
+        for (int i = 0; i < N; ++i)
+            sum += left[i] * right[i][j];
+        result[j] = sum;
+    }
+    return result;
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[__readNone]
+[ForceInline]
+vector<T, N> __mulMatrixVectorFallback(matrix<T, N, M> left, vector<T, M> right)
+{
+    vector<T, N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = __vectorDotFallback(left[i], right);
+    return result;
+}
+
+__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int>
+[__readNone]
+[ForceInline]
+matrix<T, R, C> __mulMatrixMatrixFallback(matrix<T, R, N> left, matrix<T, N, C> right)
+{
+    matrix<T, R, C> result;
+    for (int r = 0; r < R; ++r)
+        result[r] = __mulVectorMatrixFallback(left[r], right);
+    return result;
 }
 
 // General inner products
@@ -14690,6 +14951,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T mul(vector<T, N> x, vector<T, N> y)
 {
+    if (N > 4)
+        return dot(x, y);
     __target_switch
     {
     case glsl: __intrinsic_asm "dot";
@@ -14705,6 +14968,8 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T mul(vector<T, N> x, vector<T, N> y)
 {
+    if (N > 4)
+        return dot(x, y);
     __target_switch
     {
     case hlsl: __intrinsic_asm "mul";
@@ -14719,6 +14984,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
+    if (N > 4 || M > 4)
+        return __mulVectorMatrixFallback(left, right);
     __target_switch
     {
     case glsl: __intrinsic_asm "($1 * $0)";
@@ -14747,6 +15014,8 @@ __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
+    if (N > 4 || M > 4)
+        return __mulVectorMatrixFallback(left, right);
     __target_switch
     {
     case glsl: __intrinsic_asm "($1 * $0)";
@@ -14800,6 +15069,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
+    if (N > 4 || M > 4)
+        return __mulMatrixVectorFallback(left, right);
     __target_switch
     {
     case glsl: __intrinsic_asm "($1 * $0)";
@@ -14828,6 +15099,8 @@ __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
+    if (N > 4 || M > 4)
+        return __mulMatrixVectorFallback(left, right);
     __target_switch
     {
     case glsl: __intrinsic_asm "($1 * $0)";
@@ -14881,6 +15154,8 @@ __generic<T : __BuiltinFloatingPointType, let R : int, let N : int, let C : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
+    if (R > 4 || N > 4 || C > 4)
+        return __mulMatrixMatrixFallback(left, right);
     __target_switch
     {
     case glsl: __intrinsic_asm "($1 * $0)";
@@ -14910,6 +15185,8 @@ __generic<T : __BuiltinIntegerType, let R : int, let N : int, let C : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
+    if (R > 4 || N > 4 || C > 4)
+        return __mulMatrixMatrixFallback(left, right);
     __target_switch
     {
     case glsl: __intrinsic_asm "($1 * $0)";
@@ -15012,6 +15289,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 vector<T,N> nextafter(vector<T,N> x, vector<T,N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, nextafter, x, y);
     __target_switch
     {
     case metal: __intrinsic_asm "nextafter";
@@ -15075,6 +15353,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> normalize(vector<T,N> x)
 {
+    if (N > 4)
+        return x / length(x);
     __target_switch
     {
     case glsl: __intrinsic_asm "normalize";
@@ -15138,6 +15418,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, pow, x, y);
     __target_switch
     {
     case glsl: __intrinsic_asm "pow";
@@ -15158,6 +15439,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 {
+    LARGE_MATRIX_MAP_BINARY(T, N, M, pow, x, y);
     __target_switch
     {
     case hlsl: __intrinsic_asm "pow";
@@ -15190,6 +15472,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, powr, x, y);
     __target_switch
     {
     case metal: __intrinsic_asm "powr";
@@ -15358,6 +15641,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> radians(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, radians, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "radians";
@@ -15376,6 +15660,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> radians(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, radians, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "radians";
@@ -15406,6 +15691,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> rcp(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, rcp, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "rcp";
@@ -15424,6 +15710,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> rcp(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, rcp, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "rcp";
@@ -15461,6 +15748,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
 {
+    if (N > 4)
+        return i - T(2) * dot(n, i) * n;
     __target_switch
     {
     case glsl: __intrinsic_asm "reflect";
@@ -15485,6 +15774,14 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
 {
+    if (N > 4)
+    {
+        let dotNI = dot(n, i);
+        let k = T(1) - eta * eta * (T(1) - dotNI * dotNI);
+        if (k < T(0))
+            return vector<T, N>(T(0));
+        return eta * i - (eta * dotNI + sqrt(k)) * n;
+    }
     __target_switch
     {
     case glsl: __intrinsic_asm "refract";
@@ -15573,6 +15870,7 @@ T reversebits<T : __BuiltinIntegerType>(T value)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<T, N> reversebits<T : __BuiltinIntegerType, let N : int>(vector<T, N> value)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, reversebits, value);
     __target_switch
     {
     default:
@@ -15632,6 +15930,7 @@ __generic<T : __BuiltinFloatingPointType, let N:int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> rint(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, rint, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "roundEven";
@@ -15674,6 +15973,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> round(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, round, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "round";
@@ -15693,6 +15993,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> round(matrix<T,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, round, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "round";
@@ -15731,6 +16032,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> rsqrt(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, rsqrt, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "inversesqrt($0)";
@@ -15752,6 +16054,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> rsqrt(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, rsqrt, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "rsqrt";
@@ -15784,6 +16087,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> saturate(vector<T,N> x)
 {
+    if (N > 4)
+        return clamp<T,N>(x, vector<T,N>(T(0)), vector<T,N>(T(1)));
     __target_switch
     {
     case hlsl: __intrinsic_asm "saturate";
@@ -15801,6 +16106,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> saturate(matrix<T,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, saturate, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "saturate";
@@ -15892,6 +16198,7 @@ __generic<T : __BuiltinSignedArithmeticType, let N : int>
 [__readNone]
 vector<int, N> sign(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(int, N, sign, x);
     if(N == 1)
         return vector<int, N>(sign(x[0]));
     __target_switch
@@ -15924,6 +16231,7 @@ __generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<int, N, M> sign(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(int, N, M, sign, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "sign";
@@ -15961,6 +16269,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> sin(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, sin, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "sin";
@@ -15981,6 +16290,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> sin(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, sin, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "sin";
@@ -16051,6 +16361,12 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
 {
+    if (N > 4)
+    {
+        s = sin(x);
+        c = cos(x);
+        return;
+    }
     __target_switch
     {
     case hlsl: __intrinsic_asm "sincos";
@@ -16077,6 +16393,12 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1 : Mat
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 {
+    if (N > 4 || M > 4)
+    {
+        s = sin(x);
+        c = cos(x);
+        return;
+    }
     __target_switch
     {
     case hlsl: __intrinsic_asm "sincos";
@@ -16115,6 +16437,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> sinh(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, sinh, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "sinh";
@@ -16135,6 +16458,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> sinh(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, sinh, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "sinh";
@@ -16165,6 +16489,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> sinpi(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, sinpi, x);
     __target_switch
     {
     case metal: __intrinsic_asm "sinpi";
@@ -16205,6 +16530,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> smoothstep(vector<T, N> min, vector<T, N> max, vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_TRINARY(T, N, smoothstep, min, max, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "smoothstep";
@@ -16224,6 +16550,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_TRINARY(T, N, M, smoothstep, min, max, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "smoothstep";
@@ -16261,6 +16588,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> sqrt(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, sqrt, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "sqrt";
@@ -16281,6 +16609,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> sqrt(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, sqrt, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "sqrt";
@@ -16318,6 +16647,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> step(vector<T,N> y, vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_BINARY(T, N, step, y, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "step";
@@ -16337,6 +16667,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_BINARY(T, N, M, step, y, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "step";
@@ -16374,6 +16705,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> tan(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, tan, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "tan";
@@ -16394,6 +16726,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> tan(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, tan, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "tan";
@@ -16431,6 +16764,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> tanh(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, tanh, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "tanh";
@@ -16451,6 +16785,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> tanh(matrix<T,N,M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, tanh, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "tanh";
@@ -16481,6 +16816,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> tanpi(vector<T,N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, tanpi, x);
     __target_switch
     {
     case metal: __intrinsic_asm "tanpi";
@@ -16489,6 +16825,22 @@ vector<T,N> tanpi(vector<T,N> x)
     }
 }
 
+
+// Transpose by copying elements, used for matrices with more than 4 rows or columns, which no
+// target has a native operation for.
+__generic<T, let N : int, let M : int>
+[__readNone]
+[ForceInline]
+matrix<T, M, N> __transposeFallback(matrix<T, N, M> x)
+{
+    matrix<T, M, N> result;
+    for (int r = 0; r < M; ++r)
+    {
+        for (int c = 0; c < N; ++c)
+            result[r][c] = x[c][r];
+    }
+    return result;
+}
 
 /// Matrix transpose.
 /// @param x The matrix to transpose.
@@ -16500,6 +16852,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
+    if (N > 4 || M > 4)
+        return __transposeFallback(x);
     __target_switch
     {
     case glsl: __intrinsic_asm "transpose";
@@ -16523,6 +16877,8 @@ __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
+    if (N > 4 || M > 4)
+        return __transposeFallback(x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "transpose";
@@ -16542,6 +16898,8 @@ __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [OverloadRank(-1)]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
+    if (N > 4 || M > 4)
+        return __transposeFallback(x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "transpose";
@@ -16585,6 +16943,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> trunc(vector<T, N> x)
 {
+    LARGE_VECTOR_MAP_UNARY(T, N, trunc, x);
     __target_switch
     {
     case glsl: __intrinsic_asm "trunc";
@@ -16605,6 +16964,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> trunc(matrix<T, N, M> x)
 {
+    LARGE_MATRIX_MAP_UNARY(T, N, M, trunc, x);
     __target_switch
     {
     case hlsl: __intrinsic_asm "trunc";
