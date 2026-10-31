@@ -11,21 +11,22 @@
 // Pins the `isUnsupported` arm of
 // `LegalizeWGSLEntryPointContext::getSystemValueInfo` and the shared
 // `reportUnsupportedSystemAttribute` it funnels into
-// (slang-ir-legalize-varying-params.cpp:4804 and :3282). WGSL currently has
-// no clip-distance builtin, so the table marks `SV_ClipDistance`
-// unsupported rather than mapping it. What this test pins is that the
-// unsupported marking produces a real user-facing diagnostic naming the
-// semantic (in its lowercased internal spelling) at the declaration site,
-// which is the observable difference from the semantic being ignored and
-// silently emitted as an ordinary location.
+// (slang-ir-legalize-varying-params.cpp). WGSL has a `clip_distances`
+// built-in but no cull-distance built-in, so the table maps an
+// `SV_ClipDistance` array and marks `SV_CullDistance` unsupported. What
+// this test pins is that the unsupported marking produces a real
+// user-facing diagnostic naming the semantic (in its lowercased internal
+// spelling) at the declaration site, which is the observable difference
+// from the semantic being ignored and silently emitted as an ordinary
+// location.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -entry vertMain -stage vertex
 
 struct VOut
 {
     float4 pos : SV_Position;
-    float clip[1] : SV_ClipDistance;
+    float cull[1] : SV_CullDistance;
 //CHECK: E55202
-//CHECK: system value semantic 'sv_clipdistance' is not supported for the current target.
+//CHECK: system value semantic 'sv_culldistance' is not supported for the current target.
 }
 
 [shader("vertex")]
@@ -33,6 +34,6 @@ VOut vertMain()
 {
     VOut o;
     o.pos = float4(0);
-    o.clip[0] = 0;
+    o.cull[0] = 0;
     return o;
 }
