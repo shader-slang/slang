@@ -8,6 +8,14 @@
 // the generic `*ByteAddressBuffer.Load<T>` and `.Store<T>` operations,
 // and not the non-generic versions that traffic in `uint` (e.g.,
 // `Load2` or `Store3`).
+//
+// On targets that translate byte-address buffers to structured buffers
+// (`translateToStructuredBufferOps`, set for SPIR-V and GLSL), the pass also
+// replaces the global byte-address buffer parameters themselves. A parameter
+// that an operation reaches is replaced as that operation is translated, and a
+// parameter with no uses is translated at the end, so afterwards no global
+// parameter of byte-address buffer type remains unless it still has a use that
+// this pass does not translate.
 
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
@@ -55,18 +63,102 @@ struct ByteAddressBufferLegalizationContext
 
         processInstRec(module->getModuleInst());
 
+        if (m_options.translateToStructuredBufferOps)
+            translateUnusedByteAddressBufferParams();
+
         // After processing, remove ByteAddressBuffer parameters that have been
         // replaced by StructuredBuffer parameters. These are no longer needed
         // and would cause errors in backends like SPIR-V that don't support
         // ByteAddressBuffer types directly.
         for (auto param : m_replacedByteAddressBufferParams)
         {
+            removeDeadElementAccesses(param);
+
             // Only remove if it has no uses (its uses should have been replaced)
             if (!param->hasUses())
             {
                 param->removeAndDeallocate();
             }
         }
+    }
+
+    // Replace each global byte-address buffer parameter (or array of them) that
+    // has no uses with an equivalent structured buffer of `uint` elements.
+    //
+    // The walk in `processInstRec` reaches a buffer parameter only through an
+    // operation on it (a load, a store, or a `GetEquivalentStructuredBuffer`), so a
+    // buffer that the shader never accesses keeps its byte-address buffer type.
+    // Dead-code elimination normally removes such a parameter, but
+    // `-preserve-params` keeps every global parameter alive, and the SPIR-V
+    // emitter has no byte-address buffer type. GLSL takes the same path, so an
+    // unused buffer is declared as the same `uint` structured-buffer block as a
+    // used one, rather than as the emitter's native byte-address buffer block.
+    // We use `uint` elements because that is the type the basic `Load()` and
+    // `Store()` operations access.
+    //
+    void translateUnusedByteAddressBufferParams()
+    {
+        List<IRGlobalParam*> unusedParams;
+        for (auto inst : m_module->getGlobalInsts())
+        {
+            // Only a global parameter is kept alive without uses; any other byte-address
+            // buffer value is reached by the walk through the operations that use it.
+            auto param = as<IRGlobalParam>(inst);
+            if (!param)
+                continue;
+
+            // A parameter with uses was either translated through those uses, or has a use
+            // that this pass does not translate. Translating only its declaration would
+            // leave two parameters at one binding.
+            if (param->hasUses())
+                continue;
+
+            // A replaced parameter can have no uses left (for example, one read only
+            // through `Load<float>`), and translating it again would declare a second,
+            // `uint`, structured buffer at the same binding.
+            if (m_replacedByteAddressBufferParams.contains(param))
+                continue;
+
+            // Other global parameters, such as textures and structured buffers, are
+            // already legal for the target.
+            if (!as<IRByteAddressBufferTypeBase>(unwrapArray(param->getDataType())))
+                continue;
+
+            unusedParams.add(param);
+        }
+
+        // Translating a parameter records it as replaced, and the removal loop in
+        // `processModule` then deletes it.
+        for (auto param : unusedParams)
+        {
+            auto structuredBufferParam =
+                getEquivalentStructuredBufferParam(m_builder.getUIntType(), param);
+
+            // Every byte-address buffer type and every array of them has an
+            // equivalent structured-buffer type, so the translation cannot fail.
+            SLANG_RELEASE_ASSERT(structuredBufferParam);
+        }
+    }
+
+    // Remove the element accesses of `inst` that have no uses, including nested
+    // accesses into arrays of arrays.
+    //
+    // Consider a load from `arr[i]`, where `arr` is a global array of byte-address
+    // buffers. `getEquivalentStructuredBuffer` indexes the equivalent
+    // structured-buffer array with a new `getElement`, and the original
+    // `getElement(arr, i)` loses its last use when the load is replaced. The dead
+    // access still uses `arr`, so it would keep the replaced parameter alive.
+    //
+    void removeDeadElementAccesses(IRInst* inst)
+    {
+        traverseUsers<IRGetElement>(
+            inst,
+            [&](IRGetElement* elementAccess)
+            {
+                removeDeadElementAccesses(elementAccess);
+                if (!elementAccess->hasUses())
+                    elementAccess->removeAndDeallocate();
+            });
     }
 
     // We recursively walk the entire IR structure (except
