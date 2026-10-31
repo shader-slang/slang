@@ -12,13 +12,12 @@
 // `LegalizeWGSLEntryPointContext::getSystemValueInfo` and the shared
 // `reportUnsupportedSystemAttribute` it funnels into
 // (slang-ir-legalize-varying-params.cpp). WGSL has a `clip_distances`
-// built-in but no cull-distance built-in, so the table maps an
-// `SV_ClipDistance` array and marks `SV_CullDistance` unsupported. What
-// this test pins is that the unsupported marking produces a real
-// user-facing diagnostic naming the semantic (in its lowercased internal
-// spelling) at the declaration site, which is the observable difference
-// from the semantic being ignored and silently emitted as an ordinary
-// location.
+// built-in but no cull-distance built-in, so the table maps a `float[N]`
+// `SV_ClipDistance` with 1 <= N <= 8 and marks every `SV_CullDistance`
+// unsupported. What this test pins is that the unsupported marking
+// produces a real user-facing diagnostic naming the semantic (in its
+// lowercased internal spelling), which is the observable difference from
+// the semantic being ignored and silently emitted as an ordinary location.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -entry vertMain -stage vertex
 
 struct VOut

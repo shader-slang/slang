@@ -16,8 +16,8 @@
 // conversion" half of the claim — the resource and sampler families stay
 // disjoint because each conversion is declared separately. The CHECKs then
 // observe that no handle type reaches the output: HLSL re-spells the two heap
-// subscripts directly, GLSL and WGSL emit a runtime-sized heap array indexed
-// by the uint, and SPIR-V emits the `RuntimeDescriptorArray` capability with a
+// subscripts directly, GLSL emits a runtime-sized heap array and WGSL an
+// unsized `binding_array`, each indexed by the uint, and SPIR-V emits the `RuntimeDescriptorArray` capability with a
 // heap variable. The index feeding the subscript is a uniform so it cannot be
 // folded away before emission.
 
@@ -47,7 +47,8 @@ void computeMain()
 //SPV-DAG: OpCapability RuntimeDescriptorArray
 //SPV-DAG: OpName %{{[A-Za-z0-9_]+}} "__slang_resource_heap"
 
-// GLSL and WGSL both emit an unsized heap array subscripted by the index.
+// GLSL emits an unsized heap array and WGSL an unsized `binding_array`, both
+// subscripted by the index.
 //GLSL-DAG: uniform texture2D {{.*}}_slang_resource_heap{{[A-Za-z0-9_]*}}[];
 //GLSL-DAG: uniform sampler {{.*}}_slang_resource_heap{{[A-Za-z0-9_]*}}[];
 //WGSL-DAG: _slang_resource_heap{{[A-Za-z0-9_]*}} : binding_array<texture_2d<f32>>;

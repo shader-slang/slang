@@ -15,7 +15,8 @@
 // is spelled `as_type<T>`. The kernel loads a word and stores a modified
 // word so both directions stay live; CHECK asserts both the load-side and
 // store-side `as_type<...>` wrappers appear. A byte-address load has no side
-// effects, so the emitter folds this single-use load into the store's
+// effects, and nothing with side effects lies between this single-use load
+// and its use, so the emitter folds it into the store's
 // `as_type<uint32_t>(...)`. The CHECKs are unordered so that they also pass
 // when the load is kept in a temporary.
 
