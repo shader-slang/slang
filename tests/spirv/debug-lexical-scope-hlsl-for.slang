@@ -3,7 +3,8 @@
 
 // An HLSL `for` loop scopes its initializer variable to the loop, as Slang does, so both
 // languages give the loop a lexical block that holds the loop's `i` and contains the body's
-// block, while the `i` declared before the loop stays in the function's scope (#14099).
+// block, while the `i` declared before the loop stays in the function's scope (#14099). The
+// last scope before the store after the loop is the function's, where that outer `i` lives.
 // CHECK-DAG: [[NAME:%[0-9]+]] = OpString "main"
 // CHECK-DAG: [[INDEX:%[0-9]+]] = OpString "i"
 // CHECK-DAG: [[FUNC:%[A-Za-z_0-9]+]] = {{.*}} DebugFunction [[NAME]]

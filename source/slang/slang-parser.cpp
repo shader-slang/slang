@@ -7791,6 +7791,9 @@ IfStmt* Parser::parseIfStatement()
 
 ForStmt* Parser::ParseForStatement()
 {
+    // The loop's scope holds the variables of its initializer in every source language. HLSL
+    // follows DXC and C++ here, not FXC, which kept those variables visible after the loop
+    // (shader-slang/slang#14099).
     ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
     ForStmt* stmt = astBuilder->create<ForStmt>();
     stmt->scopeDecl = scopeDecl;

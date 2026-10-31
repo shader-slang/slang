@@ -9685,8 +9685,8 @@ static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
 }
 
 // Source braces and `for` statements, whose initializer can declare variables, introduce
-// declaration scopes.
-// Other control-flow statements get lexical blocks from their braced bodies, not the statement.
+// declaration scopes. Other control-flow statements get lexical blocks from their braced bodies,
+// not from the statement itself.
 static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
 {
     if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope ||
