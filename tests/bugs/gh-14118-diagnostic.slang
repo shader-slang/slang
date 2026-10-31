@@ -44,6 +44,17 @@ void doBody(bool c)
     while (c);
 }
 
+void ifLetElseBody(Optional<int> o)
+{
+    int v = 0;
+    if (let x = o)
+        v = m;
+//CHECK:    ^ undefined identifier
+//CHECK:    ^ undefined identifier 'm'.
+    else
+        int m = 1;
+}
+
 void labeledDecl()
 {
     int v = f;

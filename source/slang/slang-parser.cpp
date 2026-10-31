@@ -7767,7 +7767,14 @@ Stmt* Parser::parseIfLetStatement()
     newBody->stmts.add(ifStatement);
     PopScope();
 
-    return newBody;
+    // The `else` branch is parsed in `scopeDecl`, so an unbraced `else int i = 1;` adds `i`
+    // there. We give that scope a `BlockStmt` so that checking hides such a local from the
+    // code before it, as it does for any other block.
+    BlockStmt* blockStmt = astBuilder->create<BlockStmt>();
+    blockStmt->loc = ifStatement->loc;
+    blockStmt->scopeDecl = scopeDecl;
+    blockStmt->body = newBody;
+    return blockStmt;
 }
 
 IfStmt* Parser::parseIfStatement()
