@@ -309,8 +309,11 @@ void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt* stmt)
     checkModifiers(stmt);
     WithOuterStmt subContext(this, stmt);
 
-    stmt->predicate = checkPredicateExpr(stmt->predicate);
+    // We check the body before the predicate, in source order, because lookup reveals a
+    // local only once checking reaches its declaration: the predicate of
+    // `do int i = next(); while (i != 0);` refers to the `i` that the body declares.
     subContext.checkStmt(stmt->statement);
+    stmt->predicate = checkPredicateExpr(stmt->predicate);
     checkLoopInDifferentiableFunc(stmt);
 }
 
