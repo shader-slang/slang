@@ -1837,6 +1837,7 @@ A capability describes an optional feature that a target may or may not support.
 * `fragmentprocessing_derivativecontrol` 
 * `getattributeatvertex` 
 * `memorybarrier` 
+* `memorybarrier_device` 
 * `texture_sm_4_0` 
 * `texture_sm_4_1` 
 * `texture_sm_4_1_samplerless` 

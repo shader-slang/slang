@@ -173,3 +173,19 @@ docs/generated/tests/design/ir-reference/differentiation/builtin-requirement-dec
 # the diagnostic sorts the list, which would make the text order-stable by
 # construction rather than a reflection of the merge order.
 docs/generated/tests/design/pipeline/05-ir-passes/typeflow-report-dynamic-dispatch-sites.slang
+
+# https://github.com/shader-slang/slang/issues/14010 (fixed by
+# https://github.com/shader-slang/slang/pull/14011): on Metal,
+# DeviceMemoryBarrier and AllMemoryBarrier used to lower to
+# threadgroup_barrier, which does not order device memory across
+# threadgroups. They now lower to a device-scope atomic_thread_fence (and
+# the *WithGroupSync forms to that fence plus threadgroup_barrier). These
+# Metal directives pin the old threadgroup_barrier output for the
+# non-sync barriers. Remove the entries once the
+# basics-memory-model-consistency bundle is regenerated.
+docs/generated/tests/conformance/basics-memory-model-consistency/barrier-acquire-release-semantics-spirv-emission.slang.3
+docs/generated/tests/conformance/basics-memory-model-consistency/barrier-all-memory-spirv-emission.slang.3
+docs/generated/tests/conformance/basics-memory-model-consistency/barrier-device-memory-spirv-emission.slang.3
+docs/generated/tests/conformance/basics-memory-model-consistency/barrier-groupsync-vs-nongroupsync-spirv-emission.slang.2
+docs/generated/tests/conformance/basics-memory-model-consistency/barrier-scope-distinction-spirv-emission.slang.3
+docs/generated/tests/conformance/basics-memory-model-consistency/barrier-scope-distinction-spirv-emission.slang.4

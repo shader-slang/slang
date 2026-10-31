@@ -1316,6 +1316,11 @@ Compound Capabilities
 `memorybarrier`
 > Capabilities required to use sm_5_0 style memory barriers
 
+`memorybarrier_device`
+> Capabilities required to use device-scope memory barriers (`DeviceMemoryBarrier`,
+> `AllMemoryBarrier` and their `WithGroupSync` forms): `memorybarrier`, except that Metal
+> needs MSL 3.2 for a device-scope `atomic_thread_fence`.
+
 `meshshading`
 > Ccapabilities required to use mesh shading features
 

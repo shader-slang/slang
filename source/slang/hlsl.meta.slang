@@ -8486,7 +8486,7 @@ bool all(matrix<T,N,M> x)
 /// Barrier for writes to all memory spaces.
 /// @category barrier Memory and control barriers
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier_device)]
 void AllMemoryBarrier()
 {
     __target_switch
@@ -8494,7 +8494,11 @@ void AllMemoryBarrier()
     case hlsl: __intrinsic_asm "AllMemoryBarrier";
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__threadfence()";
-    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
+    // `threadgroup_barrier` orders memory only within a threadgroup, and is an execution barrier.
+    // Device scope needs a fence, which MSL has from 3.2.
+    // The fence does not widen a buffer's coherence scope beyond the threadgroup; that needs
+    // `coherent(device)`, which is not emitted (see the Metal page of the user guide).
+    case metal: __intrinsic_asm "atomic_thread_fence(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture, memory_order_seq_cst, thread_scope_device)";
     case spirv: spirv_asm
         {
             OpMemoryBarrier Device AcquireRelease|UniformMemory|WorkgroupMemory|ImageMemory;
@@ -8506,7 +8510,7 @@ void AllMemoryBarrier()
 /// Thread-group sync and barrier for writes to all memory spaces.
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier_device)]
 void AllMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -8514,7 +8518,8 @@ void AllMemoryBarrierWithGroupSync()
     case hlsl: __intrinsic_asm "AllMemoryBarrierWithGroupSync";
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__syncthreads()";
-    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
+    // The barrier synchronizes the threadgroup; the fence makes writes visible device-wide.
+    case metal: __intrinsic_asm "atomic_thread_fence(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture, memory_order_seq_cst, thread_scope_device); threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
             OpControlBarrier Workgroup Device AcquireRelease|UniformMemory|WorkgroupMemory|ImageMemory;
@@ -10647,7 +10652,7 @@ T determinant(matrix<T,N,N> m)
 /// Barrier for device memory.
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier_device)]
 void DeviceMemoryBarrier()
 {
     __target_switch
@@ -10655,7 +10660,11 @@ void DeviceMemoryBarrier()
     case hlsl: __intrinsic_asm "DeviceMemoryBarrier";
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__threadfence()";
-    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
+    // `threadgroup_barrier` orders memory only within a threadgroup, and is an execution barrier.
+    // Device scope needs a fence, which MSL has from 3.2.
+    // The fence does not widen a buffer's coherence scope beyond the threadgroup; that needs
+    // `coherent(device)`, which is not emitted (see the Metal page of the user guide).
+    case metal: __intrinsic_asm "atomic_thread_fence(mem_flags::mem_device | mem_flags::mem_texture, memory_order_seq_cst, thread_scope_device)";
     case spirv: spirv_asm
         {
             OpMemoryBarrier Device AcquireRelease|UniformMemory|ImageMemory;
@@ -10667,7 +10676,7 @@ void DeviceMemoryBarrier()
 /// Barrier for device memory with group synchronization.
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier_device)]
 void DeviceMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -10675,7 +10684,8 @@ void DeviceMemoryBarrierWithGroupSync()
     case hlsl: __intrinsic_asm "DeviceMemoryBarrierWithGroupSync";
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__syncthreads()";
-    case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
+    // The barrier synchronizes the threadgroup; the fence makes writes visible device-wide.
+    case metal: __intrinsic_asm "atomic_thread_fence(mem_flags::mem_device | mem_flags::mem_texture, memory_order_seq_cst, thread_scope_device); threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
             OpControlBarrier Workgroup Device AcquireRelease|UniformMemory|ImageMemory;

@@ -1924,6 +1924,51 @@ void MetalSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     SLANG_UNUSED(inst);
 }
 
+static SemanticVersion _getMetalLanguageVersionForAtom(CapabilityName atom)
+{
+    switch (atom)
+    {
+    case CapabilityName::metallib_2_3:
+        return SemanticVersion(2, 3);
+    case CapabilityName::metallib_2_4:
+        return SemanticVersion(2, 4);
+    case CapabilityName::metallib_3_0:
+        return SemanticVersion(3, 0);
+    case CapabilityName::metallib_3_1:
+        return SemanticVersion(3, 1);
+    case CapabilityName::metallib_3_2:
+        return SemanticVersion(3, 2);
+    case CapabilityName::metallib_4_0:
+        return SemanticVersion(4, 0);
+    default:
+        return SemanticVersion();
+    }
+}
+
+void MetalSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
+{
+    // An entry point's capability requirements name the MSL version its code needs, for example
+    // `metallib_3_2` for the device-scope fence of `DeviceMemoryBarrier`. A core-module function
+    // written as `__intrinsic_asm` cannot tell the extension tracker itself, so the version is
+    // taken from the requirements here, before anything is emitted.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (!globalInst->findDecoration<IREntryPointDecoration>())
+            continue;
+        for (auto decoration : globalInst->getDecorations())
+        {
+            if (auto atomDecoration = as<IRRequireCapabilityAtomDecoration>(decoration))
+            {
+                auto version = _getMetalLanguageVersionForAtom(atomDecoration->getAtom());
+                if (version.isSet())
+                    m_extensionTracker->requireMetalLanguageVersion(version);
+            }
+        }
+    }
+
+    Super::emitModuleImpl(module, sink);
+}
+
 void MetalSourceEmitter::emitFrontMatterImpl(TargetRequest*)
 {
     m_writer->emit("#include <metal_stdlib>\n");
