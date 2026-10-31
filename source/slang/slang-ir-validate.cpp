@@ -383,6 +383,29 @@ void validateCodeBody(IRValidateContext* context, IRGlobalValueWithCode* code)
     }
 }
 
+// Check that a `DebugDeclare` ties a debug variable to pointer-typed storage. The storage may be
+// an address derived from a root variable until SPIR-V legalization, which only keeps declares
+// whose storage is a root memory object.
+static void validateDebugDeclare(IRValidateContext* context, IRInst* inst)
+{
+    if (inst->getOp() != kIROp_DebugDeclare)
+        return;
+    bool validCount = inst->getOperandCount() == 2;
+    validate(context, validCount, inst, "invalid DebugDeclare operand count");
+    if (!validCount)
+        return;
+    validate(
+        context,
+        as<IRDebugVar>(inst->getOperand(0)),
+        inst,
+        "DebugDeclare must refer to a DebugVar");
+    validate(
+        context,
+        as<IRPtrTypeBase>(inst->getOperand(1)->getDataType()),
+        inst,
+        "DebugDeclare storage must have a pointer type");
+}
+
 // Check declaration-scope contracts, guarding operand counts before reading fixed positions.
 static void validateDebugScopeOperands(IRValidateContext* context, IRInst* inst)
 {
@@ -480,6 +503,7 @@ void validateIRInst(IRValidateContext* context, IRInst* inst)
         context->domTree = nullptr;
 
     validateDebugScopeOperands(context, inst);
+    validateDebugDeclare(context, inst);
 }
 
 void validateIRInst(IRInst* inst)

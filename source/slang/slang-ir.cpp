@@ -3663,6 +3663,14 @@ IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue)
         args.getBuffer());
 }
 
+IRInst* IRBuilder::emitDebugDeclare(IRInst* debugVar, IRInst* storage)
+{
+    SLANG_ASSERT(as<IRDebugVar>(debugVar));
+    SLANG_ASSERT(as<IRPtrTypeBase>(storage->getDataType()));
+    IRInst* args[] = {debugVar, storage};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugDeclare, 2, args);
+}
+
 IRInst* IRBuilder::emitDebugInlinedAt(
     IRInst* line,
     IRInst* col,

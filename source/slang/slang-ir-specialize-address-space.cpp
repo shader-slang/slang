@@ -536,9 +536,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         AddressSpace storedAddrSpace = AddressSpace::Generic;
         bool conflict = false;
-        auto consider = [&](IRInst* value)
+        auto considerAddrSpace = [&](AddressSpace valueAddrSpace)
         {
-            auto valueAddrSpace = getStoredValueAddrSpace(value);
             if (valueAddrSpace == AddressSpace::Generic)
                 return;
             if (storedAddrSpace == AddressSpace::Generic)
@@ -552,12 +551,23 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             if (auto store = as<IRStore>(user))
             {
                 if (store->getPtr() == slot)
-                    consider(store->getVal());
+                    considerAddrSpace(getStoredValueAddrSpace(store->getVal()));
             }
             else if (auto debugValue = as<IRDebugValue>(user))
             {
                 if (debugValue->getDebugVar() == slot)
-                    consider(debugValue->getValue());
+                    considerAddrSpace(getStoredValueAddrSpace(debugValue->getValue()));
+            }
+            else if (auto debugDeclare = as<IRDebugDeclare>(user))
+            {
+                // A debug variable declared on a pointer slot holds whatever that slot holds,
+                // so it follows the slot's reconciled address space.
+                if (debugDeclare->getDebugVar() == slot)
+                {
+                    if (auto storageAddrSpace =
+                            reconciledSlotAddrSpace.tryGetValue(debugDeclare->getStorage()))
+                        considerAddrSpace(*storageAddrSpace);
+                }
             }
         }
         if (conflict)

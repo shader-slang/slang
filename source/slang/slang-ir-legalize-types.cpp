@@ -982,6 +982,29 @@ static LegalVal legalizeDebugVar(
     }
 }
 
+// Re-create a `DebugDeclare` for the legalized debug variable and storage. The debug variable
+// keeps only the ordinary part of its type, so the declaration follows the ordinary part of
+// paired storage. Storage split into several pieces (the tuple flavor) cannot back one
+// declaration, so we drop the declaration rather than describe the variable by one piece.
+static LegalVal legalizeDebugDeclare(
+    IRTypeLegalizationContext* context,
+    LegalVal debugVar,
+    LegalVal storage)
+{
+    if (debugVar.flavor != LegalVal::Flavor::simple)
+        return LegalVal();
+    switch (storage.flavor)
+    {
+    case LegalVal::Flavor::simple:
+        return LegalVal::simple(
+            context->builder->emitDebugDeclare(debugVar.getSimple(), storage.getSimple()));
+    case LegalVal::Flavor::pair:
+        return legalizeDebugDeclare(context, debugVar, storage.getPair()->ordinaryVal);
+    default:
+        return LegalVal();
+    }
+}
+
 static LegalVal legalizeDebugValue(
     IRTypeLegalizationContext* context,
     LegalVal debugVar,
@@ -2156,6 +2179,9 @@ static LegalVal legalizeInst(
         break;
     case kIROp_DebugValue:
         result = legalizeDebugValue(context, args[0], args[1], (IRDebugValue*)inst);
+        break;
+    case kIROp_DebugDeclare:
+        result = legalizeDebugDeclare(context, args[0], args[1]);
         break;
 
     case kIROp_MakeStruct:
