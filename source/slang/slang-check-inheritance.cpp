@@ -432,53 +432,6 @@ DeclRef<GenericDecl> SharedSemanticsContext::getDependentGenericParent(DeclRef<D
     return genericParent;
 }
 
-// `baseIsSubtypeOfFacet` is typically an interface-to-interface witness whose sub-type still
-// refers to the base interface's abstract `This` path, not the concrete/self type we are
-// currently reasoning about.
-//
-// For example, if we are merging:
-// - `selfIsSubtypeOfBase`: `Child : IBase`
-// - `baseIsSubtypeOfFacet`: `IBase.This : IFacet`
-//
-// then we want the returned witness to mean `Child : IFacet`.
-//
-// We do that by constructing the lookup `Lookup(selfIsSubtypeOfBase, IBase.This)` and using it
-// as a substitution when cloning `baseIsSubtypeOfFacet`. That effectively rewrites uses of the
-// base interface's abstract `This` and corresponding this-type witness to flow through the new
-// `Child : IBase` path instead.
-//
-// This is intentionally a localized workaround: the type system does not yet have a first-class
-// utility for "take an interface witness written in terms of Base.This and specialize it to Self".
-SubtypeWitness* SharedSemanticsContext::_specializeInterfaceInheritanceWitness(
-    InterfaceDecl* baseInterfaceDecl,
-    SubtypeWitness* selfIsSubtypeOfBase,
-    SubtypeWitness* baseIsSubtypeOfFacet)
-{
-    SLANG_ASSERT(baseInterfaceDecl);
-    SLANG_ASSERT(selfIsSubtypeOfBase);
-    SLANG_ASSERT(baseIsSubtypeOfFacet);
-
-    SpecializeInterfaceInheritanceWitnessKey key = {
-        baseInterfaceDecl,
-        selfIsSubtypeOfBase,
-        baseIsSubtypeOfFacet};
-    if (auto found = m_specializeInterfaceInheritanceWitnessCache.tryGetValue(key))
-        return *found;
-
-    auto lookupSubstitution = SubstitutionSet(_getASTBuilder()->getLookupDeclRef(
-        selfIsSubtypeOfBase,
-        baseInterfaceDecl->getThisTypeDecl()));
-
-    // `as<SubtypeWitness>` can be null if substitution ever produced a non-witness `Val` for a
-    // witness input -- caching that is intentional and harmless: a cached null and a freshly
-    // recomputed null behave identically to every caller, so there is nothing this cache changes
-    // about how that case is handled.
-    auto result =
-        as<SubtypeWitness>(baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
-    m_specializeInterfaceInheritanceWitnessCache.add(key, result);
-    return result;
-}
-
 bool SharedSemanticsContext::tryResolveConstraintTypes(
     DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
 {
@@ -711,31 +664,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     SubtypeWitness* selfIsSelf = nullptr;
     if (selfType)
     {
-        if (isDeclRefTypeOf<InterfaceDecl>(selfType))
-        {
-            // For an interface *type*, the self/base conformance witnesses are rooted at
-            // the interface's `ThisType` (not at `selfType` as for every other type), so
-            // a concrete conforming type `T : IInterface` can later specialize them via
-            // `This -> T`. i.e. here `DeclRefType(InterfaceDecl)` is treated as a
-            // *requirement template*, not as the *existential box* it also denotes.
-            //
-            // KNOWN LIMITATION (#11469): that dual meaning means using an interface type
-            // as an existential (e.g. a generic argument `Foo<IInterface>`) gets this
-            // `This`-rooted answer, so its conformance witness's `sub` is a standalone
-            // `IInterface.This` -- ill-formed for the box, and a source of non-canonical
-            // type identity. Properly disentangling box vs `ThisType` here is invasive,
-            // so the symptom is normalized downstream instead (#11464 / #11465 / #11468).
-            selfIsSelf = visitor.getThisTypeWitness(
-                astBuilder,
-                as<DeclRefType>(selfType)->getDeclRef().as<InterfaceDecl>());
-        }
-        else
-        {
-            // If we have a `selfType` that isn't already a decl-ref type, then
-            // we need to create a witness that the type of the declaration
-            // inherits from that `selfType`.
-            selfIsSelf = visitor.createTypeEqualityWitness(selfType);
-        }
+        // We use equality for the self facet of `selfType`. For an interface, equality
+        // describes the interface contract; it does not assert conformance of a value type.
+        // `getRequirementAsLookedUpDecl` constructs the separate `This` conformance for
+        // interface requirement lookup.
+        selfIsSelf = visitor.createTypeEqualityWitness(selfType);
     }
     Facet selfFacet = new (arena) Facet::Impl(
         astBuilder,
@@ -903,27 +836,6 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 if (typeConstraintDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
                     continue;
 
-                Type* subTypeForWitness = selfType;
-                if (auto interfaceDeclRef = containerDeclRef.as<InterfaceDecl>())
-                {
-                    // If we're dealing with an interface decl, we'll need to
-                    // represent the constraint as a lookup on the 'this' type of the
-                    // interface.
-                    //
-
-                    typeConstraintDeclRef = substituteDeclRef(
-                                                SubstitutionSet(declRef),
-                                                astBuilder,
-                                                visitor.getRequirementAsLookedUpDecl(
-                                                    astBuilder,
-                                                    typeConstraintDeclRef.getDecl()))
-                                                .as<TypeConstraintDecl>();
-                    subTypeForWitness = substituteType(
-                        SubstitutionSet(declRef),
-                        astBuilder,
-                        visitor.calcThisType(interfaceDeclRef));
-                }
-
                 // A GenericTypeConstraintDecl reaches this point either as a member of an
                 // `associatedtype` declaration or, for an interface, as a direct `__constraint`
                 // member. For an `associatedtype` it contributes a base only when its subject
@@ -974,12 +886,18 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 {
                     continue;
                 }
-                // The base type and subtype witness can easily be determined
-                // using the `InheritanceDecl`.
+                // We use the specialized inheritance declaration directly. Consider this example:
                 //
+                //     interface IBase<T> {}
+                //     interface IDerived<T> : IBase<T> {}
+                //
+                // For `IDerived<int>`, `getSup` applies the substitutions in
+                // `typeConstraintDeclRef` to produce `IBase<int>`. The witness therefore proves
+                // `IDerived<int> : IBase<int>`. We compose that refinement with a proper type's
+                // conformance when looking up inherited members.
                 auto baseType = getSup(astBuilder, typeConstraintDeclRef);
                 auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
-                    subTypeForWitness,
+                    selfType,
                     baseType,
                     typeConstraintDeclRef);
 
@@ -1468,36 +1386,18 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 {
                     if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
                     {
-                        // TODO: De-duplicate the logic in the two branches.
-                        if (auto baseInterfaceDeclRef =
-                                baseFacet->origin.declRef.as<InterfaceDecl>())
+                        // We compose the proof to the direct base with its proof for the interface.
+                        // Extension inference then has a proof about the same `selfType` whose
+                        // inheritance we are computing, without re-entering that computation.
+                        auto transitiveWitness = astBuilder->getTransitiveSubtypeWitness(
+                            baseFacet->subtypeWitness,
+                            facet->subtypeWitness);
+                        additionalSubtypeWitnesses.addIfNotExists(
+                            facet->origin.type,
+                            transitiveWitness);
+                        if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
                         {
-                            auto transitiveWitness = _specializeInterfaceInheritanceWitness(
-                                baseInterfaceDeclRef.getDecl(),
-                                (*base)->facetImpl.subtypeWitness,
-                                facet->subtypeWitness);
-                            additionalSubtypeWitnesses.addIfNotExists(
-                                facet->origin.type,
-                                transitiveWitness);
-                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
-                            {
-                                supTypeWorkList.add(interfaceDeclRef);
-                            }
-                        }
-                        else
-                        {
-                            SubtypeWitness* transitiveWitness = baseFacet->subtypeWitness;
-                            transitiveWitness = astBuilder->getTransitiveSubtypeWitness(
-                                baseFacet->subtypeWitness,
-                                facet->subtypeWitness);
-
-                            additionalSubtypeWitnesses.addIfNotExists(
-                                facet->origin.type,
-                                transitiveWitness);
-                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
-                            {
-                                supTypeWorkList.add(interfaceDeclRef);
-                            }
+                            supTypeWorkList.add(interfaceDeclRef);
                         }
                     }
                 }
@@ -1849,8 +1749,9 @@ void SharedSemanticsContext::_mergeFacetLists(
                         astBuilder->getEachSubtypeWitness(selfType, baseType, selfIsSubtypeOfBase);
                 }
 
-                auto transitiveWitness = _specializeInterfaceInheritanceWitness(
-                    as<InterfaceDecl>(as<DeclRefType>(baseType)->getDeclRef().getDecl()),
+                // The base's facet starts at `baseType`, so ordinary composition preserves
+                // the declared inheritance steps used by witness-table lookup during lowering.
+                auto transitiveWitness = astBuilder->getTransitiveSubtypeWitness(
                     selfIsSubtypeOfBase,
                     baseIsSubtypeOfFacet);
 

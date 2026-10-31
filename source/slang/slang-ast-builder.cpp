@@ -958,6 +958,33 @@ Type* ASTBuilder::getAndType(Type* left, Type* right)
     return type;
 }
 
+ExistentialBoxType* ASTBuilder::getExistentialBoxType(Type* interfaceType)
+{
+    SLANG_RELEASE_ASSERT(interfaceType);
+    SLANG_RELEASE_ASSERT(isDeclRefTypeOf<InterfaceDecl>(interfaceType->getCanonicalType()));
+    return getOrCreate<ExistentialBoxType>(interfaceType);
+}
+
+ExistentialBoxDifferentiabilityWitness* ASTBuilder::getExistentialBoxDifferentiabilityWitness(
+    ExistentialBoxType* boxType,
+    SubtypeWitness* interfaceWitness)
+{
+    // We use the refinement proof's target for the artificial box conformance, so callers
+    // cannot associate the box with a different differentiability interface.
+    SLANG_RELEASE_ASSERT(boxType);
+    SLANG_RELEASE_ASSERT(interfaceWitness);
+    SLANG_RELEASE_ASSERT(boxType->getInterfaceType()->equals(interfaceWitness->getSub()));
+    auto differentiabilityInterface = interfaceWitness->getSup();
+    if (!differentiabilityInterface->equals(getDifferentiableInterfaceType()))
+        SLANG_RELEASE_ASSERT(
+            differentiabilityInterface->equals(getDifferentiableRefInterfaceType()));
+
+    return getOrCreate<ExistentialBoxDifferentiabilityWitness>(
+        boxType,
+        differentiabilityInterface,
+        interfaceWitness);
+}
+
 Type* ASTBuilder::getModifiedType(Type* base, Count modifierCount, Val* const* modifiers)
 {
     auto type = getOrCreate<ModifiedType>(base, makeArrayView((Val**)modifiers, modifierCount));

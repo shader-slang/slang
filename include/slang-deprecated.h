@@ -800,6 +800,12 @@ extern "C"
     SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(
         SlangReflectionFunction* func,
         SlangReflectionGeneric* generic);
+    /** Resolve `func` as a call with arguments of `argTypes`, returning null on failure.
+
+        Through Slang 2026, the compiler implicitly converts interface metadata to its
+        existential-box type. In Slang 202c, callers must supply explicit `dyn` types.
+        Call inference opens existential arguments.
+     */
     SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(
         SlangReflectionFunction* func,
         SlangInt argTypeCount,
@@ -972,9 +978,20 @@ extern "C"
         SlangReflection* reflection,
         char const* name);
 
+    /** Find a type by name.
+
+        An interface name such as `IFoo` identifies the interface contract; `dyn IFoo` identifies
+        its existential-box type.
+    */
     SLANG_API SlangReflectionType* spReflection_FindTypeByName(
         SlangReflection* reflection,
         char const* name);
+    /** Get the layout of `reflectionType`.
+
+        This function applies the interface conversion rules described by `ISession::getTypeLayout`.
+        Returns null if `reflectionType` cannot be used as a data type. This function does not
+        return diagnostics.
+    */
     SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
         SlangReflection* reflection,
         SlangReflectionType* reflectionType,
@@ -1019,6 +1036,15 @@ extern "C"
      */
     SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
 
+    /** Specialize the existential payload slots in `type`.
+
+        Payload arguments must be concrete conforming types or the dynamic-dispatch marker
+        returned by `ISession::getDynamicType`.
+        This function applies the interface conversion rules of `spReflection_GetTypeLayout`
+        to the base.
+        Interface contracts and existential boxes cannot be concrete payload arguments.
+        Returns null on failure, with diagnostics in `outDiagnostics` when requested.
+     */
     SLANG_API SlangReflectionType* spReflection_specializeType(
         SlangReflection* reflection,
         SlangReflectionType* type,
@@ -1026,6 +1052,16 @@ extern "C"
         SlangReflectionType* const* specializationArgs,
         ISlangBlob** outDiagnostics);
 
+    /** Specialize a generic declaration with explicit arguments.
+
+        Through Slang 2026, the compiler implicitly converts interface metadata supplied as a
+        type argument to its existential-box type. In Slang 202c, callers must supply an explicit
+        box type, such as `dyn IFoo`. Constraints apply directly to the resulting type arguments.
+        `spReflectionFunction_specializeWithArgTypes` performs call inference, which can open
+        existential boxes to infer their payload types.
+        Returns null for semantic errors or when specialization does not produce a completed
+        declaration. Semantic errors are reported in `outDiagnostics` when requested.
+     */
     SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
         SlangReflection* inProgramLayout,
         SlangReflectionGeneric* generic,
@@ -1383,8 +1419,9 @@ struct ICompileRequest : public ISlangUnknown
     /** Specify the concrete type to be used for a global "existential slot."
 
     Every shader parameter (or leaf field of a `struct`-type shader parameter)
-    that has an interface or array-of-interface type introduces an existential
-    slot. The number of slots consumed by a shader parameter, and the starting
+    that has an existential box type, or an array of boxes, introduces a slot
+    for the concrete type stored in those boxes.
+    The number of slots consumed by a shader parameter, and the starting
     slot of each parameter can be queried via the reflection API using
     `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM`.
 
@@ -1399,8 +1436,9 @@ struct ICompileRequest : public ISlangUnknown
     /** Specify the concrete type to be used for an entry-point "existential slot."
 
     Every shader parameter (or leaf field of a `struct`-type shader parameter)
-    that has an interface or array-of-interface type introduces an existential
-    slot. The number of slots consumed by a shader parameter, and the starting
+    that has an existential box type, or an array of boxes, introduces a slot
+    for the concrete type stored in those boxes.
+    The number of slots consumed by a shader parameter, and the starting
     slot of each parameter can be queried via the reflection API using
     `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM`.
 

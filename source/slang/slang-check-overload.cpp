@@ -13,6 +13,33 @@
 namespace Slang
 {
 
+/// Check whether existential box packing loses storage required by a reference-qualified parameter.
+///
+/// Both read-only and writable reference modes require actual box-typed storage; a concrete
+/// argument's storage cannot serve as a reference to the temporary box produced by packing it.
+static bool doesExistentialBoxPackingLoseRequiredReferenceStorage(
+    Expr* coercedArgument,
+    QualType argumentType,
+    QualType parameterType)
+{
+    // A failed conversion already has its own diagnostic. An l-value result supplies the
+    // required storage, and a value parameter does not require reference storage.
+    if (!coercedArgument)
+        return false;
+    if (as<ErrorType>(coercedArgument->type))
+        return false;
+    if (coercedArgument->type.isLeftValue)
+        return false;
+    if (!parameterType.isLeftValue)
+        return false;
+
+    // Passing an existing box does not pack a concrete value. For a concrete argument,
+    // coercion creates a new box, so the argument's original storage has the wrong type.
+    if (as<ExistentialBoxType>(argumentType))
+        return false;
+    return as<ExistentialBoxType>(parameterType) != nullptr;
+}
+
 bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* paramDecl)
 {
     if (auto declRef = isDeclRefTypeOf<GenericTypePackParamDecl>(type))
@@ -922,9 +949,10 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         {
             Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
-            // Check if concrete-to-interface coercion caused loss of l-valueness.
-            if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
-                !isInterfaceType(arg.type) && isInterfaceType(paramType.type))
+            if (doesExistentialBoxPackingLoseRequiredReferenceStorage(
+                    coercedExpr,
+                    arg.type,
+                    paramType))
             {
                 if (context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
@@ -937,11 +965,14 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                     else
                         name.append(paramIndex, 10);
 
-                    getSink()->diagnose(Diagnostics::ConcreteArgumentToOutputInterface{
-                        .paramName = name,
-                        .argType = arg.type,
-                        .paramType = paramType.type,
-                        .location = context.loc});
+                    getSink()->diagnose(
+                        Diagnostics::ConcreteArgumentToExistentialBoxReferenceParameter{
+                            .paramName = name,
+                            .paramType = paramType.type,
+                            .argType = arg.type,
+                            .constraintInterface =
+                                as<ExistentialBoxType>(paramType)->getInterfaceType(),
+                            .location = context.loc});
                 }
                 return {nullptr, nullptr};
             }
@@ -3092,7 +3123,13 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
     // from a value of the same type. There is no need in Slang for
     // "copy constructors" but the core module currently has to define
     // some just to make code that does, e.g., `float(1.0f)` work.)
-    LookupResult initializers = lookupConstructorsInType(type, context.sourceScope);
+    // Constructor lookup needs a data type. For an interface `IFoo`, lookup targets `dyn IFoo`
+    // before Slang 202c. Candidate discovery is speculative, so a rejected type adds no candidates;
+    // `ResolveInvoke` diagnoses proper-type errors once a constructor target is selected.
+    auto properType = tryCoerceToProperType(TypeExp(type)).type;
+    if (!properType)
+        return;
+    LookupResult initializers = lookupConstructorsInType(properType, context.sourceScope);
     AddOverloadCandidates(initializers, context);
 }
 
@@ -3560,9 +3597,21 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             bool skipCoercionFastPath =
                 isDeclRefTypeOf<ClassDecl>(targetType) &&
                 (as<NewExpr>(expr) || !targetType->equals(expr->arguments[0]->type));
-            if ((isDeclRefTypeOf<AggTypeDeclBase>(targetType) && !skipCoercionFastPath) ||
-                isDeclRefTypeOf<EnumDecl>(targetType))
+            bool shouldTryExplicitCoercion = false;
+            if (as<ExistentialBoxType>(targetType))
+                shouldTryExplicitCoercion = true;
+            else if (isDeclRefTypeOf<EnumDecl>(targetType))
+                shouldTryExplicitCoercion = true;
+            else if (isDeclRefTypeOf<AggTypeDeclBase>(targetType))
+                shouldTryExplicitCoercion = !skipCoercionFastPath;
+            if (shouldTryExplicitCoercion)
             {
+                // As with `(IFoo)value`, the target of `IFoo(value)` must be a proper type.
+                // Generic declaration callees are not coercion targets: overload resolution
+                // still needs to infer their arguments before proper-type checking can apply.
+                targetType = CoerceToProperType(TypeExp(funcExpr, targetType)).type;
+                if (as<ErrorType>(targetType))
+                    return CreateErrorExpr(expr);
                 Expr* resultExpr = nullptr;
                 ConversionCost conversionCost = kConversionCost_None;
 
@@ -3943,6 +3992,13 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
     if (auto typetype = as<TypeType>(typeExpr->type))
     {
+        // Consider `NativeRef<IFoo>(IFoo())` for a COM interface in legacy mode or Slang 2025.
+        // The inner constructor must produce a value of type `dyn IFoo`. A value incorrectly typed
+        // as `IFoo` would make the outer conversion pack it again.
+        auto targetType = CoerceToProperType(TypeExp(typeExpr, typetype->getType())).type;
+        if (as<ErrorType>(targetType))
+            return CreateErrorExpr(expr);
+
         // We allow a special case when `funcExpr` represents a composite type,
         // in which case we will try to construct the type via memberwise assignment from the
         // arguments.
@@ -3952,7 +4008,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         initListExpr->args.addRange(expr->arguments);
         initListExpr->type = m_astBuilder->getInitializerListType();
         Expr* outExpr = nullptr;
-        if (_coerceInitializerList(typetype->getType(), &outExpr, initListExpr))
+        if (_coerceInitializerList(targetType, &outExpr, initListExpr))
         {
             // If there is a coercion error, make sure we return a valid original expr
             // for language server to use.

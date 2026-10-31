@@ -1008,6 +1008,26 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     ConversionCost _getOverloadResolutionCostOverride();
 };
 
+/// A witness for the conformance of an existential box to a built-in differentiability interface.
+///
+/// For `dyn IFoo`, this represents conformance to `IDifferentiable` or
+/// `IDifferentiablePtrType`, based on a witness that `IFoo` refines that interface.
+///
+/// This conformance is unfounded according to the Slang type system, but autodiff uses this
+/// witness for compatibility. In general, `dyn IFoo` does not conform
+/// to `IBar` just because `IFoo` refines `IBar`, including when `IFoo` and `IBar` are equal.
+/// This class encodes a compatibility hack, not a precedent for other box conformances.
+FIDDLE()
+class ExistentialBoxDifferentiabilityWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    SubtypeWitness* getInterfaceWitness() { return as<SubtypeWitness>(getOperand(2)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 FIDDLE()
 class DiffTypeInfoWitness : public SubtypeWitness
 {
@@ -1057,6 +1077,8 @@ class TransitiveSubtypeWitness : public SubtypeWitness
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
+    /// Resolve operands and a stored proof alias when it proves the same typed relationship.
+    Val* _resolveImplOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     TransitiveSubtypeWitness(

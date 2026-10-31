@@ -660,11 +660,14 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     List<Expr*> argExprs;
     for (SlangInt aa = 0; aa < argTypes.getCount(); ++aa)
     {
-        auto argType = argTypes[aa];
+        auto argType = visitor.CoerceToProperType(TypeExp(argTypes[aa])).type;
+        if (as<ErrorType>(argType))
+            return DeclRef<Decl>();
 
-        // Create an 'empty' expr with the given type. Ideally, the expression itself should not
-        // matter only its checked type.
-        //
+        // A reflected `IFoo` must become `dyn IFoo` before it can describe a value.
+        // The normal call checker then opens that box for inference, just as it would
+        // for an argument written in Slang. Only the placeholder's checked type is used; no runtime
+        // value is supplied.
         auto argExpr = getCurrentASTBuilder()->create<VarExpr>();
         argExpr->type = argType;
         argExpr->type.isLeftValue = true;
@@ -707,10 +710,10 @@ DeclRef<Decl> Linkage::specializeGeneric(
     genericAppExpr->functionExpr = declRefExpr;
     genericAppExpr->arguments = argExprs;
 
-    auto specializedDeclRef =
-        as<DeclRefExpr>(visitor.checkGenericAppWithCheckedArgs(genericAppExpr))->declRef;
-
-    return specializedDeclRef;
+    auto checkedExpr = visitor.checkGenericAppWithCheckedArgs(genericAppExpr);
+    if (auto specializedExpr = as<DeclRefExpr>(checkedExpr))
+        return specializedExpr->declRef;
+    return DeclRef<Decl>();
 }
 
 SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
@@ -728,6 +731,14 @@ SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
 
     auto target = targets[targetIndex];
 
+    // Layout is a proper-type context, while type lookup also returns interface metadata.
+    // Semantic checking applies the language version's implicit-boxing rule at this boundary.
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+    type = checkProperType(this, TypeExp(type), &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+    if (sink.getErrorCount())
+        return nullptr;
+
     // TODO: We need a way to pass through the layout rules
     // that the user requested (e.g., constant buffers vs.
     // structured buffer rules). Right now the API only
@@ -741,8 +752,6 @@ SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     // errors that occur during layout (e.g., types that
     // are invalid because of target-specific layout constraints).
     //
-    SLANG_UNUSED(outDiagnostics);
-
     return asExternal(typeLayout);
 }
 
@@ -751,7 +760,12 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
     slang::ContainerType containerType,
     ISlangBlob** outDiagnostics)
 {
+    // We form the requested container over a proper type and cache the result.
+    // For `None`, we return the input metadata unchanged.
     SLANG_AST_BUILDER_RAII(getASTBuilder());
+
+    if (containerType == slang::ContainerType::None)
+        return inType;
 
     auto type = asInternal(inType);
 
@@ -759,6 +773,14 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
     ContainerTypeKey key = {inType, containerType};
     if (!m_containerTypes.tryGetValue(key, containerTypeReflection))
     {
+        // Reflection lookup can return an interface contract. We apply the language version's
+        // boxing rule before constructing the container, so its element is a proper type.
+        DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+        type = checkProperType(this, TypeExp(type), &sink);
+        sink.getBlobIfNeeded(outDiagnostics);
+        if (sink.getErrorCount())
+            return nullptr;
+
         switch (containerType)
         {
         case slang::ContainerType::ConstantBuffer:
@@ -796,8 +818,6 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
         m_containerTypes.add(key, containerTypeReflection);
     }
 
-    SLANG_UNUSED(outDiagnostics);
-
     return asExternal(containerTypeReflection);
 }
 
@@ -814,6 +834,10 @@ Linkage::getTypeRTTIMangledName(slang::TypeReflection* type, ISlangBlob** outNam
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     auto internalType = asInternal(type);
+    // `visitExistentialBoxType` lowers through the enclosed interface, so RTTI lookup uses
+    // the same declaration name.
+    if (auto boxType = as<ExistentialBoxType>(internalType))
+        internalType = boxType->getInterfaceType();
     if (auto declRefType = as<DeclRefType>(internalType))
     {
         auto name = getMangledName(m_astBuilder, declRefType->getDeclRef());
@@ -833,6 +857,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessMangled
 
     auto subType = asInternal(type);
     auto supType = asInternal(interfaceType);
+    // These names identify the payload's conformance, including when the target comes from
+    // a boxed shader-parameter layout.
+    if (auto boxType = as<ExistentialBoxType>(supType))
+        supType = boxType->getInterfaceType();
     auto name = getMangledNameForConformanceWitness(m_astBuilder, subType, supType);
     Slang::ComPtr<ISlangBlob> blob = Slang::StringUtil::createStringBlob(name);
     *outNameBlob = blob.detach();
@@ -851,6 +879,11 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
 
     if (!subType || !supType)
         return SLANG_FAIL;
+
+    // Shader-object layouts expose the box type. Its witness IDs describe the enclosed
+    // interface's conformances and must share the keys used by IR witness-table lowering.
+    if (auto boxType = as<ExistentialBoxType>(supType))
+        supType = boxType->getInterfaceType();
 
     auto name = getMangledNameForConformanceWitness(m_astBuilder, subType, supType);
     auto interfaceName = getMangledTypeName(m_astBuilder, supType);
@@ -925,13 +958,21 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
         SemanticsVisitor visitor(sharedSemanticsContext);
         visitor = visitor.withSink(&sink);
 
-        auto witness = visitor.isSubtype(
-            (Slang::Type*)type,
-            (Slang::Type*)interfaceType,
-            IsSubTypeOptions::None);
-        if (auto subtypeWitness = as<SubtypeWitness>(witness))
+        auto implementationType = visitor.CoerceToProperType(TypeExp(asInternal(type))).type;
+        auto targetInterface = asInternal(interfaceType);
+        // Hosts can obtain the target from a `dyn IFoo` shader parameter. It identifies
+        // the payload's interface here, rather than a box that the implementation must conform to.
+        if (auto boxType = as<ExistentialBoxType>(targetInterface))
+            targetInterface = boxType->getInterfaceType();
+
+        if (!as<ErrorType>(implementationType))
         {
-            result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
+            auto witness =
+                visitor.isSubtype(implementationType, targetInterface, IsSubTypeOptions::None);
+            if (auto subtypeWitness = as<SubtypeWitness>(witness))
+            {
+                result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
+            }
         }
     }
 #if SLANG_HAS_EXCEPTIONS
@@ -1126,7 +1167,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         &sink,
         scope,
         getNamePool(),
-        SourceLanguage::Slang);
+        SourceLanguage::Slang,
+        languageVersion);
 }
 
 UInt Linkage::addTarget(CodeGenTarget target)

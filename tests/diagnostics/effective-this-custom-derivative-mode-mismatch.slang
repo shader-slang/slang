@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -Wno-38109
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -Wno-38109
 
 // A member custom derivative must preserve the effective parameter-passing mode of the primal's
 // `this` parameter. Matching only the receiver value type would accept these declarations even

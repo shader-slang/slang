@@ -110,6 +110,22 @@ SLANG_UNIT_TEST(functionReflection)
         [__AttributeUsage(_AttributeTargets.Function)]
         struct MyFuncPropertyAttribute {int v;}
 
+        interface IAttributed
+        {
+            [MyFuncProperty(17)]
+            int color();
+            static int defaultValue()
+            {
+                return 1;
+            }
+            T echo<T>(T value);
+            int readCount<let N : int>();
+        }
+        struct AttributedBox
+        {
+            dyn IAttributed value;
+        }
+
         [MyFuncProperty(1024)]
         [Differentiable]
         float ordinaryFunc(no_diff float x, int y) { return x + y; }
@@ -197,6 +213,65 @@ SLANG_UNIT_TEST(functionReflection)
         funcReflection->findAttributeByName(globalSession.get(), "MyFuncProperty") ==
         userAttribute);
 
+    // Declaration reflection retrieves requirements without a concrete `This`, through either
+    // the interface name or a boxed field. It does not invoke the reflected requirement.
+    auto layout = module->getLayout();
+    auto interfaceType = layout->findTypeByName("IAttributed");
+    auto holderType = layout->findTypeByName("AttributedBox");
+    SLANG_CHECK_ABORT(interfaceType != nullptr);
+    SLANG_CHECK_ABORT(holderType != nullptr);
+    slang::TypeReflection* metadataTypes[] = {
+        interfaceType,
+        holderType->getFieldByIndex(0)->getType(),
+    };
+    for (auto metadataType : metadataTypes)
+    {
+        auto requirement = layout->findFunctionByNameInType(metadataType, "color");
+        SLANG_CHECK_ABORT(requirement != nullptr);
+        auto attribute = requirement->findAttributeByName(globalSession, "MyFuncProperty");
+        SLANG_CHECK_ABORT(attribute != nullptr);
+        int attributeValue = 0;
+        SLANG_CHECK(SLANG_SUCCEEDED(attribute->getArgumentValueInt(0, &attributeValue)));
+        SLANG_CHECK(attributeValue == 17);
+        SLANG_CHECK(layout->findFunctionByNameInType(metadataType, "defaultValue") != nullptr);
+        SLANG_CHECK(layout->findFunctionByNameInType(metadataType, "echo<int>") != nullptr);
+
+        // A nested argument expression still cannot call a requirement through the interface.
+        SLANG_CHECK(
+            layout->findFunctionByNameInType(
+                metadataType,
+                "readCount<IAttributed.defaultValue()>") == nullptr);
+    }
+
+    // Qualified global queries retrieve the same metadata with either member spelling.
+    // Their cached results must not allow a requirement to become an entry point.
+    const char* qualifiedRequirements[] = {
+        "IAttributed.color",
+        "IAttributed::color",
+        "IAttributed.defaultValue",
+        "IAttributed::defaultValue",
+        "IAttributed.echo<int>",
+    };
+    for (auto qualifiedName : qualifiedRequirements)
+    {
+        auto requirement = layout->findFunctionByName(qualifiedName);
+        SLANG_CHECK_ABORT(requirement != nullptr);
+        ComPtr<slang::IEntryPoint> invalidEntryPoint;
+        ComPtr<slang::IBlob> lookupDiagnostics;
+        SLANG_CHECK(SLANG_FAILED(module->findAndCheckEntryPoint(
+            qualifiedName,
+            SLANG_STAGE_COMPUTE,
+            invalidEntryPoint.writeRef(),
+            lookupDiagnostics.writeRef())));
+        SLANG_CHECK(invalidEntryPoint == nullptr);
+        SLANG_CHECK_ABORT(lookupDiagnostics != nullptr);
+        SLANG_CHECK(String((const char*)lookupDiagnostics->getBufferPointer())
+                        .contains("cannot reference interface requirement"));
+        SLANG_CHECK(layout->findFunctionByName(qualifiedName) == requirement);
+    }
+    SLANG_CHECK(
+        layout->findFunctionByName("IAttributed.readCount<IAttributed.defaultValue()>") == nullptr);
+
     // Check overloaded method resolution
     auto overloadReflection = module->getLayout()->findFunctionByName("foo");
     SLANG_CHECK(overloadReflection != nullptr);
@@ -230,7 +305,7 @@ SLANG_UNIT_TEST(functionReflection)
     // More testing for specializeWithArgTypes
     //
 
-    // bar1 (IFloat, IFloat) -> int
+    // `bar1` takes two boxed `IFloat` values and returns `int`.
     //
     auto bar1Reflection = module->getLayout()->findFunctionByName("bar1");
     SLANG_CHECK(bar1Reflection != nullptr);
@@ -247,9 +322,11 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK(resolvedFunctionReflection != nullptr);
     SLANG_CHECK(resolvedFunctionReflection->getParameterCount() == 2);
     SLANG_CHECK(
-        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(0)->getType()) == "IFloat");
+        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(0)->getType()) ==
+        "dyn IFloat");
     SLANG_CHECK(
-        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(1)->getType()) == "IFloat");
+        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(1)->getType()) ==
+        "dyn IFloat");
 
     // bar2 (T : IFloat, float3) -> int
     //

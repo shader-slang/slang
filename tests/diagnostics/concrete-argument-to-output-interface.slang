@@ -47,7 +47,7 @@ void entry()
     h(concrete); // No error
     f(concrete); // ERROR!
 /*diag:
-     ^ concrete type passed to interface-typed output parameter
-     ^ argument passed to parameter 'x' is of concrete type 'MyThing', but interface-typed output parameters require interface-typed arguments. To allow passing a concrete type to this function, you can replace 'IThing x' with a generic 'T x' and a 'where T : IThing' constraint.
+     ^ concrete type passed to an existential box reference parameter
+     ^ parameter 'x' has type 'dyn IThing' and is passed by reference, but the argument has concrete storage type 'MyThing'. To accept concrete storage, use 'T x' with a type parameter 'T' constrained by 'where T : IThing'.
 */
 }

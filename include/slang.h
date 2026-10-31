@@ -2310,16 +2310,15 @@ public:                                                              \
         SLANG_PARAMETER_CATEGORY_CALLABLE_PAYLOAD = 16,
         SLANG_PARAMETER_CATEGORY_SHADER_RECORD = 17,
 
-        // An existential type parameter represents a "hole" that
-        // needs to be filled with a concrete type to enable
-        // generation of specialized code.
+        // An existential type parameter is a slot for the concrete type stored in an
+        // existential box. The application supplies the type when requesting specialized code.
         //
         // Consider this example:
         //
         //      struct MyParams
         //      {
-        //          IMaterial material;
-        //          ILight lights[3];
+        //          dyn IMaterial material;
+        //          dyn ILight lights[3];
         //      };
         //
         // This `MyParams` type introduces two existential type parameters:
@@ -2330,22 +2329,21 @@ public:                                                              \
         //
         SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM = 18,
 
-        // An existential object parameter represents a value
-        // that needs to be passed in to provide data for some
-        // interface-type shader parameter.
+        // An existential object parameter represents the concrete value stored
+        // in an existential box that is passed to the shader.
         //
         // Consider this example:
         //
         //      struct MyParams
         //      {
-        //          IMaterial material;
-        //          ILight lights[3];
+        //          dyn IMaterial material;
+        //          dyn ILight lights[3];
         //      };
         //
         // This `MyParams` type introduces four existential object parameters:
         // one for `material` and three for `lights` (one for each array
-        // element). This is consistent with the number of interface-type
-        // "objects" that are being passed through to the shader.
+        // element). These are the four concrete values stored in the boxes
+        // passed to the shader.
         //
         SLANG_PARAMETER_CATEGORY_EXISTENTIAL_OBJECT_PARAM = 19,
 
@@ -3554,6 +3552,13 @@ struct FunctionReflection
             (SlangReflectionGeneric*)generic);
     }
 
+    /** Resolve this function as a call with arguments of `types`.
+
+        Through Slang 2026, the compiler implicitly converts interface metadata to its
+        existential-box type. In Slang 202c, callers must supply explicit `dyn` types.
+        Normal call inference opens existential arguments to infer their payload types.
+        Returns null if the call cannot be resolved.
+     */
     FunctionReflection* specializeWithArgTypes(unsigned int argCount, TypeReflection* const* types)
     {
         return (FunctionReflection*)spReflectionFunction_specializeWithArgTypes(
@@ -3846,6 +3851,11 @@ struct ShaderReflection
         return spReflection_getGlobalConstantBufferSize((SlangReflection*)this);
     }
 
+    /** Find a type by its name.
+
+        An interface name such as `IFoo` identifies the interface contract. Use `dyn IFoo` to
+        look up its existential-box type.
+    */
     TypeReflection* findTypeByName(const char* name)
     {
         return (TypeReflection*)spReflection_FindTypeByName((SlangReflection*)this, name);
@@ -3882,6 +3892,11 @@ struct ShaderReflection
             name);
     }
 
+    /** Get the layout of `type`.
+
+        This function applies the interface conversion rules described by `ISession::getTypeLayout`.
+        Returns null if `type` cannot be used as a data type. This form does not return diagnostics.
+    */
     TypeLayoutReflection* getTypeLayout(
         TypeReflection* type,
         LayoutRules rules = LayoutRules::Default)
@@ -3898,6 +3913,9 @@ struct ShaderReflection
             EntryPointReflection*)spReflection_findEntryPointByName((SlangReflection*)this, name);
     }
 
+    /** Specialize existential payload slots in `type`, using the rules of
+     * `ISession::specializeType`.
+     */
     TypeReflection* specializeType(
         TypeReflection* type,
         SlangInt specializationArgCount,
@@ -3912,6 +3930,16 @@ struct ShaderReflection
             outDiagnostics);
     }
 
+    /** Specialize a generic declaration with explicit arguments.
+
+        Through Slang 2026, the compiler implicitly converts interface metadata supplied as a
+        type argument to its existential-box type. In Slang 202c, callers must supply an explicit
+        box type, such as `dyn IFoo`. Constraints apply directly to the resulting type arguments.
+        `FunctionReflection::specializeWithArgTypes` performs call inference, which can open
+        existential boxes to infer their payload types.
+        Returns null for semantic errors or when specialization does not produce a completed
+        declaration. Semantic errors are reported in `outDiagnostics` when requested.
+     */
     GenericReflection* specializeGeneric(
         GenericReflection* generic,
         SlangInt specializationArgCount,
@@ -4642,7 +4670,17 @@ struct ISession : public ISlangUnknown
         IComponentType** outCompositeComponentType,
         ISlangBlob** outDiagnostics = nullptr) = 0;
 
-    /** Specialize a type based on type arguments.
+    /** Specialize the existential payload slots in `type`.
+
+        Payload arguments must be concrete conforming types or the dynamic-dispatch marker
+        returned by `getDynamicType`.
+        This function applies the interface conversion rules of `getTypeLayout` to the
+        base `type`.
+        For example, specializing reflected `IFoo` with `Foo` specializes the payload of
+        `dyn IFoo` through Slang 2026; in Slang 202c, the caller must supply the explicit box as
+        the base.
+        An interface contract or existential box cannot itself be a concrete payload argument.
+        Returns null on failure, with diagnostics in `outDiagnostics` when requested.
      */
     virtual SLANG_NO_THROW TypeReflection* SLANG_MCALL specializeType(
         TypeReflection* type,
@@ -4651,7 +4689,12 @@ struct ISession : public ISlangUnknown
         ISlangBlob** outDiagnostics = nullptr) = 0;
 
 
-    /** Get the layout `type` on the chosen `target`.
+    /** Get the layout of `type` on the chosen target.
+
+        Through Slang 2026, this function computes the layout of `dyn IFoo` when `type`
+        identifies interface `IFoo`. In Slang 202c, the caller must pass the explicit box type.
+        Returns null if `type` cannot be used as a data type, with diagnostics in
+        `outDiagnostics` when requested.
      */
     virtual SLANG_NO_THROW TypeLayoutReflection* SLANG_MCALL getTypeLayout(
         TypeReflection* type,
@@ -4661,6 +4704,10 @@ struct ISession : public ISlangUnknown
 
     /** Get a container type from `elementType`. For example, given type `T`, returns
         a type that represents `StructuredBuffer<T>`.
+
+        Uses the same interface conversion rules for `elementType` as `getTypeLayout`.
+        Returns null with diagnostics in `outDiagnostics` when a data type cannot be formed.
+        For `ContainerType::None`, returns `elementType` unchanged without conversion.
 
         @param `elementType`: the element type to wrap around.
         @param `containerType`: the type of the container to wrap `elementType` in.
@@ -4678,11 +4725,17 @@ struct ISession : public ISlangUnknown
     virtual SLANG_NO_THROW TypeReflection* SLANG_MCALL getDynamicType() = 0;
 
     /** Get the mangled name for a type RTTI object.
+
+        For an existential-box type `dyn IFoo`, returns the same name as for its enclosed
+        interface `IFoo`.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getTypeRTTIMangledName(TypeReflection* type, ISlangBlob** outNameBlob) = 0;
 
     /** Get the mangled name for a type witness.
+
+        When `interfaceType` is an existential-box type such as `dyn IFoo`, this function uses
+        its enclosed interface `IFoo`. The `type` argument still identifies the conforming type.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessMangledName(
         TypeReflection* type,
@@ -4690,7 +4743,10 @@ struct ISession : public ISlangUnknown
         ISlangBlob** outNameBlob) = 0;
 
     /** Get the sequential ID used to identify a type witness in a dynamic object.
+
         The sequential ID is part of the RTTI bytes returned by `getDynamicObjectRTTIBytes`.
+        This function interprets an existential-box `interfaceType` as its enclosed interface,
+        as described by `getTypeConformanceWitnessMangledName`.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
         slang::TypeReflection* type,
@@ -4718,6 +4774,11 @@ struct ISession : public ISlangUnknown
         `conformanceIdOverride` is -1, there will be no override behavior and Slang will
         automatically assign IDs to implementation types. The automatically assigned IDs can be
         queried via `ISession::getTypeConformanceWitnessSequentialID`.
+
+        `type` must describe an implementation, using the session's data-type conversion rules.
+        Interface metadata does not supply an implementation of itself or its base interfaces.
+        `interfaceType` identifies the interface contract; a box obtained from a reflected shader
+        parameter also identifies its enclosed interface here. This does not make the box conform.
 
         Returns SLANG_OK if succeeds, or SLANG_FAIL if `type` does not conform to `interfaceType`.
     */
@@ -4765,12 +4826,12 @@ struct ISession : public ISlangUnknown
         For example, given the following shader:
 
         ```slang
-        [anyValueSize(32)] dyn interface IFoo { int eval(); }
+        [anyValueSize(32)] interface IFoo { int eval(); }
         struct Impl : IFoo { int eval() { return 1; } }
 
         ConstantBuffer<dyn IFoo> cb0;
 
-        [numthreads(1,1,1)
+        [numthreads(1,1,1)]
         void main()
         {
             cb0.eval();
@@ -5471,8 +5532,8 @@ One example of a component type is a module of Slang code:
 * The global-scope shader parameters declared in the module are
   the parameters when considered as a component type.
 
-* Any global-scope generic or interface type parameters introduce
-  specialization parameters for the module.
+* A module has specialization parameters for its global generic parameters and for
+  the concrete types stored in existential boxes in its shader parameters.
 
 * A module does not by default include any entry points when
   considered as a component type (although the code of the
@@ -5487,8 +5548,8 @@ An entry point is another example of a component type:
 * The `uniform` parameters of the entry point function are
   its shader parameters when considered as a component type.
 
-* Any generic or interface-type parameters of the entry point
-  introduce specialization parameters.
+* An entry point has specialization parameters for its generic parameters and for
+  the concrete types stored in existential boxes in its uniform shader parameters.
 
 * An entry point component type exposes a single entry point (itself).
 
@@ -5527,8 +5588,8 @@ struct IComponentType : public ISlangUnknown
     it is not fully specialized), then the resulting layout may
     be incomplete, and plugging in arguments for generic specialization
     parameters may result in a component type that doesn't have
-    a compatible layout. If the component type only uses
-    interface-type specialization parameters, then the layout
+    a compatible layout. If all of this component type's specialization parameters are slots
+    for the concrete types stored in existential boxes, then the layout
     for a specialization should be compatible with an unspecialized
     layout (all parameters in the unspecialized layout will have
     the same offset/binding in the specialized layout).

@@ -1,10 +1,9 @@
-// Circular interface conformance without [anyValueSize] should produce a clear
-// error, not an internal compiler error.
+// Circular interface conformance without an `[anyValueSize(...)]` attribute should produce
+// a clear error, not an internal compiler error.
 //
-// When no [anyValueSize] is specified, the compiler infers the AnyValue size
-// from conforming types. A circular dependency (struct conforms to an interface
-// and contains a field of that interface type) means there is no base case for
-// size inference.
+// When an interface declaration has no `[anyValueSize(...)]` attribute, the compiler infers
+// the AnyValue size from conforming types. If a struct conforms to an interface and contains
+// a field of the corresponding existential box type, size inference has no base case.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl
@@ -13,7 +12,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl
 
-dyn interface IFoo
+interface IFoo
 {
     float getValue();
 }

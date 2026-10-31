@@ -3902,6 +3902,26 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     QualType fst,
     QualType snd)
 {
+    // We infer the generic arguments of a boxed interface from the payload's conformance.
+    // Consider this example:
+    //
+    //     interface IValue<T> {}
+    //     struct FloatValue : IValue<float> {}
+    //     void use<T>(dyn IValue<T> value) {}
+    //     void test() { use(FloatValue()); }
+    //
+    // We infer `T = float` by comparing `IValue<T>` with `FloatValue`'s `IValue<float>`
+    // base. After substitution, `_coerce` checks the conformance and constructs a box.
+    auto fstBoxType = as<ExistentialBoxType>(fst);
+    auto sndBoxType = as<ExistentialBoxType>(snd);
+    if (fstBoxType || sndBoxType)
+    {
+        return TryUnifyTypesByStructuralMatch(
+            constraints,
+            unificationOptions,
+            QualType(fstBoxType ? fstBoxType->getInterfaceType() : fst.type, fst.isLeftValue),
+            QualType(sndBoxType ? sndBoxType->getInterfaceType() : snd.type, snd.isLeftValue));
+    }
     if (auto sndDeclRefType = as<DeclRefType>(snd))
     {
         auto sndDeclRef = sndDeclRefType->getDeclRef();

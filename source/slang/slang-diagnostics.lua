@@ -1744,10 +1744,10 @@ err(
 )
 
 err(
-    "concrete-argument-to-output-interface",
+    "concrete-argument-to-existential-box-reference-parameter",
     30077,
-    "concrete type passed to interface-typed output parameter",
-    span { loc = "location", message = "argument passed to parameter '~paramName' is of concrete type '~argType:QualType', but interface-typed output parameters require interface-typed arguments. To allow passing a concrete type to this function, you can replace '~paramType:Type ~paramName' with a generic 'T ~paramName' and a 'where T : ~paramType:Type' constraint." }
+    "concrete type passed to an existential box reference parameter",
+    span { loc = "location", message = "parameter '~paramName' has type '~paramType:Type' and is passed by reference, but the argument has concrete storage type '~argType:QualType'. To accept concrete storage, use 'T ~paramName' with a type parameter 'T' constrained by 'where T : ~constraintInterface:Type'." }
 )
 
 standalone_note(
@@ -1843,10 +1843,10 @@ warning(
 )
 
 err(
-    "is-operator-value-must-be-interface-type",
+    "runtime-type-test-requires-boxed-value",
     30300,
-    "'is'/'as' operator requires interface-typed expression",
-    span { loc = "expr:Expr", message = "'is'/'as' operator requires an interface-typed expression." }
+    "runtime 'is'/'as' must be applied to an existential box value",
+    span { loc = "expr:Expr", message = "runtime 'is'/'as' must be applied to an existential box value." }
 )
 
 err(
@@ -1867,7 +1867,56 @@ err(
     "is-as-on-unrelated-concrete-types",
     30304,
     "'is'/'as' on unrelated concrete types",
-    span { loc = "expr:Expr", message = "'is'/'as' on unrelated concrete types will never succeed. Use an interface-typed expression for runtime type checks." }
+    span { loc = "expr:Expr", message = "'is'/'as' on unrelated concrete types will never succeed. Use an existential box value for runtime type checks." }
+)
+
+err(
+    "explicit-dyn-required",
+    30324,
+    "interface '~type:Type' is not a value type; write 'dyn ~type:Type' to form its existential box type",
+    span { loc = "location" }
+)
+
+err(
+    "existential-box-conjunction-not-supported",
+    30325,
+    "existential boxes over interface conjunctions are not supported",
+    span { loc = "location" }
+)
+
+err(
+    "expected-interface-type",
+    30321,
+    "expected an interface or interface conjunction, got '~type:Type'",
+    span { loc = "location" }
+)
+
+err(
+    "existential-box-is-as-not-supported",
+    30322,
+    "existential box types are not supported on the right-hand side of 'is' or 'as'",
+    span { loc = "expr:Expr" }
+)
+
+err(
+    "interface-conjunction-is-as-not-supported",
+    30326,
+    "interface conjunctions are not supported on the right-hand side of 'is' or 'as'",
+    span { loc = "expr:Expr" }
+)
+
+err(
+    "expected-proper-type-for-specialization-arg",
+    30327,
+    "expected a value type for an existential box specialization argument, got '~type:Type'",
+    span { loc = "location" }
+)
+
+err(
+    "interface-requirement-needs-conforming-type",
+    30323,
+    "cannot reference interface requirement '~requirement:Decl' through the interface itself; use a conforming type or value",
+    span { loc = "expr:Expr" }
 )
 
 err(
@@ -1899,83 +1948,83 @@ err(
 -- 3xxxx - Semantic analysis (continued)
 --
 
--- `dyn` and `some` errors
+-- Restrictions on interfaces with explicit AnyValue storage sizes.
 
 err(
-    "cannot-have-generic-dyn-interface",
+    "cannot-have-generic-interface-with-any-value-size",
     33072,
-    "dyn interfaces cannot be generic",
-    span { loc = "decl:Decl", message = "dyn interfaces cannot be generic: '~decl'." }
+    "interface declaration with [anyValueSize(...)] has generic parameters",
+    span { loc = "decl:Decl", message = "interface declaration '~decl' with [anyValueSize(...)] must not have generic parameters." }
 )
 
 err(
-    "cannot-have-associated-type-in-dyn-interface",
+    "cannot-have-associated-type-in-interface-with-any-value-size",
     33073,
-    "dyn interfaces cannot have associatedType members",
-    span { loc = "member:Decl", message = "dyn interfaces cannot have associatedType members." }
+    "interface declaration with [anyValueSize(...)] has associated types",
+    span { loc = "member:Decl", message = "associated types must not be declared in an interface declaration with [anyValueSize(...)]." }
 )
 
 err(
-    "cannot-have-generic-method-in-dyn-interface",
+    "cannot-have-generic-method-in-interface-with-any-value-size",
     33074,
-    "dyn interfaces cannot have generic methods",
-    span { loc = "member:Decl", message = "dyn interfaces cannot have generic methods." }
+    "interface declaration with [anyValueSize(...)] has methods with generic parameters",
+    span { loc = "member:Decl", message = "methods with generic parameters must not be declared in an interface declaration with [anyValueSize(...)]." }
 )
 
 err(
-    "cannot-have-mutating-method-in-dyn-interface",
+    "cannot-have-mutating-method-in-interface-with-any-value-size",
     33075,
-    "dyn interfaces cannot have [mutating] methods",
-    span { loc = "member:Decl", message = "dyn interfaces cannot have [mutating] methods." }
+    "interface declaration with [anyValueSize(...)] has [mutating] methods",
+    span { loc = "member:Decl", message = "methods with a [mutating] attribute must not be declared in an interface declaration with [anyValueSize(...)]." }
 )
 
 err(
-    "cannot-have-differentiable-method-in-dyn-interface",
+    "cannot-have-differentiable-method-in-interface-with-any-value-size",
     33076,
-    "dyn interfaces cannot have [Differentiable] methods",
-    span { loc = "member:Decl", message = "dyn interfaces cannot have [Differentiable] methods." }
+    "interface declaration with [anyValueSize(...)] has [Differentiable] methods",
+    span { loc = "member:Decl", message = "methods with a [Differentiable] attribute must not be declared in an interface declaration with [anyValueSize(...)]." }
 )
 
 err(
-    "dyn-interface-cannot-inherit-non-dyn-interface",
+    "interface-with-any-value-size-cannot-inherit-interface-without-any-value-size",
     33077,
-    "dyn interface inheritance error",
-    span { loc = "inheritance:Decl", message = "dyn interface '~dynInterface:Decl' may only inherit 'dyn' interfaces. '~inherited:Decl' is not a dyn interface." }
+    "interface declaration with [anyValueSize(...)] refines an interface without the attribute",
+    span { loc = "inheritance:Decl", message = "interface declaration '~sizedInterface:Decl' has an [anyValueSize(...)] attribute and must only refine interfaces whose declarations also have that attribute. Interface '~inherited:Decl' has no [anyValueSize(...)] attribute on its declaration." }
 )
 
 err(
-    "cannot-use-extension-to-make-type-conform-to-dyn-interface",
+    "cannot-use-extension-to-conform-to-interface-with-any-value-size",
     33078,
-    "extension cannot conform to dyn interface",
-    span { loc = "extension:Decl", message = "cannot use a extension to conform to a dyn interface '~interface:Decl'." }
+    "extension adds conformance to an interface with [anyValueSize(...)]",
+    span { loc = "extension:Decl", message = "conformance to interface '~interface:Decl' must not be added in an extension because the interface declaration has an [anyValueSize(...)] attribute." }
 )
 
 err(
-    "cannot-have-unsized-member-when-inheriting-dyn-interface",
+    "cannot-have-unsized-member-when-inheriting-interface-with-any-value-size",
     33079,
-    "unsized member with dyn interface inheritance",
-    span { loc = "member:Decl", message = "cannot have unsized member '~member' when inheriting from dyn interface '~interface:Decl'." }
+    "unsized member is not allowed with an explicitly sized interface",
+    span { loc = "member:Decl", message = "unsized member '~member' is not allowed in a type conforming to interface '~interface:Decl', whose declaration has an [anyValueSize(...)] attribute." }
 )
 
 err(
-    "cannot-have-opaque-member-when-inheriting-dyn-interface",
+    "cannot-have-opaque-member-when-inheriting-interface-with-any-value-size",
     33080,
-    "opaque member with dyn interface inheritance",
-    span { loc = "member:Decl", message = "cannot have opaque member '~member' when inheriting from dyn interface '~interface:Decl'." }
+    "opaque member is not allowed with an explicitly sized interface",
+    span { loc = "member:Decl", message = "opaque member '~member' is not allowed in a type conforming to interface '~interface:Decl', whose declaration has an [anyValueSize(...)] attribute." }
 )
 
 err(
-    "cannot-have-non-copyable-member-when-inheriting-dyn-interface",
+    "cannot-have-non-copyable-member-when-inheriting-interface-with-any-value-size",
     33081,
-    "non-copyable member with dyn interface inheritance",
-    span { loc = "member:Decl", message = "cannot have non-copyable member '~member' when inheriting from dyn interface '~interface:Decl'." }
+    "non-copyable member is not allowed with an explicitly sized interface",
+    span { loc = "member:Decl", message = "non-copyable member '~member' is not allowed in a type conforming to interface '~interface:Decl', whose declaration has an [anyValueSize(...)] attribute." }
 )
 
 err(
-    "cannot-conform-generic-to-dyn-interface",
+    "cannot-conform-generic-type-to-interface-with-any-value-size",
     33082,
-    "generic type cannot conform to dyn interface",
-    span { loc = "inheritance:Decl", message = "cannot conform generic type '~generic:Decl' to dyn interface '~interface:Decl'." }
+    "inheritance clause in a generic type declaration names an interface with [anyValueSize(...)]",
+    span { loc = "inheritance:Decl", message = "an inheritance clause in generic type declaration '~generic:Decl' cannot name interface '~interface:Decl' because the interface declaration has an [anyValueSize(...)] attribute." }
 )
 
 -- Conversion diagnostics
@@ -3601,7 +3650,7 @@ err(
     "cannot-define-ptr-type-to-managed-resource",
     30400,
     "pointer to managed resource invalid",
-    span { loc = "typeExp:Expr", message = "pointer to a managed resource is invalid, use `NativeRef<T>` instead" }
+    span { loc = "location", message = "pointer to a managed resource is invalid, use `NativeRef<T>` instead" }
 )
 
 -- Control flow (305xx)
@@ -3768,7 +3817,7 @@ err(
     "generic-type-needs-args",
     30408,
     "generic type '~type:Type' used without argument",
-    span { loc = "typeExp:Expr", message = "generic type '~type' used without argument" }
+    span { loc = "location", message = "generic type '~type' used without argument" }
 )
 
 err(
@@ -5909,7 +5958,7 @@ err(
     "ref-accessor-with-interface-type-in-dynamic-dispatch",
     52012,
     "ref accessor incompatible with dynamic dispatch",
-    span { loc = "location", message = "'ref' accessor returning type '~valueType:Type' is incompatible with dynamic dispatch because interface types require AnyValue marshalling." }
+    span { loc = "location", message = "'ref' accessor returning type '~valueType:Type' is incompatible with dynamic dispatch because the compiler uses AnyValue marshalling for an existential box in the return type." }
 )
 
 err(

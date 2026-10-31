@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -stage compute -entry computeMain -lang slang -std 2026 -enable-experimental-dynamic-dispatch
 
-// Validate AST side of `dyn` keyword use-cases
+// Validate the existing restrictions on interfaces with an explicit AnyValue size.
 
 // `experimental-dynamic-dispatch` and `-lang 2025` have fewer restrictions
 //
@@ -17,26 +17,30 @@
 
 /////////////////////////////////////////////////////
 
-// `dyn` interfaces are not allowed to be generics
+// An interface declaration with `[anyValueSize(...)]` must not have generic parameters.
 // CHECK_2026-DAG: error[E33072]
-dyn interface interface1<T>
+[anyValueSize(64)]
+interface interface1<T>
 {
 	static const int member;
 };
 
-// `dyn` interfaces must not define any associated types.
+// Associated types must not be declared in an interface declaration with `[anyValueSize(...)]`.
 // CHECK_2026-DAG: error[E33073]
 interface IBase1
 {
 };
-dyn interface interface2
+[anyValueSize(64)]
+interface interface2
 {
     associatedtype IBase1;
 };
 
-// `dyn` interfaces must not define any generic methods.
+// Methods with generic parameters must not be declared in an interface declaration with
+// `[anyValueSize(...)]`.
 // CHECK_2026-DAG: error[E33074]
-dyn interface interface3
+[anyValueSize(64)]
+interface interface3
 {
 	T genericFunc<T : IArithmetic>(T val)
 	{
@@ -44,22 +48,26 @@ dyn interface interface3
 	}
 };
 
-// `dyn` interfaces must not define any mutating methods
+// Methods with `[mutating]` must not be declared in an interface declaration with
+// `[anyValueSize(...)]`.
 // CHECK_2026-DAG: error[E33075]
-dyn interface interface4
+[anyValueSize(64)]
+interface interface4
 {
 	[mutating]
 	void mutate(int val);
 };
 
-// `dyn` interfaces cannot inherit from any interfaces that are not dyn.
+// An interface declaration with `[anyValueSize(...)]` must only refine interfaces whose
+// declarations also have that attribute.
 // CHECK_2026-DAG: error[E33077]
 
 interface IBase2
 {
 };
 
-dyn interface interface5 : IBase2
+[anyValueSize(64)]
+interface interface5 : IBase2
 {	
 	int myFunc(int val)
 	{
@@ -67,11 +75,13 @@ dyn interface interface5 : IBase2
 	}
 };
 
-dyn interface IBase3
+[anyValueSize(64)]
+interface IBase3
 {
 };
 
-dyn interface interface6 : IBase3
+[anyValueSize(64)]
+interface interface6 : IBase3
 {	
 	int myFunc(int val)
 	{
@@ -79,9 +89,11 @@ dyn interface interface6 : IBase3
 	}
 };
 
-// `dyn` interfaces cannot contain any function requirements that are marked as [Differentiable].
+// Methods with `[Differentiable]` must not be declared in an interface declaration with
+// `[anyValueSize(...)]`.
 // CHECK_2026-DAG: error[E33076]
-dyn interface interface7
+[anyValueSize(64)]
+interface interface7
 {
 	[Differentiable]
 	int myFunc(int val)
@@ -90,10 +102,12 @@ dyn interface interface7
 	}
 };
 
-// The type which is conforming to a dyn (myType in interface myType : IBase) cannot be generic.
+// An inheritance clause in a generic type declaration must not name an interface whose
+// declaration has an `[anyValueSize(...)]` attribute.
 // CHECK_2026-DAG: error[E33082]
 // CHECK_2026-DAG: error[E33082]
-dyn interface IBase4
+[anyValueSize(64)]
+interface IBase4
 {
 	int doMath(int val);
 };
@@ -115,9 +129,11 @@ interface genericInterface1<T : IArithmetic> : IBase4
 	}
 };
 
-// Extensions that make a type conform/inherit to dyn interfaces are not allowed.
+// An extension must not add a conformance to an interface whose declaration has
+// an `[anyValueSize(...)]` attribute.
 // CHECK_2026-DAG: error[E33078]
-dyn interface IBase5
+[anyValueSize(64)]
+interface IBase5
 {
 };
 interface interface9
@@ -132,7 +148,8 @@ extension<T:interface9> T : IBase5
 	}
 };
 
-// Type conforming to `dyn` interface must be an ordinary data type, meaning that it cannot contain any fields that are opaque or non-copyable or unsized.
+// Direct variable members of a type conforming to an interface whose declaration has
+// an `[anyValueSize(...)]` attribute must not have opaque, non-copyable, or unsized types.
 // CHECK_2026-DAG: error[E33079]
 // CHECK_2026-DAG: error[E33080]
 // CHECK_2026-DAG: error[E33081]
@@ -152,7 +169,8 @@ struct structWithOpaque : IBase6
 	Texture2D<float> v;
 };
 
-dyn interface IBase6
+[anyValueSize(64)]
+interface IBase6
 {
 };
 [__NonCopyableType] 
@@ -174,7 +192,8 @@ struct structWithNonCopyable2 : IBase6
     NonCopyableStruct2<int> v;
 };
 
-// `dyn` interfaces cannot contain any methods that has a `some` IFoo return type, or has any `some` IFoo parameters.
+// Methods with `some IFoo` result or parameter types must not be declared in an interface
+// whose declaration has an `[anyValueSize(...)]` attribute.
 // TODO-INTERFACE-QUALIFIERS-ADDITION-OF-SOME
 //
 

@@ -711,7 +711,12 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
 
         // Go via decl ref to get to the module that owns the type, and from there its module.
         // Not all TypeReflections are DeclRefTypes (e.g. basic types), so guard against null.
-        Slang::DeclRefType* declRefType = Slang::as<Slang::DeclRefType>(Slang::asInternal(type));
+        // A box belongs to the module declaring its interface. We unwrap only for that module
+        // query; `typeName` contains the complete boxed type name for lookup during replay.
+        auto owningType = Slang::asInternal(type);
+        if (auto boxType = Slang::as<Slang::ExistentialBoxType>(owningType))
+            owningType = boxType->getInterfaceType();
+        Slang::DeclRefType* declRefType = Slang::as<Slang::DeclRefType>(owningType);
         if (!declRefType)
         {
             uint64_t nullHandle = kNullHandle;

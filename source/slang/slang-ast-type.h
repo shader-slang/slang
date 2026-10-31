@@ -1265,6 +1265,27 @@ class NamespaceType : public Type
     Type* _createCanonicalTypeOverride();
 };
 
+/// An existential box type, based on some interface: e.g., `dyn IFoo`.
+///
+/// An existential box of type `dyn IFoo` holds a value of some unknown proper type,
+/// along with a witness proving that that type conforms to `IFoo`.
+///
+/// An existential box type like `dyn IFoo` is a proper type, distinct from the interface
+/// type `IFoo`, which is a non-proper type representing the contract a conforming type
+/// must implement.
+FIDDLE()
+class ExistentialBoxType : public Type
+{
+    FIDDLE(...)
+    Type* getInterfaceType() const { return as<Type>(getOperand(0)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+
+    /// Substitute generic arguments in the interface without removing the box.
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 // The concrete type for a value wrapped in an existential, accessible
 // when the existential is "opened" in some context.
 FIDDLE()

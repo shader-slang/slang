@@ -40,7 +40,7 @@ public struct DTensor<T : IDifferentiable & IAcc>
 }
 
 [anyValueSize(32)]
-public dyn interface IThing
+public interface IThing
 {
     [Differentiable]
     float eval(no_diff int i, float4 v);

@@ -1,4 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -std legacy
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -std 2025
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -std 2026
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -std 202c
 
 Tuple t0;
 /*diag:
@@ -7,6 +10,19 @@ Tuple t0;
 
 // This should be OK, compiling down to a zero-sized type
 Tuple<> t1;
+
+// The compiler uses declared defaults to complete a generic declaration reference; it does
+// not infer missing arguments from constraints. The explicit `Fixed<int>` below satisfies
+// the same constraint.
+struct Fixed<T> where T == int
+{
+    T value;
+}
+Fixed missingDefault;
+/*diag:
+^^^^^ generic type 'Fixed' used without argument
+*/
+Fixed<int> explicitArgument;
 
 [numthreads(1,1,1)]
 void computeMain()

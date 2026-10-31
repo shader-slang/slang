@@ -8,6 +8,7 @@
 
 #include "core/slang-char-util.h"
 #include "core/slang-type-text-util.h"
+#include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
 #include "slang-parameter-binding.h"
 #include "slang-profile.h"
@@ -695,7 +696,7 @@ static void collectDepthOutputSemantics(
     }
 }
 
-/// Recursively walk `paramDeclRef` and add any existential/interface specialization parameters to
+/// Recursively walk `paramDeclRef` and add any existential specialization parameters to
 /// `ioSpecializationParams`.
 static bool _collectExistentialSpecializationParamsRec(
     ASTBuilder* astBuilder,
@@ -704,7 +705,7 @@ static bool _collectExistentialSpecializationParamsRec(
     DiagnosticSink* sink,
     UInt recursionDepth);
 
-/// Recursively walk `type` and add any existential/interface specialization parameters to
+/// Recursively walk `type` and add any existential specialization parameters to
 /// `ioSpecializationParams`.
 static bool _collectExistentialSpecializationParamsRec(
     ASTBuilder* astBuilder,
@@ -744,22 +745,19 @@ static bool _collectExistentialSpecializationParamsRec(
             recursionDepth + 1);
     }
 
-    if (auto declRefType = as<DeclRefType>(type))
+    if (as<ExistentialBoxType>(type))
+    {
+        // We add a specialization parameter to select the concrete type stored in this box.
+        SpecializationParam specializationParam;
+        specializationParam.flavor = SpecializationParam::Flavor::ExistentialType;
+        specializationParam.loc = loc;
+        specializationParam.object = type;
+        ioSpecializationParams.add(specializationParam);
+    }
+    else if (auto declRefType = as<DeclRefType>(type))
     {
         auto typeDeclRef = declRefType->getDeclRef();
-        if (auto interfaceDeclRef = typeDeclRef.as<InterfaceDecl>())
-        {
-            // Each leaf parameter of interface type adds a specialization
-            // parameter, which determines the concrete type(s) that may
-            // be provided as arguments for that parameter.
-            //
-            SpecializationParam specializationParam;
-            specializationParam.flavor = SpecializationParam::Flavor::ExistentialType;
-            specializationParam.loc = loc;
-            specializationParam.object = type;
-            ioSpecializationParams.add(specializationParam);
-        }
-        else if (auto structDeclRef = typeDeclRef.as<StructDecl>())
+        if (auto structDeclRef = typeDeclRef.as<StructDecl>())
         {
             // A structure type should recursively introduce
             // existential slots for its fields.
@@ -803,8 +801,8 @@ static bool _collectExistentialSpecializationParamsRec(
 }
 
 
-/// Collect any interface/existential specialization parameters for `paramDeclRef` into
-/// `ioParamInfo` and `ioSpecializationParams`
+/// Collect any existential specialization parameters for `paramDeclRef` into
+/// `ioParamInfo` and `ioSpecializationParams`.
 static bool _collectExistentialSpecializationParamsForShaderParam(
     ASTBuilder* astBuilder,
     ShaderParamInfo& ioParamInfo,
@@ -929,7 +927,10 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
 {
     DeclRef<FuncDecl> entryPointFuncDeclRef;
 
-    auto expr = translationUnit->findDeclFromString(getText(name), sink);
+    auto expr = translationUnit->findDeclFromString(
+        getText(name),
+        ComponentType::DeclLookupPurpose::EntryPoint,
+        sink);
     if (auto declRefExpr = as<DeclRefExpr>(expr))
     {
         entryPointFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
@@ -3473,6 +3474,55 @@ RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
     }
 }
 
+/// Check an existential box specialization argument and return its payload's interface conformance.
+///
+/// Interface constraints and conjunctions cannot supply stored data, even when a reflexive subtype
+/// query would succeed. The argument must name a proper type conforming to the boxed interface.
+/// This function diagnoses invalid arguments to `sink` and returns null.
+/// This function uses `parameterLoc` for API type arguments without expressions.
+static SubtypeWitness* checkExistentialBoxSpecializationArg(
+    SemanticsVisitor& visitor,
+    ExistentialBoxType* boxType,
+    SpecializationArg const& argument,
+    SourceLoc parameterLoc,
+    DiagnosticSink* sink)
+{
+    auto interfaceType = boxType->getInterfaceType();
+    auto argumentType = as<Type>(argument.val);
+    if (!argumentType)
+    {
+        sink->diagnose(Diagnostics::ExpectedTypeForSpecializationArg{
+            .param = interfaceType->toString(),
+            .location = parameterLoc});
+        return nullptr;
+    }
+    auto argumentLoc = argument.expr ? argument.expr->loc : parameterLoc;
+    if (isInterfaceType(argumentType))
+    {
+        sink->diagnose(Diagnostics::ExpectedProperTypeForSpecializationArg{
+            .type = argumentType,
+            .location = argumentLoc});
+        return nullptr;
+    }
+    if (as<AndType>(argumentType))
+    {
+        sink->diagnose(Diagnostics::ExpectedProperTypeForSpecializationArg{
+            .type = argumentType,
+            .location = argumentLoc});
+        return nullptr;
+    }
+
+    auto witness = visitor.isSubtype(argumentType, interfaceType, IsSubTypeOptions::None);
+    if (!witness)
+    {
+        sink->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+            .typeArg = argumentType,
+            .interface = interfaceType,
+            .location = argumentLoc});
+    }
+    return witness;
+}
+
 RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImpl(
     SpecializationArg const* args,
     Index argCount,
@@ -3514,6 +3564,13 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                         .param = genericTypeParamDecl->getName()->text,
                         .location = param.loc});
                     argType = getLinkage()->getASTBuilder()->getErrorType();
+                }
+
+                else
+                {
+                    // Global type arguments must be proper types. We preserve the checked type,
+                    // including implicit boxes permitted by the selected language version.
+                    argType = visitor.CoerceToProperType(TypeExp(arg.expr, argType)).type;
                 }
 
                 // TODO: There is a serious flaw to this checking logic if we ever have cases where
@@ -3605,30 +3662,15 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
 
         case SpecializationParam::Flavor::ExistentialType:
             {
-                auto interfaceType = as<Type>(param.object);
-                SLANG_ASSERT(interfaceType);
-
-                Type* argType = as<Type>(arg.val);
-                if (!argType)
-                {
-                    sink->diagnose(Diagnostics::ExpectedTypeForSpecializationArg{
-                        .param = interfaceType ? interfaceType->toString() : "<unknown type>",
-                        .location = param.loc});
-                    argType = getLinkage()->getASTBuilder()->getErrorType();
-                }
-
-                auto witness = visitor.isSubtype(argType, interfaceType, IsSubTypeOptions::None);
+                auto boxType = as<ExistentialBoxType>(param.object);
+                SLANG_RELEASE_ASSERT(boxType);
+                auto witness =
+                    checkExistentialBoxSpecializationArg(visitor, boxType, arg, param.loc, sink);
                 if (!witness)
-                {
-                    // If no witness was found, then we will be unable to satisfy
-                    // the conformances required.
-                    sink->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
-                        .typeArg = argType,
-                        .interface = interfaceType});
-                }
+                    continue;
 
                 ExpandedSpecializationArg expandedArg;
-                expandedArg.val = argType;
+                expandedArg.val = arg.val;
                 expandedArg.witness = witness;
 
                 specializationInfo->existentialArgs.add(expandedArg);
@@ -3801,9 +3843,8 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
             }
             if (auto typeVal = as<Type>(specializationArg.val))
             {
-                auto typeExpr = astBuilder->create<SharedTypeExpr>();
-                typeExpr->type = astBuilder->getTypeType(typeVal);
-                genericArgs.add(typeExpr);
+                ASTSynthesizer synthesizer(astBuilder, astBuilder->getNamePool());
+                genericArgs.add(synthesizer.emitStaticTypeExpr(typeVal));
             }
             else if (auto intVal = as<ConstantIntVal>(specializationArg.val))
             {
@@ -3913,19 +3954,16 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
         // TODO: We need to handle all the cases of "flavor" for the `param`s (not just types)
 
-        auto paramType = as<Type>(param.object);
-        auto argType = as<Type>(specializationArg.val);
-
-        auto witness = visitor.isSubtype(argType, paramType, IsSubTypeOptions::None);
+        auto boxType = as<ExistentialBoxType>(param.object);
+        SLANG_RELEASE_ASSERT(boxType);
+        auto witness = checkExistentialBoxSpecializationArg(
+            visitor,
+            boxType,
+            specializationArg,
+            param.loc,
+            sink);
         if (!witness)
-        {
-            // If no witness was found, then we will be unable to satisfy
-            // the conformances required.
-            sink->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
-                .typeArg = argType,
-                .interface = paramType});
             continue;
-        }
 
         ExpandedSpecializationArg expandedArg;
         expandedArg.val = specializationArg.val;
@@ -4072,6 +4110,14 @@ Type* Linkage::specializeType(
     SharedSemanticsContext sharedSemanticsContext(this, m_optionSet.getLanguageVersion(), sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
+    // We apply the session's proper-type rules before collecting payload slots in
+    // `unspecializedType`. For a reflected interface type such as `IFoo`, we form `dyn IFoo`
+    // in language versions through Slang 2026. In Slang 202c, we diagnose the use of `IFoo`
+    // where a proper type is expected. We check each concrete payload's conformance below.
+    unspecializedType = visitor.CoerceToProperType(TypeExp(unspecializedType)).type;
+    if (as<ErrorType>(unspecializedType))
+        return nullptr;
+
     SpecializationParams specializationParams;
     if (!_collectExistentialSpecializationParamsRec(
             getASTBuilder(),
@@ -4091,12 +4137,25 @@ Type* Linkage::specializeType(
     ExpandedSpecializationArgs specializationArgs;
     for (Int aa = 0; aa < argCount; ++aa)
     {
-        auto paramType = as<Type>(specializationParams[aa].object);
-        auto argType = args[aa];
+        // The collector records boxes. We check each payload against the enclosed interface
+        // before storing its conformance witness in the specialized type.
+        auto& param = specializationParams[aa];
+        auto boxType = as<ExistentialBoxType>(param.object);
+        SLANG_RELEASE_ASSERT(boxType);
+        SpecializationArg specializationArg;
+        specializationArg.val = args[aa];
+        auto witness = checkExistentialBoxSpecializationArg(
+            visitor,
+            boxType,
+            specializationArg,
+            param.loc,
+            sink);
+        if (!witness)
+            return nullptr;
 
         ExpandedSpecializationArg arg;
-        arg.val = argType;
-        arg.witness = visitor.isSubtype(argType, paramType, IsSubTypeOptions::None);
+        arg.val = specializationArg.val;
+        arg.witness = witness;
         specializationArgs.add(arg);
     }
 

@@ -1826,8 +1826,6 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
         if (!as<VarDeclBase>(decl))
             return false;
         return isGlobalDecl(decl) || isEffectivelyStatic(decl);
-    case ASTNodeType::DynModifier:
-        return as<InterfaceDecl>(decl) || as<VarDecl>(decl) || as<ParamDecl>(decl);
     case ASTNodeType::OverrideModifier:
         {
             Decl* parent = getParentDecl(decl);
