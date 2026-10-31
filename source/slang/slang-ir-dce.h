@@ -48,6 +48,17 @@ struct IRDeadCodeEliminationOptions
     // that shares this cache across a purity-decreasing operation this invariant doesn't cover
     // must clear it first.
     Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr;
+
+    // Optional, caller-owned observer that module-level DCE calls with each module-level instruction
+    // it removes, in every round, before that round removes anything. A pass whose checks would
+    // otherwise run only after DCE uses it to check the code DCE deletes. A non-owning pointer keeps
+    // this struct cheap to copy, since `shouldInstBeLiveIfParentIsLive` takes it by value for every
+    // instruction.
+    struct RemovedGlobalInstObserver
+    {
+        virtual void onRemove(IRInst* inst) = 0;
+    };
+    RemovedGlobalInstObserver* removedGlobalInstObserver = nullptr;
 };
 
 /// Eliminate "dead" code from the given IR module.

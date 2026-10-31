@@ -23,6 +23,7 @@
 #include "slang-ir-sccp.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-specialize-address-space.h"
+#include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
@@ -3437,6 +3438,44 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
+
+    // An `export`ed generic is still pinned here, so `legalizeSPIRV` would walk its unspecialized
+    // body. There `MakeCombinedTextureSamplerFromHandle` can have the generic parameter `T` as its
+    // result type, which `processMakeCombinedTextureSamplerFromHandle` cannot lower (#13744). We
+    // drop the pins so DCE removes every generic nothing uses, along with everything only those
+    // generics reach.
+    //
+    // Other targets check atomic destinations in `linkAndOptimizeIR`, while that code is still
+    // present, but `legalizeSPIRV` checks them only after the DCE below. We therefore check each
+    // instruction the DCE removes. Like the other targets, and unlike `legalizeSPIRV`, we skip
+    // parameter destinations, because a function that is never called has no call site to validate
+    // them against. An invalid atomic in an unused exported generic, or in a function only it calls,
+    // is then reported on every target.
+    if (unpinGenerics(module))
+    {
+        struct ValidateAtomicsInRemovedInsts : IRDeadCodeEliminationOptions::RemovedGlobalInstObserver
+        {
+            DiagnosticSink* sink;
+            void onRemove(IRInst* inst) override
+            {
+                bool skipFuncParamValidation = true;
+                validateAtomicOperations(skipFuncParamValidation, sink, inst);
+            }
+        };
+        ValidateAtomicsInRemovedInsts validateRemovedInsts;
+        validateRemovedInsts.sink = codeGenContext->getSink();
+        IRDeadCodeEliminationOptions options;
+        options.removedGlobalInstObserver = &validateRemovedInsts;
+        eliminateDeadCode(module, options);
+    }
+#ifdef _DEBUG
+    if (!codeGenContext->isSpecializationDisabled())
+    {
+        for (auto inst : module->getGlobalInsts())
+            SLANG_ASSERT(!as<IRGeneric>(inst));
+    }
+#endif
+
     legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
 
