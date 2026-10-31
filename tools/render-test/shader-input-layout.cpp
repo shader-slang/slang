@@ -1536,6 +1536,10 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
         for (int j = 0; j < output.m_mipLevels; j++)
         {
             int size = output.m_textureSize >> j;
+            // A size-1 level would divide 0 by 0, and converting that NaN to unsigned char is
+            // undefined behavior. Its only texel is at coordinate 0, so a denominator of 1 stores 0
+            // there.
+            float gradientDenominator = float(Math::Max(size - 1, 1));
             int bufferLen = size;
             if (inputDesc.dimension == 2)
                 bufferLen *= size;
@@ -1561,9 +1565,9 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
                         }
                         else if (inputDesc.content == InputTextureContent::Gradient)
                         {
-                            unsigned char r = (unsigned char)(x / (float)(size - 1) * 255.0f);
-                            unsigned char g = (unsigned char)(y / (float)(size - 1) * 255.0f);
-                            unsigned char b = (unsigned char)(z / (float)(size - 1) * 255.0f);
+                            unsigned char r = (unsigned char)(x / gradientDenominator * 255.0f);
+                            unsigned char g = (unsigned char)(y / gradientDenominator * 255.0f);
+                            unsigned char b = (unsigned char)(z / gradientDenominator * 255.0f);
                             return 0xFF000000 + r + (g << 8) + (b << 16);
                         }
                         else if (inputDesc.content == InputTextureContent::ChessBoard)
@@ -1596,9 +1600,9 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
                         }
                         else if (inputDesc.content == InputTextureContent::Gradient)
                         {
-                            unsigned char r = (unsigned char)(x / (float)(size - 1));
-                            unsigned char g = (unsigned char)(y / (float)(size - 1));
-                            unsigned char b = (unsigned char)(z / (float)(size - 1));
+                            unsigned char r = (unsigned char)(x / gradientDenominator);
+                            unsigned char g = (unsigned char)(y / gradientDenominator);
+                            unsigned char b = (unsigned char)(z / gradientDenominator);
                             return 0x01000000 + r + (g << 8) + (b << 16);
                         }
                         else if (inputDesc.content == InputTextureContent::ChessBoard)
