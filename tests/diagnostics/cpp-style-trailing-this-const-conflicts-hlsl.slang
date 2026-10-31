@@ -35,19 +35,34 @@ struct Counter
     }
 };
 
-// Requirement matching uses the effective receiver mode. A default HLSL method is mutating, so it
-// cannot satisfy a requirement made non-mutating by trailing `const`.
+// Requirement matching uses the effective receiver mode. No `read` below matches the `const`
+// requirement directly, so conformance synthesizes a wrapper with an `in` receiver that calls
+// `read` on its immutable `this`, and that call is checked as HLSL code. It passes a copy to the
+// `inout` receiver of the default and the `[mutating]` method, but a `[__ref]` receiver requires
+// a mutable receiver argument.
 interface INonmutatingReceiver
 {
     void read() const;
 //CHECK: ^^^^ see interface requirement declaration of 'read'
 };
 
-struct MutatingImplementation : INonmutatingReceiver
+struct RefImplementation : INonmutatingReceiver
 {
+    [__ref]
     void read() {}
 //CHECK: ^^^^ interface requirement mismatch
 //CHECK: ^^^^ member 'read' does not match interface requirement.
+};
+
+struct MutatingImplementation : INonmutatingReceiver
+{
+    [mutating]
+    void read() {}
+};
+
+struct DefaultImplementation : INonmutatingReceiver
+{
+    void read() {}
 };
 
 struct GenericReceiver

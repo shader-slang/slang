@@ -104,6 +104,11 @@ FIDDLE() namespace Slang
         // extra cost, just so we can distinguish an overload on `ConstantBuffer<Foo>`
         // from one on `Foo`
         kConversionCost_GetRef = 5,
+
+        // Binding an immutable receiver argument to an `inout` `this` parameter by copying it
+        // (see `SemanticsVisitor::canPassCopyOfImmutableReceiver`) adds a minimal cost, so that an
+        // overload whose receiver needs no copy is preferred.
+        kConversionCost_ImmutableReceiverCopy = 5,
         kConversionCost_ImplicitDereference = 10,
         kConversionCost_InRangeIntLitConversion = 23,
         kConversionCost_InRangeIntLitSignedToUnsignedConversion = 32,

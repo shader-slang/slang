@@ -446,6 +446,10 @@ struct OverloadCandidate
     // when ranking candidates.
     ConversionCost conversionCostSum = kConversionCost_None;
 
+    // Whether the call binds a copy of an immutable receiver argument to the candidate's `inout`
+    // `this` parameter (see `SemanticsVisitor::canPassCopyOfImmutableReceiver`).
+    bool passesImmutableReceiverCopy = false;
+
     // When required, a candidate can store a pre-checked list of
     // arguments so that we don't have to repeat work across checking
     // phases. Currently this is only needed for generics.
@@ -3873,9 +3877,22 @@ public:
         OverloadResolveContext& context,
         OverloadCandidate& candidate);
 
+    /// Return whether a call in the code being checked can bind an immutable receiver argument to
+    /// the effective `this` parameter of `funcDeclRef` by passing a copy of it.
+    ///
+    /// HLSL code commonly calls methods on immutable receivers, such as constant buffer members,
+    /// and DXC accepts that. The language of the call site decides, not the language of the
+    /// callee: in HLSL code, a copy can bind to an `inout` `this` parameter of any callee, with a
+    /// warning in place of the error that other code gets, and the callee's writes to `this` stay
+    /// in the copy. A copy never binds directly to a `[__ref]` `this`
+    /// parameter, which promises the identity of the storage, and a non-copyable receiver cannot
+    /// be copied. A call through an `inout` requirement whose witness is a `[__ref]` method binds
+    /// the copy to the synthesized `inout` wrapper, which then passes its own `this` on.
+    bool canPassCopyOfImmutableReceiver(DeclRef<CallableDecl> funcDeclRef);
+
     bool TryCheckOverloadCandidateDirections(
         OverloadResolveContext& /*context*/,
-        OverloadCandidate const& /*candidate*/
+        OverloadCandidate& /*candidate*/
     );
 
     /// Check if the given `expr` refers to an `in` function

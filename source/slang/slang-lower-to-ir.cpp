@@ -3663,6 +3663,31 @@ void addArg(
     }
 }
 
+static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo const& val);
+
+/// Add an argument that binds the immutable receiver argument `receiverExpr` to the `inout` `this`
+/// parameter described by `thisParamInfo`, by passing a fresh copy of it.
+///
+/// Semantic checking records such a call in `AppExprBase::passesImmutableReceiverCopy`. The copy
+/// is never written back, so the callee's writes to `this` stay in the copy. The argument does not
+/// go through `addArg`, because that tries `tryGetAddress` first, which can succeed for a constant
+/// buffer member or a `static const` and would hand the callee a pointer into read-only storage.
+static void addImmutableReceiverCopyArg(
+    IRGenContext* context,
+    ParamInfo const& thisParamInfo,
+    Expr* receiverExpr,
+    List<IRInst*>* ioArgs)
+{
+    SLANG_RELEASE_ASSERT(
+        thisParamInfo.mode == ParamPassingMode::BorrowInOut &&
+        isCopyableType(unwrapModifiedType(thisParamInfo.type)));
+    LoweredValInfo tempVar = moveIntoMutableTemp(context, lowerRValueExpr(context, receiverExpr));
+    addSimpleArg(
+        context,
+        ioArgs,
+        LoweredValInfo::simple(getAddress(context, tempVar, receiverExpr->loc)));
+}
+
 /// Add argument(s) corresponding to one parameter to a call
 ///
 /// The `argExpr` is the AST-level expression being passed as an argument to the call.
@@ -5093,7 +5118,11 @@ struct ExprLoweringContext
                     }
                 }
 
-                if (baseExpr)
+                if (baseExpr && expr->passesImmutableReceiverCopy)
+                {
+                    addImmutableReceiverCopyArg(context, *thisParamInfo, baseExpr, &irArgs);
+                }
+                else if (baseExpr)
                 {
                     addCallArgsForParam(
                         context,
