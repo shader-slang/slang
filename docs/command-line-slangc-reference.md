@@ -1453,6 +1453,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_ray_tracing_position_fetch` : enables the SPV_KHR_ray_tracing_position_fetch extension 
 * `SPV_KHR_shader_clock` : enables the SPV_KHR_shader_clock extension 
 * `SPV_NV_shader_subgroup_partitioned` : enables the SPV_NV_shader_subgroup_partitioned extension 
+* `SPV_EXT_shader_subgroup_partitioned` : enables the SPV_EXT_shader_subgroup_partitioned extension 
 * `SPV_KHR_subgroup_rotate` : enables the SPV_KHR_subgroup_rotate extension 
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
 * `SPV_EXT_shader_invocation_reorder` : enables the SPV_EXT_shader_invocation_reorder extension 
@@ -1503,6 +1504,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvGroupNonUniformQuad` 
 * `spvGroupNonUniformVote` 
 * `spvGroupNonUniformPartitionedNV` 
+* `spvGroupNonUniformPartitionedEXT` 
 * `spvGroupNonUniformRotateKHR` 
 * `spvRayTracingMotionBlurNV` 
 * `spvMeshShadingEXT` 
