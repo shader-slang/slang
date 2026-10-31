@@ -1,3 +1,12 @@
+// SPIR-V capability rows: the tiled float path converts `MatrixAccumulator` weight tiles to the
+// half-precision `MatrixA`, which needs `spvCooperativeMatrixConversionsNV`, so a KHR-only profile
+// under `-restrictive-capability-check` reports E41013 for it.
+//TEST:SIMPLE(filecheck=SPV): -target spirv-asm -stage compute -entry computeMain -experimental-feature -DTEST_HALF=0 -DTEST_POINTER=0
+// SPV: OpCapability CooperativeMatrixConversionsNV
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=KHR): -target spirv -stage compute -entry computeMain -experimental-feature -DTEST_HALF=0 -DTEST_POINTER=0 -restrictive-capability-check -capability spvCooperativeMatrixKHR+spvGroupNonUniformVote+spvGroupNonUniform
+// KHR: error[E41013]
+// KHR: Missing capabilities are: 'spvCooperativeMatrixConversionsNV'
+
 // Vulkan tests — float only (Vulkan lacks half atomicAdd needed by backward pass)
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0 -emit-spirv-directly
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1 -emit-spirv-directly

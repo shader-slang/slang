@@ -22291,17 +22291,34 @@ struct CapabilityDeclReferenceVisitor
               CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>>(outer)
     {
     }
+    // Return the inferred capability requirements of `decl`, first bringing it to
+    // `CapabilityChecked`. The field is not final until `decl` itself is checked, and a reference
+    // can be visited before that. Consider `StructuredBuffer<T>.getCount()`: checking the
+    // `IArray<T>` conformance of `StructuredBuffer<T>` capability-checks the `getCount` witness,
+    // whose body calls `GetDimensions` before the checker has reached it. Reading the field then
+    // would see null and drop the requirements of `GetDimensions`.
+    //
+    // If `decl` is already being checked, the reference is cyclic (for example, a recursive
+    // function) and `ensureDecl` would report a cyclic-reference error. We return the field as it
+    // is stored in that case, which can be null or partial; `_propagateRequirement` ignores such a
+    // reference.
+    const CapabilitySetVal* getCheckedCapabilityRequirements(Decl* decl)
+    {
+        if (!decl->checkState.isBeingChecked())
+            this->ensureDecl(decl, DeclCheckState::CapabilityChecked);
+        return decl->inferredCapabilityRequirements;
+    }
     virtual void processReferencedDecl(Decl* decl) override
     {
         SourceLoc loc = SourceLoc();
         if (Base::sourceLocStack.getCount())
             loc = Base::sourceLocStack.getLast();
-        handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
+        handleProcessFunc(decl, getCheckedCapabilityRequirements(decl), loc);
     }
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
     {
         if (decl)
-            handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
+            handleProcessFunc(decl, getCheckedCapabilityRequirements(decl), refLoc);
     }
     // Join a user-defined derivative's capability requirements into the differentiating
     // function, gated on the derivative carrying an explicit `[require]`. The gate is

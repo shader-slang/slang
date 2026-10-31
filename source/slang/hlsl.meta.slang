@@ -20165,7 +20165,7 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(glsl_spirv, subgroup_partitioned)]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
 matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
 {
     matrix<T, N, M> result;
@@ -26088,15 +26088,15 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl_nvapi:
+        case hlsl:
             {
+                // Same-target cases must have nested capability sets (E36120), so both HLSL
+                // paths share this case. The helper chooses between NVAPI and the native
+                // DXR 1.3 `GetAttributes(out attr)`.
                 attr_t v;
                 __hlslGetAttributesFromHitObject(v);
                 return v;
             }
-        case hlsl:
-            // DXR 1.3 native - direct method call
-            __intrinsic_asm ".GetAttributes";
         case _GL_NV_shader_invocation_reorder:
             {
                 __requireTargetExtension("GL_NV_shader_invocation_reorder");
