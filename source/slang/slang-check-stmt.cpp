@@ -92,6 +92,31 @@ void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
     }
 }
 
+/// Hide every local variable that `scopeDecl` owns from lookup until checking reaches its
+/// declaration point, where `checkDeclAtDeclarationPoint` reveals it.
+///
+/// Consider this example:
+/// ```
+/// {
+///     int a = 5 + b; // should error.
+///     if (c)
+///         int b = 3;
+/// }
+/// ```
+/// Body-stage parsing leaves every local in the `ReadyForParserLookup` state, so the check
+/// state alone does not make lookup skip `b`; the `hiddenFromLookup` flag rejects the forward
+/// reference (see `_isUncheckedLocalVar`). The parser gives an unbraced statement body no scope
+/// of its own and adds `b` to the block's scope although its `DeclStmt` is nested in the `if`,
+/// so we hide every variable the scope owns rather than only those declared by the block's
+/// direct statements.
+///
+static void hideLocalVarsUntilDeclared(ScopeDecl* scopeDecl)
+{
+    for (auto varDecl : scopeDecl->getDirectMemberDeclsOfType<VarDecl>())
+        varDecl->hiddenFromLookup = true;
+}
+
+
 void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
 {
     // Make sure to fully check all nested agg type decls first.
@@ -111,39 +136,7 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
                 ensureAllDeclsRec(genericDecl, DeclCheckState::DefinitionChecked);
         }
 
-        // Consider this code:
-        // ```
-        // {
-        //       int a = 5 + b; // should error.
-        //       int b = 3;
-        // }
-        //
-        // ```
-        // In order to detect the error trying to use `b` before it's declared within
-        // a block, our lookup logic contains a condition that ignores a decl if its
-        // `hiddenFromLookup` field is set to `true`.
-        // See _lookUpDirectAndTransparentMembers().
-        // This field will be set to false when we reach the decl through the DeclStmt.
-        // The members of a group are revealed one at a time, in order.
-        //
-        if (auto seqStmt = as<SeqStmt>(stmt->body))
-        {
-            for (auto subStmt : seqStmt->stmts)
-            {
-                if (auto declStmt = as<DeclStmt>(subStmt))
-                {
-                    if (auto decl = as<Decl>(declStmt->decl))
-                    {
-                        decl->hiddenFromLookup = true;
-                    }
-                    else if (auto declGroup = as<DeclGroup>(declStmt->decl))
-                    {
-                        for (auto dd : declGroup->decls)
-                            dd->hiddenFromLookup = true;
-                    }
-                }
-            }
-        }
+        hideLocalVarsUntilDeclared(stmt->scopeDecl);
     }
     checkStmt(stmt->body);
 
