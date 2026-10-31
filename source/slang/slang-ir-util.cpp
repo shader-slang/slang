@@ -10,6 +10,33 @@
 namespace Slang
 {
 
+IRType* getMetalResourceArrayElementType(IRType* type)
+{
+    auto arrayType = as<IRArrayType>(type);
+    if (!arrayType)
+        return nullptr;
+    auto elementType = arrayType->getElementType();
+    if (auto handleType = as<IRDescriptorHandleType>(elementType))
+        elementType = handleType->getResourceType();
+    if (as<IRTextureTypeBase>(elementType) || as<IRTextureBufferType>(elementType) ||
+        as<IRSamplerStateTypeBase>(elementType))
+        return elementType;
+    return nullptr;
+}
+
+bool isMetalByValueResourceArrayParam(IRInst* inst)
+{
+    auto param = as<IRParam>(inst);
+    if (!param)
+        return false;
+    auto borrowInType = as<IRBorrowInParamType>(param->getDataType());
+    if (!borrowInType || borrowInType->getAddressSpace() != AddressSpace::MetalKernelParam)
+        return false;
+    auto func = getParentFunc(param);
+    return func && param->getParent() == func->getFirstBlock() &&
+           func->findDecoration<IREntryPointDecoration>();
+}
+
 // Share the struct-field traversal while allowing callers to choose which field types disappear.
 // DCE's existing query ignores only void and nested empty structs. Payload boundaries also need
 // arrays of empty elements, but must preserve target-intrinsic types even when they have no fields.
