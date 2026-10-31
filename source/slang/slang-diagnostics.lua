@@ -5139,6 +5139,13 @@ err(
 )
 
 err(
+    "overlapping-varying-locations",
+    39024,
+    "overlapping varying locations",
+    span { loc = "location", message = "varying '~paramName:Name' overlaps the location of '~otherName:Name'" }
+)
+
+err(
     "conflicting-vulkan-inferred-binding-for-parameter",
     39025,
     "conflicting Vulkan inferred binding",

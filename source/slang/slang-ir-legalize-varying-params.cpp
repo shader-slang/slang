@@ -3122,6 +3122,18 @@ private:
         }
     }
 
+    static IRVarLayout* findFieldLayout(IRStructTypeLayout* typeLayout, IRInst* key)
+    {
+        if (!typeLayout)
+            return nullptr;
+        for (auto fieldLayoutAttr : typeLayout->getFieldLayoutAttrs())
+        {
+            if (fieldLayoutAttr->getFieldKey() == key)
+                return fieldLayoutAttr->getLayout();
+        }
+        return nullptr;
+    }
+
     void hoistEntryPointParameterFromStruct(EntryPointInfo entryPoint)
     {
         // If an entry point has a input parameter with a struct type, we want to hoist out
@@ -3191,25 +3203,17 @@ private:
                 if (!structTypesUsedAsReturnType.contains(structType))
                     semanticInfoToRemove.add(field);
 
+                // The parameter's layout comes from the entry point layout, never from a layout
+                // decoration on the (possibly shared) struct key.
+                while (auto clonedLayout = fieldParam->findDecoration<IRLayoutDecoration>())
+                    clonedLayout->removeAndDeallocate();
+
                 IRVarLayout* fieldLayout =
                     structTypeLayout ? structTypeLayout->getFieldLayout(fieldIndex) : nullptr;
-                if (varLayout)
-                {
-                    IRVarLayout::Builder varLayoutBuilder(&builder, fieldLayout->getTypeLayout());
-                    varLayoutBuilder.cloneEverythingButOffsetsFrom(fieldLayout);
-                    for (auto offsetAttr : fieldLayout->getOffsetAttrs())
-                    {
-                        auto parentOffsetAttr =
-                            varLayout->findOffsetAttr(offsetAttr->getResourceKind());
-                        UInt parentOffset = parentOffsetAttr ? parentOffsetAttr->getOffset() : 0;
-                        UInt parentSpace = parentOffsetAttr ? parentOffsetAttr->getSpace() : 0;
-                        auto resInfo =
-                            varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
-                        resInfo->offset = parentOffset + offsetAttr->getOffset();
-                        resInfo->space = parentSpace + offsetAttr->getSpace();
-                    }
-                    builder.addLayoutDecoration(fieldParam, varLayoutBuilder.build());
-                }
+                if (fieldLayout)
+                    builder.addLayoutDecoration(
+                        fieldParam,
+                        applyOffsetToVarLayout(&builder, fieldLayout, varLayout));
                 param->insertBefore(fieldParam);
                 fieldParams.add(fieldParam);
                 fieldIndex++;
@@ -3332,8 +3336,28 @@ private:
                 auto flattenedStruct = maybeFlattenNestedStructs(
                     builder,
                     structType,
+                    layout,
                     mapOldFieldToNewField,
                     semanticInfoToRemove);
+
+                // Flattened leaves need the same target-specific layout as packed parameters.
+                if (flattenedStruct != structType && isGeometryStage(entryPoint))
+                {
+                    for (auto field : flattenedStruct->getFields())
+                    {
+                        auto key = field->getKey();
+                        auto layoutDecor = key->findDecoration<IRLayoutDecoration>();
+                        auto fieldLayout =
+                            layoutDecor ? as<IRVarLayout>(layoutDecor->getLayout()) : nullptr;
+                        if (!fieldLayout || !fieldLayout->getOperandCount() ||
+                            !as<IRTypeLayout>(fieldLayout->getOperand(0)))
+                            continue;
+                        layoutDecor->removeAndDeallocate();
+                        builder.addLayoutDecoration(
+                            key,
+                            handleGeometryStageParameterVarLayout(builder, fieldLayout));
+                    }
+                }
 
                 // Validate/rearange all semantics which overlap in our flat struct.
                 fixFieldSemanticsOfFlatStruct(flattenedStruct);
@@ -3366,6 +3390,22 @@ private:
             fixUpFuncType(func);
     }
 
+    static bool isGeometryStage(const EntryPointInfo& entryPoint)
+    {
+        switch (entryPoint.entryPointDecor->getProfile().getStage())
+        {
+        case Stage::Vertex:
+        case Stage::Amplification:
+        case Stage::Mesh:
+        case Stage::Geometry:
+        case Stage::Domain:
+        case Stage::Hull:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     void packStageInParameters(EntryPointInfo entryPoint)
     {
         // If the entry point has any parameters whose layout contains VaryingInput,
@@ -3394,18 +3434,7 @@ private:
 
         auto func = entryPoint.entryPointFunc;
 
-        bool isGeometryStage = false;
-        switch (entryPoint.entryPointDecor->getProfile().getStage())
-        {
-        case Stage::Vertex:
-        case Stage::Amplification:
-        case Stage::Mesh:
-        case Stage::Geometry:
-        case Stage::Domain:
-        case Stage::Hull:
-            isGeometryStage = true;
-            break;
-        }
+        bool geometryStage = isGeometryStage(entryPoint);
 
         List<IRParam*> paramsToPack;
         for (auto param : func->getParams())
@@ -3453,7 +3482,7 @@ private:
                 }
             }
 
-            if (isGeometryStage)
+            if (geometryStage)
             {
                 paramVarLayout = handleGeometryStageParameterVarLayout(builder, paramVarLayout);
             }
@@ -3495,6 +3524,92 @@ private:
             .location = param->sourceLoc});
     }
 
+    // Composes the absolute varying layout of each field of `structType` from `varLayout`, the
+    // layout of a value of that (unflattened) type. A field without one gets `nullptr`.
+    List<IRVarLayout*> composeFieldVaryingLayouts(
+        IRBuilder& builder,
+        IRStructType* structType,
+        IRVarLayout* varLayout)
+    {
+        List<IRVarLayout*> layouts;
+        auto typeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
+        for (auto field : structType->getFields())
+        {
+            auto layout = findFieldLayout(typeLayout, field->getKey());
+            layouts.add(layout ? applyOffsetToVarLayout(&builder, layout, varLayout) : nullptr);
+        }
+        return layouts;
+    }
+
+    // Whether the keys of `structType`, shared by every entry point returning it, can take
+    // `layouts`: no key carries a different offset from another entry point.
+    bool keysAcceptFieldLayouts(IRStructType* structType, List<IRVarLayout*> const& layouts)
+    {
+        Index index = 0;
+        for (auto field : structType->getFields())
+        {
+            auto layout = layouts[index++];
+            auto existingLayout = findVarLayout(field->getKey());
+            if (!layout || !existingLayout)
+                continue;
+            for (auto offsetAttr : layout->getOffsetAttrs())
+            {
+                auto existingOffset = existingLayout->findOffsetAttr(offsetAttr->getResourceKind());
+                if (existingOffset && (existingOffset->getOffset() != offsetAttr->getOffset() ||
+                                       existingOffset->getSpace() != offsetAttr->getSpace()))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    // Copies `structType` with fresh keys, so one entry point can give its fields their own
+    // layouts.
+    IRStructType* cloneStructWithFreshKeys(IRBuilder& builder, IRStructType* structType)
+    {
+        builder.setInsertBefore(structType);
+        auto copy = builder.createStructType();
+        copyNameHintAndDebugDecorations(copy, structType);
+        for (auto field : structType->getFields())
+        {
+            auto key = builder.createStructKey();
+            IRCloneEnv cloneEnv;
+            cloneInstDecorationsAndChildren(&cloneEnv, builder.getModule(), field->getKey(), key);
+            // Drop what another entry point derived from its layout.
+            List<IRDecoration*> derived;
+            for (auto decor : key->getDecorations())
+            {
+                auto semantic = as<IRSemanticDecoration>(decor);
+                if (as<IRLayoutDecoration>(decor) ||
+                    (semantic && semantic->getSemanticName() == toSlice("_slang_attr")))
+                    derived.add(decor);
+            }
+            for (auto decor : derived)
+                decor->removeAndDeallocate();
+            auto newField = builder.createStructField(copy, key, field->getFieldType());
+            copyNameHintAndDebugDecorations(newField, field);
+        }
+        return copy;
+    }
+
+    void attachFieldVaryingLayouts(
+        IRBuilder& builder,
+        IRStructType* structType,
+        List<IRVarLayout*> const& layouts)
+    {
+        Index index = 0;
+        for (auto field : structType->getFields())
+        {
+            auto layout = layouts[index++];
+            if (!layout)
+                continue;
+            auto key = field->getKey();
+            while (auto oldLayout = key->findDecoration<IRLayoutDecoration>())
+                oldLayout->removeAndDeallocate();
+            builder.addLayoutDecoration(key, layout);
+        }
+    }
+
     template<LayoutResourceKind K>
     void ensureStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
     {
@@ -3528,8 +3643,19 @@ private:
                 index++;
                 continue;
             }
+            // Prefer the key's own absolute layout (from flattening or
+            // `attachFieldVaryingLayouts`); otherwise find the field by position in `varLayout`.
+            if (auto keyLayout = findVarLayout(key))
+            {
+                if (auto offsetAttr = keyLayout->findOffsetAttr(K))
+                    builder.addSemanticDecoration(
+                        key,
+                        toSlice("_slang_attr"),
+                        (int)offsetAttr->getOffset());
+                index++;
+                continue;
+            }
             SLANG_ASSERT(typeLayout);
-            typeLayout->getFieldLayout(index);
             auto fieldLayout = typeLayout->getFieldLayout(index);
             if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
             {
@@ -3729,6 +3855,7 @@ private:
         IRStructType* src,
         IRSemanticDecoration* parentSemanticDecoration,
         IRLayoutDecoration* parentLayout,
+        IRVarLayout* srcVarLayout,
         MapStructToFlatStruct& mapFieldToField,
         HashSet<IRStructField*>& varsWithSemanticInfo)
     {
@@ -3750,8 +3877,16 @@ private:
         //      of 'oldKey' to 'newKey'.
         //  3b. Store a mapping from 'oldField' to 'newField' in 'mapFieldToField'. This info is
         //  needed to copy between types.
+        //
+        // `srcVarLayout`, when known, is the absolute layout of the value of type `src`; each new
+        // field's layout takes its absolute varying offsets from it.
+        auto srcTypeLayout =
+            srcVarLayout ? as<IRStructTypeLayout>(srcVarLayout->getTypeLayout()) : nullptr;
         for (auto oldField : src->getFields())
         {
+            IRVarLayout* fieldVarLayout = nullptr;
+            if (auto layout = findFieldLayout(srcTypeLayout, oldField->getKey()))
+                fieldVarLayout = applyOffsetToVarLayout(&builder, layout, srcVarLayout);
             auto& fieldMappingNode = mapFieldToField[oldField];
             fieldMappingNode.setNode(oldField);
 
@@ -3785,6 +3920,7 @@ private:
                     structFieldType,
                     fieldSemanticDecoration,
                     fieldLayout,
+                    fieldVarLayout,
                     fieldMappingNode,
                     varsWithSemanticInfo);
                 continue;
@@ -3803,16 +3939,25 @@ private:
                     fieldSemanticDecoration->getSemanticName(),
                     fieldSemanticDecoration->getSemanticIndex());
 
-            if (fieldLayout)
+            if (fieldVarLayout)
+            {
+                // `flattenNestedStructsTransferKeyDecorations` may have moved a layout onto
+                // `newKey`; the composed one replaces it.
+                while (auto movedLayout = newKey->findDecoration<IRLayoutDecoration>())
+                    movedLayout->removeAndDeallocate();
+                builder.addLayoutDecoration(newKey, fieldVarLayout);
+            }
+            else if (fieldLayout)
             {
                 IRLayout* oldLayout = fieldLayout->getLayout();
                 List<IRInst*> instToCopy;
-                // Only copy certain decorations needed for resolving system semantics
+                // Without a field layout, copy only what resolves semantics; the parent's
+                // offsets would give every leaf the same location.
                 for (UInt i = 0; i < oldLayout->getOperandCount(); i++)
                 {
                     auto operand = oldLayout->getOperand(i);
-                    if (as<IRVarOffsetAttr>(operand) || as<IRUserSemanticAttr>(operand) ||
-                        as<IRSystemValueSemanticAttr>(operand) || as<IRStageAttr>(operand))
+                    if (as<IRUserSemanticAttr>(operand) || as<IRSystemValueSemanticAttr>(operand) ||
+                        as<IRStageAttr>(operand))
                         instToCopy.add(operand);
                 }
                 IRVarLayout* newLayout = builder.getVarLayout(instToCopy);
@@ -3832,6 +3977,7 @@ private:
     IRStructType* maybeFlattenNestedStructs(
         IRBuilder& builder,
         IRStructType* src,
+        IRVarLayout* srcVarLayout,
         MapStructToFlatStruct& mapFieldToField,
         HashSet<IRStructField*>& varsWithSemanticInfo)
     {
@@ -3864,6 +4010,7 @@ private:
             src,
             nullptr,
             nullptr,
+            srcVarLayout,
             mapFieldToField,
             varsWithSemanticInfo);
     }
@@ -3923,11 +4070,10 @@ private:
         auto layout = parentLayoutDecor->getLayout();
         // Find the exact same decoration `instToReplace` in-case multiple of the same type exist
         List<IRInst*> opList;
-        opList.add(instToReplaceWith);
         for (UInt i = 0; i < layout->getOperandCount(); i++)
         {
-            if (layout->getOperand(i) != instToReplace)
-                opList.add(layout->getOperand(i));
+            auto operand = layout->getOperand(i);
+            opList.add(operand == instToReplace ? instToReplaceWith : operand);
         }
         auto newLayoutDecor = builder.addLayoutDecoration(
             parentLayoutDecor->getParent(),
@@ -3947,6 +4093,9 @@ private:
         auto layout = layoutDecor->getLayout();
         List<IRInst*> layoutOps;
         layoutOps.reserve(3);
+        // Keep the type layout, which precedes the attributes.
+        if (layout->getOperandCount() && as<IRTypeLayout>(layout->getOperand(0)))
+            layoutOps.add(layout->getOperand(0));
         bool changed = false;
         for (auto attr : layout->getAllAttrs())
         {
@@ -3985,56 +4134,15 @@ protected:
     // overlapping indices
     void fixFieldSemanticsOfFlatStruct(IRStructType* structType)
     {
-        // Goal is to ensure we do not have overlapping semantics for the user defined semantics:
-        // Note that in WGSL, the semantics can be either `builtin` without index or `location` with
-        // index.
-        /*
-            // Assume the following code
-            struct Fragment
-            {
-                float4 p0 : SV_POSITION;
-                float2 p1 : TEXCOORD0;
-                float2 p2 : TEXCOORD1;
-                float3 p3 : COLOR0;
-                float3 p4 : COLOR1;
-            };
-
-            // Translates into
-            struct Fragment
-            {
-                float4 p0 : BUILTIN_POSITION;
-                float2 p1 : LOCATION_0;
-                float2 p2 : LOCATION_1;
-                float3 p3 : LOCATION_2;
-                float3 p4 : LOCATION_3;
-            };
-        */
-
-        // For Multi-Render-Target, the semantic index must be translated to `location` with
-        // the same index. Assume the following code
-        /*
-            struct Fragment
-            {
-                float4 p0 : SV_TARGET1;
-                float4 p1 : SV_TARGET0;
-            };
-
-            // Translates into
-            struct Fragment
-            {
-                float4 p0 : LOCATION_1;
-                float4 p1 : LOCATION_0;
-            };
-        */
+        // Normalizes semantic names and gives colliding semantic indices distinct values, so
+        // semantic-based matching (e.g. Metal `[[user(...)]]` names) stays unambiguous. Varying
+        // locations come from the computed layouts and are never changed here.
 
         IRBuilder builder(this->m_module);
 
         List<IRSemanticDecoration*> overlappingSemanticsDecor;
         Dictionary<UnownedStringSlice, std::set<UInt, std::less<UInt>>>
             usedSemanticIndexSemanticDecor;
-
-        List<AttributeParentPair<IRVarOffsetAttr>> overlappingVarOffset;
-        Dictionary<UInt, std::set<UInt, std::less<UInt>>> usedSemanticIndexVarOffset;
 
         List<AttributeParentPair<IRUserSemanticAttr>> overlappingUserSemantic;
         Dictionary<UnownedStringSlice, std::set<UInt, std::less<UInt>>>
@@ -4106,15 +4214,8 @@ protected:
                 auto layout = layoutDecor->getLayout();
                 for (auto attr : layout->getAllAttrs())
                 {
-                    if (auto offset = as<IRVarOffsetAttr>(attr))
-                    {
-                        auto& semanticUse = usedSemanticIndexVarOffset[offset->getResourceKind()];
-                        if (semanticUse.find(offset->getOffset()) != semanticUse.end())
-                            overlappingVarOffset.add({layoutDecor, offset});
-                        else
-                            semanticUse.insert(offset->getOffset());
-                    }
-                    else if (auto userSemantic = as<IRUserSemanticAttr>(attr))
+                    // Offsets are computed by layout and are never reassigned here.
+                    if (auto userSemantic = as<IRUserSemanticAttr>(attr))
                     {
                         auto& semanticUse = usedSemanticIndexUserSemantic[userSemantic->getName()];
                         if (semanticUse.find(userSemantic->getIndex()) != semanticUse.end())
@@ -4136,20 +4237,6 @@ protected:
                 decor->getSemanticName(),
                 (int)newOffset);
             decor->removeAndDeallocate();
-        }
-        for (auto& varOffset : overlappingVarOffset)
-        {
-            auto newOffset = _returnNonOverlappingAttributeIndex(
-                usedSemanticIndexVarOffset[varOffset.attr->getResourceKind()]);
-            auto newVarOffset = builder.getVarOffsetAttr(
-                varOffset.attr->getResourceKind(),
-                newOffset,
-                varOffset.attr->getSpace());
-            oldLayoutDecorToNew[varOffset.layoutDecor] = _replaceAttributeOfLayout(
-                builder,
-                oldLayoutDecorToNew[varOffset.layoutDecor],
-                varOffset.attr,
-                newVarOffset);
         }
         for (auto& userSemantic : overlappingUserSemantic)
         {
@@ -4202,6 +4289,7 @@ private:
             auto flattenedStruct = maybeFlattenNestedStructs(
                 builder,
                 returnStructType,
+                resultLayout,
                 mapOldFieldToNewField,
                 semanticInfoToRemove);
             if (returnStructType != flattenedStruct)
@@ -4224,6 +4312,34 @@ private:
                         return builder.emitLoad(dstVal);
                     });
                 fixUpFuncType(func, flattenedStruct);
+            }
+            else
+            {
+                // Entry points returning one struct share its keys. One whose fields need
+                // other locations (e.g. under a different outer `SV_Target<N>`) gets a copy.
+                auto fieldLayouts =
+                    composeFieldVaryingLayouts(builder, returnStructType, resultLayout);
+                if (!keysAcceptFieldLayouts(returnStructType, fieldLayouts))
+                {
+                    flattenedStruct = cloneStructWithFreshKeys(builder, returnStructType);
+                    _replaceAllReturnInst(
+                        builder,
+                        func,
+                        flattenedStruct,
+                        [&](IRBuilder& copyBuilder, IRStructType* dstType, IRInst* srcVal)
+                            -> IRInst*
+                        {
+                            List<IRInst*> fieldVals;
+                            for (auto field : returnStructType->getFields())
+                                fieldVals.add(copyBuilder.emitFieldExtract(
+                                    field->getFieldType(),
+                                    srcVal,
+                                    field->getKey()));
+                            return copyBuilder.emitMakeStruct(dstType, fieldVals);
+                        });
+                    fixUpFuncType(func, flattenedStruct);
+                }
+                attachFieldVaryingLayouts(builder, flattenedStruct, fieldLayouts);
             }
             // Ensure non-overlapping semantics
             fixFieldSemanticsOfFlatStruct(flattenedStruct);
@@ -4679,20 +4795,22 @@ protected:
         IRBuilder& builder,
         IRVarLayout* paramVarLayout) const SLANG_OVERRIDE
     {
-        // For Metal geometric stages, we need to translate VaryingInput offsets to
-        // MetalAttribute offsets.
+        // For Metal geometric stages, VaryingInput offsets are also MetalAttribute offsets.
         IRVarLayout::Builder elementVarLayoutBuilder(&builder, paramVarLayout->getTypeLayout());
         elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(paramVarLayout);
         for (auto offsetAttr : paramVarLayout->getOffsetAttrs())
         {
-            auto resourceKind = offsetAttr->getResourceKind();
-            if (resourceKind == LayoutResourceKind::VaryingInput)
-            {
-                resourceKind = LayoutResourceKind::MetalAttribute;
-            }
-            auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resourceKind);
+            auto resInfo =
+                elementVarLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
             resInfo->offset = offsetAttr->getOffset();
             resInfo->space = offsetAttr->getSpace();
+            if (offsetAttr->getResourceKind() == LayoutResourceKind::VaryingInput)
+            {
+                auto attributeInfo = elementVarLayoutBuilder.findOrAddResourceInfo(
+                    LayoutResourceKind::MetalAttribute);
+                attributeInfo->offset = offsetAttr->getOffset();
+                attributeInfo->space = offsetAttr->getSpace();
+            }
         }
 
         return elementVarLayoutBuilder.build();
