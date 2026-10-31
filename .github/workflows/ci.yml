@@ -175,6 +175,16 @@ jobs:
       runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
       container-user: ${{ vars.LINUX_BUILD_RUNS_ON && '1003:1003' || '1001:1001' }}
 
+  test-linux-vkd3d:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-vkd3d.yml
+    permissions:
+      contents: read
+
   # WASM build runs directly on the host (no container). It needs the gcc host
   # toolchain (g++) for the native generators build; emsdk is downloaded by the
   # build itself. Both GitHub-hosted `ubuntu-22.04` and the GCP linux-cpu-runner
@@ -911,6 +921,7 @@ jobs:
         filter,
         build-linux-debug-gcc-x86_64,
         build-linux-release-gcc-x86_64,
+        test-linux-vkd3d,
         build-linux-release-gcc-wasm,
         build-linux-debug-gcc-aarch64,
         build-linux-release-gcc-aarch64,
