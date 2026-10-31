@@ -859,6 +859,7 @@ Result readSerializedModuleInfo(
 
         IRReadSerializer serializer(&reader, sharedDecodingContext);
         serialize(serializer, info);
+        reader.flush();
     }
     if (!info.module)
         return SLANG_FAIL;
