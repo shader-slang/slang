@@ -8307,8 +8307,14 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
 
             select->arguments.add(expr);
 
-            select->arguments.add(parser->ParseExpression(opPrec));
+            // As in C, C++, HLSL and GLSL, the middle operand is an `expression` at the comma
+            // level, so it can contain an assignment or a comma operator: the `:` that must
+            // follow it already delimits it.
+            select->arguments.add(parser->ParseExpression(Precedence::Comma));
             parser->ReadToken(TokenType::Colon);
+            // The last operand stays at `?:` precedence, as in C's `conditional-expression`.
+            // C++, HLSL and GLSL use an `assignment-expression` here; shader-slang/slang#13870
+            // tracks whether Slang should follow them.
             select->arguments.add(parser->ParseExpression(opPrec));
 
             expr = select;
@@ -9264,17 +9270,19 @@ static Expr* parseAtomicExpr(Parser* parser)
                 }
                 else
                 {
-                    // When language version is 2026 or later, we no longer parse comma as a
-                    // C/C++-style comma operator when it is inside a paranthesis,
-                    // but rather as a tuple element separator.
+                    // When language version is 2026 or later, we no longer parse a top-level
+                    // comma inside parentheses as a C/C++-style comma operator, but rather as
+                    // a tuple element separator. A comma inside the middle operand of `?:` is
+                    // not top-level: the `?` and `:` delimit it, so it stays a comma operator.
                     //
                     Precedence exprLevel = Precedence::Comma;
                     if (parser->getSourceLanguage() == SourceLanguage::Slang &&
                         parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
                     {
                         // Setting exprLevel to Assignment here will allow the following
-                        // tryParseExpression call to parse the expression until the next `)` or
-                        // `,`, instead of consuming any ',' as a comma operator.
+                        // tryParseExpression call to parse the expression until the next
+                        // top-level `)` or `,`, instead of consuming a top-level ',' as a comma
+                        // operator.
                         exprLevel = Precedence::Assignment;
                     }
                     auto isValidFollowToken = [=](TokenType tokenType)
