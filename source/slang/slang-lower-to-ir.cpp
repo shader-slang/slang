@@ -564,6 +564,8 @@ struct SharedIRGenContext
     ModuleDecl* m_mainModuleDecl = nullptr;
     Linkage* m_linkage = nullptr;
 
+    HashSet<Module*> modulesReportedForObfuscateSettingMismatch;
+
     // List of all string literals used in user code, regardless
     // of how they were used (i.e., whether or not they were hashed).
     //
@@ -1549,29 +1551,53 @@ static void addLinkageDecoration(
 /// Care is needed around the core module as it is only compiled once and *without* obfuscation,
 /// so any linkage name to the core module *shouldn't* have obfuscation applied to it.
 ///
-/// This is the single source of truth for that policy. `addLinkageDecoration` applies it, and
-/// `tryBorrowInterfaceFromOwningModule` consults it to decide whether the name it looks a symbol
-/// up by can match the name the linkage decoration will end up carrying.
+/// This is the single source of truth for that policy; `getLinkageName` applies it.
 static bool isLinkageNameObfuscated(IRGenContext* context, Decl* decl)
 {
     return context->shared->m_obfuscateCode && !isFromCoreModule(decl);
 }
 
+/// Return the name that the linkage decoration for `decl` carries. Code that looks `decl` up in
+/// the IR of the module that owns it uses this name, so that the lookup and the decoration agree.
+static String getLinkageName(IRGenContext* context, Decl* decl)
+{
+    String mangledName = getMangledName(context->astBuilder, decl);
+    if (isLinkageNameObfuscated(context, decl))
+        return getHashedName(mangledName.getUnownedSlice());
+    return mangledName;
+}
+
+/// Return the location to report a problem with `importedModuleDecl` at: the `import` in the
+/// module being lowered that brings it in, or `fallback` when it is only imported indirectly.
+/// The `import`s of an `__include`d file are members of that file's `FileDecl`, and every
+/// `FileDecl` is a direct member of the module, so those two levels hold every direct `import`.
+static SourceLoc findImportLoc(
+    IRGenContext* context,
+    ModuleDecl* importedModuleDecl,
+    SourceLoc fallback)
+{
+    auto mainModuleDecl = context->getMainModuleDecl();
+    if (!mainModuleDecl)
+        return fallback;
+
+    List<ContainerDecl*> containers;
+    containers.add(mainModuleDecl);
+    for (auto fileDecl : mainModuleDecl->getMembersOfType<FileDecl>())
+        containers.add(fileDecl);
+    for (auto container : containers)
+    {
+        for (auto importDecl : container->getMembersOfType<ImportDecl>())
+        {
+            if (importDecl->importedModuleDecl == importedModuleDecl)
+                return importDecl->loc;
+        }
+    }
+    return fallback;
+}
+
 static void addLinkageDecoration(IRGenContext* context, IRInst* inst, Decl* decl)
 {
-    const String mangledName = getMangledName(context->astBuilder, decl);
-
-    // Obfuscate the mangled names if necessary.
-    if (isLinkageNameObfuscated(context, decl))
-    {
-        const auto obfuscatedName = getHashedName(mangledName.getUnownedSlice());
-
-        addLinkageDecoration(context, inst, decl, obfuscatedName.getUnownedSlice());
-    }
-    else
-    {
-        addLinkageDecoration(context, inst, decl, mangledName.getUnownedSlice());
-    }
+    addLinkageDecoration(context, inst, decl, getLinkageName(context, decl).getUnownedSlice());
 }
 
 static String getNameForNameHint(IRGenContext* context, Decl* decl)
@@ -11996,10 +12022,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     /// relies on that -- and derives the interface from the AST as before. Those
     /// cases, in the order the body tests them: the interface belongs to the
     /// module being lowered, which is the common one since a module defines most
-    /// of the interfaces it mentions; the reference would be obfuscated, so the
-    /// declaration and the owning module's symbol could not be paired by name; the
-    /// decl has no owning module, or that module has no lowered IR yet; and no
-    /// interface is registered under the mangled name in a module that does have
+    /// of the interfaces it mentions; the reference would be obfuscated; the decl
+    /// has no owning module, or that module has no lowered IR yet; and no
+    /// interface is registered under the linkage name in a module that does have
     /// IR.
     ///
     /// Deriving an interface is expensive -- every requirement's type is lowered,
@@ -12021,34 +12046,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     /// locally. The policy around it differs, and deliberately: that path lowers
     /// the function *and* registers it, gated on the force-inline attribute,
     /// while this one registers *instead of* deriving, for every cross-module
-    /// interface. It also bails out when the linkage name would be obfuscated,
-    /// which the function path does not do -- an asymmetry that is a gap there
-    /// rather than caution here. Compiling a non-core imported
-    /// `[__unsafeForceInlineEarly]` function with `-obfuscate` makes that path
-    /// index an empty symbol list, which is a pre-existing defect on the function
-    /// side and not something this function inherits.
+    /// interface. It also bails out when the linkage name would be obfuscated;
+    /// the function path has no AST fallback, so it looks the function up by its
+    /// linkage name, obfuscated or not.
     bool tryBorrowInterfaceFromOwningModule(InterfaceDecl* decl, LoweredValInfo& outVal)
     {
         if (!isDeclInDifferentModule(context, decl))
             return false;
 
-        // In one combination -- obfuscating a reference to a non-core module --
-        // the declaration emitted below would carry a hashed linkage name while
-        // the name we search by is the original, so the two could not be paired.
-        // Derive from the AST instead; correctness first, and obfuscated builds
-        // are not the workload this optimises.
-        //
-        // This is an early-out rather than the only thing making obfuscation safe.
-        // When the owning module is lowered by the same obfuscating request its
-        // symbols are hashed too, so the search below finds nothing and falls
-        // through to the same place; removing this guard leaves the emitted code
-        // byte-identical for `tests/obfuscate/imported-interface-obfuscated.slang`.
-        // What the guard adds is not depending on that -- it states the condition
-        // directly instead of relying on a lookup happening to miss.
-        //
-        // The condition is read from `isLinkageNameObfuscated` rather than
-        // restated here, so it cannot drift from the copy inside
-        // `addLinkageDecoration`.
+        // An obfuscated reference to a non-core module derives the interface from
+        // the AST instead of borrowing it. The search below would find an interface
+        // that the same request obfuscated, but borrowing obfuscated interfaces is
+        // untested, and obfuscated builds are not the workload this optimises.
         if (isLinkageNameObfuscated(context, decl))
             return false;
 
@@ -12063,8 +12072,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (!owningIRModule)
             return false;
 
-        String mangledName = getMangledName(context->astBuilder, decl);
-        auto symbols = owningIRModule->findSymbolByMangledName(mangledName);
+        auto symbols = owningIRModule->findSymbolByMangledName(getLinkageName(context, decl));
 
         // Search the list rather than taking the first entry: a mangled name maps
         // to a *list* of symbols, and only one of them is the interface. Finding
@@ -12116,8 +12124,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         context->setGlobalValue(decl, LoweredValInfo::simple(declVal));
 
         // `prelinkIR` pairs the declaration with the queued symbol by mangled name
-        // and dereferences that lookup without a null check, so a name mismatch is
-        // a crash in a later pass rather than a missed optimisation here. Both
+        // and asserts that the lookup succeeds, so a name mismatch would fail in a
+        // later pass rather than show up as a missed optimisation here. Both
         // halves are in hand at this point, which is the only place the failure can
         // still be attributed to the code that caused it.
         SLANG_RELEASE_ASSERT(
@@ -13883,10 +13891,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto importedModule = getModule(decl);
             auto irModule = importedModule->getIRModule();
             SLANG_ASSERT(irModule && "Module containing imported decl does not have an IRModule.");
-            String mangledName = getMangledName(context->astBuilder, decl);
-            auto importedFunc = irModule->findSymbolByMangledName(mangledName);
-            SLANG_ASSERT(importedFunc.getCount() > 0);
-            subContext->shared->externalSymbolsToPrelink.add(importedFunc[0]);
+            auto importedFunc = irModule->findSymbolByMangledName(getLinkageName(context, decl));
+            if (importedFunc.getCount() > 0)
+            {
+                subContext->shared->externalSymbolsToPrelink.add(importedFunc[0]);
+            }
+            else
+            {
+                // A miss means the owning module spelled the name the other way, which happens
+                // when it was compiled with the opposite `-obfuscate` setting. Any other miss is
+                // a compiler bug. One report per module is enough to name the cause.
+                String mangledName = getMangledName(context->astBuilder, decl);
+                String otherName = isLinkageNameObfuscated(context, decl)
+                                       ? mangledName
+                                       : getHashedName(mangledName.getUnownedSlice());
+                SLANG_RELEASE_ASSERT(
+                    irModule->findSymbolByMangledName(otherName).getCount() > 0 &&
+                    "imported [__unsafeForceInlineEarly] function is not exported by its module");
+                if (context->shared->modulesReportedForObfuscateSettingMismatch.add(importedModule))
+                {
+                    getSink()->diagnose(Diagnostics::ObfuscateSettingMismatchOnImport{
+                        .decl = decl,
+                        .moduleName = importedModule->getNameObj(),
+                        .location = findImportLoc(context, getModuleDecl(decl), decl->loc)});
+                }
+            }
         }
 
         IRGeneric* outerGeneric = nullptr;

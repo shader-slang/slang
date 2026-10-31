@@ -7,9 +7,9 @@
 // Worth being precise about what this pins. It covers the fallback end to end:
 // the imported interface is still lowered completely and the requirement below
 // still resolves through it. It does *not* pin the obfuscation guard itself --
-// when the library is lowered by the same obfuscating request its symbols are
-// hashed as well, so with the guard removed the symbol search finds nothing and
-// falls through to the same place, and the emitted code is byte-identical.
+// the symbol search uses the linkage name, so with the guard removed it finds
+// the library's hashed interface and borrows it, and the emitted code differs
+// only in its obfuscated `#line` directives.
 
 import "imported-interface-obfuscated-lib";
 

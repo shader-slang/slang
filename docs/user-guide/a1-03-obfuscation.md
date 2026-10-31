@@ -41,7 +41,7 @@ When enabled a few things will happen
 
 The source Slang emits which is passed down to downstream compilers is obfuscated, and only contains the sections of code necessary for the kernel to compile and function. 
 
-Currently, all source that is going to be compiled and linked must have the `-obfuscate` option enabled to be able to link correctly.
+Currently, all source that is going to be compiled and linked must have the `-obfuscate` option enabled to be able to link correctly. The standard modules, such as `slang.numerics`, are compiled without `-obfuscate`, so they cannot currently be imported into code that is compiled with it.
 
 When obfuscation is enabled source locations are scrambled, but Slang will also create a [source map](https://github.com/source-map/source-map-spec), which provides the mapping from the obfuscated locations to the original source. This so-called "obfuscated source map" is stored with the module. If compilation produces an error, Slang will automatically use the obfuscated source map to display the error location in the originating source.
 

@@ -1,5 +1,6 @@
 // unit-test-path.cpp
 
+#include "core/slang-dictionary.h"
 #include "core/slang-string-util.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -573,4 +574,23 @@ SLANG_UNIT_TEST(string)
             SLANG_CHECK(pos == c.expectedEndPos);
         }
     }
+}
+
+SLANG_UNIT_TEST(immutableHashedStringFromTemporary)
+{
+    // A key built from a temporary `String` takes ownership of the string, and must hash and
+    // compare the same as a key built from the same characters any other way; a dictionary
+    // lookup with one finds an entry added with the other.
+    const UnownedStringSlice text = UnownedStringSlice::fromLiteral("_S4core3sinp1pi_f");
+
+    ImmutableHashedString fromTemporary{String(text)};
+    ImmutableHashedString fromSlice{text};
+
+    SLANG_CHECK(fromTemporary.slice == text);
+    SLANG_CHECK(fromTemporary.getHashCode() == fromSlice.getHashCode());
+    SLANG_CHECK(fromTemporary == fromSlice);
+
+    Dictionary<ImmutableHashedString, int> map;
+    map.add(fromSlice, 1);
+    SLANG_CHECK(map.containsKey(ImmutableHashedString(String(text))));
 }
