@@ -315,6 +315,11 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
     generateUniqueIDForStmt(stmt);
     WithOuterStmt subContext(this, stmt);
     checkModifiers(stmt);
+
+    // The loop's scope owns both the variables of its initial statement and a declaration
+    // used as an unbraced body, as in `for (int k = 0; k < i; k++) int i = 1;`. The predicate
+    // and side-effect expressions are checked before the body and must not see the latter.
+    hideLocalVarsUntilDeclared(stmt->scopeDecl);
     checkStmt(stmt->initialStatement);
 
     if (stmt->predicateExpression)
