@@ -5139,6 +5139,20 @@ err(
 )
 
 err(
+    "dual-source-blend-output-unpaired",
+    39024,
+    "unpaired dual-source blending output",
+    span { loc = "location", message = "dual-source blending at location ~blendLocation:Int needs exactly one output with '[[vk::index(0)]]' and one with '[[vk::index(1)]]' at that location" }
+)
+
+err(
+    "dual-source-blend-output-nested",
+    39034,
+    "nested dual-source blending output",
+    span { loc = "location", message = "an output with '[[vk::index(...)]]' must be a direct field of the fragment shader's output struct, not of a nested struct" }
+)
+
+err(
     "conflicting-vulkan-inferred-binding-for-parameter",
     39025,
     "conflicting Vulkan inferred binding",

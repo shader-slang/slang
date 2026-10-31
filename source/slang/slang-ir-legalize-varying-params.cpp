@@ -2960,6 +2960,126 @@ protected:
         SLANG_UNUSED(builder);
     }
 
+    /// Mark a fragment color output that takes part in dual-source blending: the output at
+    /// `location` with blend source `index` (`[[vk::location(location), vk::index(index)]]`).
+    virtual void markDualSourceBlendOutput(
+        IRBuilder& builder,
+        IRInst* fieldKey,
+        IRVarLayout* fieldLayout,
+        UInt location,
+        UInt index) const
+    {
+        SLANG_UNUSED(builder);
+        SLANG_UNUSED(fieldKey);
+        SLANG_UNUSED(fieldLayout);
+        SLANG_UNUSED(location);
+        SLANG_UNUSED(index);
+    }
+
+    // Report a `vk::index` on a field of a struct nested in the fragment output struct: the
+    // flattened output does not keep the blend index of a nested field.
+    bool reportNestedDualSourceBlendOutputs(IRStructTypeLayout* structLayout, bool isNested) const
+    {
+        bool found = false;
+        for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
+        {
+            auto fieldLayout = fieldAttr->getLayout();
+            if (auto nestedLayout = as<IRStructTypeLayout>(fieldLayout->getTypeLayout()))
+            {
+                found |= reportNestedDualSourceBlendOutputs(nestedLayout, true);
+                continue;
+            }
+            auto offset = fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+            if (isNested && offset && offset->getSpace() != 0)
+            {
+                m_sink->diagnose(Diagnostics::DualSourceBlendOutputNested{
+                    .location = fieldAttr->getFieldKey()->sourceLoc});
+                found = true;
+            }
+        }
+        return found;
+    }
+
+    // Dual-source blending: when a fragment output struct has a color output with a non-zero
+    // `vk::index`, the front-end layout puts both outputs at one location (the index in the
+    // VaryingOutput offset's space). A location used this way must have exactly one output with
+    // index 0 and one with index 1. Hand both to markDualSourceBlendOutput, with the location and
+    // index from the result layout, so the target does not turn them into two render targets.
+    void markDualSourceBlendOutputs(
+        IRBuilder& builder,
+        IRStructType* structType,
+        IRVarLayout* resultLayout) const
+    {
+        auto structLayout =
+            resultLayout ? as<IRStructTypeLayout>(resultLayout->getTypeLayout()) : nullptr;
+        if (!structLayout)
+            return;
+        if (reportNestedDualSourceBlendOutputs(structLayout, false))
+            return;
+
+        // For each location with a non-zero index: the outputs at that location.
+        Dictionary<UInt, List<IRStructFieldLayoutAttr*>> dualSourceOutputs;
+        for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
+        {
+            auto offset = fieldAttr->getLayout()->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+            if (offset && offset->getSpace() != 0)
+                dualSourceOutputs[offset->getOffset()] = List<IRStructFieldLayoutAttr*>();
+        }
+        if (dualSourceOutputs.getCount() == 0)
+            return;
+        for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
+        {
+            auto offset = fieldAttr->getLayout()->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+            if (!offset)
+                continue;
+            if (auto outputs = dualSourceOutputs.tryGetValue(offset->getOffset()))
+                outputs->add(fieldAttr);
+        }
+
+        HashSet<IRInst*> structKeys;
+        for (auto field : structType->getFields())
+            structKeys.add(field->getKey());
+        for (auto& [location, outputs] : dualSourceOutputs)
+        {
+            UInt sourceCount[2] = {0, 0};
+            IRStructFieldLayoutAttr* reportAt = nullptr;
+            bool isValid = outputs.getCount() == 2;
+            for (auto fieldAttr : outputs)
+            {
+                auto space = fieldAttr->getLayout()
+                                 ->findOffsetAttr(LayoutResourceKind::VaryingOutput)
+                                 ->getSpace();
+                if (space > 1)
+                    isValid = false;
+                else
+                    sourceCount[space]++;
+                if (space != 0 && !reportAt)
+                    reportAt = fieldAttr;
+            }
+            if (!isValid || sourceCount[0] != 1 || sourceCount[1] != 1)
+            {
+                m_sink->diagnose(Diagnostics::DualSourceBlendOutputUnpaired{
+                    .blendLocation = Int(location),
+                    .location = reportAt->getFieldKey()->sourceLoc});
+                continue;
+            }
+            for (auto fieldAttr : outputs)
+            {
+                auto key = fieldAttr->getFieldKey();
+                if (!structKeys.contains(key))
+                    continue;
+                markDualSourceBlendOutput(
+                    builder,
+                    key,
+                    fieldAttr->getLayout(),
+                    location,
+                    fieldAttr->getLayout()
+                        ->findOffsetAttr(LayoutResourceKind::VaryingOutput)
+                        ->getSpace());
+            }
+        }
+    }
+
     virtual void legalizeAmplificationStageEntryPoint(const EntryPointInfo& entryPoint) const
     {
         SLANG_UNUSED(entryPoint);
@@ -4230,6 +4350,8 @@ private:
             ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(
                 flattenedStruct,
                 resultLayout);
+            if (entryPoint.entryPointDecor->getProfile().getStage() == Stage::Fragment)
+                markDualSourceBlendOutputs(builder, flattenedStruct, resultLayout);
             return;
         }
 
@@ -4359,6 +4481,22 @@ public:
         : LegalizeShaderEntryPointContext(module, sink)
     {
         generatePermittedTypes_sv_target();
+    }
+
+    void markDualSourceBlendOutput(
+        IRBuilder& builder,
+        IRInst* fieldKey,
+        IRVarLayout* fieldLayout,
+        UInt location,
+        UInt index) const SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(fieldLayout);
+        if (auto systemValue = fieldKey->findDecoration<IRTargetSystemValueDecoration>())
+            systemValue->removeAndDeallocate();
+        builder.addTargetSystemValueDecoration(
+            fieldKey,
+            (String("color(") + String(location) + "), index(" + String(index) + ")")
+                .getUnownedSlice());
     }
 
 protected:
@@ -5146,6 +5284,23 @@ public:
     LegalizeWGSLEntryPointContext(IRModule* module, DiagnosticSink* sink)
         : LegalizeShaderEntryPointContext(module, sink)
     {
+    }
+
+    void markDualSourceBlendOutput(
+        IRBuilder& builder,
+        IRInst* fieldKey,
+        IRVarLayout* fieldLayout,
+        UInt location,
+        UInt index) const SLANG_OVERRIDE
+    {
+        // The WGSL emitter reads the location and blend source from this layout
+        // (@location(location) @blend_src(index)). It replaces any layout the key already has:
+        // fixFieldSemanticsOfFlatStruct may have moved that one to another location.
+        SLANG_UNUSED(location);
+        SLANG_UNUSED(index);
+        if (auto layoutDecoration = fieldKey->findDecoration<IRLayoutDecoration>())
+            layoutDecoration->removeAndDeallocate();
+        builder.addLayoutDecoration(fieldKey, fieldLayout);
     }
 
 protected:
