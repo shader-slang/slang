@@ -2554,6 +2554,16 @@ IRVarLayout* findVarLayout(IRInst* value)
     return nullptr;
 }
 
+IRVarOffsetAttr* findParameterGroupContainerOffsetAttr(
+    IRVarLayout* varLayout,
+    LayoutResourceKind kind)
+{
+    auto groupTypeLayout = as<IRParameterGroupTypeLayout>(varLayout->getTypeLayout());
+    if (!groupTypeLayout)
+        return nullptr;
+    return groupTypeLayout->getContainerVarLayout()->findOffsetAttr(kind);
+}
+
 UnownedStringSlice getBuiltinFuncName(IRInst* callee)
 {
     auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();

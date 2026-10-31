@@ -3,6 +3,7 @@
 
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-target-program.h"
@@ -227,9 +228,17 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
 
         if (auto offsetAttr = varLayout->findOffsetAttr(kind))
         {
-            // Get the binding information from this attribute and insert it into the list
             auto spaceIndex = spaceOffset + offsetAttr->getSpace();
             auto registerIndex = offsetAttr->getOffset();
+            // A parameter group's own binding adds its container's offset. The whole group's
+            // `count` then starts there, which holds because the only group with a non-zero
+            // container offset, the global scope's default constant buffer, has no element
+            // resources: the global parameters are separate variables with their own layouts.
+            if (auto containerOffsetAttr = findParameterGroupContainerOffsetAttr(varLayout, kind))
+            {
+                spaceIndex += containerOffsetAttr->getSpace();
+                registerIndex += containerOffsetAttr->getOffset();
+            }
             auto size = sizeAttr->getSize();
             auto count = size.getFiniteValueOr(0);
             _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
