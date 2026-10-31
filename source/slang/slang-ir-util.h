@@ -498,6 +498,14 @@ bool isSideEffectFreeFunctionalCall(
     SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None,
     Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
 
+// Returns whether `inst` is a call that dead-code elimination may remove when its result is
+// unused, although it might have side effects as far as other passes are concerned: a call to a
+// `[__removableIfUnused]` callee (e.g. a wave operation) whose arguments are side-effect free.
+// Such a call must still not be moved, so only dead-code elimination should use this.
+bool isRemovableIfUnusedCall(
+    IRInst* inst,
+    SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
+
 // Returns whether calling `callee` can have side effects, either directly or
 // through an associated function attached via an `IRAnnotation`. The
 // association lookup walks the callee's entire use list, so each query is

@@ -472,6 +472,9 @@ attribute_syntax [__FunctionInterface] : FunctionInterfaceAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__NoSideEffect] : NoSideEffectAttribute;
 
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__removableIfUnused] : RemovableIfUnusedAttribute;
+
 /// Marks a function as being differentiable in forward-mode.
 ///
 /// See the user guide [section on forward-mode differentiation](https://shader-slang.org/slang/user-guide/autodiff.html#invoking-auto-diff-in-slang) for more
