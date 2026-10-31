@@ -799,8 +799,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
                                            public DeclVisitor<SemanticsDeclRedeclarationVisitor>
 {
-    SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer)
-        : SemanticsDeclVisitorBase(outer)
+    SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer, RedeclarationSeverity severity)
+        : SemanticsDeclVisitorBase(outer), m_severity(severity)
     {
     }
 
@@ -808,15 +808,17 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
 
 #define CASE(TYPE) \
-    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl); }
+    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl, m_severity); }
 
     CASE(EnumCaseDecl)
     CASE(FuncDecl)
-    CASE(VarDeclBase)
     CASE(SimpleTypeDecl)
     CASE(AggTypeDecl)
+    CASE(VarDeclBase)
 
 #undef CASE
+
+    RedeclarationSeverity m_severity;
 };
 
 
@@ -2090,6 +2092,20 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
         if (outerScope)
             subContext = subContext.withOuterScope(outerScope);
         _dispatchDeclCheckingVisitor(decl, nextState, subContext);
+
+        // A visitor can advance `decl` past several states at once. Consider `let x = 1;`:
+        // the header visitor infers the type of `x` and marks `x` as `DefinitionChecked`. Of the
+        // skipped steps, only `ReadyForReference` compares `decl` with other declarations, so we
+        // still run it; without it, `int x; let x = 1;` would be accepted while
+        // `let x = 1; int x;` is not. Earlier compiler releases skipped it, so a conflict that it
+        // finds is a warning; Slang 202c may make it an error (shader-slang/slang#13956).
+        //
+        if (nextState < DeclCheckState::ReadyForReference &&
+            decl->checkState.getState() >= DeclCheckState::ReadyForReference)
+        {
+            SemanticsDeclRedeclarationVisitor(subContext, RedeclarationSeverity::Warning)
+                .dispatch(decl);
+        }
 
         // In the common case, the visitor will have done the necessary
         // checking, but will *not* have updated the `checkState` on
@@ -14818,7 +14834,10 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     return SLANG_FAIL;
 }
 
-Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
+Result SemanticsVisitor::checkRedeclaration(
+    Decl* newDecl,
+    Decl* oldDecl,
+    RedeclarationSeverity severity)
 {
     // If either of the declarations being looked at is generic, then
     // we want to consider the "inner" declaration instead when
@@ -14854,6 +14873,22 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
         return SLANG_OK;
     }
 
+    // Consider `[UnscopedEnum] enum Mode { Mode, Other }`. The alias `Mode` that the parser adds
+    // for the case conflicts with the enum, but lookup tells the type and the value apart by where
+    // the name is used, and DXC and earlier Slang releases accept the code, so we warn; Slang 202c
+    // may make it an error (shader-slang/slang#13956). The failure result stops the caller's loop,
+    // so a conflict with an older declaration is reported at the enum. The case is null when user
+    // code attaches the modifier through `syntax`.
+    if (auto aliasModifier = newDecl->findModifier<UnscopedEnumCaseAliasModifier>())
+    {
+        auto caseDecl = aliasModifier->enumCaseDecl;
+        if (caseDecl && caseDecl->parentDecl == oldDecl)
+        {
+            getSink()->diagnose(Diagnostics::UnscopedEnumCaseNamedLikeEnum{.decl = newDecl});
+            return SLANG_FAIL;
+        }
+    }
+
 
     // For all other flavors of declaration, we do not
     // allow duplicate declarations with the same name.
@@ -14868,16 +14903,19 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     //   if their generic parameter lists are sufficient to
     //   tell them apart at a use site.
 
-    // We will diagnose a redeclaration error at the new declaration,
+    // We will diagnose a redeclaration at the new declaration,
     // and point to the old declaration for context.
     //
-    getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
+    if (severity == RedeclarationSeverity::Warning)
+        getSink()->diagnose(Diagnostics::RedeclarationCompatibilityWarning{.decl = newDecl});
+    else
+        getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
     getSink()->diagnose(Diagnostics::SeePreviousDeclarationOf{.decl = oldDecl});
     return SLANG_FAIL;
 }
 
 
-void SemanticsVisitor::checkForRedeclaration(Decl* decl)
+void SemanticsVisitor::checkForRedeclaration(Decl* decl, RedeclarationSeverity severity)
 {
     // We want to consider a "new" declaration in the context
     // of some parent/container declaration, and compare it
@@ -14922,7 +14960,7 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         // whether the redeclaration should be allowed,
         // and emit an appropriate diagnostic if not.
         //
-        Result checkResult = checkRedeclaration(newDecl, oldDecl);
+        Result checkResult = checkRedeclaration(newDecl, oldDecl, severity);
 
         // The `checkRedeclaration` function will return a failure
         // status (whether or not it actually emitted a diagnostic)
@@ -14931,6 +14969,103 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         //
         if (SLANG_FAILED(checkResult))
             break;
+    }
+}
+
+/// Return whether `decl` has an earlier declaration of the same name in `containerDecl` other
+/// than the module's own `module` declaration. `checkForRedeclaration` compares `decl` with
+/// each such declaration.
+///
+static bool hasEarlierSameNameNonModuleSibling(ContainerDecl* containerDecl, Decl* decl)
+{
+    for (auto prevDecl = containerDecl->getPrevDirectMemberDeclWithSameName(decl); prevDecl;
+         prevDecl = containerDecl->getPrevDirectMemberDeclWithSameName(prevDecl))
+    {
+        if (!as<ModuleDeclarationDecl>(prevDecl))
+            return true;
+    }
+    return false;
+}
+
+/// Return the aggregate type whose members lookup finds through the transparent variable
+/// `varDecl`, or null if its type names none. As for any member lookup, lookup takes the
+/// variable's checked type and looks through a pointer-like type such as `ConstantBuffer<T>`
+/// (see `_lookUpMembersInValue` and `_lookUpMembersInSuperTypeImpl`).
+///
+static AggTypeDecl* getAggTypeDeclVisibleThroughTransparentVar(VarDeclBase* varDecl)
+{
+    Type* type = varDecl->getType();
+    if (auto pointedToType = getPointedToTypeIfCanImplicitDeref(type))
+        type = pointedToType;
+    return isDeclRefTypeOf<AggTypeDecl>(type).getDecl();
+}
+
+/// Compare `decl` with the nearest earlier declaration of its name in `visibleDecls`, unless
+/// `checkForRedeclaration` compares it with an earlier sibling, and record `decl` as visible.
+///
+static void compareWithNearestVisibleDecl(
+    SemanticsVisitor* visitor,
+    Dictionary<Name*, Decl*>& visibleDecls,
+    Decl* decl,
+    bool hasEarlierSiblingOfSameName)
+{
+    Decl* prevDecl = nullptr;
+    if (!hasEarlierSiblingOfSameName && visibleDecls.tryGetValue(decl->getName(), prevDecl) &&
+        prevDecl != decl)
+    {
+        visitor->checkRedeclaration(decl, prevDecl, RedeclarationSeverity::Warning);
+    }
+    visibleDecls[decl->getName()] = decl;
+}
+
+/// Check the declarations that lookup in `containerDecl` finds through its transparent
+/// variables against the other declarations that lookup finds there.
+///
+/// Consider this example:
+///
+///     static const int x = 1;
+///     cbuffer CB { int x; }
+///
+/// Lookup of `x` finds both declarations, but the member `x` is not a direct member of the
+/// scope, so `checkForRedeclaration` does not compare them. We treat the members of the type
+/// of each transparent variable as declared at that variable, and compare each declaration
+/// with the nearest earlier one of its name. Earlier compiler releases did not compare these
+/// pairs, so a conflict is a warning; Slang 202c may make it an error (shader-slang/slang#13956).
+///
+void SemanticsVisitor::checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl)
+{
+    if (containerDecl->getTransparentDirectMemberDecls().getCount() == 0)
+        return;
+
+    // For each name, the most recent declaration so far that lookup in `containerDecl` finds.
+    Dictionary<Name*, Decl*> visibleDecls;
+    for (auto memberDecl : containerDecl->getDirectMemberDecls())
+    {
+        if (memberDecl->getName() && !as<ModuleDeclarationDecl>(memberDecl) &&
+            DeclPassesLookupMask(memberDecl, LookupMask::Default))
+        {
+            compareWithNearestVisibleDecl(
+                this,
+                visibleDecls,
+                memberDecl,
+                hasEarlierSameNameNonModuleSibling(containerDecl, memberDecl));
+        }
+
+        auto varDecl = as<VarDeclBase>(memberDecl);
+        if (!varDecl || !varDecl->hasModifier<TransparentModifier>())
+            continue;
+        ensureDecl(varDecl, DeclCheckState::CanUseTypeOfValueDecl);
+        auto aggTypeDecl = getAggTypeDeclVisibleThroughTransparentVar(varDecl);
+        if (!aggTypeDecl)
+            continue;
+        for (auto aggMemberDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+        {
+            compareWithNearestVisibleDecl(
+                this,
+                visibleDecls,
+                aggMemberDecl,
+                aggTypeDecl->getPrevDirectMemberDeclWithSameName(aggMemberDecl) != nullptr);
+        }
     }
 }
 
@@ -19405,7 +19540,7 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
                 SemanticsDeclHeaderVisitor(shared).synthesizeDifferentiabilityRequirements(
                     functionDecl);
             }
-            SemanticsDeclRedeclarationVisitor(shared).dispatch(decl);
+            SemanticsDeclRedeclarationVisitor(shared, RedeclarationSeverity::Error).dispatch(decl);
         }
         break;
 
@@ -19429,6 +19564,11 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 
     case DeclCheckState::DefinitionChecked:
         SemanticsDeclBodyVisitor(shared).dispatch(decl);
+        // Lookup in a container also finds the members of its transparent variables, which
+        // `checkForRedeclaration` does not compare. We compare them once per container, after
+        // its own members are checked.
+        if (auto containerDecl = as<ContainerDecl>(decl))
+            SemanticsVisitor(shared).checkForRedeclarationOfTransparentMembers(containerDecl);
         break;
 
     case DeclCheckState::CapabilityChecked:
@@ -22523,6 +22663,35 @@ void visitReferencedDecls(
         visitor.dispatchIfNotNull(expr);
     if (auto decl = as<Decl>(node))
         visitor.dispatchIfNotNull(decl);
+}
+
+CapabilitySet getDeclRefCapabilityRequirements(
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef,
+    List<Decl*>& outReferencedDecls)
+{
+    // Consider this example:
+    //     [require(metal)] struct MetalOnly {}
+    //     void main<T>() {}
+    // Selecting main<MetalOnly> retains MetalOnly in the checked reference even though the body
+    // never uses T. Use the ordinary reference walk so selection has the same requirements as
+    // calling main<MetalOnly>() in a function body. As in visitDeclRefExpr, include the selected
+    // declaration itself as well as its operands.
+    CapabilitySet requirements{declRef.getDecl()->inferredCapabilityRequirements};
+    visitReferencedDecls(
+        *visitor,
+        declRef.declRefBase,
+        declRef.getDecl()->loc,
+        nullptr,
+        [&](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc)
+        {
+            requirements.join(nodeCaps);
+            if (auto decl = as<Decl>(node);
+                decl && decl != declRef.getDecl() && nodeCaps && !nodeCaps->isEmpty())
+                outReferencedDecls.add(decl);
+        },
+        [](DiagnosticCategory) {});
+    return requirements;
 }
 
 CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)

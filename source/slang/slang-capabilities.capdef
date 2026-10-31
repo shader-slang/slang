@@ -305,6 +305,10 @@ alias cpp_cuda_metal_spirv = cpp | cuda | metal | spirv;
 /// [Compound]
 alias cpp_cuda_metal_spirv_llvm = cpp | cuda | metal | spirv | llvm;
 
+/// CPP, CUDA, Metal, and WGSL code-gen targets
+/// [Compound]
+alias cpp_cuda_metal_wgsl = cpp | cuda | metal | wgsl;
+
 /// CUDA and SPIRV code-gen targets
 /// [Compound]
 alias cuda_spirv = cuda | spirv;
@@ -2365,6 +2369,7 @@ alias fragmentprocessing = fragment + _sm_5_0
 /// [Compound]
 alias fragmentprocessing_derivativecontrol = fragment + _sm_5_0
                                            | fragment + GL_ARB_derivative_control
+                                           | fragment + wgsl
                                            | raytracingstages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
                                            ;
 /// Capabilities required to use 'getAttributeAtVertex'
