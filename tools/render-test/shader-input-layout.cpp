@@ -1536,8 +1536,9 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
         for (int j = 0; j < output.m_mipLevels; j++)
         {
             int size = output.m_textureSize >> j;
-            // A 1x1 level has size - 1 == 0, and converting the resulting 0 / 0 (NaN) to
-            // unsigned char is undefined behavior, so the gradient uses 0 there instead.
+            // A size-1 level would divide 0 by 0, and converting that NaN to unsigned char is
+            // undefined behavior. Its only texel is at coordinate 0, so a denominator of 1 stores 0
+            // there.
             float gradientDenominator = float(Math::Max(size - 1, 1));
             int bufferLen = size;
             if (inputDesc.dimension == 2)
