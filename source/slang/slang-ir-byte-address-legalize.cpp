@@ -212,6 +212,14 @@ struct ByteAddressBufferLegalizationContext
                 {
                     return false; // Force legalization for 64-bit integer types
                 }
+
+                // The target's byte-address access works on 32-bit words, so 8- and 16-bit
+                // values must be legalized too: a load extracts them from the containing word,
+                // and a store is lowered as `emitSimpleStore` decides.
+                if (unsignedBaseType == BaseType::UInt8 || unsignedBaseType == BaseType::UInt16)
+                {
+                    return false;
+                }
             }
 
             // Otherwise, scalar types are assumed
@@ -648,7 +656,8 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (mustScalarizeArray(arrayType) ||
+                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -1561,6 +1570,16 @@ struct ByteAddressBufferLegalizationContext
     // of byte-address buffer stores, which mostly parallels code we've
     // already discussed.
 
+    // Returns true if an array must be loaded or stored one element at a time even when the access
+    // is aligned. With `lowerBasicTypeOps` the target accesses a byte-address buffer in 32-bit
+    // words, and an 8- or 16-bit scalar is extracted from (or stored into) its word on its own, so
+    // an array that contains one can't be accessed as a single value.
+    bool mustScalarizeArray(IRArrayTypeBase* arrayType)
+    {
+        return m_options.lowerBasicTypeOps &&
+               containsScalarSmallerThan(arrayType->getElementType(), 4);
+    }
+
     // Returns true if `type` is or contains a non-`bool` scalar smaller than `minSize` bytes.
     bool containsScalarSmallerThan(IRType* type, IRIntegerValue minSize)
     {
@@ -1697,7 +1716,8 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (mustScalarizeArray(arrayType) ||
+                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1998,6 +2018,21 @@ struct ByteAddressBufferLegalizationContext
                 IRInst* alignment = m_builder.getIntValue(m_builder.getUIntType(), 0);
                 m_builder.emitByteAddressBufferStore(buffer, loOffset, alignment, loVal);
                 m_builder.emitByteAddressBufferStore(buffer, hiOffset, alignment, hiVal);
+                return SLANG_OK;
+            }
+            else if (sizeAlignment.size < 4 && m_options.storeSubWordValuesDirectly)
+            {
+                // Store only the value's own bytes. A read-modify-write of the containing word
+                // (below) would race with other invocations that store the other bytes of the
+                // same word.
+                auto unsignedType = getSameSizeUIntType(value->getDataType());
+                SLANG_ASSERT(unsignedType);
+                if (!unsignedType)
+                    return SLANG_FAIL;
+                auto bits = value->getDataType() == unsignedType
+                                ? value
+                                : m_builder.emitBitCast(unsignedType, value);
+                m_builder.emitByteAddressBufferStore(buffer, offset, bits);
                 return SLANG_OK;
             }
             else if (sizeAlignment.size < 4)

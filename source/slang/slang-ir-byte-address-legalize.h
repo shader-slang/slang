@@ -24,6 +24,13 @@ struct ByteAddressBufferLegalizationOptions
     /// of the containing word starts by bit-casting the `half` to a 16-bit integer.
     bool loadHalfFrom32BitWords = false;
 
+    /// With `lowerBasicTypeOps`, store an 8- or 16-bit value with a `ByteAddressBufferStore` of
+    /// the same-size unsigned integer at the value's own offset, instead of a read-modify-write of
+    /// the containing 32-bit word. This is for targets whose emitter can write single bytes and
+    /// 16-bit values to a byte-address buffer (Metal). The read-modify-write is not atomic, so two
+    /// invocations that store into the same word can lose each other's bytes.
+    bool storeSubWordValuesDirectly = false;
+
     /// Causes all calls to `getEquivlentStructuredBuffer` to return a `ByteAddressBuffer` (this)
     /// instead of a `StructuredBuffer`. This option is used for targets that do not distinctly
     /// define `ByteAddressBuffer`/`StructuredBuffer` and introduce operations which prevent DCE

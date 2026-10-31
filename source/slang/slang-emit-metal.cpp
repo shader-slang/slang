@@ -994,10 +994,41 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
     case kIROp_ByteAddressBufferStore:
         {
-            // This only works for loads of 4-byte values.
-            // Other element types should have been lowered by previous legalization passes.
+            // This works for stores of 4-byte values, and of 8- and 16-bit unsigned integers,
+            // which byte-address legalization (`storeSubWordValuesDirectly`) produces for smaller
+            // values. Other element types should have been lowered by previous legalization passes.
             auto buffer = inst->getOperand(0);
             auto offset = inst->getOperand(1);
+            auto value = inst->getOperand(inst->getOperandCount() - 1);
+            const char* subWordType = nullptr;
+            const char* indexShift = "";
+            switch (value->getDataType()->getOp())
+            {
+            case kIROp_UInt16Type:
+                subWordType = "ushort";
+                indexShift = ">>1";
+                break;
+            case kIROp_UInt8Type:
+                subWordType = "uchar";
+                break;
+            default:
+                break;
+            }
+            if (subWordType)
+            {
+                // Write only the value's own bytes, through a pointer to the narrower type.
+                m_writer->emit("((device ");
+                m_writer->emit(subWordType);
+                m_writer->emit("*)(");
+                emitOperand(buffer, getInfo(EmitOp::General));
+                m_writer->emit("))[(");
+                emitOperand(offset, getInfo(EmitOp::General));
+                m_writer->emit(")");
+                m_writer->emit(indexShift);
+                m_writer->emit("] = ");
+                emitOperand(value, getInfo(EmitOp::General));
+                return true;
+            }
             emitOperand(buffer, getInfo(EmitOp::General));
             m_writer->emit("[(");
             emitOperand(offset, getInfo(EmitOp::General));
