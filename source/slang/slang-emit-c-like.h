@@ -483,6 +483,10 @@ public:
         IRStructType* /* structType */,
         IRStructField* /* field */,
         bool /* allowOffsetLayout */){};
+    /// Emit a struct field's type and name followed by its semantics, e.g. `float4 pos :
+    /// SV_Position`. A target overrides this when the field needs a different declaration, such
+    /// as Metal's clip-distance arrays: a native array with the attribute inside the declarator.
+    virtual void emitStructFieldTypeAndSemantics(IRStructField* field, bool allowOffsetLayout);
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshShaderModifiers(IRInst* varInst);
     virtual void emitPackOffsetModifier(

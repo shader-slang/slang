@@ -6122,6 +6122,13 @@ err(
 )
 
 err(
+    "metal-multiple-clip-distance-outputs",
+    55221,
+    "multiple clip distance outputs not supported",
+    span { loc = "location", message = "multiple SV_ClipDistance outputs are not yet supported on Metal; declare all clip distances as one 'float[N]' array with 'SV_ClipDistance'." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",

@@ -69,6 +69,8 @@ protected:
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsets) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
     virtual void emitPostDeclarationAttributesForType(IRInst* type) SLANG_OVERRIDE;
+    virtual void emitStructFieldTypeAndSemantics(IRStructField* field, bool allowOffsetLayout)
+        SLANG_OVERRIDE;
 
     virtual void emitInterpolationModifiersImpl(
         IRInst* varInst,
