@@ -4,6 +4,7 @@
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "slang/slang-fossil.h"
+#include "slang/slang-ir.h"
 #include "slang/slang-serialize-types.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -477,12 +478,11 @@ SLANG_UNIT_TEST(irBlob)
     }
 }
 
-// Removing `UnscopedForStmt` changes the numeric AST node IDs in version 38. This test verifies
-// that a current module loads, then changes only its module version to 37 and requires rejection
-// with the specific unsupported-version diagnostic.
-SLANG_UNIT_TEST(irBlobRejectsVersion37)
+// A module whose version is below the supported range is rejected with the specific
+// unsupported-version diagnostic. The test writes a current module, changes only its version to
+// the one just below `IRModule::k_minSupportedModuleVersion`, and loads it again.
+SLANG_UNIT_TEST(irBlobRejectsOlderModuleVersion)
 {
-    // The fixture includes the `uint` type, whose AST node ID changed in version 38.
     const char* moduleText = R"(
         module version_guard;
         public uint readValue(uint input) { return input + 1; }
@@ -565,7 +565,7 @@ SLANG_UNIT_TEST(irBlobRejectsVersion37)
     auto moduleFields = reinterpret_cast<FossilizedRecordElementLayout*>(moduleLayout + 1);
     SLANG_CHECK_ABORT(moduleFields[1].layout.get()->kind == FossilizedValKind::UInt64);
     auto versionAddress = static_cast<Byte*>(modulePointer->get()) + moduleFields[1].offset;
-    const UInt64 olderVersion = 37;
+    const UInt64 olderVersion = IRModule::k_minSupportedModuleVersion - 1;
     memcpy(versionAddress, &olderVersion, sizeof(olderVersion));
 
     // Another fresh session must reject the older version with its specific diagnostic.
@@ -587,7 +587,9 @@ SLANG_UNIT_TEST(irBlobRejectsVersion37)
     diagnosticText.append(
         static_cast<char const*>(diagnostics->getBufferPointer()),
         diagnostics->getBufferSize());
-    SLANG_CHECK(diagnosticText.contains("cannot load IR module version 37"));
+    String expectedText = "cannot load IR module version ";
+    expectedText.append(olderVersion);
+    SLANG_CHECK(diagnosticText.contains(expectedText));
 }
 
 // Regression test for #6557 that mirrors the reporter's exact deployment shape:
