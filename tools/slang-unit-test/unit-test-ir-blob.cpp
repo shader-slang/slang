@@ -479,8 +479,7 @@ SLANG_UNIT_TEST(irBlob)
 }
 
 // A module whose version is below the supported range is rejected with the specific
-// unsupported-version diagnostic. The test writes a current module, changes only its version to
-// the one just below `IRModule::k_minSupportedModuleVersion`, and loads it again.
+// unsupported-version diagnostic, not a general load failure.
 SLANG_UNIT_TEST(irBlobRejectsOlderModuleVersion)
 {
     const char* moduleText = R"(
