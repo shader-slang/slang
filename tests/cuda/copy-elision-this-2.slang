@@ -49,7 +49,9 @@ int nested(Data data, int val)
     return addCopyElision(data, val);
 }
 
-// CUDA: addCopyElision{{.*}}FixedArray{{.*}}*{{.*}}data
+// Only `data[1]` is read, so the array parameter is replaced by that element
+// (see promoteParamFields) and no copy of the array is made at all.
+// CUDA: addCopyElision{{.*}}(int data{{.*}}, int val
 int addCopyElision(int data[10], int val)
 {
 // ensure we do not introduce a temporary
@@ -57,7 +59,7 @@ int addCopyElision(int data[10], int val)
     return data[1] + val;
 }
 
-// CUDA: nested{{.*}}Array{{.*}}*{{.*}}data
+// CUDA: nested{{.*}}(int data{{.*}}, int val
 int nested(int data[10], int val)
 {
     return addCopyElision(data, val);
