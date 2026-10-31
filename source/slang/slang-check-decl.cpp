@@ -17558,6 +17558,12 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedDiffExpr, fakeArgs);
     auto resolved = subVisitor.ResolveInvoke(invokeExpr);
 
+    // ResolveInvoke can preserve the original call while marking its type as an error.
+    // Its base function may still name an unspecialized generic, so it cannot be used to
+    // synthesize an extension or the derivative interface's type-info witness.
+    if (subVisitor.IsErrorExpr(resolved))
+        return;
+
     // Extract the resolved base function from the higher-order expression.
     DeclRefExpr* baseFuncDeclRefExpr = nullptr;
     if (auto resolvedInvoke = as<InvokeExpr>(resolved))
