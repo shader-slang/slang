@@ -7791,33 +7791,14 @@ IfStmt* Parser::parseIfStatement()
 
 ForStmt* Parser::ParseForStatement()
 {
+    // The loop's scope holds the variables of its initializer in every source language. HLSL
+    // follows DXC and C++ here, not FXC, which kept those variables visible after the loop
+    // (shader-slang/slang#14099).
     ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
-
-    // HLSL implements the bad approach to scoping a `for` loop
-    // variable, and we want to respect that, but *only* when
-    // parsing HLSL code.
-    //
-
-    bool brokenScoping = getSourceLanguage() == SourceLanguage::HLSL;
-
-    // We will create a distinct syntax node class for the unscoped
-    // case, just so that we can correctly handle it in downstream
-    // logic.
-    //
-    ForStmt* stmt = nullptr;
-    if (brokenScoping)
-    {
-        stmt = astBuilder->create<UnscopedForStmt>();
-    }
-    else
-    {
-        stmt = astBuilder->create<ForStmt>();
-    }
-
+    ForStmt* stmt = astBuilder->create<ForStmt>();
     stmt->scopeDecl = scopeDecl;
 
-    if (!brokenScoping)
-        pushScopeAndSetParent(scopeDecl);
+    pushScopeAndSetParent(scopeDecl);
     FillPosition(stmt);
     ReadToken("for");
     ReadToken(TokenType::LParent);
@@ -7848,8 +7829,7 @@ ForStmt* Parser::ParseForStatement()
     ReadToken(TokenType::RParent);
     stmt->statement = ParseStatement();
 
-    if (!brokenScoping)
-        PopScope();
+    PopScope();
 
     return stmt;
 }

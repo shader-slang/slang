@@ -222,14 +222,6 @@ class ForStmt : public LoopStmt
     FIDDLE() Stmt* statement = nullptr;
 };
 
-// A `for` statement in a language that doesn't restrict the scope
-// of the loop variable to the body.
-FIDDLE()
-class UnscopedForStmt : public ForStmt
-{
-    FIDDLE(...)
-};
-
 FIDDLE()
 class WhileStmt : public LoopStmt
 {

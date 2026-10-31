@@ -9684,9 +9684,9 @@ static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
     return nullptr;
 }
 
-// Source braces and scoped loop initializers introduce declaration scopes. HLSL's unscoped
-// for initializer remains in the enclosing scope, matching semantic lookup.
-// Other control-flow statements get lexical blocks from their braced bodies, not the statement.
+// Source braces and `for` statements, whose initializer can declare variables, introduce
+// declaration scopes. Other control-flow statements get lexical blocks from their braced bodies,
+// not from the statement itself.
 static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
 {
     if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope ||
@@ -9694,8 +9694,6 @@ static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
         return nullptr;
     auto scopedStmt = as<ScopeStmt>(stmt);
     if (!scopedStmt || !scopedStmt->scopeDecl)
-        return nullptr;
-    if (as<UnscopedForStmt>(stmt))
         return nullptr;
     if (!as<BlockStmt>(stmt) && !as<ForStmt>(stmt))
         return nullptr;
