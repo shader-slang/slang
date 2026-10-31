@@ -598,8 +598,10 @@ void stripTempDecorations(IRInst* inst);
 bool isNoDiffType(IRType* paramType);
 bool isNeverDiffFuncType(IRFuncType* funcType);
 
-// True if `inst` is the value produced by a `bwd_diff(...)` operation, i.e. a callable
-// backward-derivative function. Unwraps `Specialize`/generic layers on the way in.
+// True if `inst` is a callable backward-derivative function: the value produced by a
+// `bwd_diff(...)` operation, or a witness lookup of a backward-derivative requirement, such as the
+// `bwd_diff` of the `IBackwardDifferentiable` conformance synthesized for `fwd_diff(f)`. Unwraps
+// `Specialize`/generic layers on the way in.
 bool isBackwardDerivativeValue(IRInst* inst);
 
 // Diagnose an attempt to differentiate a function whose body itself calls a `bwd_diff(...)` result,
