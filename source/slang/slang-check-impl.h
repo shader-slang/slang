@@ -3191,6 +3191,16 @@ public:
         ConstantFoldingKind kind,
         ConstantFoldingCircularityInfo* circularityInfo);
 
+    /// Return the compile-time value of the builtin operation `op` applied to `argVals`: a
+    /// `ConstantIntVal` when every operand is concrete, otherwise a `PolynomialIntVal` (for
+    /// `+`/`-`/`*`/unary `-`) or a `BuiltinOperationIntVal`. Folding paths share this function
+    /// so that an operation has one `IntVal` form regardless of which path reached it.
+    IntVal* getBuiltinOperationIntVal(
+        Type* resultType,
+        BuiltinOperationKind op,
+        List<IntVal*>& argVals,
+        SourceLoc loc);
+
     /// Try to apply front-end constant folding to determine the value of `expr`.
     IntVal* tryConstantFoldExpr(
         SubstExpr<Expr> expr,

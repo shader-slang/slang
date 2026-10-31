@@ -1933,6 +1933,50 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             lowerType(context, getType(context->astBuilder, val->getDeclRef())));
     }
 
+    // Emit `min`/`max`/`abs`/`clamp` of `args` as constexpr compares (of type `boolType`) and
+    // selects (of type `resType`). The IR has no ops for these functions, and compares and selects
+    // are also what SPIR-V accepts in `OpSpecConstantOp` for a specialization-constant operand.
+    IRInst* emitConstexprBuiltinIntegerFunction(
+        BuiltinOperationKind op,
+        IRType* resType,
+        IRType* boolType,
+        List<IRInst*> const& args)
+    {
+        auto builder = getBuilder();
+        auto emitMax = [&](IRInst* a, IRInst* b)
+        {
+            auto isGreater = builder->emitConstexprGreater(boolType, a, b);
+            return builder->emitConstexprSelect(resType, isGreater, a, b);
+        };
+        auto emitMin = [&](IRInst* a, IRInst* b)
+        {
+            auto isLess = builder->emitConstexprLess(boolType, a, b);
+            return builder->emitConstexprSelect(resType, isLess, a, b);
+        };
+        switch (op)
+        {
+        case BuiltinOperationKind::Min:
+            return emitMin(args[0], args[1]);
+        case BuiltinOperationKind::Max:
+            return emitMax(args[0], args[1]);
+        case BuiltinOperationKind::Clamp:
+            return emitMin(emitMax(args[0], args[1]), args[2]);
+        case BuiltinOperationKind::Abs:
+            {
+                auto x = args[0];
+                auto zero = builder->getIntValue(x->getDataType(), 0);
+                return builder->emitConstexprSelect(
+                    resType,
+                    builder->emitConstexprLess(boolType, x, zero),
+                    builder->emitConstexprNeg(resType, x),
+                    x);
+            }
+        default:
+            SLANG_UNEXPECTED("not a builtin integer function");
+            UNREACHABLE_RETURN(nullptr);
+        }
+    }
+
     LoweredValInfo visitBuiltinOperationIntVal(BuiltinOperationIntVal* val)
     {
         List<IRInst*> args;
@@ -1995,6 +2039,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         case BuiltinOperationKind::Conditional:
             return LoweredValInfo::simple(
                 builder->emitConstexprSelect(resType, args[0], args[1], args[2]));
+        case BuiltinOperationKind::Min:
+        case BuiltinOperationKind::Max:
+        case BuiltinOperationKind::Abs:
+        case BuiltinOperationKind::Clamp:
+            return LoweredValInfo::simple(emitConstexprBuiltinIntegerFunction(
+                val->getOp(),
+                resType,
+                maybeAddRateType(builder, specConstRateType, builder->getBoolType()),
+                args));
         case BuiltinOperationKind::Unknown:
             break;
         }
@@ -4935,10 +4988,15 @@ struct ExprLoweringContext
         case BuiltinOperationKind::Conditional:
         case BuiltinOperationKind::And:
         case BuiltinOperationKind::Or:
+        case BuiltinOperationKind::Min:
+        case BuiltinOperationKind::Max:
+        case BuiltinOperationKind::Abs:
+        case BuiltinOperationKind::Clamp:
         case BuiltinOperationKind::Unknown:
             // `convertToBuiltinArithmeticOp` never produces a `BuiltinOperatorExpr` for `?:`,
-            // `&&`, `||` (short-circuit/ternary, not fast-pathed) or for an unrecognized
-            // operator, so a node with these kinds should not exist.
+            // `&&`, `||` (short-circuit/ternary, not fast-pathed), for the built-in functions
+            // `min`/`max`/`abs`/`clamp`, or for an unrecognized operator, so a node with these
+            // kinds should not exist.
             SLANG_UNEXPECTED("BuiltinOperatorExpr with non-fast-path operation kind");
             break;
         }

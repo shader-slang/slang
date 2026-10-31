@@ -2174,6 +2174,17 @@ class KnownBuiltinAttribute : public Attribute
     FIDDLE() IntVal* name;
 };
 
+/// A `[__constantFoldAs(op)]` attribute marks a core-module function whose result is the builtin
+/// operation `op` applied to its arguments, so a call on compile-time constants folds like an
+/// operator does (e.g. `int arr[max(A, B)]`). The attribute, not the function's name, identifies
+/// the operation, so a user-defined function named `max` is not folded.
+FIDDLE()
+class ConstantFoldAsAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() BuiltinOperationKind op;
+};
+
 /// A modifier that applies to types rather than declarations.
 ///
 /// In most cases, the Slang compiler assumes that a modifier should

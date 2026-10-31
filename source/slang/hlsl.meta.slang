@@ -8108,6 +8108,7 @@ void abort();
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
+[__constantFoldAs($((int)BuiltinOperationKind::Abs))]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T abs(T x)
 {
@@ -9791,6 +9792,7 @@ bool CheckAccessFullyMapped(uint status)
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
+[__constantFoldAs($((int)BuiltinOperationKind::Clamp))]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T clamp(T x, T minBound, T maxBound)
 {
@@ -13670,6 +13672,7 @@ T __max_impl(T x, T y)
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
+[__constantFoldAs($((int)BuiltinOperationKind::Max))]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
@@ -14076,6 +14079,7 @@ T __min_impl(T x, T y)
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
+[__constantFoldAs($((int)BuiltinOperationKind::Min))]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
