@@ -2182,6 +2182,81 @@ bool GLSLSourceEmitter::_tryEmitBitBinOp(
     return true;
 }
 
+static bool isUVec2Type(IRType* type)
+{
+    auto vectorType = as<IRVectorType>(type);
+    if (!vectorType || vectorType->getElementType()->getOp() != kIROp_UIntType)
+        return false;
+    auto elementCount = as<IRIntLit>(vectorType->getElementCount());
+    return elementCount && elementCount->getValue() == 2;
+}
+
+/// Return true if a GLSL constructor converts `type` to or from a buffer reference directly: `type`
+/// is a buffer reference, a `uint64_t` (`uintptr_t` is one on GLSL), or a `uvec2`.
+static bool isBufferReferenceConstructorType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_UInt64Type:
+    case kIROp_UIntPtrType:
+        return true;
+    default:
+        return isUserPointerType(type) || isUVec2Type(type);
+    }
+}
+
+static bool isScalarIntegerOrBoolType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_Int8Type:
+    case kIROp_UInt8Type:
+    case kIROp_Int16Type:
+    case kIROp_UInt16Type:
+    case kIROp_IntType:
+    case kIROp_UIntType:
+    case kIROp_Int64Type:
+    case kIROp_UInt64Type:
+    case kIROp_IntPtrType:
+    case kIROp_UIntPtrType:
+    case kIROp_BoolType:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void GLSLSourceEmitter::_emitBufferReferenceConversion(IRInst* inst, const EmitOpInfo& inOuterPrec)
+{
+    auto resultType = inst->getDataType();
+    auto operandType = inst->getOperand(0)->getDataType();
+    SLANG_RELEASE_ASSERT(isUserPointerType(resultType) || isUserPointerType(operandType));
+    auto otherType = isUserPointerType(resultType) ? operandType : resultType;
+
+    // GLSL converts a buffer reference only to and from a `uint64_t`, a `uvec2` or another buffer
+    // reference. Any other integer, such as the `int64_t` in `Ptr<T>(int64_t(x))`, goes through a
+    // `uint64_t`.
+    bool viaUInt64 = !isBufferReferenceConstructorType(otherType);
+    SLANG_RELEASE_ASSERT(!viaUInt64 || isScalarIntegerOrBoolType(otherType));
+    if (viaUInt64)
+        _requireBaseType(BaseType::UInt64);
+
+    // GLSL converts a buffer reference to or from a `uvec2` only with this extension.
+    if (isUVec2Type(otherType))
+        _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference_uvec2"));
+
+    auto prec = getInfo(EmitOp::Postfix);
+    EmitOpInfo outerPrec = inOuterPrec;
+    bool needClose = maybeEmitParens(outerPrec, prec);
+
+    emitType(resultType);
+    m_writer->emit(viaUInt64 ? "(uint64_t(" : "(");
+    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+    m_writer->emit(viaUInt64 ? "))" : ")");
+
+    maybeCloseParens(needClose);
+}
+
 void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
 {
     auto ptrType = as<IRPtrType>(type);
@@ -2364,6 +2439,18 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_BitCast:
         {
+            // `extractBaseType` gives `Void` for a pointer, so the switch below has no case for a
+            // bit cast that makes a `T*`. Such bit casts are valid IR: `lowerBitCast` rebuilds a
+            // pointer leaf from a `uint64_t`, and AnyValue marshalling converts a `T*` field to and
+            // from a `uvec2`. We emit both directions here, so the `uvec2` side also gets its
+            // extension.
+            if (isUserPointerType(inst->getDataType()) ||
+                isUserPointerType(inst->getOperand(0)->getDataType()))
+            {
+                _emitBufferReferenceConversion(inst, inOuterPrec);
+                return true;
+            }
+
             auto toType = extractBaseType(inst->getDataType());
             auto fromType = extractBaseType(inst->getOperand(0)->getDataType());
             switch (toType)
@@ -2904,20 +2991,8 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_CastPtrToInt:
     case kIROp_CastIntToPtr:
     case kIROp_PtrCast:
-        {
-            // For GLSL, emit constructor-style casts instead of C-style casts
-            auto prec = getInfo(EmitOp::Postfix);
-            EmitOpInfo outerPrec = inOuterPrec; // Make a mutable copy
-            bool needClose = maybeEmitParens(outerPrec, prec);
-
-            emitType(inst->getDataType());
-            m_writer->emit("(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(")");
-
-            maybeCloseParens(needClose);
-            return true;
-        }
+        _emitBufferReferenceConversion(inst, inOuterPrec);
+        return true;
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
         {
