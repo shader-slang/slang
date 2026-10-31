@@ -17,8 +17,8 @@
 // disjoint because each conversion is declared separately. The CHECKs then
 // observe that no handle type reaches the output: HLSL re-spells the two heap
 // subscripts directly, GLSL emits a runtime-sized heap array and WGSL an
-// unsized `binding_array`, each indexed by the uint, and SPIR-V emits the `RuntimeDescriptorArray` capability with a
-// heap variable. The index feeding the subscript is a uniform so it cannot be
+// unsized `binding_array`, each indexed by the uint, and SPIR-V emits the
+// `RuntimeDescriptorArray` capability with a heap variable. The index feeding the subscript is a uniform so it cannot be
 // folded away before emission.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain
