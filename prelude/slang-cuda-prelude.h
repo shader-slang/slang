@@ -1292,25 +1292,52 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
                     op _slang_vector_get_element(thisVal.rows[i], j);                              \
         return result;                                                                             \
     }
-#define SLANG_INT_MATRIX_OPS(T)   \
-    SLANG_MATRIX_BINARY_OP(T, +)  \
-    SLANG_MATRIX_BINARY_OP(T, -)  \
-    SLANG_MATRIX_BINARY_OP(T, *)  \
-    SLANG_MATRIX_BINARY_OP(T, /)  \
-    SLANG_MATRIX_BINARY_OP(T, &)  \
-    SLANG_MATRIX_BINARY_OP(T, |)  \
-    SLANG_MATRIX_BINARY_OP(T, &&) \
-    SLANG_MATRIX_BINARY_OP(T, ||) \
-    SLANG_MATRIX_BINARY_OP(T, ^)  \
-    SLANG_MATRIX_BINARY_OP(T, %)  \
-    SLANG_MATRIX_UNARY_OP(T, !)   \
-    SLANG_MATRIX_UNARY_OP(T, ~)
-#define SLANG_FLOAT_MATRIX_OPS(T) \
-    SLANG_MATRIX_BINARY_OP(T, +)  \
-    SLANG_MATRIX_BINARY_OP(T, -)  \
-    SLANG_MATRIX_BINARY_OP(T, *)  \
-    SLANG_MATRIX_BINARY_OP(T, /)  \
-    SLANG_MATRIX_UNARY_OP(T, -)
+#define SLANG_MATRIX_BINARY_COMPARE_OP(T, op)                           \
+    template<int R, int C>                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<bool, R, C> operator op(  \
+        const Matrix<T, R, C>& thisVal,                                 \
+        const Matrix<T, R, C>& other)                                   \
+    {                                                                   \
+        Matrix<bool, R, C> result;                                      \
+        for (int i = 0; i < R; i++)                                     \
+            for (int j = 0; j < C; j++)                                 \
+                *_slang_vector_get_element_ptr(result.rows + i, j) =    \
+                    _slang_vector_get_element(thisVal.rows[i], j)       \
+                        op _slang_vector_get_element(other.rows[i], j); \
+        return result;                                                  \
+    }
+
+#define SLANG_INT_MATRIX_OPS(T)           \
+    SLANG_MATRIX_BINARY_OP(T, +)          \
+    SLANG_MATRIX_BINARY_OP(T, -)          \
+    SLANG_MATRIX_BINARY_OP(T, *)          \
+    SLANG_MATRIX_BINARY_OP(T, /)          \
+    SLANG_MATRIX_BINARY_OP(T, &)          \
+    SLANG_MATRIX_BINARY_OP(T, |)          \
+    SLANG_MATRIX_BINARY_OP(T, &&)         \
+    SLANG_MATRIX_BINARY_OP(T, ||)         \
+    SLANG_MATRIX_BINARY_OP(T, ^)          \
+    SLANG_MATRIX_BINARY_OP(T, %)          \
+    SLANG_MATRIX_UNARY_OP(T, !)           \
+    SLANG_MATRIX_UNARY_OP(T, ~)           \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, >)  \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, <)  \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, >=) \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, <=) \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, ==) \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, !=)
+#define SLANG_FLOAT_MATRIX_OPS(T)         \
+    SLANG_MATRIX_BINARY_OP(T, +)          \
+    SLANG_MATRIX_BINARY_OP(T, -)          \
+    SLANG_MATRIX_BINARY_OP(T, *)          \
+    SLANG_MATRIX_BINARY_OP(T, /)          \
+    SLANG_MATRIX_UNARY_OP(T, -)           \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, >)  \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, <)  \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, >=) \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, <=) \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, ==) \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, !=)
 SLANG_INT_MATRIX_OPS(int)
 SLANG_INT_MATRIX_OPS(uint)
 SLANG_INT_MATRIX_OPS(short)
@@ -1378,6 +1405,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<__half, R, C> operator%(
 #endif
 #undef SLANG_FLOAT_MATRIX_MOD
 #undef SLANG_MATRIX_BINARY_OP
+#undef SLANG_MATRIX_BINARY_COMPARE_OP
 #undef SLANG_MATRIX_UNARY_OP
 #undef SLANG_INT_MATRIX_OPS
 #undef SLANG_FLOAT_MATRIX_OPS
@@ -6464,6 +6492,17 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, i
     }                                                                                              \
     template<>                                                                                     \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                             \
+        T##3 tex2Dfetch_int(CUtexObject texObj, int x, int y, int mip)                             \
+    {                                                                                              \
+        T result_x, result_y, result_z;                                                            \
+        [[maybe_unused]] T stub;                                                                   \
+        asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"                  \
+            : c(result_x), c(result_y), c(result_z), c(stub)                                       \
+            : "l"(texObj), "r"(x), "r"(y), "r"(mip));                                              \
+        return make_##T##3(result_x, result_y, result_z);                                          \
+    }                                                                                              \
+    template<>                                                                                     \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                             \
         T##4 tex2Dfetch_int(CUtexObject texObj, int x, int y, int mip)                             \
     {                                                                                              \
         T result_x, result_y, result_z, result_w;                                                  \
@@ -6504,6 +6543,17 @@ tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip);
             : c(result_x), c(result_y), c(stub), c(stub)                                  \
             : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z) /* ignored */, "r"(mip));       \
         return make_##T##2(result_x, result_y);                                           \
+    }                                                                                     \
+    template<>                                                                            \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                    \
+        T##3 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip)             \
+    {                                                                                     \
+        T result_x, result_y, result_z;                                                   \
+        [[maybe_unused]] T stub;                                                          \
+        asm("tex.level.3d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;" \
+            : c(result_x), c(result_y), c(result_z), c(stub)                              \
+            : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z) /* ignored */, "r"(mip));       \
+        return make_##T##3(result_x, result_y, result_z);                                 \
     }                                                                                     \
     template<>                                                                            \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                    \
@@ -6549,6 +6599,17 @@ tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip);
     }                                                                              \
     template<>                                                                     \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL                                             \
+        T##3 tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip)    \
+    {                                                                              \
+        T result_x, result_y, result_z;                                            \
+        [[maybe_unused]] T stub;                                                   \
+        asm("tex.level.a1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;" \
+            : c(result_x), c(result_y), c(result_z), c(stub)                       \
+            : "l"(texObj), "r"(layer), "r"(x), "r"(mip));                          \
+        return make_##T##3(result_x, result_y, result_z);                          \
+    }                                                                              \
+    template<>                                                                     \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                             \
         T##4 tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip)    \
     {                                                                              \
         T result_x, result_y, result_z, result_w;                                  \
@@ -6588,6 +6649,17 @@ tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip);
             : c(result_x), c(result_y), c(stub), c(stub)                                    \
             : "l"(texObj), "r"(layer), "r"(x), "r"(y), "r"(layer) /* ignored */, "r"(mip)); \
         return make_##T##2(result_x, result_y);                                             \
+    }                                                                                       \
+    template<>                                                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                      \
+        T##3 tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip)      \
+    {                                                                                       \
+        T result_x, result_y, result_z;                                                     \
+        [[maybe_unused]] T stub;                                                            \
+        asm("tex.level.a2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;"  \
+            : c(result_x), c(result_y), c(result_z), c(stub)                                \
+            : "l"(texObj), "r"(layer), "r"(x), "r"(y), "r"(layer) /* ignored */, "r"(mip)); \
+        return make_##T##3(result_x, result_y, result_z);                                   \
     }                                                                                       \
     template<>                                                                              \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                      \

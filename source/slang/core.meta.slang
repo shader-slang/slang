@@ -4715,6 +4715,14 @@ __attributeTarget(FuncDecl)
 attribute_syntax [NumThreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
 
 /// Indicate a compute shader entry point is only compatible with the specified wave size.
+/// On HLSL this is emitted as `[WaveSize(N)]`, and on WGSL as `@subgroup_size(N)` (with the
+/// `subgroups` and `subgroup_size_control` extensions). SPIR-V and GLSL have no in-shader form,
+/// and Slang does not enforce the size in the generated shader: the application must request it
+/// when it creates the pipeline (`VK_EXT_subgroup_size_control`), using the value that
+/// reflection reports through `EntryPointReflection::getComputeWaveSize`. Without that request
+/// the shader can run at a different wave size. Metal cannot request
+/// a SIMD-group width, so the attribute is ignored there with a warning. CUDA warps are always 32
+/// lanes wide: `[WaveSize(32)]` needs nothing emitted, and any other size is ignored with a warning.
 /// @param numLanes The wave size this shader entrypoint is compatible with. Must be one of 4, 8, 16, 32, 64, 128.
 __attributeTarget(FuncDecl)
 attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;

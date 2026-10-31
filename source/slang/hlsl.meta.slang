@@ -15,6 +15,7 @@ in uint __builtinQuadLaneIndex : SV_QuadLaneIndex;
 in uint __builtinWaveIndex : SV_WaveIndex;
 in uint __builtinWaveCount : SV_WaveCount;
 in uint __builtinGroupIndex : SV_GroupIndex;
+in uint3 __builtinWorkgroupCount : SV_WorkgroupCount;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -1363,6 +1364,16 @@ void __wgsl_check_texture_type()
         , "WGSL: unhandled texture access type");
 }
 
+// WGSL's comparison sampling builtins (textureSampleCompare*, textureGatherCompare) take only
+// texture_depth_* textures, so the texture must be declared as a depth texture.
+[require(wgsl)]
+__generic<let isShadow:int>
+void __wgsl_check_compare_texture()
+{
+    static_assert(isShadow == 1,
+        "WGSL comparison sampling (SampleCmp, GatherCmp) needs a depth texture: declare the texture as DepthTexture2D, DepthTexture2DArray, DepthTextureCube or DepthTextureCubeArray");
+}
+
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 void __wgsl_check_texture_type_texel_offset()
 {
@@ -1370,6 +1381,16 @@ void __wgsl_check_texture_type_texel_offset()
 
      static_assert(Shape.flavor != $(SLANG_TEXTURE_2D) || Shape.flavor != $(SLANG_TEXTURE_3D)
          , "WGSL texture shape must be 2D or 3D when sampling with texel offsets");
+}
+
+// WGSL's sampling builtins (textureSample, textureSampleLevel, textureSampleGrad,
+// textureSampleBias) take only f32 textures; an integer texture is read with Load.
+[require(wgsl)]
+__generic<T:ITexelElement>
+void __wgsl_check_sample_texture()
+{
+    static_assert(T.Element is float,
+        "WGSL can only sample (Sample, SampleLevel, SampleGrad, SampleBias) a float texture: use Load to read an integer texture");
 }
 
 //@public:
@@ -3079,6 +3100,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3147,6 +3169,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<
                     T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3296,6 +3319,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3360,6 +3384,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3444,6 +3469,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             };
         case wgsl:
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -3475,6 +3501,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpLevelZero";
         case wgsl:
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -3527,6 +3554,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             };
         case wgsl:
             __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -3587,6 +3615,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpLevelZero";
         case wgsl:
             __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -4024,6 +4053,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4089,6 +4119,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4317,6 +4348,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4382,6 +4414,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4758,6 +4791,7 @@ vector<T.Element,4> __texture_gatherCmp(
         };
     case wgsl:
         __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        __wgsl_check_compare_texture<isShadow>();
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
             , "WGSL texture gather is supported only on 2D and Cube textures");
 
@@ -4832,6 +4866,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
         };
     case wgsl:
         __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        __wgsl_check_compare_texture<isShadow>();
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
             , "WGSL texture gather with offset is supported only on 2D textures");
 
@@ -5291,7 +5326,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -5325,6 +5360,14 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
+            default:
+                // Targets without an offset texel fetch (WGSL, Metal, CUDA): add the offset to the
+                // texel coordinate (the array layer and the mip level are left as they are).
+                var coord = location;
+                [ForceUnroll]
+                for (int i = 0; i < Shape.planeDimensions; i++)
+                    coord[i] += offset[i];
+                return Load(coord);
         }
     }
 
@@ -5511,7 +5554,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -5542,6 +5585,14 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                         __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
+            default:
+                // Targets without an offset texel fetch (WGSL, Metal): add the offset to the texel
+                // coordinate.
+                var coord = location;
+                [ForceUnroll]
+                for (int i = 0; i < Shape.planeDimensions; i++)
+                    coord[i] += offset[i];
+                return Load(coord, sampleIndex);
         }
     }
 
@@ -8041,7 +8092,14 @@ struct TriangleStream
 
 //@public:
 
-/// Try to terminate the current draw or dispatch call (HLSL SM 4.0)
+/// Terminate execution.
+/// @remarks Available on HLSL and C++ only. On HLSL (SM 4.0 and later) it tries to terminate the
+/// current draw or dispatch call. On C++ it calls the host `abort()` from `<stdlib.h>`, which ends
+/// the whole process. Calling it for any other target is a capability error. GLSL and SPIR-V
+/// targets have `abort(format, args...)` instead, through GL_EXT_shader_abort on GLSL and
+/// SPV_KHR_abort on SPIR-V (both VK_KHR_shader_abort). CUDA, Metal and WGSL have no form of
+/// `abort`.
+[require(cpp_hlsl)]
 void abort();
 
 /// The abs function returns the absolute value of x.
@@ -8471,13 +8529,16 @@ void AllMemoryBarrierWithGroupSync()
 __intrinsic_op($(kIROp_GetWorkGroupSize))
 int3 WorkgroupSize();
 
-// Returns number of workgroups that have been dispatched to a GLSL or SPIR-V compute shader
+// Returns the number of workgroups that have been dispatched to a compute shader.
 [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
 [require(glsl_spirv, meshshading)]
+[require(wgsl, compute)]
 uint3 WorkgroupCount()
 {
     __target_switch
     {
+    case wgsl:
+        return __builtinWorkgroupCount;
     case glsl:
         __intrinsic_asm "(gl_NumWorkGroups)";
     case spirv:
@@ -14993,7 +15054,8 @@ T __copyObject<T>(T v)
 /// divergent, and ensure scalarization happens correctly for each divergent lane.
 __generic<T:__BuiltinArithmeticType>
 __intrinsic_op($(kIROp_NonUniformResourceIndex))
-[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
+[require(glsl_hlsl_spirv, nonuniformqualifier)]
+[require(cpp_cuda_metal_wgsl)]
 T NonUniformResourceIndex(T index);
 
 /// HLSL allows NonUniformResourceIndex around non int/uint types.
@@ -35657,6 +35719,22 @@ T workgroupUniformLoad<T>(__ref T v)
         __intrinsic_asm "workgroupUniformLoad(&($0))";
     default:
         return v;
+    }
+}
+
+/// Load a workgroup atomic as a workgroup-uniform value.
+/// @param v The workgroup (groupshared) atomic to load.
+/// @return The value of `v`, the same for every invocation of the workgroup.
+/// @remarks Maps to `workgroupUniformLoad` on an `atomic<T>` when targeting WGSL (a workgroup
+/// barrier, then the load); on other targets it is an atomic load.
+T workgroupUniformLoad<T : IAtomicable>(__ref Atomic<T> v)
+{
+    __target_switch
+    {
+    case wgsl:
+        __intrinsic_asm "workgroupUniformLoad(&($0))";
+    default:
+        return v.load();
     }
 }
 

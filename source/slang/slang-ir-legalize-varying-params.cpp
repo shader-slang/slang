@@ -5143,9 +5143,38 @@ protected:
 
         case SystemValueSemanticName::ClipDistance:
             {
-                // TODO: Implement this based on the 'clip-distances' feature in WGSL
-                // https: // www.w3.org/TR/webgpu/#dom-gpufeaturename-clip-distances
-                result.isUnsupported = true;
+                // WGSL's clip_distances built-in (`enable clip_distances;`, the WebGPU
+                // `clip-distances` feature) is an array<f32, N> with N <= 8: an HLSL
+                // `float d[N] : SV_ClipDistance` maps to it directly.
+                // https://www.w3.org/TR/WGSL/#built-in-values-clip_distances
+                IRType* varType = nullptr;
+                if (auto field = as<IRStructField>(parentVar))
+                    varType = field->getFieldType();
+                else if (parentVar)
+                    varType = parentVar->getDataType();
+                if (auto ptrType = as<IRPtrTypeBase>(varType))
+                    varType = ptrType->getValueType();
+                auto arrayType = as<IRArrayType>(varType);
+                auto count = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
+                if (arrayType && count && count->getValue() >= 1 && count->getValue() <= 8 &&
+                    arrayType->getElementType()->getOp() == kIROp_FloatType)
+                {
+                    result.systemValueName = toSlice("clip_distances");
+                    result.permittedTypes.add(arrayType);
+
+                    // The built-in name is attached to the struct key when `parentVar` is a
+                    // field, so the extension requirement is attached to the key as well.
+                    auto decorated = parentVar;
+                    if (auto field = as<IRStructField>(parentVar))
+                        decorated = field->getKey();
+                    builder.addRequireWGSLExtensionDecoration(decorated, toSlice("clip_distances"));
+                }
+                else
+                {
+                    // A scalar or vector SV_ClipDistance would have to be packed into the
+                    // array; not supported.
+                    result.isUnsupported = true;
+                }
             }
             break;
 
@@ -5188,6 +5217,15 @@ protected:
         case SystemValueSemanticName::GroupID:
             {
                 result.systemValueName = toSlice("workgroup_id");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::UInt),
+                    builder.getIntValue(builder.getIntType(), 3)));
+            }
+            break;
+
+        case SystemValueSemanticName::WorkgroupCount:
+            {
+                result.systemValueName = toSlice("num_workgroups");
                 result.permittedTypes.add(builder.getVectorType(
                     builder.getBasicType(BaseType::UInt),
                     builder.getIntValue(builder.getIntType(), 3)));

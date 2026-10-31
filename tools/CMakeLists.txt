@@ -475,6 +475,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             # The record-replay unit tests call into the record-replay subsystem, which is compiled
             # out when SLANG_ENABLE_RECORD_REPLAY is OFF; the tests guard their bodies on this macro.
             SLANG_ENABLE_RECORD_REPLAY=$<BOOL:${SLANG_ENABLE_RECORD_REPLAY}>
+            # The library-unload test needs to know whether slang-glslang links mimalloc (whether
+            # slang-compiler does comes from core's SLANG_ENABLE_MIMALLOC).
+            $<$<BOOL:${SLANG_GLSLANG_USES_MIMALLOC}>:SLANG_GLSLANG_USES_MIMALLOC=1>
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
             core
