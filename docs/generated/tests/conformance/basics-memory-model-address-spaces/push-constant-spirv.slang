@@ -37,8 +37,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // CHECK: %pushConst = OpVariable {{.*}} PushConstant
 // Metal has no push-constant concept; [vk::push_constant] lowers to a constant* buffer parameter.
 // METAL: constant* pushConst_
-// WGSL has no push-constant concept; [vk::push_constant] lowers to var<uniform>.
-// WGSL: var<uniform> pushConst_
+// WGSL maps [vk::push_constant] to immediate data, a `var<immediate>` declaration.
+// WGSL: var<immediate> pushConst_
 // GLSL emits the Push-constant address space as a `layout(push_constant)` uniform block.
 // GLSL: layout(push_constant)
 // GLSL: }pushConst_
