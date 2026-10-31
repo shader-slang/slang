@@ -308,8 +308,8 @@ void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt* stmt)
     checkModifiers(stmt);
     WithOuterStmt subContext(this, stmt);
 
-    // We check the body before the predicate, in source order, because lookup reveals a
-    // local only once checking reaches its declaration. Currently an unbraced body has no
+    // We check the body before the predicate, in source order, because checking reveals a
+    // local only when it reaches the local's declaration. Currently an unbraced body has no
     // scope of its own, so in `do int i = next(); while (i != 0);` the predicate refers to
     // the `i` that the body declares.
     subContext.checkStmt(stmt->statement);
