@@ -6,8 +6,6 @@
 #include "slang-list.h"
 #include "slang-string.h"
 
-#include <mutex>
-
 namespace Slang
 {
 
@@ -84,8 +82,23 @@ protected:
     WriterFlags m_flags;
 };
 
-/* Implemented the append buffer part of the writer, such that calls to begin/endAppendBuffer are
- * transformed into appropriate calls to write method */
+/* Implements the append buffer part of the writer, such that calls to begin/endAppendBuffer are
+ * transformed into a call to the write method.
+ *
+ * A writer can be shared between threads (for example the process-wide stdout writer), so the
+ * append buffer is owned by the calling thread rather than by the writer, and no lock is held
+ * between beginAppendBuffer and endAppendBuffer. Sharing a writer between threads is then safe
+ * if its write method is, as FileWriter's is. The rules this gives callers are:
+ *
+ * - Each thread has at most one append buffer per writer. A second beginAppendBuffer on the same
+ *   writer and thread, without an endAppendBuffer in between, abandons the first buffer and
+ *   reuses its storage, so the pointer the first call returned is no longer valid.
+ * - endAppendBuffer must run on the thread that began the buffer, with the pointer
+ *   beginAppendBuffer returned and at most that many characters. Otherwise it returns
+ *   SLANG_E_INVALID_ARG and writes nothing.
+ *
+ * A write override may itself append to the same writer, because endAppendBuffer detaches the
+ * buffer before calling write. */
 class AppendBufferWriter : public BaseWriter
 {
 public:
@@ -100,18 +113,20 @@ public:
         : Parent(flags)
     {
     }
-
-protected:
-    List<char> m_appendBuffer;
-    std::mutex mutex;
+    ~AppendBufferWriter();
 };
 
-class CallbackWriter : public AppendBufferWriter
+/* Passes text to a diagnostic callback. Its write 0-terminates text in place when the text comes
+ * from its append buffer, so it keeps that buffer in the writer itself. Unlike an
+ * AppendBufferWriter, one CallbackWriter must not be used from several threads at once. */
+class CallbackWriter : public BaseWriter
 {
 public:
-    typedef AppendBufferWriter Parent;
+    typedef BaseWriter Parent;
     // ISlangWriter
     SLANG_NO_THROW char* SLANG_MCALL beginAppendBuffer(size_t maxNumChars) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL endAppendBuffer(char* buffer, size_t numChars)
+        SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL write(const char* chars, size_t numChars)
         SLANG_OVERRIDE;
 
@@ -121,6 +136,9 @@ public:
     }
 
 protected:
+    // Holds the append buffer, and the 0-terminated copy of text passed to write, because the
+    // callback takes a 0-terminated string.
+    List<char> m_appendBuffer;
     SlangDiagnosticCallback m_callback;
     const void* m_data;
 };
