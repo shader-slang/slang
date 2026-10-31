@@ -7,13 +7,16 @@
 // METAL: "binding": {"kind": "constantBuffer", "index": 0},
 
 // METAL:"name": "pdata",
-// METAL:"binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+// METAL:"bindings": [
+// METAL:{"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
+// METAL:{"kind": "metalArgumentBufferElement", "index": 0}
 // METAL:"name": "tex",
 
-// Since we will apply MetalArgumentBufferTier2, 'tex' here will just be a uniform.
-// The pdata is a nested parameter block, so it will be a 64-bit device pointer which take
-// 8 bytes. So the offset of `tex` will be 8 bytes.
-// METAL:"binding": {"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0}
+// pdata is a nested parameter block, laid out as a device pointer of 8 bytes and one argument
+// buffer slot, so tex lands at byte offset 8 and slot 1.
+// METAL:"bindings": [
+// METAL:{"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0}
+// METAL:{"kind": "metalArgumentBufferElement", "index": 1}
 
 
 // Check that there will be only two bindings.
