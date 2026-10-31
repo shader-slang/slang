@@ -4638,17 +4638,15 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         }
         else
         {
-            // If the "default" target has had a profile (or other state) specified and
-            // that state doesn't apply to anything, we give the user an error. With
-            // multiple targets the state is always dropped. With no target on the command
-            // line, only a command-line compile drops it: an API caller keeps it for the
-            // targets it adds (see `m_optionSetForDefaultTarget` below).
+            // With zero or multiple targets, state given for the "default" target may not
+            // apply to any target. We report it as an error unless that state is kept for
+            // targets added later, as described for each option below.
             //
-            const bool isDefaultTargetStateDropped =
-                m_rawTargets.getCount() != 0 || m_requestImpl->m_isCommandLineCompile;
-
-            if (isDefaultTargetStateDropped &&
-                m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
+            // A profile is reported in every mode. With no `-target`, the
+            // `IGlobalSession::parseCommandLineArguments` path cannot keep it, because
+            // `Linkage::addTarget` sets each target's profile from its `TargetDesc`.
+            //
+            if (m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
             {
                 if (m_rawTargets.getCount() == 0)
                 {
@@ -4665,7 +4663,16 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
             }
 
-            if (isDefaultTargetStateDropped &&
+            // A floating-point mode with no `-target` is reported only for a command-line
+            // compile, which adds no target after parsing. An API caller keeps it: targets
+            // already on the linkage inherit it below, targets added later inherit it from
+            // `m_optionSetForDefaultTarget`, and `parseCommandLineArguments` returns it as a
+            // session option.
+            //
+            const bool isFloatingPointModeIgnored =
+                m_rawTargets.getCount() > 1 || m_requestImpl->m_isCommandLineCompile;
+
+            if (isFloatingPointModeIgnored &&
                 defaultTargetFloatingPointMode != FloatingPointMode::Default)
             {
                 if (m_rawTargets.getCount() == 0)
