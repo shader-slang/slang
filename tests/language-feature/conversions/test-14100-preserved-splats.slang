@@ -4,8 +4,11 @@
 
 // The core module splats builtin scalar and enum sources into vectors with `__builtin_cast`,
 // and splats a one-element vector into a vector of the same element type. These conversions
-// work in concrete and generic code, and derivatives flow through the one-element splat. An
-// explicit `float4(s)` applies a user conversion to the element type and then splats.
+// work in concrete and generic code, and forward and backward derivatives flow through the
+// one-element splat, both implicit and explicit. A floating-point scalar splats into a vector of
+// a different floating-point element type, which relies on the floating-point base types
+// declaring `__BuiltinScalarType` directly. An explicit `float4(s)` applies a user conversion
+// to the element type and then splats.
 
 enum Color : int
 {
@@ -32,6 +35,13 @@ float sumOfSplat(float1 v)
     return r.x + r.y + r.z + r.w;
 }
 
+[Differentiable]
+float sumOfExplicitSplat(float1 v)
+{
+    float4 r = float4(v);
+    return r.x + r.y + r.z + r.w;
+}
+
 vector<T, N> splatGenericOneVector<T : __BuiltinFloatingPointType, let N : int>(vector<T, 1> v)
 {
     return v;
@@ -45,7 +55,7 @@ bool4 splatGenericEnum<E : __EnumType>(E e)
 //TEST_INPUT:ubuffer(data=[2 1 0 0], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [shader("compute")]
@@ -108,4 +118,22 @@ void computeMain()
     var result = fwd_diff(sumOfSplat)(diffPair(one, float1(1.0)));
     outputBuffer[12] = result.p;
     outputBuffer[13] = result.d;
+
+    // CHECK-NEXT: 4.0
+    outputBuffer[14] = fwd_diff(sumOfExplicitSplat)(diffPair(one, float1(1.0))).d;
+
+    // CHECK-NEXT: 4.0
+    var pair = diffPair(one);
+    bwd_diff(sumOfSplat)(pair, 1.0);
+    outputBuffer[15] = pair.d.x;
+
+    // CHECK-NEXT: 2.0
+    float f = float(i);
+    double4 fromFloat = f;
+    outputBuffer[16] = float(fromFloat.z);
+
+    // CHECK-NEXT: 2.0
+    half h = half(i);
+    float4 fromHalf = h;
+    outputBuffer[17] = fromHalf.y;
 }

@@ -35,6 +35,8 @@ float4 fromStruct(S s)
     return r;
 }
 
+// The core module's own `bool.__init(Ptr)` does not make a pointer splat either, because a
+// pointer is not a valid vector element.
 bool4 fromPointer(int* p)
 {
     return p;
@@ -42,7 +44,8 @@ bool4 fromPointer(int* p)
 //CHECK:   ^ expected an expression of type 'vector<bool,4>', got 'Ptr<int, Access.ReadWrite, AddressSpace.Device, DefaultDataLayout>'
 }
 
-// A one-element vector splats only into a vector of the same element type.
+// A one-element vector splats implicitly only into a vector of the same element type. An
+// explicit `float4(double1(x))` still converts the element and then splats.
 double4 fromFloat1(float1 v)
 {
     return v;
