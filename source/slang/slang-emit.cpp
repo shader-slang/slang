@@ -2509,6 +2509,12 @@ Result linkAndOptimizeIR(
             SLANG_PASS(introduceExplicitGlobalContext, target);
         SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
         break;
+    // WGSL treats every read of a `var<private>` as possibly non-uniform, so workgroup-uniform
+    // built-in inputs reach the functions that read them through an explicit context instead.
+    case CodeGenTarget::WGSL:
+        SLANG_PASS(introduceExplicitGlobalContext, target);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+        break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:

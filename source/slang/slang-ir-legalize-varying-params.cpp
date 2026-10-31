@@ -39,6 +39,20 @@ SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticN
     return systemValueSemanticName;
 }
 
+bool isWGSLWorkgroupUniformSystemValue(SystemValueSemanticName semantic, Stage stage)
+{
+    if (stage != Stage::Compute)
+        return false;
+    switch (semantic)
+    {
+    case SystemValueSemanticName::GroupID:
+    case SystemValueSemanticName::WaveLaneCount:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // This pass implements logic to "legalize" the varying parameter
 // signature of an entry point.
 //
