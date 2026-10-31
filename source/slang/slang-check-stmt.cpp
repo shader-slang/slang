@@ -825,6 +825,54 @@ void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
     // Nothing to do
 }
 
+// Count the iterations of `for (i = initialValue; i compareOp finalValue; i += step)`, where the
+// step changes `i` by `absStep` per iteration. Folded constants are held as a signed 64-bit
+// `IntegerLiteralValue`, so a value of an unsigned 64-bit type above INT64_MAX is held as a
+// negative number, and we order the bounds as `UInt64` when `isUnsigned64` is set. For example, in
+// `for (uint64_t i = 0; i < 0xFFFFFFFFFFFFFFFFull; i++)` the bound is held as -1 but lies above
+// `initialValue`. The function returns false when the count is above INT32_MAX, because
+// `InferredMaxItersAttribute` stores the count as an `int32_t`.
+//
+// The count assumes that the step moves `i` towards `finalValue` and that `i` never wraps around.
+// The caller checks neither in full: it rejects a step that moves away from a strict bound (`<`,
+// `>`) but not from an inclusive one (`<=`, `>=`), and it does not look for wrap-around. For
+// example, `for (int i = 10; i >= 0; i++)` is counted as 11 iterations although it runs until `i`
+// overflows, and `for (uint i = 0; i < 0xFFFFFFFFu; i += 0x80000000u)` as 2 although it never
+// ends. An under-count like these makes autodiff allocate too little per-iteration storage.
+static bool _tryCountForLoopIterations(
+    IROp compareOp,
+    bool isUnsigned64,
+    IntegerLiteralValue initialValue,
+    IntegerLiteralValue finalValue,
+    UInt64 absStep,
+    int32_t& outIterations)
+{
+    SLANG_ASSERT(
+        compareOp == kIROp_Less || compareOp == kIROp_Leq || compareOp == kIROp_Greater ||
+        compareOp == kIROp_Geq);
+    SLANG_ASSERT(absStep != 0);
+    const bool countsDown = compareOp == kIROp_Greater || compareOp == kIROp_Geq;
+    const bool isInclusive = compareOp == kIROp_Leq || compareOp == kIROp_Geq;
+    const IntegerLiteralValue low = countsDown ? finalValue : initialValue;
+    const IntegerLiteralValue high = countsDown ? initialValue : finalValue;
+    const bool highIsBelowLow = isUnsigned64 ? UInt64(high) < UInt64(low) : high < low;
+    if (highIsBelowLow || (high == low && !isInclusive))
+    {
+        outIterations = 0;
+        return true;
+    }
+
+    // The distance between two values of a type of at most 64 bits fits in a `UInt64`, and
+    // wrapping subtraction computes it exactly for signed and unsigned bounds alike.
+    const UInt64 distance = UInt64(high) - UInt64(low);
+    SLANG_ASSERT(isInclusive || distance != 0);
+    const UInt64 stepsAfterFirst = (isInclusive ? distance : distance - 1) / absStep;
+    if (stepsAfterFirst >= UInt64(INT32_MAX))
+        return false;
+    outIterations = int32_t(stepsAfterFirst + 1);
+    return true;
+}
+
 void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
 {
     // If a for loop is in the form of `for (var = initialVal; var $compareOp otherVal; var
@@ -1058,29 +1106,29 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     if (!initialLitVal || !finalVal)
         return;
 
-    auto absStepSize = abs(stepSize->getValue());
-    int adjustment = 0;
-    if (compareOp == kIROp_Geq || compareOp == kIROp_Leq)
-        adjustment = 1;
+    // The fast path coerced both predicate operands to one common type, and the induction
+    // variable is still a bare operand, so that type is the variable's type. Only `uint64_t` and
+    // `uintptr_t` values can exceed INT64_MAX. The ordering is right only when the folded bounds
+    // are canonical values of that type, which the constant folder does not yet guarantee (issue
+    // #13954): a mis-folded low-side bound reads as `UINT64_MAX`, which gives a false zero-trip
+    // result and an inferred `MaxIters(0)`.
+    auto compareType = as<BasicExpressionType>(cmpExpr->arguments[0]->type.type);
+    SLANG_RELEASE_ASSERT(compareType);
+    const BaseType compareBaseType = compareType->getBaseType();
+    const bool isUnsigned64 =
+        compareBaseType == BaseType::UInt64 || compareBaseType == BaseType::UIntPtr;
 
-    auto iterations = (Math::Max(finalVal->getValue(), initialLitVal->getValue()) -
-                       Math::Min(finalVal->getValue(), initialLitVal->getValue()) + absStepSize -
-                       1 + adjustment) /
-                      absStepSize;
-    switch (compareOp)
-    {
-    case kIROp_Geq:
-    case kIROp_Greater:
-        // Expect final value to be less than initial value.
-        if (finalVal->getValue() > initialLitVal->getValue())
-            iterations = 0;
-        break;
-    case kIROp_Leq:
-    case kIROp_Less:
-        if (finalVal->getValue() < initialLitVal->getValue())
-            iterations = 0;
-        break;
-    }
+    const IntegerLiteralValue step = stepSize->getValue();
+    const UInt64 absStep = step < 0 ? UInt64(0) - UInt64(step) : UInt64(step);
+    int32_t iterations = 0;
+    if (!_tryCountForLoopIterations(
+            compareOp,
+            isUnsigned64,
+            initialLitVal->getValue(),
+            finalVal->getValue(),
+            absStep,
+            iterations))
+        return;
     if (iterations == 0)
     {
         getSink()->diagnose(Diagnostics::LoopRunsForZeroIterations{.stmt = stmt});
@@ -1097,7 +1145,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     litExpr->token.setName(getNamePool()->getName(String(iterations)));
     maxItersAttr->args.add(litExpr);
     maxItersAttr->intArgVals.add(m_astBuilder->getIntVal(m_astBuilder->getIntType(), iterations));
-    maxItersAttr->value = (int32_t)iterations;
+    maxItersAttr->value = iterations;
     maxItersAttr->inductionVar = initialVar;
     addModifier(stmt, maxItersAttr);
     return;
