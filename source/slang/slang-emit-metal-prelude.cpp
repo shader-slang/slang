@@ -86,4 +86,15 @@ const char* MetalSourceEmitter::kMetalBuiltinPreludeLogging = R"(
 #include <metal_logging>
 )";
 
+// MSL declares `fence()` as a non-const member, and a texture held in a parameter block is
+// reached through a `constant` pointer. We copy the texture handle into a parameter so that the
+// call is made on a non-const object.
+const char* MetalSourceEmitter::kMetalBuiltinPreludeTextureFence = R"(
+template<typename T>
+void _slang_textureFence(T texture)
+{
+    texture.fence();
+}
+)";
+
 } // namespace Slang

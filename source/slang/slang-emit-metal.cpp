@@ -1075,6 +1075,14 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             return true;
         }
+    case kIROp_MetalTextureFence:
+        {
+            ensurePrelude(kMetalBuiltinPreludeTextureFence);
+            m_writer->emit("_slang_textureFence(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MetalSetVertex:
         {
             auto setVertex = as<IRMetalSetVertex>(inst);

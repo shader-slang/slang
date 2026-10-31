@@ -133,6 +133,7 @@ protected:
     static const char* kMetalBuiltinPreludeMatrixFmod;
     static const char* kMetalBuiltinPreludeSimdgroupMatrixOps;
     static const char* kMetalBuiltinPreludeLogging;
+    static const char* kMetalBuiltinPreludeTextureFence;
 };
 
 } // namespace Slang
