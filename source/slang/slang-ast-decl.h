@@ -401,6 +401,10 @@ class ExtensionDecl : public AggTypeDeclBase
 {
     FIDDLE(...)
     FIDDLE() TypeExp targetType;
+
+    // Attribute-generated extensions describe the decorated declaration, so they must remain
+    // discoverable through transitive imports. Handwritten extensions remain import-scoped.
+    FIDDLE() bool isAttributeExtension = false;
 };
 
 
