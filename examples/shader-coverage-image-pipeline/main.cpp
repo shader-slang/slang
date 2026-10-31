@@ -22,6 +22,7 @@
 #include <iostream>
 #include <map>
 #include <random>
+#include <set>
 #include <slang-com-ptr.h>
 #include <slang-rhi/shader-cursor.h>
 #include <slang.h>
@@ -429,8 +430,12 @@ void writeLcov(
         std::map<uint32_t, uint64_t> lines; // line → accumulated count
         std::vector<FuncRecord> funcs;
         std::vector<BranchRecord> branches;
+        std::set<uint32_t> booleanLines;
     };
     std::map<std::string, FileRecords> byFile;
+    // Site IDs are metadata-wide: source remapping can place a site's arms
+    // on different lines or files without creating separate decisions.
+    std::map<uint32_t, bool> evaluatedSites;
 
     const uint32_t entryCount = coverage->getEntryCount();
     for (uint32_t i = 0; i < entryCount; ++i)
@@ -453,6 +458,8 @@ void writeLcov(
         switch (entry.kind)
         {
         case slang::CoverageEntryKind::Line:
+            // Sum statement entries, including entries sharing a counter slot.
+            // Three statements executed four times contribute 12, not four.
             rec.lines[entry.line] += count;
             break;
         case slang::CoverageEntryKind::Function:
@@ -460,10 +467,35 @@ void writeLcov(
             break;
         case slang::CoverageEntryKind::Branch:
             rec.branches.push_back({entry.line, entry.branchSiteID, entry.branchArmID, count});
+            evaluatedSites[entry.branchSiteID] = evaluatedSites[entry.branchSiteID] || count != 0;
             break;
         default:
-            break;
+            continue;
         }
+        if (entry.counterMode == slang::CoverageCounterMode::Boolean)
+            rec.booleanLines.insert(entry.line);
+    }
+
+    // Valid function/branch-only metadata has no statement entries. LCOV
+    // consumers nevertheless need DA at each FN/BRDA location. Preserve actual
+    // statement aggregates; fill missing lines from function entries first,
+    // then branch outcomes. These records do not infer source-line visits.
+    for (auto& fp : byFile)
+    {
+        auto& rec = fp.second;
+        std::map<uint32_t, uint64_t> functionLines;
+        for (const auto& fn : rec.funcs)
+            functionLines[fn.line] += fn.count;
+        for (const auto& line : functionLines)
+            rec.lines.emplace(line.first, line.second);
+        std::map<uint32_t, uint64_t> branchLines;
+        for (const auto& br : rec.branches)
+            branchLines[br.line] += br.count;
+        for (const auto& line : branchLines)
+            rec.lines.emplace(line.first, line.second);
+        for (auto& line : rec.lines)
+            if (rec.booleanLines.count(line.first))
+                line.second = line.second != 0;
     }
 
     std::ofstream f(path, std::ios::binary);
@@ -505,10 +537,17 @@ void writeLcov(
         if (!rec.branches.empty())
         {
             uint32_t bHit = 0;
+            // A site's arms can occupy different switch case-label lines.
+            // Any taken arm proves the site was evaluated; otherwise LCOV
+            // requires '-' instead of the zero used for an untaken outcome.
             for (const auto& br : rec.branches)
             {
-                f << "BRDA:" << br.line << "," << br.siteId << "," << br.armId << "," << br.count
-                  << "\n";
+                f << "BRDA:" << br.line << "," << br.siteId << "," << br.armId << ",";
+                if (evaluatedSites[br.siteId])
+                    f << br.count;
+                else
+                    f << "-";
+                f << "\n";
                 if (br.count > 0)
                     ++bHit;
             }
