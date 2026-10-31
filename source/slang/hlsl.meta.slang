@@ -2757,6 +2757,60 @@ __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int
 _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format> __extractImage(
     _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> combinedSampler);
 
+// Texture-only operations on a combined texture-sampler forward to the extracted texture through
+// these free functions. Inside the extension that is generic over `isCombined`, a member call on
+// the extracted texture (`__extractImage(this).Load(location)`) fails lookup with E30027: the
+// extracted type reuses the extension's own generic parameters, and generic inference does not
+// record a parameter that unifies with itself, so the extension does not apply to it. A free
+// function avoids applying the extension to its own target.
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTexture(_Texture<T,Shape,isArray,0,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray+1> location)
+{
+    return t.Load(location);
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTexture(_Texture<T,Shape,isArray,0,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
+{
+    return t.Load(location, offset);
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTexture(_Texture<T,Shape,isArray,0,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+{
+    return t.Load(location, offset, status);
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTextureMS(_Texture<T,Shape,isArray,1,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray> location, int sampleIndex)
+{
+    return t.Load(location, sampleIndex);
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTextureMS(_Texture<T,Shape,isArray,1,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
+{
+    return t.Load(location, sampleIndex, offset);
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+[__readNone]
+[ForceInline]
+T __loadTextureMS(_Texture<T,Shape,isArray,1,sampleCount,0,isShadow,0,format> t, vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+{
+    return t.Load(location, sampleIndex, offset, status);
+}
+
 // Gather with a texel offset. The SPIR-V backend selects `ConstOffset` (no capability) or `Offset`
 // (`ImageGatherExtended`) based on whether the offset is a compile-time constant.
 __intrinsic_op($(kIROp_ImageGatherOffset))
@@ -4480,17 +4534,19 @@ for (int isMS = 0; isMS <= 1; isMS++) {
     }
     auto shapeTypeName = kTextureShapeTypeNames[shapeIndex];
     TextureTypeInfo textureTypeInfo(kBaseTextureShapes[shapeIndex], isArray, isMS, 0, sb, path);
+    StringBuilder combinedForwarders;
 $}
 
 __generic<T:ITexelElement, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,$(shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
 {
     ${
-    textureTypeInfo.writeGetDimensionFunctions();
+    textureTypeInfo.writeGetDimensionFunctions(combinedForwarders);
     $}
 }
 
 ${
+    sb << combinedForwarders;
 }
 $}
 
@@ -5174,6 +5230,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         {
         case cpp:
         case hlsl:
+            // A combined receiver forwards to the extracted texture here. Otherwise the member
+            // form emits `tex.Load(sampler, location)` on HLSL, where the combined value is split
+            // into two arguments, and `combined.Load(location)` on CPU, where it stays a struct
+            // with no `Load` member (see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`).
+            if (isCombined != 0)
+                return __loadTexture(__extractImage(this), location);
             __intrinsic_asm ".Load";
 		case cuda:
             // The 'tex*fetch_int<T>' prelude templates below have no half implementation
@@ -5207,41 +5269,46 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             static_assert(false, "Unsupported 'Load' of 'texture' for 'cuda' target");
             __intrinsic_asm "<invalid intrinsic>";
         case metal:
+            // The Metal and WGSL strings start with `$q`, which skips the sampler argument that a
+            // combined receiver gains; see `case 'q'` in `IntrinsicExpandContext::_emitSpecial`.
+            // These targets keep `$q` instead of forwarding like HLSL: forwarding WGSL `Load`
+            // crashes type legalization for a bindless `Sampler2D.Handle`, and Metal uses the same
+            // mechanism as WGSL and as its `GetDimensions` strings.
             switch (Shape.flavor)
             {
             case $(SLANG_TEXTURE_1D):
                 // lod is not supported for 1D texture
                 if (isArray == 1)
                     // Tv read(uint coord, uint array, uint lod = 0) const
-                    __intrinsic_asm "$c$0.read(uint(($1).x), uint(($1).y))$z";
+                    __intrinsic_asm "$q$c$0.read(uint(($1).x), uint(($1).y))$z";
                 else
                     // Tv read(uint coord, uint lod = 0) const
-                    __intrinsic_asm "$c$0.read(uint(($1).x))$z";
+                    __intrinsic_asm "$q$c$0.read(uint(($1).x))$z";
                 break;
             case $(SLANG_TEXTURE_2D):
                 if (isShadow == 1)
                 {
                     if (isArray == 1)
                         // T read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // T read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 else
                 {
                     if (isArray == 1)
                         // Tv read(uint2 coord, uint array, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                     else
                         // Tv read(uint2 coord, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z))$z";
                 }
                 break;
             case $(SLANG_TEXTURE_3D):
                 if (isShadow == 0 && isArray == 0)
                     // Tv read(uint3 coord, uint lod = 0) const
-                    __intrinsic_asm "$c$0.read(vec<uint,3>(($1).xyz), uint(($1).w))$z";
+                    __intrinsic_asm "$q$c$0.read(vec<uint,3>(($1).xyz), uint(($1).w))$z";
                 break;
             case $(SLANG_TEXTURE_CUBE):
                 static_assert(isArray == 0, "Unsupported 'Load' of 'texture cube array' for 'metal' target");
@@ -5252,7 +5319,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __intrinsic_asm "<invalid intrinsics>";
                     else
                         // T read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 else
                 {
@@ -5261,7 +5328,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         __intrinsic_asm "<invalid intrinsics>";
                     else
                         // Tv read(uint2 coord, uint face, uint lod = 0) const
-                        __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
+                        __intrinsic_asm "$q$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))$z";
                 }
                 break;
             }
@@ -5306,17 +5373,17 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 switch (Shape.flavor)
                 {
                 case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z), ($1).w)$z";
+                    __intrinsic_asm "$qtextureLoad($0, ($1).xy, i32(($1).z), ($1).w)$z";
                 }
             }
             switch (Shape.flavor)
             {
             case $(SLANG_TEXTURE_1D):
-                __intrinsic_asm "textureLoad($0, ($1).x, ($1).y)$z";
+                __intrinsic_asm "$qtextureLoad($0, ($1).x, ($1).y)$z";
             case $(SLANG_TEXTURE_2D):
-                __intrinsic_asm "textureLoad($0, ($1).xy, ($1).z)$z";
+                __intrinsic_asm "$qtextureLoad($0, ($1).xy, ($1).z)$z";
             case $(SLANG_TEXTURE_3D):
-                __intrinsic_asm "textureLoad($0, ($1).xyz, ($1).w)$z";
+                __intrinsic_asm "$qtextureLoad($0, ($1).xyz, ($1).w)$z";
             default:
                 __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
@@ -5333,6 +5400,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         {
             case cpp:
             case hlsl:
+                if (isCombined != 0)
+                    return __loadTexture(__extractImage(this), location, offset);
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
@@ -5378,7 +5447,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load";
+        case hlsl:
+            if (isCombined != 0)
+                return __loadTexture(__extractImage(this), location, offset, status);
+            __intrinsic_asm ".Load";
         case spirv:
              const int lodLoc = Shape.dimensions+isArray;
              let coord = __vectorReshape<Shape.dimensions+isArray>(location);
@@ -5432,6 +5504,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             {
                 case cpp:
                 case hlsl:
+                    if (isCombined != 0)
+                        return Load(__makeVector(location, 0));
                     __intrinsic_asm ".operator[]";
                 case metal:
                 case cuda:
@@ -5485,6 +5559,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         {
             case cpp:
             case hlsl:
+                if (isCombined != 0)
+                    return __loadTextureMS(__extractImage(this), location, sampleIndex);
                 __intrinsic_asm ".Load";
             case metal:
                 switch (Shape.flavor)
@@ -5495,20 +5571,20 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$q$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$q$c$0.read($1, uint($2))$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$q$c$0.read(($1).xy, ($1).z, uint($2))$z";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$q$c$0.read($1, uint($2))$z";
                     }
                     break;
                 }
@@ -5540,7 +5616,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
-                __intrinsic_asm "textureLoad($0, $1, $2)$z";
+                __intrinsic_asm "$qtextureLoad($0, $1, $2)$z";
         }
     }
 
@@ -5561,6 +5637,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         {
             case cpp:
             case hlsl:
+                if (isCombined != 0)
+                    return __loadTextureMS(__extractImage(this), location, sampleIndex, offset);
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
@@ -5603,7 +5681,10 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load";
+        case hlsl:
+            if (isCombined != 0)
+                return __loadTextureMS(__extractImage(this), location, sampleIndex, offset, status);
+            __intrinsic_asm ".Load";
         case spirv:
              if (isCombined != 0)
              {
@@ -5654,6 +5735,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             {
                 case cpp:
                 case hlsl:
+                    if (isCombined != 0)
+                        return Load(location, 0);
                     __intrinsic_asm "($0).sample[$1]";
                 case metal:
                 case spirv:
@@ -5677,6 +5760,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             {
                 case cpp:
                 case hlsl:
+                    if (isCombined != 0)
+                        return Load(location, sampleIndex);
                     __intrinsic_asm "($0).sample[$2][$1]";
                 case metal:
                 case spirv:
