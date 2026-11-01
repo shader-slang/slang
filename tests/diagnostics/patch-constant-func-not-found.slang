@@ -10,6 +10,7 @@
 // CHECK-NOT: E38000
 // CHECK: error[E31006]: function not found for attribute
 // CHECK: Could not find function 'constnts' for attribute 'patchconstantfunc'
+// CHECK-NOT: E31006
 // CHECK-NOT: E30015
 // CHECK-NOT: E38000
 
