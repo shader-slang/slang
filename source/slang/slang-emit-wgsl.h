@@ -94,6 +94,8 @@ private:
 
     void _requireExtension(const UnownedStringSlice& name);
 
+    void emitU32HexLiteral(uint32_t value);
+
     bool m_f16ExtensionEnabled = false;
 
     // Set when a push-constant buffer is emitted as `var<immediate>`.
