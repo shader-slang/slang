@@ -6120,6 +6120,18 @@ struct HigherOrderInvokeExprCheckingActions
         return declRef.as<CallableDecl>();
     }
 
+    // Returns whether a checked candidate binds a receiver-taking method to a value.
+    // For example, `fwd_diff(obj.eval<float>)` can contain several specialized member
+    // candidates. Each binds `obj`, while `Type.eval<float>` leaves the receiver unbound
+    // and a static method has no effective `this` parameter.
+    bool isInstanceBoundMethod(SemanticsVisitor* semantics, Expr* funcExpr)
+    {
+        auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
+        auto callableDeclRef = getBaseFunctionDeclRef(semantics, funcExpr);
+        return as<MemberExpr>(innerExpr) && callableDeclRef &&
+               semantics->findEffectiveThisParamInfo(callableDeclRef).has_value();
+    }
+
     // Extract the effective `this` parameter information for a statically referenced member method
     // (e.g. `Type::method`). Returns an empty result for declarations without that parameter and
     // for member methods referenced by name within their own type (e.g.
@@ -6248,65 +6260,6 @@ struct PassthroughHighOrderExprCheckingActionsBase : HigherOrderInvokeExprChecki
     }
 };
 
-static bool _isInstanceMethod(Decl* decl)
-{
-    if (auto genericDecl = as<GenericDecl>(decl))
-        decl = genericDecl->inner;
-    return as<CallableDecl>(decl) && !isEffectivelyStatic(decl);
-}
-
-static bool _isBoundToThis(LookupResultItem const& item)
-{
-    for (auto breadcrumb = item.breadcrumbs; breadcrumb; breadcrumb = breadcrumb->next)
-    {
-        if (breadcrumb->kind == LookupResultItem::Breadcrumb::Kind::ThisExpr)
-            return true;
-    }
-    return false;
-}
-
-// Removes the non-static methods that `funcExpr` binds to an instance, as in `obj.method`, from
-// the candidates it names. `outMethod` is set to one of them if no candidate remains.
-static Expr* _removeInstanceBoundMethods(
-    SemanticsVisitor* semantics,
-    Expr* funcExpr,
-    Decl*& outMethod)
-{
-    if (auto memberExpr = as<MemberExpr>(funcExpr))
-    {
-        if (_isInstanceMethod(memberExpr->declRef.getDecl()))
-            outMethod = memberExpr->declRef.getDecl();
-        return funcExpr;
-    }
-    auto overloadedExpr = as<OverloadedExpr>(funcExpr);
-    if (!overloadedExpr || (overloadedExpr->base && as<TypeType>(overloadedExpr->base->type.type)))
-        return funcExpr;
-
-    Decl* method = nullptr;
-    LookupResult remaining;
-    for (auto item : overloadedExpr->lookupResult2)
-    {
-        if (_isInstanceMethod(item.declRef.getDecl()) &&
-            (overloadedExpr->base || _isBoundToThis(item)))
-            method = item.declRef.getDecl();
-        else
-            AddToLookupResult(remaining, item);
-    }
-    if (!method)
-        return funcExpr;
-    if (!remaining.isValid())
-    {
-        outMethod = method;
-        return funcExpr;
-    }
-    return semantics->createLookupResultExpr(
-        overloadedExpr->name,
-        remaining,
-        overloadedExpr->base,
-        overloadedExpr->loc,
-        overloadedExpr->originalExpr);
-}
-
 static Expr* _checkHigherOrderInvokeExpr(
     SemanticsVisitor* semantics,
     HigherOrderInvokeExpr* expr,
@@ -6329,62 +6282,80 @@ static Expr* _checkHigherOrderInvokeExpr(
     if (semantics->IsErrorExpr(expr->baseFunction))
         return semantics->CreateErrorExpr(expr);
 
-    // Where a method is only named, as by a derivative attribute, its receiver is not used.
-    if (!semantics->getAllowStaticReferenceToNonStaticMember())
-    {
-        Decl* method = nullptr;
-        expr->baseFunction = _removeInstanceBoundMethods(semantics, expr->baseFunction, method);
-        if (method)
-        {
-            semantics->getSink()->diagnose(
-                Diagnostics::NonStaticMemberFunctionNotAllowedAsDiffOperand{
-                    .func = method,
-                    .expr = expr->baseFunction});
-            return semantics->CreateErrorExpr(expr);
-        }
-    }
-
     auto astBuilder = semantics->getASTBuilder();
 
-    // If base is overloaded expr, we want to return an overloaded expr as check result.
-    // This is done by pushing the `differentiate` operator to each item in the overloaded expr.
+    // Where a method is only named, as by a derivative attribute, its receiver is not used.
+    bool rejectInstanceBoundMethods = !semantics->getAllowStaticReferenceToNonStaticMember();
+    Expr* rejectedCandidate = nullptr;
+    OverloadedExpr2* result = nullptr;
+
+    // Push the higher-order operator into each checked candidate. Keep static overloads
+    // available even when other candidates bind a method to an instance.
     if (auto overloadedExpr = as<OverloadedExpr>(expr->baseFunction))
     {
-        OverloadedExpr2* result = astBuilder->create<OverloadedExpr2>();
+        result = astBuilder->create<OverloadedExpr2>();
         for (auto item : overloadedExpr->lookupResult2)
         {
-            auto lookupResultExpr = semantics->ConstructLookupResultExpr(
+            auto lookupResultExpr = subVisitor.ConstructLookupResultExpr(
                 item,
-                nullptr,
+                overloadedExpr->base,
                 overloadedExpr->name,
                 overloadedExpr->loc,
-                nullptr);
+                overloadedExpr->originalExpr);
+            if (rejectInstanceBoundMethods &&
+                actions->isInstanceBoundMethod(semantics, lookupResultExpr))
+            {
+                rejectedCandidate = lookupResultExpr;
+                continue;
+            }
             auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
             actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, lookupResultExpr);
             candidateExpr->loc = expr->loc;
             result->candidateExprs.add(candidateExpr);
         }
-        result->type.type = astBuilder->getOverloadedType();
-        result->loc = expr->loc;
-        return result;
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(expr->baseFunction))
     {
-        OverloadedExpr2* result = astBuilder->create<OverloadedExpr2>();
+        result = astBuilder->create<OverloadedExpr2>();
         for (auto item : overloadedExpr2->candidateExprs)
         {
+            if (rejectInstanceBoundMethods && actions->isInstanceBoundMethod(semantics, item))
+            {
+                rejectedCandidate = item;
+                continue;
+            }
             auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
             actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, item);
             candidateExpr->loc = expr->loc;
             result->candidateExprs.add(candidateExpr);
         }
-        result->type.type = astBuilder->getOverloadedType();
-        result->loc = expr->loc;
-        return result;
+    }
+    else
+    {
+        if (rejectInstanceBoundMethods &&
+            actions->isInstanceBoundMethod(semantics, expr->baseFunction))
+        {
+            rejectedCandidate = expr->baseFunction;
+        }
+        else
+        {
+            actions->fillHigherOrderInvokeExpr(expr, semantics, expr->baseFunction);
+            return expr;
+        }
     }
 
-    actions->fillHigherOrderInvokeExpr(expr, semantics, expr->baseFunction);
-    return expr;
+    if (rejectedCandidate && (!result || result->candidateExprs.getCount() == 0))
+    {
+        semantics->getSink()->diagnose(
+            Diagnostics::NonStaticMemberFunctionNotAllowedAsDiffOperand{
+                .func = actions->getBaseFunctionDeclRef(semantics, rejectedCandidate).getDecl(),
+                .expr = rejectedCandidate});
+        return semantics->CreateErrorExpr(expr);
+    }
+
+    result->type.type = astBuilder->getOverloadedType();
+    result->loc = expr->loc;
+    return result;
 }
 
 Expr* SemanticsExprVisitor::visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)

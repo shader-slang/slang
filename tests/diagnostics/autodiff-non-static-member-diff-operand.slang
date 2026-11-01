@@ -116,3 +116,46 @@ float testExistential(ICurve c, float t)
 //CHECK:                ^^^^ non-static function reference not allowed
 //CHECK:                ^^^^ non-static function reference 'eval' is not allowed here; differentiate a [Differentiable] function that takes the instance as a parameter and calls it instead.
 }
+
+struct GenericOverloads
+{
+    [Differentiable]
+    [NoDiffThis]
+    float eval<T>(float x) { return x * x; }
+
+    [Differentiable]
+    [NoDiffThis]
+    float eval<T>(float2 x) { return x.x * x.y; }
+}
+
+float testUnspecializedGenericOverloads(GenericOverloads s)
+{
+    return __fwd_diff(s.eval)(diffPair(1.0, 1.0)).d;
+//CHECK:                ^^^^ non-static function reference not allowed
+//CHECK:                ^^^^ non-static function reference 'eval' is not allowed here; differentiate a [Differentiable] function that takes the instance as a parameter and calls it instead.
+}
+
+// Explicit generic arguments specialize both overloads. Ordinary parameter types
+// still need overload resolution, so the operand is an OverloadedExpr2.
+float testSpecializedOverloads(GenericOverloads s)
+{
+    return __fwd_diff(s.eval<float>)(diffPair(1.0, 1.0)).d;
+//CHECK:                ^^^^ non-static function reference not allowed
+//CHECK:                ^^^^ non-static function reference 'eval' is not allowed here; differentiate a [Differentiable] function that takes the instance as a parameter and calls it instead.
+}
+
+void testSpecializedBackwardOverloads(GenericOverloads s)
+{
+    var x = diffPair(1.0);
+    __bwd_diff(s.eval<float>)(x, 1.0);
+//CHECK:         ^^^^ non-static function reference not allowed
+//CHECK:         ^^^^ non-static function reference 'eval' is not allowed here; differentiate a [Differentiable] function that takes the instance as a parameter and calls it instead.
+}
+
+float testNestedSpecializedOverloads(GenericOverloads s)
+{
+    var x = diffPair(diffPair(1.0, 1.0), diffPair(1.0, 0.0));
+    return __fwd_diff(__fwd_diff(s.eval<float>))(x).d.d;
+//CHECK:                           ^^^^ non-static function reference not allowed
+//CHECK:                           ^^^^ non-static function reference 'eval' is not allowed here; differentiate a [Differentiable] function that takes the instance as a parameter and calls it instead.
+}
