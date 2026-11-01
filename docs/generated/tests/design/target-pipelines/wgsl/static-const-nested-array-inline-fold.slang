@@ -13,11 +13,13 @@
 // `isInnerGlobalAggregate` in slang-emit-c-like.cpp): the inner rows of a 2D
 // `static const` array are module-scope aggregates used only as constituents
 // of the outer array, so they are inlined into the outer module-scope `const`
-// initializer instead of being emitted as separately named declarations. The
-// runtime row/column indices keep the array from folding away; CHECK pins the
-// `const` declaration with the nested array<array<i32 type and both inner
-// `array<i32` constructors inline in its initializer, and the CHECK-NOT lines
-// reject any `var<private>` in the output.
+// initializer instead of being emitted as separately named declarations.
+// WGSL would also accept named inner `const` rows, so the test characterizes
+// the shared fold policy rather than a validity rule. The runtime row/column
+// indices keep the array from folding away; CHECK pins the `const`
+// declaration with the nested array<array<i32 type and both inner `array<i32`
+// constructors inline in its initializer, and the CHECK-NOT lines reject any
+// `var<private>` in the output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target wgsl -entry main -stage compute
 

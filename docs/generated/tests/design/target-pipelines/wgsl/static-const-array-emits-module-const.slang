@@ -12,8 +12,9 @@
 // Verifies emitVarKeywordImpl's rule for module-scope constants: a
 // `static const` array is emitted as a WGSL `const` like any other
 // module-scope constant, because a WGSL `const` array may be indexed by a
-// runtime value and a `const` does not count against the limit on private
-// variables. The kernel indexes the array with a thread-id-derived value so
+// runtime value and a `const` does not count against WGSL's 8192-byte limit
+// on the combined size of the private-address-space variables a shader
+// accesses. The kernel indexes the array with a thread-id-derived value so
 // the access cannot fold; CHECK pins the `const` keyword at the start of the
 // module-scope declaration, the array type, and the inline `= array`
 // initializer, and the CHECK-NOT lines before and after it reject any
