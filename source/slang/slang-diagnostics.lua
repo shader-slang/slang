@@ -2918,6 +2918,13 @@ err(
 )
 
 err(
+    "invalid-cuda-kernel-attribute-value",
+    31167,
+    "invalid CUDA kernel attribute value",
+    span { loc = "attr:Modifier", message = "value '~value:Int' is out of range for attribute '~attrName:Name'" }
+)
+
+err(
     "invalid-node-launch-mode",
     31113,
     "invalid 'NodeLaunch' mode",

@@ -2091,6 +2091,21 @@ local insts = {
 				},
 			},
 			{
+				cudaLaunchBounds = {
+					struct_name = "CudaLaunchBoundsDecoration",
+					operands = {
+						{ "maxThreadsPerBlock", "IRIntLit" },
+						{ "minBlocksPerMultiprocessor", "IRIntLit" },
+					},
+				},
+			},
+			{
+				cudaMaxRegisters = {
+					struct_name = "CudaMaxRegistersDecoration",
+					operands = { { "maxRegisters", "IRIntLit" } },
+				},
+			},
+			{
 				nodeLaunch = {
 					struct_name = "NodeLaunchDecoration",
 					operands = { { "mode", "IRStringLit" } },
