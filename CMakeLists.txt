@@ -718,6 +718,26 @@ endif()
 
 fetch_or_build_slang_llvm()
 
+# slang-glslang gets mimalloc only through SPIRV-Tools-opt, and an overridden or system
+# SPIRV-Tools-opt may not link it, so we decide from SPIRV-Tools-opt's actual link dependencies.
+# We read INTERFACE_LINK_LIBRARIES because it is what slang-glslang inherits, and an imported
+# SPIRV-Tools-opt has no LINK_LIBRARIES. A static SPIRV-Tools-opt records its private mimalloc
+# dependency there as $<LINK_ONLY:mimalloc-static>; a shared one keeps mimalloc inside its own DLL.
+set(SLANG_GLSLANG_USES_MIMALLOC OFF)
+if(WIN32 AND TARGET SPIRV-Tools-opt AND TARGET mimalloc-static)
+    get_target_property(
+        _spirv_tools_opt_interface
+        SPIRV-Tools-opt
+        INTERFACE_LINK_LIBRARIES
+    )
+    if(
+        mimalloc-static IN_LIST _spirv_tools_opt_interface
+        OR "$<LINK_ONLY:mimalloc-static>" IN_LIST _spirv_tools_opt_interface
+    )
+        set(SLANG_GLSLANG_USES_MIMALLOC ON)
+    endif()
+endif()
+
 #
 # Our targets
 #

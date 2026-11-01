@@ -1691,6 +1691,12 @@ struct PeepholeContext : InstPassBase
                     auto arg = terminator->getArg(paramIndex);
                     if (as<IRUndefined>(arg))
                         continue;
+                    // A back edge that passes the param its own value (a loop that never
+                    // writes it) adds no new value. Taken as the value, it would make the
+                    // param replace its uses with itself and report a change on every
+                    // iteration, so the pass would never reach a fixed point.
+                    if (arg == inst)
+                        continue;
                     if (argValue == nullptr)
                         argValue = arg;
                     else if (argValue == arg)

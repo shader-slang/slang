@@ -516,6 +516,17 @@ class ImplicitParameterGroupElementTypeModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks the `static const` alias that an unscoped enum adds to its
+// enclosing scope for one of its cases. For `[UnscopedEnum] enum E { A }`,
+// the alias `A` refers to the case `E.A`.
+FIDDLE()
+class UnscopedEnumCaseAliasModifier : public Modifier
+{
+    FIDDLE(...)
+public:
+    FIDDLE() EnumCaseDecl* enumCaseDecl = nullptr;
+};
+
 
 // An HLSL semantic
 FIDDLE(abstract)
