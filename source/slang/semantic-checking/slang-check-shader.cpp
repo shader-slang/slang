@@ -926,6 +926,18 @@ bool isPrimaryDecl(CallableDecl* decl)
     return (!decl->primaryDecl) || (decl == decl->primaryDecl);
 }
 
+static bool _isPlainIdentifier(UnownedStringSlice text)
+{
+    if (text.getLength() == 0)
+        return false;
+    for (char c : text)
+    {
+        if (!CharUtil::isAlphaOrDigit(c) && c != '_' && c != '$')
+            return false;
+    }
+    return true;
+}
+
 DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, DiagnosticSink* sink)
 {
     DeclRef<FuncDecl> entryPointFuncDeclRef;
@@ -937,6 +949,18 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
     //
     DiagnosticSink lookupSink(sink->getSourceManager(), nullptr, sink);
     auto expr = translationUnit->findDeclFromString(getText(name), &lookupSink);
+
+    // For a plain identifier, the lookup can only report that the name is undefined,
+    // which the caller reports better. A longer expression, such as `main<MissingType>`,
+    // can fail in a part the caller does not mention, so its diagnostics are kept.
+    //
+    if (lookupSink.outputBuffer.getLength() != 0 &&
+        !_isPlainIdentifier(getText(name).getUnownedSlice()))
+    {
+        sink->diagnoseRaw(
+            lookupSink.getErrorCount() ? Severity::Error : Severity::Warning,
+            lookupSink.outputBuffer.getUnownedSlice());
+    }
     if (auto declRefExpr = as<DeclRefExpr>(expr))
     {
         entryPointFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
