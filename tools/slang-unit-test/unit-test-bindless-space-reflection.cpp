@@ -454,13 +454,13 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithStrippedNameHints)
 
 SLANG_UNIT_TEST(bindlessSpaceMetadataWithTexelPointerHeap)
 {
-    // Use the `R32UI` format so the SPIR-V texel-pointer path validates.
+    // Use format id 37 (`r32ui`) so the SPIR-V texel-pointer path validates.
     const char* userSource = R"(
         RWStructuredBuffer<uint> gOutput;
 
         struct P
         {
-            RWTexture2D<R32UI>.Handle t;
+            RWTexture2D<uint, 0, 37>.Handle t;
         };
 
         ParameterBlock<P> p1;

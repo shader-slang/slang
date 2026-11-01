@@ -1,10 +1,10 @@
 //TEST:SIMPLE: -no-codegen
 
-// Lookup for a default-value expression can occur before its containing callable has checked
-// effective-`this` information. Lookup uses a small declaration-spelling bootstrap during that
-// interval; treating `this` as immutable would reject these valid header expressions. This test is
-// intentionally limited to header checking: materializing a default expression that mutates its
-// receiver is a separate, pre-existing limitation of default-argument expansion.
+// Parameter types can refer to `this` before signature checking has attached the containing
+// method's receiver parameter information. Default arguments also perform member lookup and must
+// use the same receiver mode as an explicit `this` expression. This test stops after header
+// checking because default-argument expansion does not materialize a default expression that
+// mutates its receiver.
 
 struct HeaderLookup
 {

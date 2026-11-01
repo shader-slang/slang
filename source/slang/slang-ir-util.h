@@ -95,6 +95,9 @@ struct ParameterDirectionInfo
     // For Ref and BorrowInOut
     AddressSpace addressSpace;
 
+    // For Ref: the callee's access through the reference.
+    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+
     ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
         : kind(kind), addressSpace(addressSpace)
     {
@@ -107,7 +110,8 @@ struct ParameterDirectionInfo
 
     bool operator==(const ParameterDirectionInfo& other) const
     {
-        return kind == other.kind && addressSpace == other.addressSpace;
+        return kind == other.kind && addressSpace == other.addressSpace &&
+               accessQualifier == other.accessQualifier;
     }
 };
 

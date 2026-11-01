@@ -26,6 +26,7 @@ QualType::QualType(Type* type)
             case AccessQualifier::Read:
             case AccessQualifier::Immutable:
                 isLeftValue = false;
+                isReadOnlyMemoryLocation = true;
                 break;
 
             default:
@@ -90,29 +91,25 @@ UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
     return UnownedStringSlice();
 }
 
+AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::RefReadWrite:
+        return AccessQualifier::ReadWrite;
+    case ParamPassingMode::RefReadOnly:
+        return AccessQualifier::Read;
+    case ParamPassingMode::RefWriteOnly:
+        return AccessQualifier::WriteOnly;
+    default:
+        SLANG_UNEXPECTED("parameter-passing mode has no reference access qualifier");
+        UNREACHABLE_RETURN(AccessQualifier::ReadWrite);
+    }
+}
+
 void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
 {
-    switch (direction)
-    {
-    case ParamPassingMode::In:
-        sb << "in";
-        break;
-    case ParamPassingMode::Out:
-        sb << "out";
-        break;
-    case ParamPassingMode::Ref:
-        sb << "ref";
-        break;
-    case ParamPassingMode::BorrowInOut:
-        sb << "inout";
-        break;
-    case ParamPassingMode::BorrowIn:
-        sb << "constref";
-        break;
-    default:
-        sb << "(" << int(direction) << ")";
-        break;
-    }
+    sb << getParamPassingModeKeyword(direction);
 }
 
 String SpecializationArg::toString()

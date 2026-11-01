@@ -1460,8 +1460,8 @@ static const std::array<OperandDesc, 1252> kOperandsByValue{{
   {8,IR(4, 1),IR(27067, 21)/* MakePointerAvailable */,IR(155, 1),IR(205, 1),IR(89, 1),SPV_SPIRV_VERSION_WORD(1,5),0xffffffffu}, // SPV_OPERAND_TYPE_MEMORY_ACCESS
   {16,IR(4, 1),IR(27112, 19)/* MakePointerVisible */,IR(156, 1),IR(205, 1),IR(89, 1),SPV_SPIRV_VERSION_WORD(1,5),0xffffffffu}, // SPV_OPERAND_TYPE_MEMORY_ACCESS
   {32,IR(0, 0),IR(27153, 18)/* NonPrivatePointer */,IR(157, 1),IR(205, 1),IR(89, 1),SPV_SPIRV_VERSION_WORD(1,5),0xffffffffu}, // SPV_OPERAND_TYPE_MEMORY_ACCESS
-  {65536,IR(10, 1),IR(27192, 20)/* AliasScopeINTELMask */,IR(0, 0),IR(146, 1),IR(141, 1),0xffffffffu,0xffffffffu}, // SPV_OPERAND_TYPE_MEMORY_ACCESS
-  {131072,IR(10, 1),IR(27212, 17)/* NoAliasINTELMask */,IR(0, 0),IR(146, 1),IR(141, 1),0xffffffffu,0xffffffffu}, // SPV_OPERAND_TYPE_MEMORY_ACCESS
+  {65536,IR(10, 1),IR(27192, 20)/* AliasScopeINTELMask */,IR(0, 0),IR(146, 1),IR(0, 0),0xffffffffu,0xffffffffu}, // SPV_OPERAND_TYPE_MEMORY_ACCESS
+  {131072,IR(10, 1),IR(27212, 17)/* NoAliasINTELMask */,IR(0, 0),IR(146, 1),IR(0, 0),0xffffffffu,0xffffffffu}, // SPV_OPERAND_TYPE_MEMORY_ACCESS
   {0,IR(0, 0),IR(27229, 7)/* Simple */,IR(0, 0),IR(3, 1),IR(0, 0),SPV_SPIRV_VERSION_WORD(1,0),0xffffffffu}, // SPV_OPERAND_TYPE_MEMORY_MODEL
   {1,IR(0, 0),IR(27236, 8)/* GLSL450 */,IR(0, 0),IR(3, 1),IR(0, 0),SPV_SPIRV_VERSION_WORD(1,0),0xffffffffu}, // SPV_OPERAND_TYPE_MEMORY_MODEL
   {2,IR(0, 0),IR(27244, 7)/* OpenCL */,IR(0, 0),IR(0, 1),IR(0, 0),SPV_SPIRV_VERSION_WORD(1,0),0xffffffffu}, // SPV_OPERAND_TYPE_MEMORY_MODEL
@@ -4125,9 +4125,9 @@ static const std::array<InstructionDesc, 878> kInstructionDesc{{
   {spv::Op::OpArbitraryFloatPowRINTEL, true, true, IR(726, 10), IR(49630, 24), IR(0, 0), IR(317, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
   {spv::Op::OpArbitraryFloatPowNINTEL, true, true, IR(726, 10), IR(49654, 24), IR(0, 0), IR(317, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
   {spv::Op::OpLoopControlINTEL, false, false, IR(18, 1), IR(49678, 17), IR(0, 0), IR(318, 1), IR(129, 1), 0xffffffffu, 0xffffffffu, PrintingClass::kReserved},
-  {spv::Op::OpAliasDomainDeclINTEL, true, false, IR(742, 2), IR(49695, 21), IR(0, 0), IR(146, 1), IR(141, 1), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
-  {spv::Op::OpAliasScopeDeclINTEL, true, false, IR(744, 3), IR(49716, 20), IR(0, 0), IR(146, 1), IR(141, 1), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
-  {spv::Op::OpAliasScopeListDeclINTEL, true, false, IR(92, 2), IR(49736, 24), IR(0, 0), IR(146, 1), IR(141, 1), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
+  {spv::Op::OpAliasDomainDeclINTEL, true, false, IR(68, 1), IR(49695, 21), IR(0, 0), IR(146, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kAnnotation},
+  {spv::Op::OpAliasScopeDeclINTEL, true, false, IR(87, 2), IR(49716, 20), IR(0, 0), IR(146, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kAnnotation},
+  {spv::Op::OpAliasScopeListDeclINTEL, true, false, IR(92, 2), IR(49736, 24), IR(0, 0), IR(146, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kAnnotation},
   {spv::Op::OpFixedSqrtALTERA, true, true, IR(718, 8), IR(49760, 16), IR(210, 1), IR(208, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
   {spv::Op::OpFixedRecipALTERA, true, true, IR(718, 8), IR(49791, 17), IR(211, 1), IR(208, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
   {spv::Op::OpFixedRsqrtALTERA, true, true, IR(718, 8), IR(49824, 17), IR(212, 1), IR(208, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
@@ -4163,36 +4163,36 @@ static const std::array<InstructionDesc, 878> kInstructionDesc{{
   {spv::Op::OpRayQueryGetIntersectionWorldToObjectKHR, true, true, IR(172, 4), IR(50934, 40), IR(0, 0), IR(212, 1), IR(49, 1), 0xffffffffu, 0xffffffffu, PrintingClass::kReserved},
   {spv::Op::OpAtomicFAddEXT, true, true, IR(235, 6), IR(50974, 14), IR(0, 0), IR(321, 4), IR(166, 1), 0xffffffffu, 0xffffffffu, PrintingClass::kAtomic},
   {spv::Op::OpTypeBufferSurfaceINTEL, true, false, IR(100, 2), IR(50988, 23), IR(0, 0), IR(138, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kType_Declaration},
-  {spv::Op::OpTypeStructContinuedINTEL, false, false, IR(747, 1), IR(51011, 25), IR(0, 0), IR(325, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kType_Declaration},
-  {spv::Op::OpConstantCompositeContinuedINTEL, false, false, IR(747, 1), IR(51036, 32), IR(0, 0), IR(325, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConstant_Creation},
-  {spv::Op::OpSpecConstantCompositeContinuedINTEL, false, false, IR(747, 1), IR(51068, 36), IR(0, 0), IR(325, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConstant_Creation},
-  {spv::Op::OpCompositeConstructContinuedINTEL, false, false, IR(747, 1), IR(51104, 33), IR(0, 0), IR(325, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kComposite},
+  {spv::Op::OpTypeStructContinuedINTEL, false, false, IR(742, 1), IR(51011, 25), IR(0, 0), IR(325, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kType_Declaration},
+  {spv::Op::OpConstantCompositeContinuedINTEL, false, false, IR(742, 1), IR(51036, 32), IR(0, 0), IR(325, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConstant_Creation},
+  {spv::Op::OpSpecConstantCompositeContinuedINTEL, false, false, IR(742, 1), IR(51068, 36), IR(0, 0), IR(325, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConstant_Creation},
+  {spv::Op::OpCompositeConstructContinuedINTEL, false, false, IR(742, 1), IR(51104, 33), IR(0, 0), IR(325, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kComposite},
   {spv::Op::OpConvertFToBF16INTEL, true, true, IR(160, 3), IR(51137, 20), IR(0, 0), IR(326, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConversion},
   {spv::Op::OpConvertBF16ToFINTEL, true, true, IR(160, 3), IR(51157, 20), IR(0, 0), IR(326, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConversion},
   {spv::Op::OpControlBarrierArriveEXT, false, false, IR(221, 3), IR(51177, 24), IR(225, 1), IR(327, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kBarrier},
   {spv::Op::OpControlBarrierWaitEXT, false, false, IR(221, 3), IR(51227, 22), IR(226, 1), IR(327, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kBarrier},
   {spv::Op::OpArithmeticFenceEXT, true, true, IR(160, 3), IR(15921, 19), IR(0, 0), IR(328, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMiscellaneous},
-  {spv::Op::OpTaskSequenceCreateALTERA, true, true, IR(748, 7), IR(51273, 25), IR(227, 1), IR(329, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
+  {spv::Op::OpTaskSequenceCreateALTERA, true, true, IR(743, 7), IR(51273, 25), IR(227, 1), IR(329, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
   {spv::Op::OpTaskSequenceAsyncALTERA, false, false, IR(168, 2), IR(51322, 24), IR(228, 1), IR(329, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
   {spv::Op::OpTaskSequenceGetALTERA, true, true, IR(160, 3), IR(51369, 22), IR(229, 1), IR(329, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
   {spv::Op::OpTaskSequenceReleaseALTERA, false, false, IR(10, 1), IR(51412, 26), IR(230, 1), IR(329, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
   {spv::Op::OpTypeTaskSequenceALTERA, true, false, IR(68, 1), IR(51463, 23), IR(231, 1), IR(329, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::k_exclude},
   {spv::Op::OpSubgroupBitcastShuffleINTEL, true, true, IR(160, 3), IR(16287, 28), IR(0, 0), IR(330, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
   {spv::Op::OpSubgroupBlockPrefetchINTEL, false, false, IR(139, 3), IR(51508, 27), IR(0, 0), IR(331, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
-  {spv::Op::OpSubgroup2DBlockLoadINTEL, false, false, IR(755, 10), IR(51535, 25), IR(0, 0), IR(113, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
-  {spv::Op::OpSubgroup2DBlockLoadTransformINTEL, false, false, IR(755, 10), IR(51560, 34), IR(0, 0), IR(332, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
-  {spv::Op::OpSubgroup2DBlockLoadTransposeINTEL, false, false, IR(755, 10), IR(51594, 34), IR(0, 0), IR(333, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
-  {spv::Op::OpSubgroup2DBlockPrefetchINTEL, false, false, IR(765, 9), IR(51628, 29), IR(0, 0), IR(113, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
-  {spv::Op::OpSubgroup2DBlockStoreINTEL, false, false, IR(755, 10), IR(51657, 26), IR(0, 0), IR(113, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
-  {spv::Op::OpSubgroupMatrixMultiplyAccumulateINTEL, true, true, IR(774, 7), IR(16426, 38), IR(0, 0), IR(334, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
+  {spv::Op::OpSubgroup2DBlockLoadINTEL, false, false, IR(750, 10), IR(51535, 25), IR(0, 0), IR(113, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
+  {spv::Op::OpSubgroup2DBlockLoadTransformINTEL, false, false, IR(750, 10), IR(51560, 34), IR(0, 0), IR(332, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
+  {spv::Op::OpSubgroup2DBlockLoadTransposeINTEL, false, false, IR(750, 10), IR(51594, 34), IR(0, 0), IR(333, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
+  {spv::Op::OpSubgroup2DBlockPrefetchINTEL, false, false, IR(760, 9), IR(51628, 29), IR(0, 0), IR(113, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
+  {spv::Op::OpSubgroup2DBlockStoreINTEL, false, false, IR(750, 10), IR(51657, 26), IR(0, 0), IR(113, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
+  {spv::Op::OpSubgroupMatrixMultiplyAccumulateINTEL, true, true, IR(769, 7), IR(16426, 38), IR(0, 0), IR(334, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
   {spv::Op::OpBitwiseFunctionINTEL, true, true, IR(215, 6), IR(51745, 21), IR(0, 0), IR(335, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kBit},
   {spv::Op::OpUntypedVariableLengthArrayINTEL, true, true, IR(172, 4), IR(16492, 32), IR(0, 0), IR(336, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMemory},
   {spv::Op::OpConditionalExtensionINTEL, false, false, IR(45, 2), IR(51766, 26), IR(0, 0), IR(116, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kExtension},
-  {spv::Op::OpConditionalEntryPointINTEL, false, false, IR(781, 5), IR(51792, 27), IR(0, 0), IR(116, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMode_Setting},
-  {spv::Op::OpConditionalCapabilityINTEL, false, false, IR(786, 2), IR(51819, 27), IR(0, 0), IR(116, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMode_Setting},
-  {spv::Op::OpSpecConstantTargetINTEL, true, true, IR(788, 4), IR(51846, 24), IR(0, 0), IR(337, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConstant_Creation},
-  {spv::Op::OpSpecConstantArchitectureINTEL, true, true, IR(792, 6), IR(51870, 30), IR(0, 0), IR(337, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConstant_Creation},
-  {spv::Op::OpSpecConstantCapabilitiesINTEL, true, true, IR(798, 3), IR(51937, 30), IR(0, 0), IR(337, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConstant_Creation},
+  {spv::Op::OpConditionalEntryPointINTEL, false, false, IR(776, 5), IR(51792, 27), IR(0, 0), IR(116, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMode_Setting},
+  {spv::Op::OpConditionalCapabilityINTEL, false, false, IR(781, 2), IR(51819, 27), IR(0, 0), IR(116, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMode_Setting},
+  {spv::Op::OpSpecConstantTargetINTEL, true, true, IR(783, 4), IR(51846, 24), IR(0, 0), IR(337, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConstant_Creation},
+  {spv::Op::OpSpecConstantArchitectureINTEL, true, true, IR(787, 6), IR(51870, 30), IR(0, 0), IR(337, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConstant_Creation},
+  {spv::Op::OpSpecConstantCapabilitiesINTEL, true, true, IR(793, 3), IR(51937, 30), IR(0, 0), IR(337, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConstant_Creation},
   {spv::Op::OpConditionalCopyObjectINTEL, true, true, IR(107, 3), IR(51967, 27), IR(0, 0), IR(116, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kComposite},
   {spv::Op::OpPredicatedLoadINTEL, true, true, IR(636, 6), IR(51994, 20), IR(0, 0), IR(338, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMemory},
   {spv::Op::OpPredicatedStoreINTEL, false, false, IR(589, 4), IR(52014, 21), IR(0, 0), IR(338, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMemory},
@@ -4205,8 +4205,8 @@ static const std::array<InstructionDesc, 878> kInstructionDesc{{
   {spv::Op::OpGroupLogicalOrKHR, true, true, IR(283, 5), IR(52136, 18), IR(0, 0), IR(339, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
   {spv::Op::OpGroupLogicalXorKHR, true, true, IR(283, 5), IR(52154, 19), IR(0, 0), IR(339, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kGroup},
   {spv::Op::OpRoundFToTF32INTEL, true, true, IR(160, 3), IR(52173, 18), IR(0, 0), IR(340, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kConversion},
-  {spv::Op::OpMaskedGatherINTEL, true, true, IR(801, 6), IR(52191, 18), IR(0, 0), IR(341, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMemory},
-  {spv::Op::OpMaskedScatterINTEL, false, false, IR(807, 4), IR(52209, 19), IR(0, 0), IR(341, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMemory},
+  {spv::Op::OpMaskedGatherINTEL, true, true, IR(796, 6), IR(52191, 18), IR(0, 0), IR(341, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMemory},
+  {spv::Op::OpMaskedScatterINTEL, false, false, IR(802, 4), IR(52209, 19), IR(0, 0), IR(341, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kMemory},
   {spv::Op::OpConvertHandleToImageINTEL, true, true, IR(160, 3), IR(52228, 26), IR(0, 0), IR(342, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kImage},
   {spv::Op::OpConvertHandleToSamplerINTEL, true, true, IR(160, 3), IR(52254, 28), IR(0, 0), IR(342, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kImage},
   {spv::Op::OpConvertHandleToSampledImageINTEL, true, true, IR(160, 3), IR(52282, 33), IR(0, 0), IR(342, 1), IR(0, 0), 0xffffffffu, 0xffffffffu, PrintingClass::kImage},
@@ -5165,44 +5165,44 @@ static const std::array<NameIndex, 936> kInstructionNames{{
 //   name, a character-counting IndexRange into kStrings
 //   capabilities, an IndexRange into kCapabilitySpans
 static const std::array<ExtInstDesc, 501> kExtInstByValue{{
-    {0,IR(811, 2),IR(52372, 5),IR(1, 0)}, // CALL in arm_experimental_ml_operations
-    {0,IR(765, 9),IR(52377, 8),IR(1, 0)}, // MIN_SAD in arm_motion_engine_100
-    {1,IR(765, 9),IR(52385, 13),IR(1, 0)}, // MIN_SAD_COST in arm_motion_engine_100
+    {0,IR(806, 2),IR(52372, 5),IR(1, 0)}, // CALL in arm_experimental_ml_operations
+    {0,IR(760, 9),IR(52377, 8),IR(1, 0)}, // MIN_SAD in arm_motion_engine_100
+    {1,IR(760, 9),IR(52385, 13),IR(1, 0)}, // MIN_SAD_COST in arm_motion_engine_100
     {2,IR(471, 8),IR(52398, 8),IR(1, 0)}, // RAW_SAD in arm_motion_engine_100
     {0,IR(0, 0),IR(52406, 14),IR(1, 0)}, // DebugInfoNone in debuginfo
     {1,IR(52, 3),IR(52420, 21),IR(1, 0)}, // DebugCompilationUnit in debuginfo
-    {2,IR(813, 3),IR(52493, 15),IR(1, 0)}, // DebugTypeBasic in debuginfo
-    {3,IR(816, 3),IR(52542, 17),IR(1, 0)}, // DebugTypePointer in debuginfo
-    {4,IR(819, 2),IR(52597, 19),IR(1, 0)}, // DebugTypeQualifier in debuginfo
+    {2,IR(808, 3),IR(52493, 15),IR(1, 0)}, // DebugTypeBasic in debuginfo
+    {3,IR(811, 3),IR(52542, 17),IR(1, 0)}, // DebugTypePointer in debuginfo
+    {4,IR(814, 2),IR(52597, 19),IR(1, 0)}, // DebugTypeQualifier in debuginfo
     {5,IR(168, 2),IR(52616, 15),IR(1, 0)}, // DebugTypeArray in debuginfo
     {6,IR(261, 2),IR(52631, 16),IR(1, 0)}, // DebugTypeVector in debuginfo
-    {7,IR(821, 6),IR(52647, 13),IR(1, 0)}, // DebugTypedef in debuginfo
+    {7,IR(816, 6),IR(52647, 13),IR(1, 0)}, // DebugTypedef in debuginfo
     {8,IR(168, 2),IR(52660, 18),IR(1, 0)}, // DebugTypeFunction in debuginfo
-    {9,IR(827, 9),IR(52678, 14),IR(1, 0)}, // DebugTypeEnum in debuginfo
-    {10,IR(836, 9),IR(52730, 19),IR(1, 0)}, // DebugTypeComposite in debuginfo
-    {11,IR(845, 10),IR(52749, 16),IR(1, 0)}, // DebugTypeMember in debuginfo
-    {12,IR(855, 5),IR(52765, 21),IR(1, 0)}, // DebugTypeInheritance in debuginfo
+    {9,IR(822, 9),IR(52678, 14),IR(1, 0)}, // DebugTypeEnum in debuginfo
+    {10,IR(831, 9),IR(52730, 19),IR(1, 0)}, // DebugTypeComposite in debuginfo
+    {11,IR(840, 10),IR(52749, 16),IR(1, 0)}, // DebugTypeMember in debuginfo
+    {12,IR(850, 5),IR(52765, 21),IR(1, 0)}, // DebugTypeInheritance in debuginfo
     {13,IR(36, 2),IR(52786, 21),IR(1, 0)}, // DebugTypePtrToMember in debuginfo
     {14,IR(168, 2),IR(52807, 18),IR(1, 0)}, // DebugTypeTemplate in debuginfo
-    {15,IR(860, 6),IR(52825, 27),IR(1, 0)}, // DebugTypeTemplateParameter in debuginfo
-    {16,IR(866, 5),IR(52852, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in debuginfo
-    {17,IR(871, 5),IR(52887, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in debuginfo
-    {18,IR(845, 10),IR(52918, 20),IR(1, 0)}, // DebugGlobalVariable in debuginfo
-    {19,IR(876, 8),IR(52938, 25),IR(1, 0)}, // DebugFunctionDeclaration in debuginfo
-    {20,IR(884, 11),IR(52963, 14),IR(1, 0)}, // DebugFunction in debuginfo
-    {21,IR(895, 5),IR(52977, 18),IR(1, 0)}, // DebugLexicalBlock in debuginfo
-    {22,IR(900, 3),IR(52995, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in debuginfo
-    {23,IR(903, 2),IR(53026, 11),IR(1, 0)}, // DebugScope in debuginfo
+    {15,IR(855, 6),IR(52825, 27),IR(1, 0)}, // DebugTypeTemplateParameter in debuginfo
+    {16,IR(861, 5),IR(52852, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in debuginfo
+    {17,IR(866, 5),IR(52887, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in debuginfo
+    {18,IR(840, 10),IR(52918, 20),IR(1, 0)}, // DebugGlobalVariable in debuginfo
+    {19,IR(871, 8),IR(52938, 25),IR(1, 0)}, // DebugFunctionDeclaration in debuginfo
+    {20,IR(879, 11),IR(52963, 14),IR(1, 0)}, // DebugFunction in debuginfo
+    {21,IR(890, 5),IR(52977, 18),IR(1, 0)}, // DebugLexicalBlock in debuginfo
+    {22,IR(895, 3),IR(52995, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in debuginfo
+    {23,IR(898, 2),IR(53026, 11),IR(1, 0)}, // DebugScope in debuginfo
     {24,IR(0, 0),IR(53037, 13),IR(1, 0)}, // DebugNoScope in debuginfo
-    {25,IR(905, 3),IR(53050, 15),IR(1, 0)}, // DebugInlinedAt in debuginfo
-    {26,IR(908, 7),IR(53107, 19),IR(1, 0)}, // DebugLocalVariable in debuginfo
+    {25,IR(900, 3),IR(53050, 15),IR(1, 0)}, // DebugInlinedAt in debuginfo
+    {26,IR(903, 7),IR(53107, 19),IR(1, 0)}, // DebugLocalVariable in debuginfo
     {27,IR(36, 2),IR(53126, 21),IR(1, 0)}, // DebugInlinedVariable in debuginfo
     {28,IR(33, 3),IR(53147, 13),IR(1, 0)}, // DebugDeclare in debuginfo
     {29,IR(375, 3),IR(53160, 11),IR(1, 0)}, // DebugValue in debuginfo
-    {30,IR(915, 2),IR(53204, 15),IR(1, 0)}, // DebugOperation in debuginfo
-    {31,IR(747, 1),IR(53219, 16),IR(1, 0)}, // DebugExpression in debuginfo
-    {32,IR(917, 4),IR(53235, 14),IR(1, 0)}, // DebugMacroDef in debuginfo
-    {33,IR(900, 3),IR(53249, 16),IR(1, 0)}, // DebugMacroUndef in debuginfo
+    {30,IR(910, 2),IR(53204, 15),IR(1, 0)}, // DebugOperation in debuginfo
+    {31,IR(742, 1),IR(53219, 16),IR(1, 0)}, // DebugExpression in debuginfo
+    {32,IR(912, 4),IR(53235, 14),IR(1, 0)}, // DebugMacroDef in debuginfo
+    {33,IR(895, 3),IR(53249, 16),IR(1, 0)}, // DebugMacroUndef in debuginfo
     {1,IR(10, 1),IR(53265, 6),IR(1, 0)}, // Round in glsl_std_450
     {2,IR(10, 1),IR(53271, 10),IR(1, 0)}, // RoundEven in glsl_std_450
     {3,IR(10, 1),IR(53281, 6),IR(1, 0)}, // Trunc in glsl_std_450
@@ -5285,7 +5285,7 @@ static const std::array<ExtInstDesc, 501> kExtInstByValue{{
     {80,IR(36, 2),IR(53924, 5),IR(1, 0)}, // NMax in glsl_std_450
     {81,IR(33, 3),IR(53929, 7),IR(1, 0)}, // NClamp in glsl_std_450
     {1,IR(399, 5),IR(5975, 7),IR(1, 0)}, // Kernel in nonsemantic_clspvreflection
-    {2,IR(921, 5),IR(53936, 13),IR(1, 0)}, // ArgumentInfo in nonsemantic_clspvreflection
+    {2,IR(916, 5),IR(53936, 13),IR(1, 0)}, // ArgumentInfo in nonsemantic_clspvreflection
     {3,IR(593, 5),IR(53949, 22),IR(1, 0)}, // ArgumentStorageBuffer in nonsemantic_clspvreflection
     {4,IR(593, 5),IR(53971, 16),IR(1, 0)}, // ArgumentUniform in nonsemantic_clspvreflection
     {5,IR(557, 7),IR(53987, 25),IR(1, 0)}, // ArgumentPodStorageBuffer in nonsemantic_clspvreflection
@@ -5329,7 +5329,7 @@ static const std::array<ExtInstDesc, 501> kExtInstByValue{{
     {1,IR(168, 2),IR(55004, 12),IR(1, 0)}, // DebugPrintf in nonsemantic_debugprintf
     {1,IR(36, 2),IR(55016, 11),IR(1, 0)}, // DebugGraph in nonsemantic_graph_debuginfo
     {2,IR(375, 3),IR(53204, 15),IR(1, 0)}, // DebugOperation in nonsemantic_graph_debuginfo
-    {3,IR(926, 3),IR(55027, 12),IR(1, 0)}, // DebugTensor in nonsemantic_graph_debuginfo
+    {3,IR(921, 3),IR(55027, 12),IR(1, 0)}, // DebugTensor in nonsemantic_graph_debuginfo
     {0,IR(0, 0),IR(52406, 14),IR(1, 0)}, // DebugInfoNone in nonsemantic_shader_debuginfo
     {1,IR(296, 4),IR(52420, 21),IR(1, 0)}, // DebugCompilationUnit in nonsemantic_shader_debuginfo
     {2,IR(593, 5),IR(52493, 15),IR(1, 0)}, // DebugTypeBasic in nonsemantic_shader_debuginfo
@@ -5339,33 +5339,33 @@ static const std::array<ExtInstDesc, 501> kExtInstByValue{{
     {6,IR(36, 2),IR(52631, 16),IR(1, 0)}, // DebugTypeVector in nonsemantic_shader_debuginfo
     {7,IR(535, 6),IR(52647, 13),IR(1, 0)}, // DebugTypedef in nonsemantic_shader_debuginfo
     {8,IR(375, 3),IR(52660, 18),IR(1, 0)}, // DebugTypeFunction in nonsemantic_shader_debuginfo
-    {9,IR(929, 9),IR(52678, 14),IR(1, 0)}, // DebugTypeEnum in nonsemantic_shader_debuginfo
-    {10,IR(938, 10),IR(52730, 19),IR(1, 0)}, // DebugTypeComposite in nonsemantic_shader_debuginfo
-    {11,IR(948, 9),IR(52749, 16),IR(1, 0)}, // DebugTypeMember in nonsemantic_shader_debuginfo
+    {9,IR(924, 9),IR(52678, 14),IR(1, 0)}, // DebugTypeEnum in nonsemantic_shader_debuginfo
+    {10,IR(933, 10),IR(52730, 19),IR(1, 0)}, // DebugTypeComposite in nonsemantic_shader_debuginfo
+    {11,IR(943, 9),IR(52749, 16),IR(1, 0)}, // DebugTypeMember in nonsemantic_shader_debuginfo
     {12,IR(296, 4),IR(52765, 21),IR(1, 0)}, // DebugTypeInheritance in nonsemantic_shader_debuginfo
     {13,IR(36, 2),IR(52786, 21),IR(1, 0)}, // DebugTypePtrToMember in nonsemantic_shader_debuginfo
     {14,IR(168, 2),IR(52807, 18),IR(1, 0)}, // DebugTypeTemplate in nonsemantic_shader_debuginfo
     {15,IR(535, 6),IR(52825, 27),IR(1, 0)}, // DebugTypeTemplateParameter in nonsemantic_shader_debuginfo
     {16,IR(675, 5),IR(52852, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in nonsemantic_shader_debuginfo
-    {17,IR(957, 5),IR(52887, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in nonsemantic_shader_debuginfo
-    {18,IR(962, 10),IR(52918, 20),IR(1, 0)}, // DebugGlobalVariable in nonsemantic_shader_debuginfo
+    {17,IR(952, 5),IR(52887, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in nonsemantic_shader_debuginfo
+    {18,IR(957, 10),IR(52918, 20),IR(1, 0)}, // DebugGlobalVariable in nonsemantic_shader_debuginfo
     {19,IR(471, 8),IR(52938, 25),IR(1, 0)}, // DebugFunctionDeclaration in nonsemantic_shader_debuginfo
-    {20,IR(962, 10),IR(52963, 14),IR(1, 0)}, // DebugFunction in nonsemantic_shader_debuginfo
+    {20,IR(957, 10),IR(52963, 14),IR(1, 0)}, // DebugFunction in nonsemantic_shader_debuginfo
     {21,IR(593, 5),IR(52977, 18),IR(1, 0)}, // DebugLexicalBlock in nonsemantic_shader_debuginfo
     {22,IR(33, 3),IR(52995, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in nonsemantic_shader_debuginfo
-    {23,IR(903, 2),IR(53026, 11),IR(1, 0)}, // DebugScope in nonsemantic_shader_debuginfo
+    {23,IR(898, 2),IR(53026, 11),IR(1, 0)}, // DebugScope in nonsemantic_shader_debuginfo
     {24,IR(0, 0),IR(53037, 13),IR(1, 0)}, // DebugNoScope in nonsemantic_shader_debuginfo
-    {25,IR(926, 3),IR(53050, 15),IR(1, 0)}, // DebugInlinedAt in nonsemantic_shader_debuginfo
-    {26,IR(972, 8),IR(53107, 19),IR(1, 0)}, // DebugLocalVariable in nonsemantic_shader_debuginfo
+    {25,IR(921, 3),IR(53050, 15),IR(1, 0)}, // DebugInlinedAt in nonsemantic_shader_debuginfo
+    {26,IR(967, 8),IR(53107, 19),IR(1, 0)}, // DebugLocalVariable in nonsemantic_shader_debuginfo
     {27,IR(36, 2),IR(53126, 21),IR(1, 0)}, // DebugInlinedVariable in nonsemantic_shader_debuginfo
-    {28,IR(980, 4),IR(53147, 13),IR(1, 0)}, // DebugDeclare in nonsemantic_shader_debuginfo
-    {29,IR(980, 4),IR(53160, 11),IR(1, 0)}, // DebugValue in nonsemantic_shader_debuginfo
+    {28,IR(975, 4),IR(53147, 13),IR(1, 0)}, // DebugDeclare in nonsemantic_shader_debuginfo
+    {29,IR(975, 4),IR(53160, 11),IR(1, 0)}, // DebugValue in nonsemantic_shader_debuginfo
     {30,IR(168, 2),IR(53204, 15),IR(1, 0)}, // DebugOperation in nonsemantic_shader_debuginfo
-    {31,IR(747, 1),IR(53219, 16),IR(1, 0)}, // DebugExpression in nonsemantic_shader_debuginfo
+    {31,IR(742, 1),IR(53219, 16),IR(1, 0)}, // DebugExpression in nonsemantic_shader_debuginfo
     {32,IR(580, 4),IR(53235, 14),IR(1, 0)}, // DebugMacroDef in nonsemantic_shader_debuginfo
     {33,IR(33, 3),IR(53249, 16),IR(1, 0)}, // DebugMacroUndef in nonsemantic_shader_debuginfo
     {34,IR(516, 7),IR(55039, 20),IR(1, 0)}, // DebugImportedEntity in nonsemantic_shader_debuginfo
-    {35,IR(903, 2),IR(55059, 12),IR(1, 0)}, // DebugSource in nonsemantic_shader_debuginfo
+    {35,IR(898, 2),IR(55059, 12),IR(1, 0)}, // DebugSource in nonsemantic_shader_debuginfo
     {101,IR(36, 2),IR(55071, 24),IR(1, 0)}, // DebugFunctionDefinition in nonsemantic_shader_debuginfo
     {102,IR(10, 1),IR(55095, 21),IR(1, 0)}, // DebugSourceContinued in nonsemantic_shader_debuginfo
     {103,IR(675, 5),IR(55116, 10),IR(1, 0)}, // DebugLine in nonsemantic_shader_debuginfo
@@ -5376,51 +5376,51 @@ static const std::array<ExtInstDesc, 501> kExtInstByValue{{
     {108,IR(33, 3),IR(55192, 16),IR(1, 0)}, // DebugTypeMatrix in nonsemantic_shader_debuginfo
     {109,IR(36, 2),IR(55208, 21),IR(1, 0)}, // DebugTypeVectorIdEXT in nonsemantic_shader_debuginfo
     {110,IR(675, 5),IR(55229, 30),IR(1, 0)}, // DebugTypeCooperativeMatrixKHR in nonsemantic_shader_debuginfo
-    {1,IR(765, 9),IR(55259, 14),IR(1, 0)}, // Configuration in nonsemantic_vkspreflection
+    {1,IR(760, 9),IR(55259, 14),IR(1, 0)}, // Configuration in nonsemantic_vkspreflection
     {2,IR(10, 1),IR(55273, 13),IR(1, 0)}, // StartCounter in nonsemantic_vkspreflection
     {3,IR(10, 1),IR(55286, 12),IR(1, 0)}, // StopCounter in nonsemantic_vkspreflection
     {4,IR(296, 4),IR(55298, 14),IR(1, 0)}, // PushConstants in nonsemantic_vkspreflection
     {5,IR(33, 3),IR(55312, 23),IR(1, 0)}, // SpecializationMapEntry in nonsemantic_vkspreflection
-    {6,IR(984, 15),IR(55335, 20),IR(1, 0)}, // DescriptorSetBuffer in nonsemantic_vkspreflection
-    {7,IR(999, 33),IR(55355, 19),IR(1, 0)}, // DescriptorSetImage in nonsemantic_vkspreflection
-    {8,IR(1032, 19),IR(55374, 21),IR(1, 0)}, // DescriptorSetSampler in nonsemantic_vkspreflection
+    {6,IR(979, 15),IR(55335, 20),IR(1, 0)}, // DescriptorSetBuffer in nonsemantic_vkspreflection
+    {7,IR(994, 33),IR(55355, 19),IR(1, 0)}, // DescriptorSetImage in nonsemantic_vkspreflection
+    {8,IR(1027, 19),IR(55374, 21),IR(1, 0)}, // DescriptorSetSampler in nonsemantic_vkspreflection
     {0,IR(0, 0),IR(52406, 14),IR(1, 0)}, // DebugInfoNone in opencl_debuginfo_100
-    {1,IR(1051, 4),IR(52420, 21),IR(1, 0)}, // DebugCompilationUnit in opencl_debuginfo_100
-    {2,IR(1055, 3),IR(52493, 15),IR(1, 0)}, // DebugTypeBasic in opencl_debuginfo_100
-    {3,IR(1058, 3),IR(52542, 17),IR(1, 0)}, // DebugTypePointer in opencl_debuginfo_100
-    {4,IR(1061, 2),IR(52597, 19),IR(1, 0)}, // DebugTypeQualifier in opencl_debuginfo_100
+    {1,IR(1046, 4),IR(52420, 21),IR(1, 0)}, // DebugCompilationUnit in opencl_debuginfo_100
+    {2,IR(1050, 3),IR(52493, 15),IR(1, 0)}, // DebugTypeBasic in opencl_debuginfo_100
+    {3,IR(1053, 3),IR(52542, 17),IR(1, 0)}, // DebugTypePointer in opencl_debuginfo_100
+    {4,IR(1056, 2),IR(52597, 19),IR(1, 0)}, // DebugTypeQualifier in opencl_debuginfo_100
     {5,IR(168, 2),IR(52616, 15),IR(1, 0)}, // DebugTypeArray in opencl_debuginfo_100
     {6,IR(261, 2),IR(52631, 16),IR(1, 0)}, // DebugTypeVector in opencl_debuginfo_100
-    {7,IR(821, 6),IR(52647, 13),IR(1, 0)}, // DebugTypedef in opencl_debuginfo_100
-    {8,IR(1063, 3),IR(52660, 18),IR(1, 0)}, // DebugTypeFunction in opencl_debuginfo_100
-    {9,IR(1066, 9),IR(52678, 14),IR(1, 0)}, // DebugTypeEnum in opencl_debuginfo_100
-    {10,IR(1075, 10),IR(52730, 19),IR(1, 0)}, // DebugTypeComposite in opencl_debuginfo_100
-    {11,IR(1085, 10),IR(52749, 16),IR(1, 0)}, // DebugTypeMember in opencl_debuginfo_100
-    {12,IR(1095, 5),IR(52765, 21),IR(1, 0)}, // DebugTypeInheritance in opencl_debuginfo_100
+    {7,IR(816, 6),IR(52647, 13),IR(1, 0)}, // DebugTypedef in opencl_debuginfo_100
+    {8,IR(1058, 3),IR(52660, 18),IR(1, 0)}, // DebugTypeFunction in opencl_debuginfo_100
+    {9,IR(1061, 9),IR(52678, 14),IR(1, 0)}, // DebugTypeEnum in opencl_debuginfo_100
+    {10,IR(1070, 10),IR(52730, 19),IR(1, 0)}, // DebugTypeComposite in opencl_debuginfo_100
+    {11,IR(1080, 10),IR(52749, 16),IR(1, 0)}, // DebugTypeMember in opencl_debuginfo_100
+    {12,IR(1090, 5),IR(52765, 21),IR(1, 0)}, // DebugTypeInheritance in opencl_debuginfo_100
     {13,IR(36, 2),IR(52786, 21),IR(1, 0)}, // DebugTypePtrToMember in opencl_debuginfo_100
     {14,IR(168, 2),IR(52807, 18),IR(1, 0)}, // DebugTypeTemplate in opencl_debuginfo_100
-    {15,IR(860, 6),IR(52825, 27),IR(1, 0)}, // DebugTypeTemplateParameter in opencl_debuginfo_100
-    {16,IR(866, 5),IR(52852, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in opencl_debuginfo_100
-    {17,IR(871, 5),IR(52887, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in opencl_debuginfo_100
-    {18,IR(1085, 10),IR(52918, 20),IR(1, 0)}, // DebugGlobalVariable in opencl_debuginfo_100
-    {19,IR(1100, 8),IR(52938, 25),IR(1, 0)}, // DebugFunctionDeclaration in opencl_debuginfo_100
-    {20,IR(1108, 11),IR(52963, 14),IR(1, 0)}, // DebugFunction in opencl_debuginfo_100
-    {21,IR(895, 5),IR(52977, 18),IR(1, 0)}, // DebugLexicalBlock in opencl_debuginfo_100
-    {22,IR(900, 3),IR(52995, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in opencl_debuginfo_100
-    {23,IR(903, 2),IR(53026, 11),IR(1, 0)}, // DebugScope in opencl_debuginfo_100
+    {15,IR(855, 6),IR(52825, 27),IR(1, 0)}, // DebugTypeTemplateParameter in opencl_debuginfo_100
+    {16,IR(861, 5),IR(52852, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in opencl_debuginfo_100
+    {17,IR(866, 5),IR(52887, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in opencl_debuginfo_100
+    {18,IR(1080, 10),IR(52918, 20),IR(1, 0)}, // DebugGlobalVariable in opencl_debuginfo_100
+    {19,IR(1095, 8),IR(52938, 25),IR(1, 0)}, // DebugFunctionDeclaration in opencl_debuginfo_100
+    {20,IR(1103, 11),IR(52963, 14),IR(1, 0)}, // DebugFunction in opencl_debuginfo_100
+    {21,IR(890, 5),IR(52977, 18),IR(1, 0)}, // DebugLexicalBlock in opencl_debuginfo_100
+    {22,IR(895, 3),IR(52995, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in opencl_debuginfo_100
+    {23,IR(898, 2),IR(53026, 11),IR(1, 0)}, // DebugScope in opencl_debuginfo_100
     {24,IR(0, 0),IR(53037, 13),IR(1, 0)}, // DebugNoScope in opencl_debuginfo_100
-    {25,IR(905, 3),IR(53050, 15),IR(1, 0)}, // DebugInlinedAt in opencl_debuginfo_100
-    {26,IR(1119, 8),IR(53107, 19),IR(1, 0)}, // DebugLocalVariable in opencl_debuginfo_100
+    {25,IR(900, 3),IR(53050, 15),IR(1, 0)}, // DebugInlinedAt in opencl_debuginfo_100
+    {26,IR(1114, 8),IR(53107, 19),IR(1, 0)}, // DebugLocalVariable in opencl_debuginfo_100
     {27,IR(36, 2),IR(53126, 21),IR(1, 0)}, // DebugInlinedVariable in opencl_debuginfo_100
     {28,IR(33, 3),IR(53147, 13),IR(1, 0)}, // DebugDeclare in opencl_debuginfo_100
-    {29,IR(980, 4),IR(53160, 11),IR(1, 0)}, // DebugValue in opencl_debuginfo_100
-    {30,IR(1127, 2),IR(53204, 15),IR(1, 0)}, // DebugOperation in opencl_debuginfo_100
-    {31,IR(747, 1),IR(53219, 16),IR(1, 0)}, // DebugExpression in opencl_debuginfo_100
-    {32,IR(917, 4),IR(53235, 14),IR(1, 0)}, // DebugMacroDef in opencl_debuginfo_100
-    {33,IR(900, 3),IR(53249, 16),IR(1, 0)}, // DebugMacroUndef in opencl_debuginfo_100
-    {34,IR(1129, 7),IR(55039, 20),IR(1, 0)}, // DebugImportedEntity in opencl_debuginfo_100
-    {35,IR(903, 2),IR(55059, 12),IR(1, 0)}, // DebugSource in opencl_debuginfo_100
-    {36,IR(1136, 8),IR(55695, 17),IR(1, 0)}, // DebugModuleINTEL in opencl_debuginfo_100
+    {29,IR(975, 4),IR(53160, 11),IR(1, 0)}, // DebugValue in opencl_debuginfo_100
+    {30,IR(1122, 2),IR(53204, 15),IR(1, 0)}, // DebugOperation in opencl_debuginfo_100
+    {31,IR(742, 1),IR(53219, 16),IR(1, 0)}, // DebugExpression in opencl_debuginfo_100
+    {32,IR(912, 4),IR(53235, 14),IR(1, 0)}, // DebugMacroDef in opencl_debuginfo_100
+    {33,IR(895, 3),IR(53249, 16),IR(1, 0)}, // DebugMacroUndef in opencl_debuginfo_100
+    {34,IR(1124, 7),IR(55039, 20),IR(1, 0)}, // DebugImportedEntity in opencl_debuginfo_100
+    {35,IR(898, 2),IR(55059, 12),IR(1, 0)}, // DebugSource in opencl_debuginfo_100
+    {36,IR(1131, 8),IR(55695, 17),IR(1, 0)}, // DebugModuleINTEL in opencl_debuginfo_100
     {0,IR(10, 1),IR(55712, 5),IR(1, 0)}, // acos in opencl_std_100
     {1,IR(10, 1),IR(55717, 6),IR(1, 0)}, // acosh in opencl_std_100
     {2,IR(10, 1),IR(55723, 7),IR(1, 0)}, // acospi in opencl_std_100
@@ -5562,17 +5562,17 @@ static const std::array<ExtInstDesc, 501> kExtInstByValue{{
     {168,IR(33, 3),IR(56771, 8),IR(1, 0)}, // u_mad24 in opencl_std_100
     {169,IR(36, 2),IR(56779, 8),IR(1, 0)}, // s_mul24 in opencl_std_100
     {170,IR(36, 2),IR(56787, 8),IR(1, 0)}, // u_mul24 in opencl_std_100
-    {171,IR(1144, 3),IR(56795, 7),IR(1, 0)}, // vloadn in opencl_std_100
+    {171,IR(1139, 3),IR(56795, 7),IR(1, 0)}, // vloadn in opencl_std_100
     {172,IR(33, 3),IR(56802, 8),IR(1, 0)}, // vstoren in opencl_std_100
     {173,IR(36, 2),IR(56810, 11),IR(1, 0)}, // vload_half in opencl_std_100
-    {174,IR(1144, 3),IR(56821, 12),IR(1, 0)}, // vload_halfn in opencl_std_100
+    {174,IR(1139, 3),IR(56821, 12),IR(1, 0)}, // vload_halfn in opencl_std_100
     {175,IR(33, 3),IR(56833, 12),IR(1, 0)}, // vstore_half in opencl_std_100
-    {176,IR(1147, 4),IR(56845, 14),IR(1, 0)}, // vstore_half_r in opencl_std_100
+    {176,IR(1142, 4),IR(56845, 14),IR(1, 0)}, // vstore_half_r in opencl_std_100
     {177,IR(33, 3),IR(56859, 13),IR(1, 0)}, // vstore_halfn in opencl_std_100
-    {178,IR(1147, 4),IR(56872, 15),IR(1, 0)}, // vstore_halfn_r in opencl_std_100
-    {179,IR(1144, 3),IR(56887, 13),IR(1, 0)}, // vloada_halfn in opencl_std_100
+    {178,IR(1142, 4),IR(56872, 15),IR(1, 0)}, // vstore_halfn_r in opencl_std_100
+    {179,IR(1139, 3),IR(56887, 13),IR(1, 0)}, // vloada_halfn in opencl_std_100
     {180,IR(33, 3),IR(56900, 14),IR(1, 0)}, // vstorea_halfn in opencl_std_100
-    {181,IR(1147, 4),IR(56914, 16),IR(1, 0)}, // vstorea_halfn_r in opencl_std_100
+    {181,IR(1142, 4),IR(56914, 16),IR(1, 0)}, // vstorea_halfn_r in opencl_std_100
     {182,IR(36, 2),IR(56930, 8),IR(1, 0)}, // shuffle in opencl_std_100
     {183,IR(33, 3),IR(56938, 9),IR(1, 0)}, // shuffle2 in opencl_std_100
     {184,IR(168, 2),IR(56947, 7),IR(1, 0)}, // printf in opencl_std_100
@@ -5602,14 +5602,14 @@ static const std::array<ExtInstDesc, 501> kExtInstByValue{{
     {9,IR(33, 3),IR(57230, 9),IR(1, 0)}, // SMid3AMD in spv_amd_shader_trinary_minmax
     {0,IR(33, 3),IR(57239, 7),IR(1, 0)}, // ARGMAX in tosa_001000_1
     {1,IR(516, 7),IR(57246, 11),IR(1, 0)}, // AVG_POOL2D in tosa_001000_1
-    {2,IR(755, 10),IR(57257, 7),IR(1, 0)}, // CONV2D in tosa_001000_1
-    {3,IR(755, 10),IR(57264, 7),IR(1, 0)}, // CONV3D in tosa_001000_1
-    {4,IR(755, 10),IR(57271, 17),IR(1, 0)}, // DEPTHWISE_CONV2D in tosa_001000_1
+    {2,IR(750, 10),IR(57257, 7),IR(1, 0)}, // CONV2D in tosa_001000_1
+    {3,IR(750, 10),IR(57264, 7),IR(1, 0)}, // CONV3D in tosa_001000_1
+    {4,IR(750, 10),IR(57271, 17),IR(1, 0)}, // DEPTHWISE_CONV2D in tosa_001000_1
     {5,IR(296, 4),IR(57288, 6),IR(1, 0)}, // FFT2D in tosa_001000_1
     {6,IR(296, 4),IR(57294, 7),IR(1, 0)}, // MATMUL in tosa_001000_1
     {7,IR(675, 5),IR(57301, 11),IR(1, 0)}, // MAX_POOL2D in tosa_001000_1
     {8,IR(36, 2),IR(57312, 7),IR(1, 0)}, // RFFT2D in tosa_001000_1
-    {9,IR(765, 9),IR(57319, 17),IR(1, 0)}, // TRANSPOSE_CONV2D in tosa_001000_1
+    {9,IR(760, 9),IR(57319, 17),IR(1, 0)}, // TRANSPOSE_CONV2D in tosa_001000_1
     {10,IR(296, 4),IR(57336, 6),IR(1, 0)}, // CLAMP in tosa_001000_1
     {11,IR(10, 1),IR(57342, 4),IR(1, 0)}, // ERF in tosa_001000_1
     {12,IR(10, 1),IR(57346, 8),IR(1, 0)}, // SIGMOID in tosa_001000_1
@@ -5665,7 +5665,7 @@ static const std::array<ExtInstDesc, 501> kExtInstByValue{{
     {62,IR(33, 3),IR(57779, 8),IR(1, 0)}, // SCATTER in tosa_001000_1
     {63,IR(675, 5),IR(57787, 7),IR(1, 0)}, // RESIZE in tosa_001000_1
     {64,IR(10, 1),IR(57794, 5),IR(1, 0)}, // CAST in tosa_001000_1
-    {65,IR(755, 10),IR(57799, 8),IR(1, 0)}, // RESCALE in tosa_001000_1
+    {65,IR(750, 10),IR(57799, 8),IR(1, 0)}, // RESCALE in tosa_001000_1
 }};
 
 IndexRange ExtInstByValueRangeForKind(spv_ext_inst_type_t type) {
@@ -10708,19 +10708,19 @@ static const spv_operand_type_t kOperandSpans[] = {
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 739
   SPV_OPERAND_TYPE_ID, // 740
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 741
-  SPV_OPERAND_TYPE_RESULT_ID, // 742
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 743
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 742
+  SPV_OPERAND_TYPE_TYPE_ID, // 743
   SPV_OPERAND_TYPE_RESULT_ID, // 744
   SPV_OPERAND_TYPE_ID, // 745
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 746
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 747
-  SPV_OPERAND_TYPE_TYPE_ID, // 748
-  SPV_OPERAND_TYPE_RESULT_ID, // 749
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 746
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 747
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 748
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 749
   SPV_OPERAND_TYPE_ID, // 750
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 751
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 752
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 753
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 754
+  SPV_OPERAND_TYPE_ID, // 751
+  SPV_OPERAND_TYPE_ID, // 752
+  SPV_OPERAND_TYPE_ID, // 753
+  SPV_OPERAND_TYPE_ID, // 754
   SPV_OPERAND_TYPE_ID, // 755
   SPV_OPERAND_TYPE_ID, // 756
   SPV_OPERAND_TYPE_ID, // 757
@@ -10735,98 +10735,98 @@ static const spv_operand_type_t kOperandSpans[] = {
   SPV_OPERAND_TYPE_ID, // 766
   SPV_OPERAND_TYPE_ID, // 767
   SPV_OPERAND_TYPE_ID, // 768
-  SPV_OPERAND_TYPE_ID, // 769
-  SPV_OPERAND_TYPE_ID, // 770
+  SPV_OPERAND_TYPE_TYPE_ID, // 769
+  SPV_OPERAND_TYPE_RESULT_ID, // 770
   SPV_OPERAND_TYPE_ID, // 771
   SPV_OPERAND_TYPE_ID, // 772
   SPV_OPERAND_TYPE_ID, // 773
-  SPV_OPERAND_TYPE_TYPE_ID, // 774
-  SPV_OPERAND_TYPE_RESULT_ID, // 775
+  SPV_OPERAND_TYPE_ID, // 774
+  SPV_OPERAND_TYPE_OPTIONAL_MATRIX_MULTIPLY_ACCUMULATE_OPERANDS, // 775
   SPV_OPERAND_TYPE_ID, // 776
-  SPV_OPERAND_TYPE_ID, // 777
+  SPV_OPERAND_TYPE_EXECUTION_MODEL, // 777
   SPV_OPERAND_TYPE_ID, // 778
-  SPV_OPERAND_TYPE_ID, // 779
-  SPV_OPERAND_TYPE_OPTIONAL_MATRIX_MULTIPLY_ACCUMULATE_OPERANDS, // 780
+  SPV_OPERAND_TYPE_LITERAL_STRING, // 779
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 780
   SPV_OPERAND_TYPE_ID, // 781
-  SPV_OPERAND_TYPE_EXECUTION_MODEL, // 782
-  SPV_OPERAND_TYPE_ID, // 783
-  SPV_OPERAND_TYPE_LITERAL_STRING, // 784
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 785
-  SPV_OPERAND_TYPE_ID, // 786
-  SPV_OPERAND_TYPE_CAPABILITY, // 787
-  SPV_OPERAND_TYPE_TYPE_ID, // 788
-  SPV_OPERAND_TYPE_RESULT_ID, // 789
+  SPV_OPERAND_TYPE_CAPABILITY, // 782
+  SPV_OPERAND_TYPE_TYPE_ID, // 783
+  SPV_OPERAND_TYPE_RESULT_ID, // 784
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 785
+  SPV_OPERAND_TYPE_VARIABLE_LITERAL_INTEGER, // 786
+  SPV_OPERAND_TYPE_TYPE_ID, // 787
+  SPV_OPERAND_TYPE_RESULT_ID, // 788
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 789
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 790
-  SPV_OPERAND_TYPE_VARIABLE_LITERAL_INTEGER, // 791
-  SPV_OPERAND_TYPE_TYPE_ID, // 792
-  SPV_OPERAND_TYPE_RESULT_ID, // 793
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 794
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 795
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 796
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 797
-  SPV_OPERAND_TYPE_TYPE_ID, // 798
-  SPV_OPERAND_TYPE_RESULT_ID, // 799
-  SPV_OPERAND_TYPE_VARIABLE_CAPABILITY, // 800
-  SPV_OPERAND_TYPE_TYPE_ID, // 801
-  SPV_OPERAND_TYPE_RESULT_ID, // 802
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 791
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 792
+  SPV_OPERAND_TYPE_TYPE_ID, // 793
+  SPV_OPERAND_TYPE_RESULT_ID, // 794
+  SPV_OPERAND_TYPE_VARIABLE_CAPABILITY, // 795
+  SPV_OPERAND_TYPE_TYPE_ID, // 796
+  SPV_OPERAND_TYPE_RESULT_ID, // 797
+  SPV_OPERAND_TYPE_ID, // 798
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 799
+  SPV_OPERAND_TYPE_ID, // 800
+  SPV_OPERAND_TYPE_ID, // 801
+  SPV_OPERAND_TYPE_ID, // 802
   SPV_OPERAND_TYPE_ID, // 803
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 804
   SPV_OPERAND_TYPE_ID, // 805
-  SPV_OPERAND_TYPE_ID, // 806
-  SPV_OPERAND_TYPE_ID, // 807
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 806
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 807
   SPV_OPERAND_TYPE_ID, // 808
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 809
-  SPV_OPERAND_TYPE_ID, // 810
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 811
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 812
-  SPV_OPERAND_TYPE_ID, // 813
+  SPV_OPERAND_TYPE_ID, // 809
+  SPV_OPERAND_TYPE_DEBUG_BASE_TYPE_ATTRIBUTE_ENCODING, // 810
+  SPV_OPERAND_TYPE_ID, // 811
+  SPV_OPERAND_TYPE_STORAGE_CLASS, // 812
+  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 813
   SPV_OPERAND_TYPE_ID, // 814
-  SPV_OPERAND_TYPE_DEBUG_BASE_TYPE_ATTRIBUTE_ENCODING, // 815
+  SPV_OPERAND_TYPE_DEBUG_TYPE_QUALIFIER, // 815
   SPV_OPERAND_TYPE_ID, // 816
-  SPV_OPERAND_TYPE_STORAGE_CLASS, // 817
-  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 818
-  SPV_OPERAND_TYPE_ID, // 819
-  SPV_OPERAND_TYPE_DEBUG_TYPE_QUALIFIER, // 820
+  SPV_OPERAND_TYPE_ID, // 817
+  SPV_OPERAND_TYPE_ID, // 818
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 819
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 820
   SPV_OPERAND_TYPE_ID, // 821
   SPV_OPERAND_TYPE_ID, // 822
   SPV_OPERAND_TYPE_ID, // 823
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 824
+  SPV_OPERAND_TYPE_ID, // 824
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 825
-  SPV_OPERAND_TYPE_ID, // 826
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 826
   SPV_OPERAND_TYPE_ID, // 827
   SPV_OPERAND_TYPE_ID, // 828
-  SPV_OPERAND_TYPE_ID, // 829
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 830
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 831
-  SPV_OPERAND_TYPE_ID, // 832
+  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 829
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 830
+  SPV_OPERAND_TYPE_ID, // 831
+  SPV_OPERAND_TYPE_DEBUG_COMPOSITE_TYPE, // 832
   SPV_OPERAND_TYPE_ID, // 833
-  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 834
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 835
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 834
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 835
   SPV_OPERAND_TYPE_ID, // 836
-  SPV_OPERAND_TYPE_DEBUG_COMPOSITE_TYPE, // 837
-  SPV_OPERAND_TYPE_ID, // 838
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 839
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 840
+  SPV_OPERAND_TYPE_ID, // 837
+  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 838
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 839
+  SPV_OPERAND_TYPE_ID, // 840
   SPV_OPERAND_TYPE_ID, // 841
   SPV_OPERAND_TYPE_ID, // 842
-  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 843
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 844
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 843
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 844
   SPV_OPERAND_TYPE_ID, // 845
   SPV_OPERAND_TYPE_ID, // 846
   SPV_OPERAND_TYPE_ID, // 847
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 848
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 849
+  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 848
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 849
   SPV_OPERAND_TYPE_ID, // 850
   SPV_OPERAND_TYPE_ID, // 851
   SPV_OPERAND_TYPE_ID, // 852
-  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 853
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 854
+  SPV_OPERAND_TYPE_ID, // 853
+  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 854
   SPV_OPERAND_TYPE_ID, // 855
   SPV_OPERAND_TYPE_ID, // 856
   SPV_OPERAND_TYPE_ID, // 857
   SPV_OPERAND_TYPE_ID, // 858
-  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 859
-  SPV_OPERAND_TYPE_ID, // 860
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 859
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 860
   SPV_OPERAND_TYPE_ID, // 861
   SPV_OPERAND_TYPE_ID, // 862
   SPV_OPERAND_TYPE_ID, // 863
@@ -10834,122 +10834,122 @@ static const spv_operand_type_t kOperandSpans[] = {
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 865
   SPV_OPERAND_TYPE_ID, // 866
   SPV_OPERAND_TYPE_ID, // 867
-  SPV_OPERAND_TYPE_ID, // 868
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 868
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 869
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 870
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 870
   SPV_OPERAND_TYPE_ID, // 871
   SPV_OPERAND_TYPE_ID, // 872
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 873
+  SPV_OPERAND_TYPE_ID, // 873
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 874
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 875
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 875
   SPV_OPERAND_TYPE_ID, // 876
   SPV_OPERAND_TYPE_ID, // 877
-  SPV_OPERAND_TYPE_ID, // 878
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 879
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 880
+  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 878
+  SPV_OPERAND_TYPE_ID, // 879
+  SPV_OPERAND_TYPE_ID, // 880
   SPV_OPERAND_TYPE_ID, // 881
-  SPV_OPERAND_TYPE_ID, // 882
-  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 883
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 882
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 883
   SPV_OPERAND_TYPE_ID, // 884
   SPV_OPERAND_TYPE_ID, // 885
-  SPV_OPERAND_TYPE_ID, // 886
+  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 886
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 887
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 888
-  SPV_OPERAND_TYPE_ID, // 889
+  SPV_OPERAND_TYPE_ID, // 888
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 889
   SPV_OPERAND_TYPE_ID, // 890
-  SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS, // 891
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 891
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 892
   SPV_OPERAND_TYPE_ID, // 893
   SPV_OPERAND_TYPE_OPTIONAL_ID, // 894
   SPV_OPERAND_TYPE_ID, // 895
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 896
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 897
+  SPV_OPERAND_TYPE_ID, // 897
   SPV_OPERAND_TYPE_ID, // 898
   SPV_OPERAND_TYPE_OPTIONAL_ID, // 899
-  SPV_OPERAND_TYPE_ID, // 900
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 901
-  SPV_OPERAND_TYPE_ID, // 902
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 900
+  SPV_OPERAND_TYPE_ID, // 901
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 902
   SPV_OPERAND_TYPE_ID, // 903
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 904
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 905
-  SPV_OPERAND_TYPE_ID, // 906
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 907
+  SPV_OPERAND_TYPE_ID, // 904
+  SPV_OPERAND_TYPE_ID, // 905
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 906
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 907
   SPV_OPERAND_TYPE_ID, // 908
-  SPV_OPERAND_TYPE_ID, // 909
-  SPV_OPERAND_TYPE_ID, // 910
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 911
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 912
-  SPV_OPERAND_TYPE_ID, // 913
-  SPV_OPERAND_TYPE_OPTIONAL_LITERAL_INTEGER, // 914
-  SPV_OPERAND_TYPE_DEBUG_OPERATION, // 915
-  SPV_OPERAND_TYPE_VARIABLE_LITERAL_INTEGER, // 916
-  SPV_OPERAND_TYPE_ID, // 917
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 918
-  SPV_OPERAND_TYPE_ID, // 919
+  SPV_OPERAND_TYPE_OPTIONAL_LITERAL_INTEGER, // 909
+  SPV_OPERAND_TYPE_DEBUG_OPERATION, // 910
+  SPV_OPERAND_TYPE_VARIABLE_LITERAL_INTEGER, // 911
+  SPV_OPERAND_TYPE_ID, // 912
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 913
+  SPV_OPERAND_TYPE_ID, // 914
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 915
+  SPV_OPERAND_TYPE_ID, // 916
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 917
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 918
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 919
   SPV_OPERAND_TYPE_OPTIONAL_ID, // 920
   SPV_OPERAND_TYPE_ID, // 921
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 922
+  SPV_OPERAND_TYPE_ID, // 922
   SPV_OPERAND_TYPE_OPTIONAL_ID, // 923
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 924
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 925
+  SPV_OPERAND_TYPE_ID, // 924
+  SPV_OPERAND_TYPE_ID, // 925
   SPV_OPERAND_TYPE_ID, // 926
   SPV_OPERAND_TYPE_ID, // 927
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 928
+  SPV_OPERAND_TYPE_ID, // 928
   SPV_OPERAND_TYPE_ID, // 929
   SPV_OPERAND_TYPE_ID, // 930
   SPV_OPERAND_TYPE_ID, // 931
-  SPV_OPERAND_TYPE_ID, // 932
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 932
   SPV_OPERAND_TYPE_ID, // 933
   SPV_OPERAND_TYPE_ID, // 934
   SPV_OPERAND_TYPE_ID, // 935
   SPV_OPERAND_TYPE_ID, // 936
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 937
+  SPV_OPERAND_TYPE_ID, // 937
   SPV_OPERAND_TYPE_ID, // 938
   SPV_OPERAND_TYPE_ID, // 939
   SPV_OPERAND_TYPE_ID, // 940
   SPV_OPERAND_TYPE_ID, // 941
-  SPV_OPERAND_TYPE_ID, // 942
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 942
   SPV_OPERAND_TYPE_ID, // 943
   SPV_OPERAND_TYPE_ID, // 944
   SPV_OPERAND_TYPE_ID, // 945
   SPV_OPERAND_TYPE_ID, // 946
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 947
+  SPV_OPERAND_TYPE_ID, // 947
   SPV_OPERAND_TYPE_ID, // 948
   SPV_OPERAND_TYPE_ID, // 949
   SPV_OPERAND_TYPE_ID, // 950
-  SPV_OPERAND_TYPE_ID, // 951
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 951
   SPV_OPERAND_TYPE_ID, // 952
   SPV_OPERAND_TYPE_ID, // 953
   SPV_OPERAND_TYPE_ID, // 954
   SPV_OPERAND_TYPE_ID, // 955
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 956
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 956
   SPV_OPERAND_TYPE_ID, // 957
   SPV_OPERAND_TYPE_ID, // 958
   SPV_OPERAND_TYPE_ID, // 959
   SPV_OPERAND_TYPE_ID, // 960
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 961
+  SPV_OPERAND_TYPE_ID, // 961
   SPV_OPERAND_TYPE_ID, // 962
   SPV_OPERAND_TYPE_ID, // 963
   SPV_OPERAND_TYPE_ID, // 964
   SPV_OPERAND_TYPE_ID, // 965
-  SPV_OPERAND_TYPE_ID, // 966
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 966
   SPV_OPERAND_TYPE_ID, // 967
   SPV_OPERAND_TYPE_ID, // 968
   SPV_OPERAND_TYPE_ID, // 969
   SPV_OPERAND_TYPE_ID, // 970
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 971
+  SPV_OPERAND_TYPE_ID, // 971
   SPV_OPERAND_TYPE_ID, // 972
   SPV_OPERAND_TYPE_ID, // 973
-  SPV_OPERAND_TYPE_ID, // 974
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 974
   SPV_OPERAND_TYPE_ID, // 975
   SPV_OPERAND_TYPE_ID, // 976
   SPV_OPERAND_TYPE_ID, // 977
-  SPV_OPERAND_TYPE_ID, // 978
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 979
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 978
+  SPV_OPERAND_TYPE_ID, // 979
   SPV_OPERAND_TYPE_ID, // 980
   SPV_OPERAND_TYPE_ID, // 981
   SPV_OPERAND_TYPE_ID, // 982
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 983
+  SPV_OPERAND_TYPE_ID, // 983
   SPV_OPERAND_TYPE_ID, // 984
   SPV_OPERAND_TYPE_ID, // 985
   SPV_OPERAND_TYPE_ID, // 986
@@ -11012,109 +11012,104 @@ static const spv_operand_type_t kOperandSpans[] = {
   SPV_OPERAND_TYPE_ID, // 1043
   SPV_OPERAND_TYPE_ID, // 1044
   SPV_OPERAND_TYPE_ID, // 1045
-  SPV_OPERAND_TYPE_ID, // 1046
-  SPV_OPERAND_TYPE_ID, // 1047
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1046
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1047
   SPV_OPERAND_TYPE_ID, // 1048
-  SPV_OPERAND_TYPE_ID, // 1049
+  SPV_OPERAND_TYPE_SOURCE_LANGUAGE, // 1049
   SPV_OPERAND_TYPE_ID, // 1050
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1051
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1052
+  SPV_OPERAND_TYPE_ID, // 1051
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_BASE_TYPE_ATTRIBUTE_ENCODING, // 1052
   SPV_OPERAND_TYPE_ID, // 1053
-  SPV_OPERAND_TYPE_SOURCE_LANGUAGE, // 1054
-  SPV_OPERAND_TYPE_ID, // 1055
+  SPV_OPERAND_TYPE_STORAGE_CLASS, // 1054
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1055
   SPV_OPERAND_TYPE_ID, // 1056
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_BASE_TYPE_ATTRIBUTE_ENCODING, // 1057
-  SPV_OPERAND_TYPE_ID, // 1058
-  SPV_OPERAND_TYPE_STORAGE_CLASS, // 1059
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1060
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_TYPE_QUALIFIER, // 1057
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1058
+  SPV_OPERAND_TYPE_ID, // 1059
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 1060
   SPV_OPERAND_TYPE_ID, // 1061
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_TYPE_QUALIFIER, // 1062
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1063
-  SPV_OPERAND_TYPE_ID, // 1064
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 1065
+  SPV_OPERAND_TYPE_ID, // 1062
+  SPV_OPERAND_TYPE_ID, // 1063
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1064
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1065
   SPV_OPERAND_TYPE_ID, // 1066
   SPV_OPERAND_TYPE_ID, // 1067
-  SPV_OPERAND_TYPE_ID, // 1068
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1069
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1070
-  SPV_OPERAND_TYPE_ID, // 1071
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1068
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 1069
+  SPV_OPERAND_TYPE_ID, // 1070
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_COMPOSITE_TYPE, // 1071
   SPV_OPERAND_TYPE_ID, // 1072
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1073
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 1074
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1073
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1074
   SPV_OPERAND_TYPE_ID, // 1075
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_COMPOSITE_TYPE, // 1076
+  SPV_OPERAND_TYPE_ID, // 1076
   SPV_OPERAND_TYPE_ID, // 1077
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1078
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1079
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1078
+  SPV_OPERAND_TYPE_VARIABLE_ID, // 1079
   SPV_OPERAND_TYPE_ID, // 1080
   SPV_OPERAND_TYPE_ID, // 1081
   SPV_OPERAND_TYPE_ID, // 1082
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1083
-  SPV_OPERAND_TYPE_VARIABLE_ID, // 1084
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1083
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1084
   SPV_OPERAND_TYPE_ID, // 1085
   SPV_OPERAND_TYPE_ID, // 1086
   SPV_OPERAND_TYPE_ID, // 1087
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1088
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1089
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1088
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 1089
   SPV_OPERAND_TYPE_ID, // 1090
   SPV_OPERAND_TYPE_ID, // 1091
   SPV_OPERAND_TYPE_ID, // 1092
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1093
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 1094
+  SPV_OPERAND_TYPE_ID, // 1093
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1094
   SPV_OPERAND_TYPE_ID, // 1095
   SPV_OPERAND_TYPE_ID, // 1096
   SPV_OPERAND_TYPE_ID, // 1097
-  SPV_OPERAND_TYPE_ID, // 1098
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1099
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1098
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1099
   SPV_OPERAND_TYPE_ID, // 1100
   SPV_OPERAND_TYPE_ID, // 1101
-  SPV_OPERAND_TYPE_ID, // 1102
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1103
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1104
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1102
+  SPV_OPERAND_TYPE_ID, // 1103
+  SPV_OPERAND_TYPE_ID, // 1104
   SPV_OPERAND_TYPE_ID, // 1105
-  SPV_OPERAND_TYPE_ID, // 1106
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1107
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1106
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1107
   SPV_OPERAND_TYPE_ID, // 1108
   SPV_OPERAND_TYPE_ID, // 1109
-  SPV_OPERAND_TYPE_ID, // 1110
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1110
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1111
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1112
-  SPV_OPERAND_TYPE_ID, // 1113
+  SPV_OPERAND_TYPE_ID, // 1112
+  SPV_OPERAND_TYPE_OPTIONAL_ID, // 1113
   SPV_OPERAND_TYPE_ID, // 1114
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1115
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1116
-  SPV_OPERAND_TYPE_ID, // 1117
-  SPV_OPERAND_TYPE_OPTIONAL_ID, // 1118
+  SPV_OPERAND_TYPE_ID, // 1115
+  SPV_OPERAND_TYPE_ID, // 1116
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1117
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1118
   SPV_OPERAND_TYPE_ID, // 1119
-  SPV_OPERAND_TYPE_ID, // 1120
-  SPV_OPERAND_TYPE_ID, // 1121
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1122
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1123
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1120
+  SPV_OPERAND_TYPE_OPTIONAL_LITERAL_INTEGER, // 1121
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_OPERATION, // 1122
+  SPV_OPERAND_TYPE_VARIABLE_LITERAL_INTEGER, // 1123
   SPV_OPERAND_TYPE_ID, // 1124
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS, // 1125
-  SPV_OPERAND_TYPE_OPTIONAL_LITERAL_INTEGER, // 1126
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_OPERATION, // 1127
-  SPV_OPERAND_TYPE_VARIABLE_LITERAL_INTEGER, // 1128
-  SPV_OPERAND_TYPE_ID, // 1129
-  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_IMPORTED_ENTITY, // 1130
+  SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_IMPORTED_ENTITY, // 1125
+  SPV_OPERAND_TYPE_ID, // 1126
+  SPV_OPERAND_TYPE_ID, // 1127
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1128
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1129
+  SPV_OPERAND_TYPE_ID, // 1130
   SPV_OPERAND_TYPE_ID, // 1131
   SPV_OPERAND_TYPE_ID, // 1132
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1133
+  SPV_OPERAND_TYPE_ID, // 1133
   SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1134
   SPV_OPERAND_TYPE_ID, // 1135
   SPV_OPERAND_TYPE_ID, // 1136
   SPV_OPERAND_TYPE_ID, // 1137
-  SPV_OPERAND_TYPE_ID, // 1138
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1139
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1138
+  SPV_OPERAND_TYPE_ID, // 1139
   SPV_OPERAND_TYPE_ID, // 1140
-  SPV_OPERAND_TYPE_ID, // 1141
+  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1141
   SPV_OPERAND_TYPE_ID, // 1142
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1143
+  SPV_OPERAND_TYPE_ID, // 1143
   SPV_OPERAND_TYPE_ID, // 1144
-  SPV_OPERAND_TYPE_ID, // 1145
-  SPV_OPERAND_TYPE_LITERAL_INTEGER, // 1146
-  SPV_OPERAND_TYPE_ID, // 1147
-  SPV_OPERAND_TYPE_ID, // 1148
-  SPV_OPERAND_TYPE_ID, // 1149
-  SPV_OPERAND_TYPE_FP_ROUNDING_MODE, // 1150
+  SPV_OPERAND_TYPE_FP_ROUNDING_MODE, // 1145
 };

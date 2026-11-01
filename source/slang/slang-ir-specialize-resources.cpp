@@ -19,6 +19,8 @@ namespace Slang
 // that step makes no more progress, D3D targets also try to inline a nonrecursive call when a
 // resource argument has no HLSL form that the emitter can pass directly. Each successful inlining
 // or specialization round is followed by simplification before the process repeats.
+// On Khronos targets, each specialization round also replaces resource selections from the same
+// heap or array with selections of their indices.
 
 // True for the texture access modes that lower to writable surface accesses
 // (RW / write-only / rasterizer-ordered). Read-only (sampled) and sampler-feedback
@@ -1548,15 +1550,481 @@ static bool specializeResourceOutputs(
     return pass.processModule();
 }
 
+// Each resource select gets a corresponding integer select that chooses its resource index.
+// Leaf accesses and block parameters must already be mapped. The worklist is consumed.
+static void emitResourceIndexSelects(
+    List<IRSelect*>& workList,
+    IRType* indexType,
+    Dictionary<IRInst*, IRInst*>& mapResourceToIndex)
+{
+    // The integer selects are built in dependency order: in select(c, a, b), where b is another
+    // select that also uses a, both users need a's integer replacement first. Discovery order
+    // alone does not establish that order, so the worklist finishes missing dependencies first.
+    // Cycles pass through block parameters, whose replacements already exist.
+    while (workList.getCount())
+    {
+        auto select = workList.getLast();
+        if (mapResourceToIndex.containsKey(select))
+        {
+            workList.removeLast();
+            continue;
+        }
+        auto trueValue = select->getTrueResult();
+        auto falseValue = select->getFalseResult();
+        auto trueIndex = mapResourceToIndex.tryGetValue(trueValue);
+        auto falseIndex = mapResourceToIndex.tryGetValue(falseValue);
+        IRInst* missingValue = nullptr;
+        if (!trueIndex)
+            missingValue = trueValue;
+        else if (!falseIndex)
+            missingValue = falseValue;
+        if (missingValue)
+        {
+            // Leaves and parameters already have indices, so only another select can
+            // be missing.
+            workList.add(cast<IRSelect>(missingValue));
+            continue;
+        }
+        IRBuilder builder(select);
+        builder.setInsertBefore(select);
+        IRInst* operands[] = {select->getCondition(), *trueIndex, *falseIndex};
+        auto index = builder.emitIntrinsicInst(indexType, kIROp_Select, 3, operands);
+        index->sourceLoc = select->sourceLoc;
+        mapResourceToIndex.add(select, index);
+        workList.removeLast();
+    }
+}
+
+// Incoming branch arguments for parameters in mapResourceToIndex are replaced with their
+// mapped integer indices; other arguments remain unchanged. Every replaced argument must
+// also have an entry in mapResourceToIndex. originalParams holds the parameter lists from
+// before integer parameters were inserted, so params[i] still identifies argument i.
+static void rewriteResourceSelectionBranchArgs(
+    const Dictionary<IRBlock*, List<IRParam*>>& originalParams,
+    const Dictionary<IRInst*, IRInst*>& mapResourceToIndex)
+{
+    for (const auto& [block, params] : originalParams)
+    {
+        // Predecessor iteration follows uses of the target block. Updating resource
+        // arguments leaves those uses unchanged, so the iteration remains valid.
+        // Loop break/continue operands and branch decorations are also unchanged.
+        for (auto predecessor : block->getPredecessors())
+        {
+            auto branch = cast<IRUnconditionalBranch>(predecessor->getTerminator());
+            IRBuilder builder(branch);
+            // originalParams records the parameter positions before integer parameters were
+            // inserted, so params[i] still identifies argument i on every incoming branch.
+            //
+            // Consider a loop header with parameters (a, b, k), where a and b select samplers from
+            // different arrays and we are specializing a's graph. The back edge
+            //
+            //     unconditionalBranch(%header, %nextA, %nextB, %nextK)
+            //
+            // becomes
+            //
+            //     unconditionalBranch(%header, %nextAIndex, %nextB, %nextK)
+            //
+            // The slot for b keeps its resource because b belongs to another graph, and k is not
+            // part of any selection.
+            for (Index i = 0; i < params.getCount(); i++)
+            {
+                // A parameter outside this graph keeps its argument even when that argument
+                // is part of the graph. In `a = shared; b = shared;`, specializing a's graph
+                // must leave b's slot holding a resource. The caller's replaceUsesWith points
+                // that slot at the reconstructed resource, and a later call specializes b.
+                if (!mapResourceToIndex.containsKey(params[i]))
+                    continue;
+                auto index = mapResourceToIndex.getValue(branch->getArg((UInt)i));
+                builder.replaceOperand(branch->getArgs() + i, index);
+            }
+        }
+    }
+}
+
+// Resource selections become index selections when all incoming values access the same
+// heap or array. For example, `c ? samplers[i] : samplers[j]` becomes `samplers[c ? i : j]`.
+//
+// The function returns true if the graph rooted at candidate was rewritten. Every select
+// and block parameter consumed by the rewrite is removed from remainingCandidates.
+static bool specializeResourceSelection(
+    TargetRequest* targetReq,
+    IRInst* candidate,
+    OrderedHashSet<IRInst*>& remainingCandidates)
+{
+    // Array subscripts can have different integer types, so the selected indices need a common
+    // type. For `select(c, samplers[i], samplers[j])`, where `i` is int and `j` is uint,
+    // the transformation is:
+    //
+    //     // Before:
+    //     let %a : SamplerState = getElement(%samplers, %i : Int)
+    //     let %b : SamplerState = getElement(%samplers, %j : UInt)
+    //     let %s : SamplerState = select(%c, %a, %b)
+    //
+    //     // After (unused resource accesses omitted):
+    //     let %iAsUInt : UInt = intCast(%i)
+    //     let %s : UInt = select(%c, %iAsUInt, %j)
+    //     let %index : UInt = nonUniformResourceIndex(%s)
+    //     let %sampler : SamplerState = getElement(%samplers, %index)
+    //
+    // The original index calculations keep their types; we convert their results before the
+    // selection. If an incoming index is 64-bit, the common type must also be 64-bit to avoid
+    // truncating it. Selecting a descriptor does not change address calculations inside that
+    // resource, which are handled separately.
+    //
+    // A loop can make this more complicated than matching the two operands of a select.
+    // The following loop illustrates why:
+    //
+    //     SamplerState samplers[2];
+    //     Texture2D<float4> texture;
+    //
+    //     float4 sampleTexture(uint count, float2 uv)
+    //     {
+    //         SamplerState s = samplers[0];
+    //         for (uint k = 0; k < count; k++)
+    //         {
+    //             if (k % 2 == 0)
+    //                 s = samplers[1];
+    //         }
+    //         return texture.SampleLevel(s, uv, 0);
+    //     }
+    //
+    // After SSA construction, the loop header has a block parameter for `s`. Its incoming
+    // values are samplers[0] and the result of the if statement. The merge after the if has
+    // another block parameter, which receives either samplers[1] or the loop header's `s`.
+    // Each parameter therefore depends on the other. Neither can be handled by a rule that
+    // requires every incoming value to already be an array access.
+    //
+    // We follow both block parameters and selects until we reach the resource accesses. If
+    // they all use the same source and resource type, we can change the entire selection
+    // to use indices of a common integer type. The relevant IR changes look like this (other
+    // instructions omitted):
+    //
+    //     // Before:
+    //     block %header(param %s : SamplerState, ...):
+    //         ...
+    //     block %assign:
+    //         let %newS : SamplerState = getElement(%samplers, 1 : Int)
+    //         unconditionalBranch(%merge, %newS)
+    //     block %keep:
+    //         unconditionalBranch(%merge, %s)
+    //     block %merge(param %nextS : SamplerState):
+    //         ...
+    //     unconditionalBranch(%header, %nextS, ...)
+    //
+    //     // After (unused resource accesses omitted):
+    //     block %header(param %s : Int, ...):
+    //         let %index : Int = nonUniformResourceIndex(%s)
+    //         let %sampler : SamplerState = getElement(%samplers, %index)
+    //         ...
+    //     block %assign:
+    //         unconditionalBranch(%merge, 1 : Int)
+    //     block %keep:
+    //         unconditionalBranch(%merge, %s)
+    //     block %merge(param %nextS : Int):
+    //         ...
+    //     unconditionalBranch(%header, %nextS, ...)
+    //
+    // The sample operation now uses %sampler. The branches, including the loop back edge,
+    // still pass arguments in the same positions, but carry indices instead of resources.
+    // Each select and block parameter is replaced by a new integer instruction. We create
+    // all integer parameters first, so the loop dependencies have values to refer to, then
+    // create integer selects in dependency order. Reconstructed resource accesses supply
+    // the original resource uses, while the branches pass the corresponding indices.
+    // We check all incoming values before changing any instruction, so a rejected case leaves
+    // the IR intact.
+
+    // An array of resources has no single index for a select to choose.
+    auto resourceType = candidate->getDataType();
+    if (!isResourceType(resourceType) || as<IRArrayTypeBase>(resourceType))
+        return false;
+
+    // The worklist contains resource values that contribute to the original selection.
+    // Selects contribute their two values, and parameters contribute incoming branch
+    // arguments. Resource accesses end the traversal. Any unsupported producer rejects
+    // the entire graph before we change IR.
+    List<IRInst*> workList;
+    HashSet<IRInst*> visited;
+    List<IRInst*> graphNodes;
+    Dictionary<IRBlock*, List<IRParam*>> originalParams;
+    // Initially this maps only resource accesses to their index operands. After analysis,
+    // we convert those indices and add the new integer parameters and selects.
+    Dictionary<IRInst*, IRInst*> mapResourceToIndex;
+    IROp accessOp = kIROp_Invalid;
+    IRInst* accessSource = nullptr;
+    IRType* commonIndexType = nullptr;
+    workList.add(candidate);
+    for (Index i = 0; i < workList.getCount(); i++)
+    {
+        auto inst = workList[i];
+        // We have already checked a repeated value. In particular, a loop back edge
+        // must not cause us to visit the same parameter indefinitely.
+        if (!visited.add(inst))
+            continue;
+        if (inst->getDataType() != resourceType)
+            return false;
+
+        if (auto param = as<IRParam>(inst))
+        {
+            auto block = cast<IRBlock>(param->getParent());
+            auto func = cast<IRFunc>(block->getParent());
+            // A function parameter receives its resource from a caller rather than from
+            // branch arguments, so this graph does not tell us which heap or array
+            // supplies it.
+            if (block == func->getFirstBlock())
+                return false;
+            // A non-entry block with no predecessors is unreachable. There is no incoming
+            // resource from which to determine an index.
+            if (block->getPredecessors().isEmpty())
+                return false;
+            // For other block parameters, the argument at the parameter's position on
+            // each incoming branch supplies one incoming resource value.
+            auto paramIndex = getParamIndexInBlock(param);
+            for (auto predecessor : block->getPredecessors())
+            {
+                auto branch = cast<IRUnconditionalBranch>(predecessor->getTerminator());
+                workList.add(branch->getArg((UInt)paramIndex));
+            }
+            if (!originalParams.containsKey(block))
+            {
+                auto& params = originalParams[block];
+                for (auto originalParam : block->getParams())
+                    params.add(originalParam);
+            }
+        }
+        else if (auto select = as<IRSelect>(inst))
+        {
+            workList.add(select->getTrueResult());
+            workList.add(select->getFalseResult());
+        }
+        else
+        {
+            // The supported leaves are built-in heap loads and direct global-array
+            // accesses. Each exposes the source and index needed to recreate a resource.
+            IRInst* source = nullptr;
+            IRInst* index = nullptr;
+            switch (inst->getOp())
+            {
+            case kIROp_SPIRVLoadDescriptorFromHeap:
+                {
+                    auto load = cast<IRSPIRVLoadDescriptorFromHeap>(inst);
+                    source = load->getHeap();
+                    index = load->getIndex();
+                    // Built-in heaps are available throughout the function, so every
+                    // reconstructed load can name the same heap.
+                    if (!as<IRSPIRVResourceHeap>(source) && !as<IRSPIRVSamplerHeap>(source))
+                        return false;
+                    break;
+                }
+            case kIROp_GetElement:
+                {
+                    auto getElement = cast<IRGetElement>(inst);
+                    source = getElement->getBase();
+                    index = getElement->getIndex();
+                    // Only texture and sampler arrays are rewritten. Buffer arrays such as
+                    // StructuredBuffer<T>[] already support selection through variable
+                    // pointers, and rewriting them would add nonuniform descriptor-indexing
+                    // requirements. Heap loads above are not restricted this way: heap
+                    // buffers still need the index rewrite.
+                    if (!as<IRResourceTypeBase>(resourceType) &&
+                        !as<IRSamplerStateTypeBase>(resourceType))
+                        return false;
+                    // A global parameter is visible everywhere, so the reconstructed access
+                    // can name the same array at every selection. Resource-type legalization
+                    // runs before this pass and splits resource fields of global shader
+                    // parameters into their own global parameters, so arrays nested in
+                    // structs also arrive here as global parameters. Loaded or computed
+                    // array values are not rematerialized by this pass.
+                    if (!as<IRGlobalParam>(source))
+                        return false;
+                    // GetElement also supports other aggregate types. This rewrite handles
+                    // descriptor arrays, whose elements can be selected by a nonuniform index.
+                    if (!as<IRArrayTypeBase>(source->getDataType()))
+                        return false;
+                    break;
+                }
+            default:
+                return false;
+            }
+            if (accessOp != kIROp_Invalid)
+            {
+                // One access operation must reconstruct every selected resource, so we
+                // cannot combine heap loads and array indexing in the same graph.
+                if (inst->getOp() != accessOp)
+                    return false;
+                // a[i] and a[j] can share a selected index, but a[i] and b[j] cannot.
+                if (source != accessSource)
+                    return false;
+            }
+            accessOp = inst->getOp();
+            accessSource = source;
+            // Valid array indices are nonnegative. The widest incoming type can hold all
+            // of them if we prefer unsigned when widths match. For example, Int and UInt
+            // use UInt, while UInt and Int64 use Int64. This preserves existing 64-bit
+            // indices without introducing 64-bit values when all incoming indices are narrower.
+            auto incomingIndexType = index->getDataType();
+            if (!commonIndexType)
+                commonIndexType = incomingIndexType;
+            else
+            {
+                auto commonInfo = getIntTypeInfo(targetReq, commonIndexType);
+                auto incomingInfo = getIntTypeInfo(targetReq, incomingIndexType);
+                if (incomingInfo.width > commonInfo.width ||
+                    (incomingInfo.width == commonInfo.width && !incomingInfo.isSigned))
+                    commonIndexType = incomingIndexType;
+            }
+            mapResourceToIndex.add(inst, index);
+            continue;
+        }
+        graphNodes.add(inst);
+    }
+
+    // A cycle without any descriptor access does not establish a source to rematerialize.
+    // For example, the parameters of an unreachable loop may only feed each other.
+    if (accessOp == kIROp_Invalid)
+        return false;
+
+    // Casts are inserted only after the whole graph has been accepted, so rejection leaves
+    // the IR unchanged. Each conversion precedes its original access, where the index is
+    // available, and dominates every selection edge that used that resource, including
+    // loop back edges. The loop updates the map in place, so each access then maps to its
+    // converted index.
+    for (auto& [resource, index] : mapResourceToIndex)
+    {
+        IRBuilder builder(resource);
+        builder.setInsertBefore(resource);
+        index = builder.emitCast(commonIndexType, index);
+    }
+
+    // New parameters give cyclic dependencies their integer values before we build any
+    // selects. We insert each integer parameter immediately before its resource parameter,
+    // so the integer parameters take the original positions once the resource parameters
+    // are removed. Until then, originalParams records those positions for the branch rewrite.
+    List<IRSelect*> pendingSelects;
+    for (auto inst : graphNodes)
+    {
+        if (as<IRParam>(inst))
+        {
+            IRBuilder builder(inst);
+            auto index = builder.createParam(commonIndexType);
+            index->insertBefore(inst);
+            index->sourceLoc = inst->sourceLoc;
+            // The reconstruction step below moves the name hint to this integer parameter.
+            // Other decorations follow the reconstructed resource, which retains the original type.
+            mapResourceToIndex.add(inst, index);
+        }
+        else
+            pendingSelects.add(cast<IRSelect>(inst));
+    }
+
+    emitResourceIndexSelects(pendingSelects, commonIndexType, mapResourceToIndex);
+
+    // We rewrite branch arguments before replaceUsesWith below, because afterwards they
+    // no longer name the original resources.
+    rewriteResourceSelectionBranchArgs(originalParams, mapResourceToIndex);
+
+    // The new integer graph never uses the old resource selections, so replacing their
+    // uses cannot introduce a self-reference. When inst is a block parameter,
+    // setInsertBeforeOrdinaryInst places its reconstructed access after all of the block's
+    // parameters.
+    for (auto inst : graphNodes)
+    {
+        IRBuilder builder(inst);
+        setInsertBeforeOrdinaryInst(&builder, inst);
+        IRInst* index = mapResourceToIndex.getValue(inst);
+        // The name follows the selected state, which is now an integer. Moving the hint
+        // avoids giving the reconstructed access the same source name. Other decorations
+        // stay on the reconstructed value, which still has the resource type.
+        if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+        {
+            nameHint->removeFromParent();
+            nameHint->insertAtStart(index);
+        }
+        IRInst* resource;
+        if (accessOp == kIROp_GetElement)
+        {
+            // The index used for array indexing can be nonuniform even when all incoming
+            // indices are constant: the condition or control flow chooses between them.
+            index = builder.emitNonUniformResourceIndexInst(index);
+            resource = builder.emitElementExtract(resourceType, accessSource, index);
+        }
+        else
+        {
+            // SPIRVLoadDescriptorFromHeap needs no marker: DescriptorHeapEXT permits
+            // nonuniform resource access by default.
+            resource = builder.emitLoadDescriptorFromHeap(resourceType, accessSource, index);
+        }
+        resource->sourceLoc = inst->sourceLoc;
+        inst->transferDecorationsTo(resource);
+        inst->replaceUsesWith(resource);
+    }
+
+    for (auto inst : graphNodes)
+    {
+        // A single graph can consume several candidates saved by the outer traversal.
+        // Removing them before deletion prevents that traversal from using stale pointers.
+        remainingCandidates.remove(inst);
+        inst->removeAndDeallocate();
+    }
+    // Original resource accesses, and recreated resources used only by other selections,
+    // may now be unused. The simplifyIR call in specializeResourceUsage removes them.
+    return true;
+}
+
+// This pass finds resource-valued selects and block parameters in function bodies and
+// replaces supported graphs with index selections. Function parameters are handled by
+// specializeResourceParameters.
+static bool specializeResourceSelections(CodeGenContext* codeGenContext, IRModule* module)
+{
+    // Both SPIR-V and GLSL need this rewrite for sampler and texture selections.
+    // Out-of-SSA conversion would introduce function-local variables of these types,
+    // which neither target can represent. Selecting an integer index lets us load
+    // the resource from its heap or array instead.
+    // The access instructions and nonuniform-index handling used here cover Khronos targets.
+    // WGSL also restricts resource locals, but extending this pass to it requires checking
+    // its resource-array and nonuniform-indexing rules; that is not handled here.
+    if (!isKhronosTarget(codeGenContext->getTargetReq()))
+        return false;
+
+    bool changed = false;
+    for (auto global : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(global);
+        if (!func)
+            continue;
+        // We collect possible resource selections represented by selects and non-entry block
+        // parameters. A rewrite may consume several candidates, so collection happens first.
+        OrderedHashSet<IRInst*> candidates;
+        for (auto block : func->getBlocks())
+            for (auto inst : block->getChildren())
+            {
+                // Every select may choose between resources.
+                if (as<IRSelect>(inst))
+                    candidates.add(inst);
+                // Function parameters receive resources from callers rather than branch arguments,
+                // so only parameters of later blocks are candidates.
+                else if (as<IRParam>(inst) && block != func->getFirstBlock())
+                    candidates.add(inst);
+            }
+        while (candidates.getCount())
+        {
+            auto candidate = *candidates.begin();
+            candidates.remove(candidate);
+            changed |=
+                specializeResourceSelection(codeGenContext->getTargetReq(), candidate, candidates);
+        }
+    }
+    return changed;
+}
+
 bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
 {
-    // Simplification after either specialization can remove intermediate loads and stores. We
-    // therefore apply both transformations and simplify their results until none of those steps
+    // Simplification after specialization can remove intermediate loads and stores. We
+    // therefore apply selection, input, and output specialization until none of those steps
     // changes the module.
     //
     // Output specialization records a function when callers cannot reconstruct its resource return
     // or output parameter. We then try to inline direct calls to that function, simplify, and retry
-    // both transformations. Once output inlining makes no progress, the D3D resource-input step
+    // specialization. Once output inlining makes no progress, the D3D resource-input step
     // tries to inline calls whose resource arguments do not have a recognized HLSL form.
     bool result = false;
     for (;;)
@@ -1564,13 +2032,14 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
         bool changed = true;
         HashSet<IRFunc*> unspecializableFuncs;
 
-        // We first apply input and output specialization without removing call boundaries.
-        // Simplification after each successful round exposes resource values hidden behind
-        // temporary loads and stores.
+        // We first apply selection, input, and output specialization without removing call
+        // boundaries. Simplification after each successful round exposes resource values hidden
+        // behind temporary loads and stores.
         while (changed)
         {
             changed = false;
             unspecializableFuncs.clear();
+            changed |= specializeResourceSelections(codeGenContext, irModule);
             changed |= specializeResourceOutputs(codeGenContext, irModule, unspecializableFuncs);
             changed |= specializeResourceParameters(codeGenContext, irModule);
 
@@ -1585,8 +2054,8 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
         }
 
         // If callers could not reconstruct a resource return or output parameter, we try to inline
-        // each direct call to the callee, simplify the result, and retry input and output
-        // specialization.
+        // each direct call to the callee, simplify the result, and retry selection, input, and
+        // output specialization.
         if (unspecializableFuncs.getCount() != 0)
         {
             bool inlinedOutputCall = false;
@@ -1606,7 +2075,7 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
 
         // After output inlining makes no progress, we try to inline the D3D calls whose resource
         // inputs cannot be emitted directly as HLSL. We simplify each successful inlining round and
-        // then retry input and output specialization.
+        // then retry selection, input, and output specialization.
         if (tryInlineD3DCallsWithUnsupportedResourceInputs(codeGenContext, irModule))
         {
             simplifyIR(

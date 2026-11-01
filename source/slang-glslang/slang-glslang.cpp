@@ -2,6 +2,7 @@
 #include "slang-glslang.h"
 
 #include "SPIRV/GlslangToSpv.h"
+#include "core/slang-exception.h"
 #include "glslang/Public/ShaderLang.h"
 #include "slang.h"
 #include "spirv-tools/libspirv.h"
@@ -10,6 +11,9 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#endif
+#if defined(_MSC_VER) && defined(SLANG_GLSLANG_USES_MIMALLOC)
+#include <mimalloc.h>
 #endif
 
 #include <cassert>
@@ -941,6 +945,22 @@ static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_3& request)
     return 0;
 }
 
+#if defined(_MSC_VER) && defined(SLANG_GLSLANG_USES_MIMALLOC)
+// SPIRV-Tools-opt links its own copy of mimalloc into this DLL
+// (external/spirv-tools/source/opt/CMakeLists.txt). This hook releases that copy's memory on
+// `FreeLibrary` exactly as the one in source/slang/slang-mimalloc.cpp does for slang-compiler, and
+// the explanation and host contract there apply unchanged. The function-local static
+// `g_processInitializer` in `glslang_compile_1_3`, whose destructor calls
+// `glslang::FinalizeProcess()`, is registered with `atexit` after mimalloc, so it is destroyed
+// before mimalloc's shutdown runs.
+extern "C" BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID reserved)
+{
+    if (reason == DLL_PROCESS_DETACH && reserved == nullptr)
+        mi_option_enable(mi_option_destroy_on_exit);
+    return TRUE;
+}
+#endif
+
 // We need a per process initialization
 class ProcessInitializer
 {
@@ -1096,6 +1116,8 @@ extern "C"
     return glslang_compile_1_1(&request);
 }
 
+// Link the given SPIR-V modules into one. On success the caller owns request->linkResult and must
+// release it with glslang_freeLinkResult().
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
@@ -1107,7 +1129,7 @@ extern "C"
     if (!request || !request->modules || request->linkResult)
         return false;
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         spvtools::Context context(SPV_ENV_UNIVERSAL_1_5);
         spvtools::LinkerOptions options = {};
@@ -1156,8 +1178,22 @@ extern "C"
 
         return success == SPV_SUCCESS;
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         return false;
     }
+#endif
+}
+
+// Free a link result returned by glslang_linkSPIRV. A null pointer is accepted and ignored.
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        void glslang_freeLinkResult(const uint32_t* linkResult)
+{
+    delete[] linkResult;
 }

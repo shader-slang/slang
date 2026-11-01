@@ -30,6 +30,35 @@ static bool isMatrixDividedByScalar(IRInst* inst)
            (as<IRBasicType>(inst->getOperand(1)->getDataType()));
 }
 
+// Returns the vector or matrix type that has the shape of `compositeType` and the element type
+// `elementType`. A shift keeps the type of the shift amount, so a scalar shift amount is
+// converted to this type and not to the type of the shifted value.
+//
+// Consider this example on Metal or WGSL:
+//
+//     int2x2 m = ...;
+//     int2x2 r = m << 1;
+//
+// The shifted value is a matrix, because `legalizeMatrixTypes` rewrites an int matrix to an array
+// of vectors only after the Metal and WGSL legalization has run.
+static IRType* getCompositeTypeWithElementType(
+    IRBuilder& builder,
+    IRType* compositeType,
+    IRType* elementType)
+{
+    if (auto matrixType = as<IRMatrixType>(compositeType))
+    {
+        return builder.getMatrixType(
+            elementType,
+            matrixType->getRowCount(),
+            matrixType->getColumnCount(),
+            matrixType->getLayout());
+    }
+    auto vectorType = as<IRVectorType>(compositeType);
+    SLANG_ASSERT(vectorType);
+    return builder.getVectorType(elementType, vectorType->getElementCount());
+}
+
 // If one operand is a composite type (vector or matrix), and the other one is a scalar
 // type, then the scalar is converted to a composite type.
 static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
@@ -44,9 +73,8 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
         // Retain the scalar type for shifts
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
         {
-            auto vectorType = as<IRVectorType>(compositeType);
             compositeType =
-                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
+                getCompositeTypeWithElementType(builder, compositeType, scalarValue->getDataType());
         }
         auto newRhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands() + 1, newRhs);
@@ -62,9 +90,8 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
         // Retain the scalar type for shifts
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
         {
-            auto vectorType = as<IRVectorType>(compositeType);
             compositeType =
-                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
+                getCompositeTypeWithElementType(builder, compositeType, scalarValue->getDataType());
         }
         auto newLhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands(), newLhs);
@@ -120,6 +147,24 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
                     shiftAmountElementType,
                     shiftAmountVectorType->getElementCount());
                 IRInst* newShiftAmount = builder.emitCast(shiftAmountVectorType, shiftAmount);
+                builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
+            }
+        }
+        else if (auto shiftAmountMatrixType = as<IRMatrixType>(shiftAmountType))
+        {
+            IRType* shiftAmountElementType = shiftAmountMatrixType->getElementType();
+            IntInfo opIntInfo =
+                getIntTypeInfo(targetProgram->getTargetReq(), shiftAmountElementType);
+            if (opIntInfo.isSigned)
+            {
+                opIntInfo.isSigned = false;
+                shiftAmountElementType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
+                IRInst* newShiftAmount = builder.emitCast(
+                    getCompositeTypeWithElementType(
+                        builder,
+                        shiftAmountMatrixType,
+                        shiftAmountElementType),
+                    shiftAmount);
                 builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
             }
         }

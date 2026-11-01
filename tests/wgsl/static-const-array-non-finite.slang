@@ -9,7 +9,7 @@
 // Slang's WGSL emitter spells a NaN or infinity literal as a call to the `_slang_getNan` /
 // `_slang_getInfinity` prelude helpers, and a module-scope initializer may not call a
 // user-declared function. A runtime-indexed `static const` array holding such a literal therefore
-// cannot be the module-scope `var<private>` that an all-finite table becomes; it is materialized
+// cannot be the module-scope `const` that an all-finite table becomes; it is materialized
 // inside the functions that use it instead. For the same reason, a function-scope value built from
 // such a literal is declared with `var`, never `const`.
 
@@ -41,7 +41,7 @@ static const float4 kSplats[2] = { float4(1.0 / 0.0), float4(0.0) };
 static const float2x2 kMatSplats[2] = { float2x2(0.0 / 0.0), float2x2(1.0) };
 static const float kFinite[3] = { 1.0, 2.0, 3.0 };
 
-// WGSL: var<private> kFinite{{.*}} = array<f32, i32(3)>( 1.0f, 2.0f, 3.0f );
+// WGSL: const kFinite{{.*}} = array<f32, i32(3)>( 1.0f, 2.0f, 3.0f );
 
 RWStructuredBuffer<float> outputBuffer;
 

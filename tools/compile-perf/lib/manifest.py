@@ -712,8 +712,8 @@ WORKLOADS = [
     # (gen_codegen) contains none of the constructs the target-specific passes
     # are gated on, so all six targets agree to within 1.18x. SPIR-V is carried
     # in every family as the control, since it is what every other workload in
-    # the suite measures. See COVERAGE-ANALYSIS.md for the measurements and for
-    # why a single mixed cross-target shader was rejected.
+    # the suite measures. A mixed cross-target shader was rejected because its
+    # shared front-end cost masked the target-specific back-end differences.
     #
     # Loads in one function: deferBufferLoad + simplifyNonSSAIR. Targets that
     # move globals into an explicit global context (CUDA) turn every parameter

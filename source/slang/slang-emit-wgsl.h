@@ -98,6 +98,9 @@ private:
 
     bool m_f16ExtensionEnabled = false;
 
+    // Set when a push-constant buffer is emitted as `var<immediate>`.
+    bool m_requiresImmediateAddressSpace = false;
+
     RefPtr<ShaderExtensionTracker> m_extensionTracker;
 };
 

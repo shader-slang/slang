@@ -368,8 +368,6 @@ struct SimplifyForEmitContext : public InstPassBase
                 case kIROp_Greater:
                 case kIROp_Eql:
                 case kIROp_Neq:
-                case kIROp_Lsh:
-                case kIROp_Rsh:
                     builder.setInsertBefore(inst);
                     SLANG_ASSERT(inst->getOperandCount() == 2);
                     if (as<IRVectorType>(inst->getDataType()))
@@ -399,6 +397,39 @@ struct SimplifyForEmitContext : public InstPassBase
                         }
                     }
 
+                    break;
+                case kIROp_Lsh:
+                case kIROp_Rsh:
+                    // A shift's operands may have different integer types, and its result has the
+                    // type of the left operand. Consider this example:
+                    //
+                    //     int s = -8;
+                    //     int3 r = s >> uint3(1, 2, 3);
+                    //
+                    // The other binary operators splat `s` to the type of the other operand,
+                    // `uint3`, but that would turn this arithmetic shift into a logical one. We
+                    // splat each scalar operand to a vector of its own type instead, and rely on
+                    // the CUDA and C++ preludes for the mixed-type vector shift operators.
+                    SLANG_ASSERT(inst->getOperandCount() == 2);
+                    if (auto resultVectorType = as<IRVectorType>(inst->getDataType()))
+                    {
+                        builder.setInsertBefore(inst);
+                        for (UInt a = 0; a < 2; a++)
+                        {
+                            auto operandType = inst->getOperand(a)->getDataType();
+                            if (as<IRBasicType>(operandType))
+                            {
+                                auto splatType = builder.getVectorType(
+                                    operandType,
+                                    resultVectorType->getElementCount());
+                                inst->setOperand(
+                                    a,
+                                    builder.emitMakeVectorFromScalar(
+                                        splatType,
+                                        inst->getOperand(a)));
+                            }
+                        }
+                    }
                     break;
                 }
             }

@@ -573,6 +573,7 @@ jobs:
       cpu-only: true
       slang-user-skills: true
       server-count: 4
+      run-via-glsl: false
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -587,6 +588,8 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+      # Vulkan is not available on macOS, so the via-glsl pass (-api vk) cannot run here.
+      run-via-glsl: false
 
   test-macos-debug-clang-aarch64-rhi:
     needs: [filter, build-macos-debug-clang-aarch64]
@@ -611,6 +614,8 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+      # Vulkan is not available on macOS, so the via-glsl pass (-api vk) cannot run here.
+      run-via-glsl: false
 
   test-macos-release-clang-aarch64-rhi:
     needs: [filter, build-macos-release-clang-aarch64]
@@ -635,6 +640,7 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+      run-via-glsl: false
 
   test-linux-release-gcc-aarch64:
     needs: [filter, build-linux-release-gcc-aarch64]
@@ -647,6 +653,7 @@ jobs:
       config: release
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+      run-via-glsl: false
 
   # Windows ARM64 test (GitHub-hosted, native, CPU only — no GPU on this
   # hosted image).
@@ -668,6 +675,7 @@ jobs:
       # platform, so restrict directly to cpu+llvm via cpu-only instead of
       # relying on it.
       cpu-only: true
+      run-via-glsl: false
 
   test-windows-release-cl-aarch64:
     needs: [filter, build-windows-release-cl-aarch64]
@@ -681,14 +689,10 @@ jobs:
       runs-on: '["windows-11-vs2026-arm"]'
       full-gpu-tests: false
       cpu-only: true
+      run-via-glsl: false
 
-  # Windows GPU tests (self-hosted).
-  # Each config is split into three parallel jobs to reduce wall-clock time:
-  #   -gpu-dx:   dx11+dx12+wgpu
-  #   -gpu-vk:   vk+cpu+llvm + no-API tests
-  #   -gpu-cuda: cuda
-  # The three jobs run concurrently on separate runners.
-  test-windows-debug-cl-x86_64-gpu-dx:
+  # Windows GPU tests (self-hosted)
+  test-windows-debug-cl-x86_64-gpu:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -699,36 +703,8 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
-      api: dx11+dx12+wgpu
       gpu-tier: t4
-
-  test-windows-debug-cl-x86_64-gpu-vk:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: vk+cpu+llvm
-      gpu-tier: t4
-
-  test-windows-debug-cl-x86_64-gpu-cuda:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: cuda
-      gpu-tier: t4
+      run-via-glsl: true
 
   test-windows-debug-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
@@ -741,7 +717,7 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  test-windows-release-cl-x86_64-gpu-dx:
+  test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -752,36 +728,8 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
-      api: dx11+dx12+wgpu
       gpu-tier: t4
-
-  test-windows-release-cl-x86_64-gpu-vk:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: vk+cpu+llvm
-      gpu-tier: t4
-
-  test-windows-release-cl-x86_64-gpu-cuda:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: cuda
-      gpu-tier: t4
+      run-via-glsl: true
 
   test-windows-release-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -837,7 +785,7 @@ jobs:
           export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"
           mkdir -p temp
           # Capture stdout+stderr to match how the golden file is produced by
-          # regenerate-cmdline-ref.yml; otherwise stray stderr output would be
+          # slash-regenerate-cmdline-ref.yml; otherwise stray stderr output would be
           # baked into the reference but missing here, causing a spurious diff.
           artifacts/Release/bin/slangc -help-style markdown -h > temp/command-line-slangc-reference.md 2>&1
 
@@ -974,13 +922,9 @@ jobs:
         static-unit-test-linux-debug-gcc-aarch64,
         static-unit-test-macos-debug-clang-aarch64,
         static-unit-test-windows-debug-cl-x86_64,
-        test-windows-release-cl-x86_64-gpu-dx,
-        test-windows-release-cl-x86_64-gpu-vk,
-        test-windows-release-cl-x86_64-gpu-cuda,
+        test-windows-release-cl-x86_64-gpu,
         test-windows-release-cl-x86_64-gpu-rhi,
-        test-windows-debug-cl-x86_64-gpu-dx,
-        test-windows-debug-cl-x86_64-gpu-vk,
-        test-windows-debug-cl-x86_64-gpu-cuda,
+        test-windows-debug-cl-x86_64-gpu,
         test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
         test-macos-release-clang-aarch64-rhi,
