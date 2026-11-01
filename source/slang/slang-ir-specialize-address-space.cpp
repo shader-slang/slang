@@ -99,9 +99,38 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     Dictionary<FuncSpecializationKey, IRFunc*> functionSpecializations;
 
+    // Maps each clone created by `specializeFunc` to the unspecialized function it was cloned
+    // from. Invariant: a `FuncSpecializationKey` is always built from an unspecialized function,
+    // so a call that already targets a specialization is keyed through this map (see
+    // `getUnspecializedFunc`), and one lookup is enough.
+    //
+    // A call can already target a specialization when its caller is processed because:
+    // - the work list holds a callee once per call site without pointer arguments, so a caller
+    //   is processed again after its calls were rewritten (e.g. `f` called three times in
+    //   tests/wgsl/address-space-specialization-dedup.slang);
+    // - a caller is processed again when a callee's result address space changes;
+    // - a function that was processed before it is cloned passes its rewritten calls on to the
+    //   clone.
+    // Keying such a call on the unspecialized function finds the existing specialization
+    // instead of specializing the specialization.
+    Dictionary<IRFunc*, IRFunc*> specializationOrigin;
+
+    // Returns the unspecialized function `func` was cloned from, or `func` itself if it is not a
+    // specialization.
+    IRFunc* getUnspecializedFunc(IRFunc* func)
+    {
+        if (auto origin = specializationOrigin.tryGetValue(func))
+            return *origin;
+        return func;
+    }
+
+    // Clones `key.getFunc()` with its pointer parameters retyped to the key's address spaces,
+    // records the clone in `functionSpecializations` (under `key`) and in `specializationOrigin`,
+    // and returns it. `key.getFunc()` must be an unspecialized function, never a clone.
     IRFunc* specializeFunc(const FuncSpecializationKey& key)
     {
         auto func = key.getFunc();
+        SLANG_ASSERT(!specializationOrigin.containsKey(func));
         IRCloneEnv cloneEnv;
         IRBuilder builder(module);
 
@@ -134,6 +163,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         fixUpFuncType(specializedFunc);
 
         functionSpecializations[key] = specializedFunc;
+        specializationOrigin[specializedFunc] = func;
         return specializedFunc;
     }
 
@@ -291,7 +321,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 // If callee doesn't have a body, don't specialize.
                                 if (!callee->getFirstBlock())
                                     break;
-                                FuncSpecializationKey key(callee, argAddrSpaces);
+                                // `callee` can already be a specialization (see
+                                // `specializationOrigin`).
+                                FuncSpecializationKey key(
+                                    getUnspecializedFunc(callee),
+                                    argAddrSpaces);
                                 IRFunc* specializedCallee = nullptr;
                                 if (IRFunc** specializedFunc =
                                         functionSpecializations.tryGetValue(key))
@@ -310,7 +344,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                     callInst = as<IRCall>(builder.replaceOperand(
                                         callInst->getOperands(),
                                         specializedCallee));
-                                    // At this point, the original callee may be left without uses.
+                                    // At this point, the previous callee may be left without uses.
                                     functionsToConsiderRemoving.add(callee);
                                 }
                                 auto callResultAddrSpace =

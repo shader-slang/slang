@@ -911,9 +911,16 @@ struct PeepholeContext : InstPassBase
                 for (UInt i = 0; i < opCount; i++)
                 {
                     auto element = inst->getOperand(0)->getOperand(i);
+                    // An operand can be a vector or a Metal packed vector. Both have an element
+                    // count, and the packed vector is converted to a vector by the `MakeVector`.
+                    IRInst* elementCount = nullptr;
                     if (auto elementVecType = as<IRVectorType>(element->getDataType()))
+                        elementCount = elementVecType->getElementCount();
+                    else if (auto packedType = as<IRMetalPackedVectorType>(element->getDataType()))
+                        elementCount = packedType->getElementCount();
+                    if (elementCount)
                     {
-                        auto vecSize = as<IRIntLit>(elementVecType->getElementCount());
+                        auto vecSize = as<IRIntLit>(elementCount);
                         if (!vecSize)
                             break;
                         if (index->getValue() >= startIndex &&
@@ -1683,6 +1690,12 @@ struct PeepholeContext : InstPassBase
                     SLANG_ASSERT(terminator->getArgCount() > paramIndex);
                     auto arg = terminator->getArg(paramIndex);
                     if (as<IRUndefined>(arg))
+                        continue;
+                    // A back edge that passes the param its own value (a loop that never
+                    // writes it) adds no new value. Taken as the value, it would make the
+                    // param replace its uses with itself and report a change on every
+                    // iteration, so the pass would never reach a fixed point.
+                    if (arg == inst)
                         continue;
                     if (argValue == nullptr)
                         argValue = arg;

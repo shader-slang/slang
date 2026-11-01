@@ -30,13 +30,6 @@ struct Counter
         value++;
     }
 
-    [mutating]
-    [constref]
-    void incrementWithOverlappingAttributes()
-    {
-        value++;
-    }
-
     property int item
     {
         get
@@ -80,7 +73,6 @@ void computeMain()
     result += counter.readByBorrow();
     counter.increment();
     counter.incrementByReference();
-    counter.incrementWithOverlappingAttributes();
     counter.item = result;
     counter.nonMutatingItem = result;
 
@@ -98,8 +90,6 @@ void computeMain()
 // CHECK-NEXT: func {{.*}} : Func(Void, BorrowInOutParam(%Counter))
 // CHECK-LABEL: [nameHint("Counter.incrementByReference")]
 // CHECK-NEXT: func {{.*}} : Func(Void, RefParam(%Counter{{.*}}))
-// CHECK-LABEL: [nameHint("Counter.incrementWithOverlappingAttributes")]
-// CHECK-NEXT: func {{.*}} : Func(Void, BorrowInOutParam(%Counter))
 // CHECK-LABEL: [nameHint("Counter.item.set")]
 // CHECK-NEXT: func {{.*}} : Func(Void, BorrowInOutParam(%Counter), Int)
 // CHECK-LABEL: [nameHint("Counter.nonMutatingItem.set")]

@@ -250,9 +250,6 @@ class ResourceType : public BuiltinType
     SlangResourceShape getBaseShape();
     SlangResourceShape getShape();
     SlangResourceAccess getAccess();
-    /// Returns the original texel type argument, including any explicit format descriptor.
-    Type* getTexelType();
-    /// Returns the data type produced by loads and accepted by stores.
     Type* getElementType();
     void _toTextOverride(StringBuilder& out);
 };
@@ -882,9 +879,32 @@ class BorrowInOutParamType : public OutParamTypeBase
     void _toTextOverride(StringBuilder& out);
 };
 
+// A type that represents the pointer passed for any by-reference parameter
+FIDDLE(abstract)
+class RefParamTypeBase : public ParamPassingModeType
+{
+    FIDDLE(...)
+};
+
 // The type for a by-reference parameter, e.g., `ref T`
 FIDDLE()
-class RefParamType : public ParamPassingModeType
+class RefParamType : public RefParamTypeBase
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+};
+
+// The type for a read-only by-reference parameter, e.g., `ref_readonly T`
+FIDDLE()
+class RefReadOnlyParamType : public RefParamTypeBase
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+};
+
+// The type for a write-only by-reference parameter, e.g., `ref_writeonly T`
+FIDDLE()
+class RefWriteOnlyParamType : public RefParamTypeBase
 {
     FIDDLE(...)
     void _toTextOverride(StringBuilder& out);

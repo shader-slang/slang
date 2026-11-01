@@ -4,8 +4,11 @@ on:
     types: [created]
 permissions:
   contents: write
-  issues: read
-  pull-requests: read
+  # The reaction and the error reply are written with this token. Only
+  # `pull-requests: write` may be needed, because the commands apply to pull
+  # requests only; `issues: write` is kept until a run confirms that.
+  issues: write
+  pull-requests: write
 jobs:
   slashCommandDispatch:
     if: github.repository == 'shader-slang/slang'
@@ -16,7 +19,6 @@ jobs:
         uses: peter-evans/slash-command-dispatch@9bdcd7914ec1b75590b790b844aa3b8eee7c683a # v5.0.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          reaction-token: ${{ secrets.SLANGBOT_PAT }}
           issue-type: pull-request
           config: >
             [
@@ -37,11 +39,11 @@ jobs:
               }
             ]
 
-      - name: Edit comment with error message
+      - name: Reply with error message
         if: steps.scd.outputs.error-message
         uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
-          token: ${{ secrets.SLANGBOT_PAT }}
-          comment-id: ${{ github.event.comment.id }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.issue.number }}
           body: |
             > ${{ steps.scd.outputs.error-message }}

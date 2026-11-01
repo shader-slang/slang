@@ -65,6 +65,16 @@ jobs:
           submodules: "recursive"
           persist-credentials: false
 
+      # The language reference manual lives in shader-slang/spec. The
+      # bundles' doc_ref paths (docs/language-reference/...) resolve
+      # against this checkout; see LANG_REF_PREFIX in
+      # docs/generated/tests/_meta/regenerate.py.
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: shader-slang/spec
+          path: spec-checkout
+          persist-credentials: false
+
       - name: Authenticate to Google Cloud
         if: env.IS_FORK_PR != 'true'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0

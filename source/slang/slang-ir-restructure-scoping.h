@@ -21,6 +21,10 @@ struct IRInst;
 /// to survive across blocks are communicated through variables
 /// declared at a sufficiently broad scope.
 ///
-void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldAlwaysFoldInst);
+/// `shouldFoldInst` must give the emitter's fold decision for the IR as this pass leaves it.
+/// The pass adds uses as it goes (copies, stores into temporaries), so it asks again for
+/// each instruction when it visits it, including when it revisits the operands of a copy.
+///
+void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldFoldInst);
 
 } // namespace Slang
