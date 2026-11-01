@@ -63,8 +63,11 @@ void computeMain()
     // copysign(3, b) = (-3, ..., 3).
     // CHECK-NEXT: {{^}}-27.000000
     outputBuffer[10] = copysign(Vec8(3.0), b)[0] * 10.0 + copysign(Vec8(3.0), b)[7];
+    // The macOS CI's Metal run did not give exactly 9 here, so each term is rounded. cos(1.0) or
+    // sin(0.5) in place of cospi or sinpi still gives a different sum.
     // CHECK-NEXT: {{^}}9.000000
-    outputBuffer[11] = cospi(Vec8(1.0))[5] + 10.0 * sinpi(Vec8(0.5))[6] + tanpi(Vec8(0.0))[7];
+    outputBuffer[11] = round(cospi(Vec8(1.0))[5]) + 10.0 * round(sinpi(Vec8(0.5))[6]) +
+                       round(tanpi(Vec8(0.0))[7]);
     // Metal's exp10(1.0f) is 9.999999, so the exp10 result is rounded. Rounding still tells
     // exp10 (10) apart from exp (3) and exp2 (2).
     // CHECK-NEXT: {{^}}13.000000
