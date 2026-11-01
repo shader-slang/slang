@@ -14534,6 +14534,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     getSimpleVal(subContext, extents[2])));
                 numThreadsDecor->sourceLoc = numThreadsAttr->loc;
             }
+            else if (auto launchBoundsAttr = as<CudaLaunchBoundsAttribute>(modifier))
+            {
+                auto builder = getBuilder();
+                builder->addDecoration(
+                    irFunc,
+                    kIROp_CudaLaunchBoundsDecoration,
+                    builder->getIntValue(
+                        builder->getIntType(),
+                        launchBoundsAttr->maxThreadsPerBlock),
+                    builder->getIntValue(
+                        builder->getIntType(),
+                        launchBoundsAttr->minBlocksPerMultiprocessor));
+            }
+            else if (auto maxRegistersAttr = as<CudaMaxRegistersAttribute>(modifier))
+            {
+                auto builder = getBuilder();
+                builder->addDecoration(
+                    irFunc,
+                    kIROp_CudaMaxRegistersDecoration,
+                    builder->getIntValue(builder->getIntType(), maxRegistersAttr->maxRegisters));
+            }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
                 subContext->irBuilder->setInsertBefore(irFunc);

@@ -446,6 +446,59 @@ Modifier* SemanticsVisitor::validateAttribute(
             numThreadsAttr->extents[i] = value;
         }
     }
+    else if (auto launchBoundsAttr = as<CudaLaunchBoundsAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 2);
+
+        auto maxThreads = checkConstantIntVal(attr->args[0]);
+        if (!maxThreads)
+            return nullptr;
+        if (maxThreads->getValue() < 1 || maxThreads->getValue() > INT32_MAX)
+        {
+            getSink()->diagnose(Diagnostics::InvalidCudaKernelAttributeValue{
+                .value = maxThreads->getValue(),
+                .attrName = attr->keywordName,
+                .attr = attr});
+            return nullptr;
+        }
+
+        int32_t minBlocks = 0;
+        if (attr->args[1])
+        {
+            auto minBlocksVal = checkConstantIntVal(attr->args[1]);
+            if (!minBlocksVal)
+                return nullptr;
+            if (minBlocksVal->getValue() < 0 || minBlocksVal->getValue() > INT32_MAX)
+            {
+                getSink()->diagnose(Diagnostics::InvalidCudaKernelAttributeValue{
+                    .value = minBlocksVal->getValue(),
+                    .attrName = attr->keywordName,
+                    .attr = attr});
+                return nullptr;
+            }
+            minBlocks = (int32_t)minBlocksVal->getValue();
+        }
+
+        launchBoundsAttr->maxThreadsPerBlock = (int32_t)maxThreads->getValue();
+        launchBoundsAttr->minBlocksPerMultiprocessor = minBlocks;
+    }
+    else if (auto maxRegistersAttr = as<CudaMaxRegistersAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 1);
+
+        auto maxRegisters = checkConstantIntVal(attr->args[0]);
+        if (!maxRegisters)
+            return nullptr;
+        if (maxRegisters->getValue() < 1 || maxRegisters->getValue() > INT32_MAX)
+        {
+            getSink()->diagnose(Diagnostics::InvalidCudaKernelAttributeValue{
+                .value = maxRegisters->getValue(),
+                .attrName = attr->keywordName,
+                .attr = attr});
+            return nullptr;
+        }
+        maxRegistersAttr->maxRegisters = (int32_t)maxRegisters->getValue();
+    }
     else if (auto waveSizeAttr = as<WaveSizeAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
@@ -1646,6 +1699,11 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::HLSLGroupSharedModifier:
     case ASTNodeType::NumThreadsAttribute:
         return modifierType;
+
+    // CUDA rejects `__launch_bounds__` and `__maxnreg__` on the same kernel.
+    case ASTNodeType::CudaLaunchBoundsAttribute:
+    case ASTNodeType::CudaMaxRegistersAttribute:
+        return ASTNodeType::CudaLaunchBoundsAttribute;
 
     case ASTNodeType::NodeLaunchAttribute:
     case ASTNodeType::MaxRecordsAttribute:
