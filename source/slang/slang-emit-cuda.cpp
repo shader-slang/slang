@@ -464,6 +464,29 @@ static bool _isCudaDeviceFunctionDefinitionExported(IRFunc* func)
     return false;
 }
 
+// Emits `__launch_bounds__(...)` or `__maxnreg__(...)` for a kernel with a
+// `[CudaLaunchBounds]` or `[CudaMaxRegisters]` attribute.
+static void _emitCudaKernelResourceLimits(SourceWriter* writer, IRInst* inst)
+{
+    if (auto launchBounds = inst->findDecoration<IRCudaLaunchBoundsDecoration>())
+    {
+        writer->emit("__launch_bounds__(");
+        writer->emit(launchBounds->getMaxThreadsPerBlock()->getValue());
+        if (auto minBlocks = launchBounds->getMinBlocksPerMultiprocessor()->getValue())
+        {
+            writer->emit(", ");
+            writer->emit(minBlocks);
+        }
+        writer->emit(") ");
+    }
+    if (auto maxRegisters = inst->findDecoration<IRCudaMaxRegistersDecoration>())
+    {
+        writer->emit("__maxnreg__(");
+        writer->emit(maxRegisters->getMaxRegisters()->getValue());
+        writer->emit(") ");
+    }
+}
+
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)
@@ -483,6 +506,7 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
         else
         {
             m_writer->emit("__global__ ");
+            _emitCudaKernelResourceLimits(m_writer, inst);
         }
 
         return;
@@ -491,6 +515,7 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     if (inst->findDecoration<IRCudaKernelDecoration>())
     {
         m_writer->emit("__global__ ");
+        _emitCudaKernelResourceLimits(m_writer, inst);
     }
     else if (inst->findDecoration<IRCudaHostDecoration>())
     {
