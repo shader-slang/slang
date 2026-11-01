@@ -4479,6 +4479,16 @@ protected:
                 result.permittedTypes.add(getGroupThreadIdType(builder));
                 break;
             }
+        case SystemValueSemanticName::WorkgroupSize:
+            {
+                // The threadgroup size the host passed to the dispatch. It matches
+                // `[numthreads]` only if the host dispatches with that size.
+                result.systemValueName = toSlice("threads_per_threadgroup");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::UInt),
+                    builder.getIntValue(builder.getIntType(), 3)));
+                break;
+            }
         case SystemValueSemanticName::GSInstanceID:
             {
                 result.isUnsupported = true;
