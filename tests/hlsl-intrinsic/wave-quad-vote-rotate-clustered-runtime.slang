@@ -1,5 +1,5 @@
 //TEST_CATEGORY(wave, compute)
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgpu -compute -shaderobj -output-using-type
 
 // Runs QuadAny, QuadAll, WaveRotate and WaveClusteredSum and checks each result in the shader, so
 // the test does not depend on the subgroup size. Each invocation writes 15 when all checks pass:
