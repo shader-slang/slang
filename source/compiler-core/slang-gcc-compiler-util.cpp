@@ -1075,7 +1075,14 @@ static SlangResult _parseGCCFamilyLine(
         break;
     case FloatingPointMode::Precise:
         {
-            // cmdLine.addArg("-fno-unsafe-math-optimizations");
+            // `a*b+c` is not fused, matching `-fp-mode precise` on SPIR-V and CUDA.
+            cmdLine.addArg("-ffp-contract=off");
+
+            // Metal defaults to fast math (`-fmetal-math-mode=fast`), which assumes no NaN or
+            // Inf: it folds `x != x` to false and `x * 0.0` to 0.0, and selects the `metal::fast`
+            // math functions. We turn it off explicitly, which also selects the `metal::precise`
+            // functions. For GCC and Clang this is a no-op.
+            cmdLine.addArg("-fno-fast-math");
             break;
         }
     case FloatingPointMode::Fast:

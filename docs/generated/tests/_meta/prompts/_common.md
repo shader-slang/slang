@@ -1082,8 +1082,8 @@ pitfalls observed in earlier bundles:
   and the closesthit/anyhit signature emits without it.
 - **Entry-point stage capabilities are checked at type-check time.**
   If the core module excludes a target from the capability set for
-  a given intrinsic (e.g. `NonUniformResourceIndex` requires
-  `cpp_cuda_glsl_hlsl_spirv` and so excludes Metal), the test
+  a given intrinsic (e.g. one declared only
+  `[require(cpp_cuda_glsl_hlsl_spirv)]` excludes Metal and WGSL), the test
   rejects with E36107 before any emit happens. This is usually a
   doc-bug; see [Record a doc-gap](#record-a-doc-gap-when-the-doc-claims-a-surface-the-compiler-rejects)
   below.
@@ -1102,9 +1102,6 @@ we have already surfaced:
 - The SPIR-V doc names `-validate-spirv` as the CLI flag enabling
   spirv-val; no such flag exists. Only `SLANG_RUN_SPIRV_VALIDATION`
   (env var) and `-skip-spirv-validation` are real surfaces.
-- The Metal doc claims `NonUniformResourceIndex` is a pass-through;
-  the core module excludes Metal from its capability set, so the
-  intrinsic does not even compile.
 
 Recording the doc-gap is more valuable than working around the
 fabrication: the next doc regeneration consumes the row and fixes

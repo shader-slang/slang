@@ -85,6 +85,7 @@ flowchart LR
 
   subgraph after["After CI"]
     cirun["ci.yml"] -->|workflow_run| post["check-ir-version.yml<br>ci-retry-yielded-bot.yml"]
+    perfnight["nightly-mdl-perf-test.yml"] -->|workflow_run| bisect["claude-perf-bisect.yml"]
   end
 ```
 
@@ -100,6 +101,9 @@ flowchart LR
 | `repository_dispatch` | Triggered by a slash command relayed from a PR comment.                                                                                                                                           |
 | `schedule`            | Cron-driven.                                                                                                                                                                                      |
 | `workflow_dispatch`   | Run manually from the Actions tab.                                                                                                                                                                |
+
+`claude-perf-bisect.yml` is the one `workflow_run` workflow that builds code: it
+builds merged master commits after a scheduled nightly, never PR code.
 
 ## 1. PR gates
 
@@ -243,6 +247,7 @@ not compete for the same runners.
 | `nightly-slang-sascha-test.yml`    | nightly                            | Compiles the Sascha Willems Vulkan sample shaders.                   |
 | `nightly-slang-vkglcts-test.yml`   | nightly                            | Runs the Vulkan CTS with Slang as the shader compiler.               |
 | `nightly-mdl-perf-test.yml`        | nightly                            | Compile-performance suite for the MDL workloads.                     |
+| `claude-perf-bisect.yml`           | after a red perf nightly           | Shadow bisect of a confirmed compile-perf change.                    |
 | `ci-analytics.yml`                 | daily                              | Collects CI run statistics and publishes them.                       |
 | `pr-sweep-nightly.yml`             | nightly                            | Board-sync backstop over every open PR.                              |
 | `cmake-options.yml`                | weekly                             | Builds the matrix of non-default CMake option combinations.          |
