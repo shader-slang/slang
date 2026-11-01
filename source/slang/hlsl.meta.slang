@@ -16,6 +16,7 @@ in uint __builtinWaveIndex : SV_WaveIndex;
 in uint __builtinWaveCount : SV_WaveCount;
 in uint __builtinGroupIndex : SV_GroupIndex;
 in uint3 __builtinWorkgroupCount : SV_WorkgroupCount;
+in uint3 __builtinWorkgroupSize : SV_WorkgroupSize;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -8588,6 +8589,31 @@ uint3 WorkgroupCount()
         return spirv_asm {
             result:$$uint3 = OpLoad builtin(NumWorkgroups:uint3);
         };
+    }
+}
+
+/// Returns the workgroup size the calling compute dispatch was launched with.
+///
+/// On Metal and CUDA the host chooses the threadgroup (block) size at dispatch time,
+/// and it need not match `[numthreads]`: this reads the dispatched size, from
+/// `[[threads_per_threadgroup]]` on Metal and `blockDim` on CUDA. On the other
+/// targets the workgroup size is fixed by `[numthreads]` when the pipeline is
+/// created, so this returns the same value as `WorkgroupSize()`.
+///
+/// Use `WorkgroupSize()` when the kernel is always dispatched with its
+/// `[numthreads]` size: it is a compile-time constant on every target.
+[require(compute)]
+[require(meshshading)]
+uint3 DispatchedWorkgroupSize()
+{
+    __target_switch
+    {
+    case metal:
+        return __builtinWorkgroupSize;
+    case cuda:
+        return cudaBlockDim();
+    default:
+        return uint3(WorkgroupSize());
     }
 }
 
