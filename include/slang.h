@@ -4358,9 +4358,9 @@ struct IGlobalSession : public ISlangUnknown
      *   - The options given after a `-target` (for example `-profile`, `-capability`, `-fp-mode`),
      *     in that target's `compilerOptionEntries`. The profile is also stored in
      *     `TargetDesc::profile`.
-     *   - Target options given with no `-target`, other than `-profile`. They apply to the target
-     *     inferred from an `-o` path or a `-profile` when there is one, and otherwise become
-     *     session options that every target of the session inherits.
+     *   - Target options given before the first `-target`, other than `-profile`. With a single
+     *     target, declared or inferred, they apply to it. With no target, they become session
+     *     options for the targets added to the session. With several targets they are rejected.
      *   - All other options (for example `-I`, `-D`, `-O`, `-g`, `-matrix-layout-row-major`, `-r`,
      *     `-X...`), as session options.
      *

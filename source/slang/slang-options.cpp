@@ -3043,11 +3043,6 @@ SlangResult OptionsParser::_resolveEntryPoints()
         }
     }
 
-    // (`-trace-coverage` + `-pass-through` rejection moved to
-    // `EndToEndCompileRequest::executeActionsInner` so that C++
-    // API callers using `setPassThrough()` are also covered;
-    // this option-parser path is CLI-only.)
-
     // If the user is requesting code generation via pass-through,
     // then any entry points they specify need to have a stage set,
     // because fxc/dxc/glslang don't have a facility for taking
