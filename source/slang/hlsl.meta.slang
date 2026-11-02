@@ -4991,9 +4991,20 @@ ${
         const char* componentArgString[] = { ", 0", ", 0", ", 1", ", 2", ", 3" };
         const char* componentFunc = componentFuncString[componentId];
         const char* componentArg = (isShadow ? "" : componentArgString[componentId]);
+
+        // The combined form has no sampler parameter, so its location is argument 1. CUDA keeps a
+        // combined texture-sampler as one texture object, so its `$0` goes to tex2Dgather as is.
+        const char* locationArg = isCombined ? "$1" : "$2";
+
+        // CUDA has no depth-compare gather: tex2Dgather takes no compare value and a
+        // SamplerComparisonState is a no-op placeholder there, so GatherCmp* is unavailable on
+        // CUDA, as SampleCmp* is. `isShadow` here selects the GatherCmp* overloads, not shadow
+        // textures. The `case cuda:` arms below are emitted only when `!isShadow`, because a
+        // `__target_switch` case that the `[require]` excludes is a capability error (E36101).
+        const char* gatherTargets = isShadow ? "glsl_hlsl_metal_spirv_wgsl" : "cuda_glsl_hlsl_metal_spirv_wgsl";
 $}
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require($(gatherTargets), texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -5005,10 +5016,12 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        ${ if (!isShadow) { $}
         case cuda:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($(locationArg)).x, ($(locationArg)).y$(componentArg))";
+        ${ } $}
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -5040,7 +5053,7 @@ $}
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require($(gatherTargets), texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -5053,11 +5066,14 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        ${ if (!isShadow) { $}
         case cuda:
-            // CUDA tex2Dgather doesn't support offset - ignore offset parameter
+            // tex2Dgather has no offset parameter, so CUDA ignores `offset` here. The Sample*
+            // offset overloads leave CUDA out of [require] instead.
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($(locationArg)).x, ($(locationArg)).y$(componentArg))";
+        ${ } $}
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
