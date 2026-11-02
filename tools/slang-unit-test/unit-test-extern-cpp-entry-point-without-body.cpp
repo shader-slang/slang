@@ -7,9 +7,10 @@
 using namespace Slang;
 
 // Test that a body-less `__extern_cpp` function selected as an entry point through
-// `IModule::findAndCheckEntryPoint` is reported as an unresolved symbol rather than crashing the
-// compiler. The function has no `[shader]` attribute, so the module is lowered before anything
-// marks it as an entry point; the link step has to recognize it from the program being linked.
+// `IModule::findAndCheckEntryPoint` is reported once as an unresolved symbol rather than crashing
+// the compiler. The function has neither `[shader]` nor `[numthreads]`, so entry-point discovery
+// does not pick it up and the module is lowered before anything marks it as an entry point; the
+// check in `specializeIRForEntryPoint` has to recognize it from the program being linked.
 // See https://github.com/shader-slang/slang/issues/14200
 
 static void checkBodylessEntryPointIsUnresolved(
@@ -17,7 +18,6 @@ static void checkBodylessEntryPointIsUnresolved(
     SlangCompileTarget format)
 {
     const char* source = R"(
-        [numthreads(1, 1, 1)]
         __extern_cpp void NoBody(uniform float* p, uint3 tid : SV_DispatchThreadID);
         )";
 
@@ -69,8 +69,10 @@ static void checkBodylessEntryPointIsUnresolved(
     auto diagnostics = UnownedStringSlice(
         (const char*)codeDiagnostics->getBufferPointer(),
         codeDiagnostics->getBufferSize());
-    SLANG_CHECK(diagnostics.indexOf(toSlice("error[E45001]")) >= 0);
-    SLANG_CHECK(diagnostics.indexOf(toSlice("E99997")) < 0);
+    Index firstError = diagnostics.indexOf(toSlice("error[E45001]"));
+    SLANG_CHECK(firstError >= 0);
+    SLANG_CHECK(diagnostics.tail(firstError + 1).indexOf(toSlice("error[E45001]")) < 0);
+    SLANG_CHECK(diagnostics.indexOf(toSlice("E9999")) < 0);
 }
 
 SLANG_UNIT_TEST(externCppEntryPointWithoutBodyCuda)
@@ -81,4 +83,14 @@ SLANG_UNIT_TEST(externCppEntryPointWithoutBodyCuda)
 SLANG_UNIT_TEST(externCppEntryPointWithoutBodyCpp)
 {
     checkBodylessEntryPointIsUnresolved(unitTestContext, SLANG_CPP_SOURCE);
+}
+
+SLANG_UNIT_TEST(externCppEntryPointWithoutBodySpirv)
+{
+    checkBodylessEntryPointIsUnresolved(unitTestContext, SLANG_SPIRV);
+}
+
+SLANG_UNIT_TEST(externCppEntryPointWithoutBodyHlsl)
+{
+    checkBodylessEntryPointIsUnresolved(unitTestContext, SLANG_HLSL);
 }
