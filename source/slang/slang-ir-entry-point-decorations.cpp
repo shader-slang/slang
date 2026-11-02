@@ -259,6 +259,70 @@ void checkEntryPointDecorations(IRModule* module, CodeGenTarget target, Diagnost
     CheckEntryPointDecorationsContext(module, target, sink).check();
 }
 
+// Two entry points collide in the output when they have the same key: the symbol that the emitter
+// writes for the entry point, plus the stage on targets that keep a separate namespace per stage.
+struct EntryPointSymbolKey
+{
+    String symbol;
+    Stage stage = Stage::Unknown;
+
+    bool operator==(const EntryPointSymbolKey& other) const
+    {
+        return symbol == other.symbol && stage == other.stage;
+    }
+    HashCode getHashCode() const
+    {
+        return combineHash(Slang::getHashCode(symbol), Slang::getHashCode(stage));
+    }
+};
+
+void checkEntryPointNamesAreUnique(CodeGenContext* codeGenContext, const List<IRFunc*>& entryPoints)
+{
+    const CodeGenTarget target = codeGenContext->getTargetFormat();
+
+    // The GLSL emitter writes every entry point as `main`, and a GLSL output holds a single entry
+    // point, so the source names of GLSL entry points never reach the output.
+    if (target == CodeGenTarget::GLSL)
+        return;
+
+    Dictionary<EntryPointSymbolKey, IRFunc*> entryPointsBySymbol;
+    for (auto entryPoint : entryPoints)
+    {
+        auto decoration = entryPoint->findDecoration<IREntryPointDecoration>();
+        SLANG_ASSERT(decoration);
+        String name = decoration->getName()->getStringSlice();
+        const Stage stage = decoration->getProfile().getStage();
+
+        if (doesTargetRenameEntryPointName(target, name.getUnownedSlice()))
+            continue;
+
+        EntryPointSymbolKey key;
+        key.symbol = name;
+        if (isCUDATarget(target))
+            key.symbol = String(getOptiXEntryPointNamePrefix(stage)) + name;
+        else if (isSPIRV(target))
+            key.stage = stage;
+
+        IRFunc* otherEntryPoint = nullptr;
+        if (!entryPointsBySymbol.tryGetValue(key, otherEntryPoint))
+        {
+            entryPointsBySymbol.add(key, entryPoint);
+            continue;
+        }
+
+        // The same function may be requested as an entry point more than once.
+        if (otherEntryPoint == entryPoint)
+            continue;
+
+        codeGenContext->getSink()->diagnose(Diagnostics::DuplicateEntryPointName{
+            .name = key.symbol,
+            .target = String(TypeTextUtil::getCompileTargetName(
+                SlangCompileTarget(codeGenContext->getFinalTargetFormat()))),
+            .location = entryPoint->sourceLoc,
+            .otherLocation = otherEntryPoint->sourceLoc});
+    }
+}
+
 UnownedStringSlice getOptiXEntryPointNamePrefix(Stage stage)
 {
     // OptiX 7 Guide, Section 6.1 (Program input): "The type of program affects how the program

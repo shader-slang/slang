@@ -1369,6 +1369,7 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     SLANG_PASS(checkEntryPointDecorations, target, sink);
+    checkEntryPointNamesAreUnique(codeGenContext, irEntryPoints);
 
     // Add floating point denormal handling mode decorations to entry point functions based on
     // compiler options. This is done post-linking to ensure all entry points from linked

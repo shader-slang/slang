@@ -4639,6 +4639,14 @@ err(
     "entry point index ~entryPointIndex:int is out of range; the program's entry-point count is ~entryPointCount:int"
 )
 
+err(
+    "duplicate-entry-point-name",
+    38016,
+    "more than one entry point is named '~name' in the output for target '~target'",
+    span { loc = "location", message = "entry point named '~name' conflicts with another entry point" },
+    note { message = "see the other entry point named '~name'", span { loc = "otherLocation" } }
+)
+
 
 -- Load semantic checking diagnostics (part 10) - Interface Requirements, Global Generics, Differentiation, Modules
 -- (inlined from slang-diagnostics-semantic-checking-10.lua)

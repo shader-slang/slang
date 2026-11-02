@@ -6,6 +6,7 @@
 namespace Slang
 {
 enum class CodeGenTarget;
+struct CodeGenContext;
 class DiagnosticSink;
 
 /// Checks entry point decoration values to ensure that they are valid for
@@ -22,6 +23,25 @@ UnownedStringSlice getOptiXEntryPointNamePrefix(Stage stage);
 /// emitters for CPU, CUDA and Metal do so for `main`, which cannot name a kernel in the C++-based
 /// languages that they write.
 bool doesTargetRenameEntryPointName(CodeGenTarget target, UnownedStringSlice entryPointName);
+
+/// Diagnose two entry points of the linked program `entryPoints` that the emitter for the target
+/// of `codeGenContext` would write under the same symbol, such as two overloads of one
+/// `[shader("compute")]` function. Consider this example:
+///
+///     [shader("compute")] [numthreads(1, 1, 1)] void Count(uniform uint a) { ... }
+///     [shader("compute")] [numthreads(1, 1, 1)] void Count(uniform float a) { ... }
+///
+/// The emitters write each entry point under its unqualified name, so CUDA and Metal would emit
+/// two kernels named `Count` and SPIR-V two `OpEntryPoint GLCompute ... "Count"`, which the
+/// downstream compiler or validator rejects. SPIR-V allows entry points of different execution
+/// models to share a name, and CUDA prefixes the symbol of an OptiX ray-tracing entry point with
+/// its program type, so the comparison uses the symbol that each emitter writes.
+///
+/// `entryPoints` holds only the entry points of the program being compiled. A `[shader]` function
+/// that the program calls as an ordinary function is not an entry point of the output.
+void checkEntryPointNamesAreUnique(
+    CodeGenContext* codeGenContext,
+    const List<IRFunc*>& entryPoints);
 
 
 // OutputTopologyType member definition macro
