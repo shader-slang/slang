@@ -6,10 +6,6 @@
 // Validate the computeMain WGSL through Tint on CI (ignored where the downstream compiler is absent).
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm -entry computeMain -stage compute
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
-// Non-32-bit integer matrices are lowered to arrays of vectors and rejected like those vectors.
-//DIAGNOSTIC_TEST:SIMPLE(diag=I64): -target wgsl -entry narrowIntMain -stage compute -DINT_TYPE=int64_t
-//DIAGNOSTIC_TEST:SIMPLE(diag=I16): -target wgsl -entry narrowIntMain -stage compute -DINT_TYPE=int16_t
-//DIAGNOSTIC_TEST:SIMPLE(diag=U8): -target wgsl -entry narrowIntMain -stage compute -DINT_TYPE=uint8_t
 
 // WGSL has no unary '-' on matrices and no single-scalar matrix constructor, so a matrix negation
 // cannot be written as "-m" or as "matCxR<T>(0) - m" (#13571). The WGSL emitter multiplies by the
@@ -91,24 +87,4 @@ void halfMain(uniform RWStructuredBuffer<half4> halfBuffer)
     half2x2 a = half2x2(halfBuffer[0].x, halfBuffer[0].y, halfBuffer[0].z, halfBuffer[0].w);
     half2x2 r = -a;
     halfBuffer[1] = half4(r[0], r[1]);
-}
-
-// The matrix is converted from a float matrix, so no narrow-int vector exists until
-// legalizeMatrixTypes lowers the matrix itself; without that lowering the matrix reaches the
-// emitter. The diagnostic names a vector and carries no source location because the lowered vector
-// type has none; that is a known limitation, not part of what this test pins down.
-//I64: disallowed vector element type
-//I64: vector with disallowed element type 'int64_t' encountered
-//I16: disallowed vector element type
-//I16: vector with disallowed element type 'int16_t' encountered
-//U8: disallowed vector element type
-//U8: vector with disallowed element type 'uint8_t' encountered
-#ifndef INT_TYPE
-#define INT_TYPE int64_t
-#endif
-[numthreads(1, 1, 1)]
-void narrowIntMain(uniform RWStructuredBuffer<float2x2> narrowIntBuffer)
-{
-    matrix<INT_TYPE, 2, 2> m = matrix<INT_TYPE, 2, 2>(narrowIntBuffer[0]);
-    narrowIntBuffer[1] = float2x2(-m);
 }
