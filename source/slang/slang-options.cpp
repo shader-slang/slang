@@ -1557,6 +1557,10 @@ struct OptionsParser
 
     SlangResult _parse(int argc, char const* const* argv);
 
+    SlangResult _resolveEntryPoints();
+    void _resolveOutputPaths(const Dictionary<CodeGenTarget, int>& mapFormatToTargetIndex);
+    void _bindOutputsToTargets();
+
     static bool _passThroughRequiresStage(PassThroughMode passThrough);
 
     SlangResult _compileReproDirectory(
@@ -2828,6 +2832,442 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
     }
 
     return SLANG_OK;
+}
+
+// Resolve the entry points named on the command line (or implied by a stage and a single
+// translation unit) and add them to the compile request.
+SlangResult OptionsParser::_resolveEntryPoints()
+{
+    // As a compatability feature, if the user didn't list any explicit entry
+    // point names, *and* they are compiling a single translation unit, *and* they
+    // have either specified a stage, or we can assume one from the naming
+    // of the translation unit, then we assume they wanted to compile a single
+    // entry point named `main`.
+    //
+    if (m_rawEntryPoints.getCount() == 0 && m_rawTranslationUnits.getCount() == 1 &&
+        (m_defaultEntryPoint.stage != Stage::Unknown ||
+         m_rawTranslationUnits[0].impliedStage != Stage::Unknown))
+    {
+        RawEntryPoint entry;
+        entry.name = "main";
+        entry.translationUnitIndex = 0;
+        m_rawEntryPoints.add(entry);
+    }
+
+    // If the user (manually or implicitly) specified only a single entry point,
+    // then we allow the associated stage to be specified either before or after
+    // the entry point. This means that if there is a stage attached
+    // to the "default" entry point, we should copy it over to the
+    // explicit one.
+    //
+    if (m_rawEntryPoints.getCount() == 1)
+    {
+        if (m_defaultEntryPoint.stage != Stage::Unknown)
+        {
+            setStage(getCurrentEntryPoint(), m_defaultEntryPoint.stage);
+        }
+
+        if (m_defaultEntryPoint.redundantStageSet)
+            getCurrentEntryPoint()->redundantStageSet = true;
+        if (m_defaultEntryPoint.conflictingStagesSet)
+            getCurrentEntryPoint()->conflictingStagesSet = true;
+    }
+    else
+    {
+        // If the "default" entry point has had a stage (or
+        // other state, if we add other per-entry-point state)
+        // specified, but there is more than one entry point,
+        // then that state doesn't apply to anything and we
+        // should issue an error to tell the user something
+        // funky is going on.
+        //
+        if (m_defaultEntryPoint.stage != Stage::Unknown)
+        {
+            if (m_rawEntryPoints.getCount() == 0)
+            {
+                m_sink->diagnose(Diagnostics::StageSpecificationIgnoredBecauseNoEntryPoints{});
+            }
+            else
+            {
+                m_sink->diagnose(
+                    Diagnostics::StageSpecificationIgnoredBecauseBeforeAllEntryPoints{});
+            }
+        }
+    }
+
+    // Slang requires that every explicit entry point indicate the translation
+    // unit it comes from. If there is only one translation unit specified,
+    // then implicitly all entry points come from it.
+    //
+    if (m_translationUnitCount == 1)
+    {
+        for (auto& entryPoint : m_rawEntryPoints)
+        {
+            entryPoint.translationUnitIndex = 0;
+        }
+    }
+    else if (
+        m_frontEndReq->additionalLoadedModules &&
+        m_frontEndReq->additionalLoadedModules->getCount() == 0)
+    {
+        // Otherwise, we require that all entry points be specified after
+        // the translation unit to which tye belong.
+        bool anyEntryPointWithoutTranslationUnit = false;
+        for (auto& entryPoint : m_rawEntryPoints)
+        {
+            // Skip entry points that are already associated with a translation unit...
+            if (entryPoint.translationUnitIndex != -1)
+                continue;
+
+            anyEntryPointWithoutTranslationUnit = true;
+        }
+        if (anyEntryPointWithoutTranslationUnit)
+        {
+            m_sink->diagnose(Diagnostics::EntryPointsNeedToBeAssociatedWithTranslationUnits{});
+            return SLANG_FAIL;
+        }
+    }
+
+    // Now that entry points are associated with translation units,
+    // we can make one additional pass where if an entry point has
+    // no specified stage, but the nameing of its translation unit
+    // implies a stage, we will use that (a manual `-stage` annotation
+    // will always win out in such a case).
+    //
+    for (auto& rawEntryPoint : m_rawEntryPoints)
+    {
+        // Skip entry points that already have a stage.
+        if (rawEntryPoint.stage != Stage::Unknown)
+            continue;
+
+        // Sanity check: don't process entry points with no associated translation unit.
+        if (rawEntryPoint.translationUnitIndex == -1)
+            continue;
+
+        auto impliedStage = m_rawTranslationUnits[rawEntryPoint.translationUnitIndex].impliedStage;
+        if (impliedStage != Stage::Unknown)
+            rawEntryPoint.stage = impliedStage;
+    }
+
+    // Note: it is possible that some entry points still won't have associated
+    // stages at this point, but we don't want to error out here, because
+    // those entry points might get stages later, as part of semantic checking,
+    // if the corresponding function has a `[shader("...")]` attribute.
+
+    // Now that we've tried to establish stages for entry points, we can
+    // issue diagnostics for cases where stages were set redundantly or
+    // in conflicting ways.
+    //
+    for (auto& rawEntryPoint : m_rawEntryPoints)
+    {
+        if (rawEntryPoint.conflictingStagesSet)
+        {
+            m_sink->diagnose(
+                Diagnostics::ConflictingStagesForEntryPoint{.entryPoint = rawEntryPoint.name});
+        }
+        else if (rawEntryPoint.redundantStageSet)
+        {
+            m_sink->diagnose(Diagnostics::SameStageSpecifiedMoreThanOnce{
+                .stage = getStageName(rawEntryPoint.stage),
+                .entryPoint = rawEntryPoint.name});
+        }
+        else if (rawEntryPoint.translationUnitIndex != -1)
+        {
+            // As a quality-of-life feature, if the file name implies a particular
+            // stage, but the user manually specified something different for
+            // their entry point, give a warning in case they made a mistake.
+
+            auto& rawTranslationUnit = m_rawTranslationUnits[rawEntryPoint.translationUnitIndex];
+            if (rawTranslationUnit.impliedStage != Stage::Unknown &&
+                rawEntryPoint.stage != Stage::Unknown &&
+                rawTranslationUnit.impliedStage != rawEntryPoint.stage)
+            {
+                m_sink->diagnose(Diagnostics::ExplicitStageDoesntMatchImpliedStage{
+                    .entryPoint = rawEntryPoint.name,
+                    .specifiedStage = getStageName(rawEntryPoint.stage),
+                    .impliedStage = getStageName(rawTranslationUnit.impliedStage)});
+            }
+        }
+    }
+
+    // (`-trace-coverage` + `-pass-through` rejection moved to
+    // `EndToEndCompileRequest::executeActionsInner` so that C++
+    // API callers using `setPassThrough()` are also covered;
+    // this option-parser path is CLI-only.)
+
+    // If the user is requesting code generation via pass-through,
+    // then any entry points they specify need to have a stage set,
+    // because fxc/dxc/glslang don't have a facility for taking
+    // a named entry point and pulling its stage from an attribute.
+    //
+    if (_passThroughRequiresStage(m_requestImpl->m_passThrough))
+    {
+        for (auto& rawEntryPoint : m_rawEntryPoints)
+        {
+            if (rawEntryPoint.stage == Stage::Unknown)
+            {
+                m_sink->diagnose(Diagnostics::NoStageSpecifiedInPassThroughMode{
+                    .entryPoint = rawEntryPoint.name});
+            }
+        }
+    }
+
+    // We now have inferred enough information to add the
+    // entry points to our compile request.
+    //
+    for (auto& rawEntryPoint : m_rawEntryPoints)
+    {
+        if (rawEntryPoint.translationUnitIndex < 0)
+            continue;
+
+        auto translationUnitID =
+            m_rawTranslationUnits[rawEntryPoint.translationUnitIndex].translationUnitID;
+
+        List<const char*> specializationArgs;
+        for (auto& arg : rawEntryPoint.specializationArgs)
+            specializationArgs.add(arg.getBuffer());
+
+        int entryPointID = m_compileRequest->addEntryPointEx(
+            translationUnitID,
+            rawEntryPoint.name.begin(),
+            SlangStage(rawEntryPoint.stage),
+            (int)specializationArgs.getCount(),
+            specializationArgs.getBuffer());
+
+        rawEntryPoint.entryPointID = entryPointID;
+    }
+
+    return SLANG_OK;
+}
+
+// Associate each `-o` path with the target and entry point it is an output for, diagnosing
+// paths that cannot be matched.
+void OptionsParser::_resolveOutputPaths(
+    const Dictionary<CodeGenTarget, int>& mapFormatToTargetIndex)
+{
+    // Next we need to sort out the output files specified with `-o`, and
+    // figure out which entry point and/or target they apply to.
+    //
+    // If there is only a single entry point, then that is automatically
+    // the entry point that should be associated with all outputs.
+    //
+    if (m_rawEntryPoints.getCount() == 1)
+    {
+        for (auto& rawOutput : m_rawOutputs)
+        {
+            rawOutput.entryPointIndex = 0;
+        }
+    }
+    //
+    // Similarly, if there is only one target, then all outputs must
+    // implicitly appertain to that target.
+    //
+    if (m_rawTargets.getCount() == 1)
+    {
+        for (auto& rawOutput : m_rawOutputs)
+        {
+            rawOutput.targetIndex = 0;
+        }
+    }
+
+    // If we don't have any raw outputs but do have a raw target,
+    // add an empty' rawOutput for certain targets where the expected behavior is obvious.
+    if (m_rawOutputs.getCount() == 0 && m_rawTargets.getCount() == 1 &&
+        (m_rawTargets[0].format == CodeGenTarget::HostCPPSource ||
+         m_rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
+         m_rawTargets[0].format == CodeGenTarget::CUDASource ||
+         m_rawTargets[0].format == CodeGenTarget::CUDAHeader ||
+         m_rawTargets[0].format == CodeGenTarget::SPIRV ||
+         m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
+         m_rawTargets[0].format == CodeGenTarget::Metal ||
+         m_rawTargets[0].format == CodeGenTarget::MetalLib ||
+         m_rawTargets[0].format == CodeGenTarget::MetalLibAssembly ||
+         ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind ==
+             ArtifactKind::HostCallable))
+    {
+        RawOutput rawOutput;
+        rawOutput.impliedFormat = m_rawTargets[0].format;
+        rawOutput.targetIndex = 0;
+        m_rawOutputs.add(rawOutput);
+    }
+
+    // Consider the output files specified via `-o` and try to figure
+    // out how to deal with them.
+    //
+    for (auto& rawOutput : m_rawOutputs)
+    {
+        // For now, most output formats need to be tightly bound to
+        // both a target and an entry point.
+
+        // If an output doesn't have a target associated with
+        // it, then search for the target with the matching format.
+        if (rawOutput.targetIndex == -1)
+        {
+            auto impliedFormat = rawOutput.impliedFormat;
+            int targetIndex = -1;
+
+            if (impliedFormat == CodeGenTarget::Unknown)
+            {
+
+                // If we hit this case, then it means that we need to pick the
+                // target to assocaite with this output based on its implied
+                // format, but the file path doesn't direclty imply a format
+                // (it doesn't have a suffix like `.spv` that tells us what to write).
+                //
+                m_sink->diagnose(
+                    Diagnostics::CannotDeduceOutputFormatFromPath{.path = rawOutput.path});
+            }
+            else if (mapFormatToTargetIndex.tryGetValue(rawOutput.impliedFormat, targetIndex))
+            {
+                rawOutput.targetIndex = targetIndex;
+            }
+            else
+            {
+                m_sink->diagnose(Diagnostics::CannotMatchOutputFileToTarget{
+                    .path = rawOutput.path,
+                    .format = TypeTextUtil::getCompileTargetName(
+                        SlangCompileTarget(rawOutput.impliedFormat))});
+            }
+        }
+
+        if (rawOutput.targetIndex != -1 &&
+            m_rawTargets[rawOutput.targetIndex].optionSet.getBoolOption(
+                CompilerOptionName::GenerateWholeProgram))
+        {
+            // `-whole-program` emits one target-level artifact, even when the command line
+            // names a single entry point. Keep `-o` aligned with the artifact that
+            // `generateOutput()` will actually write.
+            rawOutput.isWholeProgram = true;
+        }
+
+        // We won't do any searching to match an output file
+        // with an entry point, since the case of a single entry
+        // point was handled above, and the user is expected to
+        // follow the ordering rules when using multiple entry points.
+        if (rawOutput.entryPointIndex == -1)
+        {
+            if (rawOutput.targetIndex != -1)
+            {
+                auto outputFormat = m_rawTargets[rawOutput.targetIndex].format;
+                // Here we check whether the given output format supports multiple entry points
+                // When we add targets with support for multiple entry points,
+                // we should update this switch with those new formats
+                switch (outputFormat)
+                {
+                case CodeGenTarget::CPPSource:
+                case CodeGenTarget::CPPHeader:
+                case CodeGenTarget::PTX:
+                case CodeGenTarget::CUDASource:
+                case CodeGenTarget::CUDAHeader:
+
+                case CodeGenTarget::HostHostCallable:
+                case CodeGenTarget::ShaderHostCallable:
+                case CodeGenTarget::HostExecutable:
+                case CodeGenTarget::ShaderSharedLibrary:
+                case CodeGenTarget::HostSharedLibrary:
+                case CodeGenTarget::PyTorchCppBinding:
+                case CodeGenTarget::DXIL:
+                case CodeGenTarget::MetalLib:
+                case CodeGenTarget::MetalLibAssembly:
+                case CodeGenTarget::Metal:
+                case CodeGenTarget::WGSL:
+                case CodeGenTarget::HostVM:
+                case CodeGenTarget::HostObjectCode:
+                case CodeGenTarget::ShaderObjectCode:
+                case CodeGenTarget::HostLLVMIR:
+                case CodeGenTarget::ShaderLLVMIR:
+                    rawOutput.isWholeProgram = true;
+                    break;
+                case CodeGenTarget::SPIRV:
+                case CodeGenTarget::SPIRVAssembly:
+                    if (getCurrentTarget()->optionSet.shouldEmitSPIRVDirectly())
+                    {
+                        rawOutput.isWholeProgram = true;
+                        break;
+                    }
+                    else if (m_rawEntryPoints.getCount() != 0)
+                    {
+                        rawOutput.entryPointIndex = (int)m_rawEntryPoints.getCount() - 1;
+                        break;
+                    }
+                    [[fallthrough]];
+                default:
+                    if (rawOutput.path.getLength() != 0)
+                    {
+                        m_sink->diagnose(
+                            Diagnostics::CannotMatchOutputFileToEntryPoint{.path = rawOutput.path});
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
+// Record the resolved output paths on the compile request's targets.
+void OptionsParser::_bindOutputsToTargets()
+{
+    // Now that we've diagnosed the output paths, we can add them
+    // to the compile request at the appropriate locations.
+    //
+    // We will consider the output files specified via `-o` and try to figure
+    // out how to deal with them.
+    //
+    for (auto& rawOutput : m_rawOutputs)
+    {
+        if (rawOutput.targetIndex == -1)
+            continue;
+        auto targetID = m_rawTargets[rawOutput.targetIndex].targetID;
+        auto target = m_requestImpl->getLinkage()->targets[targetID];
+        RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
+        if (!m_requestImpl->m_targetInfos.tryGetValue(target, targetInfo))
+        {
+            targetInfo = new EndToEndCompileRequest::TargetInfo();
+            m_requestImpl->m_targetInfos[target] = targetInfo;
+        }
+        target->getOptionSet().overrideWith(m_rawTargets[rawOutput.targetIndex].optionSet);
+        if (rawOutput.isWholeProgram)
+        {
+            if (targetInfo->wholeTargetOutputPath != "")
+            {
+                m_sink->diagnose(Diagnostics::DuplicateOutputPathsForTarget{
+                    .target = TypeTextUtil::getCompileTargetName(
+                        SlangCompileTarget(target->getTarget()))});
+            }
+            else
+            {
+                target->getOptionSet().addTargetFlags(SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
+                targetInfo->wholeTargetOutputPath = rawOutput.path;
+            }
+        }
+        else
+        {
+            if (rawOutput.entryPointIndex == -1)
+                continue;
+
+            auto entryPoint = m_rawEntryPoints[rawOutput.entryPointIndex];
+            Int entryPointID = entryPoint.entryPointID;
+            if (entryPointID == -1)
+            {
+                m_sink->diagnose(Diagnostics::EntryPointFunctionNotFound{.name = entryPoint.name});
+                continue;
+            }
+            auto entryPointReq = m_requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
+
+            // String outputPath;
+            if (targetInfo->entryPointOutputPaths.containsKey(entryPointID))
+            {
+                m_sink->diagnose(Diagnostics::DuplicateOutputPathsForEntryPointAndTarget{
+                    .entryPoint = entryPointReq->getName(),
+                    .target = TypeTextUtil::getCompileTargetName(
+                        SlangCompileTarget(target->getTarget()))});
+            }
+            else
+            {
+                targetInfo->entryPointOutputPaths[entryPointID] = rawOutput.path;
+            }
+        }
+    }
 }
 
 SlangResult OptionsParser::_parse(int argc, char const* const* argv)
@@ -4308,206 +4748,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
     // of the loop work if they are after -load-repro
     if (!m_hasLoadedRepro)
     {
-        // As a compatability feature, if the user didn't list any explicit entry
-        // point names, *and* they are compiling a single translation unit, *and* they
-        // have either specified a stage, or we can assume one from the naming
-        // of the translation unit, then we assume they wanted to compile a single
-        // entry point named `main`.
-        //
-        if (m_rawEntryPoints.getCount() == 0 && m_rawTranslationUnits.getCount() == 1 &&
-            (m_defaultEntryPoint.stage != Stage::Unknown ||
-             m_rawTranslationUnits[0].impliedStage != Stage::Unknown))
-        {
-            RawEntryPoint entry;
-            entry.name = "main";
-            entry.translationUnitIndex = 0;
-            m_rawEntryPoints.add(entry);
-        }
-
-        // If the user (manually or implicitly) specified only a single entry point,
-        // then we allow the associated stage to be specified either before or after
-        // the entry point. This means that if there is a stage attached
-        // to the "default" entry point, we should copy it over to the
-        // explicit one.
-        //
-        if (m_rawEntryPoints.getCount() == 1)
-        {
-            if (m_defaultEntryPoint.stage != Stage::Unknown)
-            {
-                setStage(getCurrentEntryPoint(), m_defaultEntryPoint.stage);
-            }
-
-            if (m_defaultEntryPoint.redundantStageSet)
-                getCurrentEntryPoint()->redundantStageSet = true;
-            if (m_defaultEntryPoint.conflictingStagesSet)
-                getCurrentEntryPoint()->conflictingStagesSet = true;
-        }
-        else
-        {
-            // If the "default" entry point has had a stage (or
-            // other state, if we add other per-entry-point state)
-            // specified, but there is more than one entry point,
-            // then that state doesn't apply to anything and we
-            // should issue an error to tell the user something
-            // funky is going on.
-            //
-            if (m_defaultEntryPoint.stage != Stage::Unknown)
-            {
-                if (m_rawEntryPoints.getCount() == 0)
-                {
-                    m_sink->diagnose(Diagnostics::StageSpecificationIgnoredBecauseNoEntryPoints{});
-                }
-                else
-                {
-                    m_sink->diagnose(
-                        Diagnostics::StageSpecificationIgnoredBecauseBeforeAllEntryPoints{});
-                }
-            }
-        }
-
-        // Slang requires that every explicit entry point indicate the translation
-        // unit it comes from. If there is only one translation unit specified,
-        // then implicitly all entry points come from it.
-        //
-        if (m_translationUnitCount == 1)
-        {
-            for (auto& entryPoint : m_rawEntryPoints)
-            {
-                entryPoint.translationUnitIndex = 0;
-            }
-        }
-        else if (
-            m_frontEndReq->additionalLoadedModules &&
-            m_frontEndReq->additionalLoadedModules->getCount() == 0)
-        {
-            // Otherwise, we require that all entry points be specified after
-            // the translation unit to which tye belong.
-            bool anyEntryPointWithoutTranslationUnit = false;
-            for (auto& entryPoint : m_rawEntryPoints)
-            {
-                // Skip entry points that are already associated with a translation unit...
-                if (entryPoint.translationUnitIndex != -1)
-                    continue;
-
-                anyEntryPointWithoutTranslationUnit = true;
-            }
-            if (anyEntryPointWithoutTranslationUnit)
-            {
-                m_sink->diagnose(Diagnostics::EntryPointsNeedToBeAssociatedWithTranslationUnits{});
-                return SLANG_FAIL;
-            }
-        }
-
-        // Now that entry points are associated with translation units,
-        // we can make one additional pass where if an entry point has
-        // no specified stage, but the nameing of its translation unit
-        // implies a stage, we will use that (a manual `-stage` annotation
-        // will always win out in such a case).
-        //
-        for (auto& rawEntryPoint : m_rawEntryPoints)
-        {
-            // Skip entry points that already have a stage.
-            if (rawEntryPoint.stage != Stage::Unknown)
-                continue;
-
-            // Sanity check: don't process entry points with no associated translation unit.
-            if (rawEntryPoint.translationUnitIndex == -1)
-                continue;
-
-            auto impliedStage =
-                m_rawTranslationUnits[rawEntryPoint.translationUnitIndex].impliedStage;
-            if (impliedStage != Stage::Unknown)
-                rawEntryPoint.stage = impliedStage;
-        }
-
-        // Note: it is possible that some entry points still won't have associated
-        // stages at this point, but we don't want to error out here, because
-        // those entry points might get stages later, as part of semantic checking,
-        // if the corresponding function has a `[shader("...")]` attribute.
-
-        // Now that we've tried to establish stages for entry points, we can
-        // issue diagnostics for cases where stages were set redundantly or
-        // in conflicting ways.
-        //
-        for (auto& rawEntryPoint : m_rawEntryPoints)
-        {
-            if (rawEntryPoint.conflictingStagesSet)
-            {
-                m_sink->diagnose(
-                    Diagnostics::ConflictingStagesForEntryPoint{.entryPoint = rawEntryPoint.name});
-            }
-            else if (rawEntryPoint.redundantStageSet)
-            {
-                m_sink->diagnose(Diagnostics::SameStageSpecifiedMoreThanOnce{
-                    .stage = getStageName(rawEntryPoint.stage),
-                    .entryPoint = rawEntryPoint.name});
-            }
-            else if (rawEntryPoint.translationUnitIndex != -1)
-            {
-                // As a quality-of-life feature, if the file name implies a particular
-                // stage, but the user manually specified something different for
-                // their entry point, give a warning in case they made a mistake.
-
-                auto& rawTranslationUnit =
-                    m_rawTranslationUnits[rawEntryPoint.translationUnitIndex];
-                if (rawTranslationUnit.impliedStage != Stage::Unknown &&
-                    rawEntryPoint.stage != Stage::Unknown &&
-                    rawTranslationUnit.impliedStage != rawEntryPoint.stage)
-                {
-                    m_sink->diagnose(Diagnostics::ExplicitStageDoesntMatchImpliedStage{
-                        .entryPoint = rawEntryPoint.name,
-                        .specifiedStage = getStageName(rawEntryPoint.stage),
-                        .impliedStage = getStageName(rawTranslationUnit.impliedStage)});
-                }
-            }
-        }
-
-        // (`-trace-coverage` + `-pass-through` rejection moved to
-        // `EndToEndCompileRequest::executeActionsInner` so that C++
-        // API callers using `setPassThrough()` are also covered;
-        // this option-parser path is CLI-only.)
-
-        // If the user is requesting code generation via pass-through,
-        // then any entry points they specify need to have a stage set,
-        // because fxc/dxc/glslang don't have a facility for taking
-        // a named entry point and pulling its stage from an attribute.
-        //
-        if (_passThroughRequiresStage(m_requestImpl->m_passThrough))
-        {
-            for (auto& rawEntryPoint : m_rawEntryPoints)
-            {
-                if (rawEntryPoint.stage == Stage::Unknown)
-                {
-                    m_sink->diagnose(Diagnostics::NoStageSpecifiedInPassThroughMode{
-                        .entryPoint = rawEntryPoint.name});
-                }
-            }
-        }
-
-        // We now have inferred enough information to add the
-        // entry points to our compile request.
-        //
-        for (auto& rawEntryPoint : m_rawEntryPoints)
-        {
-            if (rawEntryPoint.translationUnitIndex < 0)
-                continue;
-
-            auto translationUnitID =
-                m_rawTranslationUnits[rawEntryPoint.translationUnitIndex].translationUnitID;
-
-            List<const char*> specializationArgs;
-            for (auto& arg : rawEntryPoint.specializationArgs)
-                specializationArgs.add(arg.getBuffer());
-
-            int entryPointID = m_compileRequest->addEntryPointEx(
-                translationUnitID,
-                rawEntryPoint.name.begin(),
-                SlangStage(rawEntryPoint.stage),
-                (int)specializationArgs.getCount(),
-                specializationArgs.getBuffer());
-
-            rawEntryPoint.entryPointID = entryPointID;
-        }
+        SLANG_RETURN_ON_FAIL(_resolveEntryPoints());
 
         // We are going to build a mapping from target formats to the
         // target that handles that format.
@@ -4842,226 +5083,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         }
 
-        // Next we need to sort out the output files specified with `-o`, and
-        // figure out which entry point and/or target they apply to.
-        //
-        // If there is only a single entry point, then that is automatically
-        // the entry point that should be associated with all outputs.
-        //
-        if (m_rawEntryPoints.getCount() == 1)
-        {
-            for (auto& rawOutput : m_rawOutputs)
-            {
-                rawOutput.entryPointIndex = 0;
-            }
-        }
-        //
-        // Similarly, if there is only one target, then all outputs must
-        // implicitly appertain to that target.
-        //
-        if (m_rawTargets.getCount() == 1)
-        {
-            for (auto& rawOutput : m_rawOutputs)
-            {
-                rawOutput.targetIndex = 0;
-            }
-        }
-
-        // If we don't have any raw outputs but do have a raw target,
-        // add an empty' rawOutput for certain targets where the expected behavior is obvious.
-        if (m_rawOutputs.getCount() == 0 && m_rawTargets.getCount() == 1 &&
-            (m_rawTargets[0].format == CodeGenTarget::HostCPPSource ||
-             m_rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
-             m_rawTargets[0].format == CodeGenTarget::CUDASource ||
-             m_rawTargets[0].format == CodeGenTarget::CUDAHeader ||
-             m_rawTargets[0].format == CodeGenTarget::SPIRV ||
-             m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
-             m_rawTargets[0].format == CodeGenTarget::Metal ||
-             m_rawTargets[0].format == CodeGenTarget::MetalLib ||
-             m_rawTargets[0].format == CodeGenTarget::MetalLibAssembly ||
-             ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind ==
-                 ArtifactKind::HostCallable))
-        {
-            RawOutput rawOutput;
-            rawOutput.impliedFormat = m_rawTargets[0].format;
-            rawOutput.targetIndex = 0;
-            m_rawOutputs.add(rawOutput);
-        }
-
-        // Consider the output files specified via `-o` and try to figure
-        // out how to deal with them.
-        //
-        for (auto& rawOutput : m_rawOutputs)
-        {
-            // For now, most output formats need to be tightly bound to
-            // both a target and an entry point.
-
-            // If an output doesn't have a target associated with
-            // it, then search for the target with the matching format.
-            if (rawOutput.targetIndex == -1)
-            {
-                auto impliedFormat = rawOutput.impliedFormat;
-                int targetIndex = -1;
-
-                if (impliedFormat == CodeGenTarget::Unknown)
-                {
-
-                    // If we hit this case, then it means that we need to pick the
-                    // target to assocaite with this output based on its implied
-                    // format, but the file path doesn't direclty imply a format
-                    // (it doesn't have a suffix like `.spv` that tells us what to write).
-                    //
-                    m_sink->diagnose(
-                        Diagnostics::CannotDeduceOutputFormatFromPath{.path = rawOutput.path});
-                }
-                else if (mapFormatToTargetIndex.tryGetValue(rawOutput.impliedFormat, targetIndex))
-                {
-                    rawOutput.targetIndex = targetIndex;
-                }
-                else
-                {
-                    m_sink->diagnose(Diagnostics::CannotMatchOutputFileToTarget{
-                        .path = rawOutput.path,
-                        .format = TypeTextUtil::getCompileTargetName(
-                            SlangCompileTarget(rawOutput.impliedFormat))});
-                }
-            }
-
-            if (rawOutput.targetIndex != -1 &&
-                m_rawTargets[rawOutput.targetIndex].optionSet.getBoolOption(
-                    CompilerOptionName::GenerateWholeProgram))
-            {
-                // `-whole-program` emits one target-level artifact, even when the command line
-                // names a single entry point. Keep `-o` aligned with the artifact that
-                // `generateOutput()` will actually write.
-                rawOutput.isWholeProgram = true;
-            }
-
-            // We won't do any searching to match an output file
-            // with an entry point, since the case of a single entry
-            // point was handled above, and the user is expected to
-            // follow the ordering rules when using multiple entry points.
-            if (rawOutput.entryPointIndex == -1)
-            {
-                if (rawOutput.targetIndex != -1)
-                {
-                    auto outputFormat = m_rawTargets[rawOutput.targetIndex].format;
-                    // Here we check whether the given output format supports multiple entry points
-                    // When we add targets with support for multiple entry points,
-                    // we should update this switch with those new formats
-                    switch (outputFormat)
-                    {
-                    case CodeGenTarget::CPPSource:
-                    case CodeGenTarget::CPPHeader:
-                    case CodeGenTarget::PTX:
-                    case CodeGenTarget::CUDASource:
-                    case CodeGenTarget::CUDAHeader:
-
-                    case CodeGenTarget::HostHostCallable:
-                    case CodeGenTarget::ShaderHostCallable:
-                    case CodeGenTarget::HostExecutable:
-                    case CodeGenTarget::ShaderSharedLibrary:
-                    case CodeGenTarget::HostSharedLibrary:
-                    case CodeGenTarget::PyTorchCppBinding:
-                    case CodeGenTarget::DXIL:
-                    case CodeGenTarget::MetalLib:
-                    case CodeGenTarget::MetalLibAssembly:
-                    case CodeGenTarget::Metal:
-                    case CodeGenTarget::WGSL:
-                    case CodeGenTarget::HostVM:
-                    case CodeGenTarget::HostObjectCode:
-                    case CodeGenTarget::ShaderObjectCode:
-                    case CodeGenTarget::HostLLVMIR:
-                    case CodeGenTarget::ShaderLLVMIR:
-                        rawOutput.isWholeProgram = true;
-                        break;
-                    case CodeGenTarget::SPIRV:
-                    case CodeGenTarget::SPIRVAssembly:
-                        if (getCurrentTarget()->optionSet.shouldEmitSPIRVDirectly())
-                        {
-                            rawOutput.isWholeProgram = true;
-                            break;
-                        }
-                        else if (m_rawEntryPoints.getCount() != 0)
-                        {
-                            rawOutput.entryPointIndex = (int)m_rawEntryPoints.getCount() - 1;
-                            break;
-                        }
-                        [[fallthrough]];
-                    default:
-                        if (rawOutput.path.getLength() != 0)
-                        {
-                            m_sink->diagnose(Diagnostics::CannotMatchOutputFileToEntryPoint{
-                                .path = rawOutput.path});
-                        }
-                        break;
-                    }
-                }
-            }
-        }
+        _resolveOutputPaths(mapFormatToTargetIndex);
     }
 
-    // Now that we've diagnosed the output paths, we can add them
-    // to the compile request at the appropriate locations.
-    //
-    // We will consider the output files specified via `-o` and try to figure
-    // out how to deal with them.
-    //
-    for (auto& rawOutput : m_rawOutputs)
-    {
-        if (rawOutput.targetIndex == -1)
-            continue;
-        auto targetID = m_rawTargets[rawOutput.targetIndex].targetID;
-        auto target = m_requestImpl->getLinkage()->targets[targetID];
-        RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-        if (!m_requestImpl->m_targetInfos.tryGetValue(target, targetInfo))
-        {
-            targetInfo = new EndToEndCompileRequest::TargetInfo();
-            m_requestImpl->m_targetInfos[target] = targetInfo;
-        }
-        target->getOptionSet().overrideWith(m_rawTargets[rawOutput.targetIndex].optionSet);
-        if (rawOutput.isWholeProgram)
-        {
-            if (targetInfo->wholeTargetOutputPath != "")
-            {
-                m_sink->diagnose(Diagnostics::DuplicateOutputPathsForTarget{
-                    .target = TypeTextUtil::getCompileTargetName(
-                        SlangCompileTarget(target->getTarget()))});
-            }
-            else
-            {
-                target->getOptionSet().addTargetFlags(SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
-                targetInfo->wholeTargetOutputPath = rawOutput.path;
-            }
-        }
-        else
-        {
-            if (rawOutput.entryPointIndex == -1)
-                continue;
-
-            auto entryPoint = m_rawEntryPoints[rawOutput.entryPointIndex];
-            Int entryPointID = entryPoint.entryPointID;
-            if (entryPointID == -1)
-            {
-                m_sink->diagnose(Diagnostics::EntryPointFunctionNotFound{.name = entryPoint.name});
-                continue;
-            }
-            auto entryPointReq = m_requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
-
-            // String outputPath;
-            if (targetInfo->entryPointOutputPaths.containsKey(entryPointID))
-            {
-                m_sink->diagnose(Diagnostics::DuplicateOutputPathsForEntryPointAndTarget{
-                    .entryPoint = entryPointReq->getName(),
-                    .target = TypeTextUtil::getCompileTargetName(
-                        SlangCompileTarget(target->getTarget()))});
-            }
-            else
-            {
-                targetInfo->entryPointOutputPaths[entryPointID] = rawOutput.path;
-            }
-        }
-    }
+    _bindOutputsToTargets();
 
 
     // Copy all settings from linkage to targets.
