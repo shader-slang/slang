@@ -8906,6 +8906,9 @@ struct Fp8MMAHelper<AInputT, float, float, 16, 16, 16>
     }
 };
 
+// The half-accumulator form needs WmmaFragment<half, ...>, whose register counts are defined
+// only under SLANG_CUDA_ENABLE_HALF; an fp8-only module does not define it.
+#if SLANG_CUDA_ENABLE_HALF
 template<typename AInputT>
 struct Fp8MMAHelper<AInputT, half, half, 16, 16, 16>
 {
@@ -8919,6 +8922,7 @@ struct Fp8MMAHelper<AInputT, half, half, 16, 16, 16>
         mma<AInputT, half, 16, 8, 16>(d.regs + 2, a.regs, b.regs + 1, c.regs + 2);
     }
 };
+#endif // #if SLANG_CUDA_ENABLE_HALF
 
 #endif // #if SLANG_CUDA_ENABLE_FP8
 
