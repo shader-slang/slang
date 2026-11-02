@@ -1201,26 +1201,27 @@ described under [Phase D](#emitted-spellings).
 
 ### `WGSLSourceEmitter` module-scope array constants
 
-The Phase-D emitter applies two WGSL-specific rules to module-scope
-constants in
+The Phase-D emitter treats module-scope constants uniformly in
 [slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp).
-First, `emitVarKeywordImpl` emits a `static const` *array* as
-`var<private>` rather than `const`
-(`emitModuleScopeArrayConstAsPrivateVar`): a WGSL `const` array may
-only be indexed by a const-expression, so a constant array indexed
-by a runtime value would be rejected by the validator, whereas an
-addressable `var<private>` with the same initializer is
-runtime-indexable. The matching `<private>` address space is emitted
-by the same function's storage-space chain, so the keyword and
-address space stay in lockstep (a module-scope `var` without an
-address space is invalid WGSL). A `kIROp_GlobalParam` array is
-excluded so descriptor arrays keep their own address space. Second,
-`shouldFoldInstIntoUseSites` folds a module-scope `MakeArray` /
-`MakeStruct` / `MakeArrayFromElement` inline when it is used only as
-a constituent of another aggregate, so a nested `static const`
-(e.g. `int g[2][3]`) does not emit its inner arrays as separate
-named decls that the outer array's `var<private>` initializer would
-illegally reference.
+`emitVarKeywordImpl` picks `const` or `var` from `isStaticConst`
+alone, so a `static const` array is emitted as a module-scope `const`
+exactly like a scalar or vector constant, with no `var<private>`
+fallback. A WGSL `const` array may be indexed by a runtime value, and
+a `const` is not a variable, so it does not count against the
+8192-byte limit on private variables that some implementations (for
+example WebKit) enforce. This is the same rule the shared C-like
+emitter applies for HLSL's `static const`. The `<private>` address
+space is emitted only for a real `kIROp_GlobalVar`, and a
+`kIROp_GlobalParam` array keeps its own address space, so descriptor
+arrays are unaffected.
+
+A nested `static const` (e.g. `int g[2][3]`) emits its inner rows
+inline in the outer array's initializer rather than as separate
+named declarations. That folding is not WGSL-specific: the shared
+`CLikeSourceEmitter` (`isInnerGlobalAggregate`, consulted by
+`getFoldPolicy`) folds a module-scope `MakeArray` / `MakeStruct` /
+`MakeArrayFromElement` inline when it is used only as a constituent of
+another aggregate, and the WGSL emitter inherits it.
 
 ### `WGSLSourceEmitter` policy overrides and bool-conditioned values
 
