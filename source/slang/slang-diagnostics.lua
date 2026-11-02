@@ -4005,9 +4005,9 @@ err(
 )
 
 err(
-    "groupshared-parameter-cannot-have-direction-modifier",
+    "groupshared-parameter-must-be-reference",
     30707, -- 30706 reserved for #11885 (duplicate-system-value-semantic)
-    "a 'groupshared' parameter is passed by reference; 'in'/'out'/'inout' cannot be used with 'groupshared' -- use bare 'groupshared' for a read-write reference or 'const groupshared' for a read-only reference",
+    "a 'groupshared' parameter is passed by reference, so it cannot use the '~mode:ParamPassingMode' passing mode -- use bare 'groupshared' for a read-write reference or 'const groupshared' for a read-only reference",
     span { loc = "modifier:Modifier" }
 )
 
@@ -4031,14 +4031,6 @@ err(
     "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a 'groupshared' parameter forwarded on)",
     span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage; pass a 'groupshared' variable or a component of one, or declare '~param' without 'groupshared' if the function does not need thread-group-shared memory" }
 )
-
-err(
-    "groupshared-parameter-cannot-be-borrow",
-    30712,
-    "'~modifier' cannot be used with 'groupshared' -- use 'const groupshared' for a read-only reference",
-    span { loc = "modifier:Modifier" }
-)
-
 --
 -- 308xx: inheritance
 --

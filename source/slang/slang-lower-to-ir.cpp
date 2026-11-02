@@ -3720,16 +3720,9 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
         return ParamPassingMode::RefReadOnly;
     if (paramDecl->hasModifier<RefWriteOnlyModifier>())
         return ParamPassingMode::RefWriteOnly;
-    // On a parameter, `groupshared` names the address space of a reference, so the parameter is a
-    // reference whatever its spelling: a copy would leave a callee that reads after a group barrier
-    // looking at a stale snapshot. An explicit `__ref_readonly` or `__ref_writeonly` above picks
-    // the access; otherwise `groupshared` implies `__ref`, or `__ref_readonly` with `const`.
-    // Semantic checking reports the copy and borrow modes that conflict with it (`in`, `out`,
-    // `inout`, `__borrow`).
-    if (paramDecl->hasModifier<RefModifier>() || paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    if (paramDecl->hasModifier<RefModifier>())
     {
-        // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`, and
-        // `const groupshared` is a read-only reference.
+        // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`.
         if (paramDecl->hasModifier<ConstModifier>())
             return ParamPassingMode::RefReadOnly;
         return ParamPassingMode::RefReadWrite;
@@ -3756,11 +3749,18 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
         else
             return ParamPassingMode::Out;
     }
-    else
-    {
-        // No direction modifier, or just `in`:
+    if (paramDecl->hasModifier<InModifier>())
         return ParamPassingMode::In;
+    // On a parameter with no passing-mode keyword, `groupshared` names the address space of a
+    // reference: it implies `__ref`, or `__ref_readonly` with `const`. Semantic checking reports a
+    // `groupshared` parameter whose written keyword gives it any other mode.
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    {
+        if (paramDecl->hasModifier<ConstModifier>())
+            return ParamPassingMode::RefReadOnly;
+        return ParamPassingMode::RefReadWrite;
     }
+    return ParamPassingMode::In;
 }
 
 

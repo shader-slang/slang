@@ -15184,27 +15184,16 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     maybeApplyLayoutModifier(paramDecl);
 
-    // A `groupshared` parameter names one thread-group-shared memory location, so
-    // `getExplicitlyDeclaredParamPassingMode` gives it a reference mode and the copy-direction
-    // modifiers are not applicable to it. `InOutModifier` derives from `OutModifier`, so it is
-    // checked first to report the most specific keyword.
-    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    // A `groupshared` parameter names thread-group-shared memory that other invocations can access
+    // during the call, so it must be a reference to that memory. A written `in`, `out`, `inout`, or
+    // `__borrow` (or its alias `__constref`) gives the parameter a mode that is not a reference.
+    if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
     {
-        Modifier* directionModifier = paramDecl->findModifier<InOutModifier>();
-        if (!directionModifier)
-            directionModifier = paramDecl->findModifier<OutModifier>();
-        if (!directionModifier)
-            directionModifier = paramDecl->findModifier<InModifier>();
-        if (directionModifier)
-            getSink()->diagnose(Diagnostics::GroupsharedParameterCannotHaveDirectionModifier{
-                .modifier = directionModifier});
-
-        // Unlike a reference, a borrow may be a copy, which would leave a callee that reads after
-        // a group barrier looking at a stale snapshot, so `__borrow` (or its alias `__constref`)
-        // is an error here.
-        if (auto borrowModifier = paramDecl->findModifier<BorrowModifier>())
-            getSink()->diagnose(
-                Diagnostics::GroupsharedParameterCannotBeBorrow{.modifier = borrowModifier});
+        auto mode = getExplicitlyDeclaredParamPassingMode(paramDecl);
+        if (!isByReferenceParamPassingMode(mode))
+            getSink()->diagnose(Diagnostics::GroupsharedParameterMustBeReference{
+                .mode = mode,
+                .modifier = groupSharedModifier});
     }
 
     // Only texture types are allowed to have memory qualifiers on parameters

@@ -2,15 +2,13 @@
 
 // Regression guard for https://github.com/shader-slang/slang/issues/10641.
 //
-// A `groupshared` parameter names one thread-group-shared storage location and is therefore passed
-// by reference, so the copy-direction modifiers `in`/`out`/`inout` are not applicable and are a
-// compile error on a `groupshared` parameter (error 30707). The read-only spelling is
-// `const groupshared`; `__borrow` and its alias `__constref`, which ask for a borrow, are rejected
-// (error 30712). `groupshared` names the address space of the reference, so an explicit `__ref`,
-// `__ref_readonly`, or `__ref_writeonly` picks its access; without one, `groupshared` implies
-// `__ref`, or `__ref_readonly` with `const`. Those spellings must compile with no diagnostic
-// (enforced by the exhaustive diagnostic-test mode -- any stray diagnostic on those lines would
-// fail the test).
+// A `groupshared` parameter names thread-group-shared memory and must be a reference to it. With no
+// passing-mode keyword, `groupshared` implies `__ref`, or `__ref_readonly` with `const`; an
+// explicit `__ref`, `__ref_readonly`, or `__ref_writeonly` picks the access of the reference. A
+// written `in`, `out`, `inout`, or `__borrow` (or its alias `__constref`) gives the parameter a mode
+// that is not a reference, which is a compile error (error 30707). The accepted spellings must
+// compile with no diagnostic (enforced by the exhaustive diagnostic-test mode -- any stray
+// diagnostic on those lines would fail the test).
 //
 // The `//diag:` annotations are caret-less substring matches, so each is matched against one of the
 // produced diagnostics by message text regardless of line/column.
@@ -23,19 +21,25 @@ void badIn(uint tid, in groupshared uint s[N])
 {
     s[tid] = tid;
 }
-//diag: cannot be used with 'groupshared' -- use bare
+//diag: cannot use the 'in' passing mode -- use bare 'groupshared'
 
 void badOut(uint tid, out groupshared uint s[N])
 {
     s[tid] = tid;
 }
-//diag: cannot be used with 'groupshared' -- use bare
+//diag: cannot use the 'out' passing mode -- use bare 'groupshared'
 
 void badInOut(uint tid, inout groupshared uint s[N])
 {
     s[tid] = tid;
 }
-//diag: cannot be used with 'groupshared' -- use bare
+//diag: cannot use the 'inout' passing mode -- use bare 'groupshared'
+
+void badInOutSpaced(uint tid, in out groupshared uint s[N])
+{
+    s[tid] = tid;
+}
+//diag: cannot use the 'inout' passing mode -- use bare 'groupshared'
 
 // --- Rejected: `__borrow` / `__constref` on a `groupshared` parameter ---
 
@@ -43,23 +47,22 @@ uint badBorrow(uint tid, __borrow groupshared uint s[N])
 {
     return s[tid];
 }
-//diag: '__borrow' cannot be used with 'groupshared' -- use 'const groupshared'
+//diag: cannot use the 'borrow' passing mode -- use bare 'groupshared'
 
 uint badConstRef(uint tid, __constref groupshared uint s[N])
 {
     return s[tid];
 }
-//diag: '__constref' cannot be used with 'groupshared' -- use 'const groupshared'
+//diag: cannot use the 'borrow' passing mode -- use bare 'groupshared'
 
-// A doubled `__constref` reports the duplicate once and E30712 once. The parameter is still lowered
-// as a reference, because `groupshared` takes precedence over a borrow, so the call below checks.
+// A doubled `__constref` reports the duplicate once and E30707 once.
 uint badDoubleConstRef(uint tid, __constref __constref groupshared uint s[N])
 //diag:                                     ^^^^^^^^^^ duplicate modifier
 //diag:                                     ^^^^^^^^^^ modifier '__constref' is redundant or conflicting with existing modifier '__constref'
 {
     return s[tid];
 }
-//diag: '__constref' cannot be used with 'groupshared' -- use 'const groupshared'
+//diag: cannot use the 'borrow' passing mode -- use bare 'groupshared'
 
 groupshared uint doubleConstRefStorage[N];
 
