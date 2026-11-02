@@ -4191,7 +4191,7 @@ public:
 
     bool argumentNamesGroupSharedStorage(Expr* arg);
     void checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn);
-    void checkGroupSharedArgumentsOfCopiedParams(
+    void checkGroupSharedArgumentsOfExclusiveParams(
         InvokeExpr* invoke,
         FuncType* funcType,
         DeclRef<CallableDecl> calleeDeclRef,

@@ -2,11 +2,10 @@
 
 // Regression guard for https://github.com/shader-slang/slang/issues/10641.
 //
-// An `out`/`inout` parameter that is not `groupshared` has copy-in/copy-out semantics, so the call
-// works on a copy of its argument and stores the copy back when it returns. Passing
+// An `out`/`inout` parameter needs exclusive access to its argument during the call. Passing
 // thread-group-shared storage, which every invocation in the group can access, is warning 30709,
-// because a write that another invocation makes to that storage during the call is lost.
-// A direct argument of a call that is always inlined crosses no call boundary, which keeps
+// because the compiler cannot tell whether another invocation accesses that storage during the call.
+// A direct argument of a call that is always inlined is accessed in the calling body, which keeps
 // `g[i] += 1` and `g[i]++` silent; an implicitly converted argument still goes through a temporary.
 //
 // The `//diag:` annotations are caret-less substring matches, and the test is exhaustive, so the
@@ -91,13 +90,13 @@ void computeMain(uint i : SV_GroupIndex)
     setOne(local);
 }
 
-//diag: 'a' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
-//diag: 'v' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
-//diag: 'v' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
-//diag: 'v' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
-//diag: 'v' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
-//diag: 'v' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
-//diag: 'this' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory
+//diag: 'a' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
+//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
+//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
+//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
+//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
+//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
+//diag: 'this' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
 //diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
 //diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
 //diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'

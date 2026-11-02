@@ -4611,7 +4611,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // Warn when the same storage is passed to two parameters that may both be references
             // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
-            checkGroupSharedArgumentsOfCopiedParams(
+            checkGroupSharedArgumentsOfExclusiveParams(
                 invoke,
                 funcType,
                 callableDeclRef,
@@ -7871,8 +7871,9 @@ void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr*
 }
 
 // Return whether every call to `callee` is replaced by the callee's body or by an intrinsic, so
-// that no call boundary remains at which an `out`/`inout` argument would be copied. The core
-// module's compound assignments and increments (`g[i] += 1`, `g[i]++`) are such calls.
+// that its `out`/`inout` arguments are accessed in the calling body rather than across a call
+// boundary. The core module's compound assignments and increments (`g[i] += 1`, `g[i]++`) are such
+// calls.
 static bool isCallAlwaysInlinedOrIntrinsic(CallableDecl* callee)
 {
     return callee->hasModifier<ForceInlineAttribute>() ||
@@ -7881,15 +7882,15 @@ static bool isCallAlwaysInlinedOrIntrinsic(CallableDecl* callee)
            callee->hasModifier<TargetIntrinsicModifier>();
 }
 
-// An `out` or `inout` parameter has copy-in/copy-out semantics, so the call works on a copy of its
-// argument and stores the copy back when it returns. Thread-group-shared storage is accessible to
-// every invocation in the group, so the callee can miss the other invocations' writes or overwrite
-// them, and we warn. A `groupshared` parameter is a reference
-// rather than an `inout`, so it is never copied. The implicit `this` of a method whose receiver
-// mode is `inout` (a `[mutating]` method) is such a parameter too. A direct argument of a call that
-// is always inlined is not passed across a call boundary, but an implicitly converted one still
-// goes through a temporary.
-void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
+// An `out` or `inout` parameter needs exclusive access to its argument for the duration of the
+// call. Thread-group-shared storage is accessible to every invocation in the group, so passing it
+// to such a parameter is correct only if no other invocation accesses it during the call, which
+// the compiler does not check, and we warn. A `groupshared` parameter is a reference to the shared
+// storage and does not need exclusive access. The implicit `this` of a method whose receiver mode
+// is `inout` (a `[mutating]` method) is an `inout` parameter too. A direct argument of a call that
+// is always inlined is accessed in the calling body, but an implicitly converted one still goes
+// through a temporary.
+void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
     InvokeExpr* invoke,
     FuncType* funcType,
     DeclRef<CallableDecl> calleeDeclRef,
@@ -7916,7 +7917,7 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
             continue;
 
         if (argumentNamesGroupSharedStorage(addressedExpr))
-            getSink()->diagnose(Diagnostics::GroupsharedArgumentToCopiedParameter{
+            getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
                 .param = getText(paramDecl->getName()),
                 .suggestion = "; if the callee needs to see other invocations' writes, declare "
                               "the parameter 'groupshared'",
@@ -7931,7 +7932,7 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
     if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
     {
         if (argumentNamesGroupSharedStorage(memberExpr->baseExpression))
-            getSink()->diagnose(Diagnostics::GroupsharedArgumentToCopiedParameter{
+            getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
                 .param = "this",
                 .suggestion = "",
                 .arg = memberExpr->baseExpression});
@@ -8035,8 +8036,8 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* ta
 
 // A call that is always inlined, or to an intrinsic, writes its `out` and `inout` arguments in
 // the calling body, so we check those arguments as writes. Compound assignments and increments,
-// such as `g[i] += 1` and `g[i]++`, are such calls. A call to any other function copies those
-// arguments, which `checkGroupSharedArgumentsOfCopiedParams` already reports.
+// such as `g[i] += 1` and `g[i]++`, are such calls. A call to any other function needs exclusive
+// access to those arguments, which `checkGroupSharedArgumentsOfExclusiveParams` already reports.
 void SemanticsVisitor::checkGroupSharedPartialWritesByInlinedCall(
     InvokeExpr* invoke,
     FuncType* funcType,

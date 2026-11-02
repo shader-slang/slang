@@ -4019,9 +4019,9 @@ err(
 )
 
 warning(
-    "groupshared-argument-to-copied-parameter",
+    "groupshared-argument-to-exclusive-parameter",
     30709,
-    "'~param' is an 'out' or 'inout' parameter, so the call works on a copy of this thread-group-shared memory and stores the copy back when it returns; a write that another invocation makes to the memory during the call is lost",
+    "'~param' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call, but other invocations in the thread group can access this thread-group-shared memory",
     span { loc = "arg:Expr", message = "if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit~suggestion:String" }
 )
 
