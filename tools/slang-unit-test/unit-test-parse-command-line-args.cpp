@@ -1,5 +1,6 @@
 // unit-test-parse-command-line-args.cpp
 
+#include "core/slang-string.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -210,6 +211,24 @@ SLANG_UNIT_TEST(parseCommandLineArgsReportsParseErrors)
     const char* duplicateTarget[] = {"-target", "spirv", "-target", "hlsl", "-target", "spirv"};
     checkParseFails(globalSession, SLANG_COUNT_OF(duplicateTarget), duplicateTarget);
 
+    const char* conflictingTargetProfiles[] =
+        {"-target", "dxil", "-profile", "sm_6_0", "-profile", "sm_6_5"};
+    checkParseFails(
+        globalSession,
+        SLANG_COUNT_OF(conflictingTargetProfiles),
+        conflictingTargetProfiles);
+
+    const char* profileBeforeTargets[] =
+        {"-profile", "sm_5_0", "-target", "dxbc", "-profile", "glsl_450", "-target", "spirv"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(profileBeforeTargets), profileBeforeTargets);
+
+    // Entry-point options are ignored, but a malformed one is still rejected.
+    const char* unknownStage[] = {"-stage", "bogus"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(unknownStage), unknownStage);
+
+    const char* missingEntryPointName[] = {"-entry"};
+    checkParseFails(globalSession, SLANG_COUNT_OF(missingEntryPointName), missingEntryPointName);
+
     // Valid argument lists, with and without a target, still succeed, so the failures above come
     // from the invalid arguments rather than from the API itself.
     {
@@ -235,13 +254,122 @@ SLANG_UNIT_TEST(parseCommandLineArgsReportsParseErrors)
     }
 }
 
+// Return the SPIR-V assembly that a session created from `sessionDesc`, with one SPIR-V target
+// added by the caller, generates for a small compute shader. Returns an empty string on failure.
+static String compileSpirvAsmWithSession(
+    slang::IGlobalSession* globalSession,
+    slang::SessionDesc sessionDesc)
+{
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
+
+    ComPtr<slang::ISession> session;
+    if (SLANG_FAILED(globalSession->createSession(sessionDesc, session.writeRef())))
+        return String();
+
+    const char* source = R"(
+        RWStructuredBuffer<float> buffer;
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain()
+        {
+            buffer[0] = (buffer[0] + 1.25f) * 0.8125f;
+        }
+    )";
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "fpModeModule",
+        "fpModeModule.slang",
+        source,
+        diagnostics.writeRef()));
+    if (!module)
+        return String();
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    if (SLANG_FAILED(module->findEntryPointByName("computeMain", entryPoint.writeRef())))
+        return String();
+
+    slang::IComponentType* components[] = {module, entryPoint};
+    ComPtr<slang::IComponentType> program;
+    if (SLANG_FAILED(session->createCompositeComponentType(
+            components,
+            SLANG_COUNT_OF(components),
+            program.writeRef(),
+            diagnostics.writeRef())))
+        return String();
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    if (SLANG_FAILED(program->link(linkedProgram.writeRef(), diagnostics.writeRef())))
+        return String();
+
+    ComPtr<slang::IBlob> code;
+    if (SLANG_FAILED(
+            linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef())))
+        return String();
+    return String(UnownedStringSlice((const char*)code->getBufferPointer(), code->getBufferSize()));
+}
+
 // A floating-point mode given without `-target` is not an error for this API: the session desc
-// carries it as a session option, so it applies to every target the caller adds to the session.
-SLANG_UNIT_TEST(parseCommandLineArgsKeepsTargetOptionsWithoutTarget)
+// carries it as a session option, and a target that the caller adds to the session inherits it.
+// The precise mode is observed in the generated code, where SPIR-V arithmetic carries
+// `NoContraction` only in that mode.
+SLANG_UNIT_TEST(parseCommandLineArgsFloatingPointModeReachesSessionTargets)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
+    slang::SessionDesc defaultDesc{};
+    ComPtr<ISlangUnknown> defaultAllocation;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        globalSession
+            ->parseCommandLineArguments(0, nullptr, &defaultDesc, defaultAllocation.writeRef())));
+
     const char* argv[] = {"-floating-point-mode", "precise"};
+    slang::SessionDesc preciseDesc{};
+    ComPtr<ISlangUnknown> preciseAllocation;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->parseCommandLineArguments(
+        SLANG_COUNT_OF(argv),
+        argv,
+        &preciseDesc,
+        preciseAllocation.writeRef())));
+    SLANG_CHECK(preciseDesc.targetCount == 0);
+
+    const String defaultCode = compileSpirvAsmWithSession(globalSession, defaultDesc);
+    const String preciseCode = compileSpirvAsmWithSession(globalSession, preciseDesc);
+    SLANG_CHECK_ABORT(defaultCode.getLength() != 0);
+    SLANG_CHECK_ABORT(preciseCode.getLength() != 0);
+    SLANG_CHECK(defaultCode.getUnownedSlice().indexOf(toSlice("NoContraction")) < 0);
+    SLANG_CHECK(preciseCode.getUnownedSlice().indexOf(toSlice("NoContraction")) >= 0);
+}
+
+// Parse `argv`, which must succeed, and check that it yields `expectedTargetCount` targets, the
+// first of format `expectedFormat`.
+static void checkParseTargets(
+    slang::IGlobalSession* globalSession,
+    int argc,
+    const char* const* argv,
+    SlangInt expectedTargetCount,
+    SlangCompileTarget expectedFormat)
+{
+    slang::SessionDesc sessionDesc{};
+    ComPtr<ISlangUnknown> allocation;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        globalSession->parseCommandLineArguments(argc, argv, &sessionDesc, allocation.writeRef())));
+    SLANG_CHECK(sessionDesc.targetCount == expectedTargetCount);
+    if (sessionDesc.targetCount > 0)
+        SLANG_CHECK(sessionDesc.targets[0].format == expectedFormat);
+}
+
+// A profile that implies a stage is session configuration. The caller selects entry points
+// later, so the stage needs no `-entry` here, and the target keeps the full profile.
+SLANG_UNIT_TEST(parseCommandLineArgsAcceptsStageProfileWithoutEntryPoint)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const char* argv[] = {"-target", "dxil", "-profile", "cs_6_0"};
     slang::SessionDesc sessionDesc{};
     ComPtr<ISlangUnknown> allocation;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->parseCommandLineArguments(
@@ -249,15 +377,96 @@ SLANG_UNIT_TEST(parseCommandLineArgsKeepsTargetOptionsWithoutTarget)
         argv,
         &sessionDesc,
         allocation.writeRef())));
-    SLANG_CHECK(sessionDesc.targetCount == 0);
+    SLANG_CHECK_ABORT(sessionDesc.targetCount == 1);
+    SLANG_CHECK(sessionDesc.targets[0].format == SLANG_DXIL);
+    SLANG_CHECK(sessionDesc.targets[0].profile == globalSession->findProfile("cs_6_0"));
 
-    bool hasPreciseFloatingPointMode = false;
-    for (uint32_t i = 0; i < sessionDesc.compilerOptionEntryCount; ++i)
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+}
+
+// Source files, entry-point options and output paths configure a compilation rather than a
+// session, so they are accepted and ignored. An `-o` path still infers a target when no
+// `-target` is given.
+SLANG_UNIT_TEST(parseCommandLineArgsIgnoresCompileOptions)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const char* entryPointAndStage[] = {"-entry", "main", "-stage", "compute"};
+    checkParseTargets(
+        globalSession,
+        SLANG_COUNT_OF(entryPointAndStage),
+        entryPointAndStage,
+        0,
+        SLANG_TARGET_UNKNOWN);
+
+    const char* stageOnly[] = {"-stage", "compute"};
+    checkParseTargets(globalSession, SLANG_COUNT_OF(stageOnly), stageOnly, 0, SLANG_TARGET_UNKNOWN);
+
+    const char* targetAndStage[] = {"-target", "spirv", "-stage", "compute"};
+    checkParseTargets(
+        globalSession,
+        SLANG_COUNT_OF(targetAndStage),
+        targetAndStage,
+        1,
+        SLANG_SPIRV);
+
+    const char* twoOutputsForOneTarget[] = {"-target", "spirv", "-o", "a.spv", "-o", "b.spv"};
+    checkParseTargets(
+        globalSession,
+        SLANG_COUNT_OF(twoOutputsForOneTarget),
+        twoOutputsForOneTarget,
+        1,
+        SLANG_SPIRV);
+
+    const char* outputImpliesTarget[] = {"-o", "foo.spv"};
+    checkParseTargets(
+        globalSession,
+        SLANG_COUNT_OF(outputImpliesTarget),
+        outputImpliesTarget,
+        1,
+        SLANG_SPIRV);
+
+    // These files do not exist; the parse neither loads nor checks them.
+    const char* sourceFile[] = {"missing-file.slang"};
+    checkParseTargets(
+        globalSession,
+        SLANG_COUNT_OF(sourceFile),
+        sourceFile,
+        0,
+        SLANG_TARGET_UNKNOWN);
+
+    const char* moduleFile[] = {"missing-module.slang-module"};
+    checkParseTargets(
+        globalSession,
+        SLANG_COUNT_OF(moduleFile),
+        moduleFile,
+        0,
+        SLANG_TARGET_UNKNOWN);
+}
+
+// A compile request configured through the deprecated API still resolves entry points when its
+// command line is parsed, so a stage with no entry point fails there. It keeps a floating-point
+// mode given with no `-target` for the targets added to it later.
+SLANG_UNIT_TEST(parseCommandLineArgsCompileRequestKeepsCompileChecks)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    SLANG_ALLOW_DEPRECATED_BEGIN
     {
-        const auto& entry = sessionDesc.compilerOptionEntries[i];
-        if (entry.name == slang::CompilerOptionName::FloatingPointMode &&
-            entry.value.intValue0 == SLANG_FLOATING_POINT_MODE_PRECISE)
-            hasPreciseFloatingPointMode = true;
+        ComPtr<slang::ICompileRequest> request;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->createCompileRequest(request.writeRef())));
+        const char* argv[] = {"-target", "dxil", "-profile", "cs_6_0"};
+        SLANG_CHECK(SLANG_FAILED(request->processCommandLineArguments(argv, SLANG_COUNT_OF(argv))));
+        UnownedStringSlice diagnostics(request->getDiagnosticOutput());
+        SLANG_CHECK(diagnostics.indexOf(toSlice("E00033")) >= 0);
     }
-    SLANG_CHECK(hasPreciseFloatingPointMode);
+    {
+        ComPtr<slang::ICompileRequest> request;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->createCompileRequest(request.writeRef())));
+        const char* argv[] = {"-floating-point-mode", "precise"};
+        SLANG_CHECK(
+            SLANG_SUCCEEDED(request->processCommandLineArguments(argv, SLANG_COUNT_OF(argv))));
+    }
+    SLANG_ALLOW_DEPRECATED_END
 }
