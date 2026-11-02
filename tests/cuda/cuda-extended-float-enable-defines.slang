@@ -8,6 +8,8 @@
 //TEST:SIMPLE(filecheck=BF16): -stage compute -entry computeMain -target cuda -DUSE_BF16
 //TEST:SIMPLE(filecheck=FP8): -stage compute -entry computeMain -target cuda -DUSE_FP8
 //TEST:SIMPLE(filecheck=NONE): -stage compute -entry computeMain -target cuda
+// The single-type lanes cannot catch an emitter that writes at most one define per module.
+//TEST:SIMPLE(filecheck=MIXED): -stage compute -entry computeMain -target cuda -DUSE_HALF -DUSE_BF16 -DUSE_FP8
 // The defines are CUDA-only: they must never leak into the shared C++ base emitter's output.
 //TEST:SIMPLE(filecheck=CPP): -stage compute -entry computeMain -target cpp -DUSE_HALF
 // On -target ptx the defines reach NVRTC as -D options instead; these lanes are a smoke check
@@ -22,15 +24,17 @@ RWStructuredBuffer<float> outBuf;
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     float x = outBuf[tid.x];
+    float r = x * 2.0f;
 #if defined(USE_HALF)
-    outBuf[tid.x] = float(half(x) * half(2));
-#elif defined(USE_BF16)
-    outBuf[tid.x] = float(BFloat16(x));
-#elif defined(USE_FP8)
-    outBuf[tid.x] = float(FloatE4M3(x)) + float(FloatE5M2(x));
-#else
-    outBuf[tid.x] = x * 2.0f;
+    r += float(half(x) * half(2));
 #endif
+#if defined(USE_BF16)
+    r += float(BFloat16(x));
+#endif
+#if defined(USE_FP8)
+    r += float(FloatE4M3(x)) + float(FloatE5M2(x));
+#endif
+    outBuf[tid.x] = r;
 }
 
 // Each define must precede the prelude include so the prelude's gates see it. The front
@@ -49,6 +53,11 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 //FP8: #define SLANG_CUDA_ENABLE_FP8 1
 //FP8-NOT: SLANG_CUDA_ENABLE_{{HALF|BF16}}
 //FP8: slang-cuda-prelude.h
+
+//MIXED-DAG: #define SLANG_CUDA_ENABLE_HALF 1
+//MIXED-DAG: #define SLANG_CUDA_ENABLE_BF16 1
+//MIXED-DAG: #define SLANG_CUDA_ENABLE_FP8 1
+//MIXED: slang-cuda-prelude.h
 
 // The positive prelude matches keep these lanes from passing on a failed compile.
 //NONE-NOT: SLANG_CUDA_ENABLE_{{HALF|BF16|FP8}}
