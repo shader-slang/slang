@@ -1,5 +1,6 @@
 #include "slang-ir-entry-point-decorations.h"
 
+#include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "core/slang-signal.h"
 #include "core/slang-string.h"
@@ -256,6 +257,43 @@ private:
 void checkEntryPointDecorations(IRModule* module, CodeGenTarget target, DiagnosticSink* sink)
 {
     CheckEntryPointDecorationsContext(module, target, sink).check();
+}
+
+UnownedStringSlice getOptiXEntryPointNamePrefix(Stage stage)
+{
+    // OptiX 7 Guide, Section 6.1 (Program input): "The type of program affects how the program
+    // can be used during the execution of the pipeline. These program types are specified by
+    // prefixing the program name" with the prefixes below. Slang cannot yet target the
+    // continuation-callable (`__continuation_callable__`) and exception (`__exception__`) types.
+    switch (stage)
+    {
+    case Stage::RayGeneration:
+        return toSlice("__raygen__");
+    case Stage::Intersection:
+        return toSlice("__intersection__");
+    case Stage::AnyHit:
+        return toSlice("__anyhit__");
+    case Stage::ClosestHit:
+        return toSlice("__closesthit__");
+    case Stage::Miss:
+        return toSlice("__miss__");
+    case Stage::Callable:
+        return toSlice("__direct_callable__");
+    default:
+        return UnownedStringSlice();
+    }
+}
+
+bool doesTargetRenameEntryPointName(CodeGenTarget target, UnownedStringSlice entryPointName)
+{
+    if (entryPointName != toSlice("main"))
+        return false;
+
+    // Only the C-like source emitters rename `main`; the LLVM emitter keeps the name.
+    auto desc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
+    if (!isDerivedFrom(desc.kind, ArtifactKind::Source))
+        return false;
+    return isCPUTarget(target) || isCUDATarget(target) || isMetalTarget(target);
 }
 
 OutputTopologyType convertOutputTopologyStringToEnum(String rawOutputTopology)
