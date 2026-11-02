@@ -493,6 +493,64 @@ SLANG_UNIT_TEST(parseCommandLineArgsStageProfileKeepsOtherStagesUsable)
     SLANG_CHECK(code.getUnownedSlice().indexOf(toSlice("[numthreads(1, 1, 1)]")) >= 0);
 }
 
+// A session target's version-only profile keeps the explicit capabilities, from `-capability` or
+// from the `+` atoms of a `-profile`, as a `TargetDesc` that sets them directly does. The
+// `spirv_1_6` capability is observable in the SPIR-V version that the generated code declares.
+SLANG_UNIT_TEST(parseCommandLineArgsCapabilitiesMatchDirectConfiguration)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const auto generateWithArgs = [&](int argc, const char* const* argv)
+    {
+        slang::SessionDesc sessionDesc;
+        ComPtr<ISlangUnknown> allocation;
+        parseSessionDesc(globalSession, argc, argv, sessionDesc, allocation);
+        SLANG_CHECK(sessionDesc.targetCount == 1);
+        if (sessionDesc.targetCount == 1)
+            SLANG_CHECK(sessionDesc.targets[0].profile == globalSession->findProfile("glsl_450"));
+        return generateCodeWithSession(globalSession, sessionDesc, kComputeShaderSource, true);
+    };
+    const auto generateWithTargetDesc = [&](bool addCapability)
+    {
+        slang::CompilerOptionEntry capabilityEntry = {};
+        capabilityEntry.name = slang::CompilerOptionName::Capability;
+        capabilityEntry.value.kind = slang::CompilerOptionValueKind::Int;
+        capabilityEntry.value.intValue0 = globalSession->findCapability("spirv_1_6");
+
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV_ASM;
+        targetDesc.profile = globalSession->findProfile("glsl_450");
+        if (addCapability)
+        {
+            targetDesc.compilerOptionEntries = &capabilityEntry;
+            targetDesc.compilerOptionEntryCount = 1;
+        }
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.targetCount = 1;
+        return generateCodeWithSession(globalSession, sessionDesc, kComputeShaderSource, true);
+    };
+
+    const char* profileAtomArgv[] = {"-target", "spirv-asm", "-profile", "glsl_450+spirv_1_6"};
+    const char* capabilityArgv[] =
+        {"-target", "spirv-asm", "-profile", "glsl_450", "-capability", "spirv_1_6"};
+    const char* controlArgv[] = {"-target", "spirv-asm", "-profile", "glsl_450"};
+    const String profileAtomCode =
+        generateWithArgs(SLANG_COUNT_OF(profileAtomArgv), profileAtomArgv);
+    const String capabilityCode = generateWithArgs(SLANG_COUNT_OF(capabilityArgv), capabilityArgv);
+    const String controlCode = generateWithArgs(SLANG_COUNT_OF(controlArgv), controlArgv);
+    const String directCapabilityCode = generateWithTargetDesc(true);
+    const String directControlCode = generateWithTargetDesc(false);
+
+    SLANG_CHECK_ABORT(directCapabilityCode.getLength() != 0);
+    SLANG_CHECK_ABORT(directControlCode.getLength() != 0);
+    SLANG_CHECK(directCapabilityCode.getUnownedSlice().indexOf(toSlice("Version: 1.6")) >= 0);
+    SLANG_CHECK(directControlCode.getUnownedSlice().indexOf(toSlice("Version: 1.6")) < 0);
+    SLANG_CHECK(profileAtomCode == directCapabilityCode);
+    SLANG_CHECK(capabilityCode == directCapabilityCode);
+    SLANG_CHECK(controlCode == directControlCode);
+}
+
 // Source and module files, entry-point options and output paths configure a compilation rather
 // than a session, so they are accepted and ignored. An `-o` path still infers a target when no
 // `-target` is given.
