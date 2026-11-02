@@ -4355,39 +4355,54 @@ struct IGlobalSession : public ISlangUnknown
      *   The session description receives:
      *   - One target per `-target`. With no `-target`, targets are inferred from the extensions of
      *     `-o` paths, or else from a `-profile` that implies a target.
-     *   - The options given after a `-target` (for example `-profile`, `-capability`, `-fp-mode`),
-     *     in that target's `compilerOptionEntries`. The profile's version is also stored in
-     *     `TargetDesc::profile`. A stage that the profile names (for example the compute stage of
-     *     `cs_6_0`) is not kept, because entry points supply their own stages.
-     *   - Target options given before the first `-target`, other than `-profile`. With a single
-     *     target, declared or inferred, they apply to it. With no target, they become session
-     *     options for the targets added to the session. With several targets they are rejected.
-     *   - All other options (for example `-I`, `-D`, `-O`, `-g`, `-matrix-layout-row-major`, `-r`,
-     *     `-X...`), as session options.
+     *   - The target options given after a `-target`, in that target's `compilerOptionEntries`.
+     *     Target options are `-profile`, `-capability`, `-fp-mode`, `-whole-program`,
+     *     `-embed-downstream-ir`, the layout options `-fvk-use-scalar-layout`, `-fvk-use-dx-layout`
+     *     and `-fvk-use-c-layout`, and the `-emit-spirv-*` and `-emit-cpu-*` options. The
+     *     profile's version is also stored in `TargetDesc::profile`. A stage that the profile
+     *     names (for example the compute stage of `cs_6_0`) is not kept, because entry points
+     *     supply their own stages. Each target's `compilerOptionEntries` also repeat the session
+     *     options other than `-X...`.
+     *   - Target options given before the first `-target`. With a single target, declared or
+     *     inferred, they apply to it. With no target, they become session options for the targets
+     *     added to the session, except that a `-profile` fails the call. With several targets
+     *     they are rejected.
+     *   - All other options, wherever they appear (for example `-I`, `-D`, `-O`, `-g`,
+     *     `-matrix-layout-row-major`, `-r`, `-X...`), as session options.
      *
-     *   Options that configure a compilation rather than a session are accepted and ignored: source
-     *   files (including `-` for stdin, which is not read), `-entry`, `-stage` and `-specialize`.
-     *   Output paths are used only to infer a target from their extension when no `-target` is
-     *   given, and are not retained, so `-target hlsl -o foo.spv` yields only the HLSL target. An
-     *   output path does not select whole-program code generation; an explicit `-whole-program`
-     *   is kept. Checks that need entry points or output paths happen when the program is
-     *   compiled.
+     *   Options that configure a compilation rather than a session are accepted and ignored, for
+     *   example positional input paths (source files, `.slang-module` and `.slang-lib` files, and
+     *   the stdin path `-` after `--`, none of which are read), `-entry`, `-stage`, `-specialize`,
+     *   `-module-name` and `-depfile`. A module given with `-r` is instead loaded during the call
+     *   and kept as a session option. Output paths are used only to infer a target from their
+     *   extension when no `-target` is given, and are not retained, so `-target hlsl -o foo.spv`
+     *   yields only the HLSL target. Only an explicit `-whole-program` selects whole-program code
+     *   generation for a target. Neither an output path nor the implicit output that slangc gives
+     *   a single target with no `-o` (for example `-target spirv`, `-target metal` or
+     *   `-target cuda`) selects it. Because the session receives no entry points or output paths,
+     *   the slangc checks on them, such as the error for a `-stage` with no `-entry`, are not
+     *   made.
      *
-     *   `-load-core-module`, `-compile-core-module` and `-save-core-module` act on this global
-     *   session during the call.
+     *   Some options act on this global session during the call, for example
+     *   `-load-core-module`, `-compile-core-module`, `-save-core-module`, `-spirv-core-grammar`,
+     *   `-default-downstream-compiler` and the `-<compiler>-path` options. Their effects are not
+     *   undone when the call fails.
      *
      *   @param argc The number of command line arguments.
      *   @param argv An input array of command line arguments to parse.
      *   @param outSessionDesc A pointer to a SessionDesc struct to receive parsed session desc.
      *   @param outAuxAllocation Auxiliary memory allocated to hold data used in the session desc.
      *   @return SLANG_OK on success. A failure result if `outSessionDesc->structureSize` is too
-     *   small; if an argument is malformed (an unknown option, a missing option value, an unknown
-     *   target, profile, capability, stage or option value, or a `-r` module that cannot be
-     *   loaded); or if settings conflict (a target given more than once, conflicting profiles for
-     *   a target, a `-profile` that implies no target, a profile or target option given before
-     *   several targets, a capability that the profile cannot provide, or options that require or
-     *   exclude each other). On any failure `outSessionDesc` is left unchanged and
-     *   `outAuxAllocation` is set to null. No diagnostic text is returned.
+     *   small, or if the parser reports an error, for example:
+     *   - a malformed argument: an unknown option, a missing option value, an unknown target,
+     *     profile, capability, stage or option value, or a `-r` module that cannot be loaded;
+     *   - conflicting settings: a target repeated after a different `-target`, conflicting
+     *     profiles for a target, a `-profile` with no `-target` that implies no target, a profile
+     *     or target option given before several targets, a capability that the profile cannot
+     *     provide, or options that require or exclude each other.
+     *
+     *   On any failure `outSessionDesc` is left unchanged and `outAuxAllocation` is set to null.
+     *   No diagnostic text is returned.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL parseCommandLineArguments(
         int argc,
