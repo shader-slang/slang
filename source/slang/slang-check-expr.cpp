@@ -7882,14 +7882,8 @@ static bool isCallAlwaysInlinedOrIntrinsic(CallableDecl* callee)
            callee->hasModifier<TargetIntrinsicModifier>();
 }
 
-// An `out` or `inout` parameter needs exclusive access to its argument for the duration of the
-// call. Thread-group-shared storage is accessible to every invocation in the group, so passing it
-// to such a parameter is correct only if no other invocation accesses it during the call, which
-// the compiler does not check, and we warn. A `groupshared` parameter is a reference to the shared
-// storage and does not need exclusive access. The implicit `this` of a method whose receiver mode
-// is `inout` (a `[mutating]` method) is an `inout` parameter too. A direct argument of a call that
-// is always inlined is accessed in the calling body, but an implicitly converted one still goes
-// through a temporary.
+// Warn about each argument of `invoke` that passes thread-group-shared storage to an `out` or
+// `inout` parameter, including the implicit `this` of a `[mutating]` method.
 void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
     InvokeExpr* invoke,
     FuncType* funcType,
@@ -7899,10 +7893,16 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
     if (!calleeDeclRef)
         return;
 
+    // A call that is always inlined accesses its direct arguments in the calling body, as if the
+    // caller had accessed them itself, so only its implicitly converted arguments are checked
+    // below.
     bool callIsInlined = isCallAlwaysInlinedOrIntrinsic(calleeDeclRef.getDecl());
     Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
     for (Index i = 0; i < checkCount && i < paramDeclRefs.getCount(); ++i)
     {
+        // An `out` or `inout` parameter needs exclusive access to its argument for the duration
+        // of the call. A `groupshared` parameter is a reference to the shared storage instead, and
+        // does not need exclusive access, so it is not checked here.
         auto paramDecl = paramDeclRefs[i].getDecl();
         if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
             continue;
@@ -7910,12 +7910,18 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
         auto argExpr = invoke->arguments[i];
         if (isArgumentOfFailedCheck(argExpr))
             continue;
+
+        // An implicitly converted argument goes through a temporary of the parameter's type even
+        // when the call is inlined, so we look through the conversion at the storage it names.
         auto addressedExpr = argExpr;
         if (auto lValueCast = as<LValueImplicitCastExpr>(argExpr))
             addressedExpr = lValueCast->arguments[0];
         else if (callIsInlined)
             continue;
 
+        // Every invocation in the group can access thread-group-shared storage, so the exclusive
+        // access holds only if no other invocation touches it during the call. The compiler does
+        // not check that, so we warn.
         if (argumentNamesGroupSharedStorage(addressedExpr))
             getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
                 .param = getText(paramDecl->getName()),
@@ -7924,6 +7930,9 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
                 .arg = argExpr});
     }
 
+    // The implicit `this` of a method whose receiver mode is `inout` (a `[mutating]` method) is
+    // an `inout` parameter too. Its argument is the base expression of the member access, which an
+    // inlined call accesses directly.
     if (callIsInlined)
         return;
     auto thisParamInfo = findEffectiveThisParamInfo(calleeDeclRef);

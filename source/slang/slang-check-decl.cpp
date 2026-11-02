@@ -5780,10 +5780,12 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
                 return false;
             // Beyond matching modes exactly, two by-reference parameters match only if they refer
-            // to storage in the same address space. A `groupshared` parameter is the one way to
-            // spell an explicit address space, so this requires either both parameters or neither
-            // to be `groupshared`. A synthesized witness can still forward between them where the
-            // call type-checks.
+            // to storage in the same address space. `groupshared` is currently the only way to
+            // spell an address space for a by-reference parameter, so this requires either both
+            // parameters or neither to be `groupshared`. (A `Ptr<T, access, addrSpace>` parameter
+            // is a pointer passed by value, so its address space is part of its type and is
+            // already compared with the type.) A synthesized witness can still forward between
+            // them where the call type-checks.
             if (isByReferenceParamPassingMode(requiredParamInfo.mode) &&
                 getReferenceParamAddressSpace(requiredParam.getDecl()) !=
                     getReferenceParamAddressSpace(satisfyingParam.getDecl()))
