@@ -2459,6 +2459,52 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     }
 }
 
+// Emit `call`, whose result nothing reads, without binding the result to a temporary that the
+// Metal compiler would report as unused, or return false to keep the temporary. A call to a target
+// intrinsic is cast to `void` where the language allows it, because a discarded intrinsic can be a
+// non-call expression such as `(f(x).x)` or a builtin declared `const` or `pure`, which clang-based
+// compilers report as an unused value; DXC does so for a bare `tex.Load(uv);`. WGSL keeps every
+// temporary, since a call to a `@must_use` builtin cannot be a bare statement.
+bool CLikeSourceEmitter::tryEmitDiscardedCallStmt(IRCall* call)
+{
+    auto type = call->getDataType();
+    if (!type || as<IRVoidType>(type))
+        return false;
+
+    auto sourceLanguage = getSourceLanguage();
+    if (sourceLanguage == SourceLanguage::WGSL)
+        return false;
+
+    UnownedStringSlice intrinsicDefinition;
+    IRInst* intrinsicInst = nullptr;
+    if (!findTargetIntrinsicDefinition(
+            getResolvedInstForDecorations(call->getCallee()),
+            intrinsicDefinition,
+            intrinsicInst))
+    {
+        emitInstExpr(call, getInfo(EmitOp::General));
+        m_writer->emit(";\n");
+        return true;
+    }
+
+    switch (sourceLanguage)
+    {
+    case SourceLanguage::C:
+    case SourceLanguage::CPP:
+    case SourceLanguage::CUDA:
+    case SourceLanguage::Metal:
+        {
+            auto prec = getInfo(EmitOp::Prefix);
+            m_writer->emit("(void)");
+            emitInstExpr(call, rightSide(getInfo(EmitOp::General), prec));
+            m_writer->emit(";\n");
+            return true;
+        }
+    default:
+        return false;
+    }
+}
+
 void CLikeSourceEmitter::emitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     // Try target specific impl first
@@ -3355,6 +3401,9 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     switch (inst->getOp())
     {
     default:
+        if (auto call = as<IRCall>(inst);
+            call && !hasNonDebugUse(call) && tryEmitDiscardedCallStmt(call))
+            break;
         emitInstResultDecl(inst);
         emitInstExpr(inst, getInfo(EmitOp::General));
         m_writer->emit(";\n");
