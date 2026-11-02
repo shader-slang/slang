@@ -743,8 +743,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator%(T left, T right)
     return result;
 }
 
-// SLANG_MAKE_VECTOR is defined unconditionally because each use below sits under the gate
-// for its own type, and an offline build may enable any one of those types alone.
+// SLANG_MAKE_VECTOR is defined unconditionally because every use below is gated, either by
+// SLANG_CUDA_RTC (offline, the CUDA SDK provides make_* for the standard vector types) or by its
+// own type's enable define, and an offline build may enable any one of those types alone.
 #define SLANG_MAKE_VECTOR(T)                                                \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##2 make_##T##2(T x, T y)           \
     {                                                                       \
