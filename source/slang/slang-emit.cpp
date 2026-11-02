@@ -399,9 +399,32 @@ static void reportCheckpointIntermediates(
 
 struct LinkingAndOptimizationOptions
 {
+    // Whether to run existential and resource type legalization. This is false for
+    // emission paths whose downstream compiler (a C/C++ compiler, NVRTC, or LLVM)
+    // handles those types natively.
     bool shouldLegalizeExistentialAndResourceTypes = true;
+
+    // Whether the target cannot express a module-scope constant's initializer as a
+    // global. When true, global constants are inlined into the functions that use them.
+    // Set it with `doesTargetRejectGlobalInitializers`.
+    bool targetCannotEmitGlobalInitializer = false;
+
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
+
+// Return true if the target of `codeGenContext` cannot emit a global constant's
+// initializer, so the constant must be inlined into its users instead.
+//
+// - CUDA: NVRTC rejects dynamic initialization of a `__device__` variable.
+// - CPU targets in shader (kernel) mode: a global constant may reference global shader
+//   parameters, which cannot be emitted as constants. Host-style CPU targets do not have
+//   this problem.
+static bool doesTargetRejectGlobalInitializers(CodeGenContext* codeGenContext)
+{
+    auto target = codeGenContext->getTargetFormat();
+    return target == CodeGenTarget::CUDASource ||
+           (isCPUTarget(codeGenContext->getTargetReq()) && isKernelTarget(target));
+}
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
@@ -1964,16 +1987,8 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(legalizeVectorTypes, sink);
 
-    // For CUDA targets, always inline global constants to avoid dynamic initialization
-    // of __device__ variables rejected by NVRTC. This runs independently of the broader
-    // resource/existential type legalization, which remains disabled for CUDA.
-    //
-    // We also need this pass on the CPU targets in shader mode, as global
-    // constants may reference global parameters, which can't be emitted as
-    // constants.
-    if (target == CodeGenTarget::CUDASource ||
-        (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
-        options.shouldLegalizeExistentialAndResourceTypes)
+    if (options.shouldLegalizeExistentialAndResourceTypes ||
+        options.targetCannotEmitGlobalInitializer)
     {
         // Normalize synthesized member-wise constructor calls in module-scope
         // constant initializers to `makeStruct` before deciding what must be
@@ -3100,6 +3115,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
+        linkingAndOptimizationOptions.targetCannotEmitGlobalInitializer =
+            doesTargetRejectGlobalInitializers(this);
 
         switch (sourceLanguage)
         {
@@ -3878,6 +3895,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
+    linkingAndOptimizationOptions.targetCannotEmitGlobalInitializer =
+        doesTargetRejectGlobalInitializers(codeGenContext);
     SLANG_RETURN_ON_FAIL(
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 
