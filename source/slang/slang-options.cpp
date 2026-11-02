@@ -3257,15 +3257,10 @@ void OptionsParser::_resolveOutputPaths(
     }
 }
 
-// Record the resolved output paths on the compile request's targets.
+// Record each resolved output path on its target, and select whole-program code generation for a
+// target that has a whole-program output.
 void OptionsParser::_bindOutputsToTargets()
 {
-    // Now that we've diagnosed the output paths, we can add them
-    // to the compile request at the appropriate locations.
-    //
-    // We will consider the output files specified via `-o` and try to figure
-    // out how to deal with them.
-    //
     for (auto& rawOutput : m_rawOutputs)
     {
         if (rawOutput.targetIndex == -1)
