@@ -670,14 +670,48 @@ SLANG_UNIT_TEST(parseCommandLineArgsWholeProgramReachesCodeGeneration)
     SLANG_CHECK(wholeProgramCode.getUnownedSlice().indexOf(toSlice("export")) >= 0);
 }
 
+SLANG_ALLOW_DEPRECATED_BEGIN
+
+// Return the SPIR-V assembly for `kComputeShaderSource` from a compile request that parses `argv`
+// through the deprecated API and then has a SPIR-V target, the source and its entry point added to
+// it, as a caller of that API adds them after the parse. Returns an empty string on failure.
+static String compileSpirvAsmWithCompileRequest(
+    slang::IGlobalSession* globalSession,
+    int argc,
+    const char* const* argv)
+{
+    ComPtr<slang::ICompileRequest> request;
+    if (SLANG_FAILED(globalSession->createCompileRequest(request.writeRef())) ||
+        SLANG_FAILED(request->processCommandLineArguments(argv, argc)))
+        return String();
+
+    const int targetIndex = request->addCodeGenTarget(SLANG_SPIRV_ASM);
+    request->setTargetProfile(targetIndex, globalSession->findProfile("spirv_1_5"));
+    const int translationUnit =
+        request->addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, "compileRequestModule");
+    request->addTranslationUnitSourceString(
+        translationUnit,
+        "compileRequestModule.slang",
+        kComputeShaderSource);
+    const int entryPoint =
+        request->addEntryPoint(translationUnit, "computeMain", SLANG_STAGE_COMPUTE);
+    if (SLANG_FAILED(request->compile()))
+        return String();
+
+    ComPtr<ISlangBlob> code;
+    if (SLANG_FAILED(request->getEntryPointCodeBlob(entryPoint, targetIndex, code.writeRef())) ||
+        !code)
+        return String();
+    return String(UnownedStringSlice((const char*)code->getBufferPointer(), code->getBufferSize()));
+}
+
 // A compile request configured through the deprecated API still resolves entry points when its
 // command line is parsed, so a stage with no entry point fails there. It keeps a floating-point
-// mode given with no `-target` for the targets added to it later.
+// mode given with no `-target` for the targets added to it later, as the generated SPIR-V shows.
 SLANG_UNIT_TEST(parseCommandLineArgsCompileRequestKeepsCompileChecks)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
-    SLANG_ALLOW_DEPRECATED_BEGIN
     {
         ComPtr<slang::ICompileRequest> request;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->createCompileRequest(request.writeRef())));
@@ -686,12 +720,15 @@ SLANG_UNIT_TEST(parseCommandLineArgsCompileRequestKeepsCompileChecks)
         UnownedStringSlice diagnostics(request->getDiagnosticOutput());
         SLANG_CHECK(diagnostics.indexOf(toSlice("E00033")) >= 0);
     }
-    {
-        ComPtr<slang::ICompileRequest> request;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->createCompileRequest(request.writeRef())));
-        const char* argv[] = {"-floating-point-mode", "precise"};
-        SLANG_CHECK(
-            SLANG_SUCCEEDED(request->processCommandLineArguments(argv, SLANG_COUNT_OF(argv))));
-    }
-    SLANG_ALLOW_DEPRECATED_END
+
+    const String defaultCode = compileSpirvAsmWithCompileRequest(globalSession, 0, nullptr);
+    const char* preciseArgv[] = {"-floating-point-mode", "precise"};
+    const String preciseCode =
+        compileSpirvAsmWithCompileRequest(globalSession, SLANG_COUNT_OF(preciseArgv), preciseArgv);
+    SLANG_CHECK_ABORT(defaultCode.getLength() != 0);
+    SLANG_CHECK_ABORT(preciseCode.getLength() != 0);
+    SLANG_CHECK(defaultCode.getUnownedSlice().indexOf(toSlice("NoContraction")) < 0);
+    SLANG_CHECK(preciseCode.getUnownedSlice().indexOf(toSlice("NoContraction")) >= 0);
 }
+
+SLANG_ALLOW_DEPRECATED_END
