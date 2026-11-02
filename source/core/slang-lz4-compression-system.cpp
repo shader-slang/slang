@@ -83,8 +83,13 @@ SlangResult LZ4CompressionSystemImpl::decompress(
         (char*)outDecompressed,
         int(compressedSizeInBytes),
         int(decompressedSizeInBytes));
-    SLANG_UNUSED(decompressedSize);
-    SLANG_ASSERT(size_t(decompressedSize) == decompressedSizeInBytes);
+    // LZ4_decompress_safe returns the number of bytes written, or a negative
+    // value on malformed input. Reject a negative result or a short/long
+    // decompression instead of returning success with partially initialized
+    // bytes, which the caller would hand to the deserializer.
+    if (decompressedSize < 0 || size_t(decompressedSize) != decompressedSizeInBytes)
+        return SLANG_FAIL;
+
     return SLANG_OK;
 }
 
