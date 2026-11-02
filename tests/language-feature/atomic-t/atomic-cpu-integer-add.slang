@@ -3,7 +3,8 @@
 // The C++ backend lowers integer `Atomic<T>.add` to the `_slang_atomic_add_*` prelude helpers, and
 // `reduceAdd` and `+=` inline to the same operation. The other atomic operations are reported as
 // unsupported on CPU targets (see tests/diagnostics/atomic-t-cpp-unsupported.slang); this test
-// checks that the supported integer add still runs for every integer width.
+// checks that the supported integer add still runs for each 32- and 64-bit integer type. The
+// int64_t and uint64_t blocks cross 2^32, so a 64-bit helper that updated only the low word fails.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
@@ -16,7 +17,7 @@ RWStructuredBuffer<Atomic<int64_t>> int64Buffer;
 //TEST_INPUT: set uint64Buffer = ubuffer(data=[0 0 0 0], stride=8)
 RWStructuredBuffer<Atomic<uint64_t>> uint64Buffer;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -39,6 +40,8 @@ void computeMain()
     outputBuffer[6] = int(uint64Buffer[0].add(7));
     uint64Buffer[0].reduceAdd(1);
     outputBuffer[7] = int(uint64Buffer[0].add(0));
+    uint64Buffer[0] += 0x100000000ULL;
+    outputBuffer[8] = int(uint64Buffer[0].add(0) >> 32);
 }
 
 // CHECK: type: int32_t
@@ -50,3 +53,4 @@ void computeMain()
 // CHECK-NEXT: 1
 // CHECK-NEXT: 0
 // CHECK-NEXT: 8
+// CHECK-NEXT: 1

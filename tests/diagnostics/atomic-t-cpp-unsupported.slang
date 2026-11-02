@@ -111,6 +111,9 @@ void computeMain(
     intBuffer[0]++;
 //CHECK:        ^^ unsupported intrinsic operation
 //CHECK:        ^^ intrinsic operation 'atomicInc on int' is not supported for the current target.
+    intBuffer[1] = 5;
+//CHECK:         ^ unsupported intrinsic operation
+//CHECK:         ^ intrinsic operation 'atomicStore on int' is not supported for the current target.
     outputBuffer[0] = counterBuffer[0].value;
     counterBuffer[0].value = 3;
 //CHECK:                   ^ unsupported intrinsic operation
