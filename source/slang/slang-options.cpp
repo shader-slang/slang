@@ -1553,7 +1553,11 @@ struct OptionsParser
 
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode);
 
-    SlangResult parse(SlangCompileRequest* compileRequest, int argc, char const* const* argv);
+    SlangResult parse(
+        SlangCompileRequest* compileRequest,
+        int argc,
+        char const* const* argv,
+        CommandLineParsePurpose purpose);
 
     SlangResult _parse(int argc, char const* const* argv);
 
@@ -1637,6 +1641,8 @@ struct OptionsParser
 
     SlangSession* m_session = nullptr;
     SlangCompileRequest* m_compileRequest = nullptr;
+
+    CommandLineParsePurpose m_purpose = CommandLineParsePurpose::CompleteCommandLine;
 
     Slang::EndToEndCompileRequest* m_requestImpl = nullptr;
 
@@ -1928,8 +1934,43 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguageExpli
     return SLANG_OK;
 }
 
+// Return whether a parse for `purpose` configures a compilation, and so loads its input files
+// and resolves its entry points and output paths. A session description carries none of these,
+// so its parse skips that work and the diagnostics that come with it.
+static bool parsesForCompilation(CommandLineParsePurpose purpose)
+{
+    switch (purpose)
+    {
+    case CommandLineParsePurpose::CompleteCommandLine:
+    case CommandLineParsePurpose::CompileRequest:
+        return true;
+    case CommandLineParsePurpose::SessionDescription:
+        return false;
+    }
+    SLANG_UNREACHABLE("unknown CommandLineParsePurpose");
+}
+
+// Return whether targets can be added after a parse for `purpose`: through `addCodeGenTarget`
+// for a compile request, or through `SessionDesc::targets` for a session description. Such
+// targets inherit target options given with no `-target`, so those options are not ignored.
+static bool canAddTargetsAfterParse(CommandLineParsePurpose purpose)
+{
+    switch (purpose)
+    {
+    case CommandLineParsePurpose::CompleteCommandLine:
+        return false;
+    case CommandLineParsePurpose::CompileRequest:
+    case CommandLineParsePurpose::SessionDescription:
+        return true;
+    }
+    SLANG_UNREACHABLE("unknown CommandLineParsePurpose");
+}
+
 SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langOverride)
 {
+    if (!parsesForCompilation(m_purpose))
+        return SLANG_OK;
+
     SlangSourceLanguage sourceLanguageExplicitlyRequested = SlangSourceLanguage(langOverride);
     if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
@@ -4748,7 +4789,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
     // of the loop work if they are after -load-repro
     if (!m_hasLoadedRepro)
     {
-        SLANG_RETURN_ON_FAIL(_resolveEntryPoints());
+        if (parsesForCompilation(m_purpose))
+            SLANG_RETURN_ON_FAIL(_resolveEntryPoints());
 
         // We are going to build a mapping from target formats to the
         // target that handles that format.
@@ -4883,9 +4925,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             // apply to any target. We report it as an error unless that state is kept for
             // targets added later, as described for each option below.
             //
-            // A profile is reported in every mode. With no `-target`, the
-            // `IGlobalSession::parseCommandLineArguments` path cannot keep it, because
-            // `Linkage::addTarget` sets each target's profile from its `TargetDesc`.
+            // A profile is reported for every parse purpose. With no `-target`, a session
+            // description cannot keep it, because `Linkage::addTarget` sets each target's
+            // profile from its `TargetDesc`.
             //
             if (m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
             {
@@ -4904,14 +4946,14 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
             }
 
-            // A floating-point mode with no `-target` is reported only for a command-line
-            // compile, which adds no target after parsing. An API caller keeps it: targets
-            // already on the linkage inherit it below, targets added later inherit it from
+            // A floating-point mode with no `-target` is ignored only when no target can be
+            // added after parsing. Otherwise targets keep it: targets already on the linkage
+            // inherit it below, targets added later inherit it from
             // `m_optionSetForDefaultTarget`, and `parseCommandLineArguments` returns it as a
             // session option.
             //
             const bool isFloatingPointModeIgnored =
-                m_rawTargets.getCount() > 1 || m_requestImpl->m_isCommandLineCompile;
+                m_rawTargets.getCount() > 1 || !canAddTargetsAfterParse(m_purpose);
 
             if (isFloatingPointModeIgnored &&
                 defaultTargetFloatingPointMode != FloatingPointMode::Default)
@@ -5081,12 +5123,22 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 m_compileRequest->setTargetEmbedDownstreamIR(targetID, true);
             }
+
+            // A compile gives a target its full option set when it binds an output path to the
+            // target (see `_bindOutputsToTargets`); a target with no output keeps only the
+            // profile's version from the setters above, so its entry points supply their stages.
+            // A session description binds no outputs, so its targets take every option given
+            // after their `-target` here.
+            if (!parsesForCompilation(m_purpose))
+                linkage->targets[targetID]->getOptionSet().overrideWith(rawTarget.optionSet);
         }
 
-        _resolveOutputPaths(mapFormatToTargetIndex);
+        if (parsesForCompilation(m_purpose))
+            _resolveOutputPaths(mapFormatToTargetIndex);
     }
 
-    _bindOutputsToTargets();
+    if (parsesForCompilation(m_purpose))
+        _bindOutputsToTargets();
 
 
     // Copy all settings from linkage to targets.
@@ -5176,8 +5228,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 SlangResult OptionsParser::parse(
     SlangCompileRequest* compileRequest,
     int argc,
-    char const* const* argv)
+    char const* const* argv,
+    CommandLineParsePurpose purpose)
 {
+    m_purpose = purpose;
     m_compileRequest = compileRequest;
 
     // Set up useful members
@@ -5239,10 +5293,14 @@ SlangResult OptionsParser::parse(
     return res;
 }
 
-SlangResult parseOptions(SlangCompileRequest* inCompileRequest, int argc, char const* const* argv)
+SlangResult parseOptions(
+    SlangCompileRequest* inCompileRequest,
+    int argc,
+    char const* const* argv,
+    CommandLineParsePurpose purpose)
 {
     OptionsParser parser;
-    return parser.parse(inCompileRequest, argc, argv);
+    return parser.parse(inCompileRequest, argc, argv, purpose);
 }
 
 

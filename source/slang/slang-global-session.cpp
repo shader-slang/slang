@@ -1161,7 +1161,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
         return SLANG_E_BUFFER_TOO_SMALL;
     RefPtr<ParsedCommandLineData> outData = new ParsedCommandLineData();
     RefPtr<EndToEndCompileRequest> tempReq = new EndToEndCompileRequest(this);
-    SLANG_RETURN_ON_FAIL(tempReq->processCommandLineArguments(argv, argc));
+    SLANG_RETURN_ON_FAIL(
+        parseOptions(tempReq.Ptr(), argc, argv, CommandLineParsePurpose::SessionDescription));
 
     // OptionsParser keeps `-allow-glsl` request-local so ordinary slangc compilation cannot leak
     // it into imported modules. This API is specifically translating command-line options into a

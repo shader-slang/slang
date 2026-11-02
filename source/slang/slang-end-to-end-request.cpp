@@ -2390,7 +2390,12 @@ SlangResult EndToEndCompileRequest::processCommandLineArguments(
     char const* const* args,
     int argCount)
 {
-    return parseOptions(this, argCount, args);
+    return parseOptions(
+        this,
+        argCount,
+        args,
+        m_isCommandLineCompile ? CommandLineParsePurpose::CompleteCommandLine
+                               : CommandLineParsePurpose::CompileRequest);
 }
 
 SlangReflection* EndToEndCompileRequest::getReflection()

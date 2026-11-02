@@ -14,7 +14,27 @@ class IArtifact;
 
 UnownedStringSlice getCodeGenTargetName(SlangCompileTarget target);
 
-SlangResult parseOptions(SlangCompileRequest* compileRequestIn, int argc, char const* const* argv);
+/// The use a command line is parsed for. The parser reads the same options for every purpose,
+/// but the work after the last argument depends on what the result is used for.
+enum class CommandLineParsePurpose
+{
+    /// A complete slangc command line: nothing is added to the request after parsing.
+    CompleteCommandLine,
+
+    /// A compile request that the caller configures incrementally through the API, and may add
+    /// targets and entry points to after parsing.
+    CompileRequest,
+
+    /// The session description returned by `IGlobalSession::parseCommandLineArguments`. A session
+    /// has targets and compiler options, but no source files, entry points or output paths.
+    SessionDescription,
+};
+
+SlangResult parseOptions(
+    SlangCompileRequest* compileRequestIn,
+    int argc,
+    char const* const* argv,
+    CommandLineParsePurpose purpose);
 
 // Initialize command options. Holds the details how parsing works.
 void initCommandOptions(CommandOptions& commandOptions);
