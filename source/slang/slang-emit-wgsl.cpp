@@ -2,6 +2,7 @@
 
 #include "core/slang-type-text-util.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
@@ -1856,10 +1857,11 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 // WGSL has no unary '-' on matrices, so we negate by multiplying with the scalar
                 // -1, which, like '-x' and unlike "matCxR<T>() - x", flips the sign of a zero
                 // element. op0 is the right-hand side of '*', so an operand that binds no tighter
-                // than '*' (e.g. "a + b") keeps its own parentheses. legalizeMatrixTypes lowers
-                // every non-float matrix for WGSL.
+                // than '*' (e.g. "a + b") keeps its own parentheses. legalizeMatrixTypes has
+                // already rewritten bool and integer matrices into arrays of vectors.
+                SLANG_RELEASE_ASSERT(
+                    !isMatrixTypeLegalizedToVectorArray(getTargetProgram(), matrixType));
                 auto elementType = matrixType->getElementType();
-                SLANG_RELEASE_ASSERT(isFloatingType(elementType));
                 m_writer->emit("(");
                 emitType(elementType);
                 m_writer->emit("(-1) * ");
