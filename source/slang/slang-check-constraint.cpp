@@ -361,14 +361,14 @@ Type* SemanticsVisitor::TryJoinTypes(
         }
     }
 
-    // For common-type inference (see `allowCommonTypeJoins`), an enum joins with a
-    // scalar by decaying to its tag type. We only *nominate* the tag type as the
-    // candidate common type; overload applicability (the normal coercion path)
-    // remains the sole arbiter of whether each arm actually converts to it.
-    // Enum-with-enum is intentionally unhandled: two enums share no natural
-    // scalar to decay to.
+    // For common-type inference (see `allowCommonTypeJoins`), the joins below only
+    // *nominate* a candidate common type; overload applicability (the normal
+    // coercion path) remains the sole arbiter of whether each arm actually
+    // converts to it.
     if (allowCommonTypeJoins)
     {
+        // An enum joins with a scalar by decaying to its tag type. Enum-with-enum
+        // is intentionally unhandled: two enums share no natural scalar to decay to.
         if (as<BasicExpressionType>(right))
         {
             if (auto leftEnumDeclRef = isDeclRefTypeOf<EnumDecl>(left))
@@ -393,6 +393,14 @@ Type* SemanticsVisitor::TryJoinTypes(
                         allowCommonTypeJoins);
             }
         }
+
+        // `nullptr` joins with a pointer type as that pointer type, matching the
+        // only conversion `_coerce` defines for `NullPtrType`. For example,
+        // `c ? p : nullptr` infers `T = Ptr<int>` for `operator?:<T>(bool, T, T)`.
+        if (as<PtrType>(left) && as<NullPtrType>(right))
+            return left;
+        if (as<NullPtrType>(left) && as<PtrType>(right))
+            return right;
     }
 
     // HACK: trying to work trait types in here...
@@ -2012,9 +2020,10 @@ private:
 
         // Non-exact type constraints use the join path. This preserves existing
         // common-type behavior for ordinary call inference, such as picking a
-        // type that several arguments can convert to. This is the one place an
-        // enum may decay to its tag type to join with a scalar, since here the
-        // join proposes a type both arguments will be coerced to.
+        // type that several arguments can convert to. This is the one place the
+        // common-type-only joins (an enum decaying to its tag type, `nullptr`
+        // taking a pointer's type) apply, since here the join proposes a type
+        // both arguments will be coerced to.
         auto joinType =
             m_visitor->TryJoinTypes(&m_context, ioType, cType, /*allowCommonTypeJoins*/ true);
         if (!joinType)

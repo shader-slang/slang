@@ -3730,10 +3730,11 @@ public:
     //
     // `allowCommonTypeJoins` opts in to joins that only nominate a type every
     // argument will then be coerced to, such as decaying an enum to its tag type
-    // so it can join with a scalar. It is enabled only for common-type inference
-    // of ordinary call arguments (e.g. the arms of `?:`/`select`), and left off
-    // for the witness/subtype/equality constraint solver, where such a fabricated
-    // join would wrongly constrain a type parameter.
+    // so it can join with a scalar, or giving `nullptr` the type of the pointer it
+    // joins with. It is enabled only for common-type inference of ordinary call
+    // arguments (e.g. the arms of `?:`/`select`), and left off for the
+    // witness/subtype/equality constraint solver, where such a fabricated join
+    // would wrongly constrain a type parameter.
     Type* TryJoinTypes(
         GenericInferenceContext* constraints,
         QualType left,
