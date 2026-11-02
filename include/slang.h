@@ -4356,8 +4356,9 @@ struct IGlobalSession : public ISlangUnknown
      *   - One target per `-target`. With no `-target`, targets are inferred from the extensions of
      *     `-o` paths, or else from a `-profile` that implies a target.
      *   - The options given after a `-target` (for example `-profile`, `-capability`, `-fp-mode`),
-     *     in that target's `compilerOptionEntries`. The profile is also stored in
-     *     `TargetDesc::profile`.
+     *     in that target's `compilerOptionEntries`. The profile's version is also stored in
+     *     `TargetDesc::profile`. A stage that the profile names (for example the compute stage of
+     *     `cs_6_0`) is not kept, because entry points supply their own stages.
      *   - Target options given before the first `-target`, other than `-profile`. With a single
      *     target, declared or inferred, they apply to it. With no target, they become session
      *     options for the targets added to the session. With several targets they are rejected.

@@ -453,10 +453,37 @@ SLANG_UNIT_TEST(parseCommandLineArgsAcceptsStageProfileWithoutEntryPoint)
         allocation.writeRef())));
     SLANG_CHECK_ABORT(sessionDesc.targetCount == 1);
     SLANG_CHECK(sessionDesc.targets[0].format == SLANG_DXIL);
-    SLANG_CHECK(sessionDesc.targets[0].profile == globalSession->findProfile("cs_6_0"));
+    SLANG_CHECK(sessionDesc.targets[0].profile == globalSession->findProfile("sm_6_0"));
 
     ComPtr<slang::ISession> session;
     SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+}
+
+// A stage profile does not restrict the session's target to that stage: a module with entry points
+// for several stages loads, and each entry point compiles for its own stage.
+SLANG_UNIT_TEST(parseCommandLineArgsStageProfileKeepsOtherStagesUsable)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const char* source = R"(
+        [shader("vertex")]
+        float4 vertexMain(float4 position : POSITION) : SV_Position { return position; }
+
+        RWStructuredBuffer<float> outputBuffer;
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 id : SV_DispatchThreadID) { outputBuffer[id.x] = 1.0f; }
+    )";
+
+    const char* argv[] = {"-target", "hlsl", "-profile", "ps_5_0"};
+    slang::SessionDesc sessionDesc;
+    ComPtr<ISlangUnknown> allocation;
+    parseSessionDesc(globalSession, SLANG_COUNT_OF(argv), argv, sessionDesc, allocation);
+    SLANG_CHECK_ABORT(sessionDesc.targetCount == 1);
+    SLANG_CHECK(sessionDesc.targets[0].profile == globalSession->findProfile("sm_5_0"));
+
+    const String code = generateCodeWithSession(globalSession, sessionDesc, source, true);
+    SLANG_CHECK(code.getUnownedSlice().indexOf(toSlice("[numthreads(1, 1, 1)]")) >= 0);
 }
 
 // Source files, entry-point options and output paths configure a compilation rather than a

@@ -5127,9 +5127,16 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             // target (see `_bindOutputsToTargets`); a target with no output keeps only the
             // profile's version from the setters above, so its entry points supply their stages.
             // A session description binds no outputs, so its targets take every option given
-            // after their `-target` here.
+            // after their `-target` here, except that the profile also keeps only its version:
+            // the caller's entry points supply their stages, and a stage in the target profile
+            // would restrict every module the session loads to that stage.
             if (!parsesForCompilation(m_purpose))
-                linkage->targets[targetID]->getOptionSet().overrideWith(rawTarget.optionSet);
+            {
+                auto& targetOptionSet = linkage->targets[targetID]->getOptionSet();
+                targetOptionSet.overrideWith(rawTarget.optionSet);
+                if (rawTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
+                    targetOptionSet.setProfile(Profile(rawTarget.optionSet.getProfileVersion()));
+            }
         }
 
         if (parsesForCompilation(m_purpose))
