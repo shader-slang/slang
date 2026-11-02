@@ -4366,10 +4366,11 @@ struct IGlobalSession : public ISlangUnknown
      *
      *   Options that configure a compilation rather than a session are accepted and ignored: source
      *   files (including `-` for stdin, which is not read), `-entry`, `-stage` and `-specialize`.
-     *   An `-o` path infers a target when no `-target` is given; output paths are not bound.
-     *   Checks that need entry points or output paths happen when the program is compiled.
-     *   Pending maintainer decision: whether `-target hlsl -o foo.spv` is rejected, and whether
-     *   an `-o` path selects whole-program code generation for its target.
+     *   Output paths are used only to infer a target from their extension when no `-target` is
+     *   given, and are not retained, so `-target hlsl -o foo.spv` yields only the HLSL target. An
+     *   output path does not select whole-program code generation; an explicit `-whole-program`
+     *   is kept. Checks that need entry points or output paths happen when the program is
+     *   compiled.
      *
      *   `-load-core-module`, `-compile-core-module` and `-save-core-module` act on this global
      *   session during the call.
