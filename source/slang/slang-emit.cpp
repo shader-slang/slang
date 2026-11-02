@@ -399,26 +399,21 @@ static void reportCheckpointIntermediates(
 
 struct LinkingAndOptimizationOptions
 {
-    // Whether to run existential and resource type legalization. This is false for
-    // emission paths whose downstream compiler (a C/C++ compiler, NVRTC, or LLVM)
-    // handles those types natively.
+    // Run existential and resource type legalization. It is false when the downstream
+    // compiler (C/C++, NVRTC, or LLVM) handles those types.
     bool shouldLegalizeExistentialAndResourceTypes = true;
 
-    // Whether the target cannot express a module-scope constant's initializer as a
-    // global. When true, global constants are inlined into the functions that use them.
-    // Set it with `doesTargetRejectGlobalInitializers`.
+    // The target cannot emit a global constant's initializer, so global constants are
+    // inlined. Set it with `doesTargetRejectGlobalInitializers`.
     bool targetCannotEmitGlobalInitializer = false;
 
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
-// Return true if the target of `codeGenContext` cannot emit a global constant's
-// initializer, so the constant must be inlined into its users instead.
-//
+// Return true if the target cannot emit a global constant's initializer.
 // - CUDA: NVRTC rejects dynamic initialization of a `__device__` variable.
-// - CPU targets in shader (kernel) mode: a global constant may reference global shader
-//   parameters, which cannot be emitted as constants. Host-style CPU targets do not have
-//   this problem.
+// - CPU in kernel mode: a global constant can use global shader parameters, which
+//   cannot be emitted as constants. Host-style CPU targets do not have this problem.
 static bool doesTargetRejectGlobalInitializers(CodeGenContext* codeGenContext)
 {
     auto target = codeGenContext->getTargetFormat();
@@ -1990,9 +1985,8 @@ Result linkAndOptimizeIR(
     if (options.shouldLegalizeExistentialAndResourceTypes ||
         options.targetCannotEmitGlobalInitializer)
     {
-        // Normalize synthesized member-wise constructor calls in module-scope
-        // constant initializers to `makeStruct` before deciding what must be
-        // inlined, so a `static const` struct table stays a global constant.
+        // Fold constructor calls to `makeStruct`, so that a `static const` struct
+        // table can stay a global constant.
         SLANG_PASS(legalizeConstantConstructorCallsForGlobalScope);
         SLANG_PASS(inlineGlobalConstantsForLegalization);
     }
