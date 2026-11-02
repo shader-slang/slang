@@ -15054,7 +15054,8 @@ T __copyObject<T>(T v)
 /// divergent, and ensure scalarization happens correctly for each divergent lane.
 __generic<T:__BuiltinArithmeticType>
 __intrinsic_op($(kIROp_NonUniformResourceIndex))
-[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
+[require(glsl_hlsl_spirv, nonuniformqualifier)]
+[require(cpp_cuda_metal_wgsl)]
 T NonUniformResourceIndex(T index);
 
 /// HLSL allows NonUniformResourceIndex around non int/uint types.
