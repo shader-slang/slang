@@ -51,7 +51,7 @@ void computeMain(uint3 tid : SV_GroupThreadID)
 // The callee must be inlined: no `ptr<workgroup` parameter may survive.
 // WGSL-NOT: ptr<workgroup
 // The store must write the shared global directly, so a `var`-typed whole-array copy of it must
-// not appear (that would be the copy-in/out temporary that loses sharing).
+// not appear (a per-invocation temporary of the array would lose sharing).
 // WGSL-NOT: var {{[A-Za-z0-9_]+}} : array<u32,{{.*}}= groupSharedData
 // WGSL: groupSharedData{{.*}}[{{.*}}] =
 

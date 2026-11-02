@@ -139,11 +139,16 @@ struct AddressInstEliminationContext
         {
             for (auto inst : block->getChildren())
             {
-                // A borrow is read-only, and a reference names storage that other invocations or
-                // aliases may access during the function, so both stay in memory and each access
-                // through them stays an access to just the element it names.
                 auto rootType = getRootAddr(inst)->getDataType();
-                if (as<IRBorrowInParamType>(rootType) || as<IRRefParamType>(rootType))
+                // A borrow is read-only, so an access through it is a load that needs no
+                // write-back and can stay in memory.
+                if (as<IRBorrowInParamType>(rootType))
+                    continue;
+                // A reference names storage that the caller, other aliases, or other invocations
+                // may access during the function. Rewriting a write to one element into a write of
+                // the whole storage would overwrite their changes to the other elements, so each
+                // access through a reference stays an access to just the element it names.
+                if (as<IRRefParamType>(rootType))
                     continue;
                 if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
                 {

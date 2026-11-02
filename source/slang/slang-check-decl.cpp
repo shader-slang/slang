@@ -16132,8 +16132,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
                     addModifier(paramDecl, noDiffModifier);
                 }
             }
-            // A reference parameter (`__ref`, `__ref_readonly`, `__ref_writeonly`, or
-            // `groupshared`) names storage that the caller, and for `groupshared` other
+            // A by-reference parameter names storage that the caller, and possibly other
             // invocations, may also access, and only the user knows where its derivative would
             // live and how updates to it are synchronized. Automatic differentiation therefore
             // treats the parameter as `no_diff`. A user who needs gradients through such storage
