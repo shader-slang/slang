@@ -6257,7 +6257,7 @@ err(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal or WGSL (56101-56109)
+-- Metal, WGSL or CUDA (56101-56115)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
@@ -6327,6 +6327,27 @@ err(
     56112,
     "byte-address buffer stores of 8- or 16-bit values are not supported in WGSL",
     span { loc = "location", message = "storing '~type:IRInst' to a byte-address buffer writes 8- or 16-bit values; WGSL byte-address buffers are arrays of 32-bit words, so the store would have to rewrite the whole word and could lose a concurrent write to its other bytes. Use a 'RWStructuredBuffer' of the type, pack the values into 32-bit words, or use 'Atomic<uint>' operations." }
+)
+
+warning(
+    "wave-size-unsupported-on-target",
+    56113,
+    "'WaveSize' attribute is not supported on target '~target' and will be ignored",
+    span { loc = "location", message = "the target has no way to request a wave (SIMD-group) size, so the entry point runs at the size the device chooses; WaveGetLaneCount() returns it" }
+)
+
+err(
+    "wave-size-not-divisor-of-workgroup-x",
+    56114,
+    "the workgroup's x dimension (~workgroupSizeX:int) must be a multiple of the 'WaveSize' (~waveSize:int) on target '~target'",
+    span { loc = "location", message = "WGSL's '@subgroup_size' requires the x dimension of '@workgroup_size' to be a multiple of the subgroup size; otherwise pipeline creation fails" }
+)
+
+warning(
+    "wave-size-mismatch-on-target",
+    56115,
+    "'WaveSize(~waveSize:int)' cannot be honored on target '~target', whose wave size is always ~targetWaveSize:int; the attribute will be ignored",
+    span { loc = "location", message = "the entry point runs with ~targetWaveSize:int-lane waves, so code that assumes ~waveSize:int lanes per wave computes wrong results" }
 )
 
 -- SPIRV (57001-57007)

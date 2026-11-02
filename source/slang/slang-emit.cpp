@@ -439,6 +439,13 @@ void calcRequiredLoweringPassSet(
     if (isRayTracingLocationOperand(inst->getOp()))
         result.rayTracingLocationOperand = true;
 
+    // Buffer types enable the pass, not only loads and stores, because a buffer that is unused or
+    // reached only through `GetEquivalentStructuredBuffer` (as `GetDimensions` and `Interlocked*`
+    // are) still needs translating on structured-buffer targets. We match the base class so that
+    // every byte-address buffer type enables it, including rasterizer-ordered ones.
+    if (as<IRByteAddressBufferTypeBase>(inst))
+        result.byteAddressBuffer = true;
+
     switch (inst->getOp())
     {
     case kIROp_DebugValue:
@@ -568,8 +575,6 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_ByteAddressBufferLoad:
     case kIROp_ByteAddressBufferStore:
-    case kIROp_HLSLRWByteAddressBufferType:
-    case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
     case kIROp_HLSLAppendStructuredBufferType:
