@@ -223,7 +223,8 @@ SLANG_UNIT_TEST(parseCommandLineArgsReportsParseErrors)
         {"-profile", "sm_5_0", "-target", "dxbc", "-profile", "glsl_450", "-target", "spirv"};
     checkParseFails(globalSession, SLANG_COUNT_OF(profileBeforeTargets), profileBeforeTargets);
 
-    // Every target option given before several targets applies to none of them (E00045).
+    // A session description rejects every target option given before several targets, since
+    // it applies to none of them (E00045).
     const char* wholeProgramBeforeTargets[] =
         {"-whole-program", "-target", "hlsl", "-target", "spirv"};
     checkParseFails(

@@ -4923,13 +4923,20 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         }
         else
         {
-            // With zero or multiple targets, state given for the "default" target may not
-            // apply to any target. We report it as an error unless that state is kept for
-            // targets added later, as described for each option below.
+            // With zero or several targets, state given for the "default" target may apply to
+            // no target. Whether we report it depends on the option and the parse purpose:
             //
-            // A profile is reported for every parse purpose. With no `-target`, a session
-            // description cannot keep it, because `Linkage::addTarget` sets each target's
-            // profile from its `TargetDesc`.
+            // - A profile is reported for every purpose: E00042 with no target, and E00043
+            //   before several targets. With no `-target`, a session description cannot keep
+            //   it, because `Linkage::addTarget` sets each target's profile from its
+            //   `TargetDesc`.
+            // - A floating-point mode is reported before several targets for every purpose
+            //   (E00045). With no target, it is reported (E00044) only when no target can be
+            //   added after the parse.
+            // - Any other target option is reported before several targets only for a session
+            //   description (E00045). With no target, it is not reported: a compile request
+            //   and a session description keep it for the targets added later, and a complete
+            //   command line drops it, for compatibility with existing slangc command lines.
             //
             if (m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
             {
@@ -4950,9 +4957,14 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
             if (m_rawTargets.getCount() > 1)
             {
-                // With several targets, a target option given before the first `-target`
-                // applies to none of them, for every parse purpose.
-                if (hasTargetOptionOtherThanProfile(m_defaultTarget.optionSet))
+                // A compile reports only the floating-point mode here, for compatibility with
+                // existing slangc command lines that give other target options before several
+                // targets. A session description rejects any such option, as
+                // `parseCommandLineArguments` documents.
+                const bool reportsAnyTargetOption = !parsesForCompilation(m_purpose);
+                if (defaultTargetFloatingPointMode != FloatingPointMode::Default ||
+                    (reportsAnyTargetOption &&
+                     hasTargetOptionOtherThanProfile(m_defaultTarget.optionSet)))
                     m_sink->diagnose(Diagnostics::TargetFlagsIgnoredBecauseBeforeAllTargets{});
             }
             else if (
