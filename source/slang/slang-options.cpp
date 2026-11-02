@@ -1934,6 +1934,18 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguageExpli
     return SLANG_OK;
 }
 
+// Return whether `optionSet` holds a target option other than the profile, which has its own
+// diagnostics when it applies to no target.
+static bool hasTargetOptionOtherThanProfile(const CompilerOptionSet& optionSet)
+{
+    for (auto& option : optionSet.options)
+    {
+        if (option.key != CompilerOptionName::Profile)
+            return true;
+    }
+    return false;
+}
+
 // Return whether a parse for `purpose` configures a compilation, and so loads its input files
 // and resolves its entry points and output paths. A session description carries none of these,
 // so its parse skips that work and the diagnostics that come with it.
@@ -4946,26 +4958,23 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
             }
 
-            // A floating-point mode with no `-target` is ignored only when no target can be
-            // added after parsing. Otherwise targets keep it: targets already on the linkage
-            // inherit it below, targets added later inherit it from
-            // `m_optionSetForDefaultTarget`, and `parseCommandLineArguments` returns it as a
-            // session option.
-            //
-            const bool isFloatingPointModeIgnored =
-                m_rawTargets.getCount() > 1 || !canAddTargetsAfterParse(m_purpose);
-
-            if (isFloatingPointModeIgnored &&
+            if (m_rawTargets.getCount() > 1)
+            {
+                // With several targets, a target option given before the first `-target`
+                // applies to none of them, for every parse purpose.
+                if (hasTargetOptionOtherThanProfile(m_defaultTarget.optionSet))
+                    m_sink->diagnose(Diagnostics::TargetFlagsIgnoredBecauseBeforeAllTargets{});
+            }
+            else if (
+                !canAddTargetsAfterParse(m_purpose) &&
                 defaultTargetFloatingPointMode != FloatingPointMode::Default)
             {
-                if (m_rawTargets.getCount() == 0)
-                {
-                    m_sink->diagnose(Diagnostics::TargetFlagsIgnoredBecauseNoTargets{});
-                }
-                else
-                {
-                    m_sink->diagnose(Diagnostics::TargetFlagsIgnoredBecauseBeforeAllTargets{});
-                }
+                // A floating-point mode with no `-target` is ignored only when no target can be
+                // added after parsing. Otherwise targets keep it: targets already on the linkage
+                // inherit it below, targets added later inherit it from
+                // `m_optionSetForDefaultTarget`, and `parseCommandLineArguments` returns it as a
+                // session option.
+                m_sink->diagnose(Diagnostics::TargetFlagsIgnoredBecauseNoTargets{});
             }
         }
         for (auto& rawTarget : m_rawTargets)

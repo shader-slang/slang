@@ -222,6 +222,21 @@ SLANG_UNIT_TEST(parseCommandLineArgsReportsParseErrors)
         {"-profile", "sm_5_0", "-target", "dxbc", "-profile", "glsl_450", "-target", "spirv"};
     checkParseFails(globalSession, SLANG_COUNT_OF(profileBeforeTargets), profileBeforeTargets);
 
+    // Every target option given before several targets applies to none of them (E00045).
+    const char* wholeProgramBeforeTargets[] =
+        {"-whole-program", "-target", "hlsl", "-target", "spirv"};
+    checkParseFails(
+        globalSession,
+        SLANG_COUNT_OF(wholeProgramBeforeTargets),
+        wholeProgramBeforeTargets);
+
+    const char* capabilityBeforeTargets[] =
+        {"-capability", "spirv_1_5", "-target", "spirv", "-target", "hlsl"};
+    checkParseFails(
+        globalSession,
+        SLANG_COUNT_OF(capabilityBeforeTargets),
+        capabilityBeforeTargets);
+
     // Entry-point options are ignored, but a malformed one is still rejected.
     const char* unknownStage[] = {"-stage", "bogus"};
     checkParseFails(globalSession, SLANG_COUNT_OF(unknownStage), unknownStage);
@@ -345,8 +360,6 @@ SLANG_UNIT_TEST(parseCommandLineArgsFloatingPointModeReachesSessionTargets)
     SLANG_CHECK(preciseCode.getUnownedSlice().indexOf(toSlice("NoContraction")) >= 0);
 }
 
-// Parse `argv`, which must succeed, and check that it yields `expectedTargetCount` targets, the
-// first of format `expectedFormat`.
 static void checkParseTargets(
     slang::IGlobalSession* globalSession,
     int argc,

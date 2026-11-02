@@ -13,3 +13,8 @@
 //
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2):-floating-point-mode precise -target dxbc -target spirv
 //CHECK2: when using multiple targets, any target options must follow the '-target' they apply to
+
+// Case 3: any other target option before any `-target` when there are multiple targets.
+//
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK3):-whole-program -target dxbc -target spirv
+//CHECK3: when using multiple targets, any target options must follow the '-target' they apply to
