@@ -5889,6 +5889,8 @@ struct TypeFlowSpecializationContext
             return specializeLoad(context, inst);
         case kIROp_FieldExtract:
             return specializeFieldExtract(context, as<IRFieldExtract>(inst));
+        case kIROp_FieldAddress:
+            return specializeFieldAddress(context, as<IRFieldAddress>(inst));
         case kIROp_Var:
             return specializeVar(context, inst);
         case kIROp_Store:
@@ -7089,6 +7091,8 @@ struct TypeFlowSpecializationContext
         // This needs to be done even if the callee is not a set.
         //
         UCount extraArgCount = callArgs.getCount();
+        // (interface-to-tagged-union pointer, temporary) pairs to write back after the call.
+        List<KeyValuePair<IRInst*, IRInst*>> writeBacks;
         for (UInt i = 0; i < inst->getArgCount(); i++)
         {
             auto arg = inst->getArg(i);
@@ -7117,6 +7121,22 @@ struct TypeFlowSpecializationContext
             // For all other modes, sets must match ('subtyping' is not allowed)
             case ParameterDirectionInfo::Kind::BorrowInOut:
             case ParameterDirectionInfo::Kind::BorrowIn:
+                {
+                    // An interface-typed location that keeps its layout is passed through a
+                    // temporary of the parameter's type.
+                    IRBuilder builder(context);
+                    builder.setInsertBefore(inst);
+                    if (auto tempVar = bridgeInterfacePtrArg(
+                            builder,
+                            arg,
+                            paramDirection.kind,
+                            paramType,
+                            writeBacks))
+                        callArgs.add(tempVar);
+                    else
+                        callArgs.add(arg);
+                    break;
+                }
             case ParameterDirectionInfo::Kind::Ref:
                 {
                     callArgs.add(arg);
@@ -7157,6 +7177,18 @@ struct TypeFlowSpecializationContext
                 builder.emitCallInst(effectiveFuncType->getResultType(), callee, callArgs);
             inst->replaceUsesWith(newCall);
             inst->removeAndDeallocate();
+
+            // Write the bridged temporaries back to their interface-typed locations.
+            builder.setInsertAfter(newCall);
+            for (auto& writeBack : writeBacks)
+            {
+                auto tempVar = writeBack.value;
+                builder.emitStore(
+                    writeBack.key,
+                    builder.emitLoad(
+                        as<IRPtrTypeBase>(tempVar->getDataType())->getValueType(),
+                        tempVar));
+            }
         }
         else if (effectiveFuncType->getResultType() != inst->getFullType())
         {
@@ -7904,6 +7936,81 @@ struct TypeFlowSpecializationContext
         // Keep the bridge's store pointed at the original interface value.
         builder.replaceOperand(store->getValUse(), inst);
         return true;
+    }
+
+    bool specializeFieldAddress(IRInst* context, IRFieldAddress* inst)
+    {
+        // When the field keeps its interface type (no `fieldInfo`, e.g. a field of a struct
+        // that is part of a shader parameter, whose layout is fixed), the refined info of
+        // `analyzeFieldAddress` comes from the witness-table fallback. The field still holds the
+        // interface's existential layout, so the address keeps its `Ptr<Interface>` type, as an
+        // interface-typed pointer into a buffer does. Loads and stores through it are bridged by
+        // `specializeLoad` and `specializeStore`, and call arguments by `specializeCall`.
+        //
+        // Retyping only the address would give the address and the field two different layouts.
+        //
+        if (auto basePtrType = as<IRPtrTypeBase>(inst->getBase()->getDataType()))
+        {
+            if (auto structType = as<IRStructType>(basePtrType->getValueType()))
+            {
+                auto structField = findStructField(structType, as<IRStructKey>(inst->getField()));
+                if (structField && !this->fieldInfo.containsKey(structField))
+                {
+                    auto fieldType = structField->getFieldType();
+                    if (as<IRInterfaceType>(fieldType) && !isComInterfaceType(fieldType) &&
+                        !isBuiltin(fieldType))
+                        return false;
+                }
+            }
+        }
+        return replaceType(context, inst);
+    }
+
+    // Pass `arg`, a pointer to an interface-typed location, to a by-reference parameter whose
+    // value type has been specialized to the tagged union `paramType`.
+    //
+    // The location keeps the interface's layout (see `specializeFieldAddress`), so its address
+    // cannot be passed directly. The argument goes through a temporary of the parameter's type
+    // instead: the location is read into it before the call (except for `out`), and written back
+    // from it after the call (except for a read-only borrow). The read and the write go through
+    // `CastInterfaceToTaggedUnionPtr`, which `lowerTaggedUnionTypes` expands into conversions
+    // between the two layouts.
+    //
+    // Returns the temporary, or null if `arg` needs no bridge.
+    //
+    IRInst* bridgeInterfacePtrArg(
+        IRBuilder& builder,
+        IRInst* arg,
+        ParameterDirectionInfo::Kind paramDirection,
+        IRType* paramType,
+        List<KeyValuePair<IRInst*, IRInst*>>& writeBacks)
+    {
+        auto taggedUnionType = as<IRTaggedUnionType>(paramType);
+        if (!taggedUnionType)
+            return nullptr;
+        auto argPtrType = as<IRPtrTypeBase>(arg->getDataType());
+        if (!argPtrType)
+            return nullptr;
+        auto argValueType = argPtrType->getValueType();
+        if (!as<IRInterfaceType>(argValueType) || isComInterfaceType(argValueType) ||
+            isBuiltin(argValueType))
+            return nullptr;
+
+        IRInst* castArgs[] = {
+            arg,
+            taggedUnionType->getWitnessTableSet(),
+            taggedUnionType->getTypeSet()};
+        auto castPtr = builder.emitIntrinsicInst(
+            builder.getPtrTypeWithAddressSpace(taggedUnionType, argPtrType),
+            kIROp_CastInterfaceToTaggedUnionPtr,
+            3,
+            castArgs);
+        auto tempVar = builder.emitVar(taggedUnionType);
+        if (paramDirection != ParameterDirectionInfo::Kind::Out)
+            builder.emitStore(tempVar, builder.emitLoad(taggedUnionType, castPtr));
+        if (paramDirection != ParameterDirectionInfo::Kind::BorrowIn)
+            writeBacks.add(KeyValuePair<IRInst*, IRInst*>(castPtr, tempVar));
+        return tempVar;
     }
 
     bool specializeVar(IRInst* context, IRInst* inst)
