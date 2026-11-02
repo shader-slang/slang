@@ -574,7 +574,8 @@ void computeMain(uint i : SV_GroupIndex)
 }
 ```
 
-Some targets cannot pass a reference to thread-group-shared memory across a call, so Slang inlines a function with a `groupshared` parameter into its callers when compiling for them.
+HLSL does not allow `groupshared` on a function parameter, so when targeting HLSL, a function with a `groupshared` parameter cannot be `export`.
+If such a function must be `export`, have it access a global `groupshared` variable directly instead of taking the memory as a parameter.
 
 Preprocessor
 ------------
