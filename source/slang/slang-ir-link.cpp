@@ -336,6 +336,7 @@ struct IRSpecContext : IRSpecContextBase
 
 IRInst* cloneGlobalValue(IRSpecContext* context, IRInst* originalVal);
 static IRInst* findBestValueForTarget(IRSpecContext* context, IRSpecSymbol* sym);
+static IRSpecSymbol* findSymbolCheckedByCloning(IRSpecContext* context, IRSpecSymbol* sym);
 static void diagnoseUnresolvedSymbol(IRSpecContext* context, IRInst* bestVal, IRSpecSymbol* sym);
 
 IRInst* cloneValue(IRSpecContextBase* context, IRInst* originalValue);
@@ -1240,17 +1241,16 @@ IRFunc* specializeIRForEntryPoint(
         UNREACHABLE_RETURN(nullptr);
     }
 
-    // An entry point needs a body on every target. Cloning already reports a body-less function
-    // unless `isFunctionDefinedOrImported` accepts it, and that function accepts an external
-    // binding (`__extern_cpp`, `[DllImport]`, an import) only when the source function has no
-    // `IREntryPointDecoration`. An entry point selected after its module was lowered, such as one
-    // found by `findAndCheckEntryPoint` without a `[shader]` attribute, has no decoration until
-    // this function adds it below, so we report a body-less entry point that cloning accepted.
+    // Cloning reports a body-less function unless `isFunctionDefinedOrImported` accepts it, and it
+    // accepts an intrinsic or external binding only for a function without
+    // `IREntryPointDecoration`. An entry point found by `findAndCheckEntryPoint` without `[shader]`
+    // gets that decoration only below, so we report a body-less entry point that cloning accepted.
     if (!clonedFunc->getFirstBlock())
     {
-        IRInst* bestVal = findBestValueForTarget(context, sym);
+        IRSpecSymbol* checkedSym = findSymbolCheckedByCloning(context, sym);
+        IRInst* bestVal = findBestValueForTarget(context, checkedSym);
         if (isFunctionDefinedOrImported(bestVal))
-            diagnoseUnresolvedSymbol(context, bestVal, sym);
+            diagnoseUnresolvedSymbol(context, bestVal, checkedSym);
     }
 
     if (!clonedFunc->findDecorationImpl(kIROp_KeepAliveDecoration))
@@ -1622,6 +1622,20 @@ static IRInst* findBestValueForTarget(IRSpecContext* context, IRSpecSymbol* sym)
             bestVal = newVal;
     }
     return bestVal;
+}
+
+/// Return the symbol whose best value `cloneGlobalValueWithLinkage` checked when it cloned the
+/// value that `sym` names. That is `sym` itself, except for a specialized generic: the symbol then
+/// names an `IRSpecialize`, and cloning it checks the generic it specializes, which has its own
+/// symbol.
+static IRSpecSymbol* findSymbolCheckedByCloning(IRSpecContext* context, IRSpecSymbol* sym)
+{
+    auto specialize = as<IRSpecialize>(findBestValueForTarget(context, sym));
+    if (!specialize)
+        return sym;
+    auto genericLinkage = specialize->getBase()->findDecoration<IRLinkageDecoration>();
+    SLANG_ASSERT(genericLinkage);
+    return context->findSymbols(genericLinkage->getMangledName());
 }
 
 /// Report `bestVal` as an unresolved external symbol, with a note at each declaration that shares
