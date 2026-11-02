@@ -4391,7 +4391,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
         // Check constructor calls and ordinary call results. A user-defined constructor cannot
         // create a fresh MissInput<C>; a substituted call result cannot supply one either.
-        if (PortableRT::diagnoseInvalidExpression(this, invoke))
+        if (areExperimentalFeaturesEnabled() && PortableRT::diagnoseInvalidExpression(this, invoke))
             return CreateErrorExpr(invoke);
 
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
@@ -4630,7 +4630,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
     // ResolveInvoke can produce an initializer list for rt::MissInput<C>() rather than a call.
     // `typealias Inputs = rt::MissInput<C>[1]; Inputs();` likewise constructs fresh inputs.
     // Its aggregate fallback calls _coerceInitializerList directly, bypassing coerce's check.
-    else if (PortableRT::diagnoseInvalidExpression(this, rs))
+    else if (areExperimentalFeaturesEnabled() && PortableRT::diagnoseInvalidExpression(this, rs))
     {
         return CreateErrorExpr(rs);
     }

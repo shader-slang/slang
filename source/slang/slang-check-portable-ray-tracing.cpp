@@ -677,7 +677,8 @@ void diagnoseInvalidVariableType(SemanticsVisitor* visitor, VarDeclBase* varDecl
             //
             // For `MissInput<C> fresh;`, variable checking may insert a default-constructor call.
             // Check that inserted expression too, even though no initializer was written.
-            diagnoseInvalidExpression(visitor, varDecl->initExpr);
+            if (visitor->areExperimentalFeaturesEnabled())
+                diagnoseInvalidExpression(visitor, varDecl->initExpr);
             // The local declaration is allowed; any initializer error was reported above.
             return;
         }

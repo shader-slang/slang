@@ -62,9 +62,9 @@ endif()
 add_custom_command(
     OUTPUT ${portable_raytracing_module_file}
     COMMAND
-        ${PORTABLE_RAYTRACING_SLANG_COMPILER} -load-core-module
-        ${core_module_archive_without_timestamp} -I ${CMAKE_CURRENT_SOURCE_DIR}
-        portable.slang -o portable.slang-module
+        ${PORTABLE_RAYTRACING_SLANG_COMPILER} -experimental-feature
+        -load-core-module ${core_module_archive_without_timestamp} -I
+        ${CMAKE_CURRENT_SOURCE_DIR} portable.slang -o portable.slang-module
     DEPENDS
         ${portable_raytracing_copied_files}
         ${PORTABLE_RAYTRACING_SLANG_COMPILER_DEPENDENCY}
