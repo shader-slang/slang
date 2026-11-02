@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[5 7], stride=4):name=data
@@ -15,6 +15,11 @@ uniform int* data;
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):name=slot
 uniform int** slot;
+
+int three()
+{
+    return 3;
+}
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -62,4 +67,18 @@ void computeMain()
 
     // CHECK-NEXT: 8
     outputBuffer[9] = sizeof(Ptr<Ptr<int**>>);
+
+    // Before `(`, a run of `*` after a literal, a variable, a call, an indexed variable or a
+    // parenthesized expression is a multiply, because none of them names a type.
+    int arr[1] = { 3 };
+    // CHECK-NEXT: 66
+    outputBuffer[10] = 3 * *(p + 1);
+    // CHECK-NEXT: 66
+    outputBuffer[11] = a * *(p + 1);
+    // CHECK-NEXT: 66
+    outputBuffer[12] = three() * *(p + 1);
+    // CHECK-NEXT: 66
+    outputBuffer[13] = arr[0] * *(p + 1);
+    // CHECK-NEXT: 66
+    outputBuffer[14] = (a + 0) * *(p + 1);
 }
