@@ -3004,6 +3004,12 @@ protected:
         IRBuilder builder(entryPoint.entryPointFunc);
 
         auto var = workItem.var;
+
+        // A system value can be legalized ahead of its turn, by the handling of another system
+        // value computed from it (Metal's SV_GroupIndex from SV_GroupThreadID). Converting it a
+        // second time would redirect the uses of the first conversion.
+        if (!legalizedSystemValues.add(var))
+            return;
         auto varType = workItem.varType;
         auto semanticName = workItem.attrName;
 
@@ -3075,6 +3081,7 @@ protected:
     }
 
 private:
+    HashSet<IRInst*> legalizedSystemValues;
     HashSet<IRStructField*> semanticInfoToRemove;
     HashSet<IRStructType*> structTypesUsedAsReturnType;
 
@@ -4698,10 +4705,12 @@ protected:
         return elementVarLayoutBuilder.build();
     }
 
-    // Find the entry point's parameter carrying the given system value semantic, if any. At most
-    // one parameter carries a given semantic, so the first match is the only one.
-    IRInst* findSystemValueParam(const EntryPointInfo& entryPoint, SystemValueSemanticName name)
-        const
+    // Find the work item of the entry point's parameter carrying the given system value
+    // semantic, if any. At most one parameter carries a given semantic, so the first match is the
+    // only one.
+    std::optional<SystemValLegalizationWorkItem> findSystemValueWorkItem(
+        const EntryPointInfo& entryPoint,
+        SystemValueSemanticName name) const
     {
         for (auto item : collectSystemValFromEntryPoint(entryPoint))
         {
@@ -4709,9 +4718,16 @@ protected:
             UnownedStringSlice semanticIndex;
             splitNameAndIndex(item.attrName.getUnownedSlice(), semanticName, semanticIndex);
             if (convertSystemValueSemanticNameToEnum(String(semanticName)) == name)
-                return item.var;
+                return item;
         }
-        return nullptr;
+        return std::nullopt;
+    }
+
+    IRInst* findSystemValueParam(const EntryPointInfo& entryPoint, SystemValueSemanticName name)
+        const
+    {
+        auto item = findSystemValueWorkItem(entryPoint, name);
+        return item ? item->var : nullptr;
     }
 
     void handleSpecialSystemValue(
@@ -4771,8 +4787,15 @@ protected:
             if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
             {
                 if (auto groupThreadId =
-                        findSystemValueParam(entryPoint, SystemValueSemanticName::GroupThreadID))
-                    entryPointToGroupThreadId[entryPoint.entryPointFunc] = groupThreadId;
+                        findSystemValueWorkItem(entryPoint, SystemValueSemanticName::GroupThreadID))
+                {
+                    // Legalize the parameter now if its turn has not come yet. Its legalization
+                    // narrows a user-declared `uint` or `uint2` from the `uint3` attribute and
+                    // redirects every use to the narrowed value, which would include the group
+                    // index computed below.
+                    legalizeSystemValue(entryPoint, *groupThreadId);
+                    entryPointToGroupThreadId[entryPoint.entryPointFunc] = groupThreadId->var;
+                }
                 if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
                 {
                     // Add the missing groupthreadid needed to compute sv_groupindex
