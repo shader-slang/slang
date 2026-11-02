@@ -10,8 +10,8 @@
 //TEST:SIMPLE(filecheck=NONE): -stage compute -entry computeMain -target cuda
 // The defines are CUDA-only: they must never leak into the shared C++ base emitter's output.
 //TEST:SIMPLE(filecheck=CPP): -stage compute -entry computeMain -target cpp -DUSE_HALF
-// NVRTC also receives these as -D options, so the in-source definitions must not conflict
-// with them. These lanes auto-skip on tiers without NVRTC.
+// On -target ptx the defines reach NVRTC as -D options instead; these lanes are a smoke check
+// that NVRTC still compiles each type, and auto-skip on tiers without NVRTC.
 //TEST:SIMPLE(filecheck=PTX): -stage compute -entry computeMain -target ptx -DUSE_HALF
 //TEST:SIMPLE(filecheck=PTX): -stage compute -entry computeMain -target ptx -DUSE_BF16
 //TEST:SIMPLE(filecheck=PTX): -stage compute -entry computeMain -target ptx -DUSE_FP8
@@ -34,25 +34,19 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 }
 
 // Each define must precede the prelude include so the prelude's gates see it. The front
-// matter ends at that include, so the -NOT lines on both sides of each block cover all of it.
+// matter ends at that include, so the -NOT lines on both sides of each define cover all of it.
 //HALF-NOT: SLANG_CUDA_ENABLE_{{BF16|FP8}}
-//HALF: #ifndef SLANG_CUDA_ENABLE_HALF
-//HALF-NEXT: #define SLANG_CUDA_ENABLE_HALF 1
-//HALF-NEXT: #endif
+//HALF: #define SLANG_CUDA_ENABLE_HALF 1
 //HALF-NOT: SLANG_CUDA_ENABLE_{{BF16|FP8}}
 //HALF: slang-cuda-prelude.h
 
 //BF16-NOT: SLANG_CUDA_ENABLE_{{HALF|FP8}}
-//BF16: #ifndef SLANG_CUDA_ENABLE_BF16
-//BF16-NEXT: #define SLANG_CUDA_ENABLE_BF16 1
-//BF16-NEXT: #endif
+//BF16: #define SLANG_CUDA_ENABLE_BF16 1
 //BF16-NOT: SLANG_CUDA_ENABLE_{{HALF|FP8}}
 //BF16: slang-cuda-prelude.h
 
 //FP8-NOT: SLANG_CUDA_ENABLE_{{HALF|BF16}}
-//FP8: #ifndef SLANG_CUDA_ENABLE_FP8
-//FP8-NEXT: #define SLANG_CUDA_ENABLE_FP8 1
-//FP8-NEXT: #endif
+//FP8: #define SLANG_CUDA_ENABLE_FP8 1
 //FP8-NOT: SLANG_CUDA_ENABLE_{{HALF|BF16}}
 //FP8: slang-cuda-prelude.h
 

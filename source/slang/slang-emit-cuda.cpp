@@ -410,32 +410,26 @@ void CUDASourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     }
 
     // The prelude includes the CUDA SDK headers for half, bf16 and fp8, and enables its helpers
-    // for them, only under these defines. NVRTC already receives them as -D options from the same
-    // tracker (slang-code-gen.cpp), but an offline nvcc compile of this source gets them only
-    // from here. The module body is emitted before the front matter, so the tracker is complete.
+    // for them, only under these defines. On -target ptx, NVRTC already receives them as -D
+    // options (slang-nvrtc-compiler.cpp), and Slang passes NVRTC -pch only when the source starts
+    // with the prelude include, so we write them only into source that leaves Slang. The module
+    // body is emitted before the front matter, so the tracker is complete.
+    if (targetReq->getTarget() == CodeGenTarget::PTX)
+    {
+        return;
+    }
     if (m_extensionTracker->isBaseTypeRequired(BaseType::Half))
     {
-        _emitGuardedDefine("SLANG_CUDA_ENABLE_HALF");
+        m_writer->emit("#define SLANG_CUDA_ENABLE_HALF 1\n");
     }
     if (m_extensionTracker->isBfloat16Required())
     {
-        _emitGuardedDefine("SLANG_CUDA_ENABLE_BF16");
+        m_writer->emit("#define SLANG_CUDA_ENABLE_BF16 1\n");
     }
     if (m_extensionTracker->isFp8Required())
     {
-        _emitGuardedDefine("SLANG_CUDA_ENABLE_FP8");
+        m_writer->emit("#define SLANG_CUDA_ENABLE_FP8 1\n");
     }
-}
-
-void CUDASourceEmitter::_emitGuardedDefine(const char* name)
-{
-    // The `#ifndef` guard leaves a definition that arrives on the downstream compiler's
-    // command line (NVRTC always gets one; an nvcc user may pass their own) in place.
-    m_writer->emit("#ifndef ");
-    m_writer->emit(name);
-    m_writer->emit("\n#define ");
-    m_writer->emit(name);
-    m_writer->emit(" 1\n#endif\n");
 }
 
 void CUDASourceEmitter::emitLayoutSemanticsImpl(
