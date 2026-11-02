@@ -538,6 +538,18 @@ protected:
         // Allow subtype to perform any cleanup or finalization
         // after all parameters have been processed.
         endEntryPointImpl();
+
+        // Legalization has replaced varying parameters (and the subtype may
+        // have added its own), and every `returnVal` is now a plain `return`,
+        // so we rebuild the function type from the parameters that remain.
+        // Emitters that declare a function from its type, such as the CUDA
+        // header's kernel prototypes, would otherwise see the original signature.
+        //
+        if (m_firstBlock)
+        {
+            IRBuilder builder(m_module);
+            fixUpFuncType(entryPointFunc, builder.getVoidType());
+        }
     }
 
     virtual void beginEntryPointImpl() {}
