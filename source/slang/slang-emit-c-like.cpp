@@ -4126,7 +4126,6 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func, const String& name)
     if (isTargetIntrinsic(func))
         return;
 
-    // HLSL rejects entry-point forward declarations without matching metadata attributes.
     if (asEntryPoint(func) && !shouldEmitEntryPointDecl())
         return;
 
