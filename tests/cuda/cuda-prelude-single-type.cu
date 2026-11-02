@@ -7,7 +7,15 @@
 // generates the make_* helpers below) or the FP8 half-accumulator MMA helper (which needs
 // half's register counts).
 
+#if (                                                                   \
+    defined(SLANG_CUDA_ENABLE_HALF) + defined(SLANG_CUDA_ENABLE_BF16) + \
+    defined(SLANG_CUDA_ENABLE_FP8)) != 1
+#error "compile with exactly one of -DSLANG_CUDA_ENABLE_HALF, _BF16 or _FP8"
+#endif
+
 #include "slang-cuda-prelude.h"
+
+static_assert(!SLANG_CUDA_RTC, "this fixture tests the prelude's offline (non-NVRTC) branch");
 
 #if defined(SLANG_CUDA_ENABLE_HALF)
 __global__ void testHalfOnly(const __half* in, __half2* out)
@@ -25,6 +33,4 @@ __global__ void testFp8Only(const __nv_fp8_e4m3* in, __nv_fp8_e4m32* out, __nv_f
     out[0] = make___nv_fp8_e4m32(in[0], in[1]);
     out2[0] = make___nv_fp8_e5m22(__nv_fp8_e5m2(float(in[0])), __nv_fp8_e5m2(float(in[1])));
 }
-#else
-#error "compile with exactly one of -DSLANG_CUDA_ENABLE_HALF, _BF16 or _FP8"
 #endif
