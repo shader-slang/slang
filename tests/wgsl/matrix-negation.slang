@@ -3,6 +3,8 @@
 //TEST:SIMPLE(filecheck=NOZERO): -target wgsl -entry computeMain -stage compute
 // The f16 entry point is checked as text only; the Tint (SPV) run below compiles computeMain only.
 //TEST:SIMPLE(filecheck=HALF): -target wgsl -entry halfMain -stage compute
+// Integer matrices are lowered to arrays of vectors first, so they never reach the matrix branch.
+//TEST:SIMPLE(filecheck=INT): -target wgsl -entry intMain -stage compute
 // Validate the computeMain WGSL through Tint on CI (ignored where the downstream compiler is absent).
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm -entry computeMain -stage compute
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
@@ -87,4 +89,14 @@ void halfMain(uniform RWStructuredBuffer<half4> halfBuffer)
     half2x2 a = half2x2(halfBuffer[0].x, halfBuffer[0].y, halfBuffer[0].z, halfBuffer[0].w);
     half2x2 r = -a;
     halfBuffer[1] = half4(r[0], r[1]);
+}
+
+// INT: fn intMain
+// INT-NOT: (i32(-1) *
+[numthreads(1, 1, 1)]
+void intMain(uniform RWStructuredBuffer<int4> intBuffer)
+{
+    int2x2 a = int2x2(intBuffer[0].x, intBuffer[0].y, intBuffer[0].z, intBuffer[0].w);
+    int2x2 r = -a;
+    intBuffer[1] = int4(r[0], r[1]);
 }
