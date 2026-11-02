@@ -20,7 +20,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float originalValue;
     
     // HLSL: {{.*}}originalValue{{.*}} = NvInterlockedAddFp32({{.*}}t{{.*}}, {{.*}}, {{.*}}1.0{{.*}});
-    // MTL: atomic_fetch_add
+    // MSL texture atomics exist for int and uint texels only, so Metal diagnoses this.
+    // MTL: error[E55204]{{.*}}
+    // MTL: intrinsic operation 'Unsupported floating point atomic operation' is not supported
     t.InterlockedAddF32(uint2(1, 0), 1.0, originalValue);
     
     AllMemoryBarrier();

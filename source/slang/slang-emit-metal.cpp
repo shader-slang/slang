@@ -421,12 +421,23 @@ void MetalSourceEmitter::emitAtomicSrcOperand(bool isImage, IRInst* inst)
 
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
+    auto diagnoseFloatAtomic = [&]()
+    {
+        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "Unsupported floating point atomic operation",
+            .location = inst->sourceLoc});
+    };
     auto emitAtomicOp = [&](const char* imageFunc, const char* bufferFunc)
     {
         emitInstResultDecl(inst);
         bool isImageOp = false;
         if (auto imageSubscript = isTextureAccess(inst))
         {
+            // MSL texture atomics exist for `int` and `uint` texels only (and `ulong` min/max),
+            // so `texture2d<float>` has no `atomic_fetch_add`. An exchange has already
+            // diagnosed a floating-point value for every destination.
+            if (isFloatingType(inst->getDataType()) && inst->getOp() != kIROp_AtomicExchange)
+                diagnoseFloatAtomic();
             emitImageOperandWithAccessor(imageSubscript->getImage());
             m_writer->emit(imageFunc);
             m_writer->emit("(");
@@ -450,12 +461,6 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(").x;\n");
         else
             m_writer->emit(");\n");
-    };
-    auto diagnoseFloatAtomic = [&]()
-    {
-        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-            .operation = "Unsupported floating point atomic operation",
-            .location = inst->sourceLoc});
     };
     switch (inst->getOp())
     {
