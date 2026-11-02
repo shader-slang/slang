@@ -728,6 +728,17 @@ SLANG_UNIT_TEST(parseCommandLineArgsCompileRequestKeepsCompileChecks)
         UnownedStringSlice diagnostics(request->getDiagnosticOutput());
         SLANG_CHECK(diagnostics.indexOf(toSlice("E00033")) >= 0);
     }
+    {
+        // A compile reports only the floating-point mode among the target options given before
+        // several targets, unlike a session description (see
+        // `parseCommandLineArgsReportsParseErrors`), for compatibility with existing slangc
+        // command lines.
+        ComPtr<slang::ICompileRequest> request;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->createCompileRequest(request.writeRef())));
+        const char* argv[] = {"-whole-program", "-target", "hlsl", "-target", "spirv"};
+        SLANG_CHECK(
+            SLANG_SUCCEEDED(request->processCommandLineArguments(argv, SLANG_COUNT_OF(argv))));
+    }
 
     const String defaultCode = compileSpirvAsmWithCompileRequest(globalSession, 0, nullptr);
     const char* preciseArgv[] = {"-floating-point-mode", "precise"};
