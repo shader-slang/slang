@@ -77,5 +77,5 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // METAL: constant array<Record_0, int(2)> records_0 = { { { 1U, 2U }, { 3U, 4U } } };
 // METAL-NOT: Record{{.*}}init
 
-// WGSL: var<private> records_0 : array<Record_0, i32(2)> = array<Record_0, i32(2)>(
+// WGSL: const records_0 : array<Record_0, i32(2)> = array<Record_0, i32(2)>( Record_0( u32(1), u32(2) ), Record_0( u32(3), u32(4) ) );
 // WGSL-NOT: Record{{.*}}init
