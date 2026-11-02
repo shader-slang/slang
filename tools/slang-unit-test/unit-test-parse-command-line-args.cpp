@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 namespace
 {
@@ -269,8 +270,113 @@ SLANG_UNIT_TEST(parseCommandLineArgsReportsParseErrors)
     }
 }
 
-// Return the SPIR-V assembly that a session created from `sessionDesc`, with one SPIR-V target
-// added by the caller, generates for a small compute shader. Returns an empty string on failure.
+// Parse `argv`, which must succeed, into `outSessionDesc`, whose arrays `outAllocation` keeps
+// alive.
+static void parseSessionDesc(
+    slang::IGlobalSession* globalSession,
+    int argc,
+    const char* const* argv,
+    slang::SessionDesc& outSessionDesc,
+    ComPtr<ISlangUnknown>& outAllocation)
+{
+    outSessionDesc = slang::SessionDesc{};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        globalSession
+            ->parseCommandLineArguments(argc, argv, &outSessionDesc, outAllocation.writeRef())));
+}
+
+// Return the code that a session created from `sessionDesc` generates for its first target from
+// `source`: the code for the entry point `computeMain` if `source` has one, and otherwise the
+// whole program. Returns an empty string on failure.
+static String generateCodeWithSession(
+    slang::IGlobalSession* globalSession,
+    const slang::SessionDesc& sessionDesc,
+    const char* source,
+    bool hasEntryPoint)
+{
+    ComPtr<slang::ISession> session;
+    if (SLANG_FAILED(globalSession->createSession(sessionDesc, session.writeRef())))
+        return String();
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "outputPathModule",
+        "outputPathModule.slang",
+        source,
+        diagnostics.writeRef()));
+    if (!module)
+        return String();
+
+    ComPtr<slang::IComponentType> program;
+    if (hasEntryPoint)
+    {
+        ComPtr<slang::IEntryPoint> entryPoint;
+        if (SLANG_FAILED(module->findEntryPointByName("computeMain", entryPoint.writeRef())))
+            return String();
+        slang::IComponentType* components[] = {module, entryPoint};
+        if (SLANG_FAILED(session->createCompositeComponentType(
+                components,
+                SLANG_COUNT_OF(components),
+                program.writeRef(),
+                diagnostics.writeRef())))
+            return String();
+    }
+    else
+    {
+        program = module;
+    }
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    if (SLANG_FAILED(program->link(linkedProgram.writeRef(), diagnostics.writeRef())))
+        return String();
+
+    ComPtr<slang::IBlob> code;
+    const SlangResult result =
+        hasEntryPoint
+            ? linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef())
+            : linkedProgram->getTargetCode(0, code.writeRef(), diagnostics.writeRef());
+    if (SLANG_FAILED(result) || !code)
+        return String();
+    return String(UnownedStringSlice((const char*)code->getBufferPointer(), code->getBufferSize()));
+}
+
+static bool hasWholeProgramOption(const slang::TargetDesc& targetDesc)
+{
+    for (uint32_t i = 0; i < targetDesc.compilerOptionEntryCount; ++i)
+    {
+        const auto& entry = targetDesc.compilerOptionEntries[i];
+        if (entry.name == slang::CompilerOptionName::GenerateWholeProgram &&
+            entry.value.intValue0 != 0)
+            return true;
+    }
+    return false;
+}
+
+static bool areOptionEntriesEqual(
+    const slang::CompilerOptionEntry& a,
+    const slang::CompilerOptionEntry& b)
+{
+    const auto areStringsEqual = [](const char* x, const char* y)
+    { return (x == nullptr || y == nullptr) ? x == y : strcmp(x, y) == 0; };
+    return a.name == b.name && a.value.kind == b.value.kind &&
+           a.value.intValue0 == b.value.intValue0 && a.value.intValue1 == b.value.intValue1 &&
+           areStringsEqual(a.value.stringValue0, b.value.stringValue0) &&
+           areStringsEqual(a.value.stringValue1, b.value.stringValue1);
+}
+
+static const char* kComputeShaderSource = R"(
+    RWStructuredBuffer<float> buffer;
+
+    [shader("compute")]
+    [numthreads(1, 1, 1)]
+    void computeMain()
+    {
+        buffer[0] = (buffer[0] + 1.25f) * 0.8125f;
+    }
+)";
+
+// Return the SPIR-V assembly for a small compute shader from a session created from `sessionDesc`
+// with one SPIR-V target added, as an API caller adds targets to a parsed session desc.
 static String compileSpirvAsmWithSession(
     slang::IGlobalSession* globalSession,
     slang::SessionDesc sessionDesc)
@@ -280,52 +386,7 @@ static String compileSpirvAsmWithSession(
     targetDesc.profile = globalSession->findProfile("spirv_1_5");
     sessionDesc.targets = &targetDesc;
     sessionDesc.targetCount = 1;
-
-    ComPtr<slang::ISession> session;
-    if (SLANG_FAILED(globalSession->createSession(sessionDesc, session.writeRef())))
-        return String();
-
-    const char* source = R"(
-        RWStructuredBuffer<float> buffer;
-
-        [shader("compute")]
-        [numthreads(1, 1, 1)]
-        void computeMain()
-        {
-            buffer[0] = (buffer[0] + 1.25f) * 0.8125f;
-        }
-    )";
-    ComPtr<slang::IBlob> diagnostics;
-    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
-        "fpModeModule",
-        "fpModeModule.slang",
-        source,
-        diagnostics.writeRef()));
-    if (!module)
-        return String();
-
-    ComPtr<slang::IEntryPoint> entryPoint;
-    if (SLANG_FAILED(module->findEntryPointByName("computeMain", entryPoint.writeRef())))
-        return String();
-
-    slang::IComponentType* components[] = {module, entryPoint};
-    ComPtr<slang::IComponentType> program;
-    if (SLANG_FAILED(session->createCompositeComponentType(
-            components,
-            SLANG_COUNT_OF(components),
-            program.writeRef(),
-            diagnostics.writeRef())))
-        return String();
-
-    ComPtr<slang::IComponentType> linkedProgram;
-    if (SLANG_FAILED(program->link(linkedProgram.writeRef(), diagnostics.writeRef())))
-        return String();
-
-    ComPtr<slang::IBlob> code;
-    if (SLANG_FAILED(
-            linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef())))
-        return String();
-    return String(UnownedStringSlice((const char*)code->getBufferPointer(), code->getBufferSize()));
+    return generateCodeWithSession(globalSession, sessionDesc, kComputeShaderSource, true);
 }
 
 // A floating-point mode given without `-target` is not an error for this API: the session desc
@@ -456,6 +517,129 @@ SLANG_UNIT_TEST(parseCommandLineArgsIgnoresCompileOptions)
         moduleFile,
         0,
         SLANG_TARGET_UNKNOWN);
+}
+
+// Output paths only infer a target when no `-target` is given, and are not retained. An explicit
+// `-target hlsl` with a `.spv` output gives a session whose only target generates HLSL.
+SLANG_UNIT_TEST(parseCommandLineArgsOutputPathOnlyInfersTarget)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const char* argv[] = {"-target", "hlsl", "-o", "foo.spv"};
+    slang::SessionDesc sessionDesc;
+    ComPtr<ISlangUnknown> allocation;
+    parseSessionDesc(globalSession, SLANG_COUNT_OF(argv), argv, sessionDesc, allocation);
+    SLANG_CHECK_ABORT(sessionDesc.targetCount == 1);
+    SLANG_CHECK(sessionDesc.targets[0].format == SLANG_HLSL);
+    SLANG_CHECK(!hasWholeProgramOption(sessionDesc.targets[0]));
+
+    const String code =
+        generateCodeWithSession(globalSession, sessionDesc, kComputeShaderSource, true);
+    SLANG_CHECK(code.getUnownedSlice().indexOf(toSlice("[numthreads(1, 1, 1)]")) >= 0);
+}
+
+// `-o x.spv` and `-target spirv` give the same target configuration, and neither selects
+// whole-program code generation; only an explicit `-whole-program` does.
+SLANG_UNIT_TEST(parseCommandLineArgsOutputPathDoesNotSelectWholeProgram)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const char* outputArgv[] = {"-o", "x.spv"};
+    slang::SessionDesc outputDesc;
+    ComPtr<ISlangUnknown> outputAllocation;
+    parseSessionDesc(
+        globalSession,
+        SLANG_COUNT_OF(outputArgv),
+        outputArgv,
+        outputDesc,
+        outputAllocation);
+
+    const char* targetArgv[] = {"-target", "spirv"};
+    slang::SessionDesc targetDesc;
+    ComPtr<ISlangUnknown> targetAllocation;
+    parseSessionDesc(
+        globalSession,
+        SLANG_COUNT_OF(targetArgv),
+        targetArgv,
+        targetDesc,
+        targetAllocation);
+
+    SLANG_CHECK_ABORT(outputDesc.targetCount == 1 && targetDesc.targetCount == 1);
+    const slang::TargetDesc& fromOutput = outputDesc.targets[0];
+    const slang::TargetDesc& fromTarget = targetDesc.targets[0];
+    SLANG_CHECK(fromOutput.format == SLANG_SPIRV && fromTarget.format == SLANG_SPIRV);
+    SLANG_CHECK(fromOutput.profile == fromTarget.profile);
+    SLANG_CHECK(fromOutput.flags == fromTarget.flags);
+    SLANG_CHECK_ABORT(fromOutput.compilerOptionEntryCount == fromTarget.compilerOptionEntryCount);
+    for (uint32_t i = 0; i < fromOutput.compilerOptionEntryCount; ++i)
+    {
+        SLANG_CHECK(areOptionEntriesEqual(
+            fromOutput.compilerOptionEntries[i],
+            fromTarget.compilerOptionEntries[i]));
+    }
+    SLANG_CHECK(!hasWholeProgramOption(fromOutput));
+    SLANG_CHECK(!hasWholeProgramOption(fromTarget));
+
+    const String outputCode =
+        generateCodeWithSession(globalSession, outputDesc, kComputeShaderSource, true);
+    const String targetCode =
+        generateCodeWithSession(globalSession, targetDesc, kComputeShaderSource, true);
+    SLANG_CHECK(outputCode.getLength() != 0);
+    SLANG_CHECK(outputCode == targetCode);
+
+    const char* wholeProgramArgv[] = {"-target", "spirv", "-whole-program"};
+    slang::SessionDesc wholeProgramDesc;
+    ComPtr<ISlangUnknown> wholeProgramAllocation;
+    parseSessionDesc(
+        globalSession,
+        SLANG_COUNT_OF(wholeProgramArgv),
+        wholeProgramArgv,
+        wholeProgramDesc,
+        wholeProgramAllocation);
+    SLANG_CHECK_ABORT(wholeProgramDesc.targetCount == 1);
+    SLANG_CHECK(hasWholeProgramOption(wholeProgramDesc.targets[0]));
+}
+
+// An explicit `-whole-program` reaches code generation: an HLSL library target emits an exported
+// function with `export` only in whole-program mode.
+SLANG_UNIT_TEST(parseCommandLineArgsWholeProgramReachesCodeGeneration)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    const char* source = R"(
+        export float scaleValue(float x)
+        {
+            return (x + 1.25f) * 0.8125f;
+        }
+    )";
+
+    const char* libraryArgv[] = {"-target", "hlsl", "-profile", "lib_6_6"};
+    slang::SessionDesc libraryDesc;
+    ComPtr<ISlangUnknown> libraryAllocation;
+    parseSessionDesc(
+        globalSession,
+        SLANG_COUNT_OF(libraryArgv),
+        libraryArgv,
+        libraryDesc,
+        libraryAllocation);
+
+    const char* wholeProgramArgv[] = {"-target", "hlsl", "-profile", "lib_6_6", "-whole-program"};
+    slang::SessionDesc wholeProgramDesc;
+    ComPtr<ISlangUnknown> wholeProgramAllocation;
+    parseSessionDesc(
+        globalSession,
+        SLANG_COUNT_OF(wholeProgramArgv),
+        wholeProgramArgv,
+        wholeProgramDesc,
+        wholeProgramAllocation);
+
+    const String libraryCode = generateCodeWithSession(globalSession, libraryDesc, source, false);
+    const String wholeProgramCode =
+        generateCodeWithSession(globalSession, wholeProgramDesc, source, false);
+    SLANG_CHECK_ABORT(libraryCode.getLength() != 0);
+    SLANG_CHECK_ABORT(wholeProgramCode.getLength() != 0);
+    SLANG_CHECK(libraryCode.getUnownedSlice().indexOf(toSlice("export")) < 0);
+    SLANG_CHECK(wholeProgramCode.getUnownedSlice().indexOf(toSlice("export")) >= 0);
 }
 
 // A compile request configured through the deprecated API still resolves entry points when its
