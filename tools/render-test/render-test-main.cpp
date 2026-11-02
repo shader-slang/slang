@@ -820,8 +820,18 @@ struct AssignValsFromLayoutContext
                 slangTypeLayout = slangTypeLayout->getElementTypeLayout();
                 break;
             }
+            // Create the object in the session the program was compiled in, as
+            // the typed branch above does. `createShaderObjectFromTypeLayout`
+            // would use slang-rhi's own device session, which numbers type
+            // conformances independently of the program, so an interface-typed
+            // field would get a conformance ID the shader does not use.
+            //
             auto slangType = slangTypeLayout->getType();
-            device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
+            device->createShaderObject(
+                slangSession(),
+                slangType,
+                rhi::ShaderObjectContainerType::None,
+                shaderObject.writeRef());
         }
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
