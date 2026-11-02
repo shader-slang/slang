@@ -8,6 +8,7 @@
 
 #include "core/slang-char-util.h"
 #include "core/slang-type-text-util.h"
+#include "slang-ast-print.h"
 #include "slang-lookup.h"
 #include "slang-parameter-binding.h"
 #include "slang-profile.h"
@@ -925,46 +926,84 @@ bool isPrimaryDecl(CallableDecl* decl)
     return (!decl->primaryDecl) || (decl == decl->primaryDecl);
 }
 
-DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, DiagnosticSink* sink)
+// Return the function that `declRef` names if it is a function, or a generic function, declared in
+// `translationUnit`, and a null reference otherwise. A generic function gets default
+// substitutions for its generic parameters.
+static DeclRef<FuncDecl> getFunctionDeclRefInTranslationUnit(
+    Module* translationUnit,
+    DeclRef<Decl> declRef,
+    DiagnosticSink* sink)
 {
-    DeclRef<FuncDecl> entryPointFuncDeclRef;
+    if (getModule(declRef.getDecl()) != translationUnit)
+        return DeclRef<FuncDecl>();
+
+    DeclRef<FuncDecl> funcDeclRef = declRef.as<FuncDecl>();
+    if (!funcDeclRef)
+    {
+        if (auto genDeclRef = declRef.as<GenericDecl>())
+        {
+            SharedSemanticsContext context(translationUnit->getLinkage(), translationUnit, sink);
+            SemanticsVisitor visitor(&context);
+            funcDeclRef = createDefaultSubstitutionsIfNeeded(
+                              translationUnit->getASTBuilder(),
+                              &visitor,
+                              translationUnit->getASTBuilder()->getMemberDeclRef(
+                                  genDeclRef,
+                                  genDeclRef.getDecl()->inner))
+                              .as<FuncDecl>();
+        }
+    }
+    return funcDeclRef;
+}
+
+// Look up `name` in the module scope of `translationUnit` and return every matching function that
+// `translationUnit` declares. An empty list means that no function matches, and more than one
+// entry means that the name is overloaded. Diagnostics from the lookup itself, such as an unknown
+// type argument in `main<Missing>`, go to `sink`. Each caller reports a missing or ambiguous
+// function itself, because the right diagnostic depends on what the name is used for.
+//
+// A function that is declared more than once, such as a prototype followed by its definition, is
+// one function, so the result holds one entry for it, as overload resolution also counts it once.
+// We keep the declaration that has a body, because that is the declaration that defines the entry
+// point.
+static List<DeclRef<FuncDecl>> findFunctionDeclsByName(
+    Module* translationUnit,
+    Name* name,
+    DiagnosticSink* sink)
+{
+    List<DeclRef<FuncDecl>> funcDeclRefs;
+    auto getPrimaryDecl = [](DeclRef<FuncDecl> funcDeclRef) -> CallableDecl*
+    {
+        auto funcDecl = funcDeclRef.getDecl();
+        return funcDecl->primaryDecl ? funcDecl->primaryDecl : funcDecl;
+    };
+    auto addCandidate = [&](DeclRef<Decl> declRef)
+    {
+        auto funcDeclRef = getFunctionDeclRefInTranslationUnit(translationUnit, declRef, sink);
+        if (!funcDeclRef)
+            return;
+        for (auto& existingDeclRef : funcDeclRefs)
+        {
+            if (getPrimaryDecl(existingDeclRef) != getPrimaryDecl(funcDeclRef))
+                continue;
+            if (!existingDeclRef.getDecl()->body)
+                existingDeclRef = funcDeclRef;
+            return;
+        }
+        funcDeclRefs.add(funcDeclRef);
+    };
 
     auto expr = translationUnit->findDeclFromString(getText(name), sink);
     if (auto declRefExpr = as<DeclRefExpr>(expr))
     {
-        entryPointFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
-
-        if (!entryPointFuncDeclRef)
-        {
-            if (auto genDeclRef = as<GenericDecl>(declRefExpr->declRef))
-            {
-                SharedSemanticsContext context(
-                    translationUnit->getLinkage(),
-                    translationUnit,
-                    sink);
-                SemanticsVisitor visitor(&context);
-                entryPointFuncDeclRef = createDefaultSubstitutionsIfNeeded(
-                                            translationUnit->getASTBuilder(),
-                                            &visitor,
-                                            translationUnit->getASTBuilder()->getMemberDeclRef(
-                                                genDeclRef,
-                                                genDeclRef.getDecl()->inner))
-                                            .as<FuncDecl>();
-            }
-        }
-
-        if (entryPointFuncDeclRef && getModule(entryPointFuncDeclRef.getDecl()) != translationUnit)
-            entryPointFuncDeclRef = DeclRef<FuncDecl>();
+        addCandidate(declRefExpr->declRef);
     }
-
-    if (!entryPointFuncDeclRef)
+    else if (auto overloadedExpr = as<OverloadedExpr>(expr))
     {
-        auto translationUnitSyntax = translationUnit->getModuleDecl();
-        sink->diagnose(Diagnostics::EntryPointFunctionNotFound{
-            .name = name->text,
-            .location = translationUnitSyntax->loc});
+        for (auto item : overloadedExpr->lookupResult2)
+            addCandidate(item.declRef);
     }
-    return entryPointFuncDeclRef;
+    return funcDeclRefs;
 }
 
 // Is a entry pointer parmaeter of `type` always a uniform parameter?
@@ -2127,8 +2166,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // make up the entry point.
             //
             Name* name = linkage->getNamePool()->getName(stringLit->value);
-            DeclRef<FuncDecl> patchConstantFuncDeclRef = findFunctionDeclByName(module, name, sink);
-            if (!patchConstantFuncDeclRef)
+            auto patchConstantFuncDeclRefs = findFunctionDeclsByName(module, name, sink);
+            if (patchConstantFuncDeclRefs.getCount() != 1)
             {
                 sink->diagnose(Diagnostics::AttributeFunctionNotFound{
                     .funcName = name,
@@ -2137,7 +2176,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 return;
             }
 
-            attr->patchConstantFuncDecl = patchConstantFuncDeclRef.getDecl();
+            attr->patchConstantFuncDecl = patchConstantFuncDeclRefs[0].getDecl();
         }
     }
     else if (stage == Stage::Geometry)
@@ -2883,14 +2922,33 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     auto sink = compileRequest->getSink();
 
     auto entryPointName = entryPointReq->getName();
-    DeclRef<FuncDecl> entryPointFuncDeclRef =
-        findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
+    auto module = translationUnit->getModule();
+    auto entryPointFuncDeclRefs = findFunctionDeclsByName(module, entryPointName, sink);
 
-    // Did we find a function declaration in our search?
-    if (!entryPointFuncDeclRef)
+    if (entryPointFuncDeclRefs.getCount() == 0)
     {
+        sink->diagnose(Diagnostics::EntryPointFunctionNotFound{
+            .name = entryPointName->text,
+            .location = module->getModuleDecl()->loc});
         return nullptr;
     }
+    if (entryPointFuncDeclRefs.getCount() > 1)
+    {
+        Diagnostics::AmbiguousEntryPointName diagnostic;
+        diagnostic.name = entryPointName->text;
+        diagnostic.location = module->getModuleDecl()->loc;
+        for (auto candidateDeclRef : entryPointFuncDeclRefs)
+        {
+            Diagnostics::AmbiguousEntryPointName::Candidate candidate;
+            candidate.candidate = candidateDeclRef.getDecl();
+            candidate.candidateSignature =
+                ASTPrinter::getDeclSignatureString(candidateDeclRef, linkage->getASTBuilder());
+            diagnostic.candidates.add(candidate);
+        }
+        sink->diagnose(diagnostic);
+        return nullptr;
+    }
+    DeclRef<FuncDecl> entryPointFuncDeclRef = entryPointFuncDeclRefs[0];
 
     // TODO: it is possible that the entry point was declared with
     // profile or target overloading. Is there anything that we need
