@@ -303,7 +303,7 @@ Type* SemanticsVisitor::TryJoinTypes(
     GenericInferenceContext* constraints,
     QualType left,
     QualType right,
-    bool allowEnumScalarJoin)
+    bool allowCommonTypeJoins)
 {
     // Easy case: they are the same type!
     if (left->equals(right))
@@ -361,13 +361,13 @@ Type* SemanticsVisitor::TryJoinTypes(
         }
     }
 
-    // For common-type inference (see `allowEnumScalarJoin`), an enum joins with a
+    // For common-type inference (see `allowCommonTypeJoins`), an enum joins with a
     // scalar by decaying to its tag type. We only *nominate* the tag type as the
     // candidate common type; overload applicability (the normal coercion path)
     // remains the sole arbiter of whether each arm actually converts to it.
     // Enum-with-enum is intentionally unhandled: two enums share no natural
     // scalar to decay to.
-    if (allowEnumScalarJoin)
+    if (allowCommonTypeJoins)
     {
         if (as<BasicExpressionType>(right))
         {
@@ -378,7 +378,7 @@ Type* SemanticsVisitor::TryJoinTypes(
                         constraints,
                         QualType(tagType, left.isLeftValue),
                         right,
-                        allowEnumScalarJoin);
+                        allowCommonTypeJoins);
             }
         }
         if (as<BasicExpressionType>(left))
@@ -390,7 +390,7 @@ Type* SemanticsVisitor::TryJoinTypes(
                         constraints,
                         left,
                         QualType(tagType, right.isLeftValue),
-                        allowEnumScalarJoin);
+                        allowCommonTypeJoins);
             }
         }
     }
@@ -2016,7 +2016,7 @@ private:
         // enum may decay to its tag type to join with a scalar, since here the
         // join proposes a type both arguments will be coerced to.
         auto joinType =
-            m_visitor->TryJoinTypes(&m_context, ioType, cType, /*allowEnumScalarJoin*/ true);
+            m_visitor->TryJoinTypes(&m_context, ioType, cType, /*allowCommonTypeJoins*/ true);
         if (!joinType)
         {
             // If no join exists, priority decides whether a newer constraint
