@@ -9498,6 +9498,47 @@ static Expr* parseAtomicExpr(Parser* parser)
     }
 }
 
+/// Return whether the `*` at the cursor starts a pointer type suffix, as in
+/// `RWStructuredBuffer<int**>`, rather than a multiply, as in `a * *p`.
+///
+/// The expression grammar meets a pointer type only where it stands in for a type: a generic
+/// argument, a cast such as `(int**)p`, an operand of `sizeof`, or a type string that
+/// `Linkage::parseTermString` parses for reflection or specialization, which ends right after
+/// the type. Declarations parse their types with `ParseType` and never reach this code. In all
+/// of those places the run of `*` is followed by a token that cannot start an operand, so we
+/// look past the whole run: such a token means a type suffix, and an operand means a multiply.
+static bool _isPointerTypeSuffix(Parser* parser)
+{
+    TokenReader lookahead = parser->tokenReader;
+    lookahead.advanceToken();
+    int starCount = 1;
+    while (lookahead.peekTokenType() == TokenType::OpMul)
+    {
+        lookahead.advanceToken();
+        starCount++;
+    }
+    switch (lookahead.peekTokenType())
+    {
+    case TokenType::Comma:
+    case TokenType::RParent:
+    case TokenType::OpGreater:
+    case TokenType::OpRsh:
+    case TokenType::Colon:
+    case TokenType::Semicolon:
+    case TokenType::LBracket:
+    case TokenType::Dot:
+    case TokenType::EndOfFile:
+        return true;
+    case TokenType::LParent:
+        // `(` can start an operand, so a single `*` before it is a multiply. A run of two or
+        // more could be a function-style cast such as `int**(p)` or a multiply such as
+        // `a * *(p + 1)`; we read it as a pointer type so that the cast keeps compiling.
+        return starCount > 1;
+    default:
+        return false;
+    }
+}
+
 static Expr* parsePostfixExpr(Parser* parser)
 {
     auto expr = parseAtomicExpr(parser);
@@ -9620,47 +9661,9 @@ static Expr* parsePostfixExpr(Parser* parser)
             }
             break;
         case TokenType::OpMul:
-            {
-                // We may have a pointer type expr, e.g. T* or T**, or the `*` is a mul
-                // operator, e.g. `a * *p` or `a * **pp`. We disambiguate by looking at the
-                // token after the whole run of `*` tokens. If it is `,`, `)`, `>`, `>>`, `:`,
-                // `;`, `[`, `.` or the end of the input (a type string such as "int**" passed
-                // to `findTypeByName`), then the run must be a type postfix, because a
-                // multiply would need an operand there.
-                TokenReader lookahead = parser->tokenReader;
-                lookahead.advanceToken();
-                int starCount = 1;
-                while (lookahead.peekTokenType() == TokenType::OpMul)
-                {
-                    lookahead.advanceToken();
-                    starCount++;
-                }
-                switch (lookahead.peekTokenType())
-                {
-                case TokenType::LParent:
-                    // A single `*` before `(` is a multiply. A run of two or more could be
-                    // either a function-style cast such as `int**(p)` or a multiply such as
-                    // `a * *(p + 1)`; we read it as a pointer type so that the cast keeps
-                    // compiling, and the multiply can be written as `a * (*(p + 1))`.
-                    if (starCount == 1)
-                        return expr;
-                    expr = parsePostfixTypeSuffix(parser, expr);
-                    break;
-                case TokenType::Comma:
-                case TokenType::RParent:
-                case TokenType::OpGreater:
-                case TokenType::OpRsh:
-                case TokenType::Colon:
-                case TokenType::Semicolon:
-                case TokenType::LBracket:
-                case TokenType::Dot:
-                case TokenType::EndOfFile:
-                    expr = parsePostfixTypeSuffix(parser, expr);
-                    break;
-                default:
-                    return expr;
-                }
-            }
+            if (!_isPointerTypeSuffix(parser))
+                return expr;
+            expr = parsePostfixTypeSuffix(parser, expr);
             break;
         }
     }
