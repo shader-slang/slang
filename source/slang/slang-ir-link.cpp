@@ -335,6 +335,8 @@ struct IRSpecContext : IRSpecContextBase
 
 
 IRInst* cloneGlobalValue(IRSpecContext* context, IRInst* originalVal);
+static IRInst* findBestValueForTarget(IRSpecContext* context, IRSpecSymbol* sym);
+static void diagnoseUnresolvedSymbol(IRSpecContext* context, IRInst* bestVal, IRSpecSymbol* sym);
 
 IRInst* cloneValue(IRSpecContextBase* context, IRInst* originalValue);
 
@@ -1594,6 +1596,39 @@ IRInst* cloneGlobalValueImpl(
     return clonedValue;
 }
 
+/// Return the declaration among `sym` and the other declarations that share its mangled name
+/// that is the best fit for the target. A declaration more specialized for the target is better;
+/// otherwise a definition is better than a declaration.
+static IRInst* findBestValueForTarget(IRSpecContext* context, IRSpecSymbol* sym)
+{
+    IRInst* bestVal = nullptr;
+    for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
+    {
+        IRInst* newVal = ss->irGlobalValue;
+        if (isBetterForTarget(context, newVal, bestVal))
+            bestVal = newVal;
+    }
+    return bestVal;
+}
+
+/// Report `bestVal` as an unresolved external symbol, with a note at each declaration that shares
+/// its mangled name (`sym` and the declarations that follow it).
+static void diagnoseUnresolvedSymbol(IRSpecContext* context, IRInst* bestVal, IRSpecSymbol* sym)
+{
+    auto sink = context->shared->sink;
+    if (!sink)
+        return;
+
+    sink->diagnose(Diagnostics::UnresolvedSymbol{
+        .symbol = bestVal,
+        .location = bestVal->sourceLoc,
+    });
+    for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
+    {
+        sink->diagnose(Diagnostics::SeeDeclarationOfIr{.inst = ss->irGlobalValue});
+    }
+}
+
 /// Clone a global value, which has the given `originalLinkage`.
 ///
 /// The `originalVal` is a known global IR value with that linkage, if one is available.
@@ -1647,20 +1682,7 @@ IRInst* cloneGlobalValueWithLinkage(
         UNREACHABLE_RETURN(cloneGlobalValueImpl(context, originalVal, IROriginalValuesForClone()));
     }
 
-    // We will try to track the "best" declaration we can find.
-    //
-    // Generally, one declaration will be better than another if it is
-    // more specialized for the chosen target. Otherwise, we simply favor
-    // definitions over declarations.
-    //
-    IRInst* bestVal = nullptr;
-    for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
-    {
-        IRInst* newVal = ss->irGlobalValue;
-        if (isBetterForTarget(context, newVal, bestVal))
-            bestVal = newVal;
-    }
-
+    IRInst* bestVal = findBestValueForTarget(context, sym);
     if (!bestVal)
     {
         return nullptr;
@@ -1671,21 +1693,7 @@ IRInst* cloneGlobalValueWithLinkage(
     // This catches cases like extension methods declared without a body,
     // which are not valid (extensions cannot define new requirements).
     if (!isFunctionDefinedOrImported(bestVal))
-    {
-        if (auto sink = context->shared->sink)
-        {
-            sink->diagnose(Diagnostics::UnresolvedSymbol{
-                .symbol = bestVal,
-                .location = bestVal->sourceLoc,
-            });
-
-            // Emit notes for all available declarations of this symbol
-            for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
-            {
-                sink->diagnose(Diagnostics::SeeDeclarationOfIr{.inst = ss->irGlobalValue});
-            }
-        }
-    }
+        diagnoseUnresolvedSymbol(context, bestVal, sym);
 
     // Check if we've already cloned this value, for the case where
     // we didn't have an original value (just a name), but we've
