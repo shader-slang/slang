@@ -4768,7 +4768,8 @@ attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
 /// with launch bounds the compiler may use fewer registers so that the given number of blocks
 /// of `maxThreadsPerBlock` threads can be resident on one multiprocessor. A launch with more
 /// than `maxThreadsPerBlock` threads per block fails.
-/// The attribute is ignored on other targets.
+/// It applies to entry points (other than callable shaders) and `[CudaKernel]` functions; on any
+/// other function it is ignored with a warning. The attribute is ignored on other targets.
 /// @param maxThreadsPerBlock The largest block size the kernel is launched with. Must be positive.
 /// @param minBlocksPerMultiprocessor The desired minimum number of resident blocks per multiprocessor.
 /// 0 (the default) omits the argument.
@@ -4778,7 +4779,8 @@ attribute_syntax [CudaLaunchBounds(maxThreadsPerBlock: int, minBlocksPerMultipro
 /// Emits `__maxnreg__(maxRegisters)` on a CUDA kernel: the compiler uses at most `maxRegisters`
 /// registers per thread for this kernel (CUDA 12.4 or later), like `--maxrregcount` but for one
 /// kernel. It cannot be combined with `[CudaLaunchBounds]` on the same kernel.
-/// The attribute is ignored on other targets.
+/// It applies to entry points (other than callable shaders) and `[CudaKernel]` functions; on any
+/// other function it is ignored with a warning. The attribute is ignored on other targets.
 /// @param maxRegisters The register limit per thread. Must be positive.
 __attributeTarget(FuncDecl)
 attribute_syntax [CudaMaxRegisters(maxRegisters: int)] : CudaMaxRegistersAttribute;

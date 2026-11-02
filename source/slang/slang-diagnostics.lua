@@ -6527,6 +6527,13 @@ warning(
     span { loc = "location", message = "the entry point runs with ~targetWaveSize:int-lane waves, so code that assumes ~waveSize:int lanes per wave computes wrong results" }
 )
 
+warning(
+    "cuda-kernel-attribute-on-non-kernel",
+    56116,
+    "'~attrName' only applies to a CUDA kernel and is ignored on '~func'",
+    span { loc = "location", message = "only an entry point other than a callable shader, or a function marked [CudaKernel], is emitted as a '__global__' kernel" }
+)
+
 -- SPIRV (57001-57007)
 
 warning(

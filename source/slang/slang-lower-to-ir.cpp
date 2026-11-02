@@ -14562,7 +14562,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto launchBoundsAttr = as<CudaLaunchBoundsAttribute>(modifier))
             {
                 auto builder = getBuilder();
-                builder->addDecoration(
+                auto decor = builder->addDecoration(
                     irFunc,
                     kIROp_CudaLaunchBoundsDecoration,
                     builder->getIntValue(
@@ -14571,14 +14571,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     builder->getIntValue(
                         builder->getIntType(),
                         launchBoundsAttr->minBlocksPerMultiprocessor));
+                decor->sourceLoc = launchBoundsAttr->loc;
             }
             else if (auto maxRegistersAttr = as<CudaMaxRegistersAttribute>(modifier))
             {
                 auto builder = getBuilder();
-                builder->addDecoration(
+                auto decor = builder->addDecoration(
                     irFunc,
                     kIROp_CudaMaxRegistersDecoration,
                     builder->getIntValue(builder->getIntType(), maxRegistersAttr->maxRegisters));
+                decor->sourceLoc = maxRegistersAttr->loc;
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
