@@ -246,6 +246,27 @@ jobs:
         if: matrix.install_test == 'true' && matrix.windows_only != 'true'
         run: |
           cmake --install build --config "$cmake_config" --prefix install
+          # The monolithic standard-module library must be installed *in place of*
+          # the loose module tree: the single library is present and no loose
+          # *.slang-module files are installed. Neither property is observable from
+          # the build tree (both forms coexist there), so it is checked on the
+          # install prefix. See SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY.
+          if [ "${{ matrix.option }}" = "SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY" ]; then
+            loose=$(find install -name '*.slang-module')
+            if [ -n "$loose" ]; then
+              echo "ERROR: loose .slang-module files were installed alongside the monolithic library:"
+              echo "$loose"
+              exit 1
+            fi
+            lib=$(find install \( -name 'slang-standard-modules*.dll' -o -name 'libslang-standard-modules*.so' -o -name 'libslang-standard-modules*.dylib' \))
+            if [ -z "$lib" ]; then
+              echo "ERROR: the monolithic standard-modules library was not installed"
+              find install -iname '*standard-modules*' || true
+              exit 1
+            fi
+            echo "Monolithic install OK: loose modules absent, library present:"
+            echo "$lib"
+          fi
           # Minimal consumer that resolves the exported slang::slang target.
           mkdir -p consumer
           cat >consumer/CMakeLists.txt <<'EOF'
