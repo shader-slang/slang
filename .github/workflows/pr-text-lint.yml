@@ -2,7 +2,7 @@ name: PR Text Lint
 # Checks the PR title and description against the four-section format in
 # AGENTS.md ("Commit & Pull Request Guidelines"): Motivation, Approach, Key
 # choices, Evidence; three lines each; under 1,500 characters outside
-# <details>; no tables. Reports warnings until the repository variable
+# or <details> blocks; no tables. Reports warnings until the repository variable
 # PR_TEXT_LINT_ENFORCE is "true", then fails the check.
 on:
   pull_request:

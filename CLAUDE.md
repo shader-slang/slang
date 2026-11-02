@@ -277,8 +277,9 @@ change.)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
 4. **Write the PR description** in the four-section format from `AGENTS.md` (Commit & Pull
    Request Guidelines): Motivation, Approach, Key choices, Evidence; at most three lines each,
-   under 1,500 characters in total; `Fixes #N`; the process report (per-change reasoning, code
-   traces, the input-shape check) in one collapsed `<details>` block. `.github/PULL_REQUEST_TEMPLATE.md`
+   under 1,500 characters in total; `Fixes #N`; no `<details>` blocks. The process report
+   (per-change reasoning, code traces, the input-shape check) goes in a PR comment, not in the
+   description, because the description becomes the squash commit. `.github/PULL_REQUEST_TEMPLATE.md`
    carries the headings and the `pr-text-lint` workflow checks the shape.
 
 ### Testing

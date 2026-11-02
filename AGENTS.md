@@ -256,8 +256,8 @@ this layer owns the logic, with a code trace from producer to consumer.
   request the format bot with `/format`.
 
 Write the PR description in four sections, each at most three lines, under 1,500 characters
-in total (counting the text outside any `<details>` block). The description becomes the squash
-commit message, so it is written for `git log`, not for the review thread.
+in total. The description becomes the squash commit message, so it is written for `git log`,
+not for the review thread.
 `.github/PULL_REQUEST_TEMPLATE.md` carries the headings:
 
 1. **Motivation** — the problem or, for a bug, the root cause. It makes sense without opening
@@ -268,8 +268,9 @@ commit message, so it is written for `git log`, not for the review thread.
    touched).
 4. **Evidence** — tests added and run, and what was not run and why.
 
-Then `Fixes #N`. No tables, logs or file-by-file notes. The process report — per-change
-reasoning, code traces, and the input-shape check from the Problem-Solving Methodology — goes in
-one collapsed `<details>` block at the end, where it is not counted. The title is
+Then `Fixes #N`. No tables, logs, file-by-file notes or `<details>` blocks: a collapsed block
+still lands in the squash commit. The process report — per-change reasoning, code traces, and
+the input-shape check from the Problem-Solving Methodology — goes in a PR comment (the
+coworkers' explain-diff comment is one), where reviewers read it and `git log` does not. The title is
 `component: imperative summary`, under 72 characters. The `pr-text-lint` workflow checks the
 shape and reports the exact fix.

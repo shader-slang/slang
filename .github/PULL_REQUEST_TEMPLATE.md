@@ -1,8 +1,9 @@
 <!--
-Four sections, at most three lines each, under 1,500 characters in total
-(text outside the <details> block). This description becomes the squash
-commit message. No tables, logs or file-by-file notes. See AGENTS.md,
-"Commit & Pull Request Guidelines".
+Four sections, at most three lines each, under 1,500 characters in total.
+This description becomes the squash commit message, so it must read well in
+`git log`. No tables, logs, file-by-file notes or <details> blocks. Put the
+process report (per-change reasoning, code traces, the input-shape check) in a
+PR comment, not here. See AGENTS.md, "Commit & Pull Request Guidelines".
 -->
 
 ## Motivation
@@ -23,11 +24,3 @@ commit message. No tables, logs or file-by-file notes. See AGENTS.md,
 <!-- Tests added and run; what was not run and why. -->
 
 Fixes #
-
-<details>
-<summary>Process report</summary>
-
-<!-- Per-change reasoning, code traces and the input-shape check from the
-     Problem-Solving Methodology. Not counted toward the limit. -->
-
-</details>

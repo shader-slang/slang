@@ -112,8 +112,8 @@ change.)
 
 Write the PR description in the four-section format from `AGENTS.md` (Commit & Pull Request
 Guidelines): Motivation, Approach, Key choices, Evidence; at most three lines each, under 1,500
-characters in total; `Fixes #N`; the process report in one collapsed `<details>` block.
-`.github/PULL_REQUEST_TEMPLATE.md` carries the headings.
+characters in total; `Fixes #N`; no `<details>` blocks. The process report goes in a PR
+comment, not in the description. `.github/PULL_REQUEST_TEMPLATE.md` carries the headings.
 
 ## Debugging
 

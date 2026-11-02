@@ -4,9 +4,9 @@
 The description becomes the squash commit message, so AGENTS.md ("Commit & Pull
 Request Guidelines") asks for four sections -- Motivation, Approach, Key choices,
 Evidence -- of at most three lines each, under 1,500 characters in total, with no
-Markdown table. Text inside a ``<details>`` block, HTML comments, ``Fixes #N`` lines, the
-``AI assistance:`` line and a trailing ``<sub>`` disclaimer are not counted; that is where the
-process report and other long material belong.
+Markdown table and no ``<details>`` block (a collapsed block still lands in the squash
+commit; the process report belongs in a PR comment). HTML comments, ``Fixes #N`` lines, the
+``AI assistance:`` line and a trailing ``<sub>`` disclaimer are not counted.
 
 Usage::
 
@@ -64,8 +64,8 @@ def counted_lines(body: str) -> tuple[list[str], int]:
     """Return (section lines, counted characters) for a description.
 
     HTML comments (the template's hints) are removed. A block-level ``<details>``
-    block is removed and the lines after it are a footer: they count toward the
-    character total but belong to no section. Closing-keyword lines (filled or
+    block is removed here (and reported by ``check``) and the lines after it are a
+    footer: they count toward the character total but belong to no section. Closing-keyword lines (filled or
     the template's bare ``Fixes #``), the ``AI assistance:`` line and a final
     ``<sub>`` disclaimer are trailers and are not counted at all.
     """
@@ -134,13 +134,17 @@ def check(title: str, body: str, *, require_ai_line: bool = False) -> list[str]:
     for label, n in sections_of(lines):
         if n > max_lines:
             problems.append(
-                f"`{label}` has {n} lines, max {max_lines}: keep the point, move the rest into the <details> block."
+                f"`{label}` has {n} lines, max {max_lines}: keep the point, move the rest into a PR comment."
             )
     if has_table(lines):
-        problems.append("The description contains a Markdown table: move it into the <details> block or drop it.")
+        problems.append("The description contains a Markdown table: move it into a PR comment or drop it.")
     if total > max_chars:
         problems.append(
-            f"Description is {total:,} characters outside <details>, max {max_chars:,}: move the process report and traces into the <details> block."
+            f"Description is {total:,} characters, max {max_chars:,}: move the process report and traces into a PR comment."
+        )
+    if DETAILS_RE.search(HTML_COMMENT_RE.sub("", body.replace("\r\n", "\n"))):
+        problems.append(
+            "The description contains a <details> block: it still lands in the squash commit. Put the process report in a PR comment."
         )
     if require_ai_line and not any(AI_LINE_RE.match(ln) for ln in body.split("\n")):
         problems.append(
@@ -155,9 +159,11 @@ def self_test() -> int:
         "## Approach\nTreat end-of-input as a token boundary in the lexer, not in the parser.\n\n"
         "## Key choices\nNo new token kind; the fix lives where the boundary is decided.\n\n"
         "## Evidence\nAdded tests/lexer/no-final-newline.slang; slang-test passes on CPU.\n\n"
-        "Fixes #1\n\n<details><summary>Process report</summary>\n" + "x" * 5000 + "\n</details>\n"
+        "Fixes #1\n"
     )
     assert check("lexer: keep the last token without a final newline", good) == [], check("t", good)
+    folded = good + "\n<details><summary>Process report</summary>\n" + "x" * 50 + "\n</details>\n"
+    assert any("<details> block" in p for p in check("lexer: keep", folded)), check("lexer: keep", folded)
     bad = "## Motivation\n" + "\n".join(["line"] * 4) + "\n\n| a | b |\n|---|---|\n| 1 | 2 |\n"
     problems = check("A very " + "long " * 20 + "title.", bad)
     joined = "\n".join(problems)
@@ -169,7 +175,7 @@ def self_test() -> int:
     assert check("lexer: keep", wrapped) == [], check("lexer: keep", wrapped)
     assert check("t", good, require_ai_line=True)[0].startswith("Missing the AI assistance line")
     assert check("t", good + "\nAI assistance: None\n", require_ai_line=True) == []
-    # Trailers and the footer after <details> do not count as section lines.
+    # Trailers and a footer do not count as section lines.
     tail = good.replace("Fixes #1\n", "Fixes #\n\nAI assistance: None\n") + "\nGenerated with a tool\n"
     assert check("lexer: keep", tail) == [], check("lexer: keep", tail)
     print("ok")
