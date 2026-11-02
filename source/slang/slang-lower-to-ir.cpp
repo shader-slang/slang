@@ -3779,6 +3779,14 @@ ParamPassingMode getParamPassingMode(ParamDecl* paramDecl)
     return actualMode;
 }
 
+AddressSpace getReferenceParamAddressSpace(ParamDecl* paramDecl)
+{
+    SLANG_RELEASE_ASSERT(isByReferenceParamPassingMode(getParamPassingMode(paramDecl)));
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+        return AddressSpace::GroupShared;
+    return AddressSpace::Generic;
+}
+
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(
     IRGenContext* context,
     SemanticsVisitor* semantics,

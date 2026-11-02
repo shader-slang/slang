@@ -5779,12 +5779,14 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto satisfyingParamInfo = getParamInfo(m_astBuilder, satisfyingParam);
             if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
                 return false;
-            // `__ref` and `groupshared` parameters are both read-write references, but a
-            // `groupshared` parameter also requires its argument to be thread-group-shared memory,
-            // so a direct match needs both or neither. A synthesized witness can still forward
-            // between them where the call type-checks.
-            if (requiredParam.getDecl()->hasModifier<HLSLGroupSharedModifier>() !=
-                satisfyingParam.getDecl()->hasModifier<HLSLGroupSharedModifier>())
+            // Beyond matching modes exactly, two by-reference parameters match only if they refer
+            // to storage in the same address space. A `groupshared` parameter is the one way to
+            // spell an explicit address space, so this requires either both parameters or neither
+            // to be `groupshared`. A synthesized witness can still forward between them where the
+            // call type-checks.
+            if (isByReferenceParamPassingMode(requiredParamInfo.mode) &&
+                getReferenceParamAddressSpace(requiredParam.getDecl()) !=
+                    getReferenceParamAddressSpace(satisfyingParam.getDecl()))
                 return false;
         }
 
