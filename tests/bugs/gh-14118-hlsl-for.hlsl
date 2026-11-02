@@ -1,8 +1,8 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -source-language hlsl -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -source-language hlsl -output-using-type
 
-// In HLSL a `for` loop's initial declaration belongs to the enclosing block,
-// but it must stay invisible to code before the loop (gh-14118).
+// A variable declared in an HLSL `for` loop's initializer must stay invisible
+// to code that comes before the loop in the same block.
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

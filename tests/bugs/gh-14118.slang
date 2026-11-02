@@ -1,7 +1,6 @@
 // A local declared as the unbraced body of a statement is owned by the
 // enclosing scope, but it must stay invisible to code that comes before its
-// declaration in the source, just like a local declared directly in a block
-// (gh-14118).
+// declaration in the source, just like a local declared directly in a block.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
@@ -134,10 +133,9 @@ int whilePredicateBeforeBody(int i)
     return n;
 }
 
-// An unbraced body has no scope of its own today, so its local belongs to the
+// An unbraced body has no scope of its own, so its local belongs to the
 // enclosing scope, and the predicate of a `do` loop, which follows the body,
-// sees it. Giving unbraced bodies their own scope (option B on gh-14118) would
-// change this case.
+// sees it.
 int doPredicateAfterBody()
 {
     int n = 0;

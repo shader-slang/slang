@@ -2,7 +2,7 @@
 
 // A local declared as the unbraced body of a statement is not visible before
 // its declaration, so a forward reference with no outer declaration of the
-// same name is undefined (gh-14118).
+// same name is undefined.
 
 void ifBody(bool c)
 {

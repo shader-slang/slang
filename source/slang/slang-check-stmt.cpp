@@ -309,9 +309,9 @@ void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt* stmt)
     WithOuterStmt subContext(this, stmt);
 
     // We check the body before the predicate, in source order, because checking reveals a
-    // local only when it reaches the local's declaration. Currently an unbraced body has no
-    // scope of its own, so in `do int i = next(); while (i != 0);` the predicate refers to
-    // the `i` that the body declares.
+    // local only when it reaches the local's declaration. An unbraced body has no scope of its
+    // own, so in `do int i = next(); while (i != 0);` the predicate refers to the `i` that the
+    // body declares.
     subContext.checkStmt(stmt->statement);
     stmt->predicate = checkPredicateExpr(stmt->predicate);
     checkLoopInDifferentiableFunc(stmt);
