@@ -27,6 +27,20 @@ uint otherHelper(uint x)
     return x + 1;
 }
 
+// A generic method of a generic type is nested in two generics.
+struct Wrapper<T>
+{
+    [CudaMaxRegisters(32)]
+/*CHECK:
+     ^^^^^^^^^^^^^^^^ 'CudaMaxRegisters' only applies to a CUDA kernel and is ignored on 'Wrapper.scaled'
+     ^^^^^^^^^^^^^^^^ only an entry point other than a callable shader, or a function marked [CudaKernel], is emitted as a '__global__' kernel
+*/
+    static uint scaled<U>(uint x)
+    {
+        return x * 3;
+    }
+}
+
 [CudaKernel]
 [CudaLaunchBounds(128)]
 void kernel(uint x)
@@ -37,5 +51,5 @@ void kernel(uint x)
 [numthreads(64, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
-    outputBuffer[tid.x] = helper(tid.x) + otherHelper(tid.x);
+    outputBuffer[tid.x] = helper(tid.x) + otherHelper(tid.x) + Wrapper<int>.scaled<float>(tid.x);
 }
