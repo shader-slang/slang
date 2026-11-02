@@ -1,52 +1,49 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:05:53+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T21:04:45Z
 target_doc: target-pipelines/hlsl.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: d6ab7e839f67ff67089c6ff596134280c2acd4d4480e7715012652269230eb0f
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: 0b7fe7ec288dbc7e2a2ca1dd7403506557b25cefbb5c003b9e9b844c353f39c6
+source_commit: f40a5af1027e6fd524a5855f77d62bddffd998c9
 checklist:
-  factual_accuracy: fail
+  factual_accuracy: partial
   cross_references: pass
-  completeness: fail
+  completeness: partial
   style_consistency: pass
-  source_alignment: fail
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 8
+finding_count: 7
 severity_breakdown:
-  critical: 1
-  major: 5
-  minor: 2
+  critical: 2
+  major: 1
+  minor: 4
   nit: 0
 ---
 
 # Review report for target-pipelines/hlsl.md
 
 ## Summary
-The page accurately records most HLSL-reachable gates and all 118 citation-bearing lines point at the stated source locations, but several behavioral descriptions and required diagram/table details are wrong or incomplete. The most important error is that Phase D sends the assembly targets directly through the compile branches; the source instead compiles an intermediate binary target and then invokes a downstream disassembler.
+
+The document substantially matches the current pipeline, but requires corrections before acceptance. Most importantly, it misdescribes composite-select legalization: the implementation tests the result type, preserves matrices, and introduces control flow rather than element-wise selects. The downstream diagram also reverses the nesting of dispatch and source emission, while several diagrams omit required conditional paths.
 
 ## Items checked
-- Read the target document, `_common.md`, its per-document prompt, all resolved watched files, and the five `depends_on` documents reported by `regenerate.py show`.
-- Verified the recorded source commit exists and equals review-time `HEAD`, then checked every line-number citation on the 118 citation-bearing lines against that commit.
-- Spot-checked more than 10 claims, including both required-pass scans, HLSL emitter construction, byte-address-buffer options, ray-payload gates, barrier validation, logical-operator legalization, phi elimination, variable-scope correction, named-constant emission, artifact creation, and DXC/fxc dispatch.
-- Resolved relative links and peer-document references; `regenerate.py lint target-pipelines/hlsl.md` completed cleanly.
-- Compared every HLSL-reachable `SLANG_PASS` region in `linkAndOptimizeIR` with the four phase diagrams and ordered tables.
+
+- Verified against the **current working tree**, which the review input identifies as matching the document’s source commit throughout `source/`; no files were written.
+- Read `_review.md`, `_common.md`, the document-specific prompt, and `regenerate.py show target-pipelines/hlsl.md`.
+- Audited the body’s explicit line-number citations, including 292 `line`/`lines` references with repeated citations and ranges, against their identified source files.
+- Checked more than 20 behavioral claims, including lowering-flag accumulation, specialization order, coverage options, byte-address options, payload wrappers and qualifiers, matrix storage, uniform-buffer loads, logical operators, phi defaults, scope correction, NVAPI handling, named constants, and downstream dispatch.
+- Resolved all 199 Markdown link occurrences; all 10 referenced generated peer pages exist in the manifest. Consulted dependency documents only to check cross-reference descriptions.
+- Checked required sections, table columns, diagram structure, front-matter keys and formats, and Liquid safety. The document occupies 98,252 bytes against its 98,304-byte cap.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | Phase D diagram and table, lines 564-603 | The page treats `DXILAssembly` and `DXBytecodeAssembly` as direct `emitWithDownstreamForEntryPoints` compile targets. They instead recurse through the corresponding binary target and then disassemble that binary with a downstream tool. | `source/slang/slang-code-gen.cpp:1119-1141` handles all assembly targets by compiling `_getIntermediateTarget(target)` and calling `dissassembleWithDownstream`; only `DXIL` and `DXBytecode` enter `emitWithDownstreamForEntryPoints` at lines 1191-1197. | Give each assembly target a branch to its binary intermediate followed by a `(downstream) disassemble` node. Restrict the DXC/fxc compile-row gates to `DXIL` and `DXBytecode`, respectively. |
-| F-002 | major | After the Phase D table, lines 605-606 | The statement that “all validation and optimization is delegated to DXC or fxc” contradicts the page and source: Slang performs numerous validation and optimization passes before emitting HLSL. | `source/slang/slang-emit.cpp:2394-2404` runs `validateVectorsAndMatrices` and `eliminateDeadCode`; lines 2736-2739 collect metadata and run `checkUnsupportedInst`. | Say that no SPIR-V tools apply and that downstream HLSL validation/optimization continues in DXC or fxc after Slang's own IR validation and optimization. |
-| F-003 | major | Phase C row 7 and `legalizeLogicalAndOr`, lines 490 and 906-912 | The page says `legalizeLogicalAndOr` rewrites vector operations into element-wise selects. The implementation emits no selects: it converts vector operands/results to boolean vectors as needed, while lowered matrices represented as arrays are rebuilt from per-element `And`/`Or` instructions. | `source/slang/slang-ir-legalize-binary-operator.cpp:179-245` handles vector casts and `And`/`Or`; lines 246-297 rebuild arrays from per-element `And`/`Or`. | Replace the select description with the actual vector-boolean coercion and lowered-matrix array reconstruction behavior. |
-| F-004 | major | `applyVariableScopeCorrection`, lines 925-930 | The explanation attributes this pass to live-range-marker scoping and claims DXC requires declarations at the outermost enclosing scope. The implementation instead repairs values defined in a loop and used after that loop: it hoists `IRVar`, spills storable values through a function-entry variable, or clones unstorable instructions at use sites. | `source/slang/slang-ir-variable-scope-correction.cpp:131-200` detects uses outside loop scope; lines 203-244 implement spill/reload or cloning. | Describe the loop-scope producer/use mismatch and the three repair strategies. Remove the unsupported live-range-marker and universal outermost-declaration claims. |
-| F-005 | major | Phase B ordered table, lines 297-370 | Three HLSL-reachable `SLANG_PASS` call sites have no distinct table row: `stripAutoDiffDecorations`, the minimal-mode `eliminateDeadCode` after the first fast-simplification gate, and the minimal-mode `eliminateDeadCode` after matrix legalization. Notes attached to the alternative rows do not satisfy the one-row-per-call coverage rule. | `source/slang/slang-emit.cpp:1446-1452`, `source/slang/slang-emit.cpp:1589-1595`, and `source/slang/slang-emit.cpp:1938-1941`; the coverage rule is `docs/generated/design/_meta/prompts/_common.md:364-368`. | Add separate ordered rows for all three call sites and keep their mutually exclusive gates explicit. |
-| F-006 | major | Phase diagrams, lines 116-137, 205-294, and 402-479 | The diagrams flatten many conditional calls into linear edges; Phase A explicitly says all gates were omitted. The target-pipeline contract requires every conditional gate to be a diamond with true and false fall-through arms. | `docs/generated/design/_meta/prompts/_common.md:314-324` defines the mandatory diagram convention; examples omitted from Phase A include the gates at `source/slang/slang-emit.cpp:1053-1058` and `source/slang/slang-emit.cpp:1075-1076`. | Add diamond nodes for every conditional pass call, including option, target, capability, and `RequiredLoweringPassSet` gates, with false paths rejoining the sequence. |
-| F-007 | minor | Opening paragraph, lines 12-22 | The first body paragraph explains coverage but never identifies the intended reader, which is mandatory universal content. | `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first paragraph to state both coverage and intended reader; the per-doc prompt identifies a compiler developer tracing HLSL pass order and downstream flow at `docs/generated/design/_meta/prompts/target-pipelines-hlsl.md:12-15`. | Add the intended-reader clause to the first paragraph. |
-| F-008 | minor | Phase B row 55 and `legalizeEmptyRayPayloadsForHLSL`, lines 355 and 840-846 | The page generalizes the motivation to “DXR requires non-empty ray payload structs.” The implementation documents the narrower requirement: DXIL/HLSL with NVAPI needs a non-empty payload because `NvInvokeHitObject` expects a payload argument. | `source/slang/slang-ir-hlsl-legalize.cpp:252-255`. | Narrow both descriptions to the DXIL/HLSL-with-NVAPI compatibility requirement stated by the implementation. |
-
-## No-issues notes
-- All mandatory front-matter fields are present, and the watched-path digest is a valid 64-character hexadecimal value.
-- The two accumulating `calcRequiredLoweringPassSet` scans and the cited HLSL pass gates match `slang-emit.cpp`.
-- The HLSL byte-address-buffer section correctly uses default options and only enables `useBitCastFromUInt` for DX 5.0-or-earlier profiles.
-- Named work-graph types and barrier flags are correctly traced through the HLSL emitter and prelude helpers.
+| F-001 | critical | `## Notable passes` → `legalizeNonVectorCompositeSelect`, lines 953–960; Phase B row 20 | The claim that the pass rewrites selects whose **condition** is a matrix or struct into `element-wise selects` contradicts the implementation. Selection is based on the **result type**, matrices are explicitly excluded, and the rewrite produces branches and a merge parameter. | `source/slang/slang-ir-legalize-composite-select.cpp:70–72` excludes basic, vector, and matrix result types. Lines 24–31 emit if/else blocks and branches; line 47 emits the merge parameter. | Describe legalization of remaining composite **results**, such as structs or arrays, into if/else control flow with a merge block parameter. Explicitly distinguish the broader scan flag from the pass’s matrix exclusion. Remove the vector-only justification from row 20 unless appropriately qualified. |
+| F-002 | major | Phase A–C diagrams; `## Conditional gates` | The required control-flow representation is incomplete. Phase A explicitly omits gates; B and C also draw many gated calls as unconditional. Phase B lacks the path where minimal optimization is enabled and `reqSet.generics` is false, collapses five checks into one node, and includes two skipped passes as pipeline nodes. The gate consolidation is split across several tables rather than the required single grouped table. | `docs/generated/design/_meta/prompts/_common.md`, Target-pipeline contract items 5–6; `source/slang/slang-emit.cpp:1087–1104`, `1501–1532`, `1693–1710`, `1740–1747`, and `2738–2743` show representative missing branches. | Add gate diamonds and bypass edges for each conditional call; add the neither-simplification-nor-DCE path at 1740–1747; separate the validation checks into individual nodes; remove skipped-pass nodes while retaining explanatory prose. Consolidate gates into one grouped table and add the required validation-call summaries beneath the diagrams. |
+| F-003 | minor | Phase B row 26; `## Conditional gates` | `checkForMissingReturns` is shown as gated only by `reqSet.missingReturn`. Its enclosing `shouldRunNonEssentialValidation()` condition is missing, including from that option’s controlled-pass list. | `source/slang/slang-emit.cpp:1693–1705`: the `requiredLoweringPassSet.missingReturn` test is nested inside the nonessential-validation block. | Make the row’s gate the conjunction of both conditions and add `checkForMissingReturns` to the nonessential-validation option row. |
+| F-004 | minor | `## Conditional gates` → `requiredLoweringPassSet.*`, `generics` and `existentialTypeLayout` rows | Both “Set by” cells omit the interface-type fallback. A flag can therefore become true without any of the listed triggering opcodes, contrary to the table’s apparent enumeration. | `source/slang/slang-emit.cpp:673–688` examines an instruction’s type or data type, unwraps pointer types, and sets both flags when the resulting opcode is `kIROp_InterfaceType`. | Add this shared trigger to both cells: an interface type, or an instruction whose data type becomes an interface type after pointer unwrapping. |
+| F-005 | critical | Phase D diagram, lines 619–644; ordered table rows 8–10 | The graph places target dispatch, assembly recursion, and `emitWithDownstreamForEntryPoints` **after** HLSL text generation. In the implementation these are outer calls that initiate source generation. Following the depicted order implies an extra source-emission pass before assembly recursion. | `source/slang/slang-code-gen.cpp:1111–1116` recurses to the binary target first; lines 1176–1181 dispatch binary targets to `emitWithDownstreamForEntryPoints`; that function emits source at line 538 and invokes the downstream compiler at line 1029. | Start the graph with `_emitEntryPoints` dispatch. Show assembly requests recursing to their binary target, then binary requests entering `emitWithDownstreamForEntryPoints`, which generates HLSL before calling DXC/fxc. Place disassembly after binary compilation and reorder the table consistently. |
+| F-006 | minor | Phase B row 65 | The statement that HLSL keeps declaration initializers except for arrays and `CoopVector` types omits the resource-global replacement rule. The cited target-policy helper is only one part of the extraction decision. | `source/slang/slang-ir-explicit-global-init.cpp:133–149`: `shouldExtractInitializer` preserves `IRActualGlobalRate`, but otherwise extracts resource-global replacement candidates before consulting `isInitializerRequiredByTarget`. | Qualify the array/`CoopVector` rule as the target-policy portion. State that resource globals selected for per-invocation replacement also have initializers extracted, while actual-global storage is preserved. |
+| F-007 | minor | Phase D table row 7, File column | `createArtifactForCompileTarget` links to its call site in `slang-emit.cpp`, although the required File column identifies the implementation file. | `source/compiler-core/slang-artifact-util.cpp:45` defines `ArtifactUtil::createArtifactForCompileTarget`; `source/slang/slang-emit.cpp:3197` only calls it. | Link the File cell to `source/compiler-core/slang-artifact-util.cpp`; retain `slang-emit.cpp:3197` as the call-site citation in Notes. |

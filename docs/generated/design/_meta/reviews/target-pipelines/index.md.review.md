@@ -1,43 +1,48 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:05:13+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T21:10:43Z
 target_doc: target-pipelines/index.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 88909e4def1133ca5cd3ccb36f17d01f8bcc633abff88b21acd9208e1a05d1f2
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: ca52bc15faa8039821f1456579dee989310bf65674d817e74da5aba208126d04
+source_commit: f40a5af1027e6fd524a5855f77d62bddffd998c9
 checklist:
-  factual_accuracy: fail
-  cross_references: pass
-  completeness: partial
-  style_consistency: fail
-  source_alignment: fail
+  factual_accuracy: partial
+  cross_references: partial
+  completeness: pass
+  style_consistency: partial
+  source_alignment: partial
   front_matter_validity: pass
 finding_count: 5
 severity_breakdown:
-  critical: 2
-  major: 1
-  minor: 2
+  critical: 0
+  major: 2
+  minor: 3
   nit: 0
 ---
 
 # Review report for target-pipelines/index.md
 
 ## Summary
-The page has the required section order, complete five-target comparison, valid front matter, and resolving links, but it no longer conforms to the compact navigation-hub contract. Two source-behavior statements are actively misleading: Metal `printf` is not gated on a `metallib_3_2` atom, and the named HLSL/CUDA passes are not the whole of their target-specific work. Extensive pass-level material also duplicates details that the index contract explicitly reserves for child pages.
+
+The document includes all required sections, but needs corrections before acceptance. Most importantly, its HLSL comparison cites a removed legalization function. It also overstates SPIR-V and CUDA exclusivity, misdescribes two peer pages’ headings, and includes pass-level explanations explicitly forbidden by the index contract.
 
 ## Items checked
-- Read the target, `_common.md`, its per-document prompt, all seven resolved watched files, and all five `depends_on` target pages reported by `regenerate.py show`.
-- Verified source against commit `53b76e6d3009b8e6434d41573524c7ce5c499d23` and spot-checked 18 factual claims, including enum values, emitter selection, downstream transitions, target legalizers, loop behavior, and `RequiredLoweringPassSet`.
-- Re-derived all 12 line-number citations in the body; every cited line or range matches the recorded source commit.
-- Resolved all 34 relative-link occurrences (23 unique targets) at the recorded commit and confirmed generated-page references are manifest entries; none are dangling.
-- Checked required sections, comparison-table columns and rows, peer-page coverage, front-matter keys, style basics, and the 14,148-byte document against its 32,768-byte cap.
+
+- Reviewed against the CURRENT working tree; `git diff --quiet 2518a942d59b1228fc8cc70a37739baab82b6002 -- source/` returned success, confirming source equality with the document’s source commit.
+- Read `_review.md`, `_common.md`, and the target’s own prompt; ran `regenerate.py show target-pipelines/index.md`.
+- Verified all 12 body line-number citations: `slang-emit.cpp` at 409, 1015, 1085, 1592–1599, 1666, 1760, 2524, and 3774; `slang-code-gen.h` at 52; `slang-ir-spirv-legalize.cpp` at 3130–3165 and 3433; and `slang-emit-spirv.cpp` at 12469. All match.
+- Spot-checked more than 20 claims, including target enums, downstream source selection, emitter inheritance, `precise` handling, legalization-driver placement, SPIR-V iteration counters, CUDA-specific gates, the 40 lowering flags, accumulating scans, autodiff branching, and tagged-union reinterpret gating.
+- Resolved all 35 Markdown links, covering 24 distinct destinations, including the local heading anchor. Confirmed all 10 linked generated peer pages appear in the manifest.
+- Read dependency-page excerpts only to check this index’s descriptions and structural cross-references.
+- Checked required section order, all five comparison rows and six columns, required front-matter fields, and size: 14,376 bytes against the 32,768-byte cap.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `## Pages`, Metal bullet, lines 41-46 | The text says Metal `printf` is `gated on the metallib_3_2 capability atom`. The emitter actually records an MSL 3.2 requirement when it encounters `printf`, and downstream code explicitly handles this when no metallib atom is present. | `source/slang/slang-emit-metal.cpp:903-910` calls `requireMetalLanguageVersion(3, 2)` and `requireLogging()`. `source/slang/slang-code-gen.cpp:783-800` says `printf` emits metal3.2 “even though no metallib atom is present” and merges the emitter-recorded version into downstream options. | Replace the capability-gate claim with: Metal `printf` makes the emitter require MSL 3.2 and enables Metal logging for the downstream compile. |
-| F-002 | critical | `## Cross-target comparison`, caveat, lines 126-134 | The sentence that HLSL and CUDA scatter work across individual arms but `the named passes above are the whole of it` is false. The table names two HLSL examples and one CUDA-only pass, while the orchestrator contains additional target-specific calls for both families. | HLSL additionally runs `legalizeNonVectorCompositeSelect` and `wrapStructuredBuffersOfMatrices` at `source/slang/slang-emit.cpp:1493-1499` and `1988-2001`. CUDA additionally runs `synthesizeActiveMask` and `legalizeEntryPointVaryingParamsForCUDA` at `source/slang/slang-emit.cpp:2158-2164` and `2249-2253`. | Delete `the named passes above are the whole of it`; say only that HLSL and CUDA use multiple target-specific arms, and leave the inventory to their child pages. |
-| F-003 | major | `## Pages` through `## Filtering rules`, especially lines 27-58 and 124-229 | The index contains detailed per-pass behavior, gate implementation, decoration cleanup, scan ordering, and pass-result mutation. This substantially violates the navigation-hub contract and duplicates child-page content. | `docs/generated/design/_meta/prompts/_common.md:377-423` defines a compact index and forbids `per-pass details`; `docs/generated/design/_meta/prompts/target-pipelines-index.md:8-14,70-75` likewise says this is not a target page and must not document passes. | Reduce each page bullet to one clause, retain only the required four-phase overview and comparison table, and shorten filtering to the target-arm reminder. Remove the pass-level caveats and `RequiredLoweringPassSet` deep dive. |
-| F-004 | minor | Introductory paragraph, lines 12-23 | The first paragraph explains what the page covers but does not identify its intended reader, despite the universal content rule and the per-document audience declaration. | `docs/generated/design/_meta/prompts/_common.md:65-66` requires both coverage and intended reader; `docs/generated/design/_meta/prompts/target-pipelines-index.md:12-14` identifies the reader as a developer choosing a per-target page. | Add a short audience phrase such as “for compiler developers choosing the relevant target pipeline page.” |
-| F-005 | minor | `## Pages`, CUDA bullet, lines 53-58 | The claim that the PyTorch/`slangpy` path is autodiff’s `main consumer` and therefore the gate matters `most` on CUDA is a comparative usage assertion not established by the watched source or dependencies. The source only establishes a target-independent autodiff gate and CUDA/PyTorch-related paths. | `source/slang/slang-emit.cpp:1446-1453` applies the autodiff/strip branch without a CUDA-specific condition; no cited source provides consumer-frequency data. | Remove `main consumer` and `matters most`; summarize only the concrete CUDA/PyTorch autodiff connection documented by source. |
+| F-001 | major | Cross-target comparison, line 122 | The HLSL row cites `legalizeRayPayloadAccessQualifiersForHLSL`, which no longer exists in `source/slang`. It also places that removed function in `slang-ir-hlsl-legalize.cpp`. | `source/slang/slang-ir-hlsl-legalize.cpp:67` defines `validateBarrierFlagsForHLSL`. Payload legalization now uses `legalizeRayTracingPayloads`, defined in `source/slang/slang-ir-ray-tracing-legalize.cpp:884` and invoked from `source/slang/slang-emit.cpp:1989`. | Remove the obsolete example from the Phase C cell and retain `validateBarrierFlagsForHLSL`. The replacement payload pass belongs earlier in the pipeline, so do not substitute it into the Phase C cell. |
+| F-002 | minor | Pages, lines 30–31; Cross-target comparison, line 121 | SPIR-V is described as `the only target with iterative passes`. CUDA also has an internal fixed-point loop, already documented by the linked CUDA page. The narrower claim about no repeated orchestrator invocation does not establish this exclusivity. | `source/slang/slang-ir-legalize-varying-params.cpp:1966` uses `for (bool changed = true; changed;)` to inline shader-terminating callees. `docs/generated/design/target-pipelines/cuda.md:904` explicitly describes this internal loop. | Remove both exclusivity claims. Keep the SPIR-V loop names and distinguish orchestrator-level repetition from loops inside individual passes. |
+| F-003 | minor | Cross-target comparison, line 125 | `lowerImmutableBufferLoadForCUDA` is called `the one pass that exists solely for this target family`, despite other CUDA-only passes in the orchestrator. | `source/slang/slang-emit.cpp:2352–2358` selects `synthesizeActiveMask` only for CUDA source/header and PTX; lines 1902–1904 select `legalizeOptiXReportIntersectionsForCUDA` only for CUDA source/header. | Describe `lowerImmutableBufferLoadForCUDA` as an example of a CUDA-specific pass and delete the uniqueness claim. |
+| F-004 | major | Pages, lines 28–61; Filtering rules, lines 181–223 | The index exceeds its navigation-only scope: it explains emitter details, autodiff decoration stripping and DCE, and tagged-union reinterpret production. These are per-pass details expressly excluded by its generation contract. | `docs/generated/design/_meta/prompts/_common.md:455` states: `Forbidden in the index: per-pass details`. `docs/generated/design/_meta/prompts/target-pipelines-index.md`, Page shape items 3 and 6, requires one-clause page descriptions and a short filtering paragraph. | Reduce each Pages bullet to a one-clause target/path summary. Replace the detailed IR-content discussion with a brief gating summary and links to the child pages; remove the autodiff and tagged-union explanations. Preserve the comparison table’s explicitly required SPIR-V loop caveat. |
+| F-005 | minor | Shared shape, lines 106–109; Filtering rules, lines 198–200 | The claim that every peer’s Conditional gates section opens with a `requiredLoweringPassSet.* flags` subsection is false for WGSL and CUDA. | `docs/generated/design/target-pipelines/wgsl.md:872` and `docs/generated/design/target-pipelines/cuda.md:795` begin those sections with explanatory prose and have no subsection with that heading. HLSL, Metal, and SPIR-V do have it. | State that all five pages discuss lowering flags in Conditional gates, without claiming identical subsection headings. |
