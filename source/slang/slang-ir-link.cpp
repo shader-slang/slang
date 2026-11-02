@@ -1240,6 +1240,19 @@ IRFunc* specializeIRForEntryPoint(
         UNREACHABLE_RETURN(nullptr);
     }
 
+    // An entry point needs a body on every target. Cloning already reports a body-less function
+    // unless `isFunctionDefinedOrImported` accepts it, and that function accepts an external
+    // binding (`__extern_cpp`, `[DllImport]`, an import) only when the source function has no
+    // `IREntryPointDecoration`. An entry point selected after its module was lowered, such as one
+    // found by `findAndCheckEntryPoint` without a `[shader]` attribute, has no decoration until
+    // this function adds it below, so we report a body-less entry point that cloning accepted.
+    if (!clonedFunc->getFirstBlock())
+    {
+        IRInst* bestVal = findBestValueForTarget(context, sym);
+        if (isFunctionDefinedOrImported(bestVal))
+            diagnoseUnresolvedSymbol(context, bestVal, sym);
+    }
+
     if (!clonedFunc->findDecorationImpl(kIROp_KeepAliveDecoration))
     {
         context->builder->addKeepAliveDecoration(clonedFunc);
@@ -1827,8 +1840,8 @@ static bool doesFuncHaveDefinition(IRFunc* func)
 }
 
 /// Check if a function (or generic containing a function) is properly defined or imported.
-/// Returns true if the value is not a function, or if it has a definition, is an intrinsic,
-/// or is marked as imported.
+/// Returns true if the value is not a function, or if it has a definition, or if it is not an
+/// entry point and is an intrinsic, is bound to an external definition, or is marked as imported.
 static bool isFunctionDefinedOrImported(IRInst* inst)
 {
     IRFunc* func = nullptr;
@@ -1850,6 +1863,11 @@ static bool isFunctionDefinedOrImported(IRInst* inst)
     // Check if it has a function body
     if (func->getFirstBlock() != nullptr)
         return true;
+
+    // Later passes build the target's entry point from the body of every function with an
+    // `IREntryPointDecoration`, so an external binding cannot stand in for that body.
+    if (func->findDecoration<IREntryPointDecoration>())
+        return false;
 
     // Check for decorations that indicate the function has an external/special implementation
     for (auto decor : func->getDecorations())
