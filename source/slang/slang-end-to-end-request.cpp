@@ -2390,6 +2390,11 @@ SlangResult EndToEndCompileRequest::processCommandLineArguments(
     char const* const* args,
     int argCount)
 {
+    // We treat a request in command-line compiler mode as a complete slangc command line, to
+    // which nothing adds targets after the parse. slangc, and slang-test's slangc tool and test
+    // server, set the mode before this call and add no targets afterwards. An API caller that sets
+    // the mode and then adds targets still gets the slangc diagnostics, such as E00044 for a
+    // floating-point mode given with no `-target`.
     return parseOptions(
         this,
         argCount,

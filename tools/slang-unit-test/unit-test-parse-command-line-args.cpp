@@ -139,8 +139,8 @@ struct ParseCommandLineArgsTestContext
     UnitTestContext* m_unitTestContext;
 };
 
-// A failed parse preserves the caller's existing session description so it remains usable;
-// the auxiliary allocation is cleared because no parsed data is returned.
+// Check that parsing `argv` fails, leaves the caller's session description unchanged so that it
+// remains usable, and sets the auxiliary allocation to null because no parsed data is returned.
 void checkParseFails(slang::IGlobalSession* globalSession, int argc, const char* const* argv)
 {
     // Non-default starting values let the checks below tell an untouched output from one that was
@@ -287,8 +287,9 @@ static void parseSessionDesc(
 }
 
 // Return the code that a session created from `sessionDesc` generates for its first target from
-// `source`: the code for the entry point `computeMain` if `source` has one, and otherwise the
-// whole program. Returns an empty string on failure.
+// `source`. If `hasEntryPoint` is true, the result is the code for the entry point `computeMain`,
+// which `source` must define; otherwise it is the code that `getTargetCode` returns for the
+// module. Returns an empty string on failure.
 static String generateCodeWithSession(
     slang::IGlobalSession* globalSession,
     const slang::SessionDesc& sessionDesc,
@@ -301,8 +302,8 @@ static String generateCodeWithSession(
 
     ComPtr<slang::IBlob> diagnostics;
     ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
-        "outputPathModule",
-        "outputPathModule.slang",
+        "sessionCodeModule",
+        "sessionCodeModule.slang",
         source,
         diagnostics.writeRef()));
     if (!module)
@@ -377,7 +378,8 @@ static const char* kComputeShaderSource = R"(
 )";
 
 // Return the SPIR-V assembly for a small compute shader from a session created from `sessionDesc`
-// with one SPIR-V target added, as an API caller adds targets to a parsed session desc.
+// with its targets replaced by one SPIR-V target, as an API caller supplies the targets of a
+// parsed session desc that has none.
 static String compileSpirvAsmWithSession(
     slang::IGlobalSession* globalSession,
     slang::SessionDesc sessionDesc)
@@ -422,6 +424,9 @@ SLANG_UNIT_TEST(parseCommandLineArgsFloatingPointModeReachesSessionTargets)
     SLANG_CHECK(preciseCode.getUnownedSlice().indexOf(toSlice("NoContraction")) >= 0);
 }
 
+// Check that `argv` parses into a session description with `expectedTargetCount` targets, the
+// first of which has the format `expectedFormat`. Callers that expect no target pass
+// `SLANG_TARGET_UNKNOWN`, which is then not checked.
 static void checkParseTargets(
     slang::IGlobalSession* globalSession,
     int argc,
@@ -439,7 +444,7 @@ static void checkParseTargets(
 }
 
 // A profile that implies a stage is session configuration. The caller selects entry points
-// later, so the stage needs no `-entry` here, and the target keeps the full profile.
+// later, so the stage needs no `-entry` here. The target keeps only the profile's version.
 SLANG_UNIT_TEST(parseCommandLineArgsAcceptsStageProfileWithoutEntryPoint)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
@@ -460,8 +465,9 @@ SLANG_UNIT_TEST(parseCommandLineArgsAcceptsStageProfileWithoutEntryPoint)
     SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
 }
 
-// A stage profile does not restrict the session's target to that stage: a module with entry points
-// for several stages loads, and each entry point compiles for its own stage.
+// A stage profile does not restrict the session's target to that stage: with a pixel-stage
+// profile, a module with vertex and compute entry points loads, and its compute entry point
+// compiles for the compute stage.
 SLANG_UNIT_TEST(parseCommandLineArgsStageProfileKeepsOtherStagesUsable)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
@@ -487,8 +493,8 @@ SLANG_UNIT_TEST(parseCommandLineArgsStageProfileKeepsOtherStagesUsable)
     SLANG_CHECK(code.getUnownedSlice().indexOf(toSlice("[numthreads(1, 1, 1)]")) >= 0);
 }
 
-// Source files, entry-point options and output paths configure a compilation rather than a
-// session, so they are accepted and ignored. An `-o` path still infers a target when no
+// Source and module files, entry-point options and output paths configure a compilation rather
+// than a session, so they are accepted and ignored. An `-o` path still infers a target when no
 // `-target` is given.
 SLANG_UNIT_TEST(parseCommandLineArgsIgnoresCompileOptions)
 {
@@ -598,6 +604,8 @@ SLANG_UNIT_TEST(parseCommandLineArgsOutputPathDoesNotSelectWholeProgram)
     SLANG_CHECK(fromOutput.format == SLANG_SPIRV && fromTarget.format == SLANG_SPIRV);
     SLANG_CHECK(fromOutput.profile == fromTarget.profile);
     SLANG_CHECK(fromOutput.flags == fromTarget.flags);
+    // Both parses declare the target through the same code with the same options, and an option
+    // set serializes its entries in insertion order, so the entries can be compared by index.
     SLANG_CHECK_ABORT(fromOutput.compilerOptionEntryCount == fromTarget.compilerOptionEntryCount);
     for (uint32_t i = 0; i < fromOutput.compilerOptionEntryCount; ++i)
     {

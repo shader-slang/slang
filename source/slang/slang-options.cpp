@@ -1934,8 +1934,9 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguageExpli
     return SLANG_OK;
 }
 
-// Return whether `optionSet` holds a target option other than the profile, which has its own
-// diagnostics when it applies to no target.
+// Return whether `optionSet` holds an option other than the profile, which has its own
+// diagnostics when it applies to no target. `optionSet` is the option set of a raw target, which
+// holds only target options, so every other key it holds is a target option.
 static bool hasTargetOptionOtherThanProfile(const CompilerOptionSet& optionSet)
 {
     for (auto& option : optionSet.options)
@@ -1946,9 +1947,11 @@ static bool hasTargetOptionOtherThanProfile(const CompilerOptionSet& optionSet)
     return false;
 }
 
-// Return whether a parse for `purpose` configures a compilation, and so loads its input files
-// and resolves its entry points and output paths. A session description carries none of these,
-// so its parse skips that work and the diagnostics that come with it.
+// Return whether a parse for `purpose` configures a compilation, and so loads its positional
+// input paths (source files, stdin, and `.slang-module` or `.slang-lib` files) and resolves its
+// entry points and output paths. A session description carries none of these, so its parse skips
+// that work and the diagnostics that come with it. A module given with `-r` is loaded for every
+// purpose, and a session description keeps it as a `ReferenceModule` option.
 static bool parsesForCompilation(CommandLineParsePurpose purpose)
 {
     switch (purpose)
@@ -1964,7 +1967,9 @@ static bool parsesForCompilation(CommandLineParsePurpose purpose)
 
 // Return whether targets can be added after a parse for `purpose`: through `addCodeGenTarget`
 // for a compile request, or through `SessionDesc::targets` for a session description. Such
-// targets inherit target options given with no `-target`, so those options are not ignored.
+// targets inherit a floating-point mode given with no `-target`, so we report that mode as
+// ignored only when this returns false. A profile given with no `-target` is reported for every
+// purpose.
 static bool canAddTargetsAfterParse(CommandLineParsePurpose purpose)
 {
     switch (purpose)
@@ -2888,10 +2893,12 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
 }
 
 // Resolve the entry points named on the command line (or implied by a stage and a single
-// translation unit) and add them to the compile request.
+// translation unit) and add them to the compile request. The result is a failure only when an
+// entry point cannot be associated with a translation unit. Other errors, such as conflicting
+// stages, go to the sink and fail the parse through its error count.
 SlangResult OptionsParser::_resolveEntryPoints()
 {
-    // As a compatability feature, if the user didn't list any explicit entry
+    // As a compatibility feature, if the user didn't list any explicit entry
     // point names, *and* they are compiling a single translation unit, *and* they
     // have either specified a stage, or we can assume one from the naming
     // of the translation unit, then we assume they wanted to compile a single
@@ -2964,7 +2971,7 @@ SlangResult OptionsParser::_resolveEntryPoints()
         m_frontEndReq->additionalLoadedModules->getCount() == 0)
     {
         // Otherwise, we require that all entry points be specified after
-        // the translation unit to which tye belong.
+        // the translation unit to which they belong.
         bool anyEntryPointWithoutTranslationUnit = false;
         for (auto& entryPoint : m_rawEntryPoints)
         {
@@ -2983,7 +2990,7 @@ SlangResult OptionsParser::_resolveEntryPoints()
 
     // Now that entry points are associated with translation units,
     // we can make one additional pass where if an entry point has
-    // no specified stage, but the nameing of its translation unit
+    // no specified stage, but the naming of its translation unit
     // implies a stage, we will use that (a manual `-stage` annotation
     // will always win out in such a case).
     //
@@ -3088,14 +3095,13 @@ SlangResult OptionsParser::_resolveEntryPoints()
     return SLANG_OK;
 }
 
-// Associate each `-o` path with the target and entry point it is an output for, diagnosing
-// paths that cannot be matched.
+// Associate each output with the target and entry point it is for, diagnosing outputs that cannot
+// be matched, and decide which outputs are whole-program outputs. Besides the `-o` paths,
+// the outputs include a pathless output that we add when there is no `-o` and a single target
+// whose output is obvious (for example SPIR-V, Metal, CUDA, host C++ or a host-callable target).
 void OptionsParser::_resolveOutputPaths(
     const Dictionary<CodeGenTarget, int>& mapFormatToTargetIndex)
 {
-    // Next we need to sort out the output files specified with `-o`, and
-    // figure out which entry point and/or target they apply to.
-    //
     // If there is only a single entry point, then that is automatically
     // the entry point that should be associated with all outputs.
     //
@@ -3119,7 +3125,7 @@ void OptionsParser::_resolveOutputPaths(
     }
 
     // If we don't have any raw outputs but do have a raw target,
-    // add an empty' rawOutput for certain targets where the expected behavior is obvious.
+    // add an empty rawOutput for certain targets where the expected behavior is obvious.
     if (m_rawOutputs.getCount() == 0 && m_rawTargets.getCount() == 1 &&
         (m_rawTargets[0].format == CodeGenTarget::HostCPPSource ||
          m_rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
@@ -3158,8 +3164,8 @@ void OptionsParser::_resolveOutputPaths(
             {
 
                 // If we hit this case, then it means that we need to pick the
-                // target to assocaite with this output based on its implied
-                // format, but the file path doesn't direclty imply a format
+                // target to associate with this output based on its implied
+                // format, but the file path doesn't directly imply a format
                 // (it doesn't have a suffix like `.spv` that tells us what to write).
                 //
                 m_sink->diagnose(
@@ -3253,7 +3259,9 @@ void OptionsParser::_resolveOutputPaths(
 }
 
 // Record each resolved output path on its target, and select whole-program code generation for a
-// target that has a whole-program output.
+// target that has a whole-program output. Each target that an output is bound to also takes the
+// full option set of its raw target, including the stage of its profile. A compile target with no
+// output keeps only what the setters in `_parse`'s target-declaration loop apply.
 void OptionsParser::_bindOutputsToTargets()
 {
     for (auto& rawOutput : m_rawOutputs)
@@ -3297,7 +3305,6 @@ void OptionsParser::_bindOutputsToTargets()
             }
             auto entryPointReq = m_requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
 
-            // String outputPath;
             if (targetInfo->entryPointOutputPaths.containsKey(entryPointID))
             {
                 m_sink->diagnose(Diagnostics::DuplicateOutputPathsForEntryPointAndTarget{
@@ -5135,9 +5142,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_compileRequest->setTargetEmbedDownstreamIR(targetID, true);
             }
 
-            // A compile gives a target its full option set when it binds an output path to the
-            // target (see `_bindOutputsToTargets`); a target with no output keeps only the
-            // profile's version from the setters above, so its entry points supply their stages.
+            // A compile gives a target its full option set only when it binds an output to the
+            // target (see `_bindOutputsToTargets`), for compatibility with existing slangc
+            // command lines. A compile target with no output gets only what the setters above
+            // apply: the profile's version, capabilities, floating-point mode, layout options,
+            // whole-program and embedded downstream IR. Its entry points supply their stages.
             // A session description binds no outputs, so its targets take every option given
             // after their `-target` here, except that the profile also keeps only its version:
             // the caller's entry points supply their stages, and a stage in the target profile
