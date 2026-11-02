@@ -527,9 +527,54 @@ Function parameters may be marked with a _direction_ qualifier:
 * `out` indicates an output parameter
 * `inout` or `in out` indicates an input/output parameter
 
+An `out` or `inout` parameter has exclusive access to its argument for the duration of the call: an `inout` parameter is an _exclusive mutable borrow_ of its argument, and an `out` parameter is an exclusive borrow that the function writes before it returns.
+While the call is in progress, nothing else should read or write the argument's memory, whether through another parameter, a global variable, or another invocation.
+
 > #### Note ####
 > The `out` and `inout` directions are superficially similar to non-`const` reference parameters in C++.
 > In cases that do not involve aliasing of mutable memory, the semantics should be equivalent.
+> Slang does not check that a program gives an `out` or `inout` parameter exclusive access to its argument; if other code accesses the argument's memory during the call, the result is undefined.
+
+#### Borrow and Reference Parameters ####
+
+Slang has additional parameter modifiers for borrows and references:
+
+* `__borrow` (also spelled `__constref`) indicates an _immutable borrow_: the function may read the argument but not modify it, and nothing should modify the argument while the call is in progress
+* `__ref` indicates a _reference_: the parameter does not have exclusive access to its argument, so other code may read or write the argument's memory while the call is in progress, and the function observes those accesses
+
+> #### Note ####
+> These modifiers exist mainly to support the Slang core module. Their spelling and their implementation are subject to change, so we recommend that user code avoid them, with the exception of `groupshared` described below.
+> As with `out` and `inout`, Slang does not check that a program respects the access rules of a borrow (there is no borrow checker); a program that violates them has undefined behavior.
+
+A parameter marked `groupshared` is a reference to thread-group-shared memory, and is the one kind of reference parameter we intend user code to use.
+Its argument must be a `groupshared` variable, a part of one, or another `groupshared` parameter, and the function accesses that memory while other invocations in the thread group can access it too.
+A `const groupshared` parameter is a read-only reference.
+A `groupshared` parameter cannot also be marked `in`, `out`, `inout`, or `__borrow`.
+
+```hlsl
+groupshared float tile[64];
+
+void fill(groupshared float values[64], uint i)
+{
+    values[i] = float(i);
+}
+
+float neighbor(const groupshared float values[64], uint i)
+{
+    return values[(i + 1) % 64];
+}
+
+[numthreads(64, 1, 1)]
+void computeMain(uint i : SV_GroupIndex)
+{
+    fill(tile, i);
+    GroupMemoryBarrierWithGroupSync();
+    float n = neighbor(tile, i);
+    // ...
+}
+```
+
+Some targets cannot pass a reference to thread-group-shared memory across a call, so Slang inlines a function with a `groupshared` parameter into its callers when compiling for them.
 
 Preprocessor
 ------------
