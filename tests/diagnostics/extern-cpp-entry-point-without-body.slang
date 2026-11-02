@@ -3,10 +3,14 @@
 // every target builds an entry point from its Slang body, so the body must be present.
 // See https://github.com/shader-slang/slang/issues/14200
 //
-// The entry point is reported however it is selected: by its `[shader]` attribute, by `-entry`
-// alone (NO_SHADER_ATTRIBUTE), or when another entry point calls it (CALLED_FIRST). For C++ source
-// without `-o`, each entry point is linked on its own, so `NoBody` is reported in both links: as
-// the entry point, and as a callee of `Caller` that is still marked as an entry point.
+// The front end marks `NoBody` as an entry point both for `[shader]` and for `-entry` alone
+// (NO_SHADER_ATTRIBUTE), so every row here is reported by the check in
+// `isFunctionDefinedOrImported`. In the CALLED_FIRST rows `Caller` also calls `NoBody`; C++ source
+// without `-o` links each entry point on its own, so the TWICE row reports `NoBody` in both links,
+// once as a callee that is still marked as an entry point. The check in `specializeIRForEntryPoint`,
+// for an entry point the front end did not mark, is covered by
+// unit-test-extern-cpp-entry-point-without-body.cpp. Two identical "see declaration" notes
+// belong to each E45001 report; they do not mean the error was emitted twice.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuh

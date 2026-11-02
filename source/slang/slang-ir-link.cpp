@@ -337,7 +337,10 @@ struct IRSpecContext : IRSpecContextBase
 IRInst* cloneGlobalValue(IRSpecContext* context, IRInst* originalVal);
 static IRInst* findBestValueForTarget(IRSpecContext* context, IRSpecSymbol* sym);
 static IRSpecSymbol* findSymbolCheckedByCloning(IRSpecContext* context, IRSpecSymbol* sym);
-static void diagnoseUnresolvedSymbol(IRSpecContext* context, IRInst* bestVal, IRSpecSymbol* sym);
+static void diagnoseUnresolvedSymbolCandidates(
+    IRSpecContext* context,
+    IRInst* bestVal,
+    IRSpecSymbol* sym);
 
 IRInst* cloneValue(IRSpecContextBase* context, IRInst* originalValue);
 
@@ -1250,7 +1253,7 @@ IRFunc* specializeIRForEntryPoint(
         IRSpecSymbol* checkedSym = findSymbolCheckedByCloning(context, sym);
         IRInst* bestVal = findBestValueForTarget(context, checkedSym);
         if (isFunctionDefinedOrImported(bestVal))
-            diagnoseUnresolvedSymbol(context, bestVal, checkedSym);
+            diagnoseUnresolvedSymbolCandidates(context, bestVal, checkedSym);
     }
 
     if (!clonedFunc->findDecorationImpl(kIROp_KeepAliveDecoration))
@@ -1610,8 +1613,9 @@ IRInst* cloneGlobalValueImpl(
 }
 
 /// Return the declaration among `sym` and the other declarations that share its mangled name
-/// that is the best fit for the target. A declaration more specialized for the target is better;
-/// otherwise a definition is better than a declaration.
+/// that is the best fit for the target, or null when `sym` is null. A declaration more specialized
+/// for the target is better; on a tie an export is better than an import, and then a definition is
+/// better than a declaration.
 static IRInst* findBestValueForTarget(IRSpecContext* context, IRSpecSymbol* sym)
 {
     IRInst* bestVal = nullptr;
@@ -1640,7 +1644,10 @@ static IRSpecSymbol* findSymbolCheckedByCloning(IRSpecContext* context, IRSpecSy
 
 /// Report `bestVal` as an unresolved external symbol, with a note at each declaration that shares
 /// its mangled name (`sym` and the declarations that follow it).
-static void diagnoseUnresolvedSymbol(IRSpecContext* context, IRInst* bestVal, IRSpecSymbol* sym)
+static void diagnoseUnresolvedSymbolCandidates(
+    IRSpecContext* context,
+    IRInst* bestVal,
+    IRSpecSymbol* sym)
 {
     auto sink = context->shared->sink;
     if (!sink)
@@ -1715,12 +1722,12 @@ IRInst* cloneGlobalValueWithLinkage(
         return nullptr;
     }
 
-    // Check that the best value we found is valid: if it's a function,
-    // it should either have a body, be an intrinsic, or be imported.
-    // This catches cases like extension methods declared without a body,
+    // Check that the best value we found is valid: if it's a function, it should have a body or,
+    // unless it is an entry point, be an intrinsic, be bound to an external definition, or be
+    // imported. This catches cases like extension methods declared without a body,
     // which are not valid (extensions cannot define new requirements).
     if (!isFunctionDefinedOrImported(bestVal))
-        diagnoseUnresolvedSymbol(context, bestVal, sym);
+        diagnoseUnresolvedSymbolCandidates(context, bestVal, sym);
 
     // Check if we've already cloned this value, for the case where
     // we didn't have an original value (just a name), but we've
@@ -1854,8 +1861,9 @@ static bool doesFuncHaveDefinition(IRFunc* func)
 }
 
 /// Check if a function (or generic containing a function) is properly defined or imported.
-/// Returns true if the value is not a function, or if it has a definition, or if it is not an
-/// entry point and is an intrinsic, is bound to an external definition, or is marked as imported.
+/// Returns true if the value is not a function, or if it has a definition, or if it has no
+/// `IREntryPointDecoration` and is an intrinsic, is bound to an external definition, or is marked
+/// as imported.
 static bool isFunctionDefinedOrImported(IRInst* inst)
 {
     IRFunc* func = nullptr;
@@ -1879,7 +1887,8 @@ static bool isFunctionDefinedOrImported(IRInst* inst)
         return true;
 
     // Later passes build the target's entry point from the body of every function with an
-    // `IREntryPointDecoration`, so an external binding cannot stand in for that body.
+    // `IREntryPointDecoration`, so neither an intrinsic nor an external binding can stand in for
+    // that body.
     if (func->findDecoration<IREntryPointDecoration>())
         return false;
 
