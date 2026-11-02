@@ -1431,9 +1431,13 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 }
 
 // Report an atomic operation that the C++ target has no lowering for as an unsupported intrinsic,
-// naming the operation and its value type (for example "atomicAdd on float"). User code can reach
-// C++ emission with these operations because the `Atomic<T>` methods declared in extensions do not
-// repeat the struct's `[require]`.
+// naming the IR operation and its value type (for example "atomicAdd on float"). The value type is
+// the result type, except for `atomicStore`, which has no result. Capability checking does not
+// reject these operations: the `Atomic<T>` methods declared in extensions do not repeat the
+// struct's `[require]`, assignment to an `Atomic<T>` lvalue lowers directly to `atomicStore`,
+// property accessors are not capability-checked, and `lowerAppendConsumeStructuredBuffers`
+// synthesizes `atomicInc` and `atomicDec` itself. Emission output is discarded once an error is
+// reported, so no placeholder result is needed.
 void CPPSourceEmitter::_diagnoseUnsupportedAtomicOperation(IRAtomicOperation* inst)
 {
     IRType* valueType = inst->getDataType();
@@ -1446,11 +1450,6 @@ void CPPSourceEmitter::_diagnoseUnsupportedAtomicOperation(IRAtomicOperation* in
     getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
         .operation = operation.produceString(),
         .location = inst->sourceLoc});
-
-    // We still declare the result, as the CUDA emitter does for unsupported cooperative-vector
-    // operations, so that later uses of the instruction in the emitted C++ name a declared value.
-    if (!as<IRVoidType>(inst->getDataType()))
-        _emitInstAsDefaultInitializedVar(inst, inst->getDataType());
 }
 
 bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
