@@ -2248,9 +2248,8 @@ public:
     //
     // Adding or removing an AST class shifts the sequential `ASTNodeType` values, so in an older
     // module the nodes whose classes come after that class in `ASTNodeType` order would be
-    // decoded as different classes.
-    // Version 38 is the earliest module version with the numbering that follows the removal of
-    // `UnscopedForStmt`.
+    // decoded as different classes. Such a change therefore raises the minimum supported version
+    // along with the writer version.
     const static UInt k_minSupportedModuleVersion = 38;
     const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);

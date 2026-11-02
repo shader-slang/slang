@@ -4,14 +4,12 @@
 // In HLSL, as in C++ and DXC, the variable declared in a `for` initializer is scoped to the
 // loop. Sibling loops can each declare `i`, a declaration after a loop does not conflict with
 // the loop variable, and code outside a loop sees the enclosing `i`, never the loop's.
-// https://github.com/shader-slang/slang/issues/14099
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 static int g = 3;
 
-// Each loop declares its own `i`; before the fix this was E30200 and E39999.
 int siblingLoops()
 {
     int value = 0;
@@ -21,8 +19,6 @@ int siblingLoops()
     return value;
 }
 
-// Both variables of each initializer are scoped to their loop; before the fix this was E30200
-// and E39999.
 int siblingLoopsWithTwoVariables()
 {
     int value = 0;
@@ -31,8 +27,6 @@ int siblingLoopsWithTwoVariables()
     return value;
 }
 
-// The inner loop's `i` shadows the outer loop's; before the fix both were in one scope, which
-// was E30200 and E39999.
 int nestedLoopsWithoutBraces()
 {
     int value = 0;
@@ -42,8 +36,8 @@ int nestedLoopsWithoutBraces()
     return value;
 }
 
-// The read before the loop sees the outer `i`. The inner braces matter: before the fix the loop's
-// `i` belonged to that inner block, so `value = i` read the uninitialized loop variable.
+// The loop sits in an inner block that has no `i` of its own, so the read before the loop must
+// find the outer `i` rather than the variable the loop declares later in that block.
 int outerVariableBeforeLoop()
 {
     int i = 7;
@@ -55,8 +49,6 @@ int outerVariableBeforeLoop()
     return value;
 }
 
-// A declaration after the loop does not conflict with the loop's `i`; before the fix this was
-// E30200 and E39999.
 int declarationAfterLoop()
 {
     for (int i = 0; i < 4; ++i) {}
@@ -64,7 +56,6 @@ int declarationAfterLoop()
     return i;
 }
 
-// After the loop, `i` is the outer variable; before the fix this was E30200 and E39999.
 int outerVariableAfterLoop()
 {
     int i = 50;
@@ -73,14 +64,12 @@ int outerVariableAfterLoop()
     return value + i * 1000;
 }
 
-// After the loop, `i` is the parameter; before the fix it silently read the loop variable.
 int parameterAfterLoop(int i)
 {
     for (int i = 0; i < 3; ++i) {}
     return i;
 }
 
-// After the loop, `g` is the global; before the fix it silently read the loop variable.
 int globalAfterLoop()
 {
     for (int g = 0; g < 5; ++g) {}

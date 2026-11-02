@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang hlsl tests/diagnostics/hlsl-for-loop-variable-scope.slang -no-codegen
 
 // In HLSL, as in C++ and DXC, the variable declared in a `for` initializer is scoped to the
-// loop, so code after the loop cannot use it (shader-slang/slang#14099).
+// loop, so code after the loop cannot use it.
 
 int readAfterLoop()
 {
