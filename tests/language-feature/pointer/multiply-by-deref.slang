@@ -1,7 +1,8 @@
 // Multiplying by a dereferenced pointer, as in `3 * *p` or `a * **pp`, must parse as a
 // multiplication. The `*` after the left operand is followed by more `*` tokens, so the parser
-// looks past the whole run of `*` to tell this apart from a pointer type such as `int**`,
-// which is followed by `>`, `)` or `,` instead of an operand.
+// looks past the whole run of `*` to tell this apart from a pointer type such as `int**`. A run
+// followed by `)`, `>`, `,`, `[` or `>>` is a pointer type, a run followed by an operand is a
+// multiply, and a run followed by `(` is a pointer type only when the left operand can name one.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
@@ -41,8 +42,9 @@ void computeMain()
     // CHECK-NEXT: 330
     outputBuffer[3] = a * *p * *q;
 
-    // The cast, `bit_cast` and `sizeof` arguments read the run of `*` as a pointer type,
-    // because it is followed by `)`, `>`, `,`, `[` or `>>`.
+    // The cast, `bit_cast` and `sizeof(int**)` read the run of `*` as a pointer type, because
+    // it is followed by `)`, `>` or `,`. The `int**` declarations parse their type with
+    // `ParseType` and do not depend on this lookahead.
     *slot = p;
     int** pp = (int**)slot;
     int** pp2 = bit_cast<int**, int**>(pp);
@@ -56,15 +58,15 @@ void computeMain()
     // CHECK-NEXT: 8
     outputBuffer[6] = sizeof(int**);
 
-    // A run of two or more `*` followed by `(` stays a pointer type, so the function-style
-    // cast `int**(slot)` still compiles.
+    // A run of two or more `*` followed by `(` stays a pointer type when the left operand names
+    // a type, so the function-style cast `int**(slot)` still compiles.
     int** pp3 = int**(slot);
     // CHECK-NEXT: 15
     outputBuffer[7] = a * **pp3;
 
+    // A run followed by `[` or `>>` is a pointer type.
     // CHECK-NEXT: 24
     outputBuffer[8] = sizeof(int**[3]);
-
     // CHECK-NEXT: 8
     outputBuffer[9] = sizeof(Ptr<Ptr<int**>>);
 

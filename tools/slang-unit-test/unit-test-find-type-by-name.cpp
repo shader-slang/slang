@@ -150,3 +150,51 @@ SLANG_UNIT_TEST(findTypeByNameExtensionTypeAlias)
     SLANG_CHECK_ABORT(
         vectorAliasType->getScalarType() == slang::TypeReflection::ScalarType::UInt32);
 }
+
+// Pointer type strings such as "int**" end right after their run of `*`, so the parser has to
+// read a run of `*` followed by the end of the input as a pointer type rather than as a
+// multiplication with a missing operand.
+SLANG_UNIT_TEST(findPointerTypeByName)
+{
+    const char* userSource = "public struct S { int x; };";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "findPointerTypeByName",
+        "findPointerTypeByName.slang",
+        userSource,
+        diagnosticBlob.writeRef());
+    if (!module && diagnosticBlob)
+    {
+        fprintf(stderr, "%s\n", (const char*)diagnosticBlob->getBufferPointer());
+    }
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto layout = module->getLayout();
+    SLANG_CHECK_ABORT(layout != nullptr);
+
+    const char* pointerTypeNames[] = {"int*", "int**", "int***", "S**"};
+    for (auto name : pointerTypeNames)
+    {
+        auto type = layout->findTypeByName(name);
+        if (!type || type->getKind() != slang::TypeReflection::Kind::Pointer)
+        {
+            fprintf(stderr, "findTypeByName(\"%s\") did not return a pointer type\n", name);
+        }
+        SLANG_CHECK(type != nullptr && type->getKind() == slang::TypeReflection::Kind::Pointer);
+    }
+}
