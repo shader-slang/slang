@@ -582,6 +582,9 @@ public:
 
 protected:
     virtual bool shouldEmitOnlyHeader() { return false; }
+    /// Entry-point declarations are opt-in because HLSL requires entry-point attributes
+    /// that `emitFuncDecl` does not emit.
+    virtual bool shouldEmitEntryPointDecl() { return false; }
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual String getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName);

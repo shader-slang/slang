@@ -76,6 +76,10 @@ protected:
     {
         return m_target == CodeGenTarget::CUDAHeader;
     }
+    // A CUDA header declares each `__extern_cpp` kernel so that host code can launch the
+    // kernel defined in the generated `.cu`. The `extern "C" __global__` linkage that the
+    // declaration needs comes from `emitFunctionPreambleImpl`.
+    virtual bool shouldEmitEntryPointDecl() SLANG_OVERRIDE { return shouldEmitOnlyHeader(); }
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,
