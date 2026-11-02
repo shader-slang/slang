@@ -3,12 +3,17 @@
 namespace Slang
 {
 
+struct IRMatrixType;
 struct IRModule;
 class DiagnosticSink;
 class TargetProgram;
 
-// Lower matrix types the target cannot represent natively to arrays of row vectors, for SPIR-V,
-// GLSL, Metal, WGSL and LLVM CPU targets (see `shouldLowerMatrixType` for the per-target rule).
+// Return true if `legalizeMatrixTypes` rewrites `matrixType` into an array of vectors on the
+// given target. Buffer element type lowering uses this to build the storage type of such a matrix
+// before `legalizeMatrixTypes` erases the matrix layout.
+bool isMatrixTypeLegalizedToVectorArray(TargetProgram* targetProgram, IRMatrixType* matrixType);
+
+// Lower int/uint/bool matrix types to arrays for SPIRV, WGSL, GLSL, and Metal targets
 void legalizeMatrixTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 } // namespace Slang

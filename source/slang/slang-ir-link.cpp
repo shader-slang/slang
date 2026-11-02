@@ -524,11 +524,16 @@ IRGlobalVar* cloneGlobalVarImpl(
 /// associated with a specialization of a program, and not the original IR for the modules
 /// of the program.
 ///
+/// A specialization can also introduce capabilities through a concrete type argument, such as
+/// `genericMain<NeedsSpirv16>()` where NeedsSpirv16 requires `_spirv_1_6`. The layout IR records
+/// that selected requirement, so preserve its capability and execution-mode decorations when
+/// choosing the source module's function body or specializing a generic body.
+///
 /// This function scans through all the `originalValues` that were considered for `clonedInst`,
 /// and copies over any decorations that are allowed to come from a non-"best" definition.
-/// For a given decoration opcode, only one such decoration will ever be copied, and nothing
-/// will be copied if the instruction already has a matching decoration (that was cloned
-/// from the "best" definition).
+/// For a given decoration opcode, only one such decoration will ever be copied, except that
+/// capability requirements are merged by atom so distinct requirements are all preserved.
+/// Nothing is copied if the instruction already has a matching decoration.
 ///
 static void cloneExtraDecorationsFromInst(
     IRSpecContextBase* context,
@@ -542,6 +547,23 @@ static void cloneExtraDecorationsFromInst(
         {
         default:
             break;
+        case kIROp_RequireCapabilityAtomDecoration:
+            {
+                auto atom = cast<IRRequireCapabilityAtomDecoration>(decoration)->getAtom();
+                bool alreadyPresent = false;
+                for (auto existing : clonedInst->getDecorations())
+                {
+                    if (auto requirement = as<IRRequireCapabilityAtomDecoration>(existing);
+                        requirement && requirement->getAtom() == atom)
+                    {
+                        alreadyPresent = true;
+                        break;
+                    }
+                }
+                if (!alreadyPresent)
+                    cloneInst(context, builder, decoration);
+                break;
+            }
         case kIROp_HLSLExportDecoration:
         case kIROp_BindExistentialSlotsDecoration:
         case kIROp_LayoutDecoration:
@@ -550,6 +572,7 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_IntrinsicOpDecoration:
         case kIROp_NonCopyableTypeDecoration:
         case kIROp_DynamicDispatchWitnessDecoration:
+        case kIROp_Shader64BitIndexingDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {
                 cloneInst(context, builder, decoration);

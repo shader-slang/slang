@@ -6124,7 +6124,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
-public void hitObjectRecordEmptyNV(hitObjectNV hitObject)
+public void hitObjectRecordEmptyNV(inout hitObjectNV hitObject)
 {
     hitObject = HitObject::MakeNop();
 }

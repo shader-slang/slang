@@ -5,8 +5,9 @@
 //TEST:COMPILE: tests/bugs/13306/resources.hlsl -Gec -target hlsl -entry main -validate-ir -no-mangle -DREAD_WHOLE_BUFFER
 //TEST:COMPILE: tests/bugs/13306/resources.hlsl -Gec -target spirv -entry main -validate-ir -no-mangle -DREAD_WHOLE_BUFFER
 
-// Enabling compatibility must not introduce static storage for resources, resource arrays,
-// explicit parameter groups, or legacy buffers whose element structs contain resources.
+// Compatibility creates mutable shadows for direct resource values and fixed-size resource arrays.
+// Resource-global legalization must replace those shadows before emission. Explicit parameter
+// groups and legacy buffers containing resources remain read-only aliases.
 Texture2D<float4> gTex;
 Texture2D<float4> textures[2];
 SamplerState sampler;

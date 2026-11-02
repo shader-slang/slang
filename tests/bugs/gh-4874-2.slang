@@ -1,5 +1,9 @@
-// Same to gh-4874.slang, but defining the global resource typed variables
-// without the "const" modifier. This should lead to a compile time error.
+// `legalizeResourceGlobalVars` can replace a plain file- or namespace-scope
+// `static RWStructuredBuffer` with per-function storage and generated call arguments. Function-local
+// storage cannot provide `groupshared` visibility or preserve the access guarantees requested by
+// `globallycoherent`.
+// Structs also remain unsupported because the replacement pass does not split an aggregate or
+// coordinate separate replacements for its fields.
 //
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 RWStructuredBuffer<uint> outputBuffer;
@@ -7,11 +11,25 @@ RWStructuredBuffer<uint> outputBuffer;
 RWStructuredBuffer<uint> inputBuffer;
 
 static RWStructuredBuffer<uint> gBuffer = inputBuffer;
-/*CHECK:
-                                ^^^^^^^ global variable cannot have opaque type
-                                ^^^^^^^ global variable cannot have opaque type.
-                                ^^^^^^^ do you intend to define a `static const` instead?
-*/
+
+static groupshared RWStructuredBuffer<uint> gSharedBuffer;
+//CHECK:                                    ^^^^^^^^^^^^^ mutable static resource cannot use shared or memory-qualified storage
+//CHECK:                                    ^^^^^^^^^^^^^ a resource-valued `static` variable declared at file or namespace scope cannot use `groupshared` or a memory-access qualifier
+
+globallycoherent static RWStructuredBuffer<uint> coherentBuffer = inputBuffer;
+//CHECK:                                         ^^^^^^^^^^^^^^ mutable static resource cannot use shared or memory-qualified storage
+//CHECK:                                         ^^^^^^^^^^^^^^ a resource-valued `static` variable declared at file or namespace scope cannot use `groupshared` or a memory-access qualifier
+
+// Type or array-bound inference can complete a declaration during header checking, so semantic
+// body checking does not run. Header checking must still reject the unsupported memory qualifier
+// in either case.
+globallycoherent static var inferredCoherentBuffer = inputBuffer;
+//CHECK:                    ^^^^^^^^^^^^^^^^^^^^^^ mutable static resource cannot use shared or memory-qualified storage
+//CHECK:                    ^^^^^^^^^^^^^^^^^^^^^^ a resource-valued `static` variable declared at file or namespace scope cannot use `groupshared` or a memory-access qualifier
+
+globallycoherent static RWStructuredBuffer<uint> inferredCoherentBuffers[] = {inputBuffer};
+//CHECK:                                         ^^^^^^^^^^^^^^^^^^^^^^^ mutable static resource cannot use shared or memory-qualified storage
+//CHECK:                                         ^^^^^^^^^^^^^^^^^^^^^^^ a resource-valued `static` variable declared at file or namespace scope cannot use `groupshared` or a memory-access qualifier
 
 struct Stuff
 {
@@ -27,9 +45,8 @@ struct Stuff
 
 static Stuff gStuff = Stuff( inputBuffer, inputBuffer );
 /*CHECK:
-             ^^^^^^ global variable cannot have opaque type
-             ^^^^^^ global variable cannot have opaque type.
-             ^^^^^^ do you intend to define a `static const` instead?
+             ^^^^^^ opaque type is not supported for mutable static storage
+             ^^^^^^ mutable file- or namespace-scope `static` variable 'gStuff' has the opaque type 'Stuff', which cannot be represented by mutable storage
 */
 
 uint test(uint x)

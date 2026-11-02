@@ -661,6 +661,13 @@ void SourceFile::setContents(ISlangBlob* blob)
     // actual content length. For UTF-8 without BOM this is a no-op; for BOM or non-UTF-8 files,
     // the decoded size may differ from the raw file size.
     m_contentSize = decodedContentSize;
+
+    // The digest and the line break offsets are lazy caches derived from the content, so they are
+    // reset here and recomputed on the next query. Without the reset, a digest queried before any
+    // content was set would outlive the call that supplies the content.
+    std::lock_guard<std::mutex> lock(m_cacheMutex);
+    m_digest = SHA1::Digest();
+    m_lineBreakOffsets.clear();
 }
 
 void SourceFile::setContents(const String& content)

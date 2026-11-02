@@ -46,7 +46,7 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
 TargetRequest::TargetRequest(Linkage* linkage, CodeGenTarget format)
     : linkage(linkage)
 {
-    optionSet = linkage->m_optionSet;
+    optionSet = linkage->m_optionSet.copyWithoutLevelLocalOptions();
     optionSet.add(CompilerOptionName::Target, format);
 }
 
