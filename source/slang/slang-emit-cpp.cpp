@@ -1896,7 +1896,20 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         }
     case kIROp_Select:
         {
-            m_writer->emit("_slang_select(");
+            // For a scalar condition we name the IR result type explicitly rather
+            // than let C++ deduce `T` in `_slang_select(bool, T, T)` from the emitted
+            // operands, whose C++ types can differ from their shared IR type: a null
+            // pointer operand is emitted as `nullptr`, of type `std::nullptr_t`.
+            // Vector conditions keep deduction, since CUDA defines those overloads
+            // as non-templates.
+            m_writer->emit("_slang_select");
+            if (!as<IRVectorType>(inst->getOperand(0)->getDataType()))
+            {
+                m_writer->emit("<");
+                emitType(inst->getFullType());
+                m_writer->emit(">");
+            }
+            m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
