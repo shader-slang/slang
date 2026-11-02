@@ -69,7 +69,7 @@ private:
     {
         auto func = as<IRFunc>(inst);
         if (auto generic = as<IRGeneric>(inst))
-            func = as<IRFunc>(findGenericReturnVal(generic));
+            func = as<IRFunc>(findInnerMostGenericReturnVal(generic));
         if (!func)
             return;
 
