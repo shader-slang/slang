@@ -338,9 +338,10 @@ jobs:
           cmake --install build --config "$cmake_config" --prefix install
           # The monolithic standard-module library must be installed *in place of*
           # the loose module tree: the single library is present and no loose
-          # *.slang-module files are installed. Neither property is observable from
-          # the build tree (both forms coexist there), so it is checked on the
-          # install prefix. See SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY.
+          # *.slang-module files are installed. Exclusivity is checked on the
+          # install prefix: the build tree intentionally contains both forms, so
+          # the absence of loose modules is only meaningful after install.
+          # See SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY.
           if [ "${{ matrix.option }}" = "SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY" ]; then
             loose=$(find install -name '*.slang-module')
             if [ -n "$loose" ]; then
@@ -372,3 +373,43 @@ jobs:
           # (`cmake` on Windows, `${CMAKE_INSTALL_LIBDIR}/cmake/slang`
           # elsewhere; see SLANG_CMAKE_CONFIG_DIR in CMakeLists.txt).
           cmake -S consumer -B consumer/build -DCMAKE_PREFIX_PATH="$PWD/install"
+
+      # Compile a shader that imports standard modules (slang.numerics,
+      # slang.functional) with the *installed* compiler, so the modules are
+      # resolved through the monolithic library -- exercising its lookup, LZ4
+      # decompression, and IR deserialization end to end. The install-prefix
+      # file checks above prove presence/absence but cannot catch an incomplete
+      # payload, an export mismatch, or a decompression failure; this does. The
+      # negative case removes the library and requires the same import to fail,
+      # proving the library (not a stray loose file) was the source.
+      - name: Verify monolithic library import at runtime (${{ matrix.option }})
+        if: matrix.option == 'SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY' && env.SLANG_CI_CAN_RUN_BUILT_BINARY == 'true'
+        run: |
+          if [ "${{ inputs.os }}" = "windows" ]; then
+            slangc="install/bin/slangc.exe"
+          else
+            slangc="install/bin/slangc"
+          fi
+          export PATH="$PWD/install/bin:$PATH"
+          export LD_LIBRARY_PATH="$PWD/install/lib:$PWD/install/bin:${LD_LIBRARY_PATH:-}"
+          export DYLD_LIBRARY_PATH="$PWD/install/lib:$PWD/install/bin:${DYLD_LIBRARY_PATH:-}"
+          shader="tests/functional/numerics-interoperability.slang"
+          args=(-target hlsl -entry computeMain -stage compute -experimental-feature)
+
+          echo "== positive: standard-module import must succeed through the installed library =="
+          "$slangc" "$shader" "${args[@]}" -o "$RUNNER_TEMP/monolithic-positive.hlsl"
+
+          lib=$(find install \( -name 'slang-standard-modules*.dll' -o -name 'libslang-standard-modules*.so' -o -name 'libslang-standard-modules*.dylib' \) | head -n1)
+          if [ -z "$lib" ]; then
+            echo "ERROR: could not locate the installed monolithic library for the negative test"
+            exit 1
+          fi
+          echo "== negative: with $lib removed, the same import must fail =="
+          mv "$lib" "$lib.disabled"
+          if "$slangc" "$shader" "${args[@]}" -o "$RUNNER_TEMP/monolithic-negative.hlsl" 2>/dev/null; then
+            echo "ERROR: import unexpectedly succeeded with the monolithic library removed"
+            mv "$lib.disabled" "$lib"
+            exit 1
+          fi
+          mv "$lib.disabled" "$lib"
+          echo "Runtime import check passed: import works via the library and fails without it."
