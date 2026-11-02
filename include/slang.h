@@ -4350,14 +4350,42 @@ struct IGlobalSession : public ISlangUnknown
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL setSPIRVCoreGrammar(char const* jsonPath) = 0;
 
     /** Parse slangc command line options into a SessionDesc that can be used to create a session
-     *   with all the compiler options specified in the command line.
+     *   with the targets and compiler options specified in the command line.
+     *
+     *   The session description receives:
+     *   - One target per `-target`. With no `-target`, targets are inferred from the extensions of
+     *     `-o` paths, or else from a `-profile` that implies a target.
+     *   - The options given after a `-target` (for example `-profile`, `-capability`, `-fp-mode`),
+     *     in that target's `compilerOptionEntries`. The profile is also stored in
+     *     `TargetDesc::profile`.
+     *   - Target options given with no `-target`, other than `-profile`. They apply to the target
+     *     inferred from an `-o` path or a `-profile` when there is one, and otherwise become
+     *     session options that every target of the session inherits.
+     *   - All other options (for example `-I`, `-D`, `-O`, `-g`, `-matrix-layout-row-major`, `-r`,
+     *     `-X...`), as session options.
+     *
+     *   Options that configure a compilation rather than a session are accepted and ignored: source
+     *   files (including `-` for stdin, which is not read), `-entry`, `-stage`, `-specialize` and
+     *   output paths. An `-o` path is used only to infer a target when no `-target` is given. It
+     *   does not bind an output or select whole-program code generation, so
+     *   `-target hlsl -o foo.spv` yields a single HLSL target. Checks that need entry points or
+     *   output paths happen when the program is compiled.
+     *
+     *   `-load-core-module`, `-compile-core-module` and `-save-core-module` act on this global
+     *   session during the call.
+     *
      *   @param argc The number of command line arguments.
      *   @param argv An input array of command line arguments to parse.
      *   @param outSessionDesc A pointer to a SessionDesc struct to receive parsed session desc.
      *   @param outAuxAllocation Auxiliary memory allocated to hold data used in the session desc.
-     *   @return SLANG_OK on success, or a failure result if the arguments are invalid (for example
-     *   an unknown option or a missing option value). On any failure `outSessionDesc` is left
-     *   unchanged and `outAuxAllocation` is set to null. No diagnostic text is returned.
+     *   @return SLANG_OK on success. A failure result if `outSessionDesc->structureSize` is too
+     *   small; if an argument is malformed (an unknown option, a missing option value, an unknown
+     *   target, profile, capability, stage or option value, or a `-r` module that cannot be
+     *   loaded); or if settings conflict (a target given more than once, conflicting profiles for
+     *   a target, a `-profile` that implies no target, a profile or target option given before
+     *   several targets, a capability that the profile cannot provide, or options that require or
+     *   exclude each other). On any failure `outSessionDesc` is left unchanged and
+     *   `outAuxAllocation` is set to null. No diagnostic text is returned.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL parseCommandLineArguments(
         int argc,
