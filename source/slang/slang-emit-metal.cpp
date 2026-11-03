@@ -421,18 +421,19 @@ void MetalSourceEmitter::emitAtomicSrcOperand(bool isImage, IRInst* inst)
 
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
-    // An atomic whose result is never read is emitted as a bare call, because the Metal compiler
-    // warns on a temporary that is never read (-Wunused-variable) and on a discarded `.x` of a
-    // texture atomic's result (-Wunused-value). Debug-info users do not count: the emitter skips
-    // debug instructions, so they never name the result.
+    // An atomic whose result is never read does not bind it: the call is a bare statement, a
+    // texture atomic drops the `.x` that selects the result from its 4-vector, and compare-exchange
+    // drops its copy-out of the comparand. The Metal compiler warns on a temporary that is never
+    // read (-Wunused-variable) and on a discarded `.x` (-Wunused-value). Debug-info users do not
+    // count: the emitter skips debug instructions, so they never name the result.
+    bool isResultUsed = hasNonDebugUse(inst);
     auto emitAtomicResultDecl = [&]()
     {
-        if (hasNonDebugUse(inst))
+        if (isResultUsed)
             emitInstResultDecl(inst);
     };
-    // A texture atomic returns a 4-vector, of which the result is the first component.
     auto emitAtomicCallEnd = [&](bool isImageOp)
-    { m_writer->emit(isImageOp && hasNonDebugUse(inst) ? ").x;\n" : ");\n"); };
+    { m_writer->emit(isImageOp && isResultUsed ? ").x;\n" : ");\n"); };
     auto emitAtomicOp = [&](const char* imageFunc, const char* bufferFunc)
     {
         emitAtomicResultDecl();
@@ -563,7 +564,6 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             bool isImageOp = false;
             auto imageSubscript = isTextureAccess(inst);
             isImageOp = (imageSubscript != nullptr);
-            bool isResultUsed = hasNonDebugUse(inst);
 
             if (isResultUsed)
             {
