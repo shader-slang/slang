@@ -13,14 +13,26 @@ using namespace Slang;
 // check in `specializeIRForEntryPoint` has to recognize it from the program being linked.
 // See https://github.com/shader-slang/slang/issues/14200
 
+static const char* kExternCppSource = R"slang(
+__extern_cpp void NoBody(uniform float* p, uint3 tid : SV_DispatchThreadID);
+)slang";
+
+// A generic entry point is found by the mangled name of its specialization, while cloning checks
+// the generic itself, so only `findSymbolCheckedByCloning` lets the check in
+// `specializeIRForEntryPoint` report this function, at the generic's declaration.
+static const char* kIntrinsicGenericSource = R"slang(
+__target_intrinsic(hlsl, "noBody()")
+__target_intrinsic(cuda, "noBody()")
+__target_intrinsic(cpp, "noBody()")
+void NoBodyGeneric<T>(uniform T* p, uint3 tid : SV_DispatchThreadID);
+)slang";
+
 static void checkBodylessEntryPointIsUnresolved(
     UnitTestContext* unitTestContext,
-    SlangCompileTarget format)
+    SlangCompileTarget format,
+    const char* source,
+    const char* entryPointName)
 {
-    const char* source = R"(
-        __extern_cpp void NoBody(uniform float* p, uint3 tid : SV_DispatchThreadID);
-        )";
-
     auto globalSession = unitTestContext->slangGlobalSession;
     SLANG_CHECK_ABORT(globalSession != nullptr);
 
@@ -40,7 +52,7 @@ static void checkBodylessEntryPointIsUnresolved(
 
     ComPtr<slang::IEntryPoint> entryPoint;
     module->findAndCheckEntryPoint(
-        "NoBody",
+        entryPointName,
         SLANG_STAGE_COMPUTE,
         entryPoint.writeRef(),
         diagnosticBlob.writeRef());
@@ -72,25 +84,56 @@ static void checkBodylessEntryPointIsUnresolved(
     Index firstError = diagnostics.indexOf(toSlice("error[E45001]"));
     SLANG_CHECK(firstError >= 0);
     SLANG_CHECK(diagnostics.tail(firstError + 1).indexOf(toSlice("error[E45001]")) < 0);
+    // E99997-E99999 report an internal compiler error.
     SLANG_CHECK(diagnostics.indexOf(toSlice("E9999")) < 0);
+    // The report is at the declaration in `m.slang`, not at a location-less specialization.
+    UnownedStringSlice afterError = diagnostics.tail(firstError);
+    Index lineEnd = afterError.indexOf('\n');
+    SLANG_CHECK(lineEnd >= 0 && afterError.tail(lineEnd + 1).startsWith(toSlice(" --> m.slang")));
 }
 
 SLANG_UNIT_TEST(externCppEntryPointWithoutBodyCuda)
 {
-    checkBodylessEntryPointIsUnresolved(unitTestContext, SLANG_CUDA_SOURCE);
+    checkBodylessEntryPointIsUnresolved(
+        unitTestContext,
+        SLANG_CUDA_SOURCE,
+        kExternCppSource,
+        "NoBody");
 }
 
 SLANG_UNIT_TEST(externCppEntryPointWithoutBodyCpp)
 {
-    checkBodylessEntryPointIsUnresolved(unitTestContext, SLANG_CPP_SOURCE);
+    checkBodylessEntryPointIsUnresolved(
+        unitTestContext,
+        SLANG_CPP_SOURCE,
+        kExternCppSource,
+        "NoBody");
 }
 
 SLANG_UNIT_TEST(externCppEntryPointWithoutBodySpirv)
 {
-    checkBodylessEntryPointIsUnresolved(unitTestContext, SLANG_SPIRV);
+    checkBodylessEntryPointIsUnresolved(unitTestContext, SLANG_SPIRV, kExternCppSource, "NoBody");
 }
 
 SLANG_UNIT_TEST(externCppEntryPointWithoutBodyHlsl)
 {
-    checkBodylessEntryPointIsUnresolved(unitTestContext, SLANG_HLSL);
+    checkBodylessEntryPointIsUnresolved(unitTestContext, SLANG_HLSL, kExternCppSource, "NoBody");
+}
+
+SLANG_UNIT_TEST(intrinsicGenericEntryPointWithoutBodyCuda)
+{
+    checkBodylessEntryPointIsUnresolved(
+        unitTestContext,
+        SLANG_CUDA_SOURCE,
+        kIntrinsicGenericSource,
+        "NoBodyGeneric<float>");
+}
+
+SLANG_UNIT_TEST(intrinsicGenericEntryPointWithoutBodySpirv)
+{
+    checkBodylessEntryPointIsUnresolved(
+        unitTestContext,
+        SLANG_SPIRV,
+        kIntrinsicGenericSource,
+        "NoBodyGeneric<float>");
 }
