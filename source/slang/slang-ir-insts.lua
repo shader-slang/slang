@@ -3048,8 +3048,13 @@ local insts = {
 		},
 	},
 	{
+		-- The compilation unit of a source file that is not `#include`d (by `#include` or `__include`).
+		-- The operands after `source` are all of the `#include`d files of the same translation unit,
+		-- so every compilation unit of a module names the module's whole file list, including files
+		-- with no line-table entries. Only the linker reads those operands; the SPIR-V emitter uses
+		-- `source` alone.
 		DebugCompilationUnit = {
-			operands = { { "source" } },
+			operands = { { "source" }, { "includedSources", variadic = true } },
 			hoistable = true,
 		},
 	},

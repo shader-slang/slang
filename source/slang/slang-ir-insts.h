@@ -3687,7 +3687,7 @@ $(type_info.return_type) $(type_info.method_name)(
         bool isIncludedFile);
     IRInst* emitDebugBuildIdentifier(UnownedStringSlice buildIdentifier, IRIntegerValue flags);
     IRInst* emitDebugBuildIdentifier(IRInst* debugBuildIdentifier);
-    IRInst* emitDebugCompilationUnit(IRInst* source);
+    IRInst* emitDebugCompilationUnit(IRInst* source, ArrayView<IRInst*> includedSources);
     IRInst* emitDebugLine(
         IRInst* source,
         IRIntegerValue lineStart,

@@ -477,6 +477,52 @@ SLANG_UNIT_TEST(irBlob)
     }
 }
 
+// Change the module version recorded in the serialized module `moduleBytes` to `version`, leaving
+// the AST, the IR and the serialization format intact. The tests use it to load a current module as
+// if an earlier compiler version had written it.
+static void setSerializedModuleVersion(List<uint8_t>& moduleBytes, UInt64 version)
+{
+    // We use RIFF navigation to select the IR metadata without inspecting the AST chunk.
+    auto rootChunk = RIFF::RootChunk::getFromBlob(moduleBytes.getBuffer(), moduleBytes.getCount());
+    SLANG_CHECK_ABORT(rootChunk != nullptr);
+    auto moduleChunk = rootChunk->findListChunkRec(SerialBinary::kModuleFourCC);
+    SLANG_CHECK_ABORT(moduleChunk != nullptr);
+    auto irList = moduleChunk->findListChunk(PropertyKeys<IRModule>::IRModule);
+    SLANG_CHECK_ABORT(irList != nullptr);
+
+    // `writeSerializedModuleIR` writes one data chunk containing the serialized `IRModuleInfo`
+    // into this IR list, so its first child contains the metadata we need to change.
+    auto irChunk = as<RIFF::DataChunk>(irList->getFirstChild().get());
+    SLANG_CHECK_ABORT(irChunk != nullptr);
+
+    // In `slang-serialize-ir.cpp`, `IRModuleInfo` contains `serializationVersion`,
+    // `fullVersion`, then `module`. The serializer records that third field's offset in the layout.
+    auto fossilHeader = static_cast<Fossil::Header const*>(irChunk->getPayload());
+    auto moduleInfo = fossilHeader->rootValue.get();
+    auto infoLayout = reinterpret_cast<FossilizedRecordLayout*>(moduleInfo->getContentLayout());
+    SLANG_CHECK_ABORT(infoLayout->kind == FossilizedValKind::Struct);
+    SLANG_CHECK_ABORT(infoLayout->fieldCount == 3);
+    auto infoFields = reinterpret_cast<FossilizedRecordElementLayout*>(infoLayout + 1);
+    SLANG_CHECK_ABORT(infoFields[2].layout.get()->kind == FossilizedValKind::Ptr);
+
+    // We obtain the serialized `IRModule` through the recorded pointer and its element layout.
+    auto modulePointer = reinterpret_cast<FossilizedPtr<void>*>(
+        static_cast<Byte*>(moduleInfo->getContentDataPtr()) + infoFields[2].offset);
+    SLANG_CHECK_ABORT(modulePointer->get() != nullptr);
+    auto pointerLayout = reinterpret_cast<FossilizedPtrLikeLayout*>(infoFields[2].layout.get());
+    auto moduleLayout =
+        reinterpret_cast<FossilizedRecordLayout*>(pointerLayout->elementLayout.get());
+    SLANG_CHECK_ABORT(moduleLayout->kind == FossilizedValKind::Struct);
+    SLANG_CHECK_ABORT(moduleLayout->fieldCount == 3);
+
+    // `IRSerialWriteContext::handleIRModule` writes `m_name`, `m_version`, then `m_moduleInst`.
+    // We use the checked field layout to locate `m_version`, leaving the AST and format intact.
+    auto moduleFields = reinterpret_cast<FossilizedRecordElementLayout*>(moduleLayout + 1);
+    SLANG_CHECK_ABORT(moduleFields[1].layout.get()->kind == FossilizedValKind::UInt64);
+    auto versionAddress = static_cast<Byte*>(modulePointer->get()) + moduleFields[1].offset;
+    memcpy(versionAddress, &version, sizeof(version));
+}
+
 // Check current module loading and rejection of version-36 modules.
 //
 // Adding `RefReadOnlyModifier` and `RefWriteOnlyModifier` changes the numeric AST node IDs in
@@ -528,47 +574,7 @@ SLANG_UNIT_TEST(irBlobRejectsVersion36)
         moduleBlob->getBufferPointer(),
         moduleBlob->getBufferSize());
 
-    // We use RIFF navigation to select the IR metadata without inspecting the AST chunk.
-    auto rootChunk =
-        RIFF::RootChunk::getFromBlob(olderModuleBytes.getBuffer(), olderModuleBytes.getCount());
-    SLANG_CHECK_ABORT(rootChunk != nullptr);
-    auto moduleChunk = rootChunk->findListChunkRec(SerialBinary::kModuleFourCC);
-    SLANG_CHECK_ABORT(moduleChunk != nullptr);
-    auto irList = moduleChunk->findListChunk(PropertyKeys<IRModule>::IRModule);
-    SLANG_CHECK_ABORT(irList != nullptr);
-
-    // `writeSerializedModuleIR` writes one data chunk containing the serialized `IRModuleInfo`
-    // into this IR list, so its first child contains the metadata we need to change.
-    auto irChunk = as<RIFF::DataChunk>(irList->getFirstChild().get());
-    SLANG_CHECK_ABORT(irChunk != nullptr);
-
-    // In `slang-serialize-ir.cpp`, `IRModuleInfo` contains `serializationVersion`,
-    // `fullVersion`, then `module`. The serializer records that third field's offset in the layout.
-    auto fossilHeader = static_cast<Fossil::Header const*>(irChunk->getPayload());
-    auto moduleInfo = fossilHeader->rootValue.get();
-    auto infoLayout = reinterpret_cast<FossilizedRecordLayout*>(moduleInfo->getContentLayout());
-    SLANG_CHECK_ABORT(infoLayout->kind == FossilizedValKind::Struct);
-    SLANG_CHECK_ABORT(infoLayout->fieldCount == 3);
-    auto infoFields = reinterpret_cast<FossilizedRecordElementLayout*>(infoLayout + 1);
-    SLANG_CHECK_ABORT(infoFields[2].layout.get()->kind == FossilizedValKind::Ptr);
-
-    // We obtain the serialized `IRModule` through the recorded pointer and its element layout.
-    auto modulePointer = reinterpret_cast<FossilizedPtr<void>*>(
-        static_cast<Byte*>(moduleInfo->getContentDataPtr()) + infoFields[2].offset);
-    SLANG_CHECK_ABORT(modulePointer->get() != nullptr);
-    auto pointerLayout = reinterpret_cast<FossilizedPtrLikeLayout*>(infoFields[2].layout.get());
-    auto moduleLayout =
-        reinterpret_cast<FossilizedRecordLayout*>(pointerLayout->elementLayout.get());
-    SLANG_CHECK_ABORT(moduleLayout->kind == FossilizedValKind::Struct);
-    SLANG_CHECK_ABORT(moduleLayout->fieldCount == 3);
-
-    // `IRSerialWriteContext::handleIRModule` writes `m_name`, `m_version`, then `m_moduleInst`.
-    // We use the checked field layout to locate `m_version`, leaving the AST and format intact.
-    auto moduleFields = reinterpret_cast<FossilizedRecordElementLayout*>(moduleLayout + 1);
-    SLANG_CHECK_ABORT(moduleFields[1].layout.get()->kind == FossilizedValKind::UInt64);
-    auto versionAddress = static_cast<Byte*>(modulePointer->get()) + moduleFields[1].offset;
-    const UInt64 olderVersion = 36;
-    memcpy(versionAddress, &olderVersion, sizeof(olderVersion));
+    setSerializedModuleVersion(olderModuleBytes, 36);
 
     // Another fresh session must reject the older version with its specific diagnostic.
     // A general load failure would not identify the module version as the reason for rejection.
@@ -590,6 +596,137 @@ SLANG_UNIT_TEST(irBlobRejectsVersion36)
         static_cast<char const*>(diagnostics->getBufferPointer()),
         diagnostics->getBufferSize());
     SLANG_CHECK(diagnosticText.contains("cannot load IR module version 36"));
+}
+
+// Check that the linker keeps all debug source records of a used version-37 module.
+//
+// The compilation units of a version-37 module do not name its `#include`d files, so once the
+// linked code uses such a module, the linker clones every `DebugSource` of it. Consider:
+//
+//     // user.slang
+//     import dep;
+//     public float useDep(float x) { return depValue(x); }
+//     public float ownValue(float x) { return x * 2.0; }
+//
+// The IR of `user` holds a `DebugSource` for dep.slang, made for the location of `depValue`. An
+// entry point that calls only `ownValue` does not reach that record. A current `user` module
+// therefore leaves dep.slang out of the SPIR-V, and the same module marked as version 37 keeps it.
+//
+// The test observes the version check through that record for another module's file, not through
+// an `#include`d header. Marking a current module as version 37 does not remove the `#include`d
+// files from its compilation units, so a header would be listed on both paths, while the record
+// for dep.slang is cloned only on the version-37 path.
+SLANG_UNIT_TEST(irBlobVersion37KeepsAllDebugSources)
+{
+    const char* depSource = R"(
+        module dep;
+        public float depValue(float x) { return x * 3.0; }
+    )";
+    const char* userSource = R"(
+        module user;
+        import dep;
+        public float useDep(float x) { return depValue(x); }
+        public float ownValue(float x) { return x * 2.0; }
+    )";
+    const char* entrySource = R"(
+        import user;
+        RWStructuredBuffer<float> outBuf;
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void main(uint3 tid : SV_DispatchThreadID) { outBuf[tid.x] = ownValue(float(tid.x)); }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::CompilerOptionEntry debugInfoOption = {};
+    debugInfoOption.name = slang::CompilerOptionName::DebugInformation;
+    debugInfoOption.value.kind = slang::CompilerOptionValueKind::Int;
+    debugInfoOption.value.intValue0 = SLANG_DEBUG_INFO_LEVEL_STANDARD;
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &debugInfoOption;
+
+    // We serialize `user` with the current compiler, so its IR holds the record for dep.slang.
+    ComPtr<ISlangBlob> userBlob;
+    {
+        ComPtr<slang::ISession> buildSession;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, buildSession.writeRef()) == SLANG_OK);
+        SLANG_CHECK_ABORT(
+            buildSession->loadModuleFromSourceString("dep", "dep.slang", depSource, nullptr));
+        ComPtr<slang::IModule> userModule;
+        userModule =
+            buildSession->loadModuleFromSourceString("user", "user.slang", userSource, nullptr);
+        SLANG_CHECK_ABORT(userModule != nullptr);
+        SLANG_CHECK_ABORT(userModule->serialize(userBlob.writeRef()) == SLANG_OK);
+    }
+
+    // Compile the entry point in a fresh session that loads `user` from `userBytes`, and return
+    // whether the SPIR-V names dep.slang.
+    auto doesSpirvNameDep = [&](List<uint8_t> const& userBytes) -> bool
+    {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+        SLANG_CHECK_ABORT(
+            session->loadModuleFromSourceString("dep", "dep.slang", depSource, nullptr));
+        ComPtr<ISlangBlob> diagnostics;
+        ComPtr<slang::IModule> userModule;
+        userModule = slang_loadModuleFromIRBlob(
+            session,
+            "user",
+            "user.slang-module",
+            userBytes.getBuffer(),
+            userBytes.getCount(),
+            diagnostics.writeRef());
+        SLANG_CHECK_ABORT(userModule != nullptr);
+        ComPtr<slang::IModule> entryModule;
+        entryModule = session->loadModuleFromSourceString(
+            "entry",
+            "entry.slang",
+            entrySource,
+            diagnostics.writeRef());
+        SLANG_CHECK_ABORT(entryModule != nullptr);
+
+        ComPtr<slang::IEntryPoint> entryPoint;
+        SLANG_CHECK_ABORT(
+            entryModule->findEntryPointByName("main", entryPoint.writeRef()) == SLANG_OK);
+        slang::IComponentType* components[] = {entryModule, entryPoint};
+        ComPtr<slang::IComponentType> program;
+        SLANG_CHECK_ABORT(
+            session->createCompositeComponentType(components, 2, program.writeRef(), nullptr) ==
+            SLANG_OK);
+        ComPtr<slang::IComponentType> linkedProgram;
+        SLANG_CHECK_ABORT(program->link(linkedProgram.writeRef(), nullptr) == SLANG_OK);
+        ComPtr<ISlangBlob> code;
+        SLANG_CHECK_ABORT(
+            linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()) ==
+            SLANG_OK);
+        UnownedStringSlice spirv(
+            (const char*)code->getBufferPointer(),
+            (const char*)code->getBufferPointer() + code->getBufferSize());
+        // `user` is reached through `ownValue` on both paths, so user.slang is listed either way.
+        // The check makes the dep.slang result below a fact about a real SPIR-V listing, not
+        // about an empty output.
+        SLANG_CHECK_ABORT(spirv.indexOf(UnownedStringSlice("\"user.slang\"")) != -1);
+        return spirv.indexOf(UnownedStringSlice("\"dep.slang\"")) != -1;
+    };
+
+    List<uint8_t> userBytes;
+    userBytes.addRange(
+        (const uint8_t*)userBlob->getBufferPointer(),
+        Index(userBlob->getBufferSize()));
+    SLANG_CHECK(!doesSpirvNameDep(userBytes));
+
+    setSerializedModuleVersion(userBytes, 37);
+    SLANG_CHECK(doesSpirvNameDep(userBytes));
 }
 
 // Regression test for #6557 that mirrors the reporter's exact deployment shape:

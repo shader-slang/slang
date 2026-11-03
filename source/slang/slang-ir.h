@@ -2100,6 +2100,10 @@ struct ModuleLinkingInfo : RefObject
     /// The result is only valid while the module is unchanged from when this info was built.
     ArrayView<IRInst*> getKnownBuiltins() { return m_knownBuiltins.getArrayView(); }
 
+    /// Query the acceleration cache for global DebugSource and DebugCompilationUnit records.
+    /// The result is only valid while the module is unchanged from when this info was built.
+    ArrayView<IRInst*> getDebugSourceRecords() { return m_debugSourceRecords.getArrayView(); }
+
     /// Return the module's GlobalHashedStringLiterals aggregate, if present when this info was
     /// built.
     IRGlobalHashedStringLiterals* getGlobalHashedStringLiterals()
@@ -2117,6 +2121,7 @@ private:
     List<IRInst*> m_hlslExports;
     List<IRInst*> m_globalParams;
     List<IRInst*> m_knownBuiltins;
+    List<IRInst*> m_debugSourceRecords;
 
     // Cached while walking global instructions with the linker caches above. Each module is
     // expected to contain at most one IRGlobalHashedStringLiterals instruction.
@@ -2169,7 +2174,7 @@ public:
     /// Ensure the module-owned acceleration cache used by linker global handling is built.
     /// A built cache assumes the module will not change after it is built; callers must
     /// manually rebuild it if module-scope annotations, global params, exports, known builtins,
-    /// or global hashed string literals change.
+    /// global hashed string literals, or debug source records change.
     void _ensureLinkingInfo();
 
     /// Build or return the module-owned acceleration cache used by linker global handling.
@@ -2251,9 +2256,21 @@ public:
     // nodes would be decoded as different classes.
     // Version 37 is the earliest module version with the updated AST node numbering, and with
     // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
+    //
+    // Version 38 gives each `DebugCompilationUnit` the `#include`d files of its translation unit
+    // as operands. A version-37 module is still compatible, but its compilation units do not name
+    // those files, so once the linked code reaches a version-37 module's debug source records, the
+    // linker clones all of them.
     const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 37;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
+
+    /// The first module version whose compilation units name their `#include`d files.
+    const static UInt k_firstModuleVersionWithCompilationUnitIncludes = 38;
+
+    /// Returns the module version this module was written with, or the current version for a
+    /// module that was not loaded from a serialized blob.
+    UInt64 getVersion() const { return m_version; }
 
     /// Returns whether `version` is in the inclusive range this compiler can load.
     static bool isModuleVersionSupported(UInt64 version)
