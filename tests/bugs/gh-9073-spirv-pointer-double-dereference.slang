@@ -58,7 +58,6 @@ RWStructuredBuffer<int> outputBuffer;
 void main(inout Payload payload)
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE: result code = 0
 // POSITIVE-NOT: {{(error|warning).*}}:
 
     outputBuffer[0] = payload.GetVolume();

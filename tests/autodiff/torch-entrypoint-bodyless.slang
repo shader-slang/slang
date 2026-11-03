@@ -6,5 +6,4 @@
 [TorchEntryPoint]
 float foo(float x);
 
-// CHECK: result code = -1
 // CHECK: error[E55103]: '[TorchEntryPoint]' function requires a body

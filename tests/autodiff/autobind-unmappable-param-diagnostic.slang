@@ -11,5 +11,4 @@ void myKernel(float x, String s)
 {
 }
 
-//CHECK: result code = -1
 //CHECK: error{{.*}}E56001{{.*}}CUDA type mapping failed

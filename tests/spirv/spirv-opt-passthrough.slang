@@ -63,25 +63,21 @@
 // O0-NOT: {{^}}OpName %
 // O0: {{^}}%{{[0-9]+}} = OpFunctionCall
 
-// The invalid flag is reported by spirv-opt and the compile fails: assert both the failing result
-// code (a successful compile would print `result code = 0`) and the surfaced diagnostic, so the
-// test fails if the error is emitted but the compile wrongly reports success. `result code = -1`
-// and the `Unknown flag` wording are external contracts (slang-test's harness and SPIRV-Tools'
-// message); if either drifts, this is wording drift, not a Slang regression -- the `result code =
-// -1` and `{{[Ee]rror}}` lines together guard the intent (an invalid flag surfaces an error and
-// fails the compile).
-// INVALID: result code = -1
+// The invalid flag is reported by spirv-opt and the compile fails. The test line has `exit-code=-1`,
+// so slang-test checks the failing exit code, and the lines below check the surfaced diagnostic, so
+// the test fails if the compile fails for another reason. The `Unknown flag` wording is an external
+// contract (SPIRV-Tools' message); if it drifts, this is wording drift, not a Slang regression --
+// the `{{[Ee]rror}}` and `Unknown flag` lines together guard the intent (an invalid flag surfaces
+// an error).
 // INVALID: {{[Ee]rror}}
 // INVALID: Unknown flag
 
 // The second `-Xspirv-opt` flag is the invalid one, so the failure names it -- proving the second
 // list element was forwarded, not dropped.
-// MULTIFLAG: result code = -1
 // MULTIFLAG: Unknown flag {{.*}}this-pass-does-not-exist
 
 // `-Xglslang --strip-debug` is not routed to the optimizer, so the debug names survive and the
 // compile succeeds.
-// XGLSLANG: result code = 0
 // XGLSLANG: {{^}}OpName %
 
 RWStructuredBuffer<float> outputBuffer;

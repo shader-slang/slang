@@ -98,14 +98,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK202C-NEXT: 0
 //CHECK202C-NEXT: 0
 
-//WARNCHECK2025: result code = 0
 //WARNCHECK2025-NOT: warning[E30087]
 //WARNCHECK2025: standard output = {
 
-//WARNCHECK2026: result code = 0
 //WARNCHECK2026: warning[E30087]
 //WARNCHECK2026: standard output = {
 
-//WARNCHECK202C: result code = 0
 //WARNCHECK202C-NOT: warning[E30087]
 //WARNCHECK202C: standard output = {
