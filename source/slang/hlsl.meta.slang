@@ -19643,7 +19643,7 @@ uint4 WaveMatch(matrix<T,N,M> value)
             result &= WaveMatch(value[i]);
         return result;
     default:
-        return WaveMaskMatch(WaveGetActiveMask(), value);
+        return uint4(WaveMaskMatch(WaveGetActiveMask(), value), 0, 0, 0);
     }
 }
 
