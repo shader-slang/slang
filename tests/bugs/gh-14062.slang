@@ -10,7 +10,7 @@
 //TEST_INPUT:ubuffer(data=[1], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0], count=8, stride=8):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0], count=10, stride=8):out,name=outputBuffer
 RWStructuredBuffer<uint64_t> outputBuffer;
 
 T tenth<T : __BuiltinFloatingPointType>() { return T(0.1l); }
@@ -36,7 +36,7 @@ void computeMain()
     // CHECK-NEXT: 4599676419421066581
     outputBuffer[2] = bit_cast<uint64_t>(fromDouble<double>(third));
 
-    // The `float` and `half` specializations round the `double` literal once.
+    // The `float` and `half` specializations get the `float` and `half` values of the literals.
     // CHECK-NEXT: 1036831949
     outputBuffer[3] = bit_cast<uint32_t>(tenth<float>());
     // CHECK-NEXT: 0
@@ -45,9 +45,19 @@ void computeMain()
     outputBuffer[5] = bit_cast<uint16_t>(tenth<half>());
 
     // An unsuffixed literal has type `float`, so the generic `T(0.1)` gives the same value as the
-    // concrete `double(0.1)`.
+    // concrete `double(0.1)`: both are `double(0.1f)` (0x3FB99999A0000000), and this test pins that
+    // unchanged value.
     // CHECK-NEXT: 1
     outputBuffer[6] = bit_cast<uint64_t>(tenthUnsuffixed<double>()) == bit_cast<uint64_t>(double(0.1)) ? 1 : 0;
     // CHECK-NEXT: 4591870180174331904
     outputBuffer[7] = bit_cast<uint64_t>(tenthUnsuffixed<double>());
+
+    // In the `float` and `half` specializations, a run-time `double` converts the same way as the
+    // concrete `float(d)` and `half(d)`. For `half`, 1 + 2^-11 + 2^-40 tells the paths apart: rounded
+    // once it gives 0x3C01 on CUDA and Vulkan, rounded through `float` first it gives 0x3C00.
+    double nearHalfTie = 1.0l + 1.0l / 2048.0l + 1.0l / 1099511627776.0l + double(inputBuffer[0] - 1);
+    // CHECK-NEXT: 1
+    outputBuffer[8] = bit_cast<uint32_t>(fromDouble<float>(nearHalfTie)) == bit_cast<uint32_t>(float(nearHalfTie)) ? 1 : 0;
+    // CHECK-NEXT: 1
+    outputBuffer[9] = bit_cast<uint16_t>(fromDouble<half>(nearHalfTie)) == bit_cast<uint16_t>(half(nearHalfTie)) ? 1 : 0;
 }

@@ -1,8 +1,10 @@
-// The `float` and `half` specializations of generic code that converts a `double` value to `T`
+// The `float` and `half` specializations of generic code that converts a constant `double` to `T`
 // fold the conversion and emit no `double`, so they still compile for targets that have no
 // 64-bit floating-point type. Arguments that convert equally well to `float` and to `double`,
 // such as `int64_t`, `uint64_t` and `half`, convert through `float`, never through `double`
-// (shader-slang/slang#14062).
+// (shader-slang/slang#14062). Without the fix, `T(0.1l)` reaches `IFloat.__init(float)` through
+// an implicit conversion that `-warnings-as-errors 30081` turns into an error. A leaked `double`
+// fails the `CHECK-NOT` lines on Metal and aborts emission on WGSL.
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute -line-directive-mode none -warnings-as-errors 30081
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute -line-directive-mode none -warnings-as-errors 30081 -DNO_INT64
