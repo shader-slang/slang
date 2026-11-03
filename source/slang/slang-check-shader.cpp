@@ -920,16 +920,25 @@ void EntryPoint::_collectShaderParams()
     }
 }
 
-bool isPrimaryDecl(CallableDecl* decl)
+// Return the primary declaration of the function that `decl` declares. A function that is
+// declared more than once, such as a prototype followed by its definition, links its declarations
+// to the first one; a function declared once has no link and is its own primary declaration.
+static CallableDecl* getPrimaryDecl(CallableDecl* decl)
 {
     SLANG_ASSERT(decl);
-    return (!decl->primaryDecl) || (decl == decl->primaryDecl);
+    return decl->primaryDecl ? decl->primaryDecl : decl;
 }
 
-// Return the function that `declRef` names if it is a function, or a generic function, declared in
-// `translationUnit`, and a null reference otherwise. A generic function gets default
-// substitutions for its generic parameters.
-static DeclRef<FuncDecl> getFunctionDeclRefInTranslationUnit(
+bool isPrimaryDecl(CallableDecl* decl)
+{
+    return getPrimaryDecl(decl) == decl;
+}
+
+// Return a reference to the function that `declRef` names when `translationUnit` declares it as a
+// function or as a generic function, and a null reference for anything else, including a
+// function of another module. A generic function gets default substitutions for its generic
+// parameters, which is the shape that an unspecialized generic entry point has.
+static DeclRef<FuncDecl> asFunctionDeclRefOfTranslationUnit(
     Module* translationUnit,
     DeclRef<Decl> declRef,
     DiagnosticSink* sink)
@@ -937,60 +946,69 @@ static DeclRef<FuncDecl> getFunctionDeclRefInTranslationUnit(
     if (getModule(declRef.getDecl()) != translationUnit)
         return DeclRef<FuncDecl>();
 
-    DeclRef<FuncDecl> funcDeclRef = declRef.as<FuncDecl>();
-    if (!funcDeclRef)
-    {
-        if (auto genDeclRef = declRef.as<GenericDecl>())
-        {
-            SharedSemanticsContext context(translationUnit->getLinkage(), translationUnit, sink);
-            SemanticsVisitor visitor(&context);
-            funcDeclRef = createDefaultSubstitutionsIfNeeded(
-                              translationUnit->getASTBuilder(),
-                              &visitor,
-                              translationUnit->getASTBuilder()->getMemberDeclRef(
-                                  genDeclRef,
-                                  genDeclRef.getDecl()->inner))
-                              .as<FuncDecl>();
-        }
-    }
-    return funcDeclRef;
+    if (auto funcDeclRef = declRef.as<FuncDecl>())
+        return funcDeclRef;
+
+    auto genDeclRef = declRef.as<GenericDecl>();
+    if (!genDeclRef)
+        return DeclRef<FuncDecl>();
+
+    SharedSemanticsContext context(translationUnit->getLinkage(), translationUnit, sink);
+    SemanticsVisitor visitor(&context);
+    return createDefaultSubstitutionsIfNeeded(
+               translationUnit->getASTBuilder(),
+               &visitor,
+               translationUnit->getASTBuilder()->getMemberDeclRef(
+                   genDeclRef,
+                   genDeclRef.getDecl()->inner))
+        .as<FuncDecl>();
 }
 
-// Look up `name` in the module scope of `translationUnit` and return every matching function that
-// `translationUnit` declares. An empty list means that no function matches, and more than one
-// entry means that the name is overloaded. Diagnostics from the lookup itself, such as an unknown
-// type argument in `main<Missing>`, go to `sink`. Each caller reports a missing or ambiguous
-// function itself, because the right diagnostic depends on what the name is used for.
+// Add `funcDeclRef` to `funcDeclRefs` unless the list already holds a declaration of the same
+// function, so that each function appears once. Consider this example:
 //
-// A function that is declared more than once, such as a prototype followed by its definition, is
-// one function, so the result holds one entry for it, as overload resolution also counts it once.
-// We keep the declaration that has a body, because that is the declaration that defines the entry
-// point.
+//     void Other(uint3 tid);
+//     [shader("compute")] [numthreads(1, 1, 1)] void Other(uint3 tid) { ... }
+//
+// Lookup returns both declarations of `Other`. Overload resolution also counts such a function
+// once, keeping the primary declaration. We keep the declaration with a body instead, because the
+// entry-point checks read the `[shader]` and `[numthreads]` attributes and the parameter
+// modifiers from the declaration they get, and code written in the prototype-then-definition
+// style puts those on the definition. Attributes written only on a prototype are not merged into
+// the definition, as on the path that discovers `[shader]` functions.
+static void addDistinctFunctionDeclRef(
+    List<DeclRef<FuncDecl>>& funcDeclRefs,
+    DeclRef<FuncDecl> funcDeclRef)
+{
+    auto primaryDecl = getPrimaryDecl(funcDeclRef.getDecl());
+    for (auto& existingDeclRef : funcDeclRefs)
+    {
+        if (getPrimaryDecl(existingDeclRef.getDecl()) != primaryDecl)
+            continue;
+        if (!existingDeclRef.getDecl()->body && funcDeclRef.getDecl()->body)
+            existingDeclRef = funcDeclRef;
+        return;
+    }
+    funcDeclRefs.add(funcDeclRef);
+}
+
+// Look up `name` in the module scope of `translationUnit` and return every function that
+// `translationUnit` declares under that name, each function once. An empty list means that no
+// function matches, and more than one entry means that the name is overloaded. The lookup gives a
+// `DeclRefExpr` for a name with one declaration and an `OverloadedExpr` for several; any other
+// result, such as no match or a type, names no function. Diagnostics from the lookup itself, such
+// as an unknown type argument in `main<Missing>`, go to `sink`. Each caller reports a missing or
+// ambiguous function itself, because the right diagnostic depends on what the name is used for.
 static List<DeclRef<FuncDecl>> findFunctionDeclsByName(
     Module* translationUnit,
     Name* name,
     DiagnosticSink* sink)
 {
     List<DeclRef<FuncDecl>> funcDeclRefs;
-    auto getPrimaryDecl = [](DeclRef<FuncDecl> funcDeclRef) -> CallableDecl*
-    {
-        auto funcDecl = funcDeclRef.getDecl();
-        return funcDecl->primaryDecl ? funcDecl->primaryDecl : funcDecl;
-    };
     auto addCandidate = [&](DeclRef<Decl> declRef)
     {
-        auto funcDeclRef = getFunctionDeclRefInTranslationUnit(translationUnit, declRef, sink);
-        if (!funcDeclRef)
-            return;
-        for (auto& existingDeclRef : funcDeclRefs)
-        {
-            if (getPrimaryDecl(existingDeclRef) != getPrimaryDecl(funcDeclRef))
-                continue;
-            if (!existingDeclRef.getDecl()->body)
-                existingDeclRef = funcDeclRef;
-            return;
-        }
-        funcDeclRefs.add(funcDeclRef);
+        if (auto funcDeclRef = asFunctionDeclRefOfTranslationUnit(translationUnit, declRef, sink))
+            addDistinctFunctionDeclRef(funcDeclRefs, funcDeclRef);
     };
 
     auto expr = translationUnit->findDeclFromString(getText(name), sink);
@@ -2167,12 +2185,18 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             //
             Name* name = linkage->getNamePool()->getName(stringLit->value);
             auto patchConstantFuncDeclRefs = findFunctionDeclsByName(module, name, sink);
-            if (patchConstantFuncDeclRefs.getCount() != 1)
+            if (patchConstantFuncDeclRefs.getCount() == 0)
             {
                 sink->diagnose(Diagnostics::AttributeFunctionNotFound{
                     .funcName = name,
                     .attrName = "patchconstantfunc",
                     .location = expr});
+                return;
+            }
+            if (patchConstantFuncDeclRefs.getCount() > 1)
+            {
+                sink->diagnose(
+                    Diagnostics::AmbiguousReference{.name = name->text, .location = expr->loc});
                 return;
             }
 
@@ -2932,6 +2956,8 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
             .location = module->getModuleDecl()->loc});
         return nullptr;
     }
+    // `-entry` names one function, so an overloaded name is ambiguous even when `-stage` or the
+    // candidates' `[shader]` stages would leave only one of them.
     if (entryPointFuncDeclRefs.getCount() > 1)
     {
         Diagnostics::AmbiguousEntryPointName diagnostic;
