@@ -1,5 +1,6 @@
 // A `[Differentiable]` method in a generic extension gives its `this` parameter the type
-// `no_diff T`, as does any generic function with a `no_diff T` parameter. When such a
+// `no_diff T`, as does any generic function with a `no_diff T` parameter, and it gives a
+// non-differentiable parameter such as `int idx[1]` the type `no_diff int[1]`. When such a
 // function is called through an interface-typed value whose only conforming type is known
 // statically, type-flow specialization must resolve the call to that concrete type, as it
 // does for the same function without `no_diff`.
@@ -33,6 +34,9 @@ extension<T : IValue> T
     [Differentiable]
     [mutating]
     void bump() { this.set(this.get() + 1.0); }
+
+    [Differentiable]
+    float readAt(int idx[1]) { return this.get() + float(idx[0]); }
 }
 
 float readNoDiff<T : IValue>(no_diff T t) { return t.get(); }
@@ -51,7 +55,13 @@ float callBump(IValue v)
     return w.get();
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+float callReadAt(IValue v)
+{
+    int idx[1] = { 2 };
+    return v.readAt(idx);
+}
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 // HLSL: void computeMain(
@@ -69,4 +79,6 @@ void computeMain()
     outputBuffer[2] = callReadNoDiff(value);
     // CHECK-NEXT: 4.0
     outputBuffer[3] = callBump(value);
+    // CHECK-NEXT: 5.0
+    outputBuffer[4] = callReadAt(value);
 }

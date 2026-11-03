@@ -3950,6 +3950,23 @@ struct TypeFlowSpecializationContext
         if (auto info = tryGetInfo(context, type))
             return substituteSetsInTypeLike(info);
 
+        // As in `substituteSetsInTypeLike`, we handle `IRAttributedType` before the structural
+        // cases because `as<>` looks through it. A global parameter type such as
+        // `Attributed(Array(Int, 2), no_diff)` would otherwise come back as a bare array.
+        if (auto attributedType = as<IRAttributedType>(type))
+        {
+            IRBuilder builder(module);
+            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+            for (auto attr : attributedType->getAllAttrs())
+                attrs.add(attr);
+
+            auto result = builder.getAttributedType(
+                (IRType*)substituteSets(context, attributedType->getBaseType()),
+                attrs);
+            module->getContainerPool().free(&attrs);
+            return result;
+        }
+
         if (auto ptrType = as<IRPtrTypeBase>(type))
         {
             IRBuilder builder(module);
@@ -3965,20 +3982,6 @@ struct TypeFlowSpecializationContext
                 (IRType*)substituteSets(context, arrayType->getElementType()),
                 arrayType->getElementCount(),
                 getArrayStride(arrayType));
-        }
-
-        if (auto attributedType = as<IRAttributedType>(type))
-        {
-            IRBuilder builder(module);
-            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
-            for (auto attr : attributedType->getAllAttrs())
-                attrs.add(attr);
-
-            auto result = builder.getAttributedType(
-                (IRType*)substituteSets(context, attributedType->getBaseType()),
-                attrs);
-            module->getContainerPool().free(&attrs);
-            return result;
         }
 
         if (auto tupleType = as<IRTupleType>(type))
