@@ -1,6 +1,6 @@
 //TEST_CATEGORY(wave, compute)
-// WaveActiveBitAnd/Or/Xor and WaveMaskBitAnd/Or/Xor on bool scalars, vectors and matrices
-// reduce as logical and/or/xor.
+// WaveActiveBitAnd/Or/Xor on bool scalars, vectors and matrices, and WaveMaskBitAnd/Or/Xor on
+// bool vectors and matrices, reduce as logical and/or/xor.
 
 //TEST:SIMPLE(filecheck=SPV): -target spirv -entry computeMain -stage compute -emit-spirv-directly
 //TEST:SIMPLE(filecheck=SPVNOT): -target spirv -entry computeMain -stage compute -emit-spirv-directly
@@ -12,7 +12,7 @@
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -profile cs_6_5 -shaderobj -render-feature hardware-device
 
 // Every wave-op operand in this test is bool, so no OpGroupNonUniformBitwise* may appear
-// after the module header.
+// after the module header. The OpEntryPoint check makes the run fail when no SPIR-V is emitted.
 // SPVNOT: OpEntryPoint
 // SPVNOT-NOT: OpGroupNonUniformBitwise
 

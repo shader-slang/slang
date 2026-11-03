@@ -8,7 +8,7 @@
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -capability cuda_sm_7_0 -shaderobj
 
 // Every wave-op operand in this test is bool, so no OpGroupNonUniformBitwise* may appear
-// after the module header.
+// after the module header. The OpEntryPoint check makes the run fail when no SPIR-V is emitted.
 // SPVNOT: OpEntryPoint
 // SPVNOT-NOT: OpGroupNonUniformBitwise
 

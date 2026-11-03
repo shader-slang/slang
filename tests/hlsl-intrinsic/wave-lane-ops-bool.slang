@@ -44,12 +44,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     store(4, idx, packBits(QuadReadAcrossX(v)) | (packBits(QuadReadAcrossY(v)) << 4) |
                       (packBits(QuadReadAcrossDiagonal(v)) << 8) |
                       (packBits(QuadReadLaneAt(v, 2)) << 12));
-    // Quad reads of a scalar bool (v.z): across X, across Y, across diagonal, lane 2.
+    // Quad reads of a scalar bool (v.z), one bit each: across X, across Y, across diagonal, lane 2.
     store(5, idx, packBits(QuadReadAcrossX(v.z)) | (packBits(QuadReadAcrossY(v.z)) << 1) |
                       (packBits(QuadReadAcrossDiagonal(v.z)) << 2) |
                       (packBits(QuadReadLaneAt(v.z, 2)) << 3));
 
-    // AllEqual: varying bool4 (false), uniform bool2 (true), uniform bool3 (true).
+    // AllEqual, one bit each: varying bool4 (false), uniform bool2 (true), uniform bool3 (true).
     store(6, idx, packBits(WaveActiveAllEqual(v)) |
                       (packBits(WaveActiveAllEqual(bool2(idx < 8, idx > 8))) << 1) |
                       (packBits(WaveActiveAllEqual(bool3(true, false, idx < 8))) << 2));

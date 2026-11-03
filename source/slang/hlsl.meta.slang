@@ -17074,6 +17074,9 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
 
 // Across lane ops
 
+// HLSL has no masked bitwise reduction. A WaveMask must equal the active lanes
+// (docs/wave-intrinsics.md), so the HLSL cases of WaveMaskBitAnd/Or/Xor reduce with
+// WaveActiveBit*, which also supplies the bool lowering.
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17081,7 +17084,6 @@ T WaveMaskBitAnd(WaveMask mask, T expr)
 {
     __target_switch
     {
-    // HLSL has no masked form, so the mask is ignored and WaveActiveBit* supplies the bool lowering.
     case hlsl:
         return WaveActiveBitAnd(expr);
     default:
@@ -17927,9 +17929,10 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcr
 
 // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
 //
-// These functions accept bool. SPIR-V's Bitwise group ops take only integers, so bool uses the
-// Logical ops (spirvBoolName). HLSL's WaveActiveBit* takes only unsigned integers, so a bool is
-// reduced as a 0/1 uint; on 0/1 values the bitwise and logical results are the same.
+// These functions accept bool on CUDA, GLSL, HLSL and SPIR-V; the Metal and WGSL cases still
+// pass bool to the native intrinsic unchanged. SPIR-V's Bitwise group ops take only integers, so
+// bool uses the Logical ops (spirvBoolName). HLSL's WaveActiveBit* takes only unsigned integers,
+// so a bool is reduced as a 0/1 uint; on 0/1 values the bitwise and logical results are the same.
 ${
 struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const char* spirvName; const char* spirvBoolName; const char* metalName; };
 const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd", "LogicalAnd", "and"}, {"BitOr", "Or", "BitwiseOr", "LogicalOr", "or"}, {"BitXor", "Xor", "BitwiseXor", "LogicalXor", "xor"}};
