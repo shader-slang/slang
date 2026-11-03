@@ -44,34 +44,37 @@ reduce total runtime. Very small images may exercise fewer coverage paths.
 
 ## Run
 
+Run these commands from the repository root. When launching elsewhere, pass
+`--demo-dir` with the shader directory.
+
 ```bash
-./shader-coverage-image-pipeline --mode=smoke
-./shader-coverage-image-pipeline --mode=full
+./build/Release/bin/shader-coverage-image-pipeline --mode=smoke
+./build/Release/bin/shader-coverage-image-pipeline --mode=full
 
 # Compile-time disable coverage instrumentation (baseline for overhead
 # measurement):
-./shader-coverage-image-pipeline --mode=full --no-coverage
+./build/Release/bin/shader-coverage-image-pipeline --mode=full --no-coverage
 
 # Use a smaller workload with 32-row tiles:
-./shader-coverage-image-pipeline --mode=full --width=160 --height=90 --tile-rows=32
+./build/Release/bin/shader-coverage-image-pipeline --mode=full --width=160 --height=90 --tile-rows=32
 
 # Restore the original benchmark size:
-./shader-coverage-image-pipeline --mode=full --width=1920 --height=1080 --no-coverage
+./build/Release/bin/shader-coverage-image-pipeline --mode=full --width=1920 --height=1080 --no-coverage
 
 # Tune the tile height (full mode already tiles into 128-row bands by
 # default to avoid GPU watchdog resets under count mode on the hot
 # bilateral filter), or force whole-image dispatch:
-./shader-coverage-image-pipeline --mode=full --tile-rows=64
-./shader-coverage-image-pipeline --mode=full --tile-rows=0
+./build/Release/bin/shader-coverage-image-pipeline --mode=full --tile-rows=64
+./build/Release/bin/shader-coverage-image-pipeline --mode=full --tile-rows=0
 
 # Write the coverage artifacts somewhere other than the demo's source
 # directory (the default). `--output-dir` creates the directory if
 # needed:
-./shader-coverage-image-pipeline --mode=full --output-dir=./out
+./build/Release/bin/shader-coverage-image-pipeline --mode=full --output-dir=./out
 
 # Point the demo at a different copy of the `.slang` files (useful
 # when the binary has been moved away from the source tree):
-./shader-coverage-image-pipeline --mode=full \
+./build/Release/bin/shader-coverage-image-pipeline --mode=full \
     --demo-dir=/path/to/shader-coverage-image-pipeline
 ```
 
@@ -106,7 +109,7 @@ preserves). Pick `count` when you need exact execution counts; pick
 
 ```bash
 # Same coverage map, much faster on the full sweep:
-./shader-coverage-image-pipeline --mode=full --coverage-mode=boolean
+./build/Release/bin/shader-coverage-image-pipeline --mode=full --coverage-mode=boolean
 ```
 
 ## Tiled dispatch
@@ -174,33 +177,34 @@ of the four operator branches from red to green.
 
 ### Coverage instrumentation pipeline
 
-The five stages `main.cpp` walks through for each run:
+The host in [`main.cpp`](main.cpp) runs these steps:
 
-| Stage                   | What happens                                                                                                                                                                                                                                                                             | Key API                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| **1. Compile**          | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`. The compiler injects `__slang_coverage` at IR time and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (boolean mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode`  |
-| **2. Discover binding** | Query `ISyntheticResourceMetadata::getResourceInfo(0)` on the post-link metadata object to read back `(space, binding)` — the slot the compiler auto-assigned for `__slang_coverage`.                                                                                                    | `IMetadata::castAs<ISyntheticResourceMetadata>`                             |
-| **3. Allocate & bind**  | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources on set 0 and the coverage buffer at the discovered `(space, binding)`.                                                                                           | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets`                     |
-| **4. Dispatch**         | Submit 128-row tiles in full mode or a whole image in smoke mode; `--tile-rows=N` overrides this. The shader atomically increments counters as branches/lines execute.                                                                                                                   | `vkCmdDispatch`                                                             |
-| **5. Readback**         | Download the raw counter bytes, call `decodeCoverageCounters()` to widen the slots, then iterate metadata entries and read `hits[entry.counterIndex]` to write manifest + LCOV + binary.                                                                                                 | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
+| Stage     | Description                                                                                                                   | Key API                                                          |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Compile   | Enable line, function and branch coverage. Let Slang select a free coverage binding.                                          | `IComponentType::link`, `getEntryPointMetadata`                  |
+| Describe  | Read synthetic-resource metadata and register it before RHI creates the program.                                              | `getCoverageResourceDesc`, `ShaderProgramSyntheticResourcesDesc` |
+| Bind      | Bind application buffers by reflected name; allocate zeroed coverage storage and bind its opaque resource ID.                 | `ShaderCursor`, `bindSyntheticResource`                          |
+| Dispatch  | Upload parameters and dispatch each tile or batch, waiting before reusing parameters. Counters accumulate across submissions. | `ICommandEncoder`, `IComputePassEncoder`, `ICommandQueue`        |
+| Read back | Read the effective-width counter bytes and attribute slots through `entry.counterIndex`.                                      | `IDevice::readBuffer`, `ICoverageTracingMetadata`                |
 
-### Raw Vulkan host
+### slang-rhi host
 
-This example uses raw Vulkan rather than the standard slang-rhi helper
-because `__slang_coverage` is synthesized at **IR time** — after
-Slang's parameter-binding layout pass — so it is invisible to ordinary
-`ProgramLayout` reflection. slang-rhi's binding paths are all
-reflection-driven, so it cannot bind the buffer without extra support
-(slang-rhi PR #739). Raw Vulkan lets us bind it directly once we know
-its location.
+This example uses slang-rhi on Vulkan. `compileShader()` retains the linked
+Slang component and its metadata. In `exampleMain()`, the host chains a
+`ShaderProgramSyntheticResourcesDesc` through `ShaderProgramDesc.next` before
+`createShaderProgram()`, then calls `bindSyntheticResource()` on the root object.
+Ordinary reflection still does not contain `__slang_coverage`; the extension
+supplies its compiler-generated binding information.
 
-Vulkan runtime plumbing is shared in
-[`shader-coverage-common/vk_compute_demo.h`](../shader-coverage-common/vk_compute_demo.h)
-and [its implementation](../shader-coverage-common/vk_compute_demo.cpp), also used
-by the BVH and selectable-backend examples. `main.cpp` still describes this
-example's resources and dispatches. When slang-rhi PR #739 merges and the
-submodule is bumped, those callers can migrate to slang-rhi; the Slang shader
-sources stay unchanged.
+[`coverage-rhi.h`](../shader-coverage-common/coverage-rhi.h) only translates the
+single coverage resource and creates storage buffers. Program creation, binding,
+dispatch and readback stay visible in `main.cpp`. With `--no-coverage`, the host
+omits the extension and coverage buffer entirely.
+
+For integration **without slang-rhi**, see
+[`shader-coverage-backends`](../shader-coverage-backends/), which retains direct
+CPU, CUDA, Vulkan and Metal binding. RHI synthetic bindings currently support
+Vulkan and CUDA; these two larger workflow examples select Vulkan explicitly.
 
 ### Metadata-derived binding
 
@@ -224,16 +228,19 @@ compiler picks a different free slot automatically and the host follows
 without a source change.
 
 Compare the BVH-traversal demo (`shader-coverage-bvh-traversal`) which
-demonstrates the **explicit / raw-binding** approach instead.
+demonstrates the **explicit placement** approach instead.
 
 ### Counter readback and LCOV
 
 The readback section in [`main.cpp`](main.cpp) separates three host-side steps:
 
 ```cpp
-// 1. Read back after dispatch has finished (ctx.dispatch() waits for completion).
-std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
-ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
+// 1. Read back after queue->waitOnHost() has completed.
+std::vector<uint8_t> rawBytes(size_t(counterCount) * counterByteWidth);
+ComPtr<slang::IBlob> readback;
+checkSlang(device->readBuffer(coverageBuf, 0, rawBytes.size(), readback.writeRef()),
+           "read coverage buffer");
+std::memcpy(rawBytes.data(), readback->getBufferPointer(), rawBytes.size());
 
 // 2. Decode the effective 32- or 64-bit slots into uint64_t values.
 auto hits = decodeCoverageCounters(rawBytes.data(), rawBytes.size(), counterByteWidth);
@@ -259,7 +266,7 @@ After dispatch the host downloads the raw counter buffer and uses
 
 ```
 GPU counter buffer (uint32/uint64 × N slots)
-    │  ctx.download()
+    │  `IDevice::readBuffer()`
     ▼
 host: std::vector<uint8_t> rawBytes   ← retained for counters.bin
     │  decodeCoverageCounters()
@@ -288,5 +295,16 @@ then calls `slang-coverage-to-lcov.py` to produce the full LCOV.
 ## Build dependencies
 
 - Slang compiler library (linked from this repository's build).
-- Vulkan SDK (the `Vulkan::Vulkan` CMake target). The example is
-  silently skipped if `find_package(Vulkan)` returns not-found.
+- Build with `SLANG_ENABLE_EXAMPLES=ON` and `SLANG_ENABLE_SLANG_RHI=ON`.
+- A Vulkan loader and compatible GPU driver at runtime (MoltenVK on macOS).
+  RHI handles loading Vulkan; the example no longer links directly to its loader.
+- The standard example target writes the executable to `build/Release/bin/`
+  with the `release` preset. `run_coverage.py` discovers that location.
+- Counters default to 32 bits for MoltenVK. `--counter-width=64` requires
+  `AtomicInt64` support; device creation fails if no suitable device is available.
+
+### Diagnostics
+
+RHI messages and failing SlangResult values are printed to stderr. If the backend
+reports device loss during a count-mode dispatch, reduce the tile/batch size or
+use `--coverage-mode=boolean` to reduce atomic contention.

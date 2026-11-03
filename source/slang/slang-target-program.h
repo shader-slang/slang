@@ -46,7 +46,8 @@ public:
     ///
     /// If this is the first time the layout has been
     /// requested, report any errors that arise during
-    /// layout to the given `sink`.
+    /// layout to the given `sink`. Returns null if layout
+    /// reported errors, on this request or an earlier one.
     ///
     ProgramLayout* getOrCreateLayout(DiagnosticSink* sink);
 
@@ -118,6 +119,13 @@ public:
 private:
     RefPtr<IRModule> createIRModuleForLayout(DiagnosticSink* sink);
 
+    /// Seed this program's options with the session's and then the target's `DownstreamArgs`.
+    /// The constructor's `overrideWith` of the program's own options then appends the program's
+    /// entries, so Slang combines session, target and program arguments in that order, without
+    /// any of them merged. `DownstreamArgs` is level-local (see
+    /// `CompilerOptionSet::isLevelLocal`), so the levels are combined only here.
+    void composeDownstreamArgs();
+
     // The program being compiled or laid out
     ComponentType* m_program;
 
@@ -126,6 +134,9 @@ private:
 
     // The computed layout, if it has been generated yet
     RefPtr<ProgramLayout> m_layout;
+
+    // Whether generating `m_layout` reported errors
+    bool m_layoutHasErrors = false;
 
     CompilerOptionSet m_optionSet;
     // Parallel backend emission shares these lazy result caches across threads.

@@ -99,12 +99,22 @@ bool F32_isfinite(float f);
 bool F32_isinf(float f);
 
 // Binary
+// Host-callable code compiled through LLVM uses this prelude instead of the direct LLVM backend.
+// We classify NaNs before comparing so these helpers match HLSL's numeric-operand selection.
 SLANG_FORCE_INLINE float F32_min(float a, float b)
 {
+    if (F32_isnan(a))
+        return b;
+    if (F32_isnan(b))
+        return a;
     return a < b ? a : b;
 }
 SLANG_FORCE_INLINE float F32_max(float a, float b)
 {
+    if (F32_isnan(a))
+        return b;
+    if (F32_isnan(b))
+        return a;
     return a > b ? a : b;
 }
 float F32_pow(float a, float b);
@@ -353,10 +363,18 @@ bool F64_isinf(double f);
 // Binary
 SLANG_FORCE_INLINE double F64_min(double a, double b)
 {
+    if (F64_isnan(a))
+        return b;
+    if (F64_isnan(b))
+        return a;
     return a < b ? a : b;
 }
 SLANG_FORCE_INLINE double F64_max(double a, double b)
 {
+    if (F64_isnan(a))
+        return b;
+    if (F64_isnan(b))
+        return a;
     return a > b ? a : b;
 }
 double F64_pow(double a, double b);
@@ -559,57 +577,40 @@ SLANG_FORCE_INLINE double F64_calcSafeRadians(double radians)
 
 // ----------------------------- F16 -----------------------------------------
 
-// This impl is based on FloatToHalf that is in Slang codebase
+// Rounds to the nearest Half encoding, choosing even on ties, as FloatToHalf does for
+// compiler constants. Keep this implementation standalone for generated CPU code.
 SLANG_FORCE_INLINE uint32_t f32tof16(const float value)
 {
     const uint32_t inBits = _bitCastFloatToUInt(value);
-
-    // bits initially set to just the sign bit
-    uint32_t bits = (inBits >> 16) & 0x8000;
-    // Mantissa can't be used as is, as it holds last bit, for rounding.
-    uint32_t m = (inBits >> 12) & 0x07ff;
-    uint32_t e = (inBits >> 23) & 0xff;
-
-    if (e < 103)
+    const uint32_t sign = (inBits >> 16) & 0x8000u;
+    const uint32_t exponent = (inBits >> 23) & 0xffu;
+    const uint32_t fraction = inBits & 0x007fffffu;
+    if (exponent == 255)
     {
-        // It's zero
-        return bits;
+        // Preserve the existing payload truncation, including the quiet/signaling bit.
+        // Keep a NaN distinct from infinity even if all its payload bits are discarded.
+        const uint32_t payload = fraction >> 13;
+        return sign | 0x7c00u | payload | uint32_t(payload == 0 && fraction != 0);
     }
-    if (e == 0xff)
-    {
-        // Could be a NAN or INF. Is INF if *input* mantissa is 0.
+    // Float32 uses bias 127; Half uses bias 15. Exponents above 127 + 15 overflow.
+    if (exponent > 142)
+        return sign | 0x7c00u;
+    // Half subnormals are multiples of 2^-24. Values below 2^-25 round to zero.
+    if (exponent < 102)
+        return sign;
 
-        // Remove last bit for rounding to make output mantissa.
-        m >>= 1;
-
-        // We *assume* float16/float32 signaling bit and remaining bits
-        // semantics are the same. (The signalling bit convention is target specific!).
-        // Non signal bit's usage within mantissa for a NAN are also target specific.
-
-        // If the m is 0, it could be because the result is INF, but it could also be because all
-        // the bits that made NAN were dropped as we have less mantissa bits in f16.
-
-        // To fix for this we make non zero if m is 0 and the input mantissa was not.
-        // This will (typically) produce a signalling NAN.
-        m += uint32_t(m == 0 && (inBits & 0x007fffffu));
-
-        // Combine for output
-        return (bits | 0x7c00u | m);
-    }
-    if (e > 142)
-    {
-        // INF.
-        return bits | 0x7c00u;
-    }
-    if (e < 113)
-    {
-        m |= 0x0800u;
-        bits |= (m >> (114 - e)) + ((m >> (113 - e)) & 1);
-        return bits;
-    }
-    bits |= ((e - 112) << 10) | (m >> 1);
-    bits += m & 1;
-    return bits;
+    const uint32_t significand = fraction | 0x00800000u;
+    // Below 127 - 14, align to the Half subnormal grid at 2^-24: discard
+    // 23 - (exponent - 127) - 24 = 126 - exponent bits. Otherwise discard 23 - 10 bits.
+    const uint32_t shift = exponent < 113 ? 126 - exponent : 13;
+    uint32_t result = exponent < 113 ? 0 : (exponent - 113) << 10;
+    result += significand >> shift;
+    const uint32_t remainder = significand & ((1u << shift) - 1);
+    const uint32_t halfway = 1u << (shift - 1);
+    // result is the truncated Half encoding in both branches. Its low bit selects even
+    // ties, and the carry can reach the minimum normal or advance the exponent to infinity.
+    result += remainder > halfway || (remainder == halfway && (result & 1));
+    return sign | result;
 }
 
 static const float g_f16tof32Magic = _bitCastIntToFloat((127 + (127 - 15)) << 23);
@@ -999,6 +1000,16 @@ SLANG_FORCE_INLINE uint32_t U16_countbits(uint16_t v)
 #endif
 }
 
+SLANG_FORCE_INLINE uint16_t U16_min(uint16_t a, uint16_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE uint16_t U16_max(uint16_t a, uint16_t b)
+{
+    return a > b ? a : b;
+}
+
 SLANG_FORCE_INLINE half U16_ashalf(uint16_t x)
 {
     Union16 u;
@@ -1012,6 +1023,16 @@ SLANG_FORCE_INLINE uint32_t I16_countbits(int16_t v)
     return U16_countbits(uint16_t(v));
 }
 
+SLANG_FORCE_INLINE int16_t I16_min(int16_t a, int16_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE int16_t I16_max(int16_t a, int16_t b)
+{
+    return a > b ? a : b;
+}
+
 // ----------------------------- U8 -----------------------------------------
 SLANG_FORCE_INLINE uint32_t U8_countbits(uint8_t v)
 {
@@ -1019,10 +1040,30 @@ SLANG_FORCE_INLINE uint32_t U8_countbits(uint8_t v)
     return U16_countbits(uint16_t(v));
 }
 
+SLANG_FORCE_INLINE uint8_t U8_min(uint8_t a, uint8_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE uint8_t U8_max(uint8_t a, uint8_t b)
+{
+    return a > b ? a : b;
+}
+
 // ----------------------------- I8 -----------------------------------------
 SLANG_FORCE_INLINE uint32_t I8_countbits(int16_t v)
 {
     return U8_countbits(uint8_t(v));
+}
+
+SLANG_FORCE_INLINE int8_t I8_min(int8_t a, int8_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE int8_t I8_max(int8_t a, int8_t b)
+{
+    return a > b ? a : b;
 }
 
 // ----------------------------- U32 -----------------------------------------

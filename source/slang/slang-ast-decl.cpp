@@ -546,9 +546,4 @@ bool AggTypeDecl::hasTag(TypeTag tag)
     return ((int)typeTags & (int)tag) != 0;
 }
 
-void AggTypeDecl::unionTagsWith(TypeTag other)
-{
-    addTag(other);
-}
-
 } // namespace Slang

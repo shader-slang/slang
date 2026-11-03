@@ -1,6 +1,5 @@
 // Shared implementation of vk_compute_demo.h's `vkdemo::Context` class.
-// See vk_compute_demo.h for the rationale and the slang-rhi-PR-739
-// migration path.
+// Used by the native Vulkan path in shader-coverage-backends.
 
 #include "vk_compute_demo.h"
 

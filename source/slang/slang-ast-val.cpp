@@ -1325,13 +1325,22 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
         Type* thisParamType = diffTypeInfoWitness->getThisParamType();
         auto thisDiffWitness = diffTypeInfoWitness->getThisTypeDiffWitness();
 
-
-        if (thisParamType && thisDiffWitness)
+        if (thisParamType)
         {
-            auto originalThisParamType = thisParamType;
-            auto originalThisDiffWitness = thisDiffWitness;
-            thisParamType = makeDiffPairType(originalThisParamType, originalThisDiffWitness);
-            thisDiffWitness = makeDiffPairWitness(originalThisParamType, originalThisDiffWitness);
+            auto [thisParamValueType, thisParamMode] =
+                getParamInfoFromTypeWithModeWrapper(thisParamType);
+            auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamMode);
+            if (thisDiffWitness)
+            {
+                auto originalThisParamValueType = thisParamValueType;
+                auto originalThisDiffWitness = thisDiffWitness;
+                thisParamValueType =
+                    makeDiffPairType(originalThisParamValueType, originalThisDiffWitness);
+                thisDiffWitness =
+                    makeDiffPairWitness(originalThisParamValueType, originalThisDiffWitness);
+            }
+            thisParamType =
+                getParamTypeWithModeWrapper(astBuilder, thisParamValueType, differentiatedThisMode);
         }
 
         SubtypeWitness* resultDiffWitness = diffTypeInfoWitness->getReturnTypeDiffWitness();

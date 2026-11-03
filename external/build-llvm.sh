@@ -111,6 +111,11 @@ msg "# Fetching LLVM from $repo at $branch"
 msg "##########################################################"
 git -c advice.detachedHead=false clone "$repo" --branch "$branch" "$source_dir" --depth 1
 
+# LLVM's ARM COFF linker must decode scaled load offsets as byte addends.
+# This backport can be removed when the pinned LLVM includes llvm/llvm-project#229712.
+script_dir=$(cd "$(dirname "$0")" && pwd)
+git -C "$source_dir" apply "$script_dir/llvm-coff-pageoffset12l.patch"
+
 msg "##########################################################"
 msg "# Configuring LLVM in $source_dir"
 msg "##########################################################"
@@ -122,6 +127,9 @@ cmake_arguments_for_slang=(
   -DLLVM_INCLUDE_EXAMPLES=0
   -DLLVM_INCLUDE_TESTS=0
   -DLLVM_ENABLE_TERMINFO=0
+  # Prebuilts are consumed in CI containers that may not provide zstd.
+  # Keep zstd detection from adding a dependency on the build host's packages.
+  -DLLVM_ENABLE_ZSTD=OFF
   -DLLVM_FORCE_VC_REVISION=0
   -DLLVM_FORCE_VC_REPOSITORY="https://github.com/llvm/llvm-project"
   -DLLVM_ENABLE_DIA_SDK=0

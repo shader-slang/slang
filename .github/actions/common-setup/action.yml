@@ -125,7 +125,7 @@ runs:
         os: ${{ inputs.os }}
         compiler: ${{ inputs.compiler }}
         platform: ${{ inputs.platform }}
-        llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+        llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
         build-if-missing: "true"
         github-token: ${{ github.token }}
 
@@ -133,8 +133,8 @@ runs:
       shell: bash
       run: |
         if [ "${{inputs.build-llvm}}" == "true" ]; then
-          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
-          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
+          echo "LLVM_DIR=$(pwd)/build/llvm-project-install" >> "$GITHUB_ENV"
+          echo "Clang_DIR=$(pwd)/build/llvm-project-install" >> "$GITHUB_ENV"
         fi
 
       # Note: ccache for Windows self-hosted has been replaced by sccache

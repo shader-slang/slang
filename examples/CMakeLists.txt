@@ -80,6 +80,20 @@ function(example dir)
     )
 endfunction()
 
+if(SLANG_ENABLE_EXAMPLES)
+    #
+    # Meta target that depends on all examples
+    #
+    add_custom_target(
+        all-examples
+        COMMENT "meta target which depends on all examples"
+    )
+    set_target_properties(all-examples PROPERTIES FOLDER examples)
+
+    # Native coverage integration does not require slang-rhi.
+    add_subdirectory(shader-coverage-backends)
+endif()
+
 if(SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_SLANG_RHI)
     #
     # Shared libraries for examples
@@ -112,15 +126,6 @@ if(SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_SLANG_RHI)
     slang_add_target(stacktrace-windows STATIC FOLDER examples EXCLUDE_FROM_ALL)
 
     #
-    # Meta target that depends on all examples
-    #
-    add_custom_target(
-        all-examples
-        COMMENT "meta target which depends on all examples"
-    )
-    set_target_properties(all-examples PROPERTIES FOLDER examples)
-
-    #
     # Add individual examples as subdirectories
     #
     add_subdirectory(autodiff-texture)
@@ -134,7 +139,6 @@ if(SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_SLANG_RHI)
     add_subdirectory(ray-tracing-pipeline)
     add_subdirectory(reflection-api)
     add_subdirectory(reflection-parameter-blocks)
-    add_subdirectory(shader-coverage-backends)
     add_subdirectory(shader-coverage-bvh-traversal)
     add_subdirectory(shader-coverage-image-pipeline)
     add_subdirectory(shader-object)

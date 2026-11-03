@@ -602,9 +602,41 @@ bool isConcreteType(IRInst* inst)
     return true;
 }
 
-// Create info for a concrete type, using `paramType` as a union mask to determine
+// Returns true if `type` is a propagation-info kind (`TaggedUnionType`, `UntaggedUnionType` or
+// `ElementOfSetType`) rather than an ordinary IR type.
+//
+// An earlier `specializeDynamicInsts` run writes lowered infos back onto the insts it specializes,
+// so a later run can find info where it expects an IR type: as an inst's data type, as a callee's
+// declared result type, or nested inside a structural type. `isConcreteType` is true for these
+// kinds, which are global insts that cannot be refined further. We reuse such info as is, and never
+// wrap it in an `UntaggedUnionType`, because info is not a payload type. Treating it instead as an
+// upper bound for further refinement would be a broader change to the lattice.
+//
+// The test is by exact opcode, so an `IRAttributedType` around one of these kinds is not
+// recognized. `ElementOfSetType` is info as well, although `getLoweredType` writes a `SetTagType`
+// rather than an `ElementOfSetType` onto data types. We exclude `SetTagType`; the flat wrap in
+// `makeInfoForConcreteType` asserts rather than treat a tag as a payload type.
+//
+bool isRefinedInfoType(IRInst* type)
+{
+    if (!type)
+        return false;
+    switch (type->getOp())
+    {
+    case kIROp_TaggedUnionType:
+    case kIROp_UntaggedUnionType:
+    case kIROp_ElementOfSetType:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Create info for `type`, which is a concrete type or info that an earlier `specializeDynamicInsts`
+// run left in its place (see `isRefinedInfoType`), using `paramType` as a union mask to determine
 // how much structural decomposition to perform.
 //
+// - If `type` is already info, return it unchanged.
 // - If `paramType` is concrete, return the bare type (no wrapping needed).
 // - If `paramType` is structural and `type` matches the same structural form,
 //   recurse into sub-components using `paramType`'s sub-types as sub-masks.
@@ -612,9 +644,19 @@ bool isConcreteType(IRInst* inst)
 //
 IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramType)
 {
-    SLANG_ASSERT(isConcreteType(type));
+    SLANG_ASSERT(isRefinedInfoType(type) || isConcreteType(type));
     SLANG_ASSERT(paramType);
     IRBuilder builder(module);
+
+    // Consider a function `IFoo make()` that an earlier `specializeDynamicInsts` run specialized,
+    // so its declared result type is now the `TaggedUnionType` describing the returned value. A
+    // call reached only in a later run takes its info from that declared type. The info already
+    // describes the value, whatever position it flows into, so `paramType` has nothing left to
+    // decompose. Wrapping it would describe a payload whose type is an existential, an
+    // `UntaggedUnionType` operand info that the `ExtractExistential*` analyzers reject.
+    //
+    if (isRefinedInfoType(type))
+        return type;
 
     // If paramType is concrete, return the bare type directly.
     // (No wrapping needed since concrete positions can't be further refined.)
@@ -702,6 +744,11 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
     }
 
     // Non-structural or mismatched structural paramType: produce a flat UntaggedUnion.
+    //
+    // A `SetTagType` is info that `isRefinedInfoType` does not accept (see there). Wrapping one
+    // would describe a tag as a payload type, so we fail here rather than build that shape.
+    //
+    SLANG_RELEASE_ASSERT(type->getOp() != kIROp_SetTagType);
     return builder.getUntaggedUnionType(
         cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, type)));
 }
@@ -1100,24 +1147,11 @@ struct TypeFlowSpecializationContext
     //
     IRInst* tryGetInfo(IRInst* context, IRInst* inst)
     {
-        if (inst->getDataType())
-        {
-            // If the data-type is already a tagged union or untagged union or
-            // element-of-set type, then the refinement occured during a previous phase.
-            //
-            // For now, we simply re-use that info directly.
-            //
-            // In the future, it makes sense to treat it as non-concrete and use
-            // them as an upper-bound for further refinement.
-            //
-            switch (inst->getDataType()->getOp())
-            {
-            case kIROp_TaggedUnionType:
-            case kIROp_UntaggedUnionType:
-            case kIROp_ElementOfSetType:
-                return inst->getDataType();
-            }
-        }
+        // A data type that is already info was written by an earlier `specializeDynamicInsts`
+        // run; we reuse it as is (see `isRefinedInfoType`).
+        //
+        if (isRefinedInfoType(inst->getDataType()))
+            return inst->getDataType();
 
         // A small check for de-allocated insts.
         if (!inst->getParent())
@@ -2159,7 +2193,9 @@ struct TypeFlowSpecializationContext
                     {
                         // If the targetCallee's return type is concrete, but the
                         // callInst's return type is not, we should still propagate the
-                        // known concrete type.
+                        // known concrete type. The return type may also be info that an
+                        // earlier `specializeDynamicInsts` run wrote there, which
+                        // `makeInfoForConcreteType` returns unchanged.
                         //
                         IRInst* calleeForType = targetCallee;
                         if (auto fwb = as<IRSpecializeExistentialsInFunc>(targetCallee))

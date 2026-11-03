@@ -133,6 +133,32 @@ public extension<T : __BuiltinIntegerType & IScalarUnsignedIntegerType, let N : 
     CoopVec<T, N> : IUnsignedIntegerType
 {}
 
+// Extrema are component-wise for every cooperative vector whose builtin element type supplies the
+// scalar extrema contract, so integer and floating-point cooperative vectors share this witness.
+public extension<T : __BuiltinArithmeticType & INumericExtrema, let N : int>
+    CoopVec<T, N> : INumericExtrema
+{
+    [ForceInline] [require(cooperative_vector)]
+    This minimum(This other)
+    {
+        This result;
+        [ForceUnroll]
+        for (int index = 0; index < N; ++index)
+            result[index] = this[index].minimum(other[index]);
+        return result;
+    }
+
+    [ForceInline] [require(cooperative_vector)]
+    This maximum(This other)
+    {
+        This result;
+        [ForceUnroll]
+        for (int index = 0; index < N; ++index)
+            result[index] = this[index].maximum(other[index]);
+        return result;
+    }
+}
+
 public extension<T : __BuiltinFloatingPointType & IScalarFractional, let N : int>
     CoopVec<T, N> : IComponentwiseOrdered
 {
@@ -314,26 +340,6 @@ public extension<T : __BuiltinFloatingPointType & IRootFunctions, let N : int>
 public extension<T : __BuiltinFloatingPointType & IScalarReal, let N : int>
     CoopVec<T, N> : IRealOrderingFunctions
 {
-    [ForceInline] [require(cooperative_vector)]
-    This minimum(This other)
-    {
-        This result;
-        [ForceUnroll]
-        for (int index = 0; index < N; ++index)
-            result[index] = __numericsBuiltinMinimum(this[index], other[index]);
-        return result;
-    }
-
-    [ForceInline] [require(cooperative_vector)]
-    This maximum(This other)
-    {
-        This result;
-        [ForceUnroll]
-        for (int index = 0; index < N; ++index)
-            result[index] = __numericsBuiltinMaximum(this[index], other[index]);
-        return result;
-    }
-
     [ForceInline] [require(cooperative_vector)]
     This step(This edge)
     {

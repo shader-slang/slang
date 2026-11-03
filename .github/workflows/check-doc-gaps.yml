@@ -59,6 +59,16 @@ jobs:
         with:
           persist-credentials: false
 
+      # The language reference manual lives in shader-slang/spec. The
+      # bundles' doc_ref paths (docs/language-reference/...) resolve
+      # against this checkout; see LANG_REF_PREFIX in
+      # docs/generated/tests/_meta/regenerate.py.
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: shader-slang/spec
+          path: spec-checkout
+          persist-credentials: false
+
       # Hard gate. Both drivers, both trees.
       - name: Lint the generated design docs
         run: python3 docs/generated/design/_meta/regenerate.py lint

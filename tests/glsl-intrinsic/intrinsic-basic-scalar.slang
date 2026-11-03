@@ -232,7 +232,7 @@ bool Test_ScalarType()
         && genDType(0) == modf(genDType(zero), outGenDType) && 0 == outGenDType
 
         // CHECK_GLSL-COUNT-4: min(
-        // CHECK_SPIR-COUNT-2: FMin{{ }}
+        // CHECK_SPIR-COUNT-2: NMin{{ }}
         // CHECK_SPIR: SMin{{ }}
         // CHECK_SPIR: UMin{{ }}
         && genFType(0) == min(genFType(zero), genFType(zero))
@@ -241,7 +241,7 @@ bool Test_ScalarType()
         && genUType(0) == min(genUType(zero), genUType(zero))
 
         // CHECK_GLSL-COUNT-4: max(
-        // CHECK_SPIR-COUNT-2: FMax{{ }}
+        // CHECK_SPIR-COUNT-2: NMax{{ }}
         // CHECK_SPIR: SMax{{ }}
         // CHECK_SPIR: UMax{{ }}
         && genFType(0) == max(genFType(zero), genFType(zero))

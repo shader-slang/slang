@@ -2242,23 +2242,17 @@ public:
     IRCompilerDictionary* getTranslationDict() { return m_translationDict; }
     void setTranslationDict(IRCompilerDictionary* dict) { m_translationDict = dict; }
 
+    // Binary module loading checks this range before decoding serialized AST and IR.
+    // Adding an IR instruction requires a new writer version. Earlier modules can remain
+    // supported when their AST and IR representations are compatible with the reader.
     //
-    // The range of module versions this compiler supports
-    //
-    // This will need to be updated if for example an instruction is removed,
-    // the max supported version should be incremented and the min supported
-    // version set to above the last version an instance of that instruction
-    // could be found
-    //
-    // Additionally this should be updated when new instructions are added,
-    // however only k_maxSupportedModuleVersion needs to be incremented in that
-    // case
-    //
-    // It represents the version of module regarding semantics and doesn't have
-    // anything to do with serialization format
-    //
-    const static UInt k_minSupportedModuleVersion = 31;
-    const static UInt k_maxSupportedModuleVersion = 32;
+    // Adding `RefReadOnlyModifier`, `RefWriteOnlyModifier` and the reference parameter type
+    // classes shifts the sequential `ASTNodeType` values, so a version-36 module's later AST
+    // nodes would be decoded as different classes.
+    // Version 37 is the earliest module version with the updated AST node numbering, and with
+    // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
+    const static UInt k_minSupportedModuleVersion = 37;
+    const static UInt k_maxSupportedModuleVersion = 37;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

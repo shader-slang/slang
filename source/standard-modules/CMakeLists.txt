@@ -34,6 +34,33 @@ endif()
 # Set install directory using the platform-specific library directory
 set(SLANG_STANDARD_MODULE_INSTALL_DIR "${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}" CACHE STRING "Installation directory for standard modules")
 
+# Build-tree location (relative to ${slang_BINARY_DIR}/$<CONFIG>) where the module
+# producers below actually write the .slang-module tree. This is deliberately
+# kept separate from SLANG_STANDARD_MODULE_INSTALL_DIR: that is the install
+# destination and is user-overridable, so it may point somewhere the build tree
+# never populates. The optional monolithic library scans this build-tree root.
+set(SLANG_STANDARD_MODULE_BUILD_SUBDIR "${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}" CACHE INTERNAL "Build-tree subdir of the standard module files")
+
+# The loose slang-standard-module-<version>/ tree is always built below (it is the
+# input to the optional monolithic library). When SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY is
+# on, the module subdirectories below skip their install() rules (each guarded on
+# NOT SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY), so the install/package contains only the
+# monolithic library in place of the loose files. This affects install()/CPack
+# packaging only; consumers that copy straight from the build tree (e.g. CI
+# artifact staging) still see the loose tree.
+
+# Shared manifest of the serialized .slang-module files produced by the module
+# subdirectories below. The optional monolithic library
+# (source/slang-monolithic-standard-module-library) DEPENDS on these actual outputs so that editing
+# a module regenerates its embedded payload. Cleared here each configure (INTERNAL
+# force-writes); each module subdirectory appends its own outputs.
+set(SLANG_STANDARD_MODULE_FILES "" CACHE INTERNAL "Built standard .slang-module files")
+
+# Companion manifest of the targets that produce those files. The embedding
+# library DEPENDS on these so Visual Studio orders the embed step after every
+# producer; cleared here each configure, appended by each module subdirectory.
+set(SLANG_STANDARD_MODULE_TARGETS "" CACHE INTERNAL "Producer targets for standard .slang-module files")
+
 #
 # Generate the standard module configuration header, this is used by the slang compiler to find the standard module
 #

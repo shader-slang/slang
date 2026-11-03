@@ -16,6 +16,9 @@ static void findDebugInfo(IRInst* inst, List<IRInst*>& debugInstructions)
     case kIROp_DebugInlinedAt:
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
+    case kIROp_DebugLexicalBlock:
+    case kIROp_DebugFuncDecoration:
+    case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
@@ -25,7 +28,8 @@ static void findDebugInfo(IRInst* inst, List<IRInst*>& debugInstructions)
         break;
     }
 
-    for (auto child : inst->getChildren())
+    // DebugFunc and DebugLocation decorations also hold references to debug metadata.
+    for (auto child : inst->getDecorationsAndChildren())
         findDebugInfo(child, debugInstructions);
 }
 
@@ -33,7 +37,14 @@ void stripDebugInfo(IRModule* irModule)
 {
     List<IRInst*> debugInstructions;
     findDebugInfo(irModule->getModuleInst(), debugInstructions);
-    for (auto debugInst : debugInstructions)
-        debugInst->removeAndDeallocate();
+    // Collection is pre-order; remove descendants before their owners so recursive removal
+    // does not revisit collected children. This is not dependency order across functions:
+    // instruction storage remains in the module arena while removal unlinks operand uses.
+    while (debugInstructions.getCount())
+    {
+        auto inst = debugInstructions.getLast();
+        debugInstructions.removeLast();
+        inst->removeAndDeallocate();
+    }
 }
 } // namespace Slang

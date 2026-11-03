@@ -9,6 +9,16 @@
 namespace Slang
 {
 
+/// Return true if the target cannot use some matrix types as they are, so that
+/// `legalizeMatrixTypes` may rewrite them to arrays of row vectors (`vector<T,C>[R]`).
+///
+/// This only says that the target is one of the targets that rewrite matrices. It does not say
+/// that a given matrix is rewritten; `shouldLegalizeMatrixType` decides that per matrix type.
+///
+/// We rewrite matrices on SPIR-V, GLSL, WGSL and Metal because their matrix types have only
+/// floating-point elements, so an `int2x3` has no direct form there. HLSL, CUDA and C++ are not
+/// listed because they keep `int2x3` as a matrix. LLVM is listed for a different reason: it has
+/// no matrix type at all, so every matrix, float included, is rewritten.
 static bool targetLegalizesMatrixTypes(TargetProgram* targetProgram)
 {
     if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
@@ -29,6 +39,29 @@ static bool targetLegalizesMatrixTypes(TargetProgram* targetProgram)
     default:
         return false;
     }
+}
+
+static bool shouldLegalizeMatrixType(TargetProgram* targetProgram, IRMatrixType* matrixType)
+{
+    SLANG_ASSERT(targetLegalizesMatrixTypes(targetProgram));
+
+    if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
+    {
+        // Always lower all matrices on LLVM; we'd need to break them up
+        // like this for data layout reasons anyway.
+        return true;
+    }
+
+    auto elementType = matrixType->getElementType();
+    // None of these targets has integer matrices, whatever the integer width (SPIR-V matrices
+    // need floating-point columns), so integer matrices of every width are lowered.
+    return as<IRBoolType>(elementType) || isIntegralType(elementType);
+}
+
+bool isMatrixTypeLegalizedToVectorArray(TargetProgram* targetProgram, IRMatrixType* matrixType)
+{
+    return targetLegalizesMatrixTypes(targetProgram) &&
+           shouldLegalizeMatrixType(targetProgram, matrixType);
 }
 
 struct MatrixTypeLoweringContext
@@ -64,18 +97,7 @@ struct MatrixTypeLoweringContext
 
     bool shouldLowerMatrixType(IRMatrixType* matrixType)
     {
-        SLANG_ASSERT(targetLegalizesMatrixTypes(targetProgram));
-
-        if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
-        {
-            // Always lower all matrices on LLVM; we'd need to break them up
-            // like this for data layout reasons anyway.
-            return true;
-        }
-
-        auto elementType = matrixType->getElementType();
-        return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
-               as<IRIntType>(elementType);
+        return shouldLegalizeMatrixType(targetProgram, matrixType);
     }
 
     IRInst* legalizeMatrixTypeDeclaration(IRInst* inst)
@@ -420,11 +442,15 @@ struct MatrixTypeLoweringContext
         // when the float operands themselves do not need lowering. That is why
         // this function -- unlike `legalizeBinaryOperation`, which treats the
         // all-non-lowered case as `SLANG_UNREACHABLE` -- accepts matrix operands
-        // of any element type. We require only that both operands are matrices,
-        // and use `SLANG_RELEASE_ASSERT` so a non-matrix operand fails loudly in
-        // release builds rather than corrupting the row extraction below.
+        // of any element type. One operand may also be a scalar (`m > 0.0`), which is
+        // compared with every element. We require at least one matrix operand, and
+        // use `SLANG_RELEASE_ASSERT` so anything else fails loudly in release builds
+        // rather than corrupting the row extraction below.
         SLANG_RELEASE_ASSERT(
-            matrixTypeA && matrixTypeB && "Only matrix-matrix comparisons are supported");
+            (matrixTypeA || matrixTypeB) && "A matrix comparison needs a matrix operand");
+        SLANG_RELEASE_ASSERT(
+            (matrixTypeA || as<IRBasicType>(typeA)) && (matrixTypeB || as<IRBasicType>(typeB)) &&
+            "A matrix can only be compared with a matrix or a scalar");
 
         // Create IRBuilder at the top level
         IRBuilder builder(inst);
@@ -455,15 +481,28 @@ struct MatrixTypeLoweringContext
         // Create array type: vector<bool, C>[R]
         auto boolArrayType = builder.getArrayType(boolVectorType, rowCount);
 
+        // A scalar operand is compared with every element of each row, so it is
+        // broadcast to a row vector once.
+        auto broadcastScalar = [&](IRInst* scalar) -> IRInst*
+        {
+            return builder.emitMakeVectorFromScalar(
+                builder.getVectorType(scalar->getDataType(), columnCount),
+                scalar);
+        };
+        IRInst* rowOfScalarA = matrixTypeA ? nullptr : broadcastScalar(legalizedA);
+        IRInst* rowOfScalarB = matrixTypeB ? nullptr : broadcastScalar(legalizedB);
+
         // Extract vectors from both arrays and apply comparison operation
         List<IRInst*> resultVectors;
 
         for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
         {
-            // Extract the row vector from each operand array
+            // Extract the row vector from each matrix operand array
             auto rowIndexInst = builder.getIntValue(builder.getIntType(), row);
-            auto vectorA = builder.emitElementExtract(legalizedA, rowIndexInst);
-            auto vectorB = builder.emitElementExtract(legalizedB, rowIndexInst);
+            auto vectorA =
+                rowOfScalarA ? rowOfScalarA : builder.emitElementExtract(legalizedA, rowIndexInst);
+            auto vectorB =
+                rowOfScalarB ? rowOfScalarB : builder.emitElementExtract(legalizedB, rowIndexInst);
 
             // Apply the comparison operation to the vectors
             IRInst* args[] = {vectorA, vectorB};

@@ -14,6 +14,7 @@ Texture2D g_textures[];
 SamplerState g_samplers[];
 
 [shader("compute")]
+[DerivativeGroupQuad]
 [numthreads(1, 1, 1)]  // Invalid: should be multiples of 2 for derivative group quads
 void main() {
     float4 texture_color = g_textures[0].Sample(

@@ -62,11 +62,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int intMin = genericMin<int>(intA, intB);
     // CHECK: SMin
 
-    // Test IFloat constraint - should emit FMax
+    // Test IFloat constraint - should emit NMax
     float floatA = float(dispatchThreadID.y) + 2.5f;
     float floatB = float(dispatchThreadID.z) + 4.0f;
     float floatMax = genericMax<float>(floatA, floatB);
-    // CHECK: FMax
+    // CHECK: NMax
 
     outputBuffer[0] = intMin;
     outputBuffer[1] = int(floatMax * 10);
@@ -77,7 +77,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     outputBuffer[3] =
         int(max(float(dispatchThreadID.x) + 1.5f, float(dispatchThreadID.y) + 2.5f) * 10);
-    // CHECK: FMax
+    // CHECK: NMax
 
     // Test custom IArithmetic type - should use lessThan comparison + Select
     MyNumber numA = MyNumber(int(dispatchThreadID.x) + 15);

@@ -27,4 +27,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // CHECK: %[[SRC:[0-9]+]]{{.*}}= DebugSource(
-// CHECK: = DebugVar(%[[SRC]], {{[0-9]+}} : UInt, {{[0-9]+}} : UInt, 0 : UInt)
+// CHECK: = DebugVar(%[[SRC]], {{[0-9]+}} : UInt, {{[0-9]+}} : UInt, %{{[A-Za-z0-9_]+}}, 0 : UInt)

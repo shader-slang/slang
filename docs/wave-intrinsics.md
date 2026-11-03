@@ -443,3 +443,28 @@ T WaveMaskReadLaneAt<T>(WaveMask mask, T value, int lane);
 
 T WaveMaskShuffle<T>(WaveMask mask, T value, int lane);
 ```
+
+# Wave Clustered Intrinsics
+
+The Slang-specific `WaveClustered*` intrinsics were added to expose the `GroupNonUniformClustered` capability added SPIR-V 1.3, as well as the equivalent `GL_KHR_shader_subgroup_clustered` GLSL functionality.
+
+```
+T WaveClusteredSum<T>(T expr, uint clusterSize);
+
+T WaveClusteredProduct<T>(T expr, uint clusterSize);
+
+T WaveClusteredMin<T>(T expr, uint clusterSize);
+
+T WaveClusteredMax<T>(T expr, uint clusterSize);
+
+T WaveClusteredBitAnd<T>(T expr, uint clusterSize);
+
+T WaveClusteredBitOr<T>(T expr, uint clusterSize);
+
+T WaveClusteredBitXor<T>(T expr, uint clusterSize);
+```
+
+These functions operate similarly to their `WaveActive*` counterparts, except that the reductions are performed in clusters. For example, a `WaveClusteredSum(val, 4)` would mean that the wave is divided into clusters of 4 adjacent lanes, each computing their own local sum and sharing the result with each other.
+
+The `clusterSize` parameter of these function must be a compile-time constant that is 1 or greater and a power of two. It must also be less than equal to the `WaveGetLaneCount()`.
+

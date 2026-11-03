@@ -45,7 +45,18 @@ HLSL-specific on HLSL.
   `legalizeNonStructParameterToStructForHLSL`,
   `wrapStructuredBuffersOfMatrices`, `legalizeUniformBufferLoad`,
   `legalizeByteAddressBufferOps` defaults, `legalizeLogicalAndOr`
-  (HLSL is in the `isD3DTarget` arm).
+  (HLSL is in the `isD3DTarget` arm). The doc's three ray-payload
+  passes, `legalizeEmptyRayPayloadsForHLSL`,
+  `legalizeNonStructParameterToStructForHLSL` and
+  `legalizeRayPayloadAccessQualifiersForHLSL`, no longer exist. Since
+  #13256, `legalizeRayTracingPayloads`
+  (`source/slang/slang-ir-ray-tracing-legalize.cpp`) gives an empty
+  receiving payload a separate one-member struct, wraps non-struct
+  arguments of native calls such as `TraceRay`, and fills shader-model
+  6.7 payload access qualifiers. It does not wrap a non-struct DXR
+  entry-point parameter. Test the emitted HLSL rather than the pass
+  names; the README's doc-gap rows list what changed, and the
+  empty-payload maintenance override below gives the new shape.
 - HLSL-specific skips: `lowerCooperativeVectors` (HLSL `break`),
   `lowerAppendConsumeStructuredBuffers` (HLSL has native types).
 - Always-on emit shapes: `[numthreads(...)]`, `register(uN)` /
@@ -160,11 +171,6 @@ pack_matrix(column_major)`, the conditional
   is an IR-level claim that requires `-dump-ir` annotations
   cross-pass which the doc does not anchor to a specific marker.
   These pass-ordering claims live in `pipeline/05-ir-passes`.
-- **`legalizeEmptyRayPayloadsForHLSL` and
-  `legalizeNonStructParameterToStructForHLSL`.** Both require a
-  DXR (`closesthit` / `anyhit`) entry point. The no-GPU compute
-  runner does not exercise the ray-tracing pipeline shape, and
-  the doc anchors these to DXR stages.
 - **`floatNonUniformResourceIndex`.** Requires the
   `NonUniformResourceIndex(...)` HLSL intrinsic in source, which
   Slang's compute-stage entry point does not have a natural way
@@ -319,13 +325,17 @@ the separate design-document regeneration workflow.
       docs).
 - [ ] Each `.slang` file declares
       `//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute`
-      as its primary directive. Add a `-target glsl` (or other)
-      sibling directive only for HLSL-fires-but-sibling-skips
-      claims.
-- [ ] CHECK patterns avoid raw `[[...]]` and use FileCheck
-      wildcards for mangled identifiers.
-- [ ] No test depends on a GPU. Compute-only entry points; no
-      DXR; no graphics pipeline stages requiring rasterization.
+      as its primary directive, except text-only DXR tests, which
+      pair `-stage closesthit` or `-stage anyhit` with a DXR-capable
+      `-profile` (`lib_6_6`, or `sm_6_7` for payload access
+      qualifiers). Add a `-target glsl` (or other) sibling
+      directive only for HLSL-fires-but-sibling-skips claims.
+- [ ] CHECK patterns never contain literal `[[...]]` text
+      (FileCheck captures such as `[[P:...]]` are fine) and use
+      FileCheck wildcards for mangled identifiers.
+- [ ] No test depends on a GPU. DXR tests check emitted HLSL
+      only; no GPU execution and no graphics pipeline stages
+      requiring rasterization.
 - [ ] `## Doc gaps observed` records claims that lack a checkable
       marker in the doc, or behaviors observed in slangc emit
       that the doc does not currently describe.

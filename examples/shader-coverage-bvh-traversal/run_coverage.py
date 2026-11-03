@@ -58,6 +58,10 @@ _TARGET = "shader-coverage-bvh-traversal"
 def _candidate_paths(slang_root: Path) -> list:
     """All plausible output locations for the demo binary."""
     return [
+        # Standard example() targets put executables beside slangc.
+        *(slang_root / "build" / config / "bin" / (_TARGET + suffix)
+          for config in ("Release", "Debug", "RelWithDebInfo")
+          for suffix in ("", ".exe")),
         # CMake multi-config (Ninja Multi-Config / Visual Studio)
         *(slang_root / "build" / "examples" / _TARGET / config / _TARGET
           for config in ("Release", "Debug", "RelWithDebInfo")),
@@ -83,6 +87,10 @@ def _is_stale(binary: Path, slang_root: Path) -> bool:
         for src in demo_dir.glob(pattern):
             if src.stat().st_mtime > binary_mtime:
                 return True
+    shared_dir = slang_root / "examples" / "shader-coverage-common"
+    for src in shared_dir.glob("*.h"):
+        if src.stat().st_mtime > binary_mtime:
+            return True
     return False
 
 
@@ -184,22 +192,20 @@ def main(argv=None):
     # ------------------------------------------------------------------
     # Step 1 — run the demo binary
     # ------------------------------------------------------------------
-    binary_cmd = [str(binary), f"--mode={mode}",
+    binary_cmd = [str(binary), f"--demo-dir={script_dir}", f"--mode={mode}",
                   f"--output-dir={output_dir}", *demo_args]
     print(f"[1/3] running demo: {' '.join(str(a) for a in binary_cmd)}")
-    # On Windows the runtime DLLs (slang.dll etc.) live in
-    # <build-root>/<config>/bin/, not next to the demo exe. Prepend that
-    # directory to PATH so the loader finds them (otherwise STATUS_DLL_NOT_FOUND).
-    # Multi-config layout: exe at <build>/examples/<target>/<config>/<exe>
-    # Single-config layout: exe at <build>/<config>/examples/<target>/<exe>
-    # In both cases binary.parents[3] is the build root and the config name
-    # sits one level above the exe (multi) or two levels above (single).
+    # Standard example() builds place the executable beside the runtime DLLs.
+    # Retain DLL discovery for binaries built in the previous per-example layout.
     _WIN_CONFIGS = {"Release", "Debug", "RelWithDebInfo"}
     demo_env = os.environ.copy()
-    if platform.system() == "Windows" and len(binary.parents) >= 4:
-        config = (binary.parent.name if binary.parent.name in _WIN_CONFIGS
-                  else binary.parents[2].name)
-        dll_dir = binary.parents[3] / config / "bin"
+    if platform.system() == "Windows":
+        if binary.parent.name == "bin":
+            dll_dir = binary.parent
+        else:
+            config = (binary.parent.name if binary.parent.name in _WIN_CONFIGS
+                      else binary.parents[2].name)
+            dll_dir = binary.parents[3] / config / "bin"
         demo_env["PATH"] = str(dll_dir) + os.pathsep + demo_env.get("PATH", "")
     result = subprocess.run(binary_cmd, env=demo_env)
     if result.returncode != 0:

@@ -13,7 +13,8 @@ class DiagnosticSink;
 class TargetProgram;
 struct IRInst;
 
-/// Any call to a function that takes or returns a string/RefType parameter is inlined
+/// Inline calls whose parameter or result types require it on the selected target, including
+/// strings, references, and HLSL output aggregates containing matrices with non-default layouts.
 Result performTypeInlining(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 /// Inline any call sites to functions marked `[unsafeForceInlineEarly]`

@@ -1,10 +1,9 @@
-// Issue #10526: the opaque-local-variable restriction is specific to Khronos
-// targets (SPIR-V/GLSL). Selecting a resource through control flow is perfectly
-// valid for HLSL/D3D, so the same source that is rejected for SPIR-V must
-// compile cleanly here. This pins the `isKhronosTarget` gate against a polarity
-// regression that would otherwise spuriously reject valid HLSL.
+// Issue #10526: the HLSL emitter can preserve this resource selection in source form without losing
+// information. It must therefore emit the source and leave acceptance to the downstream compiler,
+// rather than applying a restriction from targets that cannot represent the surviving local.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-minimum-slang-optimization -target hlsl -entry main -stage fragment
 
 Texture1D<float> tex0, tex1;
 

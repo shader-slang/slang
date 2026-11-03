@@ -16,9 +16,9 @@
 // optional operand from a fixed one.
 //
 // `debug-function-name-line-col-file-type.slang` covers the absent form at
-// `-g1`, where no `DebugCompilationUnit` is emitted at all and the record stops
-// after the function type. This test raises the debug level to full `-g`, where
-// the compilation unit exists and the record gains the trailing reference to it.
+// `-g1`, where only the five fixed operands are pinned. This test raises the
+// debug level to full `-g` and pins the trailing reference to the compilation
+// unit.
 //
 // At full `-g` the `DebugSource` record embeds the entire text of this file, so
 // the dump contains a copy of these CHECK lines and a naive pattern can match

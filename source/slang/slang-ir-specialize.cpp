@@ -3969,12 +3969,16 @@ IRInst* specializeGenericWithSetArgs(
             loweredFunc->setFullType(
                 builder.getFuncType(funcTypeParams, loweredFuncType->getResultType()));
         }
-        else if (as<IRDebugFunction>(inst))
+        else if (as<IRDebugFunction>(inst) || as<IRDebugLexicalBlock>(inst))
         {
             // Emit out into the global scope.
             IRBuilder globalBuilder(builder.getModule());
             globalBuilder.setInsertInto(builder.getModule());
             auto clonedInst = cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            // Declaration scopes have one identity for this specialization. The function
+            // decoration uses the static environment, while body scope markers and local
+            // variables use the dynamic environment; both must refer to the same clone.
+            cloneEnv.mapOldValToNew[inst] = clonedInst;
             if (context)
             {
                 context->addSpecializationDepthDecorationsToClonedSpecializeInsts(

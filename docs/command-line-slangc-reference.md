@@ -1007,6 +1007,11 @@ Deprecated. Treat every input translation unit as GLSL. Use a GLSL file-name ext
 Enable experimental compiler passes 
 
 
+<a id="gec"></a>
+### -Gec
+Enable additional backwards-compatibility features for legacy HLSL inputs. See the user guide's HLSL backwards compatibility section for the supported behavior. 
+
+
 <a id="enable-experimental-dynamic-dispatch"></a>
 ### -enable-experimental-dynamic-dispatch
 Enable experimental dynamic dispatch features 
@@ -1546,6 +1551,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cpp_cuda_spirv_llvm` 
 * `cpp_cuda_metal_spirv` 
 * `cpp_cuda_metal_spirv_llvm` 
+* `cpp_cuda_metal_wgsl` 
 * `cuda_spirv` 
 * `cuda_metal_spirv` 
 * `cpp_cuda_glsl_spirv` 
