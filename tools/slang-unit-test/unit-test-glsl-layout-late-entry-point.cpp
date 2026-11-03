@@ -1,0 +1,208 @@
+// unit-test-glsl-layout-late-entry-point.cpp
+
+#include "core/slang-string.h"
+#include "slang-com-ptr.h"
+#include "slang.h"
+#include "unit-test/slang-unit-test.h"
+
+#include <stdio.h>
+
+using namespace Slang;
+
+// GLSL declares a compute thread-group size or `early_fragment_tests` with a standalone
+// `layout(...) in;` beside the entry point. A module loaded through the API is lowered to IR
+// before an entry point without `[shader]` is found with `findAndCheckEntryPoint`, which is
+// where the layout becomes an attribute of the entry point. These tests compile such entry
+// points and check that the generated code still carries the layout.
+
+static void printDiagnostics(slang::IBlob* diagnostics)
+{
+    if (diagnostics)
+    {
+        fprintf(
+            stderr,
+            "%.*s\n",
+            (int)diagnostics->getBufferSize(),
+            (const char*)diagnostics->getBufferPointer());
+    }
+}
+
+// Load `source` as a GLSL module, find `entryPointName` in it with `findAndCheckEntryPoint`,
+// link the two, and return the code generated for `targetDesc`. The session and the linked
+// program are returned as well, because reflection on the program needs the session alive.
+static String compileLateGLSLEntryPoint(
+    UnitTestContext* unitTestContext,
+    const char* source,
+    const char* entryPointName,
+    SlangStage stage,
+    slang::TargetDesc const& targetDesc,
+    ComPtr<slang::ISession>& outSession,
+    ComPtr<slang::IComponentType>& outLinkedProgram)
+{
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        unitTestContext->slangGlobalSession->createSession(sessionDesc, outSession.writeRef())));
+
+    // The `.glsl` extension selects GLSL as the source language of the module.
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module;
+    module = outSession->loadModuleFromSourceString(
+        "glslLayoutLateEntryPoint",
+        "glsl-layout-late-entry-point.glsl",
+        source,
+        diagnostics.writeRef());
+    printDiagnostics(diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    diagnostics.setNull();
+    module->findAndCheckEntryPoint(
+        entryPointName,
+        stage,
+        entryPoint.writeRef(),
+        diagnostics.writeRef());
+    printDiagnostics(diagnostics);
+    SLANG_CHECK_ABORT(entryPoint != nullptr);
+
+    slang::IComponentType* components[] = {module, entryPoint};
+    ComPtr<slang::IComponentType> composite;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        outSession->createCompositeComponentType(components, 2, composite.writeRef())));
+    diagnostics.setNull();
+    SlangResult linkResult = composite->link(outLinkedProgram.writeRef(), diagnostics.writeRef());
+    printDiagnostics(diagnostics);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(linkResult));
+
+    ComPtr<slang::IBlob> code;
+    diagnostics.setNull();
+    SlangResult codeResult =
+        outLinkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
+    printDiagnostics(diagnostics);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(codeResult) && code);
+    return String(
+        (const char*)code->getBufferPointer(),
+        (const char*)code->getBufferPointer() + code->getBufferSize());
+}
+
+SLANG_UNIT_TEST(glslLocalSizeOnLateEntryPoint)
+{
+    const char* source = R"(
+        #version 450
+        buffer OutputBlock { uint data[]; } outputBuffer;
+        layout(local_size_x = 16, local_size_y = 2) in;
+        void computeMain()
+        {
+            outputBuffer.data[gl_LocalInvocationIndex] = gl_LocalInvocationIndex;
+        }
+    )";
+
+    struct TargetCase
+    {
+        SlangCompileTarget format;
+        const char* profile;
+        const char* expectedThreadGroupSize;
+    };
+    const TargetCase targetCases[] = {
+        {SLANG_SPIRV_ASM, "spirv_1_5", "LocalSize 16 2 1"},
+        {SLANG_HLSL, "sm_6_0", "[numthreads(16, 2, 1)]"},
+        {SLANG_WGSL, "", "@workgroup_size(16, 2, 1)"},
+    };
+
+    for (auto& targetCase : targetCases)
+    {
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = targetCase.format;
+        targetDesc.profile = unitTestContext->slangGlobalSession->findProfile(targetCase.profile);
+
+        ComPtr<slang::ISession> session;
+        ComPtr<slang::IComponentType> linkedProgram;
+        String code = compileLateGLSLEntryPoint(
+            unitTestContext,
+            source,
+            "computeMain",
+            SLANG_STAGE_COMPUTE,
+            targetDesc,
+            session,
+            linkedProgram);
+
+        SLANG_CHECK(code.indexOf(UnownedStringSlice(targetCase.expectedThreadGroupSize)) >= 0);
+
+        auto entryPointReflection = linkedProgram->getLayout()->getEntryPointByIndex(0);
+        SlangUInt sizes[3] = {};
+        entryPointReflection->getComputeThreadGroupSize(3, sizes);
+        SLANG_CHECK(sizes[0] == 16 && sizes[1] == 2 && sizes[2] == 1);
+    }
+}
+
+SLANG_UNIT_TEST(glslLocalSizeIdOnLateEntryPoint)
+{
+    // The thread-group size refers to specialization constants, so the decoration that the
+    // generated code takes from the program's layout IR has operands of its own.
+    const char* source = R"(
+        #version 450
+        [vk::constant_id(1)]
+        const int sizeX = 4;
+        layout(local_size_x_id = 1, local_size_y_id = 0, local_size_z = 2) in;
+        void computeMain()
+        {
+        }
+    )";
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = unitTestContext->slangGlobalSession->findProfile("spirv_1_5");
+
+    ComPtr<slang::ISession> session;
+    ComPtr<slang::IComponentType> linkedProgram;
+    String spirvAsm = compileLateGLSLEntryPoint(
+        unitTestContext,
+        source,
+        "computeMain",
+        SLANG_STAGE_COMPUTE,
+        targetDesc,
+        session,
+        linkedProgram);
+
+    // Expect `OpExecutionModeId %computeMain LocalSizeId %sizeX %<y> %int_2`: x is the declared
+    // constant, y is the constant synthesized for `local_size_y_id = 0`, and z is the literal 2.
+    Index modeIndex = spirvAsm.indexOf(UnownedStringSlice("LocalSizeId "));
+    SLANG_CHECK_ABORT(modeIndex >= 0);
+    UnownedStringSlice mode = spirvAsm.getUnownedSlice().tail(modeIndex);
+    mode = mode.head(mode.indexOf('\n')).trim();
+    SLANG_CHECK(mode.startsWith("LocalSizeId %sizeX %"));
+    SLANG_CHECK(mode.endsWith(" %int_2"));
+    SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("SpecId 1")) >= 0);
+    SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("SpecId 0")) >= 0);
+}
+
+SLANG_UNIT_TEST(glslEarlyFragmentTestsOnLateEntryPoint)
+{
+    const char* source = R"(
+        #version 450
+        layout(early_fragment_tests) in;
+        layout(location = 0) out vec4 color;
+        void fragMain()
+        {
+            color = vec4(1.0);
+        }
+    )";
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = unitTestContext->slangGlobalSession->findProfile("spirv_1_5");
+
+    ComPtr<slang::ISession> session;
+    ComPtr<slang::IComponentType> linkedProgram;
+    String spirvAsm = compileLateGLSLEntryPoint(
+        unitTestContext,
+        source,
+        "fragMain",
+        SLANG_STAGE_FRAGMENT,
+        targetDesc,
+        session,
+        linkedProgram);
+
+    SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("EarlyFragmentTests")) >= 0);
+}
