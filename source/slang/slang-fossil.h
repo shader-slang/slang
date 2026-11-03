@@ -179,7 +179,10 @@ public:
     SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind) { return kind == kKind; }
 
 private:
-    T _value;
+    // The writer aligns every simple value to its size; force the same
+    // alignment here so that 64-bit fields keep that layout on targets
+    // (such as 32-bit x86) where alignof(UInt64) is only 4.
+    alignas(sizeof(T)) T _value;
 };
 
 #define SLANG_DECLARE_FOSSILIZED_SIMPLE_TYPE(TYPE, TAG)                           \

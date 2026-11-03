@@ -85,6 +85,7 @@ flowchart LR
 
   subgraph after["After CI"]
     cirun["ci.yml"] -->|workflow_run| post["check-ir-version.yml<br>ci-retry-yielded-bot.yml"]
+    perfnight["nightly-mdl-perf-test.yml"] -->|workflow_run| bisect["claude-perf-bisect.yml"]
   end
 ```
 
@@ -100,6 +101,9 @@ flowchart LR
 | `repository_dispatch` | Triggered by a slash command relayed from a PR comment.                                                                                                                                           |
 | `schedule`            | Cron-driven.                                                                                                                                                                                      |
 | `workflow_dispatch`   | Run manually from the Actions tab.                                                                                                                                                                |
+
+`claude-perf-bisect.yml` is the one `workflow_run` workflow that builds code: it
+builds merged master commits after a scheduled nightly, never PR code.
 
 ## 1. PR gates
 
@@ -243,6 +247,7 @@ not compete for the same runners.
 | `nightly-slang-sascha-test.yml`    | nightly                            | Compiles the Sascha Willems Vulkan sample shaders.                   |
 | `nightly-slang-vkglcts-test.yml`   | nightly                            | Runs the Vulkan CTS with Slang as the shader compiler.               |
 | `nightly-mdl-perf-test.yml`        | nightly                            | Compile-performance suite for the MDL workloads.                     |
+| `claude-perf-bisect.yml`           | after a red perf nightly           | Shadow bisect of a confirmed compile-perf change.                    |
 | `ci-analytics.yml`                 | daily                              | Collects CI run statistics and publishes them.                       |
 | `pr-sweep-nightly.yml`             | nightly                            | Board-sync backstop over every open PR.                              |
 | `cmake-options.yml`                | weekly                             | Builds the matrix of non-default CMake option combinations.          |
@@ -274,14 +279,21 @@ issue, comment, and review events rather than to a PR's code.
 ## 5. Slash-command regenerators
 
 `slash-command-dispatch.yml` turns an allow-listed comment into a
-`repository_dispatch`. Each regenerator rebuilds its file and opens a follow-up
-PR against your branch, so a failed check can be fixed without a local checkout.
+`repository_dispatch`. Each regenerator rebuilds its file in a job that has no
+secrets and uploads the change as the `regen-patch` artifact. The shared
+`slash-regenerate-publish.yml` then pushes `<command>/pr-<N>` to this repository with the
+`GITHUB_TOKEN` and comments on the PR with a compare link. A maintainer opens
+the PR from that link, because `GITHUB_TOKEN` cannot push to a contributor's
+fork. If the PR changes `.github/workflows/`, the branch is not pushed, because
+`GITHUB_TOKEN` cannot push workflow files, and the comment points to the patch
+instead.
+`slash-cleanup.yml` deletes the pushed branches when the PR closes.
 
-| Workflow                     | Command                   | Regenerates                        |
-| ---------------------------- | ------------------------- | ---------------------------------- |
-| `regenerate-format.yml`      | `/format`                 | Formatting across the tree.        |
-| `regenerate-toc.yml`         | `/regenerate-toc`         | The user-guide table of contents.  |
-| `regenerate-cmdline-ref.yml` | `/regenerate-cmdline-ref` | The slangc command-line reference. |
+| Workflow                           | Command                   | Regenerates                        |
+| ---------------------------------- | ------------------------- | ---------------------------------- |
+| `slash-regenerate-format.yml`      | `/format`                 | Formatting across the tree.        |
+| `slash-regenerate-toc.yml`         | `/regenerate-toc`         | The user-guide table of contents.  |
+| `slash-regenerate-cmdline-ref.yml` | `/regenerate-cmdline-ref` | The slangc command-line reference. |
 
 ## 6. Release, tag, and publishing
 

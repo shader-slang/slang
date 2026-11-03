@@ -1,13 +1,10 @@
 // Regression test for https://github.com/shader-slang/slang/issues/13701
 //
-// A qualified namespace declaration that reopens existing namespaces must not detach the
-// imported members of `Outer` from code that an earlier `namespace Outer` body declares.
-// The semantic checker attaches the imported `Outer` to the scope that `Outer` owns, which
-// is the scope of the last body of `Outer`, so `Local` sits in the last plain `Outer` body.
-// The qualified declaration below makes the members that this module declares in `Outer`
-// visible without replacing that scope. If it replaced the scope, `ImportedType` in
-// `Local` would be an undefined identifier; if it pushed no scope for `Outer`,
-// `outerValue` in `getOuterValue` would be.
+// A qualified namespace declaration that reopens existing namespaces keeps the imported
+// members of `Outer` visible to code that an earlier `namespace Outer` body declares, and
+// it makes the members that this module declares in `Outer` visible inside its own body.
+// Without the first, `ImportedType` in `Local` would be an undefined identifier; without
+// the second, `outerValue` in `getOuterValue` would be.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

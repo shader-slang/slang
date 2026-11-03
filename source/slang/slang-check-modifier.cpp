@@ -1570,6 +1570,8 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
         return modifierType;
     case ASTNodeType::OutModifier:
     case ASTNodeType::RefModifier:
+    case ASTNodeType::RefReadOnlyModifier:
+    case ASTNodeType::RefWriteOnlyModifier:
     case ASTNodeType::BorrowModifier:
     case ASTNodeType::InOutModifier:
         return ASTNodeType::OutModifier;
@@ -1645,13 +1647,17 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::HLSLUniformModifier:
         return ASTNodeType::HLSLStaticModifier;
 
+    // An interpolation mode and a sampling location combine (HLSL `noperspective centroid`,
+    // `linear sample`), so they are two conflict groups.
     case ASTNodeType::HLSLNoInterpolationModifier:
     case ASTNodeType::HLSLNoPerspectiveModifier:
     case ASTNodeType::HLSLLinearModifier:
-    case ASTNodeType::HLSLSampleModifier:
-    case ASTNodeType::HLSLCentroidModifier:
     case ASTNodeType::PerVertexModifier:
         return ASTNodeType::InterpolationModeModifier;
+
+    case ASTNodeType::HLSLSampleModifier:
+    case ASTNodeType::HLSLCentroidModifier:
+        return ASTNodeType::HLSLSampleModifier;
 
     case ASTNodeType::PrefixModifier:
     case ASTNodeType::PostfixModifier:
@@ -1701,6 +1707,10 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::GLSLPatchModifier:
         return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
                as<GLSLInterfaceBlockDecl>(decl);
+
+    case ASTNodeType::RefReadOnlyModifier:
+    case ASTNodeType::RefWriteOnlyModifier:
+        return as<ParamDecl>(decl);
     case ASTNodeType::RayPayloadAccessSemantic:
     case ASTNodeType::RayPayloadReadSemantic:
     case ASTNodeType::RayPayloadWriteSemantic:
@@ -1976,6 +1986,19 @@ Modifier* SemanticsVisitor::checkModifier(
                 return nullptr;
             }
             return m;
+        }
+
+        // Reference parameters are a core-module mechanism, so the `__ref_readonly` and
+        // `__ref_writeonly` keywords are intended for the core module, and user code opts in to
+        // them as an experimental feature. The legacy alias `const __ref` remains available to
+        // user code.
+        if ((as<RefReadOnlyModifier>(m) || as<RefWriteOnlyModifier>(m)) &&
+            !ignoreUnallowedModifier &&
+            !getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature) &&
+            !isFromCoreModule(decl))
+        {
+            getSink()->diagnose(
+                Diagnostics::RefAccessKeywordRequiresExperimentalFeature{.modifier = m});
         }
     }
 
@@ -2554,6 +2577,37 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
                     .modifier = modifier});
             }
             mapExclusiveGroupToModifier[conflictGroup] = modifier;
+        }
+    }
+
+    // On a parameter, `const __ref` is the legacy spelling of `__ref_readonly`, so `const`
+    // alongside `__ref_readonly` or `__ref_writeonly` spells a second passing mode. `const` keeps
+    // its own conflict group because it is not a passing mode on any other parameter.
+    if (as<ParamDecl>(syntaxNode))
+    {
+        Modifier* constModifier = nullptr;
+        Modifier* refAccessModifier = nullptr;
+        for (modifier = resultModifiers; modifier; modifier = modifier->next)
+        {
+            Modifier* existingModifier = nullptr;
+            if (as<ConstModifier>(modifier) && !constModifier)
+            {
+                constModifier = modifier;
+                existingModifier = refAccessModifier;
+            }
+            else if (
+                (as<RefReadOnlyModifier>(modifier) || as<RefWriteOnlyModifier>(modifier)) &&
+                !refAccessModifier)
+            {
+                refAccessModifier = modifier;
+                existingModifier = constModifier;
+            }
+            if (existingModifier)
+            {
+                getSink()->diagnose(Diagnostics::DuplicateModifier{
+                    .existingModifier = existingModifier,
+                    .modifier = modifier});
+            }
         }
     }
 

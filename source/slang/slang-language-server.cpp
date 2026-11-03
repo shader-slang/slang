@@ -1464,7 +1464,26 @@ LanguageServerResult<LanguageServerProtocol::CompletionItem> LanguageServerCore:
     }
 
     LanguageServerProtocol::CompletionItem resolvedItem = args;
-    int itemId = stringToInt(args.data);
+    // `data` is "<completion version serial>:<candidate index>" for an item that has a completion
+    // candidate. Items without a candidate (keywords, which use "-1", and the other non-member
+    // items) have no colon and are deliberately returned unchanged: there is nothing to resolve.
+    // The index is only meaningful for the completion version that produced the item, so an item
+    // from an earlier completion request (or with malformed data) is also returned unresolved
+    // instead of being resolved against an unrelated declaration.
+    auto data = args.data.getUnownedSlice();
+    auto colon = data.indexOf(':');
+    if (colon == -1)
+    {
+        return resolvedItem;
+    }
+    int64_t serial = 0;
+    Int itemId = 0;
+    if (SLANG_FAILED(StringUtil::parseInt64(data.head(colon), serial)) || serial < 0 ||
+        uint64_t(serial) != m_workspace->getCompletionVersionSerial() ||
+        SLANG_FAILED(StringUtil::parseInt(data.tail(colon + 1), itemId)))
+    {
+        return resolvedItem;
+    }
     auto version = m_workspace->getCurrentCompletionVersion();
     if (!version || !version->linkage)
     {
