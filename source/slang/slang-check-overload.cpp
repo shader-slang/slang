@@ -2908,6 +2908,35 @@ bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
     return true;
 }
 
+/// Return `typePack` with every `ParameterGroupType` element replaced by the type it holds, or
+/// `typePack` itself when it has no such element.
+///
+/// Consider `printf("%u\n", cb)` where `cb` is a `ConstantBuffer<uint>`. The payload parameter of
+/// `printf` is `expand each T`, so inferring from the argument types as written binds
+/// `T = ConstantBuffer<uint>` and the handle itself would be printed. The payload of `printf` is
+/// the data to print, so we infer `T = uint` instead; coercing `cb` to the specialized `uint`
+/// parameter then inserts the same implicit dereference that `uint v = cb;` gets.
+static ConcreteTypePack* derefParameterGroupsInTypePack(
+    ASTBuilder* astBuilder,
+    ConcreteTypePack* typePack)
+{
+    ShortList<Type*> elementTypes;
+    bool changed = false;
+    for (Index i = 0; i < typePack->getTypeCount(); i++)
+    {
+        auto elementType = typePack->getElementType(i);
+        if (auto parameterGroupType = as<ParameterGroupType>(unwrapModifiedType(elementType)))
+        {
+            elementType = parameterGroupType->getElementType();
+            changed = true;
+        }
+        elementTypes.add(elementType);
+    }
+    if (!changed)
+        return typePack;
+    return astBuilder->getTypePack(elementTypes.getArrayView().arrayView);
+}
+
 // Infer generic arguments for a generic overload candidate.
 DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     DeclRef<GenericDecl> genericDeclRef,
@@ -3020,6 +3049,11 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
             //
             auto argType = unwrapModifiedType(matchedArgs[aa].argType);
             auto paramType = (*innerParameterTypes)[aa];
+            if (auto argTypePack = as<ConcreteTypePack>(argType))
+            {
+                if (isKnownBuiltinDecl(innerCallableDecl, KnownBuiltinDeclName::Printf))
+                    argType = derefParameterGroupsInTypePack(m_astBuilder, argTypePack);
+            }
             auto canUnify = TryUnifyTypes(
                 inferenceContext,
                 UnificationOptions(),

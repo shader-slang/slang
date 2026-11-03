@@ -10529,6 +10529,7 @@ public T nonuniformEXT(T index);
 
 /// Debug output printing
 [ForceInline]
+[KnownBuiltin($((int)KnownBuiltinDeclName::Printf))]
 public void debugPrintfEXT<each T>(NativeString format, expand each T args)
 {
     printf(format, args);

@@ -242,6 +242,7 @@ FIDDLE() namespace Slang
         WaveReadLaneFirst,
         CallShader,
         ReportHit = 16,
+        Printf = 17,
         COUNT
     };
 
