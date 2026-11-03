@@ -10,9 +10,13 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -whole-program
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=VIA_GLSL):-target spirv-asm -emit-spirv-via-glsl -whole-program
 //TEST:SIMPLE(filecheck=LLVM):-target llvm-ir -whole-program
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=AMBIG):-target spirv -entry Main -stage fragment
 
 // SPIRV-DAG: OpEntryPoint Vertex %{{.*}} "Main"
 // SPIRV-DAG: OpEntryPoint Fragment %{{.*}} "Main"
+
+// `-entry` names one function, so `-stage fragment` does not pick one of the two `Main`.
+// AMBIG: error[E38017]
 
 // LLVM-NOT: E38016
 // LLVM: define {{.*}}Main

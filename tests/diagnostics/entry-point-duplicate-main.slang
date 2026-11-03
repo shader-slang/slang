@@ -4,6 +4,7 @@
 // collides there.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cuda
+//TEST:SIMPLE(filecheck=CHECK):-target ptx -whole-program
 //TEST:SIMPLE(filecheck=CHECK):-target metal
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -whole-program
 //DIAGNOSTIC_TEST:SIMPLE(diag=COLLIDE):-target spirv

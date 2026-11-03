@@ -14,6 +14,14 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -whole-program
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -profile lib_6_6 -whole-program
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cpp -whole-program
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=VIA_GLSL):-target spirv-asm -emit-spirv-via-glsl -whole-program
+
+// The names are compared under the rules of the format that the emitter writes, which is GLSL
+// here, so the compute overloads that collide on SPIR-V give no E38016; glslang rejects the
+// whole-program GLSL instead.
+// VIA_GLSL-NOT: E38016
+// VIA_GLSL: E00101
+// VIA_GLSL-NOT: E38016
 
 RWStructuredBuffer<uint> outBuf;
 

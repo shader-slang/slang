@@ -8,11 +8,19 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry Count -stage compute
 //TEST:SIMPLE(filecheck=OTHER):-target spirv-asm -entry Other -stage compute
 //TEST:SIMPLE(filecheck=OTHER):-target spirv-asm -entry Other -stage compute -entry Other -stage compute
+//TEST:SIMPLE(filecheck=PICK):-target spirv-asm -entry Later -fvk-use-entrypoint-name
 //TEST:SIMPLE(filecheck=TWICE):-target spirv-asm -entry Other -stage compute -entry Third -stage compute -entry Other -stage compute
 
 // OTHER-NOT: E38016
 // OTHER: OpEntryPoint GLCompute
 // OTHER-NOT: OpEntryPoint
+
+// `Later` is redeclared after its definition, so lookup lists the redeclaration first. The PICK
+// lane passes no `-stage`, so it compiles only if `-entry` picks the definition, which carries
+// `[shader]` and `[numthreads]`.
+// PICK-NOT: error[
+// PICK: OpEntryPoint GLCompute %[[FN:[A-Za-z0-9_]+]] "Later"
+// PICK: OpExecutionMode %[[FN]] LocalSize 4 1 1
 
 // TWICE-NOT: E38016
 // TWICE-DAG: OpEntryPoint GLCompute %{{.*}} "Other"
@@ -59,3 +67,12 @@ void Third(uint3 tid: SV_DispatchThreadID)
 {
     outBuf[2] = 1;
 }
+
+[shader("compute")]
+[numthreads(4, 1, 1)]
+void Later(uint3 tid: SV_DispatchThreadID)
+{
+    outBuf[3] = 1;
+}
+
+void Later(uint3 tid: SV_DispatchThreadID);

@@ -44,7 +44,8 @@ bool doesTargetRenameEntryPointName(CodeGenTarget target, UnownedStringSlice ent
 /// only calls keeps its decoration after linking but is not an entry point of the output. The same
 /// function listed twice is not a collision. Entry points that the emitter does not write under
 /// their decoration name are not compared (see `computeEntryPointSymbolKey`): every entry point on
-/// GLSL and the Slang VM, and `main` on the CPU, CUDA and Metal source formats. Collisions can only
+/// GLSL and the Slang VM, `main` on the CPU, CUDA and Metal source formats, and every non-compute
+/// entry point on the CPU formats that the LLVM emitter writes. Collisions can only
 /// occur when several entry points share one output, as in a whole-program compile.
 void checkEntryPointNamesAreUnique(
     CodeGenContext* codeGenContext,
