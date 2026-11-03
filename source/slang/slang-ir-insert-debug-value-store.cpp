@@ -127,7 +127,6 @@ bool DebugValueStoreContext::isDebugVarTypeSupported(IRType* type)
 void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 {
     IRBuilder builder(func);
-    Dictionary<IRInst*, IRInst*> mapVarToDebugVar;
     auto firstBlock = func->getFirstBlock();
     if (!firstBlock)
         return;
@@ -169,39 +168,34 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             builder.getIntValue(builder.getUIntType(), paramIndex));
         copyNameHintAndDebugDecorations(debugVar, param);
 
-        mapVarToDebugVar[param] = debugVar;
-
-        // Map any in-param proxy vars to the debug var.
-        bool hasProxyVar = false;
+        // Lowering copies some `in` parameters into a proxy variable that the body reads and
+        // writes in place of the parameter, so that variable's storage holds the parameter.
+        IRInst* proxyVar = nullptr;
         for (auto use = param->firstUse; use; use = use->nextUse)
         {
             if (auto inParamProxyVarDecor = as<IRInParamProxyVarDecoration>(use->getUser()))
-            {
-                mapVarToDebugVar[inParamProxyVarDecor->parent] = debugVar;
-                hasProxyVar = true;
-            }
+                proxyVar = inParamProxyVarDecor->parent;
         }
 
-        // Store the initial value of the parameter into the debug var.
-        IRInst* paramVal = nullptr;
-        if (!isRefParam)
+        if (proxyVar)
         {
-            paramVal = param;
+            builder.setInsertAfter(proxyVar);
+            builder.emitDebugDeclare(debugVar, proxyVar);
         }
-        else if (
-            as<IRBorrowInOutParamType>(param->getDataType()) ||
-            as<IRBorrowInParamType>(param->getDataType()))
+        else if (isRefParam)
         {
-            paramVal = builder.emitLoad(param);
+            // An `out`, `inout` or `borrow` parameter points at the storage that holds its value.
+            builder.emitDebugDeclare(debugVar, param);
         }
-
-        if (paramVal && !hasProxyVar)
+        else
         {
-            builder.emitDebugValue(debugVar, paramVal);
+            builder.emitDebugValue(debugVar, param);
         }
         paramIndex++;
     }
 
+    // A local variable is described by its storage from the point of its declaration on;
+    // passes that remove or replace the storage rewrite the `DebugDeclare`.
     for (auto block : func->getBlocks())
     {
         IRInst* nextInst = nullptr;
@@ -223,69 +217,8 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                         debugLoc->getCol(),
                         debugLoc->getScope());
                     copyNameHintAndDebugDecorations(debugVar, varInst);
-                    mapVarToDebugVar[varInst] = debugVar;
-                }
-            }
-        }
-    }
-
-    // Collect all stores and insert debug value insts to update debug vars.
-
-    // Helper func to insert debugValue updates.
-    auto setDebugValue = [&](IRInst* debugVar, IRInst* newValue, ArrayView<IRInst*> accessChain)
-    {
-        auto ptr = builder.emitElementAddress(debugVar, accessChain);
-        builder.emitDebugValue(ptr, newValue);
-    };
-    for (auto block : func->getBlocks())
-    {
-        IRInst* nextInst = nullptr;
-        for (auto inst = block->getFirstInst(); inst; inst = nextInst)
-        {
-            nextInst = inst->getNextInst();
-
-            if (auto storeInst = as<IRStore>(inst))
-            {
-                List<IRInst*> accessChain;
-                auto varInst = getRootAddr(storeInst->getPtr(), accessChain);
-                IRInst* debugVar = nullptr;
-                if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
-                {
-                    builder.setInsertAfter(storeInst);
-                    setDebugValue(debugVar, storeInst->getVal(), accessChain.getArrayView());
-                }
-            }
-            else if (auto swizzledStore = as<IRSwizzledStore>(inst))
-            {
-                List<IRInst*> accessChain;
-                auto varInst = getRootAddr(swizzledStore->getDest(), accessChain);
-                IRInst* debugVar = nullptr;
-                if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
-                {
-                    builder.setInsertAfter(swizzledStore);
-                    auto loadVal = builder.emitLoad(swizzledStore->getDest());
-                    setDebugValue(debugVar, loadVal, accessChain.getArrayView());
-                }
-            }
-            else if (auto callInst = as<IRCall>(inst))
-            {
-                auto funcValue = getResolvedInstForDecorations(callInst->getCallee());
-                if (!funcValue)
-                    continue;
-                for (UInt i = 0; i < callInst->getArgCount(); i++)
-                {
-                    auto arg = callInst->getArg(i);
-                    if (!as<IRPtrTypeBase>(arg->getDataType()))
-                        continue;
-                    List<IRInst*> accessChain;
-                    auto varInst = getRootAddr(arg, accessChain);
-                    IRInst* debugVar = nullptr;
-                    if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
-                    {
-                        builder.setInsertAfter(callInst);
-                        auto loadVal = builder.emitLoad(arg);
-                        setDebugValue(debugVar, loadVal, accessChain.getArrayView());
-                    }
+                    builder.setInsertAfter(varInst);
+                    builder.emitDebugDeclare(debugVar, varInst);
                 }
             }
         }

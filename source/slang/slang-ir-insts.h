@@ -2795,6 +2795,19 @@ struct IRDebugValue : IRInst
     IRInst* getValue() { return getOperand(1); }
 };
 
+/// Ties a debug variable to the storage that holds its value, the Slang IR analog of
+/// SPIR-V `DebugDeclare` and LLVM `llvm.dbg.declare`. Storage is a pointer-typed address,
+/// rooted at a `Var`, `GlobalVar` or pointer-typed `Param`; it may be a derived address (for
+/// example after inlining) until SPIR-V legalization, which keeps only declares on a root. The
+/// variable's value is whatever that memory holds; a pass that
+/// removes or replaces the storage rewrites the declare (SSA construction turns it into a
+/// `DebugValue` per new SSA value).
+FIDDLE()
+struct IRDebugDeclare : IRInst
+{
+    FIDDLE(leafInst())
+};
+
 FIDDLE()
 struct IRDebugInlinedAt : IRInst
 {
@@ -3702,6 +3715,7 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* scope,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
+    IRInst* emitDebugDeclare(IRInst* debugVar, IRInst* storage);
     // Emit coverage marker ops. The coverage instrumentation IR pass
     // later rewrites each occurrence into an atomic add on a synthesized
     // counter buffer and records the marker-specific source-entry

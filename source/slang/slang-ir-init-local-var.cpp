@@ -35,6 +35,8 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
                         break;
                     case kIROp_GetElementPtr:
                     case kIROp_FieldAddress:
+                    // A debug declaration does not read the variable.
+                    case kIROp_DebugDeclare:
                         continue;
                     case kIROp_Load:
                         // --- WORKAROUND ---

@@ -2777,6 +2777,7 @@ struct ForwardDiffTranslationContext
         case kIROp_DebugLine:
         case kIROp_DebugVar:
         case kIROp_DebugValue:
+        case kIROp_DebugDeclare:
         case kIROp_DebugInlinedAt:
         case kIROp_DebugScope:
         case kIROp_DebugNoScope:

@@ -31,14 +31,14 @@ void main(uint tid : SV_DispatchThreadID)
     output[0] = o.inner.x + float(o.inner.y) + o.z;
 }
 
-// -O0: struct uses both DebugDeclare and per-member DebugValue.
+// -O0: the struct keeps its storage, so one DebugDeclare ties it to its OpVariable
+// and no store is mirrored into a per-member DebugValue.
 // CHECK_O0-DAG: DebugTypeComposite
 // CHECK_O0-DAG: [[O_STR:%[0-9]+]] = OpString "o"
 // CHECK_O0-DAG: [[O:%[A-Za-z_0-9]+]] = OpExtInst %void {{.*}} DebugLocalVariable [[O_STR]]
-// CHECK_O0-DAG: DebugDeclare [[O]]
-// CHECK_O0-DAG: DebugValue [[O]] {{.*}} %int_0 %int_0{{$}}
-// CHECK_O0-DAG: DebugValue [[O]] {{.*}} %int_0 %int_1{{$}}
-// CHECK_O0-DAG: DebugValue [[O]] {{.*}} %int_1{{$}}
+// CHECK_O0-DAG: [[O_VAR:%o]] = OpVariable %_ptr_Function_Outer Function
+// CHECK_O0-DAG: DebugDeclare [[O]] [[O_VAR]]
+// CHECK_O0-NOT: DebugValue [[O]]
 
 // -O1/-O2: nested struct should use DebugValue per leaf member with
 // multi-level access chain indices.

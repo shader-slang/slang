@@ -166,6 +166,11 @@ void VariableScopeCorrectionContext::_processInstruction(
     List<IRUse*> outOfScopeUses;
     for (auto use = originInst->firstUse; use; use = use->nextUse)
     {
+        // Debug instructions emit no C-like source and LLVM debug metadata is not lexically
+        // scoped, so a debug use outside the loop needs no correction; spilling a value (or a
+        // debug variable) for it would let debug information change the generated code.
+        if (isDebugInfoInst(use->getUser()))
+            continue;
         if (_isOutOfScopeUse(use->getUser(), dominatorTree, loopHeaderList))
         {
             outOfScopeUses.add(use);

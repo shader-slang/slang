@@ -2359,6 +2359,23 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst->removeAndDeallocate();
     }
 
+    // Keep a DebugDeclare only when its storage is a root memory object, because SPIR-V
+    // OpDebugDeclare names an OpVariable or an OpFunctionParameter. Storage derived from a root,
+    // such as the field address an inlined `inout` call on a struct field leaves behind, has no
+    // OpDebugDeclare form until declarations carry an access path, so we drop the declaration.
+    void processDebugDeclare(IRDebugDeclare* inst)
+    {
+        auto storage = inst->getStorage();
+        bool isRootStorage = as<IRVar>(storage) || as<IRGlobalVar>(storage);
+        if (auto param = as<IRParam>(storage))
+        {
+            auto func = getParentFunc(param);
+            isRootStorage = func && param->getParent() == func->getFirstBlock();
+        }
+        if (!isRootStorage)
+            inst->removeAndDeallocate();
+    }
+
     List<IRInst*> m_instsToRemove;
     void processWorkList()
     {
@@ -2495,6 +2512,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             case kIROp_DebugValue:
                 processDebugValue(as<IRDebugValue>(inst));
+                break;
+            case kIROp_DebugDeclare:
+                processDebugDeclare(as<IRDebugDeclare>(inst));
                 break;
             case kIROp_DebugVar:
                 if (!isSimpleDataType(as<IRDebugVar>(inst)->getDataType()))
