@@ -17623,7 +17623,7 @@ WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveMatchMultiple($0, $1)";
+    case cuda: __intrinsic_asm "_waveMatchMultiple($0, $1).x";
     case glsl: __intrinsic_asm "subgroupPartitionNV($1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
     }
