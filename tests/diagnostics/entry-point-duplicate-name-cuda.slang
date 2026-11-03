@@ -40,7 +40,7 @@ RWStructuredBuffer<uint> outBuf;
 void __raygen__Foo(uint3 tid: SV_DispatchThreadID)
 /*CHECK:
      ^^^^^^^^^^^^^ more than one entry point would be emitted as '__raygen__Foo' for target 'cuda'
-     ^^^^^^^^^^^^^ entry point '__raygen__Foo' would be emitted as '__raygen__Foo'
+     ^^^^^^^^^^^^^ this entry point would also be emitted as '__raygen__Foo'
 */
 {
     outBuf[0] = 1;

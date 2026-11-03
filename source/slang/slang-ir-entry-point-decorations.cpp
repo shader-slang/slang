@@ -277,6 +277,14 @@ struct EntryPointSymbolKey
     }
 };
 
+// Return whether the code-generation format `target` is source code, such as CUDA source or C++
+// source, rather than a binary or IR format such as PTX or LLVM IR.
+static bool isSourceFormat(CodeGenTarget target)
+{
+    auto desc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
+    return isDerivedFrom(desc.kind, ArtifactKind::Source);
+}
+
 // Compute the key of the entry point that `decoration` describes when the emitter for the
 // code-generation format `target` writes it, and return whether the entry point has one. The key
 // mirrors the emitters: the SPIR-V emitter writes the name into `OpEntryPoint` for its execution
@@ -291,12 +299,13 @@ struct EntryPointSymbolKey
 //   `-emit-spirv-via-glsl`, glslang reports a whole-program compile as E00101.
 // * The Slang VM emitter names a function by its qualified name hint, such as `A.run`, and makes a
 //   repeated name unique.
-// * The C-like emitters replace `main` with a generated `main_<n>`
-// (`doesTargetRenameEntryPointName`).
-//   The generated name is not compared. A generated name can collide with an entry point that is
-//   literally named `main_0`, as any generated `<name>_<n>` can collide with a verbatim entry-point
-//   name; that is a property of the C-like emitters' unique-name scheme, not of entry points that
-//   share a name.
+// * The LLVM emitter writes a named dispatcher only for a compute entry point; an entry point of
+//   another stage keeps its mangled name.
+// * The C-like emitters replace `main` with a generated `main_<n>`, as
+//   `doesTargetRenameEntryPointName` decides. The generated name is not compared. A generated
+//   name can collide with an entry point that is literally named `main_0`, as any generated
+//   `<name>_<n>` can collide with a verbatim entry-point name; that is a property of the C-like
+//   emitters' unique-name scheme, not of entry points that share a name.
 static bool computeEntryPointSymbolKey(
     CodeGenTarget target,
     IREntryPointDecoration* decoration,
@@ -309,7 +318,11 @@ static bool computeEntryPointSymbolKey(
     if (doesTargetRenameEntryPointName(target, name))
         return false;
 
+    // A CPU format that is not source is written by the LLVM emitter.
     const Stage stage = decoration->getProfile().getStage();
+    if (stage != Stage::Compute && isCPUTarget(target) && !isSourceFormat(target))
+        return false;
+
     outKey.symbol = name;
     if (isCUDATarget(target))
         outKey.symbol = String(getOptiXEntryPointNamePrefix(stage)) + name;
@@ -351,7 +364,6 @@ void checkEntryPointNamesAreUnique(CodeGenContext* codeGenContext, const List<IR
         codeGenContext->getSink()->diagnose(Diagnostics::DuplicateEntryPointName{
             .symbol = key.symbol,
             .target = targetName,
-            .name = String(decoration->getName()->getStringSlice()),
             .location = entryPoint->sourceLoc,
             .otherLocation = otherEntryPoint->sourceLoc});
     }
@@ -388,8 +400,7 @@ bool doesTargetRenameEntryPointName(CodeGenTarget target, UnownedStringSlice ent
         return false;
 
     // The C-like emitters write source formats; the LLVM emitter, which keeps `main`, does not.
-    auto desc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
-    if (!isDerivedFrom(desc.kind, ArtifactKind::Source))
+    if (!isSourceFormat(target))
         return false;
     return isCPUTarget(target) || isCUDATarget(target) || isMetalTarget(target);
 }

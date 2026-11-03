@@ -1370,9 +1370,10 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(checkEntryPointDecorations, target, sink);
 
-    // The entry points of the output and their decoration names are final after linking. The only
-    // later rename, `legalizeEntryPointForGLSL` naming the entry point `main`, happens only when
-    // the output holds a single entry point, where nothing can collide.
+    // The entry points of the output and their decoration names are final after linking. Later
+    // IR passes rename an entry point only in `legalizeEntryPointForGLSL`, which names a single
+    // entry point `main`, where nothing can collide; the names that the emitters change while
+    // writing (the OptiX prefix, the C-like `main` rename) are modeled by the check's key.
     checkEntryPointNamesAreUnique(codeGenContext, irEntryPoints);
 
     // Add floating point denormal handling mode decorations to entry point functions based on

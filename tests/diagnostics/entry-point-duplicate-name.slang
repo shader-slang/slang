@@ -32,7 +32,7 @@ void Count(uniform uint a, uint3 tid: SV_DispatchThreadID)
 void Count(uniform float a, uint3 tid: SV_DispatchThreadID)
 /*CHECK:
      ^^^^^ more than one entry point would be emitted as 'Count' for target
-     ^^^^^ entry point 'Count' would be emitted as 'Count'
+     ^^^^^ this entry point would also be emitted as 'Count'
 */
 {
     outBuf[0] = uint(a);
@@ -58,7 +58,7 @@ namespace B
 void K(uint3 tid: SV_DispatchThreadID)
 /*CHECK:
      ^ more than one entry point would be emitted as 'K' for target
-     ^ entry point 'K' would be emitted as 'K'
+     ^ this entry point would also be emitted as 'K'
 */
 {
     outBuf[1] = 2;

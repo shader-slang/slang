@@ -4643,7 +4643,7 @@ err(
     "duplicate-entry-point-name",
     38016,
     "more than one entry point would be emitted as '~symbol' for target '~target'",
-    span { loc = "location", message = "entry point '~name' would be emitted as '~symbol'" },
+    span { loc = "location", message = "this entry point would also be emitted as '~symbol'" },
     note { message = "the other entry point emitted as '~symbol' is here", span { loc = "otherLocation" } }
 )
 
