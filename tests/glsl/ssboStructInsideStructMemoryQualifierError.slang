@@ -5,14 +5,14 @@
 // Shader storage blocks, variables declared within shader storage blocks
 // and variables declared as image types. Named structs inside a Interface
 // block violates these rules
-// CHECK_GLSL: error
-// CHECK_SPV: error
+// CHECK_GLSL: error[E31201]
+// CHECK_SPV: error[E31201]
 buffer Block4 {
     struct StructTmp
     {
         readonly int val;
     };
-    readonly structTmp myStruct;
+    readonly StructTmp myStruct;
     coherent readonly vec4 member1;
     coherent vec4 member2;
 }inputBuffer4;

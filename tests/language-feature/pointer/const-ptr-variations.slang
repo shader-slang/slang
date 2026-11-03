@@ -16,12 +16,12 @@ void computeMain(int id : SV_DispatchThreadID)
 {
     // disallowed syntax with modifier `const`
 #ifdef T1
-    // CHECK_1: error
+    // CHECK_1: error[E20001]
     int const* ptr1 = ptr;
 #endif
 
 #ifdef T2
-    // CHECK_2: error
+    // CHECK_2: error[E20001]
     int* const ptr2 = ptr;
 #endif
 
