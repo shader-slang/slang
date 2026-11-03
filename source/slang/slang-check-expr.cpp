@@ -2203,8 +2203,14 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                      type,
                      getASTBuilder()->getDifferentiableRefInterfaceType()))
         {
-            // Unsupported at the moment.
-            SLANG_UNEXPECTED("existential differentiable pointer types not supported");
+            // Autodiff cannot yet register `DifferentialPtrType` and `DifferentialPtrPairType`
+            // for an existential box. We diagnose this limitation before lowering needs them.
+            getSink()->diagnose(Diagnostics::ExistentialBoxPointerDifferentiationNotSupported{
+                .type = type,
+                .location = m_parentDifferentiableAttr->m_typeRegistrationDiagnosticLoc.isValid()
+                                ? m_parentDifferentiableAttr->m_typeRegistrationDiagnosticLoc
+                                : m_parentDifferentiableAttr->loc});
+            return;
         }
     }
     else if (isAbstractTypePack(type))

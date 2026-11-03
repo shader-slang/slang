@@ -3614,6 +3614,13 @@ err(
 )
 
 err(
+    "existential-box-pointer-differentiation-not-supported",
+    30328,
+    "differentiation of existential box type '~type:Type' through IDifferentiablePtrType is not supported",
+    span { loc = "location" }
+)
+
+err(
     "non-method-interface-requirement-cannot-have-body",
     30317,
     "interface requirement has body",
