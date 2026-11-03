@@ -75,11 +75,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float3 pd = buffer.Load<float3>(16);
 
     // Plain `Store<T>` groups the same way as plain `Load<T>`.
-    // CHECK: Store(72U,float2(
-    // CHECK: Store(80U,float2(
+    // CHECK: Store<float2 >(72U,float2(
+    // CHECK: Store<float2 >(80U,float2(
     buffer.Store<float4>(72, float4(pc, pd.x));
-    // CHECK: Store(100U,_S
-    // CHECK: Store(104U,float2(
-    // CHECK: Store(112U,_S
+    // CHECK: Store<float >(100U,_S
+    // CHECK: Store<float2 >(104U,float2(
+    // CHECK: Store<float >(112U,_S
     buffer.Store<float4>(100, float4(pd, pc.x));
 }

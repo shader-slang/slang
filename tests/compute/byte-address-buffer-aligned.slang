@@ -37,20 +37,20 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     // A load with one use is written inside that use. The last statement reads every word
     // before it stores the first one.
-    // CHECK2: buffer0_0.Store(32U,(buffer0_0).Load<float4 >(32U));
-    // CHECK2: buffer0_0.Store(32U,float4((buffer0_0).Load<float >(8U), (buffer0_0).Load<float >(12U), (buffer0_0).Load<float >(16U), (buffer0_0).Load<float >(20U)));
+    // CHECK2: buffer0_0.Store<float4 >(32U,(buffer0_0).Load<float4 >(32U));
+    // CHECK2: buffer0_0.Store<float4 >(32U,float4((buffer0_0).Load<float >(8U), (buffer0_0).Load<float >(12U), (buffer0_0).Load<float >(16U), (buffer0_0).Load<float >(20U)));
     // CHECK2: float4 [[WIDE:[A-Za-z0-9_]+]] = (buffer0_0).Load<float4 >(32U);
-    // CHECK2: buffer0_0.Store(8U,[[WIDE]][int(0)]);
-    // CHECK2: buffer0_0.Store(12U,[[WIDE]][int(1)]);
-    // CHECK2: buffer0_0.Store(16U,[[WIDE]][int(2)]);
-    // CHECK2: buffer0_0.Store(20U,[[WIDE]][int(3)]);
+    // CHECK2: buffer0_0.Store<float >(8U,[[WIDE]][int(0)]);
+    // CHECK2: buffer0_0.Store<float >(12U,[[WIDE]][int(1)]);
+    // CHECK2: buffer0_0.Store<float >(16U,[[WIDE]][int(2)]);
+    // CHECK2: buffer0_0.Store<float >(20U,[[WIDE]][int(3)]);
     // CHECK2: float [[W12:[A-Za-z0-9_]+]] = (buffer0_0).Load<float >(12U);
     // CHECK2: float [[W16:[A-Za-z0-9_]+]] = (buffer0_0).Load<float >(16U);
     // CHECK2: float [[W20:[A-Za-z0-9_]+]] = (buffer0_0).Load<float >(20U);
-    // CHECK2: buffer0_0.Store(8U,(buffer0_0).Load<float >(8U));
-    // CHECK2: buffer0_0.Store(12U,[[W12]]);
-    // CHECK2: buffer0_0.Store(16U,[[W16]]);
-    // CHECK2: buffer0_0.Store(20U,[[W20]]);
+    // CHECK2: buffer0_0.Store<float >(8U,(buffer0_0).Load<float >(8U));
+    // CHECK2: buffer0_0.Store<float >(12U,[[W12]]);
+    // CHECK2: buffer0_0.Store<float >(16U,[[W16]]);
+    // CHECK2: buffer0_0.Store<float >(20U,[[W20]]);
 
     // CHECK3-DAG: %[[v4f:[a-zA-Z0-9_]+]] = OpTypeVector %float 4
     // CHECK3-DAG: %[[SBv4f:[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer %[[v4f]]
@@ -119,10 +119,10 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     buffer0.Store<float4>(8, buffer0.LoadAligned<float4>(8, 4), 4); // scalarized load + store
 }
 
-// CHECK_CUDA: .Store(32U,({{.*}}).Load<float4{{.*}}>(32U));
-// CHECK_CUDA: .Store(32U,make_float4{{.*}}).Load<float{{.*}}>(8U), {{.*}}).Load<float{{.*}}>(12U), {{.*}}).Load<float{{.*}}>(16U), {{.*}}).Load<float{{.*}}>(20U)));
+// CHECK_CUDA: .Store<float4{{.*}}>(32U,({{.*}}).Load<float4{{.*}}>(32U));
+// CHECK_CUDA: .Store<float4{{.*}}>(32U,make_float4{{.*}}).Load<float{{.*}}>(8U), {{.*}}).Load<float{{.*}}>(12U), {{.*}}).Load<float{{.*}}>(16U), {{.*}}).Load<float{{.*}}>(20U)));
 // CHECK_CUDA: [[WIDE:[A-Za-z0-9_]+]] = ({{.*}}).Load<float4{{.*}}>(32U);
-// CHECK_CUDA: .Store(8U,[[WIDE]].x);
-// CHECK_CUDA: .Store(12U,[[WIDE]].y);
-// CHECK_CUDA: .Store(16U,[[WIDE]].z);
-// CHECK_CUDA: .Store(20U,[[WIDE]].w);
+// CHECK_CUDA: .Store<float >(8U,[[WIDE]].x);
+// CHECK_CUDA: .Store<float >(12U,[[WIDE]].y);
+// CHECK_CUDA: .Store<float >(16U,[[WIDE]].z);
+// CHECK_CUDA: .Store<float >(20U,[[WIDE]].w);

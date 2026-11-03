@@ -22,10 +22,10 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     // A load with one use is written inside that use. The second row is read before the store
     // at 16 overwrites bytes 20-31.
-    // CHECK2: buffer_0.Store(0U,(buffer_0).Load<float4 [int(2)] >(0U));
+    // CHECK2: buffer_0.Store<float4 [int(2)] >(0U,(buffer_0).Load<float4 [int(2)] >(0U));
     // CHECK2: float4 [[ROW1:[A-Za-z0-9_]+]] = float4((buffer_0).Load<float >(20U), (buffer_0).Load<float >(24U), (buffer_0).Load<float >(28U), (buffer_0).Load<float >(32U));
-    // CHECK2: buffer_0.Store(16U,float4((buffer_0).Load<float >(4U), (buffer_0).Load<float >(8U), (buffer_0).Load<float >(12U), (buffer_0).Load<float >(16U)));
-    // CHECK2: buffer_0.Store(32U,[[ROW1]]);
+    // CHECK2: buffer_0.Store<float4 >(16U,float4((buffer_0).Load<float >(4U), (buffer_0).Load<float >(8U), (buffer_0).Load<float >(12U), (buffer_0).Load<float >(16U)));
+    // CHECK2: buffer_0.Store<float4 >(32U,[[ROW1]]);
 
     // CHECK3: OpAccessChain
     // CHECK3: OpLoad %v4float

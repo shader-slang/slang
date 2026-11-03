@@ -3132,14 +3132,49 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_ByteAddressBufferStore:
         {
+            // A `uint` or `uintN` value is stored with `Store`/`StoreN`, which HLSL (including
+            // FXC) and the C++ and CUDA preludes all provide. Every other value names its type
+            // with `Store<T>`, as the load does, rather than leaving the downstream compiler to
+            // deduce the type from the spelling of the value. That spelling can be narrower than
+            // the value: HLSL writes a `double` or `half` constant as a bare literal such as
+            // `42.0`, which dxc deduces as `float`, and C++ and CUDA write a `double` infinity
+            // as the `float` macro `SLANG_INFINITY`.
+            //
+            auto store = cast<IRByteAddressBufferStore>(inst);
+            auto valueType = store->getValue()->getDataType();
+            IRType* elementType = valueType;
+            IRIntegerValue elementCount = 1;
+            if (auto vecType = as<IRVectorType>(valueType))
+            {
+                if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
+                {
+                    elementType = vecType->getElementType();
+                    elementCount = elementCountInst->getValue();
+                }
+            }
+
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
 
-            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-            m_writer->emit(".Store(");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            emitOperand(store->getBuffer(), leftSide(outerPrec, prec));
+            m_writer->emit(".Store");
+            if (elementType->getOp() == kIROp_UIntType)
+            {
+                if (elementCount != 1)
+                {
+                    m_writer->emit(elementCount);
+                }
+            }
+            else
+            {
+                m_writer->emit("<");
+                emitType(valueType);
+                m_writer->emit(" >");
+            }
+            m_writer->emit("(");
+            emitOperand(store->getOffset(), getInfo(EmitOp::General));
             m_writer->emit(",");
-            emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
+            emitOperand(store->getValue(), getInfo(EmitOp::General));
             m_writer->emit(")");
             break;
         }
