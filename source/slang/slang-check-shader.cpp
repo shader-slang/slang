@@ -2346,6 +2346,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // The GLSL layout lifts below can run after the entry point's module was lowered to IR (for
+    // an entry point found by `findAndCheckEntryPoint`). The linker then takes the decorations
+    // for the lifted attributes from the program's layout IR, so every decoration a lift
+    // produces is listed in `cloneExtraDecorationsFromInst` (slang-ir-link.cpp).
+    //
     // GLSL puts `layout(early_fragment_tests) in;` on a standalone EmptyDecl beside the entry
     // point, not on the function; lift it onto the fragment entry point as the canonical
     // EarlyDepthStencilAttribute (as the local_size_* -> NumThreadsAttribute lift below does).

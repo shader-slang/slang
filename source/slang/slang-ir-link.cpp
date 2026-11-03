@@ -529,6 +529,19 @@ IRGlobalVar* cloneGlobalVarImpl(
 /// that selected requirement, so preserve its capability and execution-mode decorations when
 /// choosing the source module's function body or specializing a generic body.
 ///
+/// Entry-point validation can also add attributes after a module was lowered. Consider this
+/// GLSL compute shader, loaded as a module and then compiled through
+/// `findAndCheckEntryPoint("computeMain", ...)`:
+///
+///     layout(local_size_x = 16) in;
+///     void computeMain() { ... }
+///
+/// `validateEntryPoint` lifts the `layout(...) in;` declaration onto `computeMain` as a
+/// `NumThreadsAttribute` (and `layout(early_fragment_tests) in;` as an
+/// `EarlyDepthStencilAttribute`), but the module's IR for `computeMain` was generated before
+/// that. Only the layout IR, which is generated for the selected program, carries the
+/// resulting thread-group size and early-fragment-tests decorations.
+///
 /// This function scans through all the `originalValues` that were considered for `clonedInst`,
 /// and copies over any decorations that are allowed to come from a non-"best" definition.
 /// For a given decoration opcode, only one such decoration will ever be copied, except that
@@ -573,6 +586,8 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_NonCopyableTypeDecoration:
         case kIROp_DynamicDispatchWitnessDecoration:
         case kIROp_Shader64BitIndexingDecoration:
+        case kIROp_NumThreadsDecoration:
+        case kIROp_EarlyDepthStencilDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {
                 cloneInst(context, builder, decoration);
