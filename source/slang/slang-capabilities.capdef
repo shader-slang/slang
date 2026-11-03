@@ -1487,58 +1487,39 @@ alias tesscontrol = hull;
 /// [Stage]
 alias tesseval = domain;
 
-/// Ray-Generation shader stage & ray-tracing capabilities
+// These stage names also describe logical roles in the portable ray-tracing API on Metal.
+// Native pipeline entry points and intrinsics additionally require `raytracing`.
+/// Ray-generation stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias raygen = _raygen + raytracing;
+alias raygen = _raygen + raytracing | _raygen + metal;
 
-/// Ray-Generation shader stage & ray-tracing capabilities
+/// Alias for the ray-generation stage.
 /// [Stage]
-alias raygeneration = _raygeneration + raytracing;
+alias raygeneration = raygen;
 
-/// Intersection shader stage & ray-tracing capabilities
+/// Intersection stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias intersection = _intersection + raytracing;
+alias intersection = _intersection + raytracing | _intersection + metal;
 
-/// Any-Hit shader stage & ray-tracing capabilities
+/// Any-hit stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias anyhit = _anyhit + raytracing;
+alias anyhit = _anyhit + raytracing | _anyhit + metal;
 
-/// Closest-Hit shader stage & ray-tracing capabilities
+/// Closest-hit stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias closesthit = _closesthit + raytracing;
+alias closesthit = _closesthit + raytracing | _closesthit + metal;
 
-/// Callable shader stage & ray-tracing capabilities
+/// Callable stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias callable = _callable + raytracing;
+alias callable = _callable + raytracing | _callable + metal;
 
-/// Ray-Miss shader stage & ray-tracing capabilities
+/// Miss stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias miss = _miss + raytracing;
+alias miss = _miss + raytracing | _miss + metal;
 
-// Logical stages implemented by the portable ray-tracing API. Metal has no native shader
-// stages for these roles, so the compiler synthesizes their physical dispatch there.
-/// Logical closest-hit role used by the portable ray-tracing API.
-/// [Compound]
-alias portable_raytracing_closesthit = closesthit | _closesthit + metal;
-/// Logical any-hit role used by the portable ray-tracing API.
-/// [Compound]
-alias portable_raytracing_anyhit = anyhit | _anyhit + metal;
-/// Logical hit roles that can read built-in triangle attributes, including Metal dispatch.
-/// [Compound]
-alias portable_raytracing_anyhit_closesthit = portable_raytracing_anyhit
-                                            | portable_raytracing_closesthit;
-/// Logical intersection role used by the portable ray-tracing API.
-/// [Compound]
-alias portable_raytracing_intersection = intersection | _intersection + metal;
 /// Intersection-stage ray payload access on CUDA/OptiX and Metal.
 /// [Compound]
-alias portable_raytracing_intersection_payload = intersection + cuda | _intersection + metal;
-/// Logical miss role used by the portable ray-tracing API.
-/// [Compound]
-alias portable_raytracing_miss = miss | _miss + metal;
-/// Logical callable role used by the portable ray-tracing API.
-/// [Compound]
-alias portable_raytracing_callable = callable | _callable + metal;
+alias portable_raytracing_intersection_payload = intersection + cuda | intersection + metal;
 
 /// Stages that may invoke a callable shader through the portable ray-tracing API.
 /// [Compound]

@@ -18,7 +18,7 @@ public struct Context : rt::IPayloadContext
     public typealias Record = input_copy::Record;
 }
 
-[require(portable_raytracing_miss)]
+[require(miss)]
 public void updatePayload(in rt::MissInput<Context> input)
 {
     rt::MissInput<Context> local = input;

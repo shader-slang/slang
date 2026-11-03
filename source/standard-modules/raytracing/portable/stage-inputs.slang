@@ -611,7 +611,7 @@ public extension<Input : ICommonHitInput> Input
 /// parameter. Copying the view does not duplicate its payload or record storage.
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
-[require(portable_raytracing_closesthit)]
+[require(closesthit)]
 [KnownBuiltin("RayTracingClosestHitInput")]
 public struct ClosestHitInput<Context> : ICommonHitInput
     where Context : IHitContext
@@ -838,7 +838,7 @@ public extension<Context> ClosestHitInput<Context>
 /// parameter. Copying the view does not duplicate its payload or record storage.
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
-[require(portable_raytracing_anyhit)]
+[require(anyhit)]
 [KnownBuiltin("RayTracingAnyHitInput")]
 public struct AnyHitInput<Context> : ICommonHitInput
     where Context : IHitContext
@@ -1113,7 +1113,7 @@ public extension<Context> AnyHitInput<Context>
 /// as a global shader parameter or field, or return one from a function.
 /// An `IIntersectionShader` implementation additionally requires
 /// `Context.Primitive : ICustomIntersectionPrimitive`.
-[require(portable_raytracing_intersection)]
+[require(intersection)]
 [KnownBuiltin("RayTracingIntersectionInput")]
 public struct IntersectionInput<Context> : ICommonHitInput
     where Context : IHitContext
@@ -1365,7 +1365,7 @@ public extension<Context> IntersectionInput<Context>
 /// parameter. Copying the view does not duplicate its payload or record storage.
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
-[require(portable_raytracing_miss)]
+[require(miss)]
 [KnownBuiltin("RayTracingMissInput")]
 public struct MissInput<Context>
     where Context : IPayloadContext
@@ -1503,7 +1503,7 @@ public extension<Context> MissInput<Context>
 /// parameter. Copying the view does not duplicate its callable-data or record storage.
 /// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
 /// as a global shader parameter or field, or return one from a function.
-[require(portable_raytracing_callable)]
+[require(callable)]
 [KnownBuiltin("RayTracingCallableInput")]
 public struct CallableInput<Context>
     where Context : ICallableContext

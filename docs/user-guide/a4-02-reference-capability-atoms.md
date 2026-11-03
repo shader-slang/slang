@@ -59,13 +59,13 @@ Stages
 > Amplification shader stage & mesh shader capabilities
 
 `anyhit`
-> Any-Hit shader stage & ray-tracing capabilities
+> Any-hit stage, including its logical role in portable ray tracing on Metal.
 
 `callable`
-> Callable shader stage & ray-tracing capabilities
+> Callable stage, including its logical role in portable ray tracing on Metal.
 
 `closesthit`
-> Closest-Hit shader stage & ray-tracing capabilities
+> Closest-hit stage, including its logical role in portable ray tracing on Metal.
 
 `compute`
 > Compute shader stage
@@ -86,13 +86,13 @@ Stages
 > Hull shader stage
 
 `intersection`
-> Intersection shader stage & ray-tracing capabilities
+> Intersection stage, including its logical role in portable ray tracing on Metal.
 
 `mesh`
 > Mesh shader stage & mesh shader capabilities
 
 `miss`
-> Ray-Miss shader stage & ray-tracing capabilities
+> Miss stage, including its logical role in portable ray tracing on Metal.
 
 `node`
 > Work-graph node stage (requires SM 6.8 or later)
@@ -101,10 +101,10 @@ Stages
 > Pixel shader stage
 
 `raygen`
-> Ray-Generation shader stage & ray-tracing capabilities
+> Ray-generation stage, including its logical role in portable ray tracing on Metal.
 
 `raygeneration`
-> Ray-Generation shader stage & ray-tracing capabilities
+> Alias for the ray-generation stage.
 
 `task`
 > Task shader stage & mesh shader capabilities
@@ -1328,33 +1328,15 @@ Compound Capabilities
 `pack_vector`
 > Capabilities required to use pack/unpack intrinsics on packed vector data
 
-`portable_raytracing_anyhit`
-> Logical any-hit role used by the portable ray-tracing API.
-
-`portable_raytracing_anyhit_closesthit`
-> Logical hit roles that can read built-in triangle attributes, including Metal dispatch.
-
 `portable_raytracing_call_shader`
 > Stages that may invoke a callable shader through the portable ray-tracing API.
-
-`portable_raytracing_callable`
-> Logical callable role used by the portable ray-tracing API.
-
-`portable_raytracing_closesthit`
-> Logical closest-hit role used by the portable ray-tracing API.
 
 `portable_raytracing_instance_motion`
 > Instance motion available to the portable ray-tracing API. Metal encodes the requirement on
 > its intersector type, while Vulkan and OptiX pass a ray time to their native trace operation.
 
-`portable_raytracing_intersection`
-> Logical intersection role used by the portable ray-tracing API.
-
 `portable_raytracing_intersection_payload`
 > Intersection-stage ray payload access on CUDA/OptiX and Metal.
-
-`portable_raytracing_miss`
-> Logical miss role used by the portable ray-tracing API.
 
 `portable_raytracing_trace`
 > Stages that may trace a ray through the portable ray-tracing API.

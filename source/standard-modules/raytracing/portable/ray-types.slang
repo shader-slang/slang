@@ -259,12 +259,12 @@ public struct TriangleData
     /// Reads the two barycentric coordinates supplied for the triangle hit.
     ///
     /// @par Constraints
-    /// Requires `portable_raytracing_anyhit_closesthit`, so access is available only in supported
+    /// Requires `anyhit_closesthit`, so access is available only in supported
     /// any-hit and closest-hit stages. The coordinates describe built-in triangle intersection
     /// state, rather than application-defined procedural attributes.
     ///
     /// @todo A following PR must connect this getter to native hit attributes or Metal stage state.
-    [require(portable_raytracing_anyhit_closesthit)]
+    [require(anyhit_closesthit)]
     public property float2 barycentricCoord
     {
         get;
@@ -273,11 +273,11 @@ public struct TriangleData
     /// Reports whether the ray hit the triangle's front face according to native face orientation.
     ///
     /// @par Constraints
-    /// Requires `portable_raytracing_anyhit_closesthit`, so access is available only in supported
+    /// Requires `anyhit_closesthit`, so access is available only in supported
     /// any-hit and closest-hit stages. Reads built-in triangle state for the current hit.
     ///
     /// @todo A following PR must synthesize Metal's candidate or committed-hit facing value.
-    [require(portable_raytracing_anyhit_closesthit)]
+    [require(anyhit_closesthit)]
     public property bool frontFacing
     {
         get

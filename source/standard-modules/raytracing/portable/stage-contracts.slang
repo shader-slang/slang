@@ -10,10 +10,10 @@ namespace rt
 /// can forward an existing input to this method, using the caller's payload and shader record.
 ///
 /// @par Constraints
-/// Requires the `portable_raytracing_closesthit` capability.
+/// Requires the `closesthit` capability.
 /// Implementations must be user-defined structs. Stage dispatch calls static `invoke` without
 /// constructing an object; per-invocation state is supplied through its input.
-[require(portable_raytracing_closesthit)]
+[require(closesthit)]
 __magic_type(ClosestHitShaderType)
 public interface IClosestHitShader
 {
@@ -36,10 +36,10 @@ public interface IClosestHitShader
 /// control flow.
 ///
 /// @par Constraints
-/// Requires the `portable_raytracing_anyhit` capability.
+/// Requires the `anyhit` capability.
 /// Implementations must be user-defined structs. Stage dispatch calls static `invoke` without
 /// constructing an object; per-invocation state is supplied through its input.
-[require(portable_raytracing_anyhit)]
+[require(anyhit)]
 __magic_type(AnyHitShaderType)
 public interface IAnyHitShader
 {
@@ -92,10 +92,10 @@ public interface IIntersectionStage
 /// @par Constraints
 /// Inherits `Context : IHitContext` from `IIntersectionStage` and further requires
 /// `Context.Primitive : ICustomIntersectionPrimitive`. Requires the
-/// `portable_raytracing_intersection` capability.
+/// `intersection` capability.
 /// Implementations must be user-defined structs. Stage dispatch calls static `invoke` without
 /// constructing an object; per-invocation state is supplied through its input.
-[require(portable_raytracing_intersection)]
+[require(intersection)]
 __magic_type(IntersectionShaderType)
 public interface IIntersectionShader : IIntersectionStage
 {
@@ -112,10 +112,10 @@ public interface IIntersectionShader : IIntersectionStage
 /// native miss entry point or the corresponding structural dispatch function.
 ///
 /// @par Constraints
-/// Requires the `portable_raytracing_miss` capability.
+/// Requires the `miss` capability.
 /// Implementations must be user-defined structs. Stage dispatch calls static `invoke` without
 /// constructing an object; per-invocation state is supplied through its input.
-[require(portable_raytracing_miss)]
+[require(miss)]
 __magic_type(MissShaderType)
 public interface IMissShader
 {
@@ -136,10 +136,10 @@ public interface IMissShader
 /// native callable entry point or the corresponding structural dispatch function.
 ///
 /// @par Constraints
-/// Requires the `portable_raytracing_callable` capability.
+/// Requires the `callable` capability.
 /// Implementations must be user-defined structs. Stage dispatch calls static `invoke` without
 /// constructing an object; per-invocation state is supplied through its input.
-[require(portable_raytracing_callable)]
+[require(callable)]
 __magic_type(CallableShaderType)
 public interface ICallableShader
 {

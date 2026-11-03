@@ -3,6 +3,11 @@
 //TEST:SIMPLE: -experimental-feature -entry Intersection -stage intersection -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry Miss -stage miss -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry Callable -stage callable -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry ClosestHit -target metal -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry AnyHit -target metal -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry Intersection -target metal -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry Miss -target metal -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry Callable -target metal -no-codegen
 
 import slang.raytracing.portable;
 
