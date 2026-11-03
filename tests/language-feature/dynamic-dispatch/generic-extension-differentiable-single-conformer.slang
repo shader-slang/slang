@@ -9,6 +9,10 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -Xslang -std -Xslang 2026
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -Xslang -std -Xslang 2026
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -profile cs_6_0 -std 2025
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -profile cs_6_0 -std 2026
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -profile cs_6_0 -std 202c
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry computeMain -std 2025
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry computeMain -std 2026
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry computeMain -std 202c
 
 interface IValue
