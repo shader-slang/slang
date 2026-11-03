@@ -1,9 +1,10 @@
 // `-entry` with an overloaded name reports E38017, with a note for each candidate, at the start of
-// the module like E38000 (shader-slang/slang#14053). The other lanes compile. In the first one, a
-// unique name links only that entry point, so the overloaded `[shader]` functions in this file do
-// not collide, and the prototype and the definition of `Other` are one function. In the second,
-// slangc merges a repeated adjacent `-entry` into one request. In the third, a request between the
-// two keeps both, so `linkIR` lists `Other` twice, and one function listed twice is not a collision.
+// the module like E38000 (shader-slang/slang#14053). The other lanes compile. In the first OTHER
+// lane, a unique name links only that entry point, so the overloaded `[shader]` functions in this
+// file do not collide, and the prototype and the definition of `Other` are one function. In the
+// second OTHER lane, slangc merges a repeated adjacent `-entry` into one request. In the TWICE lane,
+// a request between the two keeps both, so `linkIR` lists `Other` twice, and one function listed
+// twice is not a collision. The PICK lane is described next to its checks.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry Count -stage compute
 //TEST:SIMPLE(filecheck=OTHER):-target spirv-asm -entry Other -stage compute
