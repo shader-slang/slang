@@ -1,44 +1,50 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:08:37+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T08:06:21Z
 target_doc: ir-reference/generics-and-existentials.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: 56404e70e333b4f755dead63d0132446c9ebb690ea7e2d1f06bbbb9e8de4f68c
+source_commit: 8341c7e537a3f5cb3a60cd062066ffd630da40d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: fail
-  style_consistency: partial
+  completeness: partial
+  style_consistency: pass
   source_alignment: partial
-  front_matter_validity: fail
+  front_matter_validity: pass
 finding_count: 6
 severity_breakdown:
-  critical: 0
-  major: 2
-  minor: 2
-  nit: 2
+  critical: 1
+  major: 0
+  minor: 5
+  nit: 0
 ---
 
 # Review report for ir-reference/generics-and-existentials.md
 
 ## Summary
-The page is broadly accurate and all source citations and links resolve, but it does not satisfy the mandatory producer-column contract: 40 opcode rows retain retired `(synthesized)` or bare `—` origins. Its recorded watched-path digest also does not match the current manifest entry.
+
+The document substantially matches the current source, with accurate opcode coverage and useful distinctions between active producers and unused builders. The most important correction concerns interface representation: requirement entries are global instructions referenced through interface operands, not children of the interface. Five smaller findings address conditional behavior, producer attribution, wrapper counting, and a missing required source link.
 
 ## Items checked
-- Inspected the target, both generation prompts, all 11 resolved watched files, and all five dependency documents.
-- Verified all 83 unique source line targets against commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`; every cited line matched.
-- Spot-checked more than 25 factual claims, including schemas, wrappers, producers, existential projections, witness lookup, RTTI, sets, tag operations, and tagged-union operand order.
-- Resolved all 78 relative-link occurrences (34 unique targets) and confirmed every generated-doc peer is present in the manifest.
-- Swept 278 identifier-like tokens and 18 source filenames, checked front matter and required sections, and confirmed the document lints cleanly.
+
+- Read `_review.md`, `_common.md`, and the document-specific prompt obtained through `regenerate.py show`.
+- Verified against the **current working tree**, which the operator states matches the document’s source commit throughout `source/`.
+- Checked every located line-number citation, covering 170 distinct file/line starting locations and the cited `SetBase` comment range. Locations resolve; two producer citations actually identify consumers.
+- Spot-checked more than 10 claims, including specialization operands, witness lookup keys, existential construction and projections, global generic diagnostics, interface requirements, set canonicalization, tagged-union operand order, wrapper generation, optional-constraint lowering, and unused builders.
+- Checked the 52 concrete opcode rows against Lua definitions and relevant C++ wrappers/builders.
+- Resolved all 119 relative-link occurrences, representing 35 distinct destinations; checked generated destinations against the manifest and the referenced section anchors. Dependency documents were consulted only for cross-reference checks.
+- Checked required sections, table structure, front matter, Mermaid conventions, Liquid safety, and the 65,536-byte size cap; the document is 53,090 bytes.
+- No files were written.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Opcodes`, lines 178-355 | Forty six-column opcode rows use the retired `(synthesized)` catch-all or bare `—` in `AST origin`, including rows that already name a producing function. Four unproduced opcodes also use `—` instead of the required **no producer at HEAD** wording. | `docs/generated/design/_meta/prompts/_common.md:240-241` requires the actual pass/function or **no producer at HEAD**; examples include producers at `source/slang/slang-ir-legalize-global-values.cpp:229` and `source/slang/slang-ir-bind-existentials.cpp:350`. | Replace every retired label with the specific producer. For each truly uncalled opcode, write **no producer at HEAD** and state that in its summary. |
-| F-002 | major | Front matter, line 6 | `watched_paths_digest` is `64be22...`, but the current manifest entry resolved by `regenerate.py show` includes 11 watched files and `regenerate.py digest ir-reference/generics-and-existentials.md` returns `5016fe2773a7e78a94911faa961b75c8f140bba84ba007a0f0e81fc088522624`. | `docs/generated/design/_meta/manifest.yaml:637-653`; target front matter line 6. | Regenerate the page from the current manifest inputs so its front matter records the current digest. |
-| F-003 | minor | `## Source`, lines 98-101; `UnboundedGenericElement` row, line 315 | The claim that exactly four opcodes have no producer omits `UnboundedGenericElement`. Its builder exists, but no source call site invokes it, matching the page's own criterion for the other four unproduced opcodes. | `source/slang/slang-ir-insts.h:4610-4613` defines `getUnboundedGenericElement`; the only other source references are consumer/classification cases at lines 2983/2999 and `source/slang/slang-ir.cpp:9691`. | Add `UnboundedGenericElement` to the no-producer inventory and mark its row **no producer at HEAD**. |
-| F-004 | minor | `## Opcodes`, lines 246-252; `specialize` callout, lines 369-375 | The page describes specialization-pass behavior—when `lookupWitness` is replaced and how `specialize` is replaced by a generic's result—even though the per-document prompt forbids specialization-pass details. | `docs/generated/design/_meta/prompts/ir-reference-generics-and-existentials.md:70-73`. | Keep only opcode-level semantics and refer readers to the existing `pipeline/05-ir-passes.md` link for pass behavior. |
-| F-005 | nit | Introduction, lines 12-21 | The opening paragraph states the scope, but the intended reader is deferred to a second paragraph; the common contract requires both in the first paragraph. | `docs/generated/design/_meta/prompts/_common.md:65-66`. | Merge the intended-reader sentence into the opening paragraph. |
-| F-006 | nit | `interface_req_entry` row, line 231 | The phrase `an associated-type bound such as` is duplicated verbatim. | Target document line 231. | Remove one copy of the duplicated phrase. |
+| F-001 | critical | `### Witness tables and witness facts`, lines 299–307 | The example says the interface has three `interface_req_entry` **children**. This describes the wrong IR relationship and could lead readers to traverse children instead of operands. | `source/slang/slang-lower-to-ir.cpp:12187` allocates the interface with requirement operands; line 12346 uses `irInterface->setOperand(entryIndex, entry)`. `source/slang/slang-ir.cpp:5325–5336` creates each entry with `addGlobalValue(this, entry)`. | Replace “children” with “operands referencing global requirement-entry instructions.” Preserve the three-key example and explain that these entries are not nested under the interface. |
+| F-002 | minor | `### wrapExistential`, lines 532–537 | The claim that targeting an `InterfaceType` produces `makeExistential` omits conditions and an additional identity case. Consequently, the unconditional conclusion about alternative spellings is too strong. | `source/slang/slang-ir.cpp:5037–5055` requires `slotArgCount >= 2`; when `slotArgs[0]` is `DynamicType`, it returns `value` unchanged. Otherwise it extracts the bound value and builds `makeExistential`. | State the slot-count condition and the `DynamicType` identity case. Limit the canonicalization claim to the concrete-interface wrapping case handled by this branch. |
+| F-003 | minor | `#### Dispatchers and existential specialization`, lines 448–451 | `FuncTypeOf` is called “the one row in this table” not produced by type-flow specialization. The same table includes two unproduced dispatcher opcodes and `SpecializeExistentialsInType`, produced by ordinary specialization. | `source/slang/slang-ir-specialize.cpp:3214` constructs `SpecializeExistentialsInType`; `source/slang/slang-ir-insts.h:4580` and `:4601` define the uncalled dispatcher builders. | Replace the exclusivity claim with “`FuncTypeOf` is produced during AST lowering by `lowerFuncDependentType`.” Retain the verified construction-site explanation. |
+| F-004 | minor | `## Source`, lines 50–61 | “Twenty-one” hand-written opcode wrappers counts the abstract `IRSetBase` alongside concrete wrappers. There are 20 hand-written concrete wrappers in the opcode tables, plus this abstract base. | `source/slang/slang-ir-insts.h:3009–3011` declares `IRSetBase` with `FIDDLE(baseInst())`; the concrete set wrappers at lines 3080 and 3087 use `leafInst()`. | State “Twenty concrete opcode wrappers are hand-written, together with the abstract `IRSetBase`,” and retain the existing declaration list. |
+| F-005 | minor | `#### Tagged unions and tag operations`, lines 432–433 | The AST-origin cells cite dynamic-dispatch lines 1115 and 1119 as producers. These locations register processing of existing instructions, rather than constructing them. The other cited locations in those cells are valid producers. | `source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp:1114–1120` calls `processInstsOfType` and dispatches to lowering functions. Construction occurs at lines 1245 and 1290. | Remove 1115 and 1119 from the producer citations; retain 1245 and 1290 respectively. |
+| F-006 | minor | `## Source` | The source section omits the required link to `slang-ir.h`, despite relying on IR infrastructure and hoistable/global flags throughout the page. | `docs/generated/design/_meta/prompts/_common.md`, IR-reference family contract, item 2, requires including `source/slang/slang-ir.h` when the family relies on infrastructure declared there. | Add a relative Markdown link to `../../../../source/slang/slang-ir.h` in the source section, identifying its role in core IR infrastructure and flags. |

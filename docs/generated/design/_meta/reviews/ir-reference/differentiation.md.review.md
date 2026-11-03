@@ -1,45 +1,51 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:08:42+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T08:06:53Z
 target_doc: ir-reference/differentiation.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: a4029edc3abd590ad67edfef94772eff296140ceb8dff5e1e1d47a84eaada224
+source_commit: 8341c7e537a3f5cb3a60cd062066ffd630da40d8
 checklist:
-  factual_accuracy: fail
+  factual_accuracy: partial
   cross_references: pass
-  completeness: pass
+  completeness: partial
   style_consistency: partial
-  source_alignment: fail
-  front_matter_validity: fail
-finding_count: 6
+  source_alignment: partial
+  front_matter_validity: pass
+finding_count: 8
 severity_breakdown:
-  critical: 1
+  critical: 3
   major: 1
-  minor: 2
-  nit: 2
+  minor: 4
+  nit: 0
 ---
 
 # Review report for ir-reference/differentiation.md
 
 ## Summary
-The opcode inventory, wrappers, producer attributions, citations, and cross-references are generally accurate. The most important error is the `TrivialForwardDifferentiate` summary: source explicitly zeros output differentials rather than leaving them alone. The recorded watched-path digest also predates the current resolved watched set.
+
+The document provides substantial, mostly accurate opcode coverage, but needs corrections before acceptance. Most importantly, it attributes synthesized derivative witness opcodes to the wrong AST representation and lowering path. Its blanket statements about SPIR-V names and projection folding also contradict source behavior.
 
 ## Items checked
-- Reviewed the target, both generation prompts, all four dependency documents, and the 28 resolved watched files reported by `regenerate.py show`.
-- Verified all 66 explicit line/range citation expressions against source at `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
-- Checked all 39 opcode rows against the Lua declarations, generated and hand-written wrappers, lowering/checking producers, translation switch, and cited autodiff passes.
-- Resolved all 67 relative link occurrences, checked all 13 linked-anchor occurrences, and confirmed the generated peer targets are present in the manifest.
-- Ran identifier and whole-filename sweeps, including the intentionally absent `slang-ir-autodiff-transcribe.cpp` and obsolete context spellings.
-- Recomputed the watched-path digest, checked the 38,691-byte page against its 65,536-byte cap, and validated the mandatory front-matter fields.
+
+- Read `_review.md`, `_common.md`, the document-specific prompt, and `regenerate.py show ir-reference/differentiation.md`.
+- Verified against the **current working tree**, which equals the document’s recorded source commit for all of `source/`, as specified by the operator.
+- Checked more than 20 behavioral claims, including intrinsic origins, synthesized-declaration lowering, translation tuple indices, checkpoint reporting, weak references, finalization gates, wrapper generation, and unused placeholder helpers.
+- Checked every explicit source line-number citation in the body, including ranges and repeated citations.
+- Compared all 39 opcode rows with Lua declarations and checked the 17 marked hand-written wrappers.
+- Resolved all 85 Markdown link occurrences, representing 39 distinct destinations; checked generated-page manifest membership and linked heading targets. Consulted dependency documents only for cross-reference checks.
+- Checked required front-matter fields, section coverage, table conventions, Mermaid syntax, and the 46,439-byte document against its 65,536-byte cap.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `TrivialForwardDifferentiate` row, line 199 | The summary says the derivative “leaves differentials alone,” but the implementation deliberately discards incoming tangents and forces output differentials to zero. This reverses the opcode's essential derivative behavior. | `source/slang/slang-ir-autodiff-fwd.cpp:191-205` documents and implements `zeroDifferentials`; `source/slang/slang-ir-autodiff-fwd.cpp:226-249` calls the primal and pairs its result with a zero differential. | Replace the summary with wording such as “Runs the primal and returns zero output differentials, ignoring incoming tangents.” |
-| F-002 | minor | `## Source`, lines 106-116 | “Nothing in this family survives to emit” is too strong. `IRBuiltinRequirementKey` may survive as an unreferenced global until C-like emission, where the emitter explicitly skips it. It produces no target code, but it can reach the emitter. | `source/slang/slang-emit-c-like.cpp:5287-5292` says the hoistable key may survive after specialization and skips it explicitly. | Narrow the claim to say that these opcodes produce no target code, and mention that `IRBuiltinRequirementKey` can survive to emission as metadata that is ignored. |
-| F-003 | major | Front matter, lines 1-7 | `watched_paths_digest` is stale for the current manifest entry. The recorded value is `64be22...`, while `regenerate.py digest ir-reference/differentiation.md` returns `57ecc66...` after the watched set was expanded to the autodiff, translation, DCE, and checker files used by this page. | `docs/generated/design/_meta/manifest.yaml:677-692` defines the current watched set; `python3 docs/generated/design/_meta/regenerate.py digest ir-reference/differentiation.md` returned `57ecc66ac078185e6feb45fd601a286e532e930b62c724711b6b6be62d2fd570`. | Regenerate the page against the current resolved watched set and record the resulting digest in front matter. |
-| F-004 | minor | `DiffTypeInfo` row, line 266 | The operand cell says `† (none declared)`, but `DiffTypeInfo` is a nullary opcode and the family contract requires `—` for nullary rows. | `source/slang/slang-ir-insts.lua:1123-1127` declares no operands or `min_operands`; `docs/generated/design/_meta/prompts/_common.md:238` requires `—` for nullary opcodes. | Change the Operands cell to `—`; no dagger explanation is needed for a genuine nullary opcode. |
-| F-005 | nit | Introductory paragraphs, lines 12-23 | The first paragraph explains the scope, but the intended reader appears only in a separate second paragraph. The universal contract requires both in the first paragraph. | `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first body paragraph to state what the document covers and who it is for. | Merge the intended-reader sentence into the opening paragraph. |
-| F-006 | nit | `BackwardDifferentiate` callout, lines 408-410 | The statement that the attributes are declared in `diff.meta.slang` uses a bare backticked filename instead of a workspace-relative Markdown link. | `docs/generated/design/_meta/prompts/_common.md:43-45` requires source-file citations to be Markdown links. | Link this occurrence to `../../../../source/slang/diff.meta.slang`, matching the existing link near the top of the page. |
+| F-001 | critical | `## Source`, lines 74–89; synthesized derivative witness rows, lines 292–293 | The rows identify `SynthesizedFuncDecl` as the AST origin of `SynthesizedForwardDerivativeWitnessTable` and `SynthesizedBackwardDerivativeWitnessTable`, reinforced by the assertion that all listed checking origins use the synthesized-function lowering site. These witness opcodes instead arise from synthesized inheritance declarations carrying a `SynthesizedModifier`. | `source/slang/slang-check-decl.cpp:9877` and `:16261` pass the witness opcode to `extendContainerDecl`; `source/slang/slang-lower-to-ir.cpp:11138–11165` reads the inheritance declaration’s modifier and emits `(IROp)synModifier->op`. | Change both rows to name `InheritanceDecl` carrying `SynthesizedModifier`, produced through `extendContainerDecl` and lowered by `visitInheritanceDecl`. Add this distinct path to Source and qualify the claim that all origins use synthesized-function lowering. Preserve the separately documented forward-pass producers. |
+| F-002 | critical | `#### Reverse-mode`, lines 248–263 | The categorical assertion that SPIR-V output carries `no OpName for the derivative function` is false. The cited autodiff code creates name hints; the SPIR-V emitter handles function name hints through its ordinary decoration path. The surrounding guarantee that names appear in every text output is also stronger than the cited name-generation code establishes. | `source/slang/slang-ir-autodiff-rev.cpp:405` generates the propagate name; `source/slang/slang-emit-spirv.cpp:4505` emits function decorations; `:6327–6335` converts `IRNameHintDecoration` to `OpName`. | Describe the prefixes as generated IR name hints. State that surviving function hints can become SPIR-V `OpName` records; remove unconditional guarantees about names surviving optimization or appearing in every output. |
+| F-003 | critical | `### GetDifferential / GetPrimal`, lines 402–403 | `No pass folds GetPrimal(MakeDiffPair(a, b)) down to a before that rewrite` contradicts the unzip pass. For a mixed pair, unzip records its components and replaces a subsequent primal projection with the recorded primal. | `source/slang/slang-ir-autodiff-unzip.cpp:433–436` returns the pair’s original components; `:710–717` records them; `:796–803` replaces and removes the primal projection when its base is mapped. | Remove the blanket statement. Explain briefly that unzip can eliminate projections of mapped pairs before final pair-to-struct lowering. |
+| F-004 | minor | `### Differentiation operators`, lines 200–225 | The deduplication key is described as `opcode plus operands`, and a second request is said to require a different base function. The full result type also participates in identity, so equal operands alone do not guarantee deduplication. | `source/slang/slang-ir.cpp:2246–2250` hashes `getFullType()`; `source/slang/slang-ir.h:1962–1971` explicitly rejects keys whose full types differ. | Include the full result type in the key description and qualify the example as requests having identical opcode, type, and operands. |
+| F-005 | major | `## Opcodes`; operand legend, lines 29–31 | Numerous unnamed-operand cells use `† min=1`, `† min=2`, or `† min=3`, contrary to the required `(N unnamed)` spelling. The legend repurposes `†`, which the contract reserves for meaningful names recovered from C++ accessors. Two unused-opcode rows also substitute `none at this commit` for the mandatory producer label. | `docs/generated/design/_meta/prompts/_common.md:272–274` specifies both conventions; `source/slang/slang-ir-insts.lua:2857–2891` supplies the unnamed operand counts. | Replace these cells with `(1 unnamed)`, `(2 unnamed)`, or `(3 unnamed)`. Where accessors justify names, use those names with `†` and correct the legend. Change the `DiffTypeInfo` and unused legacy-witness origins to `no producer at HEAD`. |
+| F-006 | minor | `### checkpointObj and ReportCheckpointStore`, lines 591–594 | The citation to line `652` points to the weak-reference rule for `Annotation`, not the checkpoint marker. | `source/slang/slang-ir-dce.cpp:645–649` handles `ReportCheckpointStore` operand 2; `:651–653` handles `Annotation` operand 0. | Replace the citation with lines 645–649. |
+| F-007 | minor | `## See also`, lines 722–749 | The required relevant AST-reference links are absent despite the table’s substantial use of expression, declaration, and value origins. | `docs/generated/design/_meta/prompts/_common.md:288–295` requires relevant AST-reference pages. Existing targets include `docs/generated/design/ast-reference/expressions.md`, `declarations.md`, and `values.md`. | Add relative links to the applicable AST-reference pages, identifying the differentiation expressions, synthesized declarations, and differentiation values they cover. |
+| F-008 | minor | `### C++ wrappers: hand-written vs generated`, lines 670–675 | `The two abstract pair bases` miscounts the bases described immediately afterward: one construction base and two projection bases. | `source/slang/slang-ir-insts.h:2457`, `:2466`, and `:2474` declare `IRMakeDifferentialPairBase`, `IRDifferentialPairGetDifferentialBase`, and `IRDifferentialPairGetPrimalBase`. | Change `two abstract pair bases` to `three abstract pair bases`. |

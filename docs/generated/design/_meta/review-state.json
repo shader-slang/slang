@@ -496,33 +496,62 @@
     "ir-reference/control-flow.md": {
       "last_remediated": {
         "actions": {
-          "deferred": 0,
+          "deferred": 1,
           "escalated": 0,
-          "fixed": 3,
+          "fixed": 5,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-08-04T09:02:00+00:00",
-        "remediator_model": "claude-opus-5",
+        "remediated_at": "2026-11-03T08:10:08+00:00",
+        "remediator_model": "claude-sonnet-5-5",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/control-flow.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/control-flow.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 3,
+        "finding_count": 6,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/control-flow.md.review.md",
-        "reviewed_at": "2026-08-04T08:19:17+00:00",
-        "reviewer_model": "gpt-5.6-sol",
+        "reviewed_at": "2026-11-03T08:05:06+00:00",
+        "reviewer_model": "gpt-6",
         "severity_breakdown": {
           "critical": 1,
-          "major": 1,
-          "minor": 1,
+          "major": 2,
+          "minor": 3,
           "nit": 0
         },
-        "target_doc_source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
-        "target_doc_watched_paths_digest": "64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc"
+        "target_doc_source_commit": "2518a942d59b1228fc8cc70a37739baab82b6002",
+        "target_doc_watched_paths_digest": "06367290cedb9969bf17dfd68997c182e530e14c2cf4a25816d819c1b11385bb"
       }
     },
     "ir-reference/decorations.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 6,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-11-03T08:16:10+00:00",
+        "remediator_model": "claude-sonnet-5-5",
+        "report_path": "docs/generated/design/_meta/remediations/ir-reference/decorations.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/decorations.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 6,
+        "report_path": "docs/generated/design/_meta/reviews/ir-reference/decorations.md.review.md",
+        "reviewed_at": "2026-11-03T08:04:36+00:00",
+        "reviewer_model": "gpt-6",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 5,
+          "minor": 1,
+          "nit": 0
+        },
+        "target_doc_source_commit": "2518a942d59b1228fc8cc70a37739baab82b6002",
+        "target_doc_watched_paths_digest": "7003d9ffd97f502ef36deaf8cec832320bcf008e9a79f32f8c5f2570288a7ffc"
+      }
+    },
+    "ir-reference/differentiation.md": {
       "last_remediated": {
         "actions": {
           "deferred": 0,
@@ -531,53 +560,24 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-08-04T09:10:40+00:00",
-        "remediator_model": "claude-opus-5",
-        "report_path": "docs/generated/design/_meta/remediations/ir-reference/decorations.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/decorations.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 8,
-        "report_path": "docs/generated/design/_meta/reviews/ir-reference/decorations.md.review.md",
-        "reviewed_at": "2026-08-04T08:18:32+00:00",
-        "reviewer_model": "gpt-5.6-sol",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 6,
-          "nit": 2
-        },
-        "target_doc_source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
-        "target_doc_watched_paths_digest": "6ca22e11b1ae848bc68390906f1d20589efa4eb3e3366532aa60f8ccaecd4b6c"
-      }
-    },
-    "ir-reference/differentiation.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 5,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 1
-        },
-        "remediated_at": "2026-08-04T13:45:00+00:00",
-        "remediator_model": "claude-opus-5",
+        "remediated_at": "2026-11-03T08:09:45+00:00",
+        "remediator_model": "claude-sonnet-5-5",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/differentiation.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/differentiation.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 6,
+        "finding_count": 8,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/differentiation.md.review.md",
-        "reviewed_at": "2026-08-04T12:08:42+00:00",
-        "reviewer_model": "gpt-5.6-sol",
+        "reviewed_at": "2026-11-03T08:06:53+00:00",
+        "reviewer_model": "gpt-6",
         "severity_breakdown": {
-          "critical": 1,
+          "critical": 3,
           "major": 1,
-          "minor": 2,
-          "nit": 2
+          "minor": 4,
+          "nit": 0
         },
-        "target_doc_source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
-        "target_doc_watched_paths_digest": "c87b55d453408ef578c56f83aae6d62d40673c4909a3a8879fedfc11d5f0289a"
+        "target_doc_source_commit": "2518a942d59b1228fc8cc70a37739baab82b6002",
+        "target_doc_watched_paths_digest": "a4029edc3abd590ad67edfef94772eff296140ceb8dff5e1e1d47a84eaada224"
       }
     },
     "ir-reference/generics-and-existentials.md": {
@@ -585,28 +585,28 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 5,
+          "fixed": 6,
           "rejected_bogus": 0,
-          "rejected_out_of_scope": 1
+          "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-08-04T14:30:00+00:00",
-        "remediator_model": "claude-opus-5",
+        "remediated_at": "2026-11-03T08:09:22+00:00",
+        "remediator_model": "claude-sonnet-5-5",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/generics-and-existentials.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/generics-and-existentials.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 6,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/generics-and-existentials.md.review.md",
-        "reviewed_at": "2026-08-04T12:08:37+00:00",
-        "reviewer_model": "gpt-5.6-sol",
+        "reviewed_at": "2026-11-03T08:06:21+00:00",
+        "reviewer_model": "gpt-6",
         "severity_breakdown": {
-          "critical": 0,
-          "major": 2,
-          "minor": 2,
-          "nit": 2
+          "critical": 1,
+          "major": 0,
+          "minor": 5,
+          "nit": 0
         },
-        "target_doc_source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
-        "target_doc_watched_paths_digest": "81b8df45231be4f8f5631a0f32c2367f7195c78bf075b130543b70b9bdbc0e21"
+        "target_doc_source_commit": "2518a942d59b1228fc8cc70a37739baab82b6002",
+        "target_doc_watched_paths_digest": "56404e70e333b4f755dead63d0132446c9ebb690ea7e2d1f06bbbb9e8de4f68c"
       }
     },
     "ir-reference/index.md": {
@@ -645,55 +645,55 @@
           "escalated": 0,
           "fixed": 4,
           "rejected_bogus": 0,
-          "rejected_out_of_scope": 1
+          "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-08-04T13:35:00+00:00",
-        "remediator_model": "claude-opus-5",
+        "remediated_at": "2026-11-03T08:09:49+00:00",
+        "remediator_model": "claude-sonnet-5-5",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/metadata.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/metadata.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 5,
+        "finding_count": 4,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/metadata.md.review.md",
-        "reviewed_at": "2026-08-04T12:07:16+00:00",
-        "reviewer_model": "gpt-5.6-sol",
+        "reviewed_at": "2026-11-03T08:03:35+00:00",
+        "reviewer_model": "gpt-6",
         "severity_breakdown": {
           "critical": 0,
-          "major": 2,
-          "minor": 3,
+          "major": 0,
+          "minor": 4,
           "nit": 0
         },
-        "target_doc_source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
-        "target_doc_watched_paths_digest": "7a1dbed10b699c1119504013fe3801828e2a4d937052719ed584f2844323d380"
+        "target_doc_source_commit": "2518a942d59b1228fc8cc70a37739baab82b6002",
+        "target_doc_watched_paths_digest": "20d50d60a85384fcf21d93a052e6ee1e8ba60a6c2da3146dcaf4302e395fb9e8"
       }
     },
     "ir-reference/misc.md": {
       "last_remediated": {
         "actions": {
-          "deferred": 0,
+          "deferred": 1,
           "escalated": 0,
           "fixed": 6,
           "rejected_bogus": 0,
-          "rejected_out_of_scope": 1
+          "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-08-04T14:05:00+00:00",
-        "remediator_model": "claude-opus-5",
+        "remediated_at": "2026-11-03T08:10:36+00:00",
+        "remediator_model": "claude-sonnet-5-5",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/misc.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/misc.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 7,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/misc.md.review.md",
-        "reviewed_at": "2026-08-04T12:12:06+00:00",
-        "reviewer_model": "gpt-5.6-sol",
+        "reviewed_at": "2026-11-03T08:07:11+00:00",
+        "reviewer_model": "gpt-6",
         "severity_breakdown": {
           "critical": 2,
-          "major": 2,
-          "minor": 3,
-          "nit": 0
+          "major": 3,
+          "minor": 1,
+          "nit": 1
         },
-        "target_doc_source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
-        "target_doc_watched_paths_digest": "4949982a8b85d952032d9efbb3832024faa6d0b6ec41f9079186b0156ef3ea93"
+        "target_doc_source_commit": "2518a942d59b1228fc8cc70a37739baab82b6002",
+        "target_doc_watched_paths_digest": "1155790e3696c9cddf4f2405223ad2c7acc6846e935a3f2e3b8e67beb91416f3"
       }
     },
     "ir-reference/resources-and-atomics.md": {
