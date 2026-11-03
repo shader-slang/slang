@@ -1986,9 +1986,6 @@ Result linkAndOptimizeIR(
     if (options.shouldLegalizeExistentialAndResourceTypes ||
         !options.targetCanEmitGlobalInitializer)
     {
-        // Fold constructor calls to `makeStruct`, so that a `static const` struct
-        // table can stay a global constant.
-        SLANG_PASS(legalizeConstantConstructorCallsForGlobalScope, target);
         SLANG_PASS(inlineGlobalConstantsForLegalization, target);
     }
 

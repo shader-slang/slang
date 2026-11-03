@@ -449,16 +449,16 @@ static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(
 }
 
 // Fold module-scope calls to member-wise synthesized constructors into `makeStruct`.
-// This runs before `inlineGlobalConstantsForLegalization`, so that a `static const`
+// `inlineGlobalConstantsForLegalization` runs this first, so that a `static const`
 // struct table can stay a global constant.
 //
 // Calls inside function bodies are not changed, because a local struct is built at
 // run time. Only a module-scope value must be a compile-time constant. See
 // `tryBuildMakeStructFromSynthesizedConstructorCall` for an example.
-void legalizeConstantConstructorCallsForGlobalScope(IRModule* module, CodeGenTarget target)
+static void legalizeConstantConstructorCallsForGlobalScope(
+    GlobalInstLegalizationInliningContext& context,
+    IRModule* module)
 {
-    GlobalInstLegalizationInliningContext context(target);
-
     // The calls in a `static const` initializer are direct children of the module.
     // Collect them first, because the loop below changes the list of global insts.
     List<IRCall*> globalCalls;
@@ -480,6 +480,8 @@ void legalizeConstantConstructorCallsForGlobalScope(IRModule* module, CodeGenTar
 void inlineGlobalConstantsForLegalization(IRModule* module, CodeGenTarget target)
 {
     GlobalInstLegalizationInliningContext context(target);
+
+    legalizeConstantConstructorCallsForGlobalScope(context, module);
 
     context.wrapReferences = false;
     context.inlineGlobalValuesAndRemoveIfUnused(module);

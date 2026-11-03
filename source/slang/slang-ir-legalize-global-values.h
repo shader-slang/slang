@@ -46,14 +46,12 @@ struct GlobalInstInliningContextGeneric
         IRCloneEnv& cloneEnv);
 };
 
-// Fold module-scope calls to a member-wise synthesized constructor into `makeStruct`.
-// Run it before `inlineGlobalConstantsForLegalization`, so that a `static const`
-// struct table can stay a global constant.
-void legalizeConstantConstructorCallsForGlobalScope(IRModule* module, CodeGenTarget target);
-
 // For global constant values that are resource typed or struct containing resource types,
 // we need to inline their uses to concrete function bodies so they can be legalized during
 // resource legalization.
+//
+// Module-scope calls to member-wise synthesized constructors are first folded into
+// `makeStruct`, so that a `static const` struct table can stay a global constant.
 //
 // For CUDA, a global constant whose type contains `half` is also inlined, because CUDA
 // emits a `half` literal as a constructor call, which is a dynamic initializer.
