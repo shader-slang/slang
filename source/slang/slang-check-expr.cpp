@@ -7857,7 +7857,7 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 // A `groupshared` parameter is a by-reference alias of a single thread-group-shared location, so
 // its argument must itself name thread-group-shared storage. Passing a private local, a copy, or an
 // rvalue would silently alias non-shared memory as shared, breaking the group-shared aliasing
-// semantics HLSL requires (DXC rejects it outright with error 0043).
+// semantics. HLSL proposal 0043 (`groupshared` Arguments) imposes the same rule.
 void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
 {
     if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>() ||

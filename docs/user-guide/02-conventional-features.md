@@ -574,7 +574,7 @@ void computeMain(uint i : SV_GroupIndex)
 }
 ```
 
-HLSL does not allow `groupshared` on a function parameter, so when targeting HLSL, a function with a `groupshared` parameter cannot be `export`.
+HLSL does not allow a function with a `groupshared` parameter to be `export` (see [HLSL proposal 0043](https://github.com/microsoft/hlsl-specs/blob/main/proposals/0043-groupshared-arguments.md)), and neither does Slang when targeting HLSL.
 If such a function must be `export`, have it access a global `groupshared` variable directly instead of taking the memory as a parameter.
 
 Preprocessor

@@ -10,9 +10,10 @@ struct IRModule;
 
 void validateBarrierFlagsForHLSL(IRModule* module, DiagnosticSink* sink);
 
-/// Diagnose every `groupshared` parameter of an emitted function. HLSL cannot pass
-/// thread-group-shared memory across a call boundary (DXC error 0043), so a `groupshared`
-/// parameter that survives inlining cannot be lowered.
+/// Diagnose every `groupshared` parameter of an emitted function. HLSL does not allow a function
+/// that keeps a call boundary, such as an `export` function, to have a `groupshared` parameter
+/// (HLSL proposal 0043, `groupshared` Arguments), so a `groupshared` parameter that survives
+/// inlining cannot be lowered.
 void validateGroupSharedParamsForHLSL(
     IRModule* module,
     CapabilitySet const& targetCaps,

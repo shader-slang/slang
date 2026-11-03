@@ -1,7 +1,7 @@
-// HLSL cannot pass thread-group-shared memory across a function boundary (DXC error 0043), so a
-// `groupshared` parameter is rejected when the boundary survives: `export` keeps the function
-// reachable as its own symbol, so the parameter is still there when the HLSL IR check runs, where it
-// is diagnosed (shader-slang/slang#10641).
+// HLSL does not allow an `export` function to have a `groupshared` parameter (HLSL proposal 0043,
+// `groupshared` Arguments), so a `groupshared` parameter is rejected when the boundary survives:
+// `export` keeps the function reachable as its own symbol, so the parameter is still there when the
+// HLSL IR check runs, where it is diagnosed (shader-slang/slang#10641).
 //
 // The second run pins the same rejection under `-minimum-slang-optimization`: the check runs at the
 // end of IR optimization at every optimization level.
