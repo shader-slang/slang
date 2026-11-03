@@ -9525,18 +9525,23 @@ static bool _mayNameType(Parser* parser, Expr* expr)
     return true;
 }
 
-/// Return whether the `*` at the cursor, which follows the expression `expr`, starts a pointer
-/// type suffix, as in `RWStructuredBuffer<int**>`, rather than a multiply, as in `a * *p`.
+/// Return whether the run of `*` at the cursor, which follows the expression `expr`, starts a
+/// pointer type suffix, as in `RWStructuredBuffer<int**>`, rather than a multiply, as in
+/// `a * *p`.
 ///
-/// The expression grammar meets a pointer type only where it stands in for a type: a generic
-/// argument, a cast such as `(int**)p`, an operand of `sizeof`, or a type string that
-/// `Linkage::parseTermString` parses for reflection or specialization, which ends right after
-/// the type. Declarations parse their types with `ParseType` and never reach this code. In all
-/// of those places except a function-style cast such as `int**(p)` the run of `*` is followed
-/// by a token that cannot start an operand, so we look past the whole run: such a token means a
-/// type suffix, and an operand means a multiply.
+/// The expression grammar reads a pointer type where it stands in for a type: a generic argument
+/// (also inside a declaration such as `RWStructuredBuffer<int**> b;`), a cast such as
+/// `(int**)p`, an operand of `sizeof`, or a type string that `Linkage::parseTermString` parses
+/// for reflection or specialization, which ends right after the type. The outermost type of a
+/// declaration is parsed by `ParseType` and does not reach this code. In those places the run is
+/// followed by `,`, `)`, `>`, `>>`, `[` or the end of the input, so we look past the whole run
+/// and read those tokens as a type suffix. We also accept `:`, `;` and `.` as conservative
+/// terminators, because none of them can start an operand. `(` is decided below. Every other token
+/// reads as the start of a multiply's right operand; a token such as `]` or `=` that cannot start
+/// one then fails as a syntax error.
 static bool _isPointerTypeSuffix(Parser* parser, Expr* expr)
 {
+    SLANG_ASSERT(parser->tokenReader.peekTokenType() == TokenType::OpMul);
     TokenReader lookahead = parser->tokenReader;
     lookahead.advanceToken();
     int starCount = 1;
@@ -9558,9 +9563,9 @@ static bool _isPointerTypeSuffix(Parser* parser, Expr* expr)
     case TokenType::EndOfFile:
         return true;
     case TokenType::LParent:
-        // `(` can start an operand, so a single `*` before it is a multiply. A run of two or
-        // more is a function-style cast such as `int**(p)` or a multiply such as
-        // `a * *(p + 1)`, and only what `expr` names tells them apart.
+        // A single `*` before `(` is a multiply: `x * (y + z)` is not a cast, and `int*(p)` is
+        // not a function-style pointer cast. With two or more `*`, `int**(p)` is a
+        // function-style cast unless `expr` is known to be a value, as in `a * *(p + 1)`.
         return starCount > 1 && _mayNameType(parser, expr);
     default:
         return false;
@@ -9688,6 +9693,7 @@ static Expr* parsePostfixExpr(Parser* parser)
                     expr = memberExpr;
             }
             break;
+        // Pointer type suffix `T*`, or the start of a multiply `a * b`
         case TokenType::OpMul:
             if (!_isPointerTypeSuffix(parser, expr))
                 return expr;

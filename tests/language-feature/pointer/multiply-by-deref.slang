@@ -1,14 +1,14 @@
 // Multiplying by a dereferenced pointer, as in `3 * *p` or `a * **pp`, must parse as a
 // multiplication. The `*` after the left operand is followed by more `*` tokens, so the parser
-// looks past the whole run of `*` to tell this apart from a pointer type such as `int**`. A run
-// followed by `)`, `>`, `,`, `[` or `>>` is a pointer type, a run followed by an operand is a
-// multiply, and a run followed by `(` is a pointer type only when the left operand can name one.
+// looks past the whole run of `*` to tell this apart from a pointer type such as `int**`; the
+// rules are documented on `_isPointerTypeSuffix` in slang-parser.cpp. The rows below cover a run
+// followed by an operand, by `)`, `>`, `,`, `[` and `>>`, and by `(` after a value or a type.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[5 7], stride=4):name=data
@@ -26,6 +26,8 @@ struct Holder
 {
     int k;
 }
+
+typealias IntAlias = int;
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -76,7 +78,8 @@ void computeMain()
     outputBuffer[9] = sizeof(Ptr<Ptr<int**>>);
 
     // Before `(`, a run of `*` after a literal, a variable, a call, an indexed variable or a
-    // parenthesized expression is a multiply, because none of them names a type.
+    // parenthesized expression is a multiply, because none of them names a type. `*(p + 1)` is
+    // 22 here, because the `*q +=` row above updated it.
     int arr[1] = { 3 };
     // CHECK-NEXT: 66
     outputBuffer[10] = 3 * *(p + 1);
@@ -100,4 +103,12 @@ void computeMain()
     outputBuffer[16] = v.x * *(p + 1);
     // CHECK-NEXT: 110
     outputBuffer[17] = ph->k * *(p + 1);
+
+    // CHECK-NEXT: 88
+    outputBuffer[18] = sizeof(int) * *(p + 1);
+
+    // A type alias before `**(` is a type, so this is a function-style cast.
+    IntAlias** pp4 = IntAlias**(slot);
+    // CHECK-NEXT: 15
+    outputBuffer[19] = a * **pp4;
 }
