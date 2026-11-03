@@ -1,5 +1,5 @@
 //TEST_CATEGORY(wave, compute)
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -xslang -DMATRIX_WAVE_MASK_MATCH
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj
 
 // `WaveMatch` returns, in each lane, the mask of the active lanes that hold the same
@@ -8,7 +8,7 @@
 // own group rather than the full or an empty mask. A wave has at most 32 lanes here,
 // so only the `.x` component of a `WaveMatch` result can be nonzero.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(8, 1, 1)]
@@ -40,6 +40,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[48 + idx] = scalarMask.y | scalarMask.z | scalarMask.w | vectorMask.y |
                              vectorMask.z | vectorMask.w | floatMask.y | floatMask.z |
                              floatMask.w | matrixMask.y | matrixMask.z | matrixMask.w;
+
+    float2x2 maskKeys = float2x2(float(idx % 3), 0.0, 0.0, float(idx / 4));
+#if defined(MATRIX_WAVE_MASK_MATCH)
+    outputBuffer[56 + idx] = WaveMaskMatch(WaveGetActiveMask(), maskKeys);
+#else
+    // The matrix overload of `WaveMaskMatch` has no SPIR-V implementation, so the
+    // Vulkan control computes the same mask with `WaveMatch`.
+    outputBuffer[56 + idx] = WaveMatch(maskKeys).x;
+#endif
 }
 
 // CHECK: {{^}}55{{$}}
@@ -98,3 +107,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-NEXT: {{^}}0{{$}}
 // CHECK-NEXT: {{^}}0{{$}}
 // CHECK-NEXT: {{^}}0{{$}}
+// CHECK-NEXT: {{^}}9{{$}}
+// CHECK-NEXT: {{^}}2{{$}}
+// CHECK-NEXT: {{^}}4{{$}}
+// CHECK-NEXT: {{^}}9{{$}}
+// CHECK-NEXT: {{^}}90{{$}}
+// CHECK-NEXT: {{^}}20{{$}}
+// CHECK-NEXT: {{^}}40{{$}}
+// CHECK-NEXT: {{^}}90{{$}}
