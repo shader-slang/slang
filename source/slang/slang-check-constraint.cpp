@@ -361,10 +361,10 @@ Type* SemanticsVisitor::TryJoinTypes(
         }
     }
 
-    // For common-type inference (see `allowCommonTypeJoins`), the joins below only
-    // *nominate* a candidate common type; overload applicability (the normal
-    // coercion path) remains the sole arbiter of whether each arm actually
-    // converts to it.
+    // The joins below only *nominate* a candidate common type (see
+    // `allowCommonTypeJoins` in slang-check-impl.h); overload applicability (the
+    // normal coercion path) remains the sole arbiter of whether each argument
+    // actually converts to it.
     if (allowCommonTypeJoins)
     {
         // An enum joins with a scalar by decaying to its tag type. Enum-with-enum
@@ -395,8 +395,9 @@ Type* SemanticsVisitor::TryJoinTypes(
         }
 
         // `nullptr` joins with a pointer type as that pointer type, matching the
-        // only conversion `_coerce` defines for `NullPtrType`. For example,
-        // `c ? p : nullptr` infers `T = Ptr<int>` for `operator?:<T>(bool, T, T)`.
+        // only conversion `_coerce` defines for `NullPtrType` (NullPtr -> PtrType in
+        // slang-check-conversion.cpp). For example, with `int* p`, `c ? p : nullptr`
+        // infers `T = int*` for `operator?:<T>(bool, T, T)`.
         if (as<PtrType>(left) && as<NullPtrType>(right))
             return left;
         if (as<NullPtrType>(left) && as<PtrType>(right))
@@ -2020,9 +2021,8 @@ private:
 
         // Non-exact type constraints use the join path. This preserves existing
         // common-type behavior for ordinary call inference, such as picking a
-        // type that several arguments can convert to. This is the one place the
-        // common-type-only joins (an enum decaying to its tag type, `nullptr`
-        // taking a pointer's type) apply, since here the join proposes a type
+        // type that several arguments can convert to. This is the one caller that
+        // enables `allowCommonTypeJoins`, since here the join proposes a type
         // both arguments will be coerced to.
         auto joinType =
             m_visitor->TryJoinTypes(&m_context, ioType, cType, /*allowCommonTypeJoins*/ true);
