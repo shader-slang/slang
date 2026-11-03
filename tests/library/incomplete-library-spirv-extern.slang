@@ -18,6 +18,7 @@
 // A module that imports nothing is still optimized under `-incomplete-library`: the optimizer
 // inlines `triple` into the entry point.
 //TEST:SIMPLE(filecheck=OPT): -target spirv-asm -entry mainNoExtern -stage compute -incomplete-library -O2
+// OPT-NOT: Linkage
 // OPT: OpEntryPoint
 // OPT-NOT: Linkage
 // OPT-NOT: OpFunctionCall
