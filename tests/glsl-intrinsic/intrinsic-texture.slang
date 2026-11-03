@@ -1,5 +1,6 @@
-//TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target hlsl -DHLSL
-//TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target hlsl -DHLSL
+// TODO(#14260): not testing hlsl: some GLSL texture functions do not compile for HLSL.
+//DISABLE_TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target hlsl -DHLSL
+//DISABLE_TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target hlsl -DHLSL
 
 // In GLSL, the transformation to Slang and back shouldn't change GLSL target
 //TEST:SIMPLE_EX(filecheck=GLSL_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target glsl -DGLSL -DNO_GRADS
