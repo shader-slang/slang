@@ -17926,8 +17926,8 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcr
 
 // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
 ${
-struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const char* spirvName; const char* metalName; };
-const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd", "and"}, {"BitOr", "Or", "BitwiseOr", "or"}, {"BitXor", "Xor", "BitwiseXor", "xor"}};
+struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const char* spirvName; const char* spirvBoolName; const char* metalName; };
+const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd", "LogicalAnd", "and"}, {"BitOr", "Or", "BitwiseOr", "LogicalOr", "or"}, {"BitXor", "Xor", "BitwiseXor", "LogicalXor", "xor"}};
 for (auto opName : kWaveActiveBitOpEntries) {
 $}
 /// @category wave Wave and quad functions
@@ -17948,7 +17948,10 @@ T WaveActive$(opName.hlslName)(T expr)
     case metal:
         __intrinsic_asm "simd_$(opName.metalName)";
     case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvName) $$T result Subgroup Reduce $expr};
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvBoolName) $$T result Subgroup Reduce $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvName) $$T result Subgroup Reduce $expr};
     case cuda:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }
@@ -17971,7 +17974,10 @@ vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
     case metal:
         __intrinsic_asm "simd_$(opName.metalName)";
     case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvName) $$vector<T, N> result Subgroup Reduce $expr};
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvBoolName) $$vector<T, N> result Subgroup Reduce $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvName) $$vector<T, N> result Subgroup Reduce $expr};
     case cuda:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }
@@ -20251,10 +20257,16 @@ T WaveMultiBit$(opName.name)(T value, uint4 mask)
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
     case spirv:
-        return spirv_asm
-        {
-            result:$$T = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
-        };
+        if (__isBool<T>())
+            return spirv_asm
+            {
+                result:$$T = OpGroupNonUniformLogical$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+            };
+        else
+            return spirv_asm
+            {
+                result:$$T = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+            };
     }
 }
 
@@ -20272,10 +20284,16 @@ vector<T, N> WaveMultiBit$(opName.name)(vector<T, N> value, uint4 mask)
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
     case spirv:
-        return spirv_asm
-        {
-            result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
-        };
+        if (__isBool<T>())
+            return spirv_asm
+            {
+                result:$$vector<T,N> = OpGroupNonUniformLogical$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+            };
+        else
+            return spirv_asm
+            {
+                result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+            };
     }
 }
 
@@ -20354,10 +20372,16 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     case hlsl:
         __intrinsic_asm "WaveMultiPrefixBit$(opName.hlslName)";
     case spirv:
-        return spirv_asm
-        {
-            result:$$T = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
-        };
+        if (__isBool<T>())
+            return spirv_asm
+            {
+                result:$$T = OpGroupNonUniformLogical$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+            };
+        else
+            return spirv_asm
+            {
+                result:$$T = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+            };
     }
 }
 
@@ -20377,10 +20401,16 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     case hlsl:
         __intrinsic_asm "WaveMultiPrefixBit$(opName.hlslName)";
     case spirv:
-        return spirv_asm
-        {
-            result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
-        };
+        if (__isBool<T>())
+            return spirv_asm
+            {
+                result:$$vector<T,N> = OpGroupNonUniformLogical$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+            };
+        else
+            return spirv_asm
+            {
+                result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+            };
     }
 }
 
