@@ -616,6 +616,10 @@ public extension<Input : ICommonHitInput> Input
 public struct ClosestHitInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
+    // The entry point supplies this input; applications can copy it but cannot default-construct it.
+    private __init()
+    {}
+
     /// Gives mutable access to the payload supplied by the originating `RayTracer.trace` call.
     /// @todo The compiler must synthesize this accessor from the stage's payload parameter.
     ///
@@ -839,6 +843,10 @@ public extension<Context> ClosestHitInput<Context>
 public struct AnyHitInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
+    // The entry point supplies this input; applications can copy it but cannot default-construct it.
+    private __init()
+    {}
+
     /// Gives mutable access to the payload supplied by the originating `RayTracer.trace` call.
     /// @todo The compiler must synthesize this accessor from the stage's payload parameter.
     ///
@@ -1110,6 +1118,10 @@ public extension<Context> AnyHitInput<Context>
 public struct IntersectionInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
+    // The entry point supplies this input; applications can copy it but cannot default-construct it.
+    private __init()
+    {}
+
     /// Gives mutable access to the payload supplied by the originating `RayTracer.trace` call.
     /// @todo Synthesize access to Metal's `ray_data` payload or OptiX payload state.
     ///
@@ -1358,6 +1370,10 @@ public extension<Context> IntersectionInput<Context>
 public struct MissInput<Context>
     where Context : IPayloadContext
 {
+    // The entry point supplies this input; applications can copy it but cannot default-construct it.
+    private __init()
+    {}
+
     /// Gives mutable access to the payload supplied by the originating `RayTracer.trace` call.
     /// @todo The compiler must synthesize this accessor from the stage's payload parameter.
     ///
@@ -1492,6 +1508,10 @@ public extension<Context> MissInput<Context>
 public struct CallableInput<Context>
     where Context : ICallableContext
 {
+    // The entry point supplies this input; applications can copy it but cannot default-construct it.
+    private __init()
+    {}
+
     /// Gives mutable access to the data supplied by the originating `RayTracer.callShader` call.
     /// @todo The compiler must synthesize this accessor from the callable-data parameter.
     ///

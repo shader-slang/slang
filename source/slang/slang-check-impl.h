@@ -1454,8 +1454,6 @@ public:
     explicit SemanticsContext(SharedSemanticsContext* shared)
         : m_shared(shared)
         , m_sink(shared->getSink())
-        , m_enableExperimentalFeatures(
-              shared->getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature))
         , m_astBuilder(shared->getLinkage()->getASTBuilder())
     {
         if (shared->getLinkage()->m_optionSet.hasOption(CompilerOptionName::DisableShortCircuit))
@@ -1472,7 +1470,6 @@ public:
 
     SharedSemanticsContext* getShared() { return m_shared; }
     CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
-    bool areExperimentalFeaturesEnabled() const { return m_enableExperimentalFeatures; }
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
     /// Return the language of the translation unit being checked.
@@ -1734,10 +1731,6 @@ private:
     Decl* m_declToExcludeFromLookup = nullptr;
 
     bool m_excludeTransparentMembersFromLookup = false;
-
-    // Read the option once per checking operation, rather than looking it up for every expression.
-    // Reflection can reuse a shared context after options change, so keep this snapshot here.
-    bool m_enableExperimentalFeatures = false;
 
 protected:
     // TODO: consider making more of this state `private`...

@@ -40,16 +40,13 @@ void diagnoseDuplicateSchemaEntries(
     SourceLoc satisfyingDeclLoc);
 
 /// Checks whether the variable's storage, parameter direction, and initializer allow an RT input.
-void diagnoseInvalidVariableType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
+void diagnoseInvalidVariableType(DiagnosticSink* sink, VarDeclBase* varDecl);
 
 /// Diagnoses restricted RT types used as function results.
 void diagnoseInvalidReturnType(DiagnosticSink* sink, CallableDecl* decl);
 
 /// Diagnoses restricted RT types used as property results.
 void diagnoseInvalidPropertyType(DiagnosticSink* sink, PropertyDecl* decl);
-
-/// Diagnoses forbidden RT input construction or a call returning a restricted RT type.
-bool diagnoseInvalidExpression(SemanticsVisitor* visitor, Expr* expr);
 
 /// Diagnoses restricted RT types in the selected call's explicit or inferred generic arguments.
 bool diagnoseInvalidGenericArguments(DiagnosticSink* sink, InvokeExpr* invoke);

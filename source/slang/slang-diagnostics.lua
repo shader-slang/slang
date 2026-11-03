@@ -1109,13 +1109,6 @@ err(
 )
 
 err(
-    "structural-ray-tracing-type-construction",
-    20027,
-    "construction of a structural ray-tracing type",
-    span { loc = "location", message = "structural ray-tracing type '~type:type' cannot be constructed by user code" }
-)
-
-err(
     "structural-ray-tracing-input-generic-argument",
     20030,
     "ray-tracing stage input cannot be used as a generic type argument",

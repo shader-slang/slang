@@ -3086,7 +3086,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     // Therefore, the body visitor will not check them for invalid RT builtin type use.
     // Run that check here instead, now that their types and initializers are known.
     if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
-        PortableRT::diagnoseInvalidVariableType(this, varDecl);
+        PortableRT::diagnoseInvalidVariableType(getSink(), varDecl);
 
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
@@ -3929,9 +3929,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
     }
 
-    // An input local must receive an existing view. Check after initialization has been chosen:
-    // `let copy = input` is valid, while an inserted default constructor still creates a new input.
-    PortableRT::diagnoseInvalidVariableType(this, varDecl);
+    // Check after initialization and type inference: `let copy = input` is valid, while
+    // `MissInput<C> fresh;` has no initializer and must be rejected.
+    PortableRT::diagnoseInvalidVariableType(getSink(), varDecl);
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
 
@@ -16700,7 +16700,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
-        PortableRT::diagnoseInvalidVariableType(this, paramDecl);
+        PortableRT::diagnoseInvalidVariableType(getSink(), paramDecl);
     }
 
     PortableRT::diagnoseInvalidReturnType(getSink(), decl);

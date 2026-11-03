@@ -24,8 +24,8 @@ struct HitContext : rt::IHitContext
 void outputInput(out rt::ClosestHitInput<HitContext> input) { input = {}; }
 //CHECK:                                             ^^^^^ storage of a structural ray-tracing stage input
 //CHECK:                                             ^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
-//CHECK:                                                              ^ construction of a structural ray-tracing type
-//CHECK:                                                              ^ structural ray-tracing type 'rt.ClosestHitInput<HitContext>' cannot be constructed by user code
+//CHECK:                                                              ^ declaration not accessible
+//CHECK:                                                              ^ 'ClosestHitInput.init' is not accessible from the current context.
 
 [require(closesthit)]
 void updateInput(inout rt::ClosestHitInput<HitContext> input) {}

@@ -48,8 +48,8 @@ void invalidStorage(
 //CHECK:        ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' cannot be used as a generic type argument
 
     rt::ClosestHitInput<TestHitContext>();
-//CHECK:                               ^ construction of a structural ray-tracing type
-//CHECK:                               ^ structural ray-tracing type 'rt.ClosestHitInput<TestHitContext>' cannot be constructed by user code
+//CHECK:                               ^ declaration not accessible
+//CHECK:                               ^ 'ClosestHitInput.init' is not accessible from the current context.
 }
 
 rt::ClosestHitInput<TestHitContext> invalidResult();

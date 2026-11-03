@@ -18,10 +18,10 @@ struct Context : rt::IPayloadContext
 [require(miss)]
 void useView(in rt::MissInput<Context> input)
 {
-    // Compiler-inserted initialization does not provide the stage state needed by a fresh view.
+    // Compiler-inserted initialization must also respect the private constructor.
     rt::MissInput<Context> uninitialized;
-//CHECK:^^^^^^^^^ construction of a structural ray-tracing type
-//CHECK:^^^^^^^^^ structural ray-tracing type 'rt.MissInput<Context>' cannot be constructed by user code
+//CHECK: declaration not accessible
+//CHECK: 'MissInput.init' is not accessible from the current context.
 
     let local = input;
     local.payload = local.record;

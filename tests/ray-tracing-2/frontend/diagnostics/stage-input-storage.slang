@@ -38,8 +38,8 @@ struct InvalidFields : rt::IMissShader
     rt::MissInput<::Context> explicitInputField;
 //CHECK:                     ^^^^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
 //CHECK:                     ^^^^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' may only be used as an 'in' parameter or an initialized local copy
-//CHECK:^^^^^^^^^ construction of a structural ray-tracing type
-//CHECK:^^^^^^^^^ structural ray-tracing type 'rt.MissInput<Context>' cannot be constructed by user code
+//CHECK: declaration not accessible
+//CHECK: 'MissInput.init' is not accessible from the current context.
 
     static void invoke(in rt::MissInput<::Context> input) {}
 }
@@ -57,14 +57,14 @@ void cannotCreateView(in rt::MissInput<Context> input)
 //CHECK:                   ^^^^^^^^^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' may only be used as an 'in' parameter or an initialized local copy
 
     rt::MissInput<Context> empty = {};
-//CHECK:                           ^ construction of a structural ray-tracing type
-//CHECK:                           ^ structural ray-tracing type 'rt.MissInput<Context>' cannot be constructed by user code
+//CHECK:                           ^ declaration not accessible
+//CHECK:                           ^ 'MissInput.init' is not accessible from the current context.
 
     rt::MissInput<Context>();
-//CHECK:                  ^ construction of a structural ray-tracing type
-//CHECK:                  ^ structural ray-tracing type 'rt.MissInput<Context>' cannot be constructed by user code
+//CHECK:                  ^ declaration not accessible
+//CHECK:                  ^ 'MissInput.init' is not accessible from the current context.
 
     useView({});
-//CHECK:    ^ construction of a structural ray-tracing type
-//CHECK:    ^ structural ray-tracing type 'rt.MissInput<Context>' cannot be constructed by user code
+//CHECK:    ^ declaration not accessible
+//CHECK:    ^ 'MissInput.init' is not accessible from the current context.
 }

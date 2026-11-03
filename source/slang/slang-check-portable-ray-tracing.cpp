@@ -651,9 +651,9 @@ void diagnoseDuplicateSchemaEntries(
 //     }
 //
 // A direct input is allowed as a non-uniform in parameter or an initialized non-static local.
-// Globals, fields, and other parameter directions are rejected. An initializer must itself pass
-// the ordinary expression/conversion checks below, which reject fresh input construction.
-void diagnoseInvalidVariableType(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+// Globals, fields, and other parameter directions are rejected. The input types have private
+// constructors, so ordinary constructor access checking rejects direct construction.
+void diagnoseInvalidVariableType(DiagnosticSink* sink, VarDeclBase* varDecl)
 {
     auto type = varDecl->getType();
     // Recognize the input type itself, such as MissInput<C>. Unknown means it is not a stage input.
@@ -671,29 +671,20 @@ void diagnoseInvalidVariableType(SemanticsVisitor* visitor, VarDeclBase* varDecl
         else if (
             isLocalVar(varDecl) && !varDecl->hasModifier<HLSLStaticModifier>() && varDecl->initExpr)
         {
-            // Only an initialized, non-static local can copy an input. Having an initializer is
-            // not enough: `MissInput<C> copy = input` is allowed, but `MissInput<C> fresh = {}`
-            // creates a new input and is rejected by the expression check.
-            //
-            // For `MissInput<C> fresh;`, variable checking may insert a default-constructor call.
-            // Check that inserted expression too, even though no initializer was written.
-            if (visitor->areExperimentalFeaturesEnabled())
-                diagnoseInvalidExpression(visitor, varDecl->initExpr);
-            // The local declaration is allowed; any initializer error was reported above.
             return;
         }
     }
     // Reject input declarations that were not accepted above: globals, fields, static locals,
-    // disallowed parameters, and `MissInput<C> fresh;` when no initializer was inserted. This also
+    // disallowed parameters, and uninitialized locals such as `MissInput<C> fresh;`. This also
     // checks restricted types inside built-in containers and the stage interface itself.
     // Reaching this call does not imply an error: ordinary types, including concrete stage
     // structs, pass without a diagnostic.
-    _diagnoseInvalidBuiltinTypeUse(visitor->getSink(), type, varDecl->loc);
+    _diagnoseInvalidBuiltinTypeUse(sink, type, varDecl->loc);
 }
 
 // Rejects results such as `rt::MissInput<C> makeInput();`. Inputs may be received as in parameters
-// and copied locally, but a function cannot promise a new input. Constructors are checked at
-// their call expressions instead, so their declarations do not trigger this result check.
+// and copied locally, but a function cannot promise a new input. Constructors do not have
+// a separately declared return type, so they are not subject to this check.
 void diagnoseInvalidReturnType(DiagnosticSink* sink, CallableDecl* decl)
 {
     if (as<ConstructorDecl>(decl))
@@ -712,52 +703,6 @@ void diagnoseInvalidPropertyType(DiagnosticSink* sink, PropertyDecl* propertyDec
         sink,
         propertyDecl->type.type,
         propertyDecl->type.exp ? propertyDecl->type.exp->loc : propertyDecl->loc);
-}
-
-// Checks actual construction and call results after normal expression checking. Consider:
-//
-//     use(rt::MissInput<C>(input)); // Same-type coercion returns input itself: allowed.
-//     use(rt::MissInput<C>());      // A constructor creates a fresh view: rejected.
-//     use({});                     // Initializing the argument creates a fresh view: rejected.
-//
-// ResolveInvoke and coercion distinguish these cases. Inspect their checked result, rather than
-// treating every Type(...) spelling as construction. Ordinary struct results need no RT check.
-bool diagnoseInvalidExpression(SemanticsVisitor* visitor, Expr* expr)
-{
-    auto type = expr->type;
-    if (_getRestrictedTypeKind(type) == RestrictedTypeKind::None)
-        return false;
-
-    bool isConstruction = false;
-    auto location = expr->loc;
-    if (auto invoke = as<InvokeExpr>(expr))
-    {
-        if (auto callee = as<DeclRefExpr>(invoke->functionExpr))
-        {
-            if (as<ConstructorDecl>(callee->declRef.getDecl()))
-            {
-                isConstruction = true;
-                location = invoke->functionExpr->loc;
-            }
-        }
-    }
-    else if (as<InitializerListExpr>(expr) || as<DefaultConstructExpr>(expr))
-    {
-        isConstruction = true;
-    }
-    else
-    {
-        return false;
-    }
-    if (isConstruction)
-    {
-        // Coercion can check the same constructor after call checking. Use ordinary suppression
-        // so that one forbidden construction produces one diagnostic.
-        visitor->diagnoseOnce(
-            Diagnostics::StructuralRayTracingTypeConstruction{.type = type, .location = location});
-        return true;
-    }
-    return _diagnoseInvalidBuiltinTypeUse(visitor->getSink(), type, location);
 }
 
 // Checks the type arguments of a resolved function, method, or constructor call. Consider:
