@@ -18,7 +18,8 @@ const
 static
 #endif
 #ifdef USE_EXTERN
-extern int num;
+// A default value makes the link-time constant resolvable without another module.
+extern int num = 10;
 #else
 export int num = 10;
 #endif

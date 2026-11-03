@@ -8,7 +8,7 @@
 //TEST:SIMPLE(filecheck=CHK,exit-code=-1):-entry computeMain -target dxil -profile cs_6_0
 //TEST:SIMPLE(filecheck=CHK,exit-code=-1):-entry computeMain -target dxbc
 //TEST:SIMPLE(filecheck=CHK,exit-code=-1):-entry computeMain -target shader-dll
-//TEST:SIMPLE(filecheck=CHK):-entry computeMain -target ptx
+//TEST:SIMPLE(filecheck=CHK,exit-code=-1):-entry computeMain -target ptx
 
 // Here the thing being checked is error reporting around return, and +=
 

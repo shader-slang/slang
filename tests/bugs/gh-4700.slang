@@ -3,9 +3,9 @@
 //TEST:SIMPLE(filecheck=WARN): -entry computeMain -stage compute -target spirv -DWARN2
 
 //PASS-NOT: 31104
-#ifdef PASS
+#ifdef PASS1
 [[vk_binding(0,0)]] uniform ConstantBuffer<uint> addresses;
-layout(location = 1) uniform ConstantBuffer<uint> addresses1;
+[[vk_binding(1,0)]] uniform ConstantBuffer<uint> addresses1;
 #endif
 
 //WARN: 31104

@@ -1,7 +1,9 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target glsl -DTARGET_GLSL
 //TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
-//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
-//TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target cuda -DTARGET_CUDA
+// TODO(#14249): not testing hlsl: some subgroup functions have no HLSL implementation
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
+// TODO(#14249): not testing cuda: some subgroup functions have no CUDA implementation
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_Inclusive.slang -stage compute -entry computeMain -target cpp -DTARGET_CPP
@@ -104,7 +106,7 @@ bool test1Arithmetic() {
     return true
         & subgroupInclusiveAdd(T(1)) == T(4)
         & subgroupInclusiveMul(T(1)) == T(1)
-    
+
         // WGSL and Metal does not support inclusive min/max
 #if !defined(WGPU) && !defined(METAL)
         & subgroupInclusiveMin(T(1)) == T(1)
@@ -117,7 +119,7 @@ bool testVArithmetic() {
     typealias gvec = vector<T, N>;
 
     return true
-        & subgroupInclusiveAdd(gvec(T(1))) == gvec(T(4)) 
+        & subgroupInclusiveAdd(gvec(T(1))) == gvec(T(4))
         // & subgroupInclusiveMul(gvec(T(1))) == gvec(T(1))
 
         // WGSL and Metal does not support inclusive min/max
@@ -157,15 +159,15 @@ bool testArithmetic() {
         & testVArithmetic<uint8_t, 2>()
         & testVArithmetic<uint8_t, 3>()
         & testVArithmetic<uint8_t, 4>()
-        & test1Arithmetic<uint64_t>() 
+        & test1Arithmetic<uint64_t>()
         & testVArithmetic<uint64_t, 2>()
         & testVArithmetic<uint64_t, 3>()
         & testVArithmetic<uint64_t, 4>()
-        & test1Arithmetic<int8_t>() 
+        & test1Arithmetic<int8_t>()
         & testVArithmetic<int8_t, 2>()
         & testVArithmetic<int8_t, 3>()
         & testVArithmetic<int8_t, 4>()
-        & test1Arithmetic<int64_t>() 
+        & test1Arithmetic<int64_t>()
         & testVArithmetic<int64_t, 2>()
         & testVArithmetic<int64_t, 3>()
         & testVArithmetic<int64_t, 4>()
@@ -173,11 +175,11 @@ bool testArithmetic() {
 
         // Disabled on WGPU as these built-in types are not supported as of time of writing.
 #if !defined (WGPU)
-        & test1Arithmetic<uint16_t>() 
+        & test1Arithmetic<uint16_t>()
         & testVArithmetic<uint16_t, 2>()
         & testVArithmetic<uint16_t, 3>()
         & testVArithmetic<uint16_t, 4>()
-        & test1Arithmetic<int16_t>() 
+        & test1Arithmetic<int16_t>()
         & testVArithmetic<int16_t, 2>()
         & testVArithmetic<int16_t, 3>()
         & testVArithmetic<int16_t, 4>()
@@ -195,7 +197,7 @@ void computeMain()
             & testLogical()
 #endif
             ;
-    
+
     bool res1 = true
             & testArithmetic()
             ;

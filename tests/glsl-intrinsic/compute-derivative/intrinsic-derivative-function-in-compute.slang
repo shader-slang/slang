@@ -123,8 +123,12 @@ bool derivativeFunc()
 #endif
 #ifdef COMPUTE
 [numthreads(2, 2, 1)]
-#endif
+// The dispatch thread ID is only valid in a compute shader. The fragment variants of this test
+// compile the same entry point, so the parameter has to be absent there.
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+#else
+void computeMain()
+#endif
 {
     // CHECK_SPV: OpEntryPoint
     outputBuffer.result = true
