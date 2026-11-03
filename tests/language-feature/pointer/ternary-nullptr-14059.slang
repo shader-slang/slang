@@ -1,14 +1,14 @@
 // Regression for https://github.com/shader-slang/slang/issues/14059: a pointer and
 // `nullptr` as the two arms of `?:` (in either order), of `select`, or of a user
 // generic `pick<T>(bool, T, T)` infer the pointer type as the common type, and
-// `nullptr` converts to it. Every case runs both branches, so a pointer arm reads
-// the pointed-to value and a null arm reads -1.
+// `nullptr` converts to it. Each form runs with both a true and a false condition,
+// so a pointer arm reads the pointed-to value and a null arm reads -1.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 //TEST_INPUT: set dataPtr = ubuffer(data=[10 20], stride=4)
@@ -58,4 +58,11 @@ void computeMain()
     outputBuffer[7] = readOr(pick(t, nullptr, p));
     // CHECK-NEXT: 10
     outputBuffer[8] = readOr(pick(f, nullptr, p));
+    // CHECK-NEXT: -1
+    outputBuffer[9] = readOr(pick(f, p, nullptr));
+
+    // CHECK-NEXT: -1
+    outputBuffer[10] = readOr(select(t, nullptr, p));
+    // CHECK-NEXT: 10
+    outputBuffer[11] = readOr(select(f, nullptr, p));
 }

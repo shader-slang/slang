@@ -1,6 +1,6 @@
 // The reporter's shape for https://github.com/shader-slang/slang/issues/14059:
-// `cond ? ptr : nullptr`, in either operand order, compiles on the
-// pointer-capable source targets, with each null arm assigning a null pointer.
+// `cond ? ptr : nullptr`, in either operand order, compiles for Metal, CUDA and
+// SPIR-V, with each null arm assigning a null pointer.
 
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
@@ -10,8 +10,9 @@
 //METAL: n1_{{[0-9]+}} = nullptr;
 //CUDA: n0_{{[0-9]+}} = nullptr;
 //CUDA: n1_{{[0-9]+}} = nullptr;
-//SPIRV: OpConvertUToPtr %_ptr_PhysicalStorageBuffer_v3float
-//SPIRV: OpConvertUToPtr %_ptr_PhysicalStorageBuffer_v3float
+//SPIRV: %[[ZERO:[a-zA-Z0-9_]+]] = OpConstant %ulong 0
+//SPIRV: OpConvertUToPtr %_ptr_PhysicalStorageBuffer_v3float %[[ZERO]]
+//SPIRV: OpConvertUToPtr %_ptr_PhysicalStorageBuffer_v3float %[[ZERO]]
 
 [numthreads(64, 1, 1)]
 void computeMain(
