@@ -8411,6 +8411,32 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
                 return;
             }
         }
+        else if (constantIntVal->getValue() == (int)KnownBuiltinDeclName::Printf)
+        {
+            // A resource handle has no portable printed form: GPU targets cannot pass one to
+            // their print call at all, and CPU and CUDA would print an implementation-specific
+            // handle. We reject such an argument here, where its source type and location are
+            // still known.
+            auto diagnoseIfOpaque = [&](Expr* arg)
+            {
+                if (typeTransitivelyContainsOpaqueHandle(this, arg->type.type))
+                    getSink()->diagnose(Diagnostics::PrintfArgumentCannotBeOpaqueType{
+                        .type = arg->type.type,
+                        .expr = arg});
+            };
+            for (auto arg : checkedInvokeExpr->arguments)
+            {
+                if (auto packExpr = as<PackExpr>(arg))
+                {
+                    for (auto element : packExpr->args)
+                        diagnoseIfOpaque(element);
+                }
+                else
+                {
+                    diagnoseIfOpaque(arg);
+                }
+            }
+        }
     }
 }
 

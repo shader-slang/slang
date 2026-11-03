@@ -4174,6 +4174,13 @@ err(
     span { loc = "expr:Expr", message = "'~type:Type' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'." }
 )
 
+err(
+    "printf-argument-cannot-be-opaque-type",
+    30903,
+    "'printf' argument cannot be a resource or opaque type",
+    span { loc = "expr:Expr", message = "argument of type '~type:Type' is or contains a resource or opaque type, which 'printf' cannot print." }
+)
+
 -- Load semantic checking diagnostics (part 8) - Accessors, Bit Fields, Integer Constants, Overloads, Switch, Generics, Ambiguity
 -- (inlined from slang-diagnostics-semantic-checking-8.lua)
 
