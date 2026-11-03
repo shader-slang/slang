@@ -3,7 +3,7 @@ generated: true
 model: claude-sonnet-5-5
 generated_at: 2026-11-03T00:00:00Z
 source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
-watched_paths_digest: 6748a07954ceb40e436e8f6a49be3654fb34ecb651451d8c8d2f588f37ccfd1a
+watched_paths_digest: 1b502949c96c75dab4349b13cd31e60f4dda8f636185cafb9180bfb42c5b401a
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -270,7 +270,10 @@ explicitly.
   to the pointer's own address, so a fossilized object graph is
   traversable directly once the file is mapped, with **no**
   pointer-fixup pass at load. A finished fossil blob is what a RIFF data
-  chunk contains, so the two formats nest rather than compete.
+  chunk contains, so the two formats nest rather than compete. The IR
+  payload carries its own `serializationVersion`, checked against
+  `kSupportedSerializationVersion` (2 at `source_commit`) in
+  [slang-serialize-ir.cpp](../../../source/slang/slang-serialize-ir.cpp).
 
   See: [cross-cutting/serialization.md](cross-cutting/serialization.md)
 
@@ -356,7 +359,11 @@ explicitly.
 **IRModule** `[Slang]`
 : The top-level container for an IR program. It holds module-scope
   values (hoistable instructions, global variables, functions) and is
-  the unit of linking and serialization. The `module` opcode and the
+  the unit of linking and serialization. Its module version
+  (`m_version`) must fall in the inclusive range
+  `k_minSupportedModuleVersion`..`k_maxSupportedModuleVersion` declared
+  in [slang-ir.h](../../../source/slang/slang-ir.h), which is 37..37 at
+  `source_commit`. The `module` opcode and the
   other module-structure opcodes are tabulated in
   [ir-reference/structure.md](ir-reference/structure.md).
 
@@ -374,7 +381,8 @@ explicitly.
   which that header includes. The opcode is stored in `IRInst::m_op`
   and read via `IRInst::getOp()`; downstream casts (`as<IRFoo>()`,
   `cast<IRFoo>()`) test the opcode against a contiguous range
-  determined by the Lua nesting.
+  determined by the Lua nesting. At `source_commit` the enum holds 865
+  concrete opcodes.
 
   See: [cross-cutting/ir-instructions.md](cross-cutting/ir-instructions.md),
   [ir-reference/index.md](ir-reference/index.md)
@@ -918,7 +926,8 @@ explicitly.
 **visibility** `[Slang]`
 : An access-control attribute attached to a declaration and projected
   onto each scope it appears in. The three levels — `Public`,
-  `Internal`, `Private` — are the `DeclVisibility` enum in
+  `Internal`, `Private`; the default is `Internal` — are the
+  `DeclVisibility` enum in
   [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h),
   expressed in source by the `public`/`internal`/`private` keywords
   (modeled by `VisibilityModifier` subclasses in

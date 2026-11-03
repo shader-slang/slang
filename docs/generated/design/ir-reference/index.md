@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 4a402816950fc37013a5a9338c50efeab6c20d0c88ce7b5512f05d6ecacc6501
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: 140c480b4017179b5ab6b107590ef9acc166eff6d0552fce305aa2d0003b184e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -56,15 +56,15 @@ flowchart TD
 | Page | Family | Lua entry root | Approx. opcodes |
 | --- | --- | --- | --- |
 | [types.md](types.md) | Type instructions | `Type` (line 20), with the nested `BasicType` (22), `TranslatedTypeBase` (168), and `WorkGraphRecordTypeBase` (232) groups | ~170 |
-| [values.md](values.md) | Constants, arithmetic, conversions (including the `DescriptorHandle<T>` conversions), memory, aggregate constructors, reshape/pack helpers, constexpr arithmetic/casts, string and native-pointer helpers | `Constant` (line 953) plus top-level value opcodes; the `constexpr*` cluster starts at line 3412 | ~150 |
+| [values.md](values.md) | Constants, arithmetic, conversions (including the `DescriptorHandle<T>` conversions), memory, aggregate constructors, reshape/pack helpers, constexpr arithmetic/casts, string and native-pointer helpers | `Constant` (line 953) plus top-level value opcodes; the `constexpr*` cluster starts at line 3454 | ~150 |
 | [structure.md](structure.md) | Module structure: functions, generics, globals, structs, interfaces, witness tables | `GlobalValueWithCode` (line 885), `module` (line 942) | ~20 |
-| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits, target / quad-execution `Require*` markers | `block` (line 944), `param` (line 1170), `TerminatorInst` (lines 1454-1535), the backend-hint group (1537-1547) | ~30 |
-| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI, type-flow specialization (sets, tagged unions, dispatchers) | `specialize` (line 1047), `lookupWitness` (1048); the type-flow `SetBase` group at line 3129 | ~50 |
+| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits, target / quad-execution `Require*` markers | `block` (line 944), `param` (line 1170), `TerminatorInst` (lines 1455-1539), the backend-hint group (1541-1551) | ~30 |
+| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI, type-flow specialization (sets, tagged unions, dispatchers) | `specialize` (line 1047), `lookupWitness` (1048); the type-flow `SetBase` group at line 3171 | ~50 |
 | [resources-and-atomics.md](resources-and-atomics.md) | Image/buffer/sampler ops, shader IO, atomics, barriers, fragment-shader interlocks, cooperative matrix/vector, wave intrinsics, raytracing, descriptor-heap loads, and the natural-layout `getNaturalStride` / `getNaturalAlignment` pair | `AtomicOperation` (line 1186) plus top-level resource opcodes | ~90 |
-| [differentiation.md](differentiation.md) | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts, autodiff placeholders, `DiffTypeInfo` | `MakeDifferentialPairBase` (lines 1016-1046), `DiffTypeInfo` (1124), `TranslateBase` (2816-2855) | ~40 |
-| [decorations.md](decorations.md) | Decoration family (metadata attached to instructions) | `Decoration` (line 1756) | ~200 |
-| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line 2880), `Attr` (2909), the `Debug*` cluster (2974-3009), `SPIRVAsmOperand` (3016) | ~60 |
-| [misc.md](misc.md) | System opcodes (`nop`, `Unrecognized`), pack/expansion, type queries, compile-time size/align/count queries, storage casts, untyped descriptor-heap handle casts, liveness markers, tensor / runtime helpers, kernel launch | Top-level miscellaneous opcodes, plus the `Undefined` (972), `BindingQuery` (1736), `CastStorageToLogicalBase` (2763), and `LiveRangeMarker` (2961) groups | ~70 |
+| [differentiation.md](differentiation.md) | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts, autodiff placeholders, `DiffTypeInfo` | `MakeDifferentialPairBase` (lines 1016-1046), `DiffTypeInfo` (1124), `TranslateBase` (2853-2892) | ~40 |
+| [decorations.md](decorations.md) | Decoration family (metadata attached to instructions) | `Decoration` (line 1763) | ~200 |
+| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line 2880), `Attr` (2909), the `Debug*` cluster (3011-3055), `SPIRVAsmOperand` (3062) | ~60 |
+| [misc.md](misc.md) | System opcodes (`nop`, `Unrecognized`), pack/expansion, type queries, compile-time size/align/count queries, storage casts, untyped descriptor-heap handle casts, liveness markers, tensor / runtime helpers, kernel launch | Top-level miscellaneous opcodes, plus the `Undefined` (972), `BindingQuery` (1747), `CastStorageToLogicalBase` (2799), and `LiveRangeMarker` (2998) groups | ~70 |
 
 The **Approx. opcodes** column is rounded to the nearest ten. It is
 approximate for a second reason as well: a few rows on each page are
@@ -85,7 +85,7 @@ compile-time `sizeOf` / `alignOf` queries on [misc.md](misc.md).
 
 Line numbers in the **Lua entry root** column refer to
 [../../../../source/slang/slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua),
-which is 3609 lines at this commit; both the counts and the line
+which is 3655 lines at this commit; both the counts and the line
 numbers drift as opcodes are added, removed, or moved between
 families.
 
@@ -93,9 +93,9 @@ families.
 
 The AST-origin column on every family page names the *producer* that
 constructs a given opcode: where that producer is AST lowering, the
-citation is one of the roughly 230 `visit*` member functions in
+citation is one of the more than 200 `visit*` member functions in
 [../../../../source/slang/slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-(for example, `visitVarDecl` at line 12011 emits `var`), and the AST
+(for example, `visitVarDecl` at line 11812 emits `var`), and the AST
 side of that mapping is documented in the
 [../ast-reference/](../ast-reference) subtree — chiefly
 [../ast-reference/expressions.md](../ast-reference/expressions.md),
@@ -104,9 +104,9 @@ side of that mapping is documented in the
 Do not assume a visitor exists just because a parse-level AST class
 does: there is no `visitInfixExpr`, because the `InfixExpr` the parser
 builds for `a + b` is resolved during semantic checking into either a
-`BuiltinOperatorExpr` (`visitBuiltinOperatorExpr`, line 7217) or an
+`BuiltinOperatorExpr` (`visitBuiltinOperatorExpr`, line 6714) or an
 ordinary `InvokeExpr` of a core-module function declared with
-`__intrinsic_op` (`visitInvokeExpr`, line 7209). An opcode with no
+`__intrinsic_op` (`visitInvokeExpr`, line 6706). An opcode with no
 direct AST source names its producing pass or function instead — an
 `__intrinsic_op` declaration in
 [../../../../source/slang/core.meta.slang](../../../../source/slang/core.meta.slang),
