@@ -259,8 +259,9 @@ void checkEntryPointDecorations(IRModule* module, CodeGenTarget target, Diagnost
     CheckEntryPointDecorationsContext(module, target, sink).check();
 }
 
-// Two entry points collide in the output when they have the same key: the symbol that the emitter
-// writes for the entry point, plus the stage on targets that keep a separate namespace per stage.
+// The symbol under which an emitter writes an entry point, plus the stage on SPIR-V, where each
+// execution model has its own namespace of entry-point names. Two entry points with equal keys
+// would be written under the same symbol into one output.
 struct EntryPointSymbolKey
 {
     String symbol;
@@ -276,32 +277,64 @@ struct EntryPointSymbolKey
     }
 };
 
+// Compute the key of the entry point that `decoration` describes when the emitter for the
+// code-generation format `target` writes it, and return whether the entry point has one. The key
+// mirrors the emitters: the SPIR-V emitter writes the name into `OpEntryPoint` for its execution
+// model, `CUDASourceEmitter::generateEntryPointNameImpl` adds the OptiX program-type prefix, and
+// the other emitters write the name into one namespace for all stages.
+//
+// An entry point has no key when its emitter does not write the decoration's name, so it cannot
+// collide by that name:
+//
+// * The GLSL emitter writes every entry point as `main`. A GLSL output can therefore hold a single
+//   entry point whatever the names are, which is a different error from a name collision; for
+//   `-emit-spirv-via-glsl`, glslang reports a whole-program compile as E00101.
+// * The Slang VM emitter names a function by its qualified name hint, such as `A.run`, and makes a
+//   repeated name unique.
+// * The C-like emitters replace `main` with a generated `main_<n>`
+// (`doesTargetRenameEntryPointName`).
+//   The generated name is not compared. A generated name can collide with an entry point that is
+//   literally named `main_0`, as any generated `<name>_<n>` can collide with a verbatim entry-point
+//   name; that is a property of the C-like emitters' unique-name scheme, not of entry points that
+//   share a name.
+static bool computeEntryPointSymbolKey(
+    CodeGenTarget target,
+    IREntryPointDecoration* decoration,
+    EntryPointSymbolKey& outKey)
+{
+    if (target == CodeGenTarget::GLSL || target == CodeGenTarget::HostVM)
+        return false;
+
+    auto name = decoration->getName()->getStringSlice();
+    if (doesTargetRenameEntryPointName(target, name))
+        return false;
+
+    const Stage stage = decoration->getProfile().getStage();
+    outKey.symbol = name;
+    if (isCUDATarget(target))
+        outKey.symbol = String(getOptiXEntryPointNamePrefix(stage)) + name;
+    else if (isSPIRV(target))
+        outKey.stage = stage;
+    return true;
+}
+
 void checkEntryPointNamesAreUnique(CodeGenContext* codeGenContext, const List<IRFunc*>& entryPoints)
 {
+    // The naming rules depend on the format that the emitter writes, such as CUDA source for a PTX
+    // target, while the diagnostic names the target that the user asked for.
     const CodeGenTarget target = codeGenContext->getTargetFormat();
-
-    // The GLSL emitter writes every entry point as `main`, and a GLSL output holds a single entry
-    // point, so the source names of GLSL entry points never reach the output.
-    if (target == CodeGenTarget::GLSL)
-        return;
+    const String targetName = TypeTextUtil::getCompileTargetName(
+        SlangCompileTarget(codeGenContext->getFinalTargetFormat()));
 
     Dictionary<EntryPointSymbolKey, IRFunc*> entryPointsBySymbol;
     for (auto entryPoint : entryPoints)
     {
         auto decoration = entryPoint->findDecoration<IREntryPointDecoration>();
         SLANG_ASSERT(decoration);
-        String name = decoration->getName()->getStringSlice();
-        const Stage stage = decoration->getProfile().getStage();
-
-        if (doesTargetRenameEntryPointName(target, name.getUnownedSlice()))
-            continue;
 
         EntryPointSymbolKey key;
-        key.symbol = name;
-        if (isCUDATarget(target))
-            key.symbol = String(getOptiXEntryPointNamePrefix(stage)) + name;
-        else if (isSPIRV(target))
-            key.stage = stage;
+        if (!computeEntryPointSymbolKey(target, decoration, key))
+            continue;
 
         IRFunc* otherEntryPoint = nullptr;
         if (!entryPointsBySymbol.tryGetValue(key, otherEntryPoint))
@@ -310,14 +343,15 @@ void checkEntryPointNamesAreUnique(CodeGenContext* codeGenContext, const List<IR
             continue;
         }
 
-        // The same function may be requested as an entry point more than once.
+        // `linkIR` returns one entry for each requested entry point, so a function requested twice,
+        // as in `-entry A -entry B -entry A`, appears twice as the same `IRFunc`.
         if (otherEntryPoint == entryPoint)
             continue;
 
         codeGenContext->getSink()->diagnose(Diagnostics::DuplicateEntryPointName{
-            .name = key.symbol,
-            .target = String(TypeTextUtil::getCompileTargetName(
-                SlangCompileTarget(codeGenContext->getFinalTargetFormat()))),
+            .symbol = key.symbol,
+            .target = targetName,
+            .name = String(decoration->getName()->getStringSlice()),
             .location = entryPoint->sourceLoc,
             .otherLocation = otherEntryPoint->sourceLoc});
     }
@@ -353,7 +387,7 @@ bool doesTargetRenameEntryPointName(CodeGenTarget target, UnownedStringSlice ent
     if (entryPointName != toSlice("main"))
         return false;
 
-    // Only the C-like source emitters rename `main`; the LLVM emitter keeps the name.
+    // The C-like emitters write source formats; the LLVM emitter, which keeps `main`, does not.
     auto desc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
     if (!isDerivedFrom(desc.kind, ArtifactKind::Source))
         return false;

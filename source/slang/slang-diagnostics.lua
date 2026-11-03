@@ -4642,9 +4642,9 @@ err(
 err(
     "duplicate-entry-point-name",
     38016,
-    "more than one entry point is named '~name' in the output for target '~target'",
-    span { loc = "location", message = "entry point named '~name' conflicts with another entry point" },
-    note { message = "see the other entry point named '~name'", span { loc = "otherLocation" } }
+    "more than one entry point would be emitted as '~symbol' for target '~target'",
+    span { loc = "location", message = "entry point '~name' would be emitted as '~symbol'" },
+    note { message = "the other entry point emitted as '~symbol' is here", span { loc = "otherLocation" } }
 )
 
 err(

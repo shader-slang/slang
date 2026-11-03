@@ -522,18 +522,10 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 
 String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
 {
-    // We have an entry-point function in the IR module and need to
-    // generate the name of the corresponding CUDA C++ function.
-    //
-    // The most common case will be a compute kernel, in which case
-    // we will emit the function more or less as-is, including
-    // usingits original name as the name of the global symbol.
-    //
-    // We also suport emitting ray tracing kernels for use with
-    // OptiX, and in that case the name of the global symbol
-    // must be prefixed to indicate to the OptiX runtime what
-    // stage it is to be compiled for.
-    //
+    // The global symbol of a CUDA kernel is the C-like entry-point name, after the rename of
+    // `main`, preceded by the OptiX program-type prefix of its stage. A compute kernel has no
+    // prefix; a ray-tracing kernel for OptiX needs one so that the OptiX runtime knows its stage.
+    // `checkEntryPointNamesAreUnique` builds the same symbol to find kernels that would collide.
     String funcName = Super::generateEntryPointNameImpl(entryPointDecor);
     return String(getOptiXEntryPointNamePrefix(entryPointDecor->getProfile().getStage())) +
            funcName;
