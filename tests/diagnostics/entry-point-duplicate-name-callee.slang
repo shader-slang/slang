@@ -1,6 +1,7 @@
 // A `[shader]` function that the program calls as an ordinary function is not an entry point of
 // the output, so two such functions named `K` do not collide (shader-slang/slang#14053). Only the
-// entry points of the program being compiled are compared.
+// entry points of the program being compiled are compared. The imported module also declares an
+// ordinary `Main`, which does not make `-entry Main` ambiguous.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry Main -stage compute
 //TEST:SIMPLE(filecheck=CHECK-CUDA):-target cuda -entry Main -stage compute

@@ -1,17 +1,22 @@
-// An overloaded name passed to `-entry` is ambiguous, so it is reported as such instead of as
-// "no function found" (shader-slang/slang#14053). Like E38000, the error is reported at the start
-// of the module, and each candidate gets a note. A unique `-entry` name in the same file links
-// only that entry point, so the overloaded `[shader]` functions do not collide, and requesting
-// the same function twice gives one entry point. A prototype and its definition are one function,
-// so `Other` is not ambiguous.
+// `-entry` with an overloaded name reports E38017, with a note for each candidate, at the start of
+// the module like E38000 (shader-slang/slang#14053). The other lanes compile. In the first one, a
+// unique name links only that entry point, so the overloaded `[shader]` functions in this file do
+// not collide, and the prototype and the definition of `Other` are one function. In the second,
+// slangc merges a repeated adjacent `-entry` into one request. In the third, a request between the
+// two keeps both, so `linkIR` lists `Other` twice, and one function listed twice is not a collision.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry Count -stage compute
 //TEST:SIMPLE(filecheck=OTHER):-target spirv-asm -entry Other -stage compute
 //TEST:SIMPLE(filecheck=OTHER):-target spirv-asm -entry Other -stage compute -entry Other -stage compute
+//TEST:SIMPLE(filecheck=TWICE):-target spirv-asm -entry Other -stage compute -entry Third -stage compute -entry Other -stage compute
 
 // OTHER-NOT: E38016
 // OTHER: OpEntryPoint GLCompute
 // OTHER-NOT: OpEntryPoint
+
+// TWICE-NOT: E38016
+// TWICE-DAG: OpEntryPoint GLCompute %{{.*}} "Other"
+// TWICE-DAG: OpEntryPoint GLCompute %{{.*}} "Third"
 
 RWStructuredBuffer<uint> outBuf;
 /*CHECK:
@@ -46,4 +51,11 @@ void Other(uint3 tid: SV_DispatchThreadID);
 void Other(uint3 tid: SV_DispatchThreadID)
 {
     outBuf[1] = 1;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void Third(uint3 tid: SV_DispatchThreadID)
+{
+    outBuf[2] = 1;
 }
