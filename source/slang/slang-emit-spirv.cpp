@@ -4249,7 +4249,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // is a symbol that the IR linker left unresolved, which it allows only under
         // `-incomplete-library`. Another module defines the symbol, and a later `spirv-link`
         // combines that module with this one. SPIR-V expresses this with Import linkage, which is
-        // also the only form in which it allows a function without a body.
+        // also the only form in which it allows a function without a body. A function that a
+        // precompiled module provides carries an export decoration instead, and gets its Import
+        // from the `DownstreamModuleImportDecoration` case in `emitDecoration`, so no function
+        // gets both.
         //
         if (auto importDecoration = irFunc->findDecoration<IRImportDecoration>())
         {
