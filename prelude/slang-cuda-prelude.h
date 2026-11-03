@@ -3642,6 +3642,11 @@ struct ElementTypeTrait<ushort>
 {
     typedef ushort Type;
 };
+template<>
+struct ElementTypeTrait<bool>
+{
+    typedef bool Type;
+};
 #if SLANG_CUDA_ENABLE_HALF
 template<>
 struct ElementTypeTrait<__half>
@@ -3825,6 +3830,26 @@ template<>
 struct ElementTypeTrait<ulonglong4>
 {
     typedef uint64_t Type;
+};
+template<>
+struct ElementTypeTrait<bool1>
+{
+    typedef bool Type;
+};
+template<>
+struct ElementTypeTrait<bool2>
+{
+    typedef bool Type;
+};
+template<>
+struct ElementTypeTrait<bool3>
+{
+    typedef bool Type;
+};
+template<>
+struct ElementTypeTrait<bool4>
+{
+    typedef bool Type;
 };
 #if SLANG_CUDA_ENABLE_HALF
 template<>
