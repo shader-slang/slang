@@ -2306,11 +2306,12 @@ public:
 
     /// Record available autodiff metadata for `type` and its component types.
     ///
-    /// Writes to the non-null `m_parentDifferentiableAttr`. For existential boxes, uses
-    /// `ExistentialBoxDifferentiabilityWitness` and records a separately boxed differential type,
-    /// such as `dyn IDifferentiable`.
-    /// This operation does not establish ordinary interface conformance. Boxed pointer
-    /// differentiation is unsupported.
+    /// Writes to the non-null `m_parentDifferentiableAttr`. For a box whose interface refines
+    /// `IDifferentiable`, uses `ExistentialBoxDifferentiabilityWitness` and records the separately
+    /// boxed differential type `dyn IDifferentiable`.
+    /// This operation does not establish ordinary interface conformance. Diagnoses unsupported
+    /// boxed pointer differentiation at the stored type-registration location, or at the
+    /// differentiability attribute if that location is unavailable.
     void maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* builder, Type* type);
 
     // Construct the differential for 'type', if it exists.
