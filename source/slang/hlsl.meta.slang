@@ -17081,6 +17081,7 @@ T WaveMaskBitAnd(WaveMask mask, T expr)
 {
     __target_switch
     {
+    // HLSL has no masked form, so the mask is ignored and WaveActiveBit* supplies the bool lowering.
     case hlsl:
         return WaveActiveBitAnd(expr);
     default:
@@ -17925,6 +17926,10 @@ vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
 
 // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
+//
+// These functions accept bool. SPIR-V's Bitwise group ops take only integers, so bool uses the
+// Logical ops (spirvBoolName). HLSL's WaveActiveBit* takes only unsigned integers, so a bool is
+// reduced as a 0/1 uint; on 0/1 values the bitwise and logical results are the same.
 ${
 struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const char* spirvName; const char* spirvBoolName; const char* metalName; };
 const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd", "LogicalAnd", "and"}, {"BitOr", "Or", "BitwiseOr", "LogicalOr", "or"}, {"BitXor", "Xor", "BitwiseXor", "LogicalXor", "xor"}};
@@ -17944,7 +17949,6 @@ T WaveActive$(opName.hlslName)(T expr)
     case wgsl:
         __intrinsic_asm "subgroup$(opName.glslName)";
     case hlsl:
-        // HLSL's WaveActiveBit* accepts only unsigned integers, so a bool is reduced as a 0/1 uint.
         if (__isBool<T>())
         {
             let bits = WaveActive$(opName.hlslName)(uint(__slang_noop_cast<bool>(expr)));
@@ -18005,7 +18009,12 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
     case hlsl:
         if (__isBool<T>())
         {
-            MATRIX_MAP_UNARY(T, N, M, WaveActive$(opName.hlslName), expr);
+            // Each row goes through the vector overload's uint lowering.
+            matrix<T, N, M> result;
+            [ForceUnroll]
+            for (int i = 0; i < N; ++i)
+                result[i] = WaveActive$(opName.hlslName)(expr[i]);
+            return result;
         }
         __intrinsic_asm "WaveActive$(opName.hlslName)";
     default:
@@ -20252,6 +20261,8 @@ $}
 //
 // WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
 //
+// SPIR-V's Bitwise group ops take only integers, so a bool operand uses the Logical ops.
+//
 ${
 struct WaveMultiBitsEntry { const char* name; };
 const WaveMultiBitsEntry kWaveMultiBitsNames[] = { {"And"}, {"Or"} , {"Xor"} };
@@ -20338,6 +20349,9 @@ $}
 // WaveMultiPrefixInclusiveBitAnd/WaveMultiPrefixInclusiveBitOr/WaveMultiInclusiveBitXor.
 // WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
+//
+// SPIR-V's Bitwise group ops take only integers, so a bool operand uses the Logical ops. DXC's
+// WaveMultiPrefixBit* accepts bool, so the HLSL case passes it through unchanged.
 //
 ${
 struct WaveMultiPrefixBitwiseEntry
