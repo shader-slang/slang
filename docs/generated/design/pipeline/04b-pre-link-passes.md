@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: bacba2986b0463d7f151bb550e996caeb1476af530ba42c256881fbc105a4c5d
+model: claude-sonnet-5-5
+generated_at: 2026-11-02T21:22:30Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: d9fbf98cc4d17c2b8019253e037a7e9366f0b2086a5feb13733c0efd78728ffe
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -38,9 +38,9 @@ the `SLANG_PASS(...)`-wrapped post-link passes start running.
 ## Source
 
 - [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-  — `generateIRForTranslationUnit` (line 15712) is the orchestrator.
+  — `generateIRForTranslationUnit` (line 15444) is the orchestrator.
   The function is invoked once per `TranslationUnitRequest`, from
-  `FrontEndCompileRequest::generateIR` in
+  `FrontEndCompileRequest::generateIR` (line 730) in
   [slang-compile-request.cpp](../../../../source/slang/slang-compile-request.cpp)
   for the translation units of a front-end request, and from the
   imported-module loading path in
@@ -48,10 +48,10 @@ the `SLANG_PASS(...)`-wrapped post-link passes start running.
   its result is cached on `Module::m_irModule`.
 - [slang-ir-link.h](../../../../source/slang/slang-ir-link.h)
   (line 35) / [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)
-  (line 2589) — declare and define `prelinkIR`, which pulls in the
+  (line 2656) — declare and define `prelinkIR`, which pulls in the
   `externalSymbolsToPrelink` set — the `[unsafeForceInlineEarly]`
-  functions reached from other modules — so the mandatory passes
-  below can simplify them in-place.
+  functions and the interface definitions reached from other modules
+  — so the mandatory passes below can simplify them in-place.
 - [slang-ir-lower-error-handling.h](../../../../source/slang/slang-ir-lower-error-handling.h)
   / [slang-ir-lower-defer.h](../../../../source/slang/slang-ir-lower-defer.h)
   / [slang-ir-bit-field-accessors.h](../../../../source/slang/slang-ir-bit-field-accessors.h)
@@ -89,7 +89,7 @@ the program is composed for a specific target.
 
 ## Phase A: AST walk and IR emission
 
-Spans lines 15734-15850 of
+Spans lines 15466-15583 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 This phase creates a fresh `IRModule`, optionally attaches
 `kIROp_ExperimentalModuleDecoration` and per-source `DebugSource`
@@ -105,7 +105,6 @@ flowchart TD
   expDec["kIROp_ExperimentalModuleDecoration"]
   diGate{"debugInfoLevel != None?"}
   emitDS["emitDebugSource per source file (contents if Standard+ or -debug-info-include-source)"]
-  stdGate{"debugInfoLevel >= Standard?"}
   emitDCU["emitDebugCompilationUnit per non-included source"]
   epLoop["for entryPoint in translationUnit.entryPoints"]
   lfeep[lowerFrontEndEntryPointToIR]
@@ -120,9 +119,7 @@ flowchart TD
   mc --> setName --> expGate
   expGate -- yes --> expDec --> diGate
   expGate -- no --> diGate
-  diGate -- yes --> emitDS --> stdGate
-  stdGate -- yes --> emitDCU --> epLoop
-  stdGate -- no --> epLoop
+  diGate -- yes --> emitDS --> emitDCU --> epLoop
   diGate -- no --> epLoop
   epLoop --> lfeep --> declLoop
   declLoop --> eadr --> slGate
@@ -134,22 +131,22 @@ flowchart TD
 
 | # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
-| A1 | `IRModule::create(session)` (line 15734) | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 5060) | always | Creates the empty module that the rest of the pipeline mutates. |
+| A1 | `IRModule::create(session)` (line 15466) | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 5092) | always | Creates the empty module that the rest of the pipeline mutates. |
 | A2 | `module->setName(moduleDecl->getName())` | [slang-ir.h](../../../../source/slang/slang-ir.h) (line 2208, inline) | always | Records the module's source-level name. |
-| A3 | `addDecoration(moduleInst, kIROp_ExperimentalModuleDecoration)` | [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) (line 4672, inline) | `moduleDecl->findModifier<ExperimentalModuleAttribute>()` | Marks the module as experimental. |
-| A4 | `emitDebugSource(...)` per source file (line 15443) | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 3536) | `debugInfoLevel != None` | Embeds the most-unique-identity path for every source file. The source *text* is carried only when `debugInfoLevel >= Standard` **or** `shouldIncludeSourceInDebugInfo()` is set; see the note below. |
-| A5 | `emitDebugCompilationUnit(debugSource)` per non-included source | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 3554) | `debugInfoLevel >= Standard` and `!source->isIncludedFile()` | Makes the IR the source of truth for which files are compilation units, removing the need for heuristics during SPIR-V emit. |
-| A6 | `lowerFrontEndEntryPointToIR(...)` per entry point | [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) | always | Establishes the entry-point `IRFunc` skeleton before the full decl walk so it can be referenced by later decls. |
-| A7 | `ensureAllDeclsRec(context, decl)` per direct module-decl member | [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) | always | Walks the declaration tree and lowers every public/exported symbol. |
-| A8 | `emitIntrinsicInst(VoidType, kIROp_GlobalHashedStringLiterals, ...)` (line 15820) | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 4145) | `sharedContext->m_stringLiterals.getCount() != 0` | Single aggregate inst that holds every hashed string literal observed during lowering. |
-| A9 | `addNVAPISlotDecoration(moduleInst, registerName, spaceName)` | [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) (line 5261) | `moduleDecl->findModifier<NVAPISlotModifier>()` | Module-level NVAPI register/space binding. |
-| A10 | `validateIRModuleIfEnabled(compileRequest, module)` (line 15850) | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) (line 435) | always (no-op unless validation is enabled at the compiler-option level) | Closes Phase A with a structural sanity check on the freshly emitted IR. |
+| A3 | `addDecoration(moduleInst, kIROp_ExperimentalModuleDecoration)` | [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) (inline) | `moduleDecl->findModifier<ExperimentalModuleAttribute>()` | Marks the module as experimental. |
+| A4 | `emitDebugSource(...)` per source file (line 15503) | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 3554) | `debugInfoLevel != None` | Embeds the most-unique-identity path for every source file. The source *text* is carried only when `debugInfoLevel >= Standard` **or** `shouldIncludeSourceInDebugInfo()` is set; see the note below. |
+| A5 | `emitDebugCompilationUnit(debugSource)` per non-included source | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 3572) | `debugInfoLevel != None` and `!source->isIncludedFile()` (line 15514) | Makes the IR the source of truth for which files are compilation units, removing the need for heuristics during SPIR-V emit. It is retained at `Minimal` so that a module serialized at `Minimal` and later compiled at a higher level still has the parent that inline scopes need; the emitter itself still omits extended debug info at `Minimal`. |
+| A6 | `lowerFrontEndEntryPointToIR(...)` per entry point (line 15534) | [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) | always | Establishes the entry-point `IRFunc` skeleton before the full decl walk so it can be referenced by later decls. |
+| A7 | `ensureAllDeclsRec(context, decl)` per direct module-decl member (line 15542) | [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) | always | Walks the declaration tree and lowers every public/exported symbol. |
+| A8 | `emitIntrinsicInst(VoidType, kIROp_GlobalHashedStringLiterals, ...)` (line 15553) | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 4177) | `sharedContext->m_stringLiterals.getCount() != 0` | Single aggregate inst that holds every hashed string literal observed during lowering. |
+| A9 | `addNVAPISlotDecoration(moduleInst, registerName, spaceName)` | [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) (line 5311) | `moduleDecl->findModifier<NVAPISlotModifier>()` | Module-level NVAPI register/space binding. |
+| A10 | `validateIRModuleIfEnabled(compileRequest, module)` (line 15583) | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) (line 514) | always (no-op unless validation is enabled at the compiler-option level) | Closes Phase A with a structural sanity check on the freshly emitted IR. |
 
 Two details of A4 are worth calling out. First, the debug-source
 loop is the only place in the pre-link pipeline that reads the
-`DebugInfoIncludeSource` option: line 15762 caches
+`DebugInfoIncludeSource` option: line 15496 caches
 `linkage->m_optionSet.shouldIncludeSourceInDebugInfo()` into a local
-`includeSource`, and line 15771 embeds `source->getContent()` when
+`includeSource`, and line 15505 embeds `source->getContent()` when
 either `debugInfoLevel >= DebugInfoLevel::Standard` **or**
 `includeSource` holds. That means `-debug-info-include-source` lets a
 `Minimal`-level build carry full source text into each
@@ -157,36 +154,37 @@ either `debugInfoLevel >= DebugInfoLevel::Standard` **or**
 `OpSource`) without promoting the whole debug-info level. The
 accessor is declared in
 [slang-compiler-options.h](../../../../source/slang/slang-compiler-options.h)
-line 380. Second, every `IRDebugSource` produced here is recorded in
+line 403. Second, every `IRDebugSource` produced here is recorded in
 `context->shared->mapSourceFileToDebugSourceInst`, which later
 per-decl lowering consults rather than re-emitting.
 
 A3 and A9 attach their decorations to the module instruction itself
 rather than to a global symbol, so neither appears in a `-dump-ir`
 listing: `dumpIRModule` in
-[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 8462)
+[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 8486)
 walks `module->getGlobalInsts()`, and `IRInst::getFirstChild` (line
-8872) starts after the last decoration. The two gates are reached
+8957) starts after the last decoration. The two gates are reached
 from source in different ways. A3 fires for a module declaration
 carrying the `[ExperimentalModule]` attribute, declared by
-`attribute_syntax` at line 128 of
+`attribute_syntax` at line 164 of
 [core.meta.slang](../../../../source/slang/core.meta.slang) and used
 by the shipped experimental modules (for example
 [workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang)
-line 9). A9 fires when the `NV_SHADER_EXTN_SLOT` and
-`NV_SHADER_EXTN_REGISTER_SPACE` preprocessor macros are defined, in
-the source or on the command line; the front end reads their values
+line 9). A9 fires when the `NV_SHADER_EXTN_SLOT` preprocessor macro is
+defined, in the source or on the command line;
+`NV_SHADER_EXTN_REGISTER_SPACE` is optional and overrides the default
+`space0`. The front end reads their values
 and attaches the `NVAPISlotModifier` to the `ModuleDecl` at lines
-283-338 of
+315-372 of
 [slang-compile-request.h](../../../../source/slang/slang-compile-request.h).
 
-The `#if 0` block at line 15837 (a `dumpIR(module, ..., "GENERATED", ...)`
+The `#if 0` block at line 15570 (a `dumpIR(module, ..., "GENERATED", ...)`
 call) is intentionally disabled in production builds; flip it for
 debugging the pre-mandatory IR shape.
 
 ## Phase B: Mandatory pre-optimization transformations
 
-Spans lines 15872-15898. The block comment at lines 15852-15862
+Spans lines 15605-15631. The block comment at lines 15585-15597
 states the dual purpose: simplify the IR ahead of backend
 compilation (and ahead of module serialization, so the effort is
 amortized across every entry point that uses the module), **and**
@@ -209,7 +207,7 @@ flowchart TD
 
 | # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
-| B1 | `prelinkIR(translationUnit->module, module, externalSymbolsToPrelink)` (line 15872) | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) (line 2589) | always | Imports the bodies of the cross-module `[unsafeForceInlineEarly]` functions collected in `externalSymbolsToPrelink` so later passes can inline and simplify them. Distinct from the post-link `linkIR` driven by `linkAndOptimizeIR`. |
+| B1 | `prelinkIR(translationUnit->module, module, externalSymbolsToPrelink)` (line 15605) | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) (line 2656) | always | Replaces the placeholder declarations collected in `externalSymbolsToPrelink` -- cross-module `[unsafeForceInlineEarly]` functions and borrowed cross-module interfaces -- with clones of the imported definitions, so later passes can inline and simplify them. Distinct from the post-link `linkIR` driven by `linkAndOptimizeIR`. |
 | B2 | `lowerErrorHandling(module, sink)` | [slang-ir-lower-error-handling.cpp](../../../../source/slang/slang-ir-lower-error-handling.cpp) | always | Rewrites throwing functions to return `Result<T,E>`; translates `tryCall` into `call` + `ifElse`. |
 | B3 | `lowerDefer(module, sink)` | [slang-ir-lower-defer.cpp](../../../../source/slang/slang-ir-lower-defer.cpp) | always | Lowers the `defer` statement so later passes can assume linear control flow. |
 | B4 | `synthesizeBitFieldAccessors(module)` | [slang-ir-bit-field-accessors.cpp](../../../../source/slang/slang-ir-bit-field-accessors.cpp) | always | Synthesizes get/set bodies for bit-field accessors. Intentionally placed before the inlining loop in Phase C so those bodies can be inlined and simplified. |
@@ -218,7 +216,7 @@ flowchart TD
 
 ## Phase C: Mandatory optimization passes
 
-Spans lines 15905-15985. This phase establishes SSA,
+Spans lines 15638-15718. This phase establishes SSA,
 constant-propagates with `applySparseConditionalConstantPropagation`,
 performs an optional CFG simplification + peephole pair (gated on
 `!minimumOptimizations`), runs a per-function DCE sweep, optionally
@@ -251,9 +249,9 @@ flowchart TD
 | C2 | `applySparseConditionalConstantPropagation(module, nullptr, sink)` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | always | SCCP over the freshly constructed SSA. |
 | C3 | `simplifyCFG(module, CFGSimplificationOptions::getDefault())` | [slang-ir-simplify-cfg.cpp](../../../../source/slang/slang-ir-simplify-cfg.cpp) | `!minimumOptimizations` | Removes empty/unreachable blocks. |
 | C4 | `peepholeOptimize(nullptr, module, getPrelinking())` | [slang-ir-peephole.cpp](../../../../source/slang/slang-ir-peephole.cpp) | `!minimumOptimizations` | The pre-linking peephole subset; full peephole runs post-link. |
-| C5 | per-function `eliminateDeadCode(func, dceOptions)` (lines 15921-15925) | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | always | One pass over every `IRGlobalValueWithCode` in `module->getGlobalInsts()`, with `keepExportsAlive`, `keepLayoutsAlive`, `useFastAnalysis` all set (lines 15916-15919). |
+| C5 | per-function `eliminateDeadCode(func, dceOptions)` (lines 15654-15658) | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | always | One pass over every `IRGlobalValueWithCode` in `module->getGlobalInsts()`, with `keepExportsAlive`, `keepLayoutsAlive`, `useFastAnalysis` all set (lines 15649-15652). |
 | C6 | `invertLoops(module)` | [slang-ir-loop-inversion.cpp](../../../../source/slang/slang-ir-loop-inversion.cpp) | `CompilerOptionName::LoopInversion` | Moves loop condition checks to the end of the loop and wraps the loop in an outer `if`, so SCCP can recognize loops that always execute at least once. |
-| C7 | `performMandatoryEarlyInlining` fixed-point loop (lines 15960-15986) | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) (line 1021) | always (loop body) | Called as `performMandatoryEarlyInlining(module, &modifiedFuncs.getHashSet())`. Documented under [Loops in the pipeline](#loops-in-the-pipeline). Honors `[unsafeForceInlineEarly]` as a hard requirement, not a hint. |
+| C7 | `performMandatoryEarlyInlining` fixed-point loop (lines 15693-15718) | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) (line 966) | always (loop body) | Called as `performMandatoryEarlyInlining(module, &modifiedFuncs.getHashSet())`. Documented under [Loops in the pipeline](#loops-in-the-pipeline). Honors `[unsafeForceInlineEarly]` as a hard requirement, not a hint. |
 
 C5 iterates over functions but not over passes; treat it as one
 step in the pipeline whose effect happens to be per-function. The
@@ -264,9 +262,10 @@ inlining loop.
 
 ## Phase D: Non-essential validation, stripping, and finalization
 
-Spans lines 15988-16105. Phase D first runs a block of
+Spans lines 15721-15858. Phase D first runs a block of
 optional dataflow validators (gated on
-`shouldRunNonEssentialValidation`), then strips front-end-only
+`shouldRunNonEssentialValidation`; when that option is off, only a
+language-version-gated missing-return check survives), then strips front-end-only
 decorations (with an obfuscation sub-gate that also requests a
 source map), runs a final structural validation, and builds the
 mangled-name → global-inst map used by the post-link `linkIR`.
@@ -274,6 +273,8 @@ mangled-name → global-inst map used by the post-link `linkIR`.
 ```mermaid
 flowchart TD
   neGate{"shouldRunNonEssentialValidation?"}
+  mrGate{"languageVersion >= 202C?"}
+  cmr2["checkForMissingReturns(target=None)"]
   crt[checkForRecursiveTypes]
   errGate{"sink.errorCount != 0?"}
   earlyExit["return module (no further passes)"]
@@ -299,7 +300,9 @@ flowchart TD
   lv2025 -- yes --> adge --> cmor
   lv2025 -- no --> cmor
   cmor --> strip
-  neGate -- no --> strip
+  neGate -- no --> mrGate
+  mrGate -- yes --> cmr2 --> strip
+  mrGate -- no --> strip
   strip --> siwt --> dceFinal --> obGate
   obGate -- yes --> obfs --> vMod
   obGate -- no --> vMod
@@ -309,20 +312,20 @@ flowchart TD
 | # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
 | D1 | `checkForRecursiveTypes(module, sink)` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation` | Disallows recursive type definitions. |
-| D2 | early return on error (lines 15993-15994) | [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) | `sink->getErrorCount() != 0` | If D1 (or any earlier diagnostic) raised an error, Phase D exits before propagation and the later passes. |
-| D3 | `propagateConstExpr(module, sink)` | [slang-ir-constexpr.cpp](../../../../source/slang/slang-ir-constexpr.cpp) | `shouldRunNonEssentialValidation` | Propagates `constexpr`-ness through the dataflow and call graph. A transform as well as a check: every value it proves constant is retyped to the rate-qualified form `@ConstExpr T` by `markConstExpr` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 10112). It diagnoses only where a `constexpr` demand cannot be met. |
+| D2 | early return on error (lines 15726-15727) | [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) | `sink->getErrorCount() != 0` | If D1 (or any earlier diagnostic) raised an error, Phase D exits before propagation and the later passes. |
+| D3 | `propagateConstExpr(module, sink)` | [slang-ir-constexpr.cpp](../../../../source/slang/slang-ir-constexpr.cpp) | `shouldRunNonEssentialValidation` | Propagates `constexpr`-ness through the dataflow and call graph. A transform as well as a check: every value it proves constant is retyped to the rate-qualified form `@ConstExpr T` by `markConstExpr` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 10138). It diagnoses only where a `constexpr` demand cannot be met. |
 | D4 | `checkForUsingUninitializedValues(module, sink)` | [slang-ir-use-uninitialized-values.cpp](../../../../source/slang/slang-ir-use-uninitialized-values.cpp) | `shouldRunNonEssentialValidation` | Dataflow check that requires SSA + SCCP from Phase C. |
-| D5 | `checkForMissingReturns(module, sink, CodeGenTarget::None, true)` | [slang-ir-missing-return.cpp](../../../../source/slang/slang-ir-missing-return.cpp) | `shouldRunNonEssentialValidation` | Note `target=None`: pre-link this is target-agnostic; later passes may re-run target-aware variants. |
+| D5 | `checkForMissingReturns(module, sink, languageVersion, CodeGenTarget::None, true)` (line 15739) | [slang-ir-missing-return.cpp](../../../../source/slang/slang-ir-missing-return.cpp) | `shouldRunNonEssentialValidation`; also run from the `else` arm (line 15768) when validation is off but `languageVersion >= SLANG_LANGUAGE_VERSION_202C` | Note `target=None`: pre-link this is target-agnostic; later passes may re-run target-aware variants. For `languageVersion >= 202C` a missing return is an unconditional error (`MissingReturnNotAllowedInSlang202c`, [slang-ir-missing-return.cpp](../../../../source/slang/slang-ir-missing-return.cpp) line 35), which is why it is not left to the non-essential gate. |
 | D6 | `checkAutoDiffUsages(module, sink)` | [slang-ir-check-differentiability.cpp](../../../../source/slang/slang-ir-check-differentiability.cpp) | `shouldRunNonEssentialValidation` | Validates bodies of `[Differentiable]` functions. |
 | D7 | `checkForOperatorShiftOverflow(module, sink)` | [slang-ir-operator-shift-overflow.cpp](../../../../source/slang/slang-ir-operator-shift-overflow.cpp) | `shouldRunNonEssentialValidation` | Flags shift counts that exceed the operand width, on the `kIROp_Lsh` insts that survive Phase C; see the note below. |
 | D8 | `addDecorationsForGenericsSpecializedWithExistentials(module, sink)` | [slang-ir-check-specialize-generic-with-existential.cpp](../../../../source/slang/slang-ir-check-specialize-generic-with-existential.cpp) | `shouldRunNonEssentialValidation` and `languageVersion >= 2025` | Slang 2025+ disallows specializing a generic with an existential type; this pass adds the diagnostic-bearing decoration. |
 | D9 | `checkForMeshOutputReads(module, sink)` | [slang-ir-mesh-output-reads.cpp](../../../../source/slang/slang-ir-mesh-output-reads.cpp) | `shouldRunNonEssentialValidation` | Reading from mesh-shader outputs is not allowed. |
-| D10 | `stripFrontEndOnlyInstructions(module, stripOptions)` (line 16058) | [slang-ir-strip.cpp](../../../../source/slang/slang-ir-strip.cpp) (line 50) | always | `stripOptions.shouldStripNameHints = shouldObfuscateCode()` (line 16048); `stripSourceLocs = false` (line 16057 — the obfuscation pass below produces new locs). |
+| D10 | `stripFrontEndOnlyInstructions(module, stripOptions)` (line 15811) | [slang-ir-strip.cpp](../../../../source/slang/slang-ir-strip.cpp) (line 50) | always | `stripOptions.shouldStripNameHints = shouldObfuscateCode()` (line 15801); `stripSourceLocs = false` (line 15810 — the obfuscation pass below produces new locs). |
 | D11 | `stripImportedWitnessTable(module)` | [slang-ir-strip.cpp](../../../../source/slang/slang-ir-strip.cpp) (line 55) | always | For every global witness table (or generic returning one) that carries `IRImportDecoration`, removes the *nested* witness tables held directly as its children; the table's other entries are left in place. |
 | D12 | `eliminateDeadCode(module, dceOptions)` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | always | Cleans up everything orphaned by D10/D11, keeping exports and layouts. |
 | D13 | `obfuscateModuleLocs(module, sourceManager)` | [slang-ir-obfuscate-loc.cpp](../../../../source/slang/slang-ir-obfuscate-loc.cpp) | `stripOptions.shouldStripNameHints && shouldHaveSourceMap()` | Generates obfuscated source locations and the matching source map. |
-| D14 | `validateIRModuleIfEnabled(compileRequest, module)` (line 16089) | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) (line 435) | always | Structural sanity check after stripping. |
-| D15 | `module->buildMangledNameToGlobalInstMap()` (line 16105) | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 5170) | always | Builds the lookup index `linkIR` later needs. |
+| D14 | `validateIRModuleIfEnabled(compileRequest, module)` (line 15842) | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) (line 514) | always | Structural sanity check after stripping. |
+| D15 | `module->buildMangledNameToGlobalInstMap()` (line 15858) | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 5202) | always | Builds the lookup index `linkIR` later needs. |
 
 The diagnostics the validators in this block emit, with a minimal
 input that triggers each:
@@ -331,7 +334,7 @@ input that triggers each:
 |---|---|---|
 | D1 | `E41001` *type contains cyclic reference* | `struct Bad { Bad next; }` |
 | D3 | `E40013` *argument is not a compile-time constant* | passing a `uniform` to a parameter whose type is `constexpr` — this is the call-argument form, reported per argument index at [slang-ir-constexpr.cpp](../../../../source/slang/slang-ir-constexpr.cpp) line 552 |
-| D3 | `E40012` *expected a compile-time constant* | the general form: any instruction a `constexpr` context demands be constant and that propagation could not make so (line 671 of the same file, plus the front-end site at [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 7580). A call argument does not reach it, because the argument-specific check above fires first |
+| D3 | `E40012` *expected a compile-time constant* | the general form: any instruction a `constexpr` context demands be constant and that propagation could not make so (line 671 of the same file, plus the front-end site at [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 7114). A call argument that cannot be marked constexpr immediately reports `E40013` instead; a constexpr demand propagated backwards onto an argument's producing instruction can still end here (see `tests/diagnostics/constexpr-diagnostic-location.slang` lines 36-37) |
 | D4 | `W41016` *use of uninitialized variable* | `int x; buf[0] = x;` |
 | D5 | `W41010` *non-void function does not return in all cases* | `int f(int x) { if (x > 0) return 1; }` |
 | D6 | `E41022` *derivative cannot be propagated through non-differentiable call* | a `[Differentiable]` function calling one that has no derivative |
@@ -352,7 +355,7 @@ than a narrow (under 32-bit) left operand, where Slang — unlike C —
 does not promote before shifting.
 
 Note that the `if (compileRequest->optionSet.shouldDumpIR())` block
-between D14 and D15 (lines 16093-16103, tagged `"LOWER-TO-IR"`) is an
+between D14 and D15 (lines 15846-15857, tagged `"LOWER-TO-IR"`) is an
 optional dump, not a pipeline step; it does not mutate the module.
 
 ## Conditional gates
@@ -362,27 +365,27 @@ optional dump, not a pipeline step; it does not mutate the module.
 | Toggle | Accessor | Gates |
 |---|---|---|
 | Minimum optimizations | `linkage->m_optionSet.shouldPerformMinimumOptimizations()` | C3, C4, and the inner per-modified-function simplification cluster inside the Phase C inlining loop. |
-| Non-essential validation | `linkage->m_optionSet.shouldRunNonEssentialValidation()` | D1, D3-D9. |
+| Non-essential validation | `linkage->m_optionSet.shouldRunNonEssentialValidation()` | D1, D3-D9. D5 additionally runs, for `languageVersion >= 202C` only, when this option is off. |
 | Obfuscation | `linkage->m_optionSet.shouldObfuscateCode()` | The `shouldStripNameHints` flag in D10 and (with `shouldHaveSourceMap()`) D13. |
 | Source map | `linkage->m_optionSet.shouldHaveSourceMap()` | D13 (only when `shouldStripNameHints` is also true). |
 | Loop inversion | `linkage->m_optionSet.getBoolOption(CompilerOptionName::LoopInversion)` | C6. |
 | Trace coverage (`-trace-coverage`) | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage)` | Sets `context->traceCoverage`; does **not** directly gate a pass in this pipeline, but propagates into per-decl lowering inside A6/A7. |
 | Trace function coverage (`-trace-function-coverage`) | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage)` | Sets `context->traceFunctionCoverage`; like `TraceCoverage`, it influences per-decl lowering (function-entry counters) rather than gating a pass here. |
 | Trace branch coverage (`-trace-branch-coverage`) | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage)` | Sets `context->traceBranchCoverage`; influences per-decl lowering (per-branch-arm counters) rather than gating a pass here. |
-| Debug info | `linkage->m_optionSet.getDebugInfoLevel()` | A4 (any level above `None`), A5 (`Standard` or higher), B6 (`Standard` or higher). The level is cached once on `context->debugInfoLevel` at line 15742 and every gate below reads that field. |
+| Debug info | `linkage->m_optionSet.getDebugInfoLevel()` | A4 and A5 (any level above `None`), B6 (`Standard` or higher). The level is cached once on `context->debugInfoLevel` at line 15474 and every gate below reads that field. |
 | Include source in debug info | `linkage->m_optionSet.shouldIncludeSourceInDebugInfo()`, i.e. `getBoolOption(CompilerOptionName::DebugInfoIncludeSource)` | Not a pass gate: it widens A4 so that `IRDebugSource` carries the source *text* even at `Minimal` debug-info level. It does **not** enable A4 on its own — `debugInfoLevel != None` is still required. |
 
 The three trace-coverage fields are read out of the option set at
-lines 15443-15447 and consumed during the Phase A decl walk, which
+lines 15475-15479 and consumed during the Phase A decl walk, which
 emits `kIROp_IncrementCoverageCounter` before every executable
-statement (line 10083), `kIROp_IncrementFunctionCoverageCounter` at
-the head of each lowered function body (line 14630), and
+statement (line 9749), `kIROp_IncrementFunctionCoverageCounter` at
+the head of each lowered function body (line 14380), and
 `kIROp_IncrementBranchCoverageCounter` on each `if` arm,
-loop-condition arm, and `switch` arm (line 8188). Because they come
+loop-condition arm, and `switch` arm (line 3831). Because they come
 from lowering rather than from a pass, all three are already present
 in the pre-link IR; the pass that turns them into stores through the
-synthesized `__slang_coverage` buffer (`instrumentCoverage`, line
-1216 of [slang-emit.cpp](../../../../source/slang/slang-emit.cpp))
+synthesized `__slang_coverage` buffer (`instrumentCoverage`, the
+`SLANG_PASS` at line 1351 of [slang-emit.cpp](../../../../source/slang/slang-emit.cpp))
 runs post-link.
 
 ### Context predicates
@@ -398,14 +401,15 @@ runs post-link.
 | Predicate | Effect |
 |---|---|
 | `moduleDecl->languageVersion >= SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025` | Gates D8 (`addDecorationsForGenericsSpecializedWithExistentials`). |
+| `moduleDecl->languageVersion >= SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202C` | Gates the D5 call in the `else` arm, taken when `shouldRunNonEssentialValidation()` is false (the missing-return error is unconditional from 202C). |
 
 D8 does not diagnose. It only attaches
 `IRDisallowSpecializationWithExistentialsDecoration` to the offending
-`specialize` instruction (line 69 of
+`specialize` instruction (line 67 of
 [slang-ir-check-specialize-generic-with-existential.cpp](../../../../source/slang/slang-ir-check-specialize-generic-with-existential.cpp));
 the error a user sees, `E33180` *cannot specialize generic with
 existential type*, is raised post-link by the typeflow specialization
-pass (`emitExistentialSpecializationDiagnostic`, line 8435 of
+pass (`emitExistentialSpecializationDiagnostic`, line 8483 of
 [slang-ir-typeflow-specialize.cpp](../../../../source/slang/slang-ir-typeflow-specialize.cpp),
 covered by [05-ir-passes.md](05-ir-passes.md)). That pass also
 recognizes the shape by scanning function bodies when the decoration
@@ -417,7 +421,7 @@ the error go away.
 
 The pre-link pipeline contains **exactly one** pass-level loop:
 the unbounded `for(;;)` `performMandatoryEarlyInlining` fixed point
-at lines 15960-15986. There is no iteration count cap; termination
+at lines 15693-15718. There is no iteration count cap; termination
 depends entirely on the passes reporting no further change.
 
 ```mermaid
@@ -458,7 +462,7 @@ its results into `changed` (the trailing `eliminateDeadCode` call
 does not). The loop breaks once this final `changed` value is
 `false`.
 
-The per-function DCE sweep at C5 (lines 15921-15925) iterates over
+The per-function DCE sweep at C5 (lines 15654-15658) iterates over
 functions but not over passes — it is one pipeline step whose
 effect happens to be per-function, not a loop in the pipeline
 sense. The same applies to A6 (`lowerFrontEndEntryPointToIR` per
@@ -469,38 +473,60 @@ they are per-element iterations of a single pipeline step.
 
 ### `prelinkIR`
 
-Lives at line 2657 of
+Lives at line 2656 of
 [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp).
 Despite the name, it is **not** the same as the post-link
-`linkIR` (line 2155 of the same file). `prelinkIR` runs once per
+`linkIR` (line 2207 of the same file). `prelinkIR` runs once per
 translation unit, before optimization, and its entire work list is
 the `externalSymbolsToPrelink` list it is handed. That list has
-exactly one producer: `lowerFuncDeclInContext` at line 14093 of
-[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-adds the imported `IRFunc` (line 14120) whenever it is about to lower
-a decl that is both in a different module and
-`[__unsafeForceInlineEarly]`, as decided by `isDeclInDifferentModule`
-and `isForceInlineEarly` at line 14100. So `[unsafeForceInlineEarly]` and
-`externalSymbolsToPrelink` are not two independent categories — the
-list *is* the set of cross-module force-inline-early functions whose
-bodies the mandatory-early-inlining loop in Phase C will need.
+two producers in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp):
+
+- `lowerFuncDeclInContext` adds the imported `IRFunc` (line 13889)
+  whenever it is about to lower a decl that is both in a different
+  module and `[__unsafeForceInlineEarly]`, as decided by
+  `isDeclInDifferentModule` (line 754) and `isForceInlineEarly`
+  (line 759) at line 13869. These are the cross-module
+  force-inline-early functions whose bodies the
+  mandatory-early-inlining loop in Phase C will need.
+- `tryBorrowInterfaceFromOwningModule` (line 12030), called from
+  `visitInterfaceDecl`, adds the owning module's interface symbol
+  (line 12127) for every interface owned by another module, instead of
+  re-deriving that interface from the AST. It declines (and the
+  interface is derived as before) when the linkage name would be
+  obfuscated, when the decl has no owning module or that module has
+  no lowered IR yet, and when no interface is registered under the
+  mangled name. It emits a bodiless declaration with the same mangled
+  name and, through `reproduceInterfaceDecorationsReadBeforePrelink`
+  (line 11977), the `IRComInterfaceDecoration` that
+  `visitInheritanceDecl` reads before prelink runs.
+
+So the list is not only force-inline-early functions: it is the set of
+cross-module definitions that lowering chose to supply by cloning
+rather than by deriving.
 
 For each entry, `prelinkIR` looks up the same mangled name in the
 current module, strips that placeholder's `IRLinkageDecoration`,
 clones the imported definition in its place, and
-`replaceUsesWith`es the placeholder (lines 2651-2661). The
+`replaceUsesWith`es the placeholder (lines 2706-2727). The
 placeholder is deliberately left parented in the module tree until
 after `replaceUsesWith` so that insts nested inside it — for
 example a `specialize` inside a generic's body that refers to the
 generic itself — do not become orphaned mid-clone.
 
 Cloning is shallow by default. `IRPrelinkContext::maybeCloneValue`
-(line 2483) overrides the generic spec-context behavior so that a
+(line 2529) overrides the generic spec-context behavior so that a
 `kIROp_Func` is cloned *with* its body only when it carries
-`IRUnsafeForceInlineEarlyDecoration` (lines 2565-2576); every other
-referenced symbol is cloned as a bodiless declaration marked
-`[Import]`. That is what keeps prelink from transitively dragging in
-an imported module's whole call graph.
+`IRUnsafeForceInlineEarlyDecoration` (line 2621); a `Generic`,
+`GlobalVar`, `GlobalParam`, `GlobalConstant`, `StructKey`,
+`InterfaceRequirementEntry`, `GlobalGenericParam` or `InterfaceType`
+is cloned in full through `cloneGlobalValueImpl`, and a witness table,
+other func, struct, class or enum is cloned as a bodiless declaration
+marked `[Import]`. A symbol whose mangled name is already present in
+the current module is reused rather than re-cloned, and `[Import]`-origin
+clones are registered under their mangled name for the same reason.
+That is what keeps prelink from transitively dragging in an imported
+module's whole call graph.
 
 `linkIR`, by contrast, runs inside `linkAndOptimizeIR`
 (see [../target-pipelines/](../target-pipelines)) once the
@@ -509,7 +535,7 @@ referenced symbol from every imported module.
 
 Before cloning, `prelinkIR` calls `_ensureLinkingInfo()` on every
 stable input module (the current module's dependencies plus the
-core modules), but **not** on `irModule` itself (lines 2626-2633) —
+core modules), but **not** on `irModule` itself (lines 2679-2700) —
 prelink mutates `irModule` by replacing declarations with cloned
 definitions, and the per-module linking-info cache assumes the
 module is frozen once built. The linking-info cache (a module-owned
@@ -524,22 +550,22 @@ imported.
 
 `IRSharedSpecContext` (line 45) carries an `isFinalCodegenLink`
 flag (line 67) that is **false** for `prelinkIR` and set to `true`
-only by `linkIR` (line 2238). The flag feeds
+only by `linkIR` (line 2282). The flag feeds
 `canPruneAutodiffLinkArtifacts()` (line 84), which is
 `isFinalCodegenLink && !useAutodiff`. Two clone-time decisions read
 that predicate:
 
-- `cloneAnnotations` (line 228) returns without cloning any
+- `cloneAnnotations` (line 229) returns without cloning any
   module-scope `IRAnnotation` when pruning is allowed. Every
   `AnnotationKind` is differentiability-related, so the skip is
   wholesale; a `static_assert` on `AnnotationKind::CountOf` guards
   against a future non-autodiff kind being dropped silently.
-- `shouldDeepCloneWitnessTable` (line 735) returns
+- `shouldDeepCloneWitnessTable` (line 759) returns
   `!canPruneAutodiffLinkArtifacts()` for a witness table whose
   `IRKnownBuiltinDecoration` names a differentiable interface
   (`isDifferentiableInterfaceBuiltin` in
   [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  line 260). Deep-cloning such a table drags the entire derivative
+  line 262). Deep-cloning such a table drags the entire derivative
   closure of its concrete type through every downstream pass. The
   differentiable-interface arm is reached only after the
   unconditional keep-alive cases (user `export`, COM interface,
@@ -551,10 +577,16 @@ that predicate:
   have no mangled name to defer on; only the mangled-name-keyed
   derivative methods are held back.
 
-Because `prelinkIR` leaves `isFinalCodegenLink` false, both
-decisions behave as if the program used auto-diff: prelink always
-clones annotations and always deep-clones differentiable-interface
-witness tables. This is deliberate. The module `prelinkIR` mutates
+Because `prelinkIR` leaves `isFinalCodegenLink` false, the shared
+predicate disables pruning: prelink always clones annotations, and
+`shouldDeepCloneWitnessTable` would not defer differentiable-interface
+entries. That predicate is not the whole prelink story, though.
+`IRPrelinkContext::maybeCloneValue` (line 2611) handles
+`kIROp_WitnessTable` itself by creating the table with cloned types and
+cloning only its decorations (lines 2645-2651), bypassing
+`cloneWitnessTableImpl` and the deep-clone decision; a witness table
+reached through that override can therefore stay a declaration without
+entries. Keeping the pruning policy off is deliberate. The module `prelinkIR` mutates
 is the one cached on `Module::m_irModule`; it stays live past the
 link, can be serialized (the core module is), and is reused for
 every subsequent target and entry point, so it must remain complete
@@ -564,15 +596,15 @@ can be cloned on demand by mangled name.
 
 Neither policy changes emitted code, so that is the wrong place to
 look for the difference. The comment on
-`canPruneAutodiffLinkArtifacts` (lines 68-84) states the cost it is
+`canPruneAutodiffLinkArtifacts` (lines 69-84) states the cost it is
 avoiding: in a program that never differentiates, the artifacts are
 dragged through specialization, `simplifyIR`, and DCE before DCE
 finally removes them — the compile-time regression tracked as issue
-#11781. What differs is therefore an intermediate module shape, and it
+#11781 (introduced by PR #9808). What differs is therefore an intermediate module shape, and it
 has names to look for: module-scope `IRAnnotation` insts, and the
 mangled-name-keyed derivative entries of a differentiable-interface
 witness table. No dump isolates them, though. `linkIR` is called
-directly at line 1005 of
+directly at line 1050 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) rather than
 through the `SLANG_PASS` wrapper that gives every post-link pass an
 `### AFTER <pass>:` block under `-dump-ir`
@@ -583,9 +615,9 @@ block is the prelinked module.
 
 Note that `prelinkIR` still computes
 `sharedContext.useAutodiff = doesModuleUseAutodiff(irModule)` at
-line 2595, and `doesModuleUseAutodiff` (line 2119) is now a full
+line 2662, and `doesModuleUseAutodiff` (line 2171) is a full
 recursive walk of the module inst tree via `containsTranslateInst`
-(line 2091) rather than a scan of module-scope insts only, because
+(line 2143) rather than a scan of module-scope insts only, because
 an `IRTranslateBase` request cannot hoist out of a generic body it
 depends on. Since `useAutodiff` is only ever read through
 `canPruneAutodiffLinkArtifacts()`, and that predicate is
@@ -638,11 +670,14 @@ needs to understand `IRExpand`.
 
 ### `performMandatoryEarlyInlining` and the surrounding loop
 
-Lives at line 1026 of
+Lives at line 966 of
 [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp).
-Inlines every call to a function marked `[unsafeForceInlineEarly]`.
-For shader authors this attribute is a **hard requirement**:
-functions tagged with it must not survive the pre-link pipeline.
+Inlines eligible call sites of functions marked
+`[unsafeForceInlineEarly]`, with no profitability heuristic. Eligibility
+is still checked: `canInline` (line 213 of the same file) rejects some
+callees, for example generic-assembly bodies. Only the inlined call is
+removed; a tagged function that is exported can survive DCE, because
+`keepExportsAlive` is enabled for the pre-link DCE.
 The loop exists because inlining one body can expose another
 `[unsafeForceInlineEarly]` call inside, and because the inner
 simplification cluster can produce new opportunities that further
@@ -658,9 +693,9 @@ list: `IRHighLevelDeclDecoration` and `IRInParamProxyVarDecoration`
 are always removed, and `IRNameHintDecoration` is removed only when
 `options.shouldStripNameHints` is set. The pass can also clear every
 `sourceLoc` when `options.stripSourceLocs` is set, but the pre-link
-caller never asks for that (line 16057 sets it to `false`
+caller never asks for that (line 15810 sets it to `false`
 unconditionally). The intent is documented by the comment at lines
-15696-15710 of
+15777-15792 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp):
 the mandatory passes use `IRHighLevelDeclDecoration` to point
 diagnostics back at AST-level code, but letting that information
@@ -671,7 +706,7 @@ the phase boundary.
 
 Lives at line 64 of
 [slang-ir-obfuscate-loc.cpp](../../../../source/slang/slang-ir-obfuscate-loc.cpp);
-called at line 16075. Runs only when both `shouldObfuscateCode()` and
+called at line 15828. Runs only when both `shouldObfuscateCode()` and
 `shouldHaveSourceMap()` are true — that is, the user wants
 obfuscated source locations **and** the ability to map them back
 to actual source via a side-channel source map. This pre-link
@@ -683,9 +718,9 @@ place.
 
 ### `module->buildMangledNameToGlobalInstMap`
 
-Lives at line 5174 of
+Lives at line 5202 of
 [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) and is called
-at line 16105, the very last statement before
+at line 15858, the very last statement before
 `generateIRForTranslationUnit` returns the module for caching on
 `Module::m_irModule`. The
 lookup it builds is the index `linkIR` consumes to resolve cross-
@@ -699,7 +734,7 @@ module references during the post-link pipeline.
 mandatory optimization passes; it does not stand in for the
 post-link `linkIR`. The two functions consume different inputs
 (`prelinkIR` consumes the current translation unit plus the
-`externalSymbolsToPrelink` set; `linkIR` consumes the composed
+`externalSymbolsToPrelink` set of imported force-inline-early functions and borrowed interfaces; `linkIR` consumes the composed
 program's full module set) and run at different times in the
 overall flow. They also differ in how much of what they touch they
 are allowed to discard: `linkIR` announces itself as the final
@@ -712,10 +747,10 @@ output is the long-lived, potentially serialized module IR. See
 
 ### `SpecializedComponentTypeIRGenContext::process`
 
-Lives at line 16111 of
+Lives at line 15864 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-(its `process` method begins at line 16119, and the public entry
-point `generateIRForSpecializedComponentType` at line 16248). This
+(its `process` method begins at line 15872, and the public entry
+point `generateIRForSpecializedComponentType` at line 16001). This
 routine builds a
 small IR module for a
 `SpecializedComponentType` that records how specialization
@@ -725,13 +760,13 @@ specialized-component modules carry only specialization bindings
 and witness tables, and are designed to be linked in alongside
 the per-translation-unit IR module before `linkAndOptimizeIR`
 runs. The only step it shares with Phase D is
-`module->buildMangledNameToGlobalInstMap()` (line 16149), which it
+`module->buildMangledNameToGlobalInstMap()` (line 15902), which it
 needs for the same reason: `linkIR` resolves cross-module references
 by mangled name.
 
 ### `TargetProgram::createIRModuleForLayout`
 
-Lives at line 16681 of
+Lives at line 16434 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 It produces a separate, per-target IR module that carries target
 layout metadata: import stubs for globals and entry points, the

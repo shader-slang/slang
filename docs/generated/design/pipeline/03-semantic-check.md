@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 4d4dfc0a23d4b9278059883fb251ba8d4b24f87bccc211329ce352870e7f9718
+model: claude-sonnet-5-5
+generated_at: 2026-11-02T21:22:45Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: cd6860f053b52ab46cc0816a230dc20093e248da0db8a4bb4c551e2dee5c5a14
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -37,18 +37,15 @@ the parser hands over an `S` whose base list is still an unchecked
 `Expr`, a `call` body still in `UnparsedStmt` form, and not one `Expr`
 carrying a type. Checking resolves `IFoo` in `S`'s base list and in
 `T`'s constraint to the same decl (*names resolved*); gives
-`v.twice()` the type `int`, which is what makes the call legal
-(*types attached*); records the `S : IFoo` witness table
-(*conformances recorded*); fills that table's `twice` slot with a
-witness for the interface's default body, which `S` never spelled
-(*default conformance witnesses synthesized*); and turns the
-`UnparsedStmt` into a checked `Stmt` tree (*function bodies fully
-parsed and checked*). The one modifier in the snippet is the `static`
-on `S::tag`: `checkModifier` asks `isModifierAllowedOnDecl` whether a
-`static` may sit on a struct field, which it may, and
-`getModifierConflictGroupKind` whether anything else on that decl has
-already claimed `static`'s group — `uniform` would have — which
-nothing has (*modifiers validated*). Both checks are described under
+`v.twice()` the type `int` (*types attached*); records the `S : IFoo`
+witness table (*conformances recorded*); fills its `twice` slot with a
+witness for the interface's default body (*default conformance
+witnesses synthesized*); and turns the `UnparsedStmt` into a checked
+`Stmt` tree (*function bodies fully parsed and checked*). The `static`
+on `S::tag` is the *modifiers validated* case: `checkModifier` asks
+`isModifierAllowedOnDecl` whether `static` may sit on a struct field
+and `getModifierConflictGroupKind` whether another modifier has claimed
+its group. Both are described under
 [Modifier validation](#modifier-validation).
 
 The result is the input to AST → IR lowering
@@ -74,17 +71,13 @@ collected the decls.
 
 The `slang-check-*.cpp` family in
 [source/slang/](../../../../source/slang) splits the work by concern.
-Every file collaborates through `SemanticsContext` /
-`SemanticsVisitor` declared in
-[slang-check-impl.h](../../../../source/slang/slang-check-impl.h).
 
 The *Example rejection* column names one diagnostic the file itself
-emits, so that each row is a claim a test can be written against
-rather than a label. Three rows have none to name:
-`slang-check-conformance.cpp` and `slang-check-resolve-val.cpp` emit
-no diagnostics at all — they compute a result and leave the reporting
-to whoever asked for it — and `slang-check.cpp`'s only diagnostics are
-about loading a downstream compiler, not about the program.
+emits, so each row is a claim a test can be written against. Three rows
+have none: `slang-check-conformance.cpp` and
+`slang-check-resolve-val.cpp` emit no diagnostics, leaving reporting to
+the caller, and `slang-check.cpp`'s only diagnostics are about loading a
+downstream compiler.
 
 | File | Concern | Example rejection |
 | --- | --- | --- |
@@ -102,44 +95,39 @@ about loading a downstream compiler, not about the program.
 | [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Resolves and canonicalizes `Type`, `DeclRef`, and witness values | none; a bad resolution result is reported at the use site |
 | [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp) | Entry-point checks: stage-specific signatures, parameter rules | `E38007`, an entry point with no stage |
 
-`E30815` in that table is narrower than "circular extension" suggests,
-and the name is easy to over-read. It is not a general cycle detector
-over extension target types; it fires only when *the same
-`ExtensionDecl`* is re-entered while its own inheritance information is
-still being computed. `getInheritanceInfo(DeclRef<ExtensionDecl>)`
+`E30815` is narrower than "circular extension" suggests. It is not a
+general cycle detector over extension target types; it fires only when
+*the same `ExtensionDecl`* is re-entered while its own inheritance
+information is still being computed. `getInheritanceInfo(DeclRef<ExtensionDecl>)`
 pushes an `InheritanceCircularityInfo` node naming the extension onto a
 linked stack and recurses;
 `_checkForCircularityInExtensionTargetType`
 ([slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp)
-line 254) walks that stack on entry and, on finding the same `Decl*`
-already present, reports `CircularityInExtension` and returns an empty
-`InheritanceInfo` so the recursion terminates rather than overflowing.
+line 254) walks that stack on entry and, on finding the same `Decl*`,
+reports `CircularityInExtension` and returns an empty `InheritanceInfo`
+so the recursion terminates.
 
-Cycles that never re-enter one extension are therefore *other*
-diagnostics, not this one — which is why the shapes a reader reaches
-for first (mutually-referential extension targets, a self-referential
-`typealias` inside an extension, an extension reached through `This`)
-report `E30027`, `E30813`, or the fatal `E40002` cyclic reference
-instead. Note also the deliberately benevolent case just above it:
-`_isInheritanceInfoBeingComputed` exists so that an equality constraint
-such as `__constraint A == B`, which makes each of `T.A` and `T.B` a
-base of the other, is skipped during linearization rather than reported
-as a cycle.
+Cycles that never re-enter one extension are *other* diagnostics:
+mutually-referential extension targets, a self-referential `typealias`
+in an extension, or an extension reached through `This` report `E30027`,
+`E30813`, or the fatal `E40002` instead. `_isInheritanceInfoBeingComputed`
+exists so that an equality constraint such as `__constraint A == B`,
+which makes each of `T.A` and `T.B` a base of the other, is skipped
+during linearization rather than reported as a cycle.
 
 ## Two-pass interaction with the parser
 
 The parser left function and method bodies as `UnparsedStmt` nodes
 (see [02-parse-ast.md](02-parse-ast.md)). When the checker reaches
-one, it calls `parseUnparsedStmt`
+one, `SemanticsVisitor::maybeParseStmt`
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
+line 15606) calls `parseUnparsedStmt`
 ([slang-parser.h](../../../../source/slang/slang-parser.h)) with a
 `SemanticsVisitor*` so that the parser can call back into the
 checker to disambiguate `<` tokens at parse time. Once the body is
-parsed, the checker continues normally over the resulting `Stmt`
-tree.
-
-This interleaving means there is no clean parse / check boundary
-inside function bodies: parsing and checking happen together,
-on demand. The deeper rationale is in
+parsed, the checker continues over the resulting `Stmt` tree, so there
+is no clean parse / check boundary inside function bodies. The deeper
+rationale is in
 [../../../design/parsing.md](../../../design/parsing.md).
 
 ## Name lookup and `DeclRef`
@@ -171,7 +159,8 @@ The checker implements generic-parameter resolution through:
 When resolving a generic application,
 `TryCheckOverloadCandidateConstraints`
 ([slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp))
-routes an outermost generic's defaulted and witness arguments through
+routes an outermost generic's defaulted and witness arguments (a nested
+generic keeps the per-constraint linear pass) through
 the constraint solver's fixpoint (`trySolveGenericArguments`) — the
 same path used for inferred arguments — passing only the explicitly
 supplied ordinary-argument prefix
@@ -179,7 +168,7 @@ supplied ordinary-argument prefix
 [slang-check-impl.h](../../../../source/slang/slang-check-impl.h)) as
 fixed caller input so a user-written self-reference argument is not
 overwritten by a parameter's default. On solver failure the code
-falls through to a per-constraint linear pass that re-derives the
+falls through to the per-constraint linear pass that re-derives the
 failing constraint to emit a precise diagnostic.
 
 A constraint written on an associated type — whether as
@@ -202,22 +191,19 @@ witness-table early-out at the top of that function.
 Linearized inheritance lists are computed by `getInheritanceInfo` /
 `_calcInheritanceInfo` in
 [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp).
-When computing the inheritance of an associated-type access such as
-`T.D`, the engine surfaces interface-level `__constraint`s of the
-interfaces each anchor type conforms to, re-expresses each through the
-anchor's conformance witness, and adds the opposite endpoint as a base
-of the access. An equality constraint such as `__constraint A == B`
-makes `T.A` and `T.B` mutual bases — a *benevolent* cycle. The engine
-tolerates this by skipping a base whose inheritance info is still being
-computed (`_isInheritanceInfoBeingComputed`), accumulating the skipped
+For an associated-type access such as `T.D`, the engine surfaces the
+interface-level `__constraint`s of the interfaces each anchor type
+conforms to, re-expresses each through the anchor's conformance witness,
+and adds the opposite endpoint as a base of the access. For the
+*benevolent* cycle made by `__constraint A == B` it skips a base whose
+inheritance info is still being computed, accumulating the skipped
 in-progress ancestor `DeclRef`s through a `HashSet<DeclRef<Decl>>*
 ioSkippedIncompleteFacet` out-parameter; a frame whose skipped set is
-non-empty after subtracting itself is contextual (partial), is not
-cached, and is recomputed by a later root-level query. A bare-`This`
-subject on an interface `__constraint` (which would express inheritance
-rather than a checked predicate) is rejected during checking in
-`visitGenericTypeConstraintDecl`
-([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)).
+non-empty after subtracting itself is partial, is not cached, and is
+recomputed by a later root-level query. A bare-`This` subject on an
+interface `__constraint` is rejected in `visitGenericTypeConstraintDecl`
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
+line 4755) as `ConstraintSubjectCannotBeThisType`.
 
 When a generic cannot be specialized for a call, the failure reason is
 captured eagerly but reported lazily. The constraint solver records a
@@ -237,16 +223,14 @@ diagnostic that will eventually be emitted:
 
 Every arm follows its error with a "see declaration of" note carrying
 the candidate's rendered signature (`GenericSignatureTried`), and the
-`GenericConstraintNotSatisfied` arm adds a second note pointing at the
-`where`-clause. Each `Kind` stores only the offending fields (counts,
-the parameter `Decl*`, or the substituted sub/super types); the
-expensive message formatting is deferred so that speculative candidates
-never pay for it. The failure is attached to the `OverloadCandidate`
+`GenericConstraintNotSatisfied` arm adds a note pointing at the
+`where`-clause. Each `Kind` stores only the offending fields; message
+formatting is deferred so speculative candidates never pay for it. The failure is attached to the `OverloadCandidate`
 and turned into a focused diagnostic only if overload resolution
 selects that failed candidate — see the `switch` over
 `candidate.genericInferenceFailure.kind` in `CompleteOverloadCandidate`
 ([slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)).
-Before this mechanism, every specialization failure collapsed into the
+A candidate whose failure `Kind` is `None` still falls back to the
 catch-all `Diagnostics::GenericArgumentInferenceFailed`.
 
 ### Differentiability as interface conformance
@@ -262,51 +246,69 @@ float f(float x) { return x * x; }
 
 `[Differentiable]` parses to a `BackwardDifferentiableAttribute` (see
 the `attribute_syntax` declarations in
-[core.meta.slang](../../../../source/slang/core.meta.slang), line 470 at
-`source_commit`). When `SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon`
+[core.meta.slang](../../../../source/slang/core.meta.slang), lines 489,
+498 and 517; `ForwardDifferentiableAttribute` and
+`BackwardDifferentiableAttribute` both derive from `DifferentiableAttribute`
+in [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h)).
+`SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
-line 14950) sees that attribute or a `ForwardDifferentiableAttribute`,
-it calls `extendContainerDecl` to synthesize
+line 16160) runs for each non-synthesized `FunctionDeclBase` in the
+`DeclCheckState::ReadyForReference` arm of the decl-check dispatch, after
+`SignatureChecked` has recorded the effective `this` parameter. On seeing
+`ForwardDifferentiableAttribute` or `BackwardDifferentiableAttribute` it
+calls `extendContainerDecl` to synthesize
 `extension __func_as_type(f) : IForwardDifferentiable<__func_as_type(f)>`
 and then `addSynthesizedFunc` to give that extension the `fwd_diff`
 member the interface requires, with `kIROp_ForwardDifferentiate` as its
 implementation. The synthesized `fwd_diff` is in turn given the same
-pair of conformances, which is what makes higher-order differentiation
-resolve through ordinary lookup.
+pair of conformances (`IForwardDifferentiable` and
+`IBackwardDifferentiable`), which is what makes higher-order
+differentiation resolve through ordinary lookup. A backward-mode extension
+synthesizes the `BwdCallable` and `MinimalContext` structs and the
+`apply_bwd` and `remat` members. A decl carrying
+`[TreatAsDifferentiable]` or `HasTrivialForwardDerivativeAttribute` gets
+the forward extension with the trivial ops (`kIROp_TrivialForwardDifferentiate`).
 
-The interface types themselves are built by
-`getForwardDiffFuncInterfaceType` and
-`getBackwardDiffFuncInterfaceType` (lines 10014 and 10020), which pair
+Each mode must end up with one conformance, so the synthesized forward
+(backward) extension is skipped when the decl itself carries
+`[ForwardDerivative]` (`[BackwardDerivative]`); the later translation of
+that attribute supplies it. The guard sees only attributes on the decl,
+so `[ForwardDerivativeOf]` can still produce both.
+
+The interface types are built by `getForwardDiffFuncInterfaceType` and
+`getBackwardDiffFuncInterfaceType` (lines 10414 and 10420), which pair
 the base function type with the `__hasDiffTypeInfo` witness that
 `IForwardDifferentiable<FType>` / `IBackwardDifferentiable<FType>`
-demand — those interfaces are declared in
-[core.meta.slang](../../../../source/slang/core.meta.slang) at lines 720
-and 739, and their requirements (`fwd_diff`, the `BwdCallable` /
-`MinimalContext` associated types, `apply_bwd`) are what the checker
-must supply.
+demand. Those interfaces are declared in
+[core.meta.slang](../../../../source/slang/core.meta.slang) at lines 767
+and 786; their requirements (`fwd_diff`; `BwdCallable`, `MinimalContext`,
+`apply_bwd`, `remat`, `bwd_diff`) are what the checker must supply.
 
 Because the fact now lives in a witness table, asking "is this callee
 differentiable?" is a subtype query instead of a modifier lookup:
 `isFuncForwardDifferentiable` and `isFuncBackwardDifferentiable` (lines
-5467 and 5476) return the `SubtypeWitness*` that
-`tryGetSubtypeWitness` produced, replacing the earlier boolean
-`doesCalleeHaveFwdDiff` / `doesCalleeHaveBwdDiff` predicates. Handing
-back the witness rather than a `bool` matters because the caller needs
-that witness to build and specialize the derivative call.
+5806 and 5815) return the `SubtypeWitness*` that `tryGetSubtypeWitness`
+produced. The caller needs the witness to build the derivative call.
 
-A `[Differentiable]` annotation on an *interface requirement* is
-handled the same way as the associated-type constraints described
-above — as a requirement of the enclosing interface rather than
-something nested under the member. `_moveInterfaceDifferentiabilityRequirementToInterface`
-(line 14863) starts the `GenericTypeConstraintDecl` under the callable
-that owns the generic environment its type mentions, then uses
-`liftDeclFromGenericContainers` to hoist it into a standalone generic
-requirement directly under the interface. The explicit
+A differentiability annotation (`[ForwardDifferentiable]`,
+`[BackwardDifferentiable]`, `[Differentiable]`, `[MaybeDifferentiable]`)
+on an *interface requirement* is handled like the associated-type
+constraints above: a sibling requirement of the enclosing interface
+rather than something nested under the member. The same function creates a
+`FuncConstraintDecl` (a `GenericTypeConstraintDecl`; marked
+`OptionalConstraintModifier` for `[MaybeDifferentiable]`) whose subject is
+the requirement viewed as a type, and
+`_moveInterfaceDifferentiabilityRequirementToInterface` (line 16036)
+starts it under the callable that owns the generic environment its type
+mentions, then uses `liftDeclFromGenericContainers` to hoist it into a
+standalone generic requirement directly under the interface. The explicit
 `__func_extension fwd_diff(foo)(...)` spelling arrives at the same
-representation through `_funcExtensionForwardDiff` /
-`_funcExtensionBackwardDiff` (lines 15981 and 16016), which rewrite it
+representation through `_funcExtensionForwardDiff` (line 17207), which rewrites it
 into `extension foo : IForwardDifferentiable<foo>` with the user's body
-as the `fwd_diff` member.
+as the `fwd_diff` member. `_funcExtensionBackwardDiff` (line 17240)
+instead builds an `IBackwardDifferentiable` conformance whose `bwd_diff`
+is a synthesized `kIROp_FunctionCopy` of the user's function, plus
+synthesized backward-context members.
 
 The full conceptual model (interfaces, witness tables, existential
 types) is in
@@ -316,8 +318,7 @@ this document only points at the implementation.
 
 ## Synthesizing implicit code
 
-Some declarations gain members at check time rather than at parse
-time: default conformance witnesses, generated comparison /
+Some declarations gain members at check time: default conformance witnesses, generated comparison /
 construction methods, and several built-in conformances. The
 *decisions* about what to synthesize live primarily in
 [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
@@ -327,8 +328,8 @@ requirements — while
 [slang-ast-synthesis.cpp](../../../../source/slang/slang-ast-synthesis.cpp)
 supplies the `ASTSynthesizer` helpers (`emitBinaryExpr`, `emitVarExpr`,
 `emitInvokeExpr`, `emitVarDeclStmt`, ...) that build the AST fragments
-those routines emit. The checker calls into this machinery whenever it
-needs a member that the user did not write but the language guarantees.
+those routines emit. The checker calls into this machinery for members the user did not
+write but the language guarantees.
 
 ## Modifier validation
 
@@ -345,45 +346,44 @@ competes in; a second modifier landing in a group already claimed on
 the same decl produces `E31202`. Most modifiers are their own group,
 so a plain repeat (`static static int g;`) is the common case, but the
 groups with more than one member are the ones worth knowing:
-`out`, `inout`, `ref` and `borrow` share a group; `static` and
-`uniform` share one; and `nointerpolation`, `noperspective`, `linear`,
-`sample` and `centroid` share one more.
+`out`, `inout`, `ref`, `__ref_readonly`, `__ref_writeonly` and `borrow`
+share a group; `static` and `uniform` share one; `nointerpolation`,
+`noperspective`, `linear` and `pervertex` share one; and `sample` and
+`centroid` share a separate one, so an interpolation mode combines with
+a sampling location (`noperspective centroid`).
 
 The dialect axis here is GLSL rather than HLSL. `checkModifier` (line
-1936) computes `isGLSLInput` from the `-allow-glsl` option
-(`CompilerOptionName::AllowGLSL`) or from a `GLSLModuleModifier` on
-the module, and passes it to `isModifierAllowedOnDecl` (line 1675); a
+1946) computes `isGLSLInput` from
+`SharedSemanticsContext::isGLSLSourceLanguage`
+([slang-check-impl.h](../../../../source/slang/slang-check-impl.h), line
+1056), which is true when the translation unit's source language is GLSL
+(false for a context with no translation unit), and passes it to
+`isModifierAllowedOnDecl` (line 1681); a
 modifier used in a position that predicate rejects is reported as
 `E31201` (*modifier '<name>' is not allowed here*).
 
-A concrete pair that reaches it: `globallycoherent` on a **function
-parameter**, as in
+A concrete case that reaches it is `globallycoherent` on a **function
+parameter**:
 
 ```slang
 void f(globallycoherent int x) { }
 ```
 
-Without `-allow-glsl` the arm for `GloballyCoherentModifier` and
-`HLSLVolatileModifier` (line 1731) requires `as<VarDecl>(decl)` — and a
+Without GLSL input the arm for `GloballyCoherentModifier` and
+`HLSLVolatileModifier` (line 1741) requires `as<VarDecl>(decl)`, and a
 parameter is a `ParamDecl`, which derives from `VarDeclBase` as a
-*sibling* of `VarDecl` rather than from `VarDecl`
+*sibling* of `VarDecl`
 ([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) lines
-321, 339, 597) — so the predicate returns false and the modifier is
-rejected. This is a position the parser is happy to produce, which is
-what makes it reachable; many combinations a reader might try instead
-are settled earlier, either by the parser or by plain acceptance, and
-so never reach `E31201` at all.
+321, 339, 648), so the modifier is rejected. Many other combinations are
+settled earlier, by the parser or by plain acceptance, and never reach
+`E31201`.
 
-That same arm is the clearest illustration of what the GLSL flag does
-and does not widen, because it is easy to read the two branches the
-wrong way round. Both branches already accept a *struct field*: the
-non-GLSL branch allows a `VarDecl` whose parent is any `StructDecl`,
-so `struct G { globallycoherent int a; }` is accepted with or without
-`-allow-glsl` and the flag makes no observable difference there. What
-`isGLSLInput` adds is the parameter case above (`as<ParamDecl>(decl)`),
-global declarations that are a `VarDeclBase` without being a `VarDecl`,
-and — redundantly with the non-GLSL branch — a field of a struct that
-is itself global. Only a handful of entries branch on the flag at all.
+The GLSL flag widens that arm only a little. Both branches already
+accept a *struct field* (`struct G { globallycoherent int a; }` is
+accepted either way); `isGLSLInput` adds the parameter case above
+(`as<ParamDecl>(decl)`) and global declarations that are a
+`VarDeclBase` without being a `VarDecl`. Only a handful of entries
+branch on the flag at all.
 
 ### Visibility scopes
 
@@ -391,7 +391,7 @@ is itself global. Only a handful of entries branch on the flag at all.
 modifier, but the scope each one names is not the source file.
 `isDeclVisibleFromScope`
 ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp),
-line 1144) decides the question:
+line 1181) decides the question:
 
 | Modifier | Visible from |
 | --- | --- |
@@ -399,9 +399,8 @@ line 1144) decides the question:
 | `internal` | any scope in the declaring module |
 | `private` | the declaring type or namespace, plus extensions of that same type |
 
-`private` is therefore type-scoped, not file-scoped: a free function
-in the *same* file cannot read a `private` member of a `struct`, and
-the read is rejected with `E30600`. Writing `private` where there is
+`private` is type-scoped, not file-scoped: a free function in the
+*same* file cannot read a `private` member of a `struct` (`E30600`). Writing `private` where there is
 no enclosing type for it to scope to — at global scope, or on an
 interface requirement — is rejected up front with `E30603`.
 
@@ -410,21 +409,24 @@ interface requirement — is rejected up front with `E30603`.
 `validateDynInterfaceUsage` and
 `validateDynInterfaceUseWithInheritanceDecl`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
-lines 372 and 442) constrain what a `dyn interface` may declare and
-what may conform to one. Both are gated on
-`allowExperimentalDynamicDispatch` (line 364) and are a no-op unless
+lines 383 and 453) constrain what a `dyn interface` may declare and
+what may conform to one. `validateDynInterfaceUsage` is gated on
+`allowExperimentalDynamicDispatch` (line 375) and is a no-op unless
 the module's language version is 2026 or later (`-std 2026`) *and*
 `-enable-experimental-dynamic-dispatch` was **not** passed — so the
-same source compiles differently under the default `-std`.
+same source compiles differently under the default `-std`. In
+`validateDynInterfaceUseWithInheritanceDecl` the same gate covers only
+the extension and generic-conformer checks; the field checks are not
+gated.
 
 When the gate is open, the interface may not be generic (`E33072`)
 and may not declare an associated type (`E33073`), a generic method
 (`E33074`), a `[mutating]` method (`E33075`), a `[Differentiable]`
 method (`E33076`), or a non-`dyn` base interface (`E33077`). A
 conforming type may not acquire the conformance through an `extension`
-(`E33078`) and may not be generic (`E33082`), and its fields may be
-neither unsized (`E33079`), opaque (`E33080`), nor non-copyable
-(`E33081`) — the dynamic representation has to be a copyable,
+(`E33078`) and may not be generic (`E33082`); a conforming aggregate's
+fields may be neither unsized (`E33079`), opaque (`E33080`), nor
+non-copyable (`E33081`), gate open or not — the dynamic representation has to be a copyable,
 fixed-size box.
 
 ## Shader-specific checks
@@ -433,56 +435,58 @@ fixed-size box.
 validates entry points: the function's stage attribute, parameter
 modifiers (`in`, `out`, `inout` and stage-specific intrinsics), return
 type compatibility with the stage, and resource binding rules.
-Failures here surface as diagnostics that reference the
-`shader("...")` attribute or the entry-point signature.
 
-Two checks worth calling out are scoped specifically to entry-point
-validation rather than the general inference walk:
+Checks scoped to entry-point validation rather than the general
+inference walk:
 
 - **Generic-struct capability requirements.**
   `collectGenericStructTypeUses`
   ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp))
-  recurses through an entry point's signature types to find every
-  user-defined generic struct (e.g. a `Foo<int>`, including nested
+  recurses through an entry point's signature types (parameters and
+  return type, through each struct's fields with substitutions applied
+  and through `Val` operands) to find every user-defined generic struct
+  with a non-empty requirement (e.g. a `Foo<int>`, including nested
   inside `Optional<...>`, arrays, or `ConstantBuffer<...>`) and
   validates its `[require(...)]` against the target. The general
   capability-inference walk (`SemanticsDeclReferenceVisitor`) records a
   type's requirements only for a `DirectDeclRef`; a generic
   specialization is a `GenericAppDeclRef` and is skipped, so the
-  requirement would otherwise be dropped. The check deliberately lives
-  here — not in the inference walk — to avoid forcing every library
-  function that names such a type to redeclare those capabilities.
+  requirement would otherwise be dropped. The check lives
+  here, not in the inference walk, so library functions that name such
+  a type need not redeclare its capabilities.
   Builtin generic types carrying `MagicTypeModifier`/
-  `IntrinsicTypeModifier` already have more specific diagnostics and are
-  filtered out (but still recursed *through*). A requirement the target
+  `IntrinsicTypeModifier` are filtered out (but still recursed *through*). A requirement the target
   cannot provide — `[require(cpp)] struct Foo<T>` named as `Foo<int>`
   in a SPIR-V entry point's signature — is reported against the entry
-  point as `E36107`, followed by a `see using of 'Foo'` note.
+  point as `E36107`, followed by `see using of 'Foo'`, `see definition
+  of` and `see declaration of` modifier notes
+  (`validateEntryPointCapabilities`, line 1813).
 - **Unspecialized generic entry points.** A generic entry point such as
   `void main<T>(...)` left genuinely unspecialized lowers to an
   `IRGeneric` rather than an `IRFunc` and used to crash at link time.
   `createSpecializedGlobalAndEntryPointsComponentType`
   ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp))
-  now uses `Linkage::isSpecialized` together with the presence of
+  uses `Linkage::isSpecialized` together with the presence of
   specialization-argument strings to decide, and calls
-  `diagnoseGenericEntryPoint` (line 3964) — which emits `E38014`
+  `diagnoseGenericEntryPoint` (line 4269) — which emits `E38014`
   against the entry-point name — only for the truly-unspecialized
-  case.
+  case. The check runs only when the `SkipCodeGen` option is unset,
+  since checking alone needs no concrete entry points.
 - **Conflicting depth outputs.** A fragment entry point may write at
   most one depth system value. Because the per-parameter semantic check
   looks at each semantic in isolation, the conflict is detected
   separately: `collectDepthOutputSemantics`
   ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp),
-  line 536 at `source_commit`) walks every `out` / `inout` parameter and
+  line 649 at `source_commit`) walks every `out` / `inout` parameter and
   the return type — unwrapping `Conditional<T>` and array wrappers and
   recursing into struct fields, so a semantic on a field of an
   `out DepthOut a[1]` is still reached — and a collected count above one
   produces `Diagnostics::MultipleDepthOutputSemantics` (`E30705`),
   naming the second contributor as conflicting with the first.
 - **System-value semantic type compatibility.** `isSemanticTypeCompatible`
-  (line 112) decides whether a declared type may carry a given
-  system-value semantic. Two types match when they have the same shape
-  (both scalar, or both vectors of equal element count) and their scalar
+  (line 175) decides whether a declared type may carry a given
+  system-value semantic. Two types match when they have the same
+  element count (a scalar counts as one, so `float` matches `float1`) and their scalar
   element types fall in the same category — integer, floating-point, or
   bool. That admits sign coercions such as `int3` for a `uint3` semantic
   while still rejecting cross-category ones such as
@@ -490,16 +494,16 @@ validation rather than the general inference walk:
   `float pos : SV_Position`; both are reported as `E30701`, whose
   message lists the types the semantic will accept.
 - **Ignored binding modifiers on entry-point parameters.** Slang
-  silently ignores `[[vk::binding(...)]]`, `[[vk::push_constant]]`,
-  `register()`, and `packoffset()` in some positions, which misleads
-  users either way. Entry-point parameter checking therefore reports
+  ignores `[[vk::binding(...)]]`, `[[vk::push_constant]]`,
+  `register()`, and `packoffset()` in some positions. Entry-point
+  parameter checking therefore reports
   `Diagnostics::UnhandledModOnEntryPointParameter` (`E38010`, whose
   message names the modifier and the parameter and says the modifier
   will be ignored) for each such
   modifier. Only the `[[vk::binding(...)]]` case is gated — by
-  `_allTargetsSupportVkBindingOnEntryPointParameters` (line 1580) over
+  `_allTargetsSupportVkBindingOnEntryPointParameters` (line 1693) over
   all of the linkage's targets and by
-  `isVkBindingCompatibleEntryPointParameterType` (line 920) for the
+  `isVkBindingCompatibleEntryPointParameterType` (line 1033) for the
   parameter's own type — so that it fires only where the attribute
   really would be dropped. `[[vk::push_constant]]`, `register()`, and
   `packoffset()` are diagnosed unconditionally when found on an
@@ -511,18 +515,16 @@ All semantic-checking errors flow through the `DiagnosticSink`
 threaded into `SemanticsContext`. Check-level recovery is generally
 "continue with a placeholder type" so that one error does not cascade:
 unresolved decls become `ErrorType`-typed, and overload resolution
-returns a synthetic `errorExpr` rather than aborting. Diagnostics aim
-to name the offending source construct: when `ExpectATypeRepr`
+returns a synthetic `errorExpr`. When `ExpectATypeRepr`
 ([slang-check-type.cpp](../../../../source/slang/slang-check-type.cpp))
 finds an expression that does not denote a type, it builds the
 `Diagnostics::ExpectedAType` message from the expression's actual type
 and, when available, the referenced name.
 
-Several diagnostics in this stage go beyond naming the construct and
-point the user at the likely fix:
+Several diagnostics point the user at the likely fix:
 
 - **Per-candidate argument mismatch.** When a call matches no overload,
-  the diagnostic now lists each candidate signature *and* the specific
+  the diagnostic lists each candidate signature *and* the specific
   argument that rejected it. `slang-check-overload.cpp` records the
   offending argument index and the expected/actual types on the
   candidate, then emits a
@@ -531,9 +533,12 @@ point the user at the likely fix:
   `float`s reports `E39999` on the call, then an `E40011`
   `candidate: <signature>` note per candidate, each followed by an
   `E40018` note reading `argument 0 does not match: expected 'A', got
-  'float'`. Candidates are deduplicated by their rendered signature
-  string (not by `Decl*`, which would wrongly collapse distinct
-  specializations such as `foo<float>` and `foo<int>`); at most ten
+  'float'`. Generic candidates rejected for an unsatisfied conformance or
+  `where`-clause are listed first, each with an `E40022` or `E40023`
+  note (plus the constraint-declaration note for the latter) built by
+  `diagnoseGenericConstraintFailureNote`. Candidates are deduplicated by their rendered signature
+  string (not by `Decl*`, which would collapse specializations such as
+  `foo<float>` and `foo<int>`); at most ten
   unique candidates are printed and the remainder are summarized by an
   `E40015` "N more overload candidates" note.
 - **"Did you mean ...?" on undefined identifiers.** When a name fails to
@@ -541,7 +546,7 @@ point the user at the likely fix:
   `StringUtil::calcLevenshteinDistanceCaseInsensitive`, attaches a
   conservative similar-name suggestion to the existing
   `Diagnostics::UndefinedIdentifier` (`E30015`) rather than emitting a
-  detached note. `findClosestInScopeName` (line 5216) fixes the budget
+  detached note. `findClosestInScopeName` (line 5455) fixes the budget
   concretely: nothing is suggested for a name under 3 or over 256
   characters, the allowed distance is
   `min(3, max(1, length / 3))` — roughly one edit per three characters,
@@ -549,15 +554,16 @@ point the user at the likely fix:
   anything the scope could not access are skipped, and a tie between
   two distinct names suppresses the suggestion so the output does not
   depend on scope-walk order. So `myLongVariableNam` suggests
-  `myLongVariableName`, while `ac` does not suggest the in-scope `ab`
-  and `sqr` does not suggest the core module's `sqrt`.
+  `myLongVariableName`, while `sqr` does not suggest the core module's
+  `sqrt`.
 - **Discarded `[NoDiscard]` results.** `maybeDiagnoseDiscardedNoDiscardResult`
-  ([slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp))
-  fires with `E30059` when the result of a call to a
+  ([slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp),
+  line 742) fires with `E30059` when the result of a call to a
   `[NoDiscard]`-marked function is thrown away — `f();` written as a
-  bare expression statement — recursing through
-  comma, ternary-select, and short-circuit forms to find the discarded
-  sub-expression. A bare discarded constructor call is deliberately
+  bare expression statement, or in a `for` side-effect expression —
+  peeling parentheses and recursing through comma, ternary-select, and
+  short-circuit forms to find the discarded sub-expression. A `void`
+  call and a bare discarded constructor call are deliberately
   excluded.
 
 The diagnostic infrastructure is described in

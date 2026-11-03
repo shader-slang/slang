@@ -10,11 +10,11 @@
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
     "01340fd96350": {
-      "decided_at": "2026-08-11T16:38:07+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added a paragraph under IR passes answering the gap's own question \u2014 the pass list branches on target, and the `[numthreads(16, 1, 1)]` per-target spellings are settled in the emitter, not here \u2014 with the minimal example the gap asked for",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
+      "fix_summary": "turned the per-target `numthreads` prose into a seven-line per-target block (HLSL, GLSL, SPIR-V, WGSL, C++, Metal, CUDA) so the example is unmistakable",
       "kind": "missing-example",
-      "rationale": "`source/slang/slang-emit.cpp:2536-2539` (`legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL` under `isKhronosTarget && !emitSpirvDirectly`), `:2574-2578` and `:2615-2618` (direct-SPIR-V-only pass options and passes), `:1521-1537` (PyTorch-binding-only and CUDA-only pass groups) for the pass-list branching; `source/slang/slang-emit-hlsl.cpp:449`, `slang-emit-glsl.cpp:1504`, `slang-emit-wgsl.cpp:204`, `slang-emit-cpp.cpp:939` and the absence of any `NumThreads` handling in `slang-emit-metal.cpp` / `slang-emit-cuda.cpp` for the emitter-side spelling; verified printed forms in `docs/generated/tests/design/pipeline/overview/pipeline-is-target-sensitive.slang`",
+      "rationale": "`source/slang/slang-emit.cpp:2745-2748` (Khronos non-direct-SPIR-V guard), `:1670-1673` (PyTorch-binding-only passes), `source/slang/slang-emit-hlsl.cpp:454` (`[numthreads(`), `source/slang/slang-emit-wgsl.cpp:219` (`@workgroup_size(`), `source/slang/slang-emit-cpp.cpp:939` (`// [numthreads(` comment), `source/slang/slang-emit-spirv.cpp:6533` (LocalSize execution mode); no `NumThreads` handling in `slang-emit-metal.cpp` or `slang-emit-cuda.cpp`; printed forms in `docs/generated/tests/design/pipeline/overview/pipeline-is-target-sensitive.slang`",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/overview.md.gap-intake.md",
       "status": "fixed",
       "summary": "The section says the sequence is \"target-sensitive\" but gives no example of a source construct whose emitted shape differs per target, so a reader cannot tell ...",
@@ -880,13 +880,12 @@
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
     "2ed4b39212fa": {
-      "decided_at": "2026-08-11T16:29:02+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "stated that an unknown `#pragma` sub-directive warns and is skipped, unlike the unknown-`#`-directive error; part of the same consolidated edit as `ef72a4b5521d`",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
       "kind": "undocumented-behavior",
-      "rationale": "`source/slang/slang-preprocessor.cpp:4459-4470` (`findPragmaDirective` falls back to `kUnknownPragmaDirective`), `:4242-4249` (`UnknownPragmaDirectiveIgnored` then `SkipToEndOfLine`), contrasted with `:4614-4620` (`HandleInvalidDirective` errors); severity `warning` at `source/slang/slang-diagnostics.lua:763-768`.",
+      "rationale": "Doc states an unknown `#pragma` sub-directive warns (`UnknownPragmaDirectiveIgnored`) versus the unknown-directive error; source: source/slang/slang-preprocessor.cpp lines 4242-4244, 4677",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/01-lex-preprocess.md.gap-intake.md",
-      "status": "fixed",
+      "status": "rejected-bogus",
       "summary": "The section does not state the policy for an unknown `#pragma` sub-directive. The compiler emits a warning and continues, which is materially different from ...",
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
@@ -1167,13 +1166,12 @@
       "target_doc": "docs/generated/design/cross-cutting/diagnostics.md"
     },
     "3e1202309230": {
-      "decided_at": "2026-08-11T16:29:02+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added the `#if` evaluation model: signed `int` value type, undefined-identifier-is-zero, and overflow neither detected nor diagnosed",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
       "kind": "undocumented-behavior",
-      "rationale": "`source/slang/slang-preprocessor.cpp:2984` (`typedef int PreprocessorExpressionValue`), `:3117-3120` (undefined identifier warns and returns `0`), `:3194-3262` (`EvaluateInfixOp` applies the C++ operator; only `/` and `%` check anything); `if-undefined-macro-is-zero.slang`, `if-expression-uint32-max-is-true.slang`.",
+      "rationale": "Doc states `#if` values are plain signed `int`, undefined identifier is 0 with a warning, overflow undetected; source: source/slang/slang-preprocessor.cpp lines 2984, 3117, 3194",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/01-lex-preprocess.md.gap-intake.md",
-      "status": "fixed",
+      "status": "rejected-bogus",
       "summary": "Nothing in the section commits to the arithmetic semantics of a `#if` expression. The compiler treats an undefined identifier as `0`, accepts `0xFFFFFFFF` as ...",
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
@@ -1316,13 +1314,12 @@
       "target_doc": "docs/generated/design/pipeline/04c-layout-ir.md"
     },
     "49106a3707d8": {
-      "decided_at": "2026-08-11T16:29:02+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "stated that only `octalLiteral` is a warning and `017` still scans as a usable base-8 literal, the other two being errors",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
       "kind": "ambiguous-claim",
-      "rationale": "`source/compiler-core/slang-lexer.cpp:2097` (warn, then `_lexNumber(lexer, 8)` continues), `:551` and `:1797` (the other two); severities `10002 Warning`, `10003 Error`, `10010 Error` in `source/compiler-core/slang-lexer-diagnostic-defs.h:27-49`; `octal-literal-scan-warning.slang` (W10002).",
+      "rationale": "Doc \"Literal scanning\" says only `octalLiteral` is a warning, scanning continues into `_lexNumber(lexer, 8)`, other two are errors; source: source/compiler-core/slang-lexer.cpp lines 2097-2099, 551, 1797",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/01-lex-preprocess.md.gap-intake.md",
-      "status": "fixed",
+      "status": "rejected-bogus",
       "summary": "The scan-time list names `octalLiteral` as a \"purely syntactic check\" alongside two errors, without saying that it is a warning that leaves the literal usable, ...",
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
@@ -1369,13 +1366,12 @@
       "target_doc": "docs/generated/design/cross-cutting/targets.md"
     },
     "4cc2b13c259b": {
-      "decided_at": "2026-08-11T16:29:02+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added the argument-count mismatch to the replay paragraph, noting the invocation contributes no tokens and that variadic macros require only fixed parameters",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
       "kind": "undocumented-behavior",
-      "rationale": "`source/slang/slang-preprocessor.cpp:1865-1900` \u2014 `WrongNumberOfArgumentsToMacro` at `:1870` (non-variadic) and `:1892` (variadic under-supply), each followed by `delete invocation; return;` so nothing is pushed; `macro-wrong-argument-count-diagnostic.slang` (E15501).",
+      "rationale": "Doc states a wrong argument count is diagnosed with `WrongNumberOfArgumentsToMacro` and contributes no tokens; source: source/slang/slang-preprocessor.cpp lines 1870, 1892",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/01-lex-preprocess.md.gap-intake.md",
-      "status": "fixed",
+      "status": "rejected-bogus",
       "summary": "The section describes parameter ops and index-based argument replay but never says what happens when the invocation's argument count does not match the ...",
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
@@ -2079,13 +2075,12 @@
       "target_doc": "docs/generated/design/target-pipelines/metal.md"
     },
     "72ada6869b5d": {
-      "decided_at": "2026-08-11T16:29:02+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added a two-line `1e300lf` / `1e300` example showing that the suffix alone decides representability",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
       "kind": "missing-example",
-      "rationale": "`source/compiler-core/slang-lexer.cpp:1273-1284` (empty suffix \u2192 `Float`, `l`/`lf`/`fl` \u2192 `Double`), `:1331-1333` (the `Float` arm parses into a `float`, so `1e300` is out of range); `float-double-suffix-preserves-double-range.slang`.",
+      "rationale": "Doc contains the `1e300lf` (Double) vs `1e300` (Float, INFINITY) example; source: source/compiler-core/slang-lexer.cpp lines 1272-1283, 1329-1333",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/01-lex-preprocess.md.gap-intake.md",
-      "status": "fixed",
+      "status": "rejected-bogus",
       "summary": "The suffix-classification rule (`h`/`hf`/`fh` -> Half, empty or `f` -> Float, `l`/`lf`/`fl` -> Double, \"each in either case\") is the most surprising claim in ...",
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
@@ -2441,13 +2436,12 @@
       "target_doc": "docs/generated/design/target-pipelines/cuda.md"
     },
     "8082592cbed7": {
-      "decided_at": "2026-08-11T16:29:02+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added cyclic include and the stray `#else` / `#elif` / `#endif` closer to the enumerated preprocessor failure modes, with the recovery behaviour for each",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
       "kind": "undocumented-behavior",
-      "rationale": "`source/slang/slang-preprocessor.cpp:3710-3715` (`includedFiles.contains` \u2192 `Diagnostics::CyclicInclude`, then `return`), `:3530` (`#endif` with no open conditional \u2192 `Diagnostics::DirectiveWithoutIf`), `:4773` (one `EndOfFileInPreprocessorConditional` per still-open conditional); `include-self-cycle-diagnostic.slang`.",
+      "rationale": "Doc \"Failure modes\" already lists cyclic include and a stray `#else`/`#elif`/`#endif`, naming `DirectiveWithoutIf` and `CyclicInclude`; source: source/slang/slang-preprocessor.cpp lines 3530, 3710-3714",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/01-lex-preprocess.md.gap-intake.md",
-      "status": "fixed",
+      "status": "rejected-bogus",
       "summary": "The list of preprocessor failure modes is \"unbalanced `#if`, unknown directive, missing include\", but the compiler also has a dedicated cyclic-include ...",
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
@@ -3401,13 +3395,12 @@
       "target_doc": "docs/generated/design/syntax-reference/keywords-and-builtins.md"
     },
     "aa4d7f543736": {
-      "decided_at": "2026-08-11T16:29:02+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "stated the busy-list rule: a macro naming itself is left as a plain identifier, not depth-limited or diagnosed, and the same list stops mutual recursion",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
       "kind": "ambiguous-claim",
-      "rationale": "`source/slang/slang-preprocessor.cpp:1462-1471` (`MacroInvocation::isBusy` walks the in-flight list), `:1723-1730` (`_maybeBeginMacroInvocation` returns without expanding when busy, leaving `m_lookaheadToken` to be delivered as an identifier).",
+      "rationale": "Doc \"Macro expansion\" states expansion is self-suppressing via the busy list and a self-naming macro stays a plain identifier; source: source/slang/slang-preprocessor.cpp lines 1462, 1728",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/01-lex-preprocess.md.gap-intake.md",
-      "status": "fixed",
+      "status": "rejected-bogus",
       "summary": "The section says argument tokens for an `ExpandedParam` \"are themselves macro-expanded\" but does not address a macro that names itself in its own body, so a ...",
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
@@ -4015,11 +4008,11 @@
       "target_doc": "docs/generated/design/cross-cutting/serialization.md"
     },
     "c70735963289": {
-      "decided_at": "2026-08-11T16:38:07+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "attached the user-visible consequence to the `checkAllTranslationUnits` bullet: an `import` resolves against a sibling translation unit only when that unit precedes it in the request",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
+      "fix_summary": "added the user-visible consequence for a `slangc` command line with two files (later file can `import` the earlier by module name, not the reverse) and the `additionalLoadedModules` seed; re-derived the line citation to 702",
       "kind": "missing-surface",
-      "rationale": "`source/slang/slang-compile-request.cpp:508-522` \u2014 `checkTranslationUnit` runs once per unchecked unit under the `isChecked` guard, and `loadedModules.add(...)` happens only *after* that unit is checked, so `findOrImportModule` sees it for subsequent `import` decls; the `TODO` at `:517-520` states explicitly that a unit added later is not discoverable",
+      "rationale": "`source/slang/slang-compile-request.cpp:702-727` (`checkAllTranslationUnits` seeds `loadedModules` from `additionalLoadedModules`, skips `isChecked` units, adds each checked module after checking, with the `TODO` that a later-added unit is not discoverable)",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/overview.md.gap-intake.md",
       "status": "fixed",
       "summary": "The section is written entirely in terms of C++ types and line numbers (`FrontEndCompileRequest`, `checkAllTranslationUnits` \"line 498 at `source_commit`\"), ...",
@@ -4684,11 +4677,11 @@
       "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
     },
     "ec552f809731": {
-      "decided_at": "2026-08-11T16:38:07+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added a paragraph under AST \u2192 IR lowering stating where block parameters come from (direct at lowering for short-circuit forms, via mandatory `constructSSA` for local variables) and that `eliminatePhis` removes them before emit, so SPIR-V `OpPhi` is the downstream optimizer's work \u2014 the gap's premise that an optimization pass establishes the form is not what the source says",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
+      "fix_summary": "corrected the SPIR-V optimizer gate to include `-Xspirv-opt` flags and stated that without the optimizer SPIR-V holds no `OpPhi` for a value joined across a branch",
       "kind": "undocumented-behavior",
-      "rationale": "`source/slang/slang-lower-to-ir.cpp:7113-7130` and `:7136-7175` (lowering emits a join-block `emitParam` directly for `?:` and for short-circuiting `&&` / `||`), `:15602-15605` (`constructSSA` is in the mandatory pass block, unconditional; only `simplifyCFG` / `peepholeOptimize` at `:15609-15614` are gated, and on `MinimumSlangOptimization` \u2014 `source/slang/slang-compiler-options.h:363-366` \u2014 not on `-O`), `source/slang/slang-emit.cpp:2547-2551,2579` (`eliminatePhis` moves the IR back out of SSA form for every target before emit), `:3388-3393` (spirv-opt runs only when the optimization level is not `None`); printed forms in `docs/generated/tests/design/pipeline/overview/ssa-block-params-across-branch.slang`",
+      "rationale": "`source/slang/slang-lower-to-ir.cpp:15638` (`constructSSA` unconditional; only `simplifyCFG` / `peepholeOptimize` at `:15642-15646` are gated on `shouldPerformMinimumOptimizations`), `source/slang/slang-lower-to-ir.cpp:6580-6700` (`SelectExpr` and short-circuit logical-and / logical-or emit join-block params), `source/slang/slang-emit.cpp:2794` (`eliminatePhis` before emit), `source/slang/slang-emit.cpp:3624-3628` (`needsOptimization` is true for a level other than `None` or when `-Xspirv-opt` args exist); the gap's premise that an optimization pass establishes the form is not what the source says",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/overview.md.gap-intake.md",
       "status": "fixed",
       "summary": "The section says \"block parameters carrying values across control-flow edges\" without noting that the block-parameter form is only established by an ...",
@@ -4780,13 +4773,12 @@
       "target_doc": "docs/generated/design/pipeline/04b-pre-link-passes.md"
     },
     "ef72a4b5521d": {
-      "decided_at": "2026-08-11T16:29:02+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added per-directive effects for the four non-C entries and the `#pragma` sub-directive set; one consolidated edit that also covers `2ed4b39212fa`",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
       "kind": "missing-surface",
-      "rationale": "`source/slang/slang-preprocessor.cpp:4536-4605` (`#language` / `#lang` set language + version), `:4501-4527` (`#version`), `:4496-4499` (`#extension` skips its line), `:4445-4451` (`kPragmaDirectives` = `once`, `warning`), `:4272` and `:3680` (`#pragma once` identity round-trip); `source/slang/slang-preprocessor.h:65-69` (`outDetectedLanguage` / `outLanguageVersion`); `pragma-once-prevents-redefinition.slang`.",
+      "rationale": "Doc \"Preprocessor directives\" describes `#language`/`#lang`, `#version`, `#extension` effects and lists `once` and `warning` in `kPragmaDirectives`; source: source/slang/slang-preprocessor.cpp lines 4445-4448, 4558, 4593, 4731-4736",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/01-lex-preprocess.md.gap-intake.md",
-      "status": "fixed",
+      "status": "rejected-bogus",
       "summary": "The `kDirectives` list now names `#language` / `#lang` and `#version` / `#extension` but says nothing about what they do, so a reader knows the names are ...",
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
@@ -4921,11 +4913,11 @@
       "target_doc": "docs/generated/design/ir-reference/differentiation.md"
     },
     "f5121a986fd4": {
-      "decided_at": "2026-08-11T16:38:07+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "qualified the Torch entry in the emitter list: wrappers are generated only for `[TorchEntryPoint]` / `[AutoPyBindCUDA]` functions, so `-target torch` on an ordinary compute entry point has nothing to bind",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
+      "fix_summary": "removed Torch from the list of emitters that emit for any entry point and gave it its own clause naming the two annotations",
       "kind": "ambiguous-claim",
-      "rationale": "`source/slang/core.meta.slang:4795-4798` (`[TorchEntryPoint]`, \"Mark a function as a pytorch kernel entrypoint\") and `:4830-4833` (`[AutoPyBindCUDA]`); `source/slang/slang-emit.cpp:1521-1528` (the `PyTorchCppBinding` target runs a Torch-only pass group) and `:2851-2852` (`TorchCppSourceEmitter`). The decisive gate is `source/slang/slang-ir-pytorch-cpp-binding.cpp:1257-1287`, which builds its work list only from functions carrying `IRTorchEntryPointDecoration` / `IRCudaKernelDecoration` and strips the export decorations from every other function \u2014 that file is outside the watched paths",
+      "rationale": "`source/slang/slang-emit.cpp:3076-3082` (Torch glue uses `TorchCppSourceEmitter`, a separate case from the CPP/GLSL/HLSL/CUDA/Metal/WGSL source-language switch at `:3040-3075`), `source/slang/slang-ir-pytorch-cpp-binding.cpp:1288-1310` (work list built from `IRTorchEntryPointDecoration` or `IRCudaKernelDecoration` functions only), `source/slang/core.meta.slang:4915,4950` (`[TorchEntryPoint]`, `[AutoPyBindCUDA]`)",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/overview.md.gap-intake.md",
       "status": "fixed",
       "summary": "The list \"HLSL, GLSL, Metal, WGSL, C++, CUDA, or Torch glue\" mixes six targets that emit for any entry point with Torch glue, which emits nothing unless the ...",
@@ -4954,13 +4946,12 @@
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
     "f64c1edac915": {
-      "decided_at": "2026-08-11T16:29:02+00:00",
-      "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "rewrote category 2 around `_getArgTokens` and added the `TWICE(x)` example whose diagnostic location would move into the body under the category-1 rule",
+      "decided_at": "2026-11-02T00:00:00+00:00",
+      "decided_by_model": "claude-sonnet-5-5",
       "kind": "ambiguous-claim",
-      "rationale": "`source/slang/slang-preprocessor.cpp:2351-2379` (`_getArgTokens` builds a `TokenReader` over the recorded call-site token range), `:2487-2505` (`ExpandedParam` wraps it in a `PretokenizedInputStream` with no location rewriting), against `:2440-2459` (the `RawSpan` arm replaying definition tokens).",
+      "rationale": "Doc category 2 gives the `TWICE(x)` worked example distinguishing call-site from body locations; source: source/slang/slang-preprocessor.cpp lines 2351, 2494",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/01-lex-preprocess.md.gap-intake.md",
-      "status": "fixed",
+      "status": "rejected-bogus",
       "summary": "Category 2 says argument tokens \"retain the call-site `SourceLoc`, since they are physically lexed from the invocation\", but gives no observation that ...",
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },

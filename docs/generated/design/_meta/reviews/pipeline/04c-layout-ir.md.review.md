@@ -1,23 +1,23 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:09:06+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T21:19:09Z
 target_doc: pipeline/04c-layout-ir.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 71774435a40512fdfeaa2771405f426a01abae3299e7b7ac5b896252ae444cc5
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: ec9d30d850ec7e35bbb21364629106ad1c885d9bf8f52ed78e6df228739b2df5
+source_commit: be3c344414f6541ba6731813b36591a94cd05482
 checklist:
-  factual_accuracy: pass
+  factual_accuracy: partial
   cross_references: pass
   completeness: pass
   style_consistency: pass
-  source_alignment: pass
-  front_matter_validity: partial
-finding_count: 1
+  source_alignment: partial
+  front_matter_validity: pass
+finding_count: 5
 severity_breakdown:
-  critical: 0
-  major: 1
-  minor: 0
+  critical: 2
+  major: 0
+  minor: 3
   nit: 0
 ---
 
@@ -25,26 +25,23 @@ severity_breakdown:
 
 ## Summary
 
-The page's source descriptions, citations, links, required sections, and style match the recorded source commit and generation contract. One major front-matter issue remains: the document carries an obsolete watched-path digest, which prevents the review ledger from recognizing this cycle as current.
+The document covers the required construction workflow and provides substantially accurate parameter-binding detail. Its most important error is interpreting capability-atom filtering as target filtering: the implementation does not guarantee that non-SPIR-V/non-Metal layout modules lack capability decorations. The construction diagram also misrepresents error handling; three smaller inaccuracies concern IR types and manifest coverage.
 
 ## Items checked
 
-- Ran `regenerate.py show pipeline/04c-layout-ir.md` and read the target page, `_common.md`, `pipeline-04c-layout-ir.md`, and dependencies `pipeline/04-ast-to-ir.md`, `pipeline/04b-pre-link-passes.md`, `cross-cutting/targets.md`, and `ir-reference/index.md`.
-- Verified all 72 line-number citation occurrences against source at `53b76e6d3009b8e6434d41573524c7ce5c499d23`, including citations in `slang-lower-to-ir.cpp`, `slang-parameter-binding.cpp`, `slang-target-program.h`, `slang-type-layout.cpp`, `slang-ir-link.cpp`, and `slang-compiler-options.h`.
-- Spot-checked more than 20 factual claims, including parameter-binding order, explicit Vulkan entry-point bindings, descriptor-space bookkeeping, unsupported ray-tracing diagnostics, cache behavior, both construction loops, capability forwarding, obfuscation, and link participation.
-- Resolved all 18 unique relative link targets at the recorded commit and confirmed all seven referenced generated peers are present in the manifest.
-- Swept 197 identifier tokens and 10 source-like filenames against the recorded tree; the only apparent identifier misses were prose metadata and abbreviated commit hashes, whose commits were separately verified.
-- Ran the structural linter and checked the 29,290-byte document against its 32,768-byte cap.
+- Reviewed against the **current working tree**. Confirmed HEAD matches the supplied report commit and `git diff 2518a942d59b1228fc8cc70a37739baab82b6002 -- source/` is empty.
+- Read `_review.md`, `_common.md`, the document-specific prompt, and `regenerate.py show pipeline/04c-layout-ir.md`; checked required sections, both numbered construction tables, and exclusions.
+- Checked every body line-number citation against the corresponding source location. All are within the required ±5-line tolerance.
+- Spot-checked more than 10 claims, including lazy construction, cache reuse, mutex acquisition, error latching, explicit-binding reservation, mixed-binding completion, default-space selection, attachment-index occupancy, bindless-space allocation, diagnostic IDs, ray-tracing layout rules, entry-point guards, capability forwarding, obfuscation options, and linker consumption.
+- Checked all 51 Markdown link occurrences: filesystem destinations exist, local heading anchors resolve, and linked generated pages have manifest entries. Consulted dependency documents only for cross-reference checks.
+- Checked required front-matter keys, Markdown structure, Mermaid conventions, and Liquid safety. The document is 36,593 bytes, below its 49,152-byte cap. No files were written; shader examples were assessed from source rather than executed.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 |---|---|---|---|---|---|
-| F-001 | major | Front matter, line 6 | `watched_paths_digest` is `71774435a40512fdfeaa2771405f426a01abae3299e7b7ac5b896252ae444cc5`, but the digest for the resolved watched files at the recorded source commit is `209732500305bcb18fcda63902d7342536b82874be03cfaadcb631d2b21216ed`. The stale value also differs from the authoritative freshness entry, so recording this report would leave the document review-stale. | `docs/generated/design/_meta/freshness.json:231-235` records source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23` with digest `209732500305bcb18fcda63902d7342536b82874be03cfaadcb631d2b21216ed`; `python3 docs/generated/design/_meta/regenerate.py digest pipeline/04c-layout-ir.md` returns the same value. | Replace the target document's `watched_paths_digest` with `209732500305bcb18fcda63902d7342536b82874be03cfaadcb631d2b21216ed`, then refresh the freshness record through the normal remediation workflow. |
-
-## No-issues notes
-
-- The document correctly avoids turning layout-IR construction into a four-phase target-pipeline page.
-- Both numbered construction tables cover their source loops in order, and the optional obfuscation description matches the strip and DCE options.
-- The parameter-binding additions are supported by the watched source and stay distinct from post-link target legalization.
-- The caveat about layout modules participating in `linkIR` is supported by `targetProgram->getExistingIRModuleForLayout()` at `source/slang/slang-ir-link.cpp:2208-2210`.
+| F-001 | critical | Per-entry-point steps, line 491; Caveats and gotchas, lines 596–604 | The claim that `HLSL, WGSL, and CUDA layout-module entry points do not carry capability decorations` confuses the namespace of retained atoms with the selected target. Construction iterates all alternatives in the inferred capability set without a target-selection gate. | `source/slang/slang-parameter-binding.cpp:3373` copies entry-point or specialization requirements into the layout. `source/slang/slang-lower-to-ir.cpp:16564–16575` iterates `set.getAtomSets()` and filters atom values only. | State that only SPIR-V-version and Metal-version atoms are forwarded, regardless of the selected target. Remove the guaranteed absence on other targets and the tool guidance based on that absence. |
+| F-002 | critical | Construction flow, lines 405–428 | The diagram always runs binding and then tests `sink->getErrorCount() != 0`. Actual construction binds only when `m_layout` is absent and rejects using the persistent `m_layoutHasErrors` latch. Pre-existing sink errors do not alone trigger that latch; a previously latched failure still rejects with a fresh sink. | `source/slang/slang-parameter-binding.cpp:4853–4868`: binding is guarded by `if (!m_layout)`; the error-count comparison is against `errorCountBefore`; rejection tests `m_layoutHasErrors`. | Add the `!m_layout` branch around binding, show the before/after error-count comparison setting the latch, and gate continuation on `m_layoutHasErrors`. Preserve the cached-layout path. |
+| F-003 | minor | Per-global-parameter steps, line 447 | `Materialize stub IRGlobalVar` names the wrong instruction class for global shader parameters. These lower through `lowerGlobalShaderParam` to `IRGlobalParam`. | `source/slang/slang-lower-to-ir.cpp:11576–11578` dispatches global shader parameters to `lowerGlobalShaderParam`; line 11375 calls `builder->createGlobalParam(paramType)`. | Change the step to `Materialize stub IRGlobalParam`, retaining the existing materialization expression. |
+| F-004 | minor | Global-scope type layout, lines 462–476 | Saying the module's layout decoration `is an IRParameterGroupTypeLayout rather than the raw struct layout` skips the variable-layout wrapper. The decoration always references an `IRVarLayout`; its type-layout operand contains the parameter-group or struct layout. | `source/slang/slang-lower-to-ir.cpp:16528–16531` calls `lowerVarLayout(context, globalScopeVarLayout, irGlobalScopeTypeLayout)` and decorates the module with that result. | Say that the module's `IRVarLayout` references an `IRParameterGroupTypeLayout` when wrapped, otherwise an `IRStructTypeLayout`. |
+| F-005 | minor | Source, lines 65–69 | The sentence saying `slang-type-layout.cpp` is `not` in the watched paths contradicts both its own continuation and the manifest. | `docs/generated/design/_meta/manifest.yaml:241` includes `source/slang/slang-type-layout.cpp`. | Replace the contradictory sentence with a direct statement that this file is included in the watched paths. |
