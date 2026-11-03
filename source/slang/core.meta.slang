@@ -1807,6 +1807,14 @@ struct BFloat16 : IFloatingPointCoopElement
 
 extension<T:__BuiltinFloatingPointType> T
 {
+    // Generic code such as `T(0.1l)` converts a `double` with this initializer, so the `double`
+    // specialization keeps the full value instead of rounding through `IFloat.__init(float)`.
+    // A free-form extension member loses ties against `IFloat.__init(float)`, so arguments that
+    // convert equally well to `float` and `double`, such as `int64_t`, `uint64_t` or `half`, still
+    // use `__init(float)` and do not introduce a `double` in the `float` specialization.
+    __intrinsic_op($(kIROp_FloatCast))
+    __init(double val);
+
     [OverloadRank(-5)]
     __intrinsic_op($(kIROp_FloatCast))
     __init(FloatE4M3 val);
