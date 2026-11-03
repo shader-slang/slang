@@ -1,16 +1,15 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag):-target hlsl -entry computeMain -stage compute
 
-// Regression guard for https://github.com/shader-slang/slang/issues/10641.
-//
-// `__ref`, `groupshared` and `const groupshared` parameters all pass by reference, but a
-// `groupshared` parameter also requires its argument to name group-shared storage (error 30711), and
-// a `const groupshared` one is a read-only reference. A method satisfies an interface requirement
-// only if each reference parameter has the requirement's exact access (read-write or read-only),
-// as for `__ref` and `const __ref`. A method whose parameter requires group-shared storage does not
-// satisfy a requirement that does not promise it, while one that accepts any memory location does
-// satisfy a `groupshared` requirement.
+// A method's reference parameter must have the same access (read-write or read-only) as the
+// interface requirement's (E38108). It satisfies the requirement directly only if it also refers
+// to storage in the same address space (shader-slang/slang#10641). When only the address space
+// differs, or the method has an extra defaulted parameter, a synthesized witness forwards the
+// requirement's parameters to the method, which works where the forwarding call type-checks: a
+// `groupshared` argument can be passed to a `__ref` parameter, but a `__ref` argument cannot be
+// passed to a `groupshared` one (E30711). The witness's parameters keep the requirement's
+// `groupshared` and `const`.
 
-// --- Rejected: the implementation needs group-shared storage the requirement does not promise ---
+// --- Rejected: a `__ref` requirement cannot forward to a `groupshared` parameter ---
 
 interface IRef
 {
@@ -25,7 +24,7 @@ struct SharedForRef : IRef
 //diag:  ^ interface requirement mismatch
 }
 
-// --- Rejected: a reference parameter must have the requirement's exact access ---
+// --- Rejected: the access differs ---
 
 interface IReadOnly
 {
@@ -53,7 +52,8 @@ struct ReadsOnly : ISharedWrite
 //diag:                               ^ parameter 'a' direction 'ref_readonly' does not match interface requirement 'ref'.
 }
 
-// --- Accepted: the same qualifiers, or an implementation that asks for less storage ---
+// --- Accepted: the same qualifiers, a `__ref` parameter for a `groupshared` requirement, and an
+// extra defaulted parameter ---
 
 interface IShared
 {
@@ -67,10 +67,16 @@ struct Exact : IShared
     uint read(const groupshared uint a[8]) { return a[0]; }
 }
 
-struct AsksForLess : IShared
+struct AnyStorage : IShared
 {
     void write(__ref uint a[8]) { a[1] = 2; }
     uint read(const groupshared uint a[8]) { return a[1]; }
+}
+
+struct ExtraDefaultedParameter : IShared
+{
+    void write(groupshared uint a[8], uint x = 0) { a[0] = x; }
+    uint read(const groupshared uint a[8], uint x = 0) { return a[0] + x; }
 }
 
 groupshared uint sh[8];
@@ -82,15 +88,11 @@ uint use<T : IShared>(T t)
     return t.read(sh);
 }
 
-void touch<T : ISharedWrite>(T t)
-{
-    t.touch(sh);
-}
-
 [numthreads(8, 1, 1)]
 void computeMain(uint tid: SV_DispatchThreadID)
 {
     Exact exact;
-    AsksForLess asksForLess;
-    output[tid] = use(exact) + use(asksForLess);
+    AnyStorage anyStorage;
+    ExtraDefaultedParameter extraDefaultedParameter;
+    output[tid] = use(exact) + use(anyStorage) + use(extraDefaultedParameter);
 }

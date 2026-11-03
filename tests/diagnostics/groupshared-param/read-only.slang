@@ -1,9 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda -entry main -stage compute
 
-// A read-only `groupshared` parameter (`const groupshared`) is a reference its callee cannot write
-// through (shader-slang/slang#10641).
-// It can be passed on to another read-only `groupshared` parameter, which is still the same
-// group-shared storage, but not to a read-write one.
+// A `const groupshared` parameter is a read-only reference, so its callee cannot write through it
+// (shader-slang/slang#10641). It can be passed on to another `const groupshared` parameter, which
+// refers to the same storage, but not to a read-write one.
 
 groupshared uint sh[8];
 

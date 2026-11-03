@@ -1,15 +1,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag):-target cuda -entry computeMain -stage compute
 
-// Regression guard for https://github.com/shader-slang/slang/issues/10641.
-//
-// An `out`/`inout` parameter needs exclusive access to its argument during the call. Passing
+// An `out` or `inout` parameter needs exclusive access to its argument during the call. Passing
 // thread-group-shared storage, which every invocation in the group can access, is warning 30709,
-// because the compiler cannot tell whether another invocation accesses that storage during the call.
-// A direct argument of a call that is always inlined is accessed in the calling body, which keeps
-// `g[i] += 1` and `g[i]++` silent; an implicitly converted argument still goes through a temporary.
-//
-// The `//diag:` annotations are caret-less substring matches, and the test is exhaustive, so the
-// silent calls in `computeMain` must produce no diagnostic at all.
+// because the compiler cannot tell whether another invocation accesses that storage during the call
+// (shader-slang/slang#10641). A direct argument of a call that is always inlined is accessed in the
+// calling body, which keeps `g[i] += 1` and `g[i]++` silent; an implicitly converted argument still
+// goes through a temporary. The test is exhaustive, so the silent calls must produce no diagnostic.
 
 struct Counter
 {

@@ -6,13 +6,12 @@
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute -capability SPV_KHR_variable_pointers
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute -capability SPV_KHR_variable_pointers
 
-// Regression guard for https://github.com/shader-slang/slang/issues/10641.
-//
-// A `groupshared` parameter is a `Workgroup` pointer. On direct SPIR-V, a `[noinline]` callee keeps
-// its call boundary when the target already enables `SPV_KHR_variable_pointers`: the parameter is
-// specialized to a `Workgroup` pointer, the caller passes the shared variable or an access chain
-// into it directly, and no per-thread copy is made, with or without debug info (VP, VPCOPY). Without the extension, and on
-// GLSL, SPIR-V via GLSL and WGSL even with it, the callee is inlined (NOVP, GLSL, WGSL).
+// On direct SPIR-V, a `[noinline]` callee with a `groupshared` parameter keeps its call boundary
+// when the target already enables `SPV_KHR_variable_pointers` (shader-slang/slang#10641). The
+// parameter is specialized to a `Workgroup` pointer, the caller passes the shared variable or an
+// access chain into it directly, and no per-thread copy is made, with or without debug info (VP,
+// VPCOPY). Without the extension, and on GLSL, SPIR-V via GLSL, and WGSL even with it, the callee
+// is inlined (NOVP, GLSL, WGSL).
 
 RWStructuredBuffer<uint> output;
 groupshared uint shared[8];

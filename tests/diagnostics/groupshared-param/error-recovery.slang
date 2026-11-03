@@ -1,7 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
-// Regression guard for https://github.com/shader-slang/slang/issues/10641.
-//
 // An undefined name passed to an `out`, `inout` or `groupshared` parameter reaches the checks that
 // ask which storage an argument names (warning 30709, error 30711). Error recovery leaves such an
 // argument with an error type and no declaration, and the checks must report nothing beyond the

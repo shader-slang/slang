@@ -1,17 +1,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag):-experimental-feature
 
-// Regression guard for https://github.com/shader-slang/slang/issues/10641.
-//
-// A `groupshared` parameter names thread-group-shared memory and must be a reference to it. With no
-// passing-mode keyword, `groupshared` implies `__ref`, or `__ref_readonly` with `const`; an
-// explicit `__ref`, `__ref_readonly`, or `__ref_writeonly` picks the access of the reference. A
-// written `in`, `out`, `inout`, or `__borrow` (or its alias `__constref`) gives the parameter a mode
-// that is not a reference, which is a compile error (error 30707). The accepted spellings must
-// compile with no diagnostic (enforced by the exhaustive diagnostic-test mode -- any stray
-// diagnostic on those lines would fail the test).
-//
-// The `//diag:` annotations are caret-less substring matches, so each is matched against one of the
-// produced diagnostics by message text regardless of line/column.
+// A `groupshared` parameter is a reference to thread-group-shared memory (shader-slang/slang#10641).
+// With no passing-mode keyword, `groupshared` implies `__ref`, or `__ref_readonly` with `const`,
+// and an explicit `__ref`, `__ref_readonly`, or `__ref_writeonly` picks the access of the
+// reference. A written `in`, `out`, `inout`, or `__borrow` (or its alias `__constref`) gives the
+// parameter a mode that is not a reference, which is error 30707. The test is exhaustive, so the
+// accepted spellings must compile with no diagnostic.
 
 static const uint N = 8;
 

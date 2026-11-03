@@ -1,8 +1,8 @@
-// `[noinline]` alone does not keep a function boundary: the callee below is still inlined into the
-// entry point, so the group-shared write lands directly on `groupSharedData` and the program is valid
-// HLSL. Only a boundary that actually survives is rejected (shader-slang/slang#10641).
+// A write through a `groupshared` parameter reaches the caller's `threadgroup` storage, not a
+// per-thread copy (shader-slang/slang#10641). The execution run is in
+// tests/language-feature/groupshared-param/by-reference.slang.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> outputBuffer;
 
@@ -23,3 +23,6 @@ void computeMain(uint3 tid : SV_GroupThreadID)
     GroupMemoryBarrierWithGroupSync();
     outputBuffer[tid.x] = groupSharedData[(tid.x + 1) % N];
 }
+
+// METAL: threadgroup {{.*}}groupSharedData
+// METAL: groupSharedData{{.*}}] =
