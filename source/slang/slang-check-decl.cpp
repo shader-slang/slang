@@ -4403,7 +4403,7 @@ bool isProperConstraineeType(Type* type)
     return true;
 }
 
-static bool isKnownBuiltinDecl(Decl* decl, KnownBuiltinDeclName name)
+bool isKnownBuiltinDecl(Decl* decl, KnownBuiltinDeclName name)
 {
     if (auto genericDecl = as<GenericDecl>(decl))
         decl = getInner(genericDecl);

@@ -4728,6 +4728,10 @@ bool isOpaqueHandleType(Type* type);
 // (or array thereof) that transitively contains an opaque handle field.
 bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
 
+// Returns true if `decl` (or the inner declaration of a generic `decl`) carries
+// `[KnownBuiltin(name)]`.
+bool isKnownBuiltinDecl(Decl* decl, KnownBuiltinDeclName name);
+
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
