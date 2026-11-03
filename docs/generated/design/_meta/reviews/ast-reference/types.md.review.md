@@ -1,22 +1,22 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:06:43+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T06:56:05Z
 target_doc: ast-reference/types.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: b05183b09ce7aed8128e45e31d4986249932ca45431a04b94d0ca99f3d163135
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: fbf01df9017d66463a64e01622276ae0c4dd5286d0596b4b1a494ffe03ab0b91
+source_commit: 56b1b0b83fb96f88f36da7e37cd9c2c7f27af70c
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: partial
   source_alignment: partial
-  front_matter_validity: fail
-finding_count: 8
+  front_matter_validity: pass
+finding_count: 3
 severity_breakdown:
   critical: 0
-  major: 5
+  major: 0
   minor: 3
   nit: 0
 ---
@@ -24,25 +24,24 @@ severity_breakdown:
 # Review report for ast-reference/types.md
 
 ## Summary
-The page now covers every concrete type class in one table and most checked claims match the recorded source. The most important issue is that its watched-path digest no longer matches the manifest-resolved inputs, while the prose still says the newly watched parser is unwatched. Required details are also missing from several prompt-mandated callouts and cross-references.
+
+The document covers all concrete classes and has valid cross-references and front matter. Three localized corrections are needed: the exclusive claim about magic-type registration overlooks builtin scalar registration, descriptor-handle lowering needs a more precise phase description, and one table summary exceeds the required format.
 
 ## Items checked
-- Ran `regenerate.py show ast-reference/types.md` and reviewed the target document, `_common.md`, `ast-reference-types.md`, and dependency docs `ast-reference/base.md` and `ast-reference/values.md`.
-- Confirmed all four resolved watched files are unchanged from `53b76e6d3009b8e6434d41573524c7ce5c499d23`, then inspected the type/base/value headers and parser entry points at that commit.
-- Compared all 121 table rows with the concrete `FIDDLE()` declarations and all 12 abstract intermediates in `slang-ast-type.h`; coverage and parent classification are complete.
-- Spot-checked more than 10 claims: `Val -> Type`, `m_operands`, `getCanonicalType()`, parser entry points, `DeclRefType`, arithmetic accessors, `FuncType` operands, pointer modes, resource handles, existential caches, `ThisType`, `AndType`, and pack operands.
-- Resolved all 48 relative-link occurrences and their anchors; every generated peer destination is present in the manifest.
-- Found zero line-number citations in the body, so there were no line-number citations to re-derive.
-- Confirmed all mandatory front-matter keys, but recomputation produced digest `b1f3c2700c886b77f0e421224e42c78398c812e92f550840904a27c88b810926`, not the recorded value.
+
+- Reviewed against the **current working tree**, which the operator identifies as matching the document’s source commit throughout `source/`; the source diff against that commit was empty.
+- Read the review prompt, common generation contract, and document-specific prompt; ran `regenerate.py show ast-reference/types.md`.
+- Compared all 123 concrete `FIDDLE()` classes in `slang-ast-type.h` with the 123 table rows: no missing or extra classes.
+- Spot-checked more than 20 claims, including `Val → Type` inheritance, canonicalization, reflection storage, parser entry points, vector/matrix accessors, pointer qualifiers, function operand order, parameter-mode decoding, existential caches, pack operands, literal boundaries, and descriptor-heap capability gates.
+- Verified all four explicit line-number citations: `slang-ast-type.cpp` lines 124, 1392, and 1400, and `slang-ast-type.h` line 50. All match.
+- Resolved all 56 Markdown link occurrences, covering 20 distinct destinations; confirmed all nine referenced generated pages are registered in the manifest and checked the three distinct fragment targets. Dependency documents were consulted only for cross-reference checks.
+- Checked required section order, table columns, front-matter keys and formats, Mermaid syntax, and Liquid safety. The document is 35,226 bytes, below its 65,536-byte cap.
+- No files were written.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | front matter, line 6 | The recorded watched-path digest is stale: it is `b051...3135`, while `regenerate.py digest ast-reference/types.md` resolves to `b1f3...926` with the current manifest and the same source commit. | `docs/generated/design/ast-reference/types.md:6`; `docs/generated/design/_meta/manifest.yaml:401-413`; recomputed digest `b1f3c2700c886b77f0e421224e42c78398c812e92f550840904a27c88b810926`. | Regenerate or refresh this page through the prescribed freshness workflow so front matter records the current resolved watched-path digest. |
-| F-002 | minor | `## Source`, lines 35-42 | The page says `slang-parser.cpp` “is not among this page's watched paths,” but it is now explicitly watched. The accompanying recommendation to add it is therefore stale. | `docs/generated/design/_meta/manifest.yaml:401-413` includes `source/slang/slang-parser.cpp`. | Delete the stale parser watch-gap sentence; retain the parser entry-point description. |
-| F-003 | minor | `## Nodes`, line 178 | `BorrowInParamType` is described as parsed `in T`, but the type prints as `borrow T`; the parser maps `in` to `InModifier` and the borrow wrapper to `BorrowModifier` via `__constref`. | `source/slang/slang-ast-type.h:890-902`; `source/slang/slang-ast-type.cpp:1407-1410`; `source/slang/slang-parser.cpp:10746-10751`. | Change the summary to an immutable borrow parameter and use `(none)` for grammar unless a direct public grammar production is identified. |
-| F-004 | major | `## Nodes`, line 238 | The `ThisType` row links parsed grammar, contrary to the per-page contract requiring checking-only `ThisType` to use `(none)` with a synthesized/checking note. | `docs/generated/design/_meta/prompts/ast-reference-types.md:31-36`; `source/slang/slang-ast-type.h:1332-1343`. | Replace the Grammar cell with `(none)` and state in Summary that checking represents interface/extension self types with this node. |
-| F-005 | major | `## See also`, lines 416-432 | The required parsing pipeline page is absent even though this is a parsed AST family. | `docs/generated/design/_meta/prompts/_common.md:119-122`; the current list has no `pipeline/02-parse-ast.md` link. | Add a relative link to `../pipeline/02-parse-ast.md` with a short parsing-oriented description. |
-| F-006 | major | `### FuncType`, lines 354-359 | The mandated callout covers parameters, return, and error type, but omits effects/qualifiers and parameter-mode wrappers. | `docs/generated/design/_meta/prompts/ast-reference-types.md:54-55`; `source/slang/slang-ast-type.h:990-1077` documents wrapped parameter types, passing modes, result, and error. | Add a concise explanation that parameter qualifiers are encoded by mode-wrapper types and the error type models explicit failure. |
-| F-007 | major | `### Resource and texture type families`, lines 368-378 | The prompt requires this group note to cite the relevant intrinsic definitions in the core module, but the callout contains no module-source link or intrinsic declaration citation. | `docs/generated/design/_meta/prompts/ast-reference-types.md:57-59`; relevant declarations are in `source/slang/core.meta.slang` and `source/slang/hlsl.meta.slang`. | Add direct workspace-relative links to the relevant resource/texture/sampler intrinsic declarations in the module sources. |
-| F-008 | minor | `## Notable nodes`, lines 301-311 and 380-401 | The page includes detailed IR identity, lowering-pass, layout, and emit behavior, although AST-family pages forbid IR-level information outside the designated cross-reference. | `docs/generated/design/_meta/prompts/_common.md:131-135`; the target names IR identity and `lowerUntypedResourceHandleToUInt` behavior. | Remove the pass/layout/emit details and leave a short link to `cross-cutting/ir-instructions.md` for IR behavior. |
+| F-001 | minor | `### DeclRefType`, lines 302–309 | The statement that a core-module type “only gets its own C++ class here when it is bound to one with `__magic_type(...)`” overlooks scalar builtins registered through `__builtin_type`. The distinction concerning intrinsic-only work-graph records does not establish this exclusive rule. | `source/slang/core.meta.slang:1187` declares scalar types using `__builtin_type`; `source/slang/slang-ast-type.cpp:2250` implements `BasicExpressionType::getBaseType()` by reading `BuiltinTypeModifier`. | Qualify the rule to acknowledge `__builtin_type` scalar registration alongside `__magic_type`, while retaining the narrower explanation about intrinsic-only work-graph records. |
+| F-002 | minor | `### UntypedResourceHandleType and UntypedSamplerHandleType`, lines 455–456 | Saying handles become `uint` “during IR lowering” obscures the distinction between producing handle IR during AST lowering and eliminating surviving handles in the later target pipeline. | `source/slang/slang-ast-type.h:488` names the `lowerUntypedResourceHandleToUInt` IR pass. `source/slang/slang-emit.cpp:2137–2144` explicitly distinguishes AST-to-IR production from the later gated pass invocation. | Replace the timing phrase with “by the `lowerUntypedResourceHandleToUInt` IR pass before emission,” retaining the existing cross-reference for details. |
+| F-003 | minor | `## Nodes`, `NamedExpressionType` row, line 150 | The Summary cell contains several sentences, implementation discussion, and a Markdown source link. The family contract requires one short clause with no markup beyond inline code. | `docs/generated/design/_meta/prompts/_common.md`, AST reference family contract, defines Summary as “One short clause; no markup beyond inline code.” The relevant implementation is `source/slang/slang-ast-type.cpp:1392–1406`. | Reduce the cell to a short description of an alias type. Move the printing/canonicalization explanation and citations into a `NamedExpressionType` callout under `## Notable nodes`. |

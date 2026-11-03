@@ -1,46 +1,48 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:08:39+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T06:59:15Z
 target_doc: ast-reference/values.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: aea6c67df76f1024b3cea1726b279a8ddc00bda3f01d9c6a25e65b7c80d11490
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: cd5fe829a30362fa6bacf71395cf957c34b3269ebbdb651fde1109f4bea47fac
+source_commit: 56b1b0b83fb96f88f36da7e37cd9c2c7f27af70c
 checklist:
-  factual_accuracy: fail
+  factual_accuracy: partial
   cross_references: pass
   completeness: partial
-  style_consistency: pass
-  source_alignment: fail
-  front_matter_validity: partial
-finding_count: 6
+  style_consistency: partial
+  source_alignment: partial
+  front_matter_validity: pass
+finding_count: 4
 severity_breakdown:
-  critical: 1
+  critical: 0
   major: 0
-  minor: 5
+  minor: 4
   nit: 0
 ---
 
 # Review report for ast-reference/values.md
 
 ## Summary
-The page exhaustively covers all 62 concrete non-Type classes and has valid links, but its universal pointer-identity guarantee is contradicted by `DifferentiateVal` substitution, which creates an uncached `Val`. Five smaller findings cover two data-shape inaccuracies, contract deviations, and a watched-path digest that still represents the former two-file input set.
+
+The document covers all 62 concrete non-Type classes, and all explicit line-number citations match their source locations. It needs localized corrections and contract cleanup. Most notably, the worked example compares identically spelled array bounds while claiming to demonstrate equality between differently spelled bounds.
 
 ## Items checked
-- Ran `regenerate.py show ast-reference/values.md` and reviewed the target document, `_common.md`, `ast-reference-values.md`, and dependency doc `ast-reference/base.md`.
-- Verified all four currently resolved watched files at `53b76e6d3009b8e6434d41573524c7ce5c499d23`; none differs from that commit in the workspace.
-- Compared all 62 concrete `FIDDLE()` classes in `slang-ast-val.h` with the node-table rows: none are missing or extra, and no concrete `Type` subclass is listed.
-- Spot-checked more than 20 factual claims, including all four decl-ref layouts, `IntVal`'s type slot, builtin-operation exclusions, pack transforms, polynomial operands, subtype/coercion witnesses, variadic-count witnesses, modifier inheritance, differentiation operands, `UIntSetVal`, substitution traversal, equality resolution, and link-time propagation.
-- Re-derived the body's only line-number citation: `slang-ast-val.h` lines 1352-1388 exactly contain `isTypeEqualityWitness` and its pack-witness recursion.
-- Resolved all 31 relative-link occurrences at the target commit and confirmed every linked generated page is a manifest key. The document is 27,863 bytes, below its 49,152-byte cap.
-- Swept 153 backticked identifier-like tokens and the named source files. All required front-matter keys are present, but the recorded digest matches the old two-file watched set rather than the four files currently resolved by the manifest.
+
+- Verified against the **current working tree**, which the operator confirms equals the document’s source commit throughout `source/`.
+- Read `_review.md`, `_common.md`, and the document-specific prompt; ran `regenerate.py show ast-reference/values.md`.
+- Compared all 62 concrete `FIDDLE()` classes against the node rows: no missing or extra classes.
+- Checked more than 10 substantive claims, including decl-ref operands and folding, integer type slots, polynomial representation, witness operands, modifier inheritance, differentiation operands, capability bitmasks, link-time constants, equality, substitution caching, and emitter behavior.
+- Verified all 21 explicit source line-number citations, including all seven inheritance call sites. No citation drift found.
+- Resolved all 46 Markdown link occurrences, covering 24 unique destinations; checked linked files at the recorded commit, peer manifest membership, and fragment targets. Read the dependency page only for cross-reference checks.
+- Checked required headings, table columns, front-matter syntax and keys, Mermaid conventions, Liquid safety, and size: 36,089 bytes against a 49,152-byte cap.
+- No files were written; executable examples were not run.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `## Source`, lines 46-53; `### Hash-consing and the ASTBuilder`, lines 412-430 | The page says every `Val` is hash-consed and guarantees that equal dynamic class plus operands implies pointer identity. `DifferentiateVal::_substituteImplOverride` instead creates a replacement with `createByNodeType`, and that API directly instantiates a node without consulting the `getOrCreate` cache. The claimed universal guarantee is therefore false for a class documented on this page. | `source/slang/slang-ast-val.cpp:3268-3280` creates the substituted value with `createByNodeType`; `source/slang/slang-ast-builder.cpp:446-450` shows that this path only calls `SyntaxClass::createInstance`, unlike cached `getOrCreate`. | Limit the guarantee to Vals constructed through `ASTBuilder::getOrCreate` and explicitly describe the `DifferentiateVal` exception. If the uncached construction is a source bug, do not restore universal wording until that producer is fixed. |
-| F-002 | minor | `### Modifier values`, lines 248-253 | The page says `ModifierVal`s are used “inside `ModifiedType` and `ModifiedTypeExpr`.” `ModifiedTypeExpr` stores syntax-level `Modifiers`, not `ModifierVal`s; checking converts those modifiers into `Val`s and stores them on the resulting `ModifiedType`. | `source/slang/slang-ast-expr.h:942-949` declares `ModifiedTypeExpr::modifiers` as `Modifiers`; `source/slang/slang-check-expr.cpp:9255-9312` builds `modifierVals` and passes them to `getModifiedType`. | Say that modifier Vals are stored by `ModifiedType`; explain separately that checking a `ModifiedTypeExpr` converts its syntax modifiers into those values. |
-| F-003 | minor | `### Differentiation values`, lines 264-282 | “Each node pairs a differentiation direction with the `DeclRef`” overstates the data shape. Every class stores only the function decl-ref; class identity distinguishes forward/backward operations, while the intermediate-type, primal, and propagate subclasses denote backward artifacts rather than directions. | `source/slang/slang-ast-val.h:1220-1282` declares only `getFunc()` on the base and shows the five subclass identities. | State that the family stores a function decl-ref and that the concrete subclass identifies either a differentiation mode or a backward-derivative artifact. |
-| F-004 | minor | `## Nodes`, lines 135-289 | The AST-family contract requires one table under `## Nodes`, but the page splits the complete 62-row inventory across eight family tables. Coverage is correct, but the required canonical shape is not. | `docs/generated/design/_meta/prompts/_common.md:99-108` requires “a single table”; separate tables begin at target lines 146, 163, 192, 213, 233, 240, 255, and 275. | Merge the rows into one `Class / Parent / Key fields / Grammar / Summary` table; retain family grouping in the hierarchy and notable-node prose. |
-| F-005 | minor | Front matter line 6; `### TypeEqualityWitness`, lines 368-372 | The recorded digest is for the former two-file watched set, while the current manifest resolves four files; the same paragraph incorrectly says the conformance and inheritance sources are outside the watched paths and should be added. The old two-file digest is `aea6c67d...`, while `regenerate.py digest ast-reference/values.md` now returns `8222d30c...`. | `docs/generated/design/_meta/manifest.yaml:435-446` includes both checker files; the target front matter records `aea6c67d...` and the current driver computes `8222d30c...`. | Regenerate or refresh this page against the current four-file watched set, record the resulting digest, and replace the stale “add these paths” text with direct citations to the checker construction sites. |
-| F-006 | minor | `## See also`, lines 455-472 | The required See-also list has no relevant generated pipeline page. For this synthesized value family, the semantic-checking pipeline is the natural required pipeline cross-reference. | `docs/generated/design/_meta/prompts/_common.md:119-122` requires a relevant `docs/generated/design/pipeline/` link; the target list contains no `pipeline/` link. | Add a relative link to `../pipeline/03-semantic-check.md` with a short description of witness and compile-time-value construction during checking. |
+| F-001 | minor | `## Notable nodes` → `### TypeEqualityWitness`, lines 458–472 | `Every construction site funnels through SemanticsVisitor::createTypeEqualityWitness` overstates the otherwise accurate inventory of semantic-checking callers. Substitution constructs a witness directly through the builder cache. | `source/slang/slang-ast-val.cpp:312–319`: `TypeEqualityWitness::_substituteImplOverride` calls `astBuilder->getOrCreate<TypeEqualityWitness>(type, type)`. | Restrict the statement to the listed semantic-checking creation sites and mention that substitution rebuilds the witness directly through `getOrCreate`. |
+| F-002 | minor | `### Hash-consing and the ASTBuilder`, lines 537–553 | The explanation says `c = a` demonstrates canonicalization of two different spellings. However, both `c` and `a` have the bound `2*N+3`; only `b` uses `3+2*N`. That assignment does not exercise the distinction the paragraph claims it proves. | Target lines 540–541 contain the identical bounds. `source/slang/slang-ast-base.h:434–437` compares resolved identities; polynomial factor and term sorting occur in `source/slang/slang-ast-val.cpp:1840` and `:1873`. | Use an assignment between `b` and `c`, or give `c` the alternate bound. Remove the historical execution claim for any revised example unless that exact example is verified. |
+| F-003 | minor | `## Nodes`, lines 175–376, especially line 257 | The catalog is complete but does not follow the required single-table structure. The `DiffTypeInfoWitness` row also omits the types of `thisTypeDiffWitness`, `returnTypeDiffWitness`, and the parameter-witness operands. | `docs/generated/design/_meta/prompts/_common.md`, AST reference contract item 4, requires one table and `name: Type` cells. `source/slang/slang-ast-val.h:1018–1024` declares all three witness accessor categories as `SubtypeWitness*`. | Consolidate the node rows into one table, moving family explanations outside it. Add `SubtypeWitness` types to the omitted witness operands, following the table’s existing pointer-omission convention. |
+| F-004 | minor | `### Modifier values`, lines 294–338 | The detailed walkthrough of attributed-type emission and SPIR-V image-format selection exceeds the AST reference contract’s prohibition on IR-level information. These details are supported by source, but belong outside this page’s node reference. | `docs/generated/design/_meta/prompts/_common.md`, AST reference forbidden-content paragraph; `source/slang/slang-emit-c-like.cpp:484–493` handles `IRAttributedType`, and `source/slang/slang-emit-spirv.cpp:3347–3380` selects image formats from IR attributes. | Retain the AST modifier-value semantics and a short statement that target handling varies. Replace the backend walkthrough with the existing link to `../pipeline/06-emit.md`. |

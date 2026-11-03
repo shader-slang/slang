@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: f9f1edaba5787454d468a3ca6e414e1eeed2f925728c05ed389b5f2d6fd1e008
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: cd5fe829a30362fa6bacf71395cf957c34b3269ebbdb651fde1109f4bea47fac
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -157,6 +157,21 @@ add information beyond the path — an argument list and a
 `SubtypeWitness` — and so are the two that can make decl-refs to the
 same `Decl` denote different things.
 
+Seen from program text, then, `DirectDeclRef` and `MemberDeclRef`
+are not distinguishable: a member reached through a static path
+denotes the same entity either way, and the fold above exists so that
+the two spellings of the path become one node. Only the other two
+shapes have a language-level reading. A `GenericAppDeclRef` is what
+makes `Box<int>` and `Box<float>` different types although both name
+the same `Box` declaration (assigning one to the other is diagnosed,
+E30019, with both spellings in the message), and a `LookupDeclRef`
+is what makes `T.Elem` inside a generic body mean a different type for
+each conformer of `T`: it carries the `SubtypeWitness` of
+`lookupSource` (see [slang-ast-val.h](../../../../source/slang/slang-ast-val.h)
+lines 62-76), so substituting the witness re-resolves the lookup. The
+diagnostic and the per-conformer result were observed by running the
+test bundle; they were not re-run for this revision.
+
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `DirectDeclRef` | `DeclRefBase` | `decl: Decl` (`getDecl()`) | (none) | A bare decl-ref to a `Decl` with no substitutions. |
@@ -194,7 +209,7 @@ operands that follow that slot.
 | `ShapeReduceIntValPack` | `ShapeTransformIntValPack` | `valuePack: Val`, `axis: IntVal` | (none) | Drop one axis from an `IntVal` pack. |
 | `ExpandIntValPack` | `IntVal` | `patternVal: Val` plus captured-pack operands | (none) | An unexpanded value pattern over captured value packs (the value analogue of `ExpandType`). |
 | `EachIntVal` | `IntVal` | `basePack: Val` | (none) | Indexes into a value pack during substitution using the substitution's `packExpansionIndex`. |
-| `WitnessLookupIntVal` | `IntVal` | `witness: SubtypeWitness`, `key: Decl` (`getKey()`) | (none) | An integer value resolved through a witness-table lookup; spelled `T.Name` for a `static const int` interface requirement read through a type parameter's conformance, as `Shape.dimensions` is in `_Texture`. |
+| `WitnessLookupIntVal` | `IntVal` | `witness: SubtypeWitness`, `key: Decl` (`getKey()`) | (none) | An integer value resolved through a witness-table lookup; spelled `T.Name` for a `static const int` interface requirement read through a type parameter's conformance, as `Shape.dimensions` is in the `_Texture` extensions. |
 | `PolynomialIntVal` | `IntVal` | `constantTerm: IntegerLiteralValue` plus `PolynomialIntValTerm` operands | (none) | A polynomial in unsubstituted generic value parameters. |
 | `ErrorIntVal` | `IntVal` | (type operand only) | (none) | Error placeholder; lets checking continue when an integer value cannot be computed. |
 
@@ -239,7 +254,7 @@ follow the `sub` / `sup` convention.
 | `TrimLastSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | Pack witness with the last element trimmed. |
 | `PackBranchSubtypeWitness` | `SubtypeWitness` | `packOperand: Val`, `emptyWitness: SubtypeWitness`, `nonEmptyWitness: SubtypeWitness` | (none) | Pack-conditional subtype witness: selects a witness depending on whether the pack is empty. |
 | `ExpandSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | `expand` of a pattern witness. |
-| `DiffTypeInfoWitness` | `SubtypeWitness` | `thisParamType: Type`, `thisTypeDiffWitness`, `returnTypeDiffWitness`, per-parameter witnesses from slot 3 | (none) | Bundles the differential-type witnesses for a callable's `this`, return, and parameter types. |
+| `DiffTypeInfoWitness` | `SubtypeWitness` | `thisParamType: Type`, `thisTypeDiffWitness: SubtypeWitness`, `returnTypeDiffWitness: SubtypeWitness`, per-parameter `SubtypeWitness` operands from slot 3 | (none) | Bundles the differential-type witnesses for a callable's `this`, return, and parameter types. |
 | `HigherOrderDiffTypeTranslationWitness` | `SubtypeWitness` | `baseWitness: Witness` | (none) | Evidence for higher-order differentiable-type translation. |
 
 #### Type-coercion witnesses
@@ -276,17 +291,27 @@ declares `unorm` and `snorm` (lines 44-60 and 62-78) as marking a
 buffer or texture element type as backed by normalized data, states
 that the modifier does not change the semantics of a `float` or
 vector that carries it, and notes that some platforms require the
-qualifier while others operate correctly without it — so how much of
-a `ResourceFormatModifierVal` survives into generated code is a
-per-target decision. The modified element type is not interchangeable
-with the unmodified one in those decisions: the core module's WGSL
-texture check `__wgsl_check_texture_type` in
+qualifier while others operate correctly without it. How much of a
+`ResourceFormatModifierVal` survives into generated code is therefore
+a per-target decision, made in the emitters; targets differ in
+whether they re-spell it, turn it into an image format, or drop it.
+The emission details are IR-level and are covered in
+[../pipeline/06-emit.md](../pipeline/06-emit.md).
+
+The WGSL texture check `__wgsl_check_texture_type` in
 [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) (lines
-1130-1134) requires the texel type to be `float`, `int`, `uint` or a
-vector of one of them, and a `unorm`-modified element type fails that
-`static_assert` where the bare spelling passes. Which spelling each
-target actually emits is decided in the emitters, which are not in
-this page's `watched_paths`; see
+1329-1337) is the front-end side of the same decision for WGSL: it
+`static_assert`s that the texel type `is` one of `float`, `int`,
+`uint` or a 2-4 element vector of them, with the message "WGSL
+supports only f32/i32/u32 type textures". A test-bundle run against an
+earlier commit saw E41400 for `Texture2D<unorm float4>` and none for
+`Texture2D<float4>`. Reading the current source does not settle
+whether that still holds: `is` goes through `isSubtype`, and for a
+`ModifiedType` without `no_diff` the inheritance computation returns
+the base type's inheritance info unchanged
+([slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp)
+lines 2421-2488), which may let the modified type satisfy the test.
+That outcome was not run here. See also
 [../pipeline/06-emit.md](../pipeline/06-emit.md).
 
 | Class | Parent | Key fields | Grammar | Summary |
@@ -395,24 +420,35 @@ itself, and the checker builds one (through
 `SemanticsVisitor::createTypeEqualityWitness`, which calls
 `ASTBuilder::getTypeEqualityWitness`) whenever a subtype obligation is
 discharged because the two types are the same type rather than by an
-inheritance step — the self facet of a non-decl-ref type in the
-inheritance graph, and the opened/projected type produced when an
-existential is unpacked, are the main cases. It is not the only way
+inheritance step — the self facet of a type in the inheritance
+graph, including an opened existential and the pack-projection types,
+is the main case (the call sites are listed below). It is not the only way
 equality evidence is spelled: a declared equality constraint such as
 `where T == U` yields a `DeclaredSubtypeWitness` whose `isEquality()`
 is true, which is a different class. Code that must accept either form
 calls the `isTypeEqualityWitness` helper at the end of
 [slang-ast-val.h](../../../../source/slang/slang-ast-val.h) (lines
-1352-1388), which also looks through the pack witnesses. Every
-construction site funnels through
+1352-1405), which also looks through the `each`, `expand`, `first`,
+`last`, `trim-first` and `trim-last` pack witnesses and requires every
+element witness of a `TypePackSubtypeWitness` to be one; any other
+witness kind answers `false`. Every
+semantic-checking construction site funnels through
 `SemanticsVisitor::createTypeEqualityWitness` in
 [slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp)
-(line 531), which just forwards to `ASTBuilder::getTypeEqualityWitness`.
-Its callers are in
-[slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp):
-line 712 builds the self facet of a non-decl-ref type, and lines 2037
-and 2097 build the extracted and projected types of an opened
-existential.
+(line 654), which just forwards to `ASTBuilder::getTypeEqualityWitness`.
+Its callers are all in
+[slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp),
+each building the self facet of a type's inheritance linearization:
+line 737 for a non-decl-ref type that is the `selfType` of a
+declaration, line 2116 for an opened existential
+(`ExtractExistentialType`), line 2176 for the pack-projection types
+(`each`, `expand`, `first`, `last`, trims), line 2207 for a
+`ConcreteTypePack`, line 2374 for a `PackBranchType`, line 2441 for a
+`no_diff`-modified type, and line 2499 for the fallback that covers any
+other type. Substitution is the exception: `TypeEqualityWitness::_substituteImplOverride`
+rebuilds the witness directly with `getOrCreate`
+([slang-ast-val.cpp](../../../../source/slang/slang-ast-val.cpp)
+lines 312-319).
 
 ### SubtypeWitness across packs
 
@@ -475,7 +511,23 @@ surface consequence is that two differently-spelled compile-time
 values compare equal exactly when they hash-cons to one node: inside
 a generic over `let N : int`, `int[2*N+3]` and `int[3+2*N]` are the
 same type and values of each are mutually assignable, which they
-would not be if either spelling built a second node. Any
+would not be if either spelling built a second node.
+
+A worked example (not run for this revision): given
+`int sumBoth<let N : int>(int a[2*N+3], int b[3+2*N])`, the body may
+declare `int c[3+2*N] = a;` and then index `c` and `b` with the same
+loop bound, and the call `sumBoth<1>(aa, bb)` with two `int[5]`
+arrays type-checks. The parameter `a` has a bound written
+`2*N+3` and `b` has one written `3+2*N`; neither is a
+`BuiltinOperationIntVal`, because `+` and `*` are always built as a
+`PolynomialIntVal`, whose canonical form sorts terms so both spellings
+reach the same hash-consed node. The assignment `c = a` (bound `3+2*N` against `2*N+3`) is checked
+before `N` is substituted, so it succeeds only because the two
+bounds are the same `Val*`; had the two spellings produced distinct
+nodes, `Val::equals` ([slang-ast-base.h](../../../../source/slang/slang-ast-base.h)
+lines 434-437) would compare unequal resolved nodes and the
+declaration would be rejected as a type mismatch between two different
+array types. Any
 cache keyed on `Val*` identity — inside or outside the AST — is only
 correct because one logical value has exactly one canonical
 representation, which is why classes such as `BuiltinOperationIntVal`
