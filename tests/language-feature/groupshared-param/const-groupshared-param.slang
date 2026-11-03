@@ -1,5 +1,3 @@
-// gh-10641-const-groupshared-param.slang
-
 // A `groupshared` parameter is always a reference to one thread-group-shared location. The
 // read-only spelling `const groupshared` therefore uses the same strict `ref` passing mode as the
 // read-write spelling and differs from it only in access. A borrow

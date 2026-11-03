@@ -1,5 +1,3 @@
-// gh-10641-groupshared-member-arg.slang
-
 // A field of a group-shared variable, and a component of such a field, name group-shared storage,
 // so each is a valid argument for a `groupshared` parameter and is passed by reference rather than
 // copied per invocation (shader-slang/slang#10641).
@@ -85,4 +83,4 @@ void main(uint tid : SV_DispatchThreadID)
 //CHECK-DAG: func %readWriteWholeStruct{{.*}}RefParam({{.*}}0 : UInt64, 2147483647
 
 // The opposite direction -- a field of a *non*-group-shared variable must still be rejected -- is
-// covered by tests/diagnostics/groupshared-argument-lvalue.slang.
+// covered by tests/diagnostics/groupshared-param/argument-storage.slang.
