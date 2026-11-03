@@ -3655,16 +3655,20 @@ static SlangResult createArtifactFromIR(
 
     // The SPIRV-Tools optimizer assumes that every function it reaches has a body, and some of its
     // passes (dead-branch elimination, local single-store elimination) crash on an imported
-    // function declaration. A module that imports symbols and is not linked here is an incomplete
-    // library: its consumer links it and then optimizes the whole program, so we leave it
-    // unoptimized. A module that is linked here has no imports left afterwards, because the link
-    // fails on any import it cannot resolve.
-    const bool isUnlinkedIncompleteModule = !needsLink && doesSPIRVModuleImportSymbols(spirv);
+    // function declaration. A module keeps its imports when this compile does not link it: an
+    // `-incomplete-library` module that calls an unresolved `extern`, the precompiled SPIR-V
+    // (`-embed-downstream-ir`) of a module that imports another precompiled module, and a compile
+    // with `SkipDownstreamLinking`. Such a module becomes a whole program only after a later link,
+    // so we skip the `-O` preset here. Passes named with `-Xspirv-opt` still run, because the user
+    // requested them explicitly. A module that is linked here has no imports left afterwards,
+    // because the link fails on any import it cannot resolve.
+    const bool hasUnresolvedImports = !needsLink && doesSPIRVModuleImportSymbols(spirv);
+    const OptimizationLevel optimizationLevel =
+        hasUnresolvedImports
+            ? OptimizationLevel::None
+            : codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel();
     const bool needsOptimization =
-        !isUnlinkedIncompleteModule &&
-        (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel() !=
-             OptimizationLevel::None ||
-         spirvOptArgs.getCount() != 0);
+        optimizationLevel != OptimizationLevel::None || spirvOptArgs.getCount() != 0;
     const bool needsValidation = shouldRunSPIRVValidation(codeGenContext);
     const bool needsDownstreamCompiler = needsLink || needsOptimization || needsValidation;
 
@@ -3752,7 +3756,7 @@ static SlangResult createArtifactFromIR(
             // must outlive the compile() call below.
             SliceAllocator allocator;
             downstreamOptions.compilerSpecificArguments = allocator.allocate(spirvOptArgs);
-            switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
+            switch (optimizationLevel)
             {
             case OptimizationLevel::None:
                 downstreamOptions.optimizationLevel =
