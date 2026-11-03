@@ -1809,9 +1809,12 @@ extension<T:__BuiltinFloatingPointType> T
 {
     // Generic code such as `T(0.1l)` converts a `double` with this initializer, so the `double`
     // specialization keeps the full value instead of rounding through `IFloat.__init(float)`.
-    // A free-form extension member loses ties against `IFloat.__init(float)`, so arguments that
-    // convert equally well to `float` and `double`, such as `int64_t`, `uint64_t` or `half`, still
-    // use `__init(float)` and do not introduce a `double` in the `float` specialization.
+    // Integer and `half` arguments convert to `float` and to `double` at the same cost, and on such
+    // a tie `CompareLookupResultItems` ranks a free-form extension member below the requirement.
+    // So `int64_t`, `uint64_t` and `half` arguments still use `__init(float)`, which keeps `double`
+    // out of the `float` and `half` specializations (Metal and WGSL have no `double`) but rounds a
+    // 64-bit integer to `float` precision in the `double` specialization. The call lowers to an
+    // inline `FloatCast`, which autodiff differentiates directly, so no `[Differentiable]` is needed.
     __intrinsic_op($(kIROp_FloatCast))
     __init(double val);
 
