@@ -382,6 +382,21 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueFloat(
         return SLANG_E_INVALID_ARG;
     if (index >= (unsigned int)userAttr->args.getCount())
         return SLANG_E_INVALID_ARG;
+
+    if (userAttr->floatArgVals.getCount() > (Index)index)
+    {
+        if (auto floatVal = userAttr->floatArgVals[index])
+        {
+            *rs = (float)*floatVal;
+            return 0;
+        }
+    }
+
+    // Arguments without a folded value fall back to reading a literal. `findUserAttributeByName`
+    // also returns builtin attributes such as `[maxtessfactor(64.0)]`, whose arguments are never
+    // coerced to a parameter type and so are never folded; an integer literal coerced to a
+    // non-scalar parameter, such as `1` for a `float2`, has no folded scalar value either and
+    // reads back as `1.0`.
     if (auto cexpr = as<FloatingPointLiteralExpr>(userAttr->args[index]))
     {
         *rs = (float)cexpr->value;

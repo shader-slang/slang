@@ -2249,10 +2249,13 @@ public:
     // Adding `RefReadOnlyModifier`, `RefWriteOnlyModifier` and the reference parameter type
     // classes shifts the sequential `ASTNodeType` values, so a version-36 module's later AST
     // nodes would be decoded as different classes.
-    // Version 37 is the earliest module version with the updated AST node numbering, and with
-    // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
-    const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 37;
+    // Version 38 is the earliest module version we load. Version 37 introduced the current AST
+    // node numbering and the `QualType::isReadOnlyMemoryLocation` field in serialized
+    // expressions; version 38 adds the `Attribute::floatArgVals` field to every serialized
+    // attribute, so every later field of a version-37 attribute record would be read from the
+    // wrong position, and version-37 modules are rejected.
+    const static UInt k_minSupportedModuleVersion = 38;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

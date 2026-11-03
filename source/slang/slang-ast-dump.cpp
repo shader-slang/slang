@@ -200,6 +200,15 @@ struct ASTDumpContext
         m_writer->emit("}");
     }
 
+    template<typename T>
+    void dump(const std::optional<T>& value)
+    {
+        if (value)
+            dump(*value);
+        else
+            _dumpPtr(nullptr);
+    }
+
     template<typename T, int n>
     void dump(const ShortList<T, n>& list)
     {
