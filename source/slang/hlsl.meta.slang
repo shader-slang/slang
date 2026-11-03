@@ -17082,7 +17082,7 @@ T WaveMaskBitAnd(WaveMask mask, T expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitAnd($1)";
+        return WaveActiveBitAnd(expr);
     default:
         return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
@@ -17096,7 +17096,7 @@ vector<T,N> WaveMaskBitAnd(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitAnd($1)";
+        return WaveActiveBitAnd(expr);
     default:
         return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
@@ -17109,7 +17109,7 @@ matrix<T,N,M> WaveMaskBitAnd(WaveMask mask, matrix<T,N,M> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitAnd($1)";
+        return WaveActiveBitAnd(expr);
     default:
         return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
@@ -17123,7 +17123,7 @@ T WaveMaskBitOr(WaveMask mask, T expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitOr($1)";
+        return WaveActiveBitOr(expr);
     default:
         return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
@@ -17136,7 +17136,7 @@ vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitOr($1)";
+        return WaveActiveBitOr(expr);
     default:
         return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
@@ -17150,7 +17150,7 @@ matrix<T,N,M> WaveMaskBitOr(WaveMask mask, matrix<T,N,M> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitOr($1)";
+        return WaveActiveBitOr(expr);
     default:
         return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
@@ -17164,7 +17164,7 @@ T WaveMaskBitXor(WaveMask mask, T expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitXor($1)";
+        return WaveActiveBitXor(expr);
     default:
         return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
@@ -17178,7 +17178,7 @@ vector<T,N> WaveMaskBitXor(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitXor($1)";
+        return WaveActiveBitXor(expr);
     default:
         return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
@@ -17192,7 +17192,7 @@ matrix<T,N,M> WaveMaskBitXor(WaveMask mask, matrix<T,N,M> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitXor($1)";
+        return WaveActiveBitXor(expr);
     default:
         return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
@@ -17944,6 +17944,12 @@ T WaveActive$(opName.hlslName)(T expr)
     case wgsl:
         __intrinsic_asm "subgroup$(opName.glslName)";
     case hlsl:
+        // HLSL's WaveActiveBit* accepts only unsigned integers, so a bool is reduced as a 0/1 uint.
+        if (__isBool<T>())
+        {
+            let bits = WaveActive$(opName.hlslName)(uint(__slang_noop_cast<bool>(expr)));
+            return __slang_noop_cast<T>(bits != 0);
+        }
         __intrinsic_asm "WaveActive$(opName.hlslName)";
     case metal:
         __intrinsic_asm "simd_$(opName.metalName)";
@@ -17970,6 +17976,11 @@ vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
     case wgsl:
         __intrinsic_asm "subgroup$(opName.glslName)";
     case hlsl:
+        if (__isBool<T>())
+        {
+            let bits = WaveActive$(opName.hlslName)(vector<uint, N>(__slang_noop_cast<vector<bool, N>>(expr)));
+            return __slang_noop_cast<vector<T, N>>(bits != 0);
+        }
         __intrinsic_asm "WaveActive$(opName.hlslName)";
     case metal:
         __intrinsic_asm "simd_$(opName.metalName)";
@@ -17992,6 +18003,10 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
     case cuda:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     case hlsl:
+        if (__isBool<T>())
+        {
+            MATRIX_MAP_UNARY(T, N, M, WaveActive$(opName.hlslName), expr);
+        }
         __intrinsic_asm "WaveActive$(opName.hlslName)";
     default:
         matrix<T,N,M> result;
