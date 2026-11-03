@@ -3493,6 +3493,36 @@ static SlangResult stripDbgSpirvFromArtifact(
     return SLANG_OK;
 }
 
+// Return whether the SPIR-V module `spirv` imports a symbol, that is, whether it has an
+// `OpDecorate %x LinkageAttributes "<name>" Import`. Such a module only becomes a whole program
+// once a `spirv-link` combines it with the modules that export those symbols. Decorations precede
+// every function in the logical layout of a module, so the scan stops at the first `OpFunction`.
+static bool doesSPIRVModuleImportSymbols(const List<uint8_t>& spirv)
+{
+    const auto words = reinterpret_cast<const SpvWord*>(spirv.getBuffer());
+    const Index wordCount = spirv.getCount() / Index(sizeof(SpvWord));
+    Index i = SpirvInstructionHelper::SPV_INDEX_INSTRUCTION_START;
+    while (i < wordCount)
+    {
+        const SpvOp opCode = SpvOp(words[i] & 0xFFFF);
+        const Index instWordCount = Index(words[i] >> 16);
+        SLANG_RELEASE_ASSERT(instWordCount != 0 && i + instWordCount <= wordCount);
+        if (opCode == SpvOpFunction)
+            break;
+
+        // The words of a LinkageAttributes decoration are the opcode, the target, the
+        // decoration, the name string (one or more words), then the linkage type.
+        if (opCode == SpvOpDecorate && instWordCount >= 5 &&
+            words[i + 2] == SpvDecorationLinkageAttributes &&
+            words[i + instWordCount - 1] == SpvLinkageTypeImport)
+        {
+            return true;
+        }
+        i += instWordCount;
+    }
+    return false;
+}
+
 static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
 {
     auto& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
@@ -3622,10 +3652,19 @@ static SlangResult createArtifactFromIR(
     // (`glslang_optimizeSPIRV`), so skipping the call drops no bytes and no diagnostics.
     List<String> spirvOptArgs =
         codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt");
+
+    // The SPIRV-Tools optimizer assumes that every function it reaches has a body, and some of its
+    // passes (dead-branch elimination, local single-store elimination) crash on an imported
+    // function declaration. A module that imports symbols and is not linked here is an incomplete
+    // library: its consumer links it and then optimizes the whole program, so we leave it
+    // unoptimized. A module that is linked here has no imports left afterwards, because the link
+    // fails on any import it cannot resolve.
+    const bool isUnlinkedIncompleteModule = !needsLink && doesSPIRVModuleImportSymbols(spirv);
     const bool needsOptimization =
-        codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel() !=
-            OptimizationLevel::None ||
-        spirvOptArgs.getCount() != 0;
+        !isUnlinkedIncompleteModule &&
+        (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel() !=
+             OptimizationLevel::None ||
+         spirvOptArgs.getCount() != 0);
     const bool needsValidation = shouldRunSPIRVValidation(codeGenContext);
     const bool needsDownstreamCompiler = needsLink || needsOptimization || needsValidation;
 
