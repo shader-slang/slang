@@ -3877,12 +3877,15 @@ struct TypeFlowSpecializationContext
 
     IRInst* substituteSetsInTypeLike(IRInst* typeLike)
     {
-        // We handle `IRAttributedType` first because `as<>` looks through it: a later case
-        // would match the base type and return a result without the attributes. Consider a
-        // generic `float read<T : IValue>(no_diff T t)` called with an `IValue` whose only
-        // conforming type is `Value`: the parameter info is `Attributed(ElementOfSet(Value),
-        // no_diff)`, and the substituted type must be `Attributed(Value, no_diff)` so that the
-        // rebuilt specialization has the same function type as the original.
+        // We handle `IRAttributedType` first because `as<>` looks through it, so
+        // `substituteLeafSet` or a structural case below would match the base type and drop
+        // the attributes. Consider `float read<T : IValue>(no_diff T t)` called with an `IValue`
+        // that type-flow proves can only hold a `Value`: the parameter info is
+        // `Attributed(ElementOfSet(Value), no_diff)`, and the substituted type must be
+        // `Attributed(Value, no_diff)`. The original `Specialize` of `read`, which carries
+        // `DisallowSpecializationWithExistentials`, is deduplicated into the one that
+        // `analyzeSpecialize` builds only when their function types are identical. Otherwise
+        // the decorated original survives and `specializeCall` reports E33180.
         if (auto attributedType = as<IRAttributedType>(typeLike))
         {
             IRBuilder builder(module);
@@ -3951,8 +3954,9 @@ struct TypeFlowSpecializationContext
             return substituteSetsInTypeLike(info);
 
         // As in `substituteSetsInTypeLike`, we handle `IRAttributedType` before the structural
-        // cases because `as<>` looks through it. A global parameter type such as
-        // `Attributed(Array(Int, 2), no_diff)` would otherwise come back as a bare array.
+        // cases because `as<>` looks through it. An attributed type with no info, such as
+        // `Attributed(Array(Int, 1), no_diff)` for the `int idx[1]` parameter of a
+        // `[Differentiable]` method, would otherwise come back as a bare array.
         if (auto attributedType = as<IRAttributedType>(type))
         {
             IRBuilder builder(module);
