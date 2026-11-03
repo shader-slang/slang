@@ -1,47 +1,50 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:18:41+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T06:27:59Z
 target_doc: architecture/module-map.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 8f8f11ba3fefd6f5527363f5b7ce223022ccac1773c5e77ca1ff8000d572a91d
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: ad5cfc68952f75bc650d1948578b7524c289308afe465ed1d94f5fa2ddb91081
+source_commit: cd566e9f0e7783ebfbac93c6e9957b63c4f2e64e
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: fail
+  completeness: partial
   style_consistency: partial
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 4
+finding_count: 6
 severity_breakdown:
-  critical: 0
+  critical: 1
   major: 1
-  minor: 3
+  minor: 4
   nit: 0
 ---
 
 # Review report for architecture/module-map.md
 
 ## Summary
-The map is broadly accurate and all checked paths resolve, but it still falls short of the prompt's exhaustive logical-unit inventory. The most important issue is that independently useful watched units remain absent from the `core`, `compiler-core`, and compiler-orchestration tables. Three smaller issues concern one inaccurate AST responsibility, pervasive unlinked source citations, and a conflation of the two core-module embedding stages.
+
+The module map provides useful navigation, but needs corrections and additional coverage before satisfying its generation contract. The most consequential error identifies CUDA output as a consumer of `slang-rt`, although runtime linking is gated on host-style targets. Several substantial compiler units are also absent from the promised exhaustive inventory.
 
 ## Items checked
-- Read the target, `_common.md`, the per-doc prompt, `architecture/overview.md`, and the resolved watched inputs from `regenerate.py show` at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
-- Verified 202 inline entries in table `Files` cells in their stated source groups and resolved all 59 Markdown link targets; generated peer-page links point to manifest pages.
-- Spot-checked more than 10 factual claims, including the built-in cache format, lexer and diagnostics roles, compile-request/session/module ownership, AST cloning and substitution caching, IR-family counts, emit backends, standard modules, record/replay, WASM bindings, and `slangc`.
-- Verified that the body contains no line-number citations, so there were zero source line citations to re-derive.
-- Recomputed the watched-path digest, checked all mandatory front-matter fields, and confirmed the 23,719-byte body is below the 32-KB cap.
+
+- Read `_review.md`, `_common.md`, and the document-specific prompt; ran `regenerate.py show architecture/module-map.md`.
+- Verified against the **current working tree**. The source comparison against the document’s recorded commit produced no differences under `source/`, consistent with the supplied equivalence.
+- Resolved all 61 Markdown link occurrences (57 distinct destinations); all exist, and all linked generated pages have manifest entries.
+- Searched the entire body for line-number citations: none appear.
+- Spot-checked more than 15 claims, including built-in cache timestamp encoding, persistent-cache locking/LRU behavior, inline dictionary storage, AST cloning, substitution caching, IR file counts, switch threading, HLSL barrier helpers, functional/numerics module attributes, standard-module configuration, core-module embedding, mimalloc integration, record/replay inclusion, session interfaces, dispatcher behavior, and runtime linking.
+- Confirmed the IR-family count: 167 `.cpp` and 167 `.h` files.
+- Compared subsystem coverage and session/runtime descriptions with dependency document `architecture/overview.md`, solely for cross-reference checks.
+- Checked required front-matter fields, table structure, source-link conventions, and document size: 30,478 bytes against the 32,768-byte cap.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | Group tables, especially lines 35-97 | The document is not the requested exhaustive decomposition. Examples of absent, independently useful watched units include HTTP packet transport, memory file systems, RIFF support, process execution, Metal/Tint downstream compiler discovery, and central orchestration types such as `CodeGenContext`, `TargetProgram`, and `TranslationUnitRequest`. | The manifest describes this page as an inventory of every logical unit at `docs/generated/design/_meta/manifest.yaml:37-43`. Representative omitted declarations are in `source/core/slang-http.h:81-101`, `source/core/slang-memory-file-system.h:11-30`, `source/core/slang-process-util.h:28-41`, `source/compiler-core/slang-metal-compiler.h:10-15`, `source/compiler-core/slang-tint-compiler.h:9-14`, `source/slang/slang-code-gen.h:90-91`, and `source/slang/slang-target-program.h:25-34`. | Add compact rows for these omitted families and perform a watched-file-to-row coverage sweep. Where the size cap discourages one row per pair, use explicit catch-all family rows that name the covered files and responsibilities. |
-| F-002 | minor | AST table, line 127 | The responsibility `Layout assigned during AST traversal` misstates `slang-ast-natural-layout`: the implementation recursively computes and caches a type's natural size; it does not assign a layout during a general AST traversal. | `source/slang/slang-ast-natural-layout.h:85-88` exposes `ASTNaturalLayoutContext::calcSize`, and `source/slang/slang-ast-natural-layout.cpp:92-106` computes and caches `NaturalSize`. | Change the responsibility to “Computes and caches natural sizes for AST types.” |
-| F-003 | minor | Tables throughout, for example lines 42-50 and 59-76 | Most source filenames are inline code rather than Markdown links. This violates the universal citation rule and weakens a page whose primary purpose is navigation. | `docs/generated/design/_meta/prompts/_common.md:43-45` requires source-file citations to use workspace-relative Markdown links; the report found 202 unlinked inline entries in `Files` cells. | Convert each file or compact file-family citation in `Files` cells to a workspace-relative link, retaining grouped notation where useful. |
-| F-004 | minor | Core-module table, line 272 | The single row says both core-module files are “compiled into `libslang`,” conflating the source-embedding target used to bootstrap generation with the generated binary-module embedding target linked as needed into the library. | `source/slang-core-module/CMakeLists.txt:52-89` defines the source-embedding targets; lines 93-95 say that source generates the embeddable core module; lines 198-217 define the separate generated-module embed and no-embed targets. | Split the row into “bootstrap source embedding” (`slang-embedded-core-module-source.cpp`) and “compiled core-module embedding” (`slang-embedded-core-module.cpp`), with their distinct build roles. |
-
-## No-issues notes
-- All 59 relative links resolve at the recorded source commit, and every checked `Files` entry names an existing file in its stated group.
-- The `slang-ir-*` estimate is accurate at 162 `.cpp` plus 162 headers and is appropriately summarized instead of enumerated.
-- Front matter is complete, and the recomputed watched-path digest exactly matches the target document.
+| F-001 | critical | `## source/slang-rt/`, line 367 | `Runtime library used by emitted CPU/Torch/CUDA targets` incorrectly includes CUDA. This misstates a build/runtime dependency. | `source/slang/slang-code-gen.cpp:354` defines `_isCPUHostTarget` using `ArtifactStyle::Host`; lines 743–762 add `slang-rt` only under that predicate. The dependency overview’s “Runtime and bindings” section also explicitly excludes CUDA source. | Describe `slang-rt` as supporting host-style CPU outputs, including PyTorch bindings; remove CUDA from the consumer list. |
+| F-002 | major | `## source/slang/`, lines 101–298 | The promised exhaustive decomposition omits substantial non-pass units: name lookup, mangling, parameter binding/type layout, and the bytecode interpreter. Listing VM emission does not identify the interpreter implementation. | `source/slang/slang-lookup.h:19` declares scope lookup; `source/slang/slang-mangle.h:15` declares mangling; `source/slang/slang-parameter-binding.h:14` describes register assignment; `source/slang/slang-type-layout.h:28` begins layout-rule definitions; `source/slang/slang-vm.h:72` declares `ByteCodeInterpreter`. These are within the watched paths. | Add compact logical-unit rows covering `slang-lookup.*`, `slang-mangle.*`, `slang-parameter-binding.*`, `slang-type-layout.*`, and the `slang-vm*` family. Audit remaining non-pass families for coverage, shortening existing enumeration to retain the size cap. |
+| F-003 | minor | Dispatcher heading and row, lines 357–361 | `downstream-tool dispatcher` misidentifies the primary role of this executable: it dispatches Slang CLI commands to sibling executables. | `source/slang-dispatcher/main.cpp:66` registers `compile` → `slangc` and `interpret` → `slangi`, alongside help/version commands. | Rename the heading to “command-line dispatcher” and describe the `slangc`/`slangi` delegation in the responsibility cell. |
+| F-004 | minor | Source tables throughout, e.g. lines 43–62 and 137–153 | Many source citations are plain backticked filenames, leaving whole rows without navigable source links. This violates the universal requirement to cite source files using Markdown links. | `docs/generated/design/_meta/prompts/_common.md`, “Universal style rules”: source-file citations must use Markdown links. Examples include the strings, allocation, AST builder, and cloning rows. | Convert cited filenames to relative Markdown links; for summarized families, provide a linked representative file and clearly identify the family. |
+| F-005 | minor | Standard-module rows, lines 324–328; glslang row, line 355 | Some table paths fall outside the resolved watched paths, contrary to the document-specific checklist. Examples include `slang-standard-module-config.h.in`, nested standard-module sources, and `slang-glslang.version-script`. Their changes therefore do not trigger this page’s freshness tracking. | `docs/generated/design/_meta/manifest.yaml:57` watches only `source/*/CMakeLists.txt`, `prelude/*.h`, `source/*/*.h`, and `source/*/*.cpp`. `docs/generated/design/_meta/prompts/architecture-module-map.md:60` requires table paths to exist within watched paths. | Expand this manifest entry to include the configuration template, described standard-module source files, and glslang version script; regenerate with the expanded inputs. |
+| F-006 | minor | Compile-request orchestration, line 120 | `Process-wide Session class` implies a single process-wide instance, while independent global sessions can coexist. | `source/slang/slang-api.cpp:391` implements `slang_createGlobalSessionWithoutCoreModule`; line 399 allocates a fresh `Slang::Session` for each call. The dependency overview explicitly distinguishes global-session scope from process-wide uniqueness. | Replace “Process-wide” with “Global-session-scoped” in the responsibility cell. |

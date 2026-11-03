@@ -1,28 +1,32 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T09:03:00Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-03T07:00:00Z
 target_doc: architecture/module-map.md
 review_report: ../../reviews/architecture/module-map.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 3
+  fixed: 4
   rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 1
+  deferred: 2
   escalated: 0
 ---
 
 # Remediation report for architecture/module-map.md
 
 ## Summary
-Three findings were fixed and one deferred. The coverage gap in F-001 was larger than the review's examples: a basename sweep of `source/core/*.h` and `source/compiler-core/*.h` against the document found roughly 50 and 17 unmentioned units respectively, all now covered by compact family rows plus the three missing orchestration rows. F-002 and F-004 were verified against the cited sources and corrected in place. F-003 is deferred because the fix no longer fits the manifest size cap. The document was edited; it is now 28921 bytes against the 32768-byte cap and `regenerate.py lint` passes.
+
+Each finding was checked against the current source. Four were real and fixed in the doc (F-001, F-002, F-003, F-006). Two were deferred (F-004, F-005): one needs a table-wide rewrite that would exceed the size cap, the other a manifest change. The doc grew from 30478 to 31585 bytes against the 32768-byte cap.
 
 ## Actions
+
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed and extended: the cited units were absent, as were many peers found by a basename sweep. Roles were read from source, e.g. `source/core/slang-http.h:19` (`HTTPHeader`), `source/core/slang-process-util.h:10,28`, `source/core/slang-persistent-cache.h:12-15`, `source/slang/slang-code-gen.h:90` (`CodeGenContext`), `source/slang/slang-target-program.h:20-34` (`TargetProgram`), `source/slang/slang-translation-unit.h:22`, `source/compiler-core/slang-metal-compiler.h:10`, `source/compiler-core/slang-tint-compiler.h:9`. | Added 14 core rows (I/O, file systems, RIFF, compression, process/platform, HTTP, persistent cache, containers, RTTI, text utilities, portability, profiling, tool support), 8 compiler-core rows plus Metal/Tint/MSVC in the per-vendor row, and 3 orchestration rows (`TranslationUnitRequest`, `CodeGenContext`, `TargetRequest`/`TargetProgram`); extended the hashing, allocation, token, and diagnostic-catalog rows. |
-| F-002 | fixed | Confirmed: `source/slang/slang-ast-natural-layout.h:85-88` exposes `ASTNaturalLayoutContext::calcSize` returning a cached `NaturalSize`; there is no general AST traversal that assigns layout. | AST table: responsibility changed to "Computes and caches natural sizes for AST types". |
-| F-003 | deferred | The universal rule at `docs/generated/design/_meta/prompts/_common.md:43-45` does require Markdown links, but the document now holds 332 inline file citations; linking them costs roughly 15 KB and the manifest size cap is 32768 bytes with only 3847 bytes free. Fix needs an operator decision: raise `size_cap` for this key to about 49152, or amend the contract to allow one linked representative per family row. | — |
-| F-004 | fixed | Confirmed: `source/slang-core-module/CMakeLists.txt:52-95` builds the source-embedding objects consumed by `slang-bootstrap`, while lines 198-217 define the separate `slang-embedded-core-module` / `slang-no-embedded-core-module` targets for the generated binary module. | Core-module table: single row split into "Bootstrap source embedding" and "Compiled core-module embedding" with their distinct build roles. |
+| F-001 | fixed | `source/slang/slang-code-gen.cpp:743-762` adds `slang-rt` only under `_isCPUHostTarget`; CUDA is not host-style | `slang-rt` row now says host-style CPU outputs incl. PyTorch bindings, not CUDA |
+| F-002 | fixed | `slang-lookup.h`, `slang-mangle.h`, `slang-parameter-binding.h`, `slang-type-layout.h`, `slang-vm.h` (`ByteCodeInterpreter`, line 72) exist and were absent from the doc | added four compact rows to the compile-request table; wider family audit not attempted to stay within the cap |
+| F-003 | fixed | `source/slang-dispatcher/main.cpp:66-75` registers `compile` to `slangc`, `interpret` to `slangi`, plus help and version | heading renamed to command-line dispatcher; responsibility cell rewritten |
+| F-004 | deferred | Linking every plain-filename citation would add several KB and exceed the 32768-byte cap (doc is 31585 bytes); needs a table-wide restructure into summary-with-link rows | — |
+| F-005 | deferred | `_meta/manifest.yaml:57` watched paths must be expanded to cover the `.h.in`, standard-module sources and glslang version script; manifest edits are outside this remediation | — |
+| F-006 | fixed | `source/slang/slang-api.cpp:391-399` allocates a fresh `Slang::Session` per call, so it is not a process-wide singleton | "Process-wide" replaced by "Global-session-scoped" |

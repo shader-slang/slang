@@ -1,22 +1,22 @@
 {
   "documents": {
     "architecture/dependency-graph.md": {
-      "generated_at": "2026-09-11T12:03:17+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "d094acf8ee07e8b883c42d90aeebbe61a4b7c8e7ad8381e4a6aae62849a95031"
+      "generated_at": "2026-11-03T06:31:45+00:00",
+      "model": "claude-sonnet-5-5",
+      "source_commit": "cd566e9f0e7783ebfbac93c6e9957b63c4f2e64e",
+      "watched_paths_digest": "c607137db619e7fb3fa941a06e151cddf9fdb533d8005452d73cf7e068cf805a"
     },
     "architecture/module-map.md": {
-      "generated_at": "2026-09-11T11:53:47+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "2464030004e84d0c0aa0884184d6030f75a67784d237bd0c6558593236696070"
+      "generated_at": "2026-11-03T06:32:07+00:00",
+      "model": "claude-sonnet-5-5",
+      "source_commit": "cd566e9f0e7783ebfbac93c6e9957b63c4f2e64e",
+      "watched_paths_digest": "ad5cfc68952f75bc650d1948578b7524c289308afe465ed1d94f5fa2ddb91081"
     },
     "architecture/overview.md": {
-      "generated_at": "2026-09-11T11:50:22+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "95ff3cab526c686528a630d76f0bf7e9952fec44677b796b3e89d2d11ae228ae"
+      "generated_at": "2026-11-03T06:33:29+00:00",
+      "model": "claude-sonnet-5-5",
+      "source_commit": "cd566e9f0e7783ebfbac93c6e9957b63c4f2e64e",
+      "watched_paths_digest": "0b13514236df58d535ec2ed36e2311b6d01cb5c18433dcafd2320abf4f924a3f"
     },
     "ast-reference/base.md": {
       "generated_at": "2026-09-11T12:11:47+00:00",
@@ -97,10 +97,10 @@
       "watched_paths_digest": "524db519639c68c87df847957eafdee39c8abdb2e708167900770ba6290809b5"
     },
     "glossary.md": {
-      "generated_at": "2026-09-12T07:07:50+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "2094af503348384f42f81337791d59c3b5e5b6ee",
-      "watched_paths_digest": "61ffea6c38472e843c19fc2b6ed36a41ba779ffce9c70eb8e09f62e30ba50562"
+      "generated_at": "2026-11-03T06:32:09+00:00",
+      "model": "claude-sonnet-5-5",
+      "source_commit": "cd566e9f0e7783ebfbac93c6e9957b63c4f2e64e",
+      "watched_paths_digest": "80aff9fba15701570a4f4d912d31a83010b337b36786aa5d0993528dd45d779a"
     },
     "ir-reference/control-flow.md": {
       "generated_at": "2026-09-11T12:29:27+00:00",
