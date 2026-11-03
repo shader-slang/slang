@@ -1,5 +1,6 @@
 #include "slang-ir-insert-debug-value-store.h"
 
+#include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -171,13 +172,26 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 
         mapVarToDebugVar[param] = debugVar;
 
-        // Map any in-param proxy vars to the debug var.
+        // An `out`, `inout` or `__constref` parameter (`isRefParam`; a `ref` parameter gets no
+        // debug variable) points at the caller's storage, and the function reads and writes the
+        // parameter only through it, so that storage holds the parameter's value for the whole
+        // call. Entry-point parameters are shader inputs and outputs instead; linking removes
+        // the decoration from them (`specializeIRForEntryPoint`).
+        if (isRefParam)
+            builder.addDecoration(param, kIROp_DebugVarStorageDecoration, debugVar);
+
+        // A by-value parameter that the function modifies lives in its in-param proxy var,
+        // which is then its storage.
         bool hasProxyVar = false;
         for (auto use = param->firstUse; use; use = use->nextUse)
         {
             if (auto inParamProxyVarDecor = as<IRInParamProxyVarDecoration>(use->getUser()))
             {
                 mapVarToDebugVar[inParamProxyVarDecor->parent] = debugVar;
+                builder.addDecoration(
+                    inParamProxyVarDecor->parent,
+                    kIROp_DebugVarStorageDecoration,
+                    debugVar);
                 hasProxyVar = true;
             }
         }
@@ -224,6 +238,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                         debugLoc->getScope());
                     copyNameHintAndDebugDecorations(debugVar, varInst);
                     mapVarToDebugVar[varInst] = debugVar;
+                    builder.addDecoration(varInst, kIROp_DebugVarStorageDecoration, debugVar);
                 }
             }
         }
@@ -288,6 +303,26 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                     }
                 }
             }
+        }
+    }
+}
+
+void rebindDebugVarStorageDecorations(IRFunc* func, IRCloneEnv* env)
+{
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            auto decor = inst->findDecoration<IRDebugVarStorageDecoration>();
+            if (!decor)
+                continue;
+            IRInst* debugVar = decor->getDebugVar();
+            if (getParentFunc(debugVar) != func)
+                debugVar = findCloneForOperand(env, debugVar);
+            if (as<IRDebugVar>(debugVar) && getParentFunc(debugVar) == func)
+                decor->setOperand(0, debugVar);
+            else
+                decor->removeAndDeallocate();
         }
     }
 }

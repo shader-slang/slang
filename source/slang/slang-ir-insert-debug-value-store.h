@@ -9,6 +9,7 @@ struct IRModule;
 struct IRType;
 struct IRFunc;
 struct IRInst;
+struct IRCloneEnv;
 
 struct DebugValueStoreContext
 {
@@ -19,6 +20,13 @@ struct DebugValueStoreContext
     bool isTypeKind(IRInst* inst);
 };
 void insertDebugValueStore(DebugValueStoreContext& context, IRModule* module);
+
+// Repairs the `DebugVarStorage` decorations of `func` after `func` was built by cloning another
+// function with `env`. A cloner that copies parameters before the function body copies their
+// decorations before the debug variables they name, so a copied decoration can still name the
+// original function's debug variable. We point it at that debug variable's clone in `func`, or
+// remove it if `func` has no clone of it.
+void rebindDebugVarStorageDecorations(IRFunc* func, IRCloneEnv* env);
 
 } // namespace Slang
 

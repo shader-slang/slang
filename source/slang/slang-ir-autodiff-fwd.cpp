@@ -8,6 +8,7 @@
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-init-local-var.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-propagate-func-properties.h"
 #include "slang-ir-single-return.h"
@@ -254,6 +255,7 @@ struct ForwardDiffTranslationContext
         {
             builder.markInstAsPrimal(builder.emitReturn(primalCall));
         }
+        rebindDebugVarStorageDecorations(diffFunc, &cloneEnv);
     }
 
     // Returns "d<var-name>" to use as a name hint for variables and parameters.
@@ -2348,6 +2350,10 @@ struct ForwardDiffTranslationContext
             auto ptrType = asRelevantPtrType(param->getDataType());
             auto tempVar = builder.emitVar(ptrType->getValueType());
             param->replaceUsesWith(tempVar);
+            // The function now reads and writes the temporary and writes the IR parameter only
+            // on return, so the IR parameter no longer holds the source parameter's value.
+            if (auto decor = param->findDecoration<IRDebugVarStorageDecoration>())
+                decor->removeAndDeallocate();
             mapParamToTempVar[param] = tempVar;
             if (ptrType->getOp() != kIROp_OutParamType)
             {
@@ -2557,6 +2563,8 @@ struct ForwardDiffTranslationContext
                 }
             }
         }
+
+        rebindDebugVarStorageDecorations(diffFunc, &cloneEnv);
 
 #if _DEBUG
         checkAutodiffInstDecorations(diffFunc);

@@ -1694,6 +1694,10 @@ struct LoweredElementTypeContext
             auto logicalParamType = param->getFullType();
             auto storageType = specializedFuncType->getParamType(i);
             param->setFullType((IRType*)storageType);
+            // The parameter now holds the buffer's storage type, not the source parameter's. (No
+            // known input reaches this with a decorated parameter.)
+            if (auto decor = param->findDecoration<IRDebugVarStorageDecoration>())
+                decor->removeAndDeallocate();
             setInsertAfterOrdinaryInst(&builder, param);
 
             // Store uses of param before creating a cast inst that uses it.

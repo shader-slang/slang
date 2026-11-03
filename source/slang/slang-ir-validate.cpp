@@ -383,6 +383,29 @@ void validateCodeBody(IRValidateContext* context, IRGlobalValueWithCode* code)
     }
 }
 
+// Check the contract of a `DebugVarStorage` decoration (see `slang-ir-insts.lua`): it sits on a
+// var or pointer-typed parameter of a function and names a debug variable of that same function.
+static void validateDebugVarStorageDecoration(IRValidateContext* context, IRInst* inst)
+{
+    auto decor = as<IRDebugVarStorageDecoration>(inst);
+    if (!decor)
+        return;
+    auto storage = decor->getParent();
+    auto func = getParentFunc(storage);
+    validate(
+        context,
+        func && (as<IRVar>(storage) ||
+                 (as<IRParam>(storage) && as<IRPtrTypeBase>(storage->getDataType()))),
+        inst,
+        "debug variable storage must be a var or pointer-typed parameter of a function");
+    auto debugVar = as<IRDebugVar>(decor->getDebugVar());
+    validate(
+        context,
+        debugVar && getParentFunc(debugVar) == func,
+        inst,
+        "debug variable storage must name a debug variable of its own function");
+}
+
 // Check declaration-scope contracts, guarding operand counts before reading fixed positions.
 static void validateDebugScopeOperands(IRValidateContext* context, IRInst* inst)
 {
@@ -480,6 +503,7 @@ void validateIRInst(IRValidateContext* context, IRInst* inst)
         context->domTree = nullptr;
 
     validateDebugScopeOperands(context, inst);
+    validateDebugVarStorageDecoration(context, inst);
 }
 
 void validateIRInst(IRInst* inst)
