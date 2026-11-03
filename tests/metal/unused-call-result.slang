@@ -1,5 +1,6 @@
 // A discarded call result is not bound to a temporary, which the Metal compiler would report as
-// unused (shader-slang/slang#14058); a used result still is.
+// unused (shader-slang/slang#14058); a used result still is. Target intrinsics keep the temporary
+// on HLSL and GLSL, and WGSL keeps every temporary.
 
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute -line-directive-mode none -g
@@ -12,6 +13,7 @@
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute -line-directive-mode none -g
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute -line-directive-mode none -g
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=WAVE):-target metal -entry waveMain -stage compute -line-directive-mode none -DWAVE
 //TEST:SIMPLE(filecheck=WAVEHLSL):-target hlsl -entry waveMain -stage compute -line-directive-mode none -DWAVE
 //TEST:SIMPLE(filecheck=LIBWAVE):-target metallib -entry waveMain -stage compute -Xmetal -Werror=unused-variable -Xmetal -Werror=unused-value -DWAVE
@@ -44,8 +46,10 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     // CUDA: {{^ *}}setA_0({{.*}}int(2)
     // CPP-NOT: = setA_0(
     // CPP: {{^ *}}setA_0({{.*}}int(2)
+    // WGSL: = setA_0({{.*}}i32(2)
     setA(int(tid.x) + 2);
 
+    // The source's own `void` cast emits the same bare call, with neither `(void)` nor a temporary.
     // METAL-NOT: = setA_0(
     // METAL: {{^ *}}setA_0({{.*}}int(3)
     // HLSL-NOT: = setA_0(
@@ -99,9 +103,11 @@ void waveMain(uint3 tid: SV_DispatchThreadID)
     // WAVEHLSL: = WaveActiveSum(
     WaveActiveSum(int(tid.x));
     // DXC reports a bare `tex_0.Load(...);` as an unused read-only result, so HLSL keeps it bound.
+    // On Metal it expands to the non-call `(tex.read(...).x)`, which needs the `void` cast.
+    // WAVE-NOT: = ({{.*}}.read(
+    // WAVE: {{^ *}}(void)((tex_{{[0-9]+}}).read(
     // WAVEHLSL: = tex_0.Load(
     tex.Load(int2(tid.xy));
-    outputBuffer[tid.x] = 1;
 }
 #endif
 
