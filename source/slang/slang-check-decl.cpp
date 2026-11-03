@@ -23225,7 +23225,12 @@ DeclVisibility getDeclVisibility(Decl* decl)
             return getDeclVisibility(genericDecl->inner);
         return DeclVisibility::Default;
     }
-    if (auto genericDecl = as<GenericDecl>(decl))
+    // A declaration can be wrapped in a chain of `GenericDecl`s, one per generic level: a generic
+    // interface default method sits inside its implicit `This` generic, and
+    // `liftDeclFromGenericContainers` wraps a hoisted declaration in one clone per enclosing
+    // generic. Only the innermost declaration carries visibility modifiers, so the whole chain
+    // takes its visibility.
+    while (auto genericDecl = as<GenericDecl>(decl))
         decl = genericDecl->inner;
     for (; decl; decl = getParentDecl(decl))
     {
