@@ -30,6 +30,7 @@
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
 #include "slang-ir-check-optional-none-usage.h"
+#include "slang-ir-check-printf-args.h"
 #include "slang-ir-check-recursion.h"
 #include "slang-ir-check-shader-parameter-type.h"
 #include "slang-ir-check-unsupported-inst.h"
@@ -1812,6 +1813,7 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(lowerTuples, sink);
+    SLANG_PASS(checkPrintfArgumentTypes, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 

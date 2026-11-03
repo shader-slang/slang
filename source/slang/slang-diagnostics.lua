@@ -6101,6 +6101,13 @@ err(
 )
 
 err(
+    "printf-argument-type-not-supported",
+    55219,
+    "unsupported printf argument type",
+    span { loc = "location", message = "a 'printf' argument is or contains '~type:IRInst', a resource or opaque type, which 'printf' cannot print." }
+)
+
+err(
     "abort-not-supported-in-reverse-mode-auto-diff",
     55212,
     "abort is not supported in reverse-mode automatic differentiation",
