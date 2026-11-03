@@ -8448,9 +8448,11 @@ public bool subgroupInverseBallot(uvec4 value)
 }
 
 // CUDA and HLSL have no ballot-bit-extract operation, so on those targets we compute the bit.
-// A ballot keeps lanes 32*i to 32*i+31 in component i, so the bit for `index` is bit
-// `index % 32` of component `index / 32`. We pick the component with comparisons, which keeps the
-// ballot in registers and reads inside the vector for any `index`.
+// A ballot stores lanes 32*i to 32*i+31 in component i, so the bit for `index` is bit
+// `index % 32` of component `index / 32`. We pick the component with comparisons because a
+// dynamically indexed vector becomes an `alloca` in DXC, and an `index` of 128 or more would read
+// past it. An `index` at or above the subgroup size has an undefined result; here it gives a bit
+// of the ballot (bit `index % 32` of `value.w` once `index` >= 128).
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
