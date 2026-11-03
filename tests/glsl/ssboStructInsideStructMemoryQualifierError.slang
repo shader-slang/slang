@@ -1,8 +1,8 @@
-//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl/ssboStructInsideStructMemoryQualifierError.slang -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl/ssboStructInsideStructMemoryQualifierError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL,exit-code=-1): -lang glsl tests/glsl/ssboStructInsideStructMemoryQualifierError.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV,exit-code=-1): -lang glsl tests/glsl/ssboStructInsideStructMemoryQualifierError.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 
 // This code should error since memory qualifiers are only allowed inside:
-// Shader storage blocks, variables declared within shader storage blocks 
+// Shader storage blocks, variables declared within shader storage blocks
 // and variables declared as image types. Named structs inside a Interface
 // block violates these rules
 // CHECK_GLSL: error

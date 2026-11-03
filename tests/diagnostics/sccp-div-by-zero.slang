@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -entry computeMain -profile cs_5_0 -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -entry computeMain -profile cs_5_0 -target hlsl
 RWStructuredBuffer<uint> outputBuffer;
 
 // CHECK: divide by zero
@@ -11,9 +11,9 @@ uint check<let b : bool>()
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 	uint tid = dispatchThreadID.x;
-    
+
     uint a = check<false>();
     uint b = check<true>();
-    
-	outputBuffer[tid] = a + b; 
+
+	outputBuffer[tid] = a + b;
 }

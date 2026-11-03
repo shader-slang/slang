@@ -11,7 +11,7 @@
 // the checks below are ORDERED and each pins the distinct `expected '<type>', got '<handle>'` pair
 // of one assignment, so all four must independently error, in source order, for the test to pass.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -profile cs_6_6
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry computeMain -profile cs_6_6
 
 RWStructuredBuffer<float> outputBuffer;
 

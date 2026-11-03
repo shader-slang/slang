@@ -2,12 +2,12 @@
 // Optional) are also invalid as varying parameters. The existential data
 // embedded inside these compound types cannot be interpolated.
 
-//TEST:SIMPLE(filecheck=CHK1): -target spirv -entry vertexStructMain -stage vertex
-//TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry vertexStructMain -stage vertex
-//TEST:SIMPLE(filecheck=CHK2): -target spirv -entry vertexArrayMain -stage vertex
-//TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry vertexArrayMain -stage vertex
-//TEST:SIMPLE(filecheck=CHK3): -target spirv -entry vertexOptionalMain -stage vertex
-//TEST:SIMPLE(filecheck=CHK3): -target hlsl -entry vertexOptionalMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK1,exit-code=-1): -target spirv -entry vertexStructMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK1,exit-code=-1): -target hlsl -entry vertexStructMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK2,exit-code=-1): -target spirv -entry vertexArrayMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK2,exit-code=-1): -target hlsl -entry vertexArrayMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK3,exit-code=-1): -target spirv -entry vertexOptionalMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK3,exit-code=-1): -target hlsl -entry vertexOptionalMain -stage vertex
 
 interface IFoo
 {

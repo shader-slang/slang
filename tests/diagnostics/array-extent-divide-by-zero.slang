@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -entry computeMain -profile cs_5_0 -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -entry computeMain -profile cs_5_0 -target hlsl
 
 // A generic array extent `N / M` is a symbolic `BuiltinOperationIntVal(Div)`. Specializing it
 // with `M == 0` must fold through `BuiltinOperationIntVal::tryFoldImpl`'s divide-by-zero guard

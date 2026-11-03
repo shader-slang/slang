@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=METAL_ERROR): -target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL_ERROR,exit-code=-1): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
 // Metal currently lacks multisampled texture write support.
 // Due to this, Metal compute test is disabled

@@ -3,7 +3,7 @@
 // first so the partial-wrapper cleanup path (discarding already-emitted parameter
 // IR) is exercised.
 
-//TEST:SIMPLE(filecheck=CHECK): -target torch -line-directive-mode none
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target torch -line-directive-mode none
 
 [AutoPyBindCUDA]
 [CudaKernel]

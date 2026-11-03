@@ -26,13 +26,13 @@
 
 // An invalid pass flag is rejected by SPIRV-Tools rather than silently ignored: the optimize step
 // fails and its diagnostic is surfaced (the compiler does not run a partially-registered pipeline).
-//TEST:SIMPLE(filecheck=INVALID): -target spirv-asm -entry computeMain -stage compute -O1 -Xspirv-opt --this-pass-does-not-exist
+//TEST:SIMPLE(filecheck=INVALID,exit-code=-1): -target spirv-asm -entry computeMain -stage compute -O1 -Xspirv-opt --this-pass-does-not-exist
 
 // Every `-Xspirv-opt` occurrence accumulates: the forwarding collects a list, not just the first
 // flag. A valid first flag plus an invalid second one must still fail on the second -- proving the
 // whole list is forwarded (a first-only or mis-counted regression would ignore the second and
 // succeed).
-//TEST:SIMPLE(filecheck=MULTIFLAG): -target spirv-asm -entry computeMain -stage compute -O1 -Xspirv-opt --strip-debug -Xspirv-opt --this-pass-does-not-exist
+//TEST:SIMPLE(filecheck=MULTIFLAG,exit-code=-1): -target spirv-asm -entry computeMain -stage compute -O1 -Xspirv-opt --strip-debug -Xspirv-opt --this-pass-does-not-exist
 
 // Only `-Xspirv-opt` args are forwarded to the optimizer; `-Xglslang` args target a different
 // downstream tool and must not affect a `-target spirv` compile. `-Xglslang --strip-debug` must

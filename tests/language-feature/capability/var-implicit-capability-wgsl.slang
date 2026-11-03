@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry Main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl -entry Main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS): -target wgsl -entry Main -stage compute -ignore-capabilities
 
 

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv
 // CHECK: type 'FooImpl' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 interface IFoo
 {

@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_1):-stage compute -entry computeMain -target spirv -DT1
-//TEST:SIMPLE(filecheck=CHECK_2):-stage compute -entry computeMain -target spirv -DT2
-//TEST:SIMPLE(filecheck=CHECK_3):-stage compute -entry computeMain -target spirv -DT3
+//TEST:SIMPLE(filecheck=CHECK_1,exit-code=-1):-stage compute -entry computeMain -target spirv -DT1
+//TEST:SIMPLE(filecheck=CHECK_2,exit-code=-1):-stage compute -entry computeMain -target spirv -DT2
+//TEST:SIMPLE(filecheck=CHECK_3,exit-code=-1):-stage compute -entry computeMain -target spirv -DT3
 //TEST:SIMPLE(filecheck=CHECK_4):-stage compute -entry computeMain -target spirv -DT4
 
 // Tests for invalid use of `const` with Ptr/T*

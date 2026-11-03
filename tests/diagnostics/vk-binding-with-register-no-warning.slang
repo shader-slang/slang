@@ -1,6 +1,6 @@
 // vk-binding-with-register-no-warning.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target metallib -matrix-layout-row-major -entry main
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target metallib -matrix-layout-row-major -entry main
 
 // Test that no spurious warnings are generated when vk::binding is present alongside register
 // This addresses issue #7553 where the compiler incorrectly warned about missing vk::binding

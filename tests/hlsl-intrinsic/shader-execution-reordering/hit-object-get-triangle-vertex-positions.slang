@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderEXT -capability spvRayTracingPositionFetchKHR
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=NV_ERR): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV -capability spvRayTracingPositionFetchKHR
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=NV_ERR,exit-code=-1): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV -capability spvRayTracingPositionFetchKHR
 
 // HitObject.GetTriangleVertexPositions is Vulkan-EXT only and lowers to the
 // result-producing OpHitObjectGetIntersectionTriangleVertexPositionsEXT (opcode 5307),

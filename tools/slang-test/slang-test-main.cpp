@@ -105,6 +105,25 @@ struct TestOptions
     }
     bool isNonExhaustiveDiagTest() const { return commandOptions.containsKey("non-exhaustive"); }
 
+    /// Gets the exit code that the tool under test is expected to return.
+    ///
+    /// A test expects exit code 0 unless it says otherwise, for example
+    /// `//TEST:SIMPLE(filecheck=CHECK, exit-code=1): ...` for a test that expects the compilation
+    /// to fail. Returns false if the value of `exit-code` is not an integer.
+    bool getExpectedExitCode(int& outExitCode) const
+    {
+        outExitCode = 0;
+        String value;
+        if (!commandOptions.tryGetValue("exit-code", value))
+            return true;
+
+        Int parsed = 0;
+        if (SLANG_FAILED(StringUtil::parseInt(value.getUnownedSlice(), parsed)))
+            return false;
+        outExitCode = int(parsed);
+        return true;
+    }
+
     Type type = Type::Normal;
 
     String command;
@@ -3513,11 +3532,41 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
 
+    // A FileCheck test only looks at the text of the output, so it does not notice when the tool
+    // fails. We check the exit code here. A test that expects a failure says so with
+    // `exit-code=N`. Diagnostic tests and tests that compare with an `.expected` file already
+    // check the result code, because it is a part of the text they compare.
+    bool exitCodeMismatch = false;
+    String fileCheckPrefix;
+    if (!input.testOptions->getDiagTestPrefix(diagPrefix) &&
+        input.testOptions->getFileCheckPrefix(fileCheckPrefix))
+    {
+        auto reporter = context->getTestReporter();
+
+        int expectedExitCode = 0;
+        if (!input.testOptions->getExpectedExitCode(expectedExitCode))
+        {
+            reporter->message(
+                TestMessageType::TestFailure,
+                "the value of `exit-code` must be an integer");
+            return TestResult::Fail;
+        }
+
+        if (exeRes.resultCode != expectedExitCode)
+        {
+            StringBuilder message;
+            message << "expected exit code " << expectedExitCode << ", but the exit code is "
+                    << exeRes.resultCode;
+            reporter->message(TestMessageType::TestFailure, message.getBuffer());
+            exitCodeMismatch = true;
+        }
+    }
+
     return _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }

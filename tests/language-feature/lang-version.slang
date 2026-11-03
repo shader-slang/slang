@@ -11,7 +11,7 @@
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -DVER_2027
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -DVER_2027_2
 
-//TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv
+//TEST:SIMPLE(filecheck=CHECK_LEGACY,exit-code=-1): -target spirv
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG1): -target spirv -DVER_ILLEGAL
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG2): -target spirv -DVER_ILLEGAL2
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG3): -target spirv -DVER_ILLEGAL3
