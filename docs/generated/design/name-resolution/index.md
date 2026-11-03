@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: ddc8a343319153258a35708611c317282b7f0c70518628b09c256b83617903d5
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: 8ab8bbe9091c2f5b7cdba8789fd7fe31e3c94786be663f97327c6d08d614df5b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -40,8 +40,8 @@ items the requesting scope is allowed to see; and
 [overload-resolution.md](overload-resolution.md) ranks the survivors.
 The split is a reading order, not a hard phase boundary — visibility
 filtering and the narrowing of duplicate lookup items each run partly
-on either side of the lookup/overload line, and builtin operators skip
-overload resolution entirely. See
+on either side of the lookup/overload line, and builtin operators handled
+by the fast path skip overload resolution. See
 [Where the boundaries blur](#where-the-boundaries-blur) below before
 assuming a mechanism lives wholly on one page.
 
@@ -69,9 +69,9 @@ flowchart TD
   fast["Builtin-operator fast path"]
   builtin["BuiltinOperatorExpr with a resolved BuiltinOperationKind"]
   ident -->|"scopes.md"| scopeWalk
-  scopeWalk -->|"scopes.md"| raw
-  raw -->|"lookup.md"| visFilter
-  visFilter -->|"visibility.md"| narrow
+  scopeWalk -->|"lookup.md"| raw
+  raw -->|"visibility.md"| visFilter
+  visFilter -->|"lookup.md and overload-resolution.md"| narrow
   narrow -->|"lookup.md and overload-resolution.md"| overload
   overload -->|"overload-resolution.md"| ranked
   invoke -->|"overload-resolution.md"| fast
@@ -98,12 +98,16 @@ flowchart TD
   [lookup.md#deduplication](lookup.md#deduplication) and
   [overload-resolution.md#relationship-to-lookup](overload-resolution.md#relationship-to-lookup).
 - **Builtin operators handled by the fast path never reach overload
-  resolution.** Checking an `InvokeExpr` first attempts two rewrites;
-  on success the expression is replaced by a fully checked
-  `BuiltinOperatorExpr`, and no candidate set is ever collected — see
+  resolution.** Checking an `InvokeExpr` first attempts two rewrites,
+  `convertToLogicOperatorExpr` for `&&` and `||` and
+  `convertToBuiltinArithmeticOp` for builtin numeric operators; on
+  success the expression is replaced by a fully checked node (a
+  `LogicOperatorShortCircuitExpr` or a `BuiltinOperatorExpr`
+  respectively), and no candidate set is ever collected — see
   [overload-resolution.md#the-builtin-operator-fast-path](overload-resolution.md#the-builtin-operator-fast-path).
   The fast path declines some builtin-operand cases on purpose: in GLSL
-  operator scope, matrix operators and vector equality return null so
+  operator scope, matrix operators and vector equality are left alone
+  (`convertToBuiltinArithmeticOp` returns null) so
   the `glsl` module's overloads apply. Those, together with
   user-defined operators, take the general `operator OP` path in
   [overload-resolution.md#the-general-path](overload-resolution.md#the-general-path).
@@ -120,8 +124,8 @@ flowchart TD
 - **Lookup from the parser is weaker than lookup from the checker.**
   Parsing is two-stage: function bodies are captured as token spans
   and re-parsed later, and a lookup issued while there is no
-  `SemanticsVisitor` yet sees direct members only — no bases, no
-  extensions. See
+  `SemanticsVisitor` yet sees direct and transparent members only — no
+  bases, no extensions. See
   [lookup.md#edge-cases-and-failure-modes](lookup.md#edge-cases-and-failure-modes)
   and
   [scopes.md#edge-cases-and-failure-modes](scopes.md#edge-cases-and-failure-modes).

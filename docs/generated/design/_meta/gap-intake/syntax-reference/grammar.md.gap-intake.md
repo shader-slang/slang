@@ -1,16 +1,16 @@
 ---
 gap_intake_report: true
-intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:42:21Z
+intake_model: claude-sonnet-5-5
+intake_at: 2026-11-03T00:00:00Z
 target_doc: syntax-reference/grammar.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
-gap_count: 10
+target_doc_source_commit_before: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
+gap_count: 8
 actions:
   fixed: 8
   rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 2
+  deferred: 0
   escalated_to_finding: 0
 ---
 
@@ -18,59 +18,40 @@ actions:
 
 ## Summary
 
-Eight of the ten gaps were fixed in the document and two were deferred.
-No gap was escalated: the one `drift-from-source` row that looked like a
-compiler defect (`__require_capability` separators) turned out to be
-confirmed by the watched source itself — `AdvanceIf(parser, "+")` cannot
-match an operator token — so the document, not the compiler, was wrong,
-and the production was narrowed with a note explaining why the list form
-is unreachable. The two deferred gaps both ask for check-time facts
-(the `$for` loop variable's type and constant-bounds rule; whether an
-untyped modern parameter survives checking) whose answers live in
-`source/slang/slang-check-stmt.cpp` and `source/slang/slang-check-decl.cpp`,
-neither of which is in this document's `watched_paths`; the answers are
-recorded below so a `watched_paths` expansion can land them cheaply.
-Two further observations that no gap covered are flagged at the end.
+Eight gaps recorded as fixed were still reported by a regenerated bundle,
+so each was re-decided against the source at 2518a942d59b. All eight are
+again `fixed`: no source contradicts the document, so nothing is
+escalated. The earlier edits were kept but re-verified (line citations
+had drifted by several hundred lines and were re-derived), and the
+passages the gaps point at were made more explicit: the diagnostic code
+and message for the reversed `countof` form, the check-time rule for
+`optional` constraints, the exact CLI flag and warning for
+`__func_extension`, a lambda example that is a real lambda expression,
+and the three modifiers added since the last refresh. The `-experimental-feature`,
+lambda and `where optional` examples were verified by reading source and the
+repository tests only; `build/Release/bin/slangc` is a Linux binary and was not run.
 
 ## Actions
 
 | Gap ID | Action | Evidence | Fix summary |
 | --- | --- | --- | --- |
-| 2570d305e7ce | fixed | `source/slang/core.meta.slang:2037-2041` declares `interface IFunc<TR, each TP>` with the requirement `TR operator()(expand each TP p)`; the lambda form itself is `source/slang/slang-parser.cpp:8441-8468`. The consuming shape matches the CI-run example `tests/language-feature/lambda/lambda-0.slang`. | added a note plus a two-line example under the expression grammar showing a lambda passed to an `IFunc`-typed parameter and called through `operator()` |
-| 115c5727e059 | deferred | The parser only records the absence of a type: `parseModernVarDeclBaseCommon` (`source/slang/slang-parser.cpp:4994-5012`) leaves `decl->type` unset when `':' Type` is omitted. The rejection is `ParamWithoutTypeMustHaveInitializer` at `source/slang/slang-check-decl.cpp:13933` (defined as E30621 in `source/slang/slang-diagnostics.lua:3637-3642`), i.e. the untyped form is valid only when an initializer supplies the type. Both files are outside `watched_paths`, so the claim cannot be confirmed under this document's contract; needs a `watched_paths` expansion (or the note belongs in `../pipeline/03-semantic-check.md`). | — |
-| dd12ac189d86 | fixed | `source/slang/slang-parser.cpp:1984-1998`: the reversed clause is detected by `_hasCountOfOnRightOfPackCountComparison` and diagnosed as `Diagnostics::VariadicPackCountConstraintRequiresCountofOnLeft` (line 1993), after which `_skipRestOfGenericWhereClause` discards the remainder of the clause. The numeric code and message text live in `source/slang/slang-diagnostics.lua:2021-2026`, outside `watched_paths`, so the diagnostic is named symbolically, matching how this document names `UnknownCapability` and `OperatorNameOnNonFunction`. | named the diagnostic and added that the rest of the `where` clause is skipped after it fires |
-| 202fbec095aa | fixed | `source/slang/slang-parser.cpp:1947` reads the `optional` keyword and lines 2029-2034 / 2048-2051 attach `OptionalConstraintModifier` to the conformance and equality terms; the guard requirement is the expected diagnostic of the CI test `tests/language-feature/generics/where-optional-1.slang` ("the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage") and the working shape is `tests/language-feature/generics/where-optional-2.slang`. | added a minimal `where optional T : IThing` example with the `if (T is IThing)` guard |
-| c60c5946d167 | fixed | `source/slang/slang-parser.cpp:10759-10763` ("simple" modifiers, no further tokens) vs. `10831-10853` ("more complex modifiers, which allow or expect more tokens"); parens are optional in `parseIntrinsicOpModifier` (10123), `parseTargetIntrinsicModifier` (10138), `parseSpecializedForTargetModifier` (10178) and `parseImplicitConversionModifier` (10641), and mandatory in `parseGLSLExtensionModifier` (10190), `parseGLSLVersionModifier` (10201), `parseWGSLExtensionModifier` (10212), `parseSemanticVersion` (10224, used by `__spirv_version` / `__cuda_sm_version`), `parseBuiltinTypeModifier` (10555), `parseBuiltinRequirementModifier` (10566), `parseMagicTypeModifierImpl` (10586), `parseIntrinsicTypeModifier` (10624), `parseAttributeTargetModifier` (10670) and `parseLayoutModifier` (10397); `parseHitAttributeEXTModifier` (10545-10550) and `parseShared/Volatile/Coherent/Restrict/Readonly/WriteonlyModifier` (10281-10383) read nothing. Tail examples are real spellings in `source/slang/core.meta.slang` / `source/slang/hlsl.meta.slang` (`__spirv_version(1.3)`, `__glsl_extension(GL_EXT_texture_shadow_lod)`, `__magic_type(DifferentiableType)`, `__target_intrinsic(hlsl, RayDesc)`). | split `ModifierKeyword` into `BareModifierKeyword` / `TailModifierKeyword`, marked which tails are required vs. optional, and replaced `ModifierTail ::= '(' ArgList? ')'` with a per-modifier token-shape description |
-| 1b1ee9e6546d | deferred | `parseCompileTimeForStmt` (`source/slang/slang-parser.cpp:6862-6906`) creates the loop `VarDecl` with **no** type and parses both `Range` arguments as ordinary `ParseArgExpr()`s, so neither answer is in a watched path. `source/slang/slang-check-stmt.cpp:329-352` supplies them: the variable is given `int` plus a `ConstModifier`, and both bounds go through `checkExpressionAndExpectIntegerConstant(..., ConstantFoldingKind::LinkTime)` with an omitted begin defaulting to 0. Needs a `watched_paths` expansion to `slang-check-stmt.cpp` (or the note belongs in `../pipeline/03-semantic-check.md`). | — |
-| 574379db1ee4 | fixed | `parseModuleDeclarationDecl` (`source/slang/slang-parser.cpp:1384-1414`) reads exactly one `Identifier` or one `StringLiteral` and then `';'`, while the dotted spelling exists only in `parseFileReferenceDeclBase` (`source/slang/slang-parser.cpp:1337-1356`), which serves `implementing`, `import` and `__include`. | added to the `ModuleName` comment that only the `implementing` alternative and `ImportPath` reach the dotted form |
-| 8bf2be1914f4 | fixed | `parseFuncExtensionDecl` (`source/slang/slang-parser.cpp:4244-4298`): higher-order head via `tryParseUsingSyntaxDecl`, then `parseModernParamList`, optional `throws`, optional `-> Type`, optional `where`, then `parseOptBody`. The example is the shape of the CI-run test `tests/autodiff/func-extension/fwd-diff-basic.slang`; the `-experimental-feature` spelling the document already carries is confirmed at `source/slang/slang-options.cpp:1222-1225` and enforced at `source/slang/slang-check-decl.cpp:16258-16262`. | added a minimal `__func_extension fwd_diff(cube)(...)` example and noted that the parameter list is the modern one |
-| 77a45d0801b2 | fixed | `parseRequireCapabilityDecl` (`source/slang/slang-parser.cpp:4637-4659`) does contain a `AdvanceIf(parser, "+") \|\| AdvanceIf(parser, ",")` continuation, but that overload routes to `Parser::LookAheadToken(const char*)` (`source/slang/slang-parser.cpp:717-721`), which requires `token.type == TokenType::Identifier`; `+` and `,` are never `Identifier` tokens, so the branch is unreachable and the loop always falls through to `ReadToken(TokenType::Semicolon)` at 4657. The source therefore agrees with the observation, not with the old production. | narrowed the production to a single `CapabilityName`, added a note explaining why the separator branch is unreachable, and pointed multi-atom use at the statement form |
-| 22e335a751f6 | fixed | Both `':'` clauses resolve through `astBuilder->findSyntaxClass` (`source/slang/slang-parser.cpp:5227` and `5587`), i.e. against the compiler's AST node classes; worked examples come from the watched core module: `syntax constexpr : ConstExprModifier;` (`source/slang/core.meta.slang:28`) and `attribute_syntax [vk_binding(binding: int, set: int = 0)] : GLSLBindingAttribute;` (`source/slang/core.meta.slang:4381`). The gap's "core-module-only" hypothesis was **not** written: nothing gates `syntax` / `attribute_syntax` on `options.isCoreModule` (`g_parseSyntaxEntries[]`, lines 10738-10739), and `docs/generated/tests/_meta/findings/declarations-attribute-syntax-unknown-class-ice.yaml` records user code reaching `attribute_syntax`. | said what the `':'` clause may name and added one worked example of each form from `core.meta.slang` |
+| 2570d305e7ce | fixed | `source/slang/slang-parser.cpp:8824-8851` (`parseLambdaExpr`: traditional `ParseParameter` list, `=>`, block or `ParseArgExpr`) and `9205-9212` (a parenthesized group followed by `DoubleRightArrow` selects it); `source/slang/core.meta.slang:2101-2105` declares `IFunc<TR, each TP>` with `TR operator()(expand each TP p)`; the consuming shape matches `tests/language-feature/lambda/lambda-0.slang`. Not executed. | replaced the comment-only example with a compiled-looking `apply((float v) => v * 2.0, x)` call inside a function, stated the `=>` lookahead rule, and cited the `IFunc` line |
+| dd12ac189d86 | fixed | `source/slang/slang-parser.cpp:2053-2067` diagnoses the reversed form with `VariadicPackCountConstraintRequiresCountofOnLeft` and then calls `_skipRestOfGenericWhereClause`; `source/slang/slang-diagnostics.lua:2269-2274` gives code 30437 and the message text; the non-`==` operator case is `source/slang/slang-parser.cpp:1945-1962` with code 30436 (`slang-diagnostics.lua:2262-2267`). | named E30437 with its message text, the rewrite it asks for, and the separate E30436 for a non-`==` comparison |
+| 202fbec095aa | fixed | `source/slang/slang-parser.cpp:2016` consumes `optional`; `2029-2047` and `2090-2121` attach `OptionalConstraintModifier` to the nonempty, countof, conformance and equality terms, and `2078-2082` diagnoses it on `__hasDiffTypeInfo`; the checker rejects `optional nonempty` / `optional countof` at `source/slang/slang-check-decl.cpp:4607` and `4689`; the unguarded-use error is `RequiredConstraintIsNotChecked` (E30403, `source/slang/slang-diagnostics.lua:3815-3819`); examples `tests/language-feature/generics/where-optional-1.slang` and `where-optional-2.slang`. | kept the minimal `where optional T : IThing` example with the `is` guard, added the E30403 text, and listed which terms the parser versus the checker rejects with `optional` |
+| c60c5946d167 | fixed | `source/slang/slang-parser.cpp:11105-11243` (`g_parseSyntaxEntries[]`): `_makeParseModifier(name, getSyntaxClass<...>)` entries are bare; callback entries are tail modifiers, with mandatory parentheses in `parseGLSLExtensionModifier` (10566), `parseGLSLVersionModifier` (10577), `parseWGSLExtensionModifier` (10588), `parseSemanticVersion` (10599), `parseBuiltinTypeModifier` (10939), `parseBuiltinRequirementModifier` (10950), `parseMagicTypeModifierImpl` (10967), `parseIntrinsicTypeModifier` (11008), `parseAttributeTargetModifier` (11055), `parseLayoutModifier` (10764), and optional ones in `parseIntrinsicOpModifier` (10484), `parseTargetIntrinsicModifier` (10513), `parseSpecializedForTargetModifier` (10555), `parseImplicitConversionModifier` (11023); `parseHitAttributeEXTModifier` (10932) and the `shared`/`volatile`/`coherent`/`restrict`/`readonly`/`writeonly` callbacks read no tail. A script comparing the doc's keyword lists to the `_makeParseModifier` entries found three missing bare keywords. | kept the Bare/Tail split and added `__ref_readonly`, `__ref_writeonly` and `__borrow` to `BareModifierKeyword` |
+| 574379db1ee4 | fixed | `source/slang/slang-parser.cpp:1453-1484` (`parseModuleDeclarationDecl`) reads one `Identifier` or one `StringLiteral` (or nothing) then `';'`; the dotted loop lives only in `parseFileReferenceDeclBase` (1366), called from the import (1406) and include/implementing (1440) parsers. | kept `ModuleHeader` with a single-token name and the `ModuleName` comment that only `implementing` and `ImportPath` reach the dotted form |
+| 8bf2be1914f4 | fixed | `source/slang/slang-parser.cpp:4494-4546` (`parseFuncExtensionDecl`: head via `tryParseUsingSyntaxDecl`, `parseModernParamList`, optional `throws` / `->` / `where`, `parseOptBody`); `source/slang/slang-check-decl.cpp:17462-17471` rejects user code without the option unless `isFromCoreModule`; `source/slang/slang-options.cpp:1282` spells the flag `-experimental-feature`; `source/slang/slang-diagnostics.lua:2394-2399` makes it warning 30131; example matches `tests/autodiff/func-extension/fwd-diff-basic.slang`. Not executed. | kept the `__func_extension fwd_diff(cube)(...)` example and added the exact flag, warning 30131 with early return, core-module exemption, and the unsupported-head diagnostics |
+| 77a45d0801b2 | fixed | `source/slang/slang-parser.cpp:4906-4926` (`parseRequireCapabilityDecl`): the `AdvanceIf(parser, "+") \|\| AdvanceIf(parser, ",")` continuation routes to `AdvanceIf(Parser*, char const*)` (787), which calls `LookAheadToken(const char*)` (759), requiring `TokenType::Identifier`; `+` and `,` are operator tokens, so the loop always ends after one atom and `ReadToken(TokenType::Semicolon)` fails on the separator. The document, not the compiler, was wrong (the compiler does what the source says). | kept the production narrowed to one `CapabilityName` with the dead-branch explanation and the `__requireCapability(a, b)` statement alternative |
+| 22e335a751f6 | fixed | `source/slang/slang-parser.cpp:5497` and `5874` resolve the `':'` name through `astBuilder->findSyntaxClass`; worked examples `syntax constexpr : ConstExprModifier;` (`source/slang/core.meta.slang:28`) and `attribute_syntax [vk_binding(binding: int, set: int = 0)] : GLSLBindingAttribute;` (`core.meta.slang:4470`). Nothing gates either form to the core module (`g_parseSyntaxEntries[]` at 11125-11126), so the "core-module-only" suggestion was not written. | kept the paragraph on what the `':'` clause may name and the two core-module examples; made the optional `':'` of `AttributeSyntaxDecl` explicit in the production (parse-time TODO at 5876-5883) |
 
 ## Notes for the operator
 
-- Blocked on source outside `watched_paths`: gaps `115c5727e059` and
-  `1b1ee9e6546d` need `source/slang/slang-check-decl.cpp` and
-  `source/slang/slang-check-stmt.cpp` respectively. Diagnostic codes and
-  message texts (used by gap `dd12ac189d86`) live in
-  `source/slang/slang-diagnostics.lua`, also unwatched — which is why
-  this document names diagnostics symbolically and no E-code was added.
-- Suspected compiler defect, no finding opened: the separator branch in
-  `parseRequireCapabilityDecl` (`source/slang/slang-parser.cpp:4652`) is
-  dead code. `AdvanceIf(parser, "+")` / `AdvanceIf(parser, ",")` compare
-  against `Identifier` token text, so `__require_capability hlsl + sm_5_0;`
-  and `__require_capability compute, sm_5_0;` both fail at the `';'`.
-  Either the branch should be deleted or it should test `TokenType::OpAdd`
-  / `TokenType::Comma`. Handled as `fixed` (the document was wrong about
-  accepted syntax) rather than `escalated-to-finding` because the watched
-  source agrees with the observed behaviour.
-- Second suspected defect, not documented: `maybeParseGenericConstraints`
-  consumes a leading `optional` for a type-coercion `where` term but never
-  attaches `OptionalConstraintModifier` to it
-  (`source/slang/slang-parser.cpp:1947` vs. `2054-2067`), unlike the
-  conformance and equality branches. The document's existing claim that
-  `optional` is "accepted" on that term stays true as written, so nothing
-  was changed.
-- Gap `8bf2be1914f4` is anchored at `#type-defining-declarations`, but
-  `FuncExtensionDecl` is defined under `### Function-style declarations`;
-  the fix landed there.
+- Two previously deferred gaps (`115c5727e059`, `1b1ee9e6546d`) became answerable
+  because `slang-check-decl.cpp` and `slang-check-stmt.cpp` are now watched. The
+  document now states both answers (untyped modern parameter: E30621 unless an
+  initializer is given, `slang-check-decl.cpp:15084-15094`; `$for` variable `int`
+  and const, bounds integer constants, `slang-check-stmt.cpp:361-390`), plus
+  the `$for` deprecation (E30525) and removal (E30526). Their ledger rows are
+  unchanged by this report.
+- Suspected compiler defect, no finding opened: the `+` / `,` continuation in
+  `parseRequireCapabilityDecl` is dead code (see gap 77a45d0801b2).

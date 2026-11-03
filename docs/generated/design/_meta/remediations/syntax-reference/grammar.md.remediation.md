@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T09:40:18Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-03T12:00:00Z
 target_doc: syntax-reference/grammar.md
 review_report: ../../reviews/syntax-reference/grammar.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 11
+  fixed: 7
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 1
@@ -17,20 +17,18 @@ actions:
 # Remediation report for syntax-reference/grammar.md
 
 ## Summary
-Eleven of twelve findings were verified against `source/slang/slang-parser.cpp` at the recorded commit and fixed in place; every production shape the reviewer flagged really was narrower or wider than the parser. F-001, a page-wide citation sweep, is deferred because the page sits at 49,121 of its 49,152-byte cap. Edits were confined to single lines or cells, and comment text was kept terse to stay under the cap. The document was edited; lint is clean.
+
+Seven findings were fixed in the document after checking each against `source/slang/slang-parser.cpp`; one (F-008) was deferred. F-005 was fixed for the non-terminals the reviewer named, not as a full audit of every production. The document is now 63,170 bytes, under the 65,536-byte manifest cap.
 
 ## Actions
+
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | deferred | Blocked by the size cap: 31 bytes remain, so ~50 new citations plus definitions for `Operator`/`RegToken` need `size_cap_bytes` raised or sub-pages added, then a regeneration. The `InterfaceConstraintDecl` sub-claim is weak: the page defines it as a non-terminal and already cites `parseInterfaceConstraintDecl`. | — |
-| F-002 | fixed | `parseModuleDeclarationDecl` (line 1380) reads one identifier or one string literal, never dotted; `module` is a plain `g_parseSyntaxEntries[]` entry (line 10724) reached via `parseDecls`. | `SourceFile ::= TopDecl* EOF`; `ModuleHeader` takes one name token; `TopDecl` gains `ModuleHeader` |
-| F-003 | fixed | `parseExtensionDecl` (4220), `parseInterfaceDecl` (4409), `parseTypeAliasDecl` (5162) all use `parseOptGenericDecl` + `maybeParseGenericConstraints`; `ParseClass` (6433) has neither. | Added generic/where slots to extension and where clauses to interface and typealias; dropped `ClassDecl` from the inline-generic list |
-| F-004 | fixed | `parsePropertyDecl` (4873) takes a `ParseType` + `parseDeclarator` branch when `_peekModernStyleVarDecl` fails; C-style vars go through the recursive `parseInitDeclarator`. | Added `property Type Declarator` alternative; `VarDeclarator ::= Declarator Initializer?` |
-| F-005 | fixed | `ParseInitExpr` is `ParseExpression(Precedence::Assignment)` (232); `parseModernVarDeclBaseCommon` makes `=` optional (5000); `parseInitDeclarator` has only the `=` branch (2729). | `Expr` to `ArgExpr` on params and `var`; `let`'s `=` optional; `Initializer ::= '=' ArgExpr`; dangling `InitList` removed |
-| F-006 | fixed | The case loop (6556) tests `}` before parsing a case, so an empty body parses. | Enum body is now `(EnumCase (',' EnumCase)* ','?)?` |
-| F-007 | fixed | `ParseDoCatchStatement` (7482) loops while `catch` follows, nesting each clause as the next `tryBody`. | Catch suffix made one-or-more, with a nesting note |
-| F-008 | fixed | `parsePostfixExpr`: zero-or-more comma-separated index args (9126), `Scope` branch (9173), `Dot`/`RightArrow` branch (9193). | Subscript is `'[' ArgList? ']'`; added dot/arrow member and `'::' NameOrSubscript` suffixes |
-| F-009 | fixed | `parseTryExpr` (8177) and `parseTreatAsDifferentiableExpr` (8186) both call `ParseLeafExpression`, which the page equates with `UnaryExpr`. | Both operands changed to `UnaryExpr` with a leaf-expression note |
-| F-010 | fixed | `parseDispatchKernel` (3209) reads three operands with two mandatory commas. | `ArgList` replaced by three `ArgExpr` operands, roles named |
-| F-011 | fixed | `_parseInfixTypeExprSuffix` builds `AndTypeExpr` on `&` (7693); `_parseSimpleTypeSpec` loops over `<`, `::`, `.` in any order (3494). | `CoreType` interleaves the three suffixes and gains a `CoreType '&' CoreType` alternative |
-| F-012 | fixed | `parseSyntaxDecl` (5213-5262) leaves both clauses optional; the missing-clause diagnostic is a TODO. | "At least one is required" replaced by an unenforced-intent note |
+| F-001 | fixed | `ParseGenericDeclImpl` reads `<` and `>` (slang-parser.cpp:1818, 1850); the bare `GenericParams?` was wrong. | Added `GenericParamList ::= '<' GenericParams '>'` and used it in all eight declaration rules, the extension and type-alias rules, and `GenericDecl` |
+| F-002 | fixed | `tryParseGenericApp` leaves `baseKind` Unknown for unrecognized shapes and then speculates (slang-parser.cpp:3079-3177). | Rewrote the paragraph to give the three outcomes |
+| F-003 | fixed | Parsing only builds an `UncheckedAttribute` (slang-parser.cpp:1046-1062); lookup is deferred to semantic checking. | Replaced the syntax-decl lookup sentence |
+| F-004 | fixed | `Operator`, `RegToken`, `CaseStmt`, `DefaultStmt`, `GenericSpecialization` and `ModifierArgs` were undefined. | Defined `OperatorToken` (ParseDeclName), `Register`, `CaseStmt` and `DefaultStmt`; used `GenericArgs`; marked `ModifierTail` as deliberately abbreviated |
+| F-005 | fixed | The named non-terminals lacked parser-function attribution. | Added citations to `TypeList`, `ArraySuffix`, `UnaryOp`, `ModifierList`, `ArgList`; other productions not re-audited |
+| F-006 | fixed | `parseFuncTypeExpr` accepts an immediate `)` (slang-parser.cpp:3403-3416). | Made the `functype` parameter list optional |
+| F-007 | fixed | `parseDeclarator` recurses after `*` (slang-parser.cpp:2784-2803). | Made `Declarator` pointer branch recursive |
+| F-008 | deferred | The manifest cap (65,536) conflicts with the prompt's 48 KB line (`_meta/prompts/syntax-grammar.md:96-98`); cutting about 15 KB would drop required productions. Needs the operator to reconcile prompt and manifest. | — |
