@@ -74,9 +74,9 @@ public interface IPayloadContext : IStageContext
     /// This associated type has no conformance constraint. An explicit trace payload and the
     /// receiving stage's payload must have the same type. The no-payload trace overload supplies
     /// an internal empty value; post-link lowering must normalize it with the reached stages'
-    /// empty payload types. Intersection-stage access additionally requires
-    /// `portable_raytracing_intersection_payload` (Metal or CUDA/OptiX). Empty structs are valid
-    /// payload types; the target ABI determines their physical storage.
+    /// empty payload types. Intersection shaders can access the payload only on CUDA/OptiX
+    /// and Metal. Empty structs are valid payload types; the target ABI determines their
+    /// physical storage.
     associatedtype Payload;
 }
 

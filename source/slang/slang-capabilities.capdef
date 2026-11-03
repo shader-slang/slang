@@ -1517,10 +1517,6 @@ alias callable = _callable + raytracing | _callable + metal;
 /// [Stage]
 alias miss = _miss + raytracing | _miss + metal;
 
-/// Intersection-stage ray payload access on CUDA/OptiX and Metal.
-/// [Compound]
-alias portable_raytracing_intersection_payload = intersection + cuda | intersection + metal;
-
 /// Stages that may invoke a callable shader through the portable ray-tracing API.
 /// [Compound]
 alias portable_raytracing_call_shader = cuda_glsl_hlsl_spirv + raygen

@@ -1126,10 +1126,11 @@ public struct IntersectionInput<Context> : ICommonHitInput
     /// @todo Synthesize access to Metal's `ray_data` payload or OptiX payload state.
     ///
     /// @par Constraints
-    /// Requires `portable_raytracing_intersection_payload` (Metal or CUDA/OptiX).
+    /// Available in intersection shaders on CUDA/OptiX and Metal.
     /// The `[nonmutating] ref` accessor leaves the view unchanged and exposes `Context.Payload`
     /// for mutation through an `in` parameter or immutable local copy.
-    [require(portable_raytracing_intersection_payload)]
+    [require(intersection, cuda)]
+    [require(intersection, metal)]
     public property Context.Payload payload
     {
         [nonmutating]

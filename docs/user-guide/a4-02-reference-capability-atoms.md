@@ -1335,9 +1335,6 @@ Compound Capabilities
 > Instance motion available to the portable ray-tracing API. Metal encodes the requirement on
 > its intersector type, while Vulkan and OptiX pass a ray time to their native trace operation.
 
-`portable_raytracing_intersection_payload`
-> Intersection-stage ray payload access on CUDA/OptiX and Metal.
-
 `portable_raytracing_trace`
 > Stages that may trace a ray through the portable ray-tracing API.
 
