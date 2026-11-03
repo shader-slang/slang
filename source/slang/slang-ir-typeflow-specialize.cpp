@@ -3877,6 +3877,26 @@ struct TypeFlowSpecializationContext
 
     IRInst* substituteSetsInTypeLike(IRInst* typeLike)
     {
+        // We handle `IRAttributedType` first because `as<>` looks through it: a later case
+        // would match the base type and return a result without the attributes. Consider a
+        // generic `float read<T : IValue>(no_diff T t)` called with an `IValue` whose only
+        // conforming type is `Value`: the parameter info is `Attributed(ElementOfSet(Value),
+        // no_diff)`, and the substituted type must be `Attributed(Value, no_diff)` so that the
+        // rebuilt specialization has the same function type as the original.
+        if (auto attributedType = as<IRAttributedType>(typeLike))
+        {
+            IRBuilder builder(module);
+            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+            for (auto attr : attributedType->getAllAttrs())
+                attrs.add(attr);
+
+            auto result = builder.getAttributedType(
+                (IRType*)substituteSetsInTypeLike(attributedType->getBaseType()),
+                attrs);
+            module->getContainerPool().free(&attrs);
+            return result;
+        }
+
         if (auto substitutedLeaf = substituteLeafSet(typeLike))
             return substitutedLeaf;
 
@@ -3895,20 +3915,6 @@ struct TypeFlowSpecializationContext
                 (IRType*)substituteSetsInTypeLike(arrayType->getElementType()),
                 arrayType->getElementCount(),
                 getArrayStride(arrayType));
-        }
-
-        if (auto attributedType = as<IRAttributedType>(typeLike))
-        {
-            IRBuilder builder(module);
-            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
-            for (auto attr : attributedType->getAllAttrs())
-                attrs.add(attr);
-
-            auto result = builder.getAttributedType(
-                (IRType*)substituteSetsInTypeLike(attributedType->getBaseType()),
-                attrs);
-            module->getContainerPool().free(&attrs);
-            return result;
         }
 
         if (auto tupleType = as<IRTupleType>(typeLike))
