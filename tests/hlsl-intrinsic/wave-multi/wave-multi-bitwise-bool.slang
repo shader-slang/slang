@@ -16,7 +16,7 @@
 // SPV-DAG: OpGroupNonUniformLogicalXor %v4bool %{{.*}} PartitionedReduce
 // SPV-DAG: OpGroupNonUniformLogicalAnd %v2bool %{{.*}} PartitionedExclusiveScan
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 static const uint kLaneCount = 8;
@@ -48,6 +48,10 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     outputBuffer[1 * kLaneCount + idx] = packBits(WaveMultiPrefixBitAnd(v.xy, mask)) |
                                          (packBits(WaveMultiPrefixBitOr(v.xy, mask)) << 4) |
                                          (packBits(WaveMultiPrefixBitXor(v.xy, mask)) << 8);
+    // WaveMaskPrefixBit* forwards to WaveMultiPrefixBit*, so it gives the same prefixes.
+    outputBuffer[2 * kLaneCount + idx] = packBits(WaveMaskPrefixBitAnd(mask.x, v.xy)) |
+                                         (packBits(WaveMaskPrefixBitOr(mask.x, v.xy)) << 4) |
+                                         (packBits(WaveMaskPrefixBitXor(mask.x, v.xy)) << 8);
 }
 
 // Reductions (lanes 0-3, then lanes 4-7)
@@ -60,6 +64,15 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // CHECK-NEXT: {{^}}8D1{{$}}
 // CHECK-NEXT: {{^}}8D1{{$}}
 // Exclusive prefixes of v.xy
+// CHECK-NEXT: {{^}}3{{$}}
+// CHECK-NEXT: {{^}}222{{$}}
+// CHECK-NEXT: {{^}}132{{$}}
+// CHECK-NEXT: {{^}}232{{$}}
+// CHECK-NEXT: {{^}}3{{$}}
+// CHECK-NEXT: {{^}}111{{$}}
+// CHECK-NEXT: {{^}}11{{$}}
+// CHECK-NEXT: {{^}}111{{$}}
+// WaveMaskPrefixBit* of v.xy
 // CHECK-NEXT: {{^}}3{{$}}
 // CHECK-NEXT: {{^}}222{{$}}
 // CHECK-NEXT: {{^}}132{{$}}

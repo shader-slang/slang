@@ -53,9 +53,9 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
                       (packBits(WaveActiveAllEqual(bool2(idx < 8, idx > 8))) << 1) |
                       (packBits(WaveActiveAllEqual(bool3(true, false, idx < 8))) << 2));
 
-    // Exclusive prefixes, one hex digit each: And of v.xy, Or of v.xy, Xor of v.y.
+    // Exclusive prefixes of v.xy, one hex digit each: And, Or, Xor.
     store(7, idx, packBits(WavePrefixBitAnd(v.xy)) | (packBits(WavePrefixBitOr(v.xy)) << 4) |
-                      (packBits(WavePrefixBitXor(v.y)) << 8));
+                      (packBits(WavePrefixBitXor(v.xy)) << 8));
 }
 
 // WaveReadLaneAt(v, 5)
@@ -121,12 +121,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // CHECK-NEXT: {{^}}6{{$}}
 // CHECK-NEXT: {{^}}6{{$}}
 // CHECK-NEXT: {{^}}6{{$}}
-// Prefix And of v.xy, Or of v.xy, Xor of v.y
+// Prefix And, Or, Xor of v.xy
 // CHECK-NEXT: {{^}}3{{$}}
-// CHECK-NEXT: {{^}}122{{$}}
-// CHECK-NEXT: {{^}}32{{$}}
+// CHECK-NEXT: {{^}}222{{$}}
 // CHECK-NEXT: {{^}}132{{$}}
-// CHECK-NEXT: {{^}}130{{$}}
-// CHECK-NEXT: {{^}}130{{$}}
-// CHECK-NEXT: {{^}}130{{$}}
-// CHECK-NEXT: {{^}}130{{$}}
+// CHECK-NEXT: {{^}}232{{$}}
+// CHECK-NEXT: {{^}}330{{$}}
+// CHECK-NEXT: {{^}}230{{$}}
+// CHECK-NEXT: {{^}}330{{$}}
+// CHECK-NEXT: {{^}}230{{$}}
