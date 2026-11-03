@@ -3534,8 +3534,9 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     // A FileCheck test only looks at the text of the output, so it does not notice when the tool
     // fails. We check the exit code here. A test that expects a failure says so with
-    // `exit-code=N`. Diagnostic tests and tests that compare with an `.expected` file already
-    // check the result code, because it is a part of the text they compare.
+    // `exit-code=N`. Tests that compare with an `.expected` file already check the result code,
+    // because it is a part of the text they compare. Diagnostic tests (`diag=`) do not check it
+    // yet (#14266).
     bool exitCodeMismatch = false;
     String fileCheckPrefix;
     if (!input.testOptions->getDiagTestPrefix(diagPrefix) &&
