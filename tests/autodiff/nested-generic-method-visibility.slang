@@ -6,7 +6,7 @@
 // Derivatives of public generic methods nested in several generic containers of a non-public
 // module are usable from an importing module.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 import "nested-generic-method-visibility-lib";
@@ -67,6 +67,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     bwd_diff(Wrapper<float>.Inner<int>.identityWithCustomBwd<int>)(dCustom, 0, 1.0);
     outputBuffer[11] = dCustom.d;
 
+    outputBuffer[12] = fwd_diff(Outer<float>.Inner<int>.cubeViaPrivate<int>)(diffPair(2.0, 1.0), 0).d;
+
+    var dViaPrivate = diffPair(3.0);
+    bwd_diff(Outer<float>.Inner<int>.cubeViaPrivate<int>)(dViaPrivate, 0, 1.0);
+    outputBuffer[13] = dViaPrivate.d;
+
     // CHECK:      6.0
     // CHECK-NEXT: 12.0
     // CHECK-NEXT: 147.0
@@ -79,4 +85,6 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     // CHECK-NEXT: 12.0
     // CHECK-NEXT: 1.0
     // CHECK-NEXT: 2.0
+    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: 27.0
 }

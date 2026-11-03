@@ -39,6 +39,29 @@ public struct Outer<T : __BuiltinFloatingPointType>
         {
             return x * x * x;
         }
+
+        // A private method gets an internal synthesized extension with private members, so its
+        // derivatives take a different visibility path from the public methods above.
+        [Differentiable]
+        private static T cubePrivate<Index : __BuiltinIntegerType>(T x, Index idx)
+        {
+            return x * x * x;
+        }
+
+        // Under Slang 2026, an unmodified member inherits the visibility of `Inner`, so this
+        // method is public and its derivatives take the same path as `cubeStatic`. Under older
+        // language versions it is internal, and it only needs to compile.
+        [Differentiable]
+        static T cubeInherited<Index : __BuiltinIntegerType>(T x, Index idx)
+        {
+            return x * x * x;
+        }
+
+        [Differentiable]
+        public static T cubeViaPrivate<Index : __BuiltinIntegerType>(T x, Index idx)
+        {
+            return cubePrivate(x, idx);
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
-// An internal generic method nested in several generic containers, and its derivatives, stay
-// inaccessible from an importing module.
+// An internal generic method nested in several generic containers stays inaccessible from an
+// importing module, both directly and as the operand of `fwd_diff`.
 
 import "nested-generic-method-visibility-lib";
 
