@@ -929,11 +929,6 @@ static CallableDecl* getPrimaryDecl(CallableDecl* decl)
     return decl->primaryDecl ? decl->primaryDecl : decl;
 }
 
-bool isPrimaryDecl(CallableDecl* decl)
-{
-    return getPrimaryDecl(decl) == decl;
-}
-
 // Return a reference to the function that `declRef` names when `translationUnit` declares it as a
 // function or as a generic function, and a null reference for anything else, including a
 // function of another module. A generic function gets default substitutions for its generic
