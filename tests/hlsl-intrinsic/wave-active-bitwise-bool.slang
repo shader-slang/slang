@@ -1,5 +1,6 @@
 //TEST_CATEGORY(wave, compute)
-// WaveActiveBitAnd/Or/Xor on bool scalars and vectors reduce as logical and/or/xor.
+// WaveActiveBitAnd/Or/Xor and WaveMaskBitAnd/Or/Xor on bool scalars, vectors and matrices
+// reduce as logical and/or/xor.
 
 //TEST:SIMPLE(filecheck=SPV): -target spirv -entry computeMain -stage compute -emit-spirv-directly
 //TEST:SIMPLE(filecheck=SPVNOT): -target spirv -entry computeMain -stage compute -emit-spirv-directly
@@ -10,7 +11,8 @@
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -capability cuda_sm_7_0 -shaderobj
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -profile cs_6_5 -shaderobj -render-feature hardware-device
 
-// Every operand in this test is bool, so no Bitwise op may appear after the module header.
+// Every wave-op operand in this test is bool, so no OpGroupNonUniformBitwise* may appear
+// after the module header.
 // SPVNOT: OpEntryPoint
 // SPVNOT-NOT: OpGroupNonUniformBitwise
 

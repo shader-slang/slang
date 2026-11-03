@@ -1,5 +1,6 @@
 //TEST_CATEGORY(wave, compute)
-// Wave lane-read, quad, match and prefix-bitwise intrinsics on bool vectors.
+// Lane-read, broadcast, shuffle, quad, AllEqual and prefix-bitwise wave intrinsics on bool and
+// bool vectors. On CUDA these use the prelude _wave*Multiple helpers through ElementTypeTrait.
 
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry computeMain -stage compute -profile cs_6_6
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly

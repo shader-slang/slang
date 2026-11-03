@@ -7,7 +7,8 @@
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -capability cuda_sm_7_0 -shaderobj
 
-// Every operand in this test is bool, so no Bitwise op may appear after the module header.
+// Every wave-op operand in this test is bool, so no OpGroupNonUniformBitwise* may appear
+// after the module header.
 // SPVNOT: OpEntryPoint
 // SPVNOT-NOT: OpGroupNonUniformBitwise
 
