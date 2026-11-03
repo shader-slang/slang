@@ -2,9 +2,10 @@
 // rewrites races with other invocations: address elimination turns an element, field, or
 // component write into a read-modify-write of the whole variable, so each invocation stores back
 // stale copies of the other invocations' parts. Each case below writes part of shared memory in a
-// differentiable function without a custom derivative. A write through the function's own
-// `groupshared` parameter, a whole-variable write, and an atomic stay in place; they are in
-// silent.slang. A write in a `[ForceInline]` helper is in write-in-force-inline-helper.slang.
+// differentiable function without a custom derivative. A whole-variable write and an atomic stay
+// in place; they are in silent.slang. A write through the function's own `groupshared` parameter
+// also stays in place; it is in reference-parameter-silent.slang. A write in a `[ForceInline]`
+// helper is in write-in-force-inline-helper.slang.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
 
