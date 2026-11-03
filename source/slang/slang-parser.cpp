@@ -9499,18 +9499,27 @@ static Expr* parseAtomicExpr(Parser* parser)
 }
 
 /// Return whether `expr` can name a type, as the `int` in the function-style cast `int**(p)`
-/// does. Literals, calls, casts, `sizeof`-like expressions and parenthesized expressions always
-/// produce values, an indexed expression names a type only if its base does (`int[3]` but not
-/// `a[0]`), and a name that already resolves names a type only if its declaration is a type.
-/// Any other expression, such as the name of a type declared later in the file, can name a
-/// type, because the parser cannot see that declaration yet.
+/// does. A `false` result means `expr` certainly produces a value; `true` means it names a type
+/// or the parser cannot tell. Literals, calls, casts, `sizeof`-like expressions, parenthesized
+/// expressions, `this` and `p->m` always produce values. An indexed expression names a type only
+/// if its base does (`int[3]` but not `a[0]`), and a member `x.m` is a value when `x` is a
+/// variable or another value (`s.k`, `v.x`), but can name a type when `x` names a type or a
+/// namespace (`ns.T`). A name that resolves names a type only if its declaration is a type. Any
+/// other expression, such as a generic application `Ptr<int>` or a name that does not resolve
+/// to a single declaration, can name a type.
 static bool _mayNameType(Parser* parser, Expr* expr)
 {
     if (as<LiteralExpr>(expr) || as<InvokeExpr>(expr) || as<SizeOfLikeExpr>(expr) ||
-        as<ParenExpr>(expr))
+        as<ParenExpr>(expr) || as<ThisExpr>(expr) || as<DerefMemberExpr>(expr))
         return false;
     if (auto indexExpr = as<IndexExpr>(expr))
         return _mayNameType(parser, indexExpr->baseExpression);
+    if (auto memberExpr = as<MemberExpr>(expr))
+    {
+        if (Decl* baseDecl = _tryResolveDecl(parser, memberExpr->baseExpression))
+            return !as<VarDeclBase>(baseDecl);
+        return _mayNameType(parser, memberExpr->baseExpression);
+    }
     if (Decl* decl = _tryResolveDecl(parser, expr))
         return _isType(decl);
     return true;

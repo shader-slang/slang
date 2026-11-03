@@ -8,7 +8,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[5 7], stride=4):name=data
@@ -20,6 +20,11 @@ uniform int** slot;
 int three()
 {
     return 3;
+}
+
+struct Holder
+{
+    int k;
 }
 
 [numthreads(1, 1, 1)]
@@ -83,4 +88,16 @@ void computeMain()
     outputBuffer[13] = arr[0] * *(p + 1);
     // CHECK-NEXT: 66
     outputBuffer[14] = (a + 0) * *(p + 1);
+
+    // A member of a value, through `.` or `->`, is a value too.
+    Holder h;
+    h.k = 3;
+    Holder* ph = (Holder*)data;
+    int2 v = int2(3, 0);
+    // CHECK-NEXT: 66
+    outputBuffer[15] = h.k * *(p + 1);
+    // CHECK-NEXT: 66
+    outputBuffer[16] = v.x * *(p + 1);
+    // CHECK-NEXT: 110
+    outputBuffer[17] = ph->k * *(p + 1);
 }
