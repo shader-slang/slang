@@ -11,7 +11,9 @@
 
 //TEST:SIMPLE(filecheck=COMPUTE,exit-code=-1): -target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=MISS): -target spirv -entry missMain -stage miss
-//TEST:SIMPLE(filecheck=TASK): -target spirv -entry taskMain -stage amplification
+// The task payload has a vector with 5 components, which SPIR-V validation rejects. That limit belongs
+// to the backend, so validation is skipped to keep the result independent of SLANG_RUN_SPIRV_VALIDATION.
+//TEST:SIMPLE(filecheck=TASK): -target spirv -entry taskMain -stage amplification -skip-spirv-validation
 
 // --- Compute: any banned varying shape is fine as an internal variable,
 // and an `Atomic<int>` parameter is auto-classified uniform (no error).
