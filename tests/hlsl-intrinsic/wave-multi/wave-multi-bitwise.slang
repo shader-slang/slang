@@ -70,12 +70,10 @@ bool testBitwise(uint4 mask)
         & testVBitwise<uint, 3>(mask)
         & testVBitwise<uint, 4>(mask)
 
-        // TODO: these are failing SPIRV validation and should be fixed.
-        // SPIRV's ops do not directly accept/return bool.
-        // & test1Bitwise<bool>(mask)
-        // & testVBitwise<bool, 2>(mask)
-        // & testVBitwise<bool, 3>(mask)
-        // & testVBitwise<bool, 4>(mask)
+        & test1Bitwise<bool>(mask)
+        & testVBitwise<bool, 2>(mask)
+        & testVBitwise<bool, 3>(mask)
+        & testVBitwise<bool, 4>(mask)
 
 #if !defined(CUDA)
         & test1Bitwise<int8_t>(mask)
