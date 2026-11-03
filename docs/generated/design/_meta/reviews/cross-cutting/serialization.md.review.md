@@ -1,42 +1,46 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:06:58+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T08:20:07Z
 target_doc: cross-cutting/serialization.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: f1411119c2984cf871fda3e87109caf5abb8a34836f05a251561d7792998a19a
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: e47a6f43c0eb2a5586546cd7f7a5b275cfa12cbb91caecfcd280aa2045cbc433
+source_commit: 801b9e6e57d41f5cef1a5d54c0eeff9e0db4fee6
 checklist:
-  factual_accuracy: fail
+  factual_accuracy: partial
   cross_references: pass
-  completeness: partial
-  style_consistency: pass
-  source_alignment: fail
-  front_matter_validity: fail
+  completeness: pass
+  style_consistency: partial
+  source_alignment: partial
+  front_matter_validity: pass
 finding_count: 4
 severity_breakdown:
-  critical: 1
-  major: 2
-  minor: 1
+  critical: 2
+  major: 0
+  minor: 2
   nit: 0
 ---
 
 # Review report for cross-cutting/serialization.md
 
 ## Summary
-Most source-behavior explanations are accurate and all links resolve, but the page has four findings. Most importantly, it incorrectly tells readers that `-load-repro` is deprecated even though the repository guidance says to use it for specialized repro handling; its watched-path digest and manifest-coverage discussion are also stale.
+
+The core serialization descriptions are well supported, but the document needs corrections before approval. Most importantly, its field-addition guidance incorrectly implies that adding IR information always requires changing the serialization schema. It also incorrectly describes repro handling as removed, overstates freshness coverage, and exceeds the prompt’s length limit.
 
 ## Items checked
-- Reviewed the target, `_common.md`, the per-document prompt, the `architecture/overview.md` dependency, and all 21 files resolved by `regenerate.py show`.
-- Verified 18 source-backed claims at `53b76e6d3009b8e6434d41573524c7ce5c499d23`, including generic read/write dispatch, shared-pointer handling, enum generation, Fossil validation and relative pointers, RIFF chunks, flat-IR tables and validation, unknown-op handling, source-location reconstruction, stable opcode names, and serialization version 1.
-- Verified all relative links (25 unique targets) at the recorded source commit; all resolve. The body contains zero line-number citations, so every such citation was verified vacuously.
-- Ran identifier and file-name sweeps and confirmed the document is 18,827 bytes, below its 24,576-byte cap.
-- Recomputed the watched-path digest after confirming the resolved watched source files match the recorded source commit byte-for-byte.
+
+- Reviewed against the **current working tree**; `git diff` confirmed that `source/` matches the document’s source commit. Confirmed HEAD matches the supplied review commit.
+- Checked more than 20 claims covering AST enum generation, generated field visits, generic serializer dispatch, Fossil headers and relative pointers, validation configuration, RIFF chunk codes, embedded downstream blobs, flat-table encoding, null references, allocation bounds, recursion depth, unknown opcodes, source-location reconstruction, and both version checks.
+- Verified the sole explicit line-number citation: `-line-directive-mode` is at `source/slang/slang-options.cpp:879`.
+- Resolved all 65 Markdown link occurrences, representing 31 distinct targets; checked destination existence at the document’s source commit, peer manifest entries, and the source-location anchor. Consulted the dependency document only for cross-reference context.
+- Swept 94 simple backticked identifiers and 31 source-file names; unmatched entries were historical names, metadata vocabulary, or the existing unit-test file outside `source/`.
+- Checked all required sections, coverage of serialize-related watched files, front-matter keys and formats, Liquid safety, and document size: 27,202 UTF-8 bytes. No files were written.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | Front matter, line 6 | The recorded digest is `f141...a19a`, but the current resolved watched set produces `ec2dbba845c65be8a0b4a6e9917fe98983520d876c47130c349d660c048c7927`. The metadata therefore does not identify the watched inputs supplied for this review. | `docs/generated/design/_meta/manifest.yaml:925-950` defines the resolved watched set; `regenerate.py digest cross-cutting/serialization.md` returns `ec2d...927`. | Regenerate the page against the current resolved watched set and record the recomputed digest. |
-| F-002 | major | `## Manifest coverage`, lines 368-388 | The section says four cited files are outside `watched_paths` and recommends adding them, but every named file is already watched. It also overlooks the now-watched stable-name implementation `.cpp`, so the freshness guidance is wholly stale. | `docs/generated/design/_meta/manifest.yaml:940-950` watches `slang-serialize-types.{h,cpp}` and all three `slang-ir-insts-stable-names` files. | Remove the add-path recommendation and replace the section with an accurate statement that the cited serialization types, stable-name implementation, and core RIFF files are covered. |
-| F-003 | minor | `## Versioning and backwards compatibility`, lines 285-296 | The stable-name mapping discussion links the declaration header and generator input but never mentions `slang-ir-insts-stable-names.cpp`, despite the per-document checklist requiring every relevant watched file to be mentioned. That `.cpp` owns both mapping tables and the two conversion functions. | `source/slang/slang-ir-insts-stable-names.cpp:6-40,72-90`; the file is watched at `docs/generated/design/_meta/manifest.yaml:949`. | Link `slang-ir-insts-stable-names.cpp` in this paragraph and identify it as the implementation of the opcode-to-stable-name and stable-name-to-opcode mappings. |
-| F-004 | critical | `## Round-trip and repro files`, lines 313-320 | The page groups `-load-repro` with `-dump-repro` as deprecated and says it should not be relied on. Repository guidance discourages `-dump-repro`, but explicitly says `-load-repro` and `-extract-repro` are specialized tools to use when working on repro handling. The per-document prompt repeats the stale premise, but the resulting reader instruction still contradicts the source of truth it cites. | `CLAUDE.md:324-333` places only `-dump-repro` in the “DO NOT USE” list and directs repro work to `-load-repro` / `-extract-repro`; `source/slang/slang-options.cpp:1071-1092` still registers both options. | After correcting the stale premise in the per-document prompt out of band, state that `-dump-repro` is discouraged while `-load-repro` and `-extract-repro` remain specialized repro-handling tools; keep implementation details out of scope because their files are unwatched. |
+| F-001 | critical | `## Adding a new serialized field`, lines 473–480 | `Adding information therefore means changing that schema` incorrectly makes a schema change necessary for ordinary IR additions. New operands or instructions can use the existing flat representation; this guidance could cause unnecessary format changes and invalidate existing modules. | `source/slang/slang-serialize-ir.cpp:471` records each instruction’s operand count, and line 488 serializes its type and all operands generically. `source/slang/slang-ir.cpp:4347` represents embedded downstream data using ordinary integer/blob operands. | Explain that ordinary operands and decorations fit the existing schema. Reserve schema changes and serialization-version bumps for changes to the encoding or special payload representation; retain the separate guidance about semantic module versions. |
+| F-002 | critical | `## What is not in this document`, line 500 | `The historical repro format. Treat it as removed.` contradicts the retained repro implementation and the page’s earlier explanation that loading and extraction remain available. No specific removed format version is identified. | `source/slang/slang-repro.cpp:1356` implements `ReproUtil::loadState`; line 1404 implements `extractFilesToDirectory`. `CLAUDE.md:362` explicitly retains `-load-repro` and `-extract-repro`. | Replace this bullet with “Repro format details are outside this page’s watched paths.” Keep the distinction between discouraged dumping and retained loading/extraction. |
+| F-003 | minor | `## Manifest coverage`, lines 504–506 | `Every source file this page cites for serialization behavior is inside ... watched_paths` is false. The page describes behavior in unwatched files, including Fossil validation and session loading, and even labels some of them unwatched. Changes confined to these files will not trigger this page’s freshness tracking. | `docs/generated/design/_meta/manifest.yaml:1251` lists the watched paths without `source/slang/slang-fossil.h` or `source/slang/slang-session.cpp`; their behavior is discussed at document lines 149–159 and 429–433. | Qualify the coverage statement to describe the watched serialization drivers and explicitly identify these unwatched behavioral dependencies. |
+| F-004 | minor | Entire document | The document is 27,202 UTF-8 bytes, exceeding the per-document requirement `Document length under 24 KB`, although it remains below the manifest’s 32,768-byte ceiling. | `docs/generated/design/_meta/prompts/cross-cutting-serialization.md:59` sets the stricter limit. | Reduce the document below 24,000 bytes while retaining required sections; shorten historical backend discussion and repeated validation/version explanations first. |

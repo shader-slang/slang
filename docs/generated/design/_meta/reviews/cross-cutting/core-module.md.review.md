@@ -1,23 +1,23 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:18:42+00:00
+reviewer_model: gpt-6-astra
+reviewed_at: 2026-11-03T08:20:38Z
 target_doc: cross-cutting/core-module.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 758f3793c6cde62bb10f3ecad0e65bcabd0d3115b5629165afe8408e4fab2f78
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: d4e2be8995c8c95a45df9e148d2a3e7eca71adcea84c5108fd81038c3a296350
+source_commit: 801b9e6e57d41f5cef1a5d54c0eeff9e0db4fee6
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: pass
+  completeness: partial
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
 finding_count: 2
 severity_breakdown:
-  critical: 1
-  major: 1
-  minor: 0
+  critical: 0
+  major: 0
+  minor: 2
   nit: 0
 ---
 
@@ -25,25 +25,22 @@ severity_breakdown:
 
 ## Summary
 
-The document satisfies the required structure, covers all resolved meta-slang and prelude files, and is broadly accurate. Two source-alignment errors remain: the non-embedded build can still compile the core module eagerly and fail during the build, and default preludes are emitted into generated source as embedded text rather than referenced through generated `#include` directives.
+The document substantially matches the implementation and covers all required sections. Its main factual issue is conflating the numerics output-directory layout with API visibility: the differentiable annex is intended for clients to import. The document also exceeds its per-document prompt’s size limit.
 
 ## Items checked
 
-- Read `_review.md`, `_common.md`, the per-document prompt, the target document, `architecture/overview.md`, and the complete resolved file list from `regenerate.py show`.
-- Verified 31 factual claims at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`, including meta-module declarations, autodiff types and conformances, standard-module contents and import paths, compiler selection, build products, cache format, and prelude selection.
-- Verified every line-number citation in the body; the document contains no explicit source line-number citations.
-- Resolved all 59 Markdown-link occurrences (45 distinct destinations) at the recorded commit and confirmed all referenced generated pages are manifest entries.
-- Recomputed the watched-path digest, confirmed all mandatory front-matter fields, ran the document lint, and confirmed the 20,211-byte document is below its 24,576-byte cap.
+- Read `_review.md`, `_common.md`, the document-specific prompt, and the resolved watched paths from `regenerate.py show cross-cutting/core-module.md`.
+- Verified against the **current working tree**, which the operator states equals the document’s source commit for all of `source/`; the source-tree diff against that commit was empty.
+- Spot-checked more than 20 claims, including scalar aliases, modifier declarations, matrix-layout parameters, floating-point matrix/vector multiplication, vector `dot` and `length`, GLSL loading, standard-module paths and compiler selection, numerics artifact dependencies, functional operations, experimental-module validation, prelude registration, command-line prelude overrides, core-module generation, and cache layout.
+- Verified all **six line-number citations**: `source/slang/core.meta.slang:2362,2372`; `source/slang/slang-session.cpp:43,73,1651`; and `source/slang/slang-diagnostics.lua:603`. All match.
+- Resolved all **72 Markdown link occurrences**, comprising 52 distinct destinations, against the working tree; checked both local heading anchors and manifest membership for all three linked generated pages.
+- Consulted `architecture/overview.md` only for cross-reference context.
+- Checked required headings, coverage of all four watched meta-Slang files and nine prelude headers, front-matter keys and formats, relative-link style, and absence of raw Liquid openers. Measured the document at **28,821 UTF-8 bytes**.
+- No files were written.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `## Core module`, lines 74-80; `## Building the core module`, lines 267-270 and 377-380 | The repeated claim that with `SLANG_EMBED_CORE_MODULE=OFF` meta-source errors surface only at runtime is false for the documented build graph. A non-embedded shared build creates the `ALL` target `generate_core_module_cache`, which depends on `generate_core_module`; both standard modules also depend on `generate_core_module`, and their module targets are `ALL`. Thus the build can run `slang-bootstrap -compile-core-module` and report meta-source errors before any normal session starts, even though C++ source compilation is decoupled from core-module compilation. | `source/slang/CMakeLists.txt:370-404` defines the eager cache target and its dependency on `generate_core_module`; `source/slang-core-module/CMakeLists.txt:141-174` shows that target runs `slang-bootstrap -compile-core-module`; `source/standard-modules/neural/CMakeLists.txt:53-82` and `source/standard-modules/experimental/CMakeLists.txt:46-64` make the standard-module `ALL` targets depend on the same generator target. | Replace all “only at runtime” wording with the narrower invariant: disabling embedding separates core-module compilation from C++ compilation. Explain that the normal full/shared build may still compile the module eagerly for the archive, standard modules, or runtime cache; runtime compilation is the fallback when no valid cache or embedded module is available. |
-| F-002 | major | `## Preludes`, lines 235-240 | The document says prelude headers are emitted alongside target output and referenced through `#include "<prelude>"`-style mechanisms. The default compiler path instead embeds each `*-prelude.h` into the compiler as a string, registers the CUDA/C++/HLSL strings on the global session, and writes the selected string directly into generated source. A custom prelude string may itself contain an include, but that is not how the shipped default preludes are brought into scope. | `prelude/CMakeLists.txt:2-20` runs `slang-embed` on each prelude header; `source/slang/slang-global-session.cpp:125-128` registers the embedded default strings; `source/slang/slang-emit.cpp:2937-2951` emits the Torch, host, or language prelude string directly through `sourceWriter.emit(...)`. | Replace the sidecar-header/`#include` description with the embedded-string flow. Note separately that the headers are installed and that callers can override a language prelude with text containing an include if desired. |
-
-## No-issues notes
-
-- All four watched `*.meta.slang` files and all nine resolved `prelude/*.h` files are mentioned.
-- The standard-module import paths, build compiler selection, and `-load-core-module` dependency match the two module CMake files.
-- The core archive, core embeddable header, and GLSL embeddable header are correctly described as outputs of one `-compile-core-module` command.
+| F-001 | minor | `## Standard modules`, lines 211–219 and 268–273 | Calling the numerics artifacts `one public and three private` incorrectly includes `differentiable.slang-module` among private implementation modules. Likewise, saying the adapters are `kept out of the public import graph` misstates the dependency direction: public modules import the adapters; the adapters avoid importing public modules. | `source/standard-modules/numerics/differentiable-wrappers.slang:11–14` explicitly describes clients importing `slang.numerics.differentiable`. `source/standard-modules/numerics/differentiable.slang:11–12` imports both the base module and its adapter. `source/standard-modules/numerics/CMakeLists.txt:59–63` states: “The public modules import these adapters.” | Describe two public entry points, `slang.numerics` and `slang.numerics.differentiable`, plus two implementation adapters. Preserve the accurate output paths, but clarify that directory nesting does not establish privacy. Replace the import-graph claim with the precise statement that adapters do not import the public numerics modules. |
+| F-002 | minor | Entire document | At 28,821 bytes, the document exceeds the per-document requirement to remain under 24 KB, although it satisfies the manifest’s larger 32,768-byte cap. | `docs/generated/design/_meta/prompts/cross-cutting-core-module.md:53`: `Document length under 24 KB.` | Reduce the document below 24,000 UTF-8 bytes to satisfy either interpretation of KB. Condense repeated build/cache explanations and the detailed standard-module file inventory while retaining the required sections and coverage of every meta-Slang file and prelude header. |
