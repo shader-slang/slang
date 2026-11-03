@@ -1,6 +1,8 @@
 //TEST_CATEGORY(wave, compute)
 // Run WavePrefixBitXor and WaveMaskPrefixBitXor on vector and matrix values and check the results.
 // The lane values have overlapping bits, so a prefix OR gives different results from a prefix XOR.
+// WavePrefixBitXor reaches the vector and matrix WaveMaskPrefixBitXor overloads only on CUDA
+// (D3D12 and Vulkan use their own prefix XOR), so the test also calls WaveMaskPrefixBitXor directly.
 //
 // Note: DX12/HLSL requires SM 6.5 because the implementation uses WaveMultiPrefixBit* intrinsics
 
