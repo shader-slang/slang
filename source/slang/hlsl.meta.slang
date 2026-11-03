@@ -19603,7 +19603,7 @@ uint4 WaveMatch(T value)
             OpGroupNonUniformPartitionNV $$uint4 result $value
         };
     default:
-        return WaveMaskMatch(WaveGetActiveMask(), value);
+        return uint4(WaveMaskMatch(WaveGetActiveMask(), value), 0, 0, 0);
     }
 }
 
@@ -19623,7 +19623,7 @@ uint4 WaveMatch(vector<T,N> value)
             OpGroupNonUniformPartitionNV $$uint4 result $value
         };
     default:
-        return WaveMaskMatch(WaveGetActiveMask(), value);
+        return uint4(WaveMaskMatch(WaveGetActiveMask(), value), 0, 0, 0);
     }
 }
 
