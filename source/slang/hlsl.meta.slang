@@ -15254,6 +15254,9 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 /// @remarks The function maps to `printf` for HLSL, CPU and CUDA targets, maps to `OpDebugPrintf` for SPIR-V target,
 /// maps to `debugPrintfEXT` for GLSL target, and maps to `os_log_default.log` for Metal target.
 /// Depending on the target and execution environment, the function may have no effect.
+/// A `ConstantBuffer` or `ParameterBlock` argument is passed by value, so the function prints the
+/// buffer contents. Any other argument that is or contains a resource or opaque type, such as a
+/// `Texture2D` or a buffer whose element type holds one, is an error.
 /// @example
 /// ```cpp
 /// void test(int x, float y)
