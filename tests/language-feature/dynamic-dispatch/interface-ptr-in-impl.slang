@@ -21,7 +21,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-llvm -compute -shaderobj -output-using-type
 
 // Verify dynamic dispatch is actually generated (not optimized away)
-//TEST:SIMPLE(filecheck=DISPATCH,exit-code=-1):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
+//TEST:SIMPLE(filecheck=DISPATCH):-target spirv -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 // Input buffer to control which type is selected at runtime
 // This forces TRUE dynamic dispatch - compiler cannot optimize it away

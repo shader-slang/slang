@@ -25,7 +25,6 @@ struct B : IInterface
     int doSomething() { return 6; }
 };
 
-//TEST_INPUT:
 //TEST_INPUT: type_conformance B:IInterface = 1
 
 RWStructuredBuffer<IInterface> data;
