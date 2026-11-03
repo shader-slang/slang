@@ -17,7 +17,7 @@
 // SPV-DAG: OpGroupNonUniformLogicalXor %v4bool %{{.*}} PartitionedReduce
 // SPV-DAG: OpGroupNonUniformLogicalAnd %v2bool %{{.*}} PartitionedExclusiveScan
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 static const uint kLaneCount = 8;
@@ -53,6 +53,10 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     outputBuffer[2 * kLaneCount + idx] = packBits(WaveMaskPrefixBitAnd(mask.x, v.xy)) |
                                          (packBits(WaveMaskPrefixBitOr(mask.x, v.xy)) << 4) |
                                          (packBits(WaveMaskPrefixBitXor(mask.x, v.xy)) << 8);
+    // The matrix WaveMaskPrefixBitXor overload, with v stored row by row; one bit per element.
+    bool2x2 m = bool2x2(v.x, v.y, v.z, v.w);
+    bool2x2 r = WaveMaskPrefixBitXor(mask.x, m);
+    outputBuffer[3 * kLaneCount + idx] = packBits(r[0]) | (packBits(r[1]) << 2);
 }
 
 // Reductions (lanes 0-3, then lanes 4-7)
@@ -82,3 +86,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // CHECK-NEXT: {{^}}111{{$}}
 // CHECK-NEXT: {{^}}11{{$}}
 // CHECK-NEXT: {{^}}111{{$}}
+// WaveMaskPrefixBitXor of the bool2x2
+// CHECK-NEXT: {{^}}0{{$}}
+// CHECK-NEXT: {{^}}2{{$}}
+// CHECK-NEXT: {{^}}5{{$}}
+// CHECK-NEXT: {{^}}6{{$}}
+// CHECK-NEXT: {{^}}0{{$}}
+// CHECK-NEXT: {{^}}1{{$}}
+// CHECK-NEXT: {{^}}C{{$}}
+// CHECK-NEXT: {{^}}D{{$}}
