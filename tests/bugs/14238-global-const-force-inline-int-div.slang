@@ -4,6 +4,10 @@
 // helper body is still valid at the global scope. CUDA, GLSL and C++ reject a global initializer
 // that calls a function. A division whose divisor does not fold, written directly or through a
 // helper, is evaluated where the constant is used.
+//
+// `kDiv` and `kRem` divide by a parameter, `Holder.arr` uses a helper without `[__readNone]`, and
+// `kScalar` is a scalar. `kLiteralDivisor` divides by a literal, which already had no side effect.
+// `kSafe` and `kHandWritten` divide by `max(4, 1)`, a call that constant propagation does not fold.
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none -g
@@ -61,9 +65,9 @@ struct Holder
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
-// Each array is initialized with literals, `kScalar` is the literal 3 at its use, and no call to
-// a helper remains.
-// CUDA-NOT: {{ceilDiv|wrap_|halve_}}
+// Each array is initialized with literals, `kScalar` is the literal 3 at its use, `kSafe` and
+// `kHandWritten` are divisions at their uses, and no call to a helper remains.
+// CUDA-NOT: {{ceilDiv|wrap_|halve_|max}}
 // CUDA: kLiteralDivisor_0 = { {
 // CUDA-NEXT: int(5), int(3)
 // CUDA: arr_0 = { {
@@ -76,8 +80,10 @@ RWStructuredBuffer<int> outputBuffer;
 // CUDA: void computeMain(
 // CUDA-NOT: {{ceilDiv|wrap_|halve_}}
 // CUDA: = int(3);
+// CUDA: = int(13) / ({{.*}}max
+// CUDA: = int(10) / ({{.*}}max
 // CUDA-NOT: {{ceilDiv|wrap_|halve_}}
-// CPP-NOT: {{ceilDiv|wrap_|halve_}}
+// CPP-NOT: {{ceilDiv|wrap_|halve_|max}}
 // CPP: kLiteralDivisor_0 = { { int(5), int(3) } };
 // CPP: arr_0 = { { int(3), int(4) } };
 // CPP: kRem_0 = { { 1U, 2U, 1U } };
@@ -86,8 +92,10 @@ RWStructuredBuffer<int> outputBuffer;
 // CPP: void _computeMain(
 // CPP-NOT: {{ceilDiv|wrap_|halve_}}
 // CPP: = int(3);
+// CPP: = int(13) / ({{.*}}max
+// CPP: = int(10) / ({{.*}}max
 // CPP-NOT: {{ceilDiv|wrap_|halve_}}
-// GLSL-NOT: {{ceilDiv|wrap_|halve_}}
+// GLSL-NOT: {{ceilDiv|wrap_|halve_|max\(}}
 // GLSL: kLiteralDivisor_0[2] = int[](5, 3);
 // GLSL: arr_0[2] = int[](3, 4);
 // GLSL: kRem_0[3] = uint[](1U, 2U, 1U);
@@ -96,6 +104,8 @@ RWStructuredBuffer<int> outputBuffer;
 // GLSL: void main(
 // GLSL-NOT: {{ceilDiv|wrap_|halve_}}
 // GLSL: = 3;
+// GLSL: = 13 / max(
+// GLSL: = 10 / max(
 // GLSL-NOT: {{ceilDiv|wrap_|halve_}}
 
 [shader("compute")]

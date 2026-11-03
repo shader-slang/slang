@@ -4,7 +4,9 @@
 // is inlined, so the effect runs once.
 //
 // A helper that divides by a value that does not fold, without using the quotient, is inlined.
-// The division is then an unused module-scope value with no effect of its own, and is removed.
+// Inside a function, an unused division is kept because it might trap. At module scope it has no
+// effect of its own, so dead code elimination removes it. The divisor `max(4, 1)` stays a call,
+// which constant propagation does not fold, so it is not a literal.
 
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute -line-directive-mode none
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
