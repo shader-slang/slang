@@ -22,6 +22,7 @@ layout(location = 1) uniform uint addresses1;
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID, uint groupIndex: SV_GroupIndex)
 {
-    printf("\nfrom gpu: %u", addresses);
-    printf("\nfrom gpu: %u", addresses1);
+    // TODO(#14247): the explicit cast is needed because printf aborts on a ConstantBuffer<uint> argument.
+    printf("\nfrom gpu: %u", uint(addresses));
+    printf("\nfrom gpu: %u", uint(addresses1));
 }
