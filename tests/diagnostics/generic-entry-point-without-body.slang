@@ -1,7 +1,7 @@
 // A body-less generic entry point is reported when cloning checks the generic itself. The entry
-// point is found by the mangled name of the generic's specialization, so the check that runs after
-// the entry point is cloned must look at the generic too, or it reports the specialization again
-// without a location.
+// point is found by the mangled name of the generic's specialization, so the post-clone check
+// must look at the generic too. Two E45001 reports are expected here; a third would diagnose
+// the specialization without a source location.
 // See https://github.com/shader-slang/slang/issues/14200
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry NoBodyGeneric<float> -stage compute

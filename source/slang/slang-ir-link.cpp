@@ -1246,8 +1246,10 @@ IRFunc* specializeIRForEntryPoint(
 
     // Cloning reports a body-less function unless `isFunctionDefinedOrImported` accepts it, and it
     // accepts an intrinsic or external binding only for a function without
-    // `IREntryPointDecoration`. An entry point found by `findAndCheckEntryPoint` without `[shader]`
-    // gets that decoration only below, so we report a body-less entry point that cloning accepted.
+    // `IREntryPointDecoration`. An entry point that the front end did not mark while lowering its
+    // module, such as one found by `findAndCheckEntryPoint` without `[shader]` (or, outside CUDA,
+    // without `[numthreads]`), gets that decoration only below, so we report a body-less entry
+    // point that cloning accepted.
     if (!clonedFunc->getFirstBlock())
     {
         IRSpecSymbol* checkedSym = findSymbolCheckedByCloning(context, sym);
@@ -1638,8 +1640,10 @@ static IRSpecSymbol* findSymbolCheckedByCloning(IRSpecContext* context, IRSpecSy
     if (!specialize)
         return sym;
     auto genericLinkage = specialize->getBase()->findDecoration<IRLinkageDecoration>();
-    SLANG_ASSERT(genericLinkage);
-    return context->findSymbols(genericLinkage->getMangledName());
+    SLANG_RELEASE_ASSERT(genericLinkage);
+    auto genericSym = context->findSymbols(genericLinkage->getMangledName());
+    SLANG_RELEASE_ASSERT(genericSym);
+    return genericSym;
 }
 
 /// Report `bestVal` as an unresolved external symbol, with a note at each declaration that shares
@@ -1723,9 +1727,9 @@ IRInst* cloneGlobalValueWithLinkage(
     }
 
     // Check that the best value we found is valid: if it's a function, it should have a body or,
-    // unless it is an entry point, be an intrinsic, be bound to an external definition, or be
-    // imported. This catches cases like extension methods declared without a body,
-    // which are not valid (extensions cannot define new requirements).
+    // unless it has an `IREntryPointDecoration`, be an intrinsic, be bound to an external
+    // definition, or be imported. This catches cases like extension methods declared without a
+    // body, which are not valid (extensions cannot define new requirements).
     if (!isFunctionDefinedOrImported(bestVal))
         diagnoseUnresolvedSymbolCandidates(context, bestVal, sym);
 
