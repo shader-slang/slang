@@ -403,22 +403,23 @@ struct LinkingAndOptimizationOptions
     // compiler (C/C++, NVRTC, or LLVM) handles those types.
     bool shouldLegalizeExistentialAndResourceTypes = true;
 
-    // The target cannot emit a global constant's initializer, so global constants are
-    // inlined. Set it with `doesTargetRejectGlobalInitializers`.
-    bool targetCannotEmitGlobalInitializer = false;
+    // The target can emit a global constant's initializer. If it is false, global
+    // constants are inlined. Set it with `canTargetEmitGlobalInitializers`.
+    bool targetCanEmitGlobalInitializer = true;
 
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
-// Return true if the target cannot emit a global constant's initializer.
+// Return true if the target can emit a global constant's initializer. It returns false for:
 // - CUDA: NVRTC rejects dynamic initialization of a `__device__` variable.
 // - CPU in kernel mode: a global constant can use global shader parameters, which
 //   cannot be emitted as constants. Host-style CPU targets do not have this problem.
-static bool doesTargetRejectGlobalInitializers(CodeGenContext* codeGenContext)
+static bool canTargetEmitGlobalInitializers(CodeGenContext* codeGenContext)
 {
     auto target = codeGenContext->getTargetFormat();
-    return target == CodeGenTarget::CUDASource ||
-           (isCPUTarget(codeGenContext->getTargetReq()) && isKernelTarget(target));
+    bool isUnsupported = target == CodeGenTarget::CUDASource ||
+                         (isCPUTarget(codeGenContext->getTargetReq()) && isKernelTarget(target));
+    return !isUnsupported;
 }
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -1983,12 +1984,12 @@ Result linkAndOptimizeIR(
     SLANG_PASS(legalizeVectorTypes, sink);
 
     if (options.shouldLegalizeExistentialAndResourceTypes ||
-        options.targetCannotEmitGlobalInitializer)
+        !options.targetCanEmitGlobalInitializer)
     {
         // Fold constructor calls to `makeStruct`, so that a `static const` struct
         // table can stay a global constant.
-        SLANG_PASS(legalizeConstantConstructorCallsForGlobalScope);
-        SLANG_PASS(inlineGlobalConstantsForLegalization);
+        SLANG_PASS(legalizeConstantConstructorCallsForGlobalScope, target);
+        SLANG_PASS(inlineGlobalConstantsForLegalization, target);
     }
 
     // We don't need the legalize pass for C/C++ based types
@@ -3109,8 +3110,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
-        linkingAndOptimizationOptions.targetCannotEmitGlobalInitializer =
-            doesTargetRejectGlobalInitializers(this);
+        linkingAndOptimizationOptions.targetCanEmitGlobalInitializer =
+            canTargetEmitGlobalInitializers(this);
 
         switch (sourceLanguage)
         {
@@ -3889,8 +3890,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
-    linkingAndOptimizationOptions.targetCannotEmitGlobalInitializer =
-        doesTargetRejectGlobalInitializers(codeGenContext);
+    linkingAndOptimizationOptions.targetCanEmitGlobalInitializer =
+        canTargetEmitGlobalInitializers(codeGenContext);
     SLANG_RETURN_ON_FAIL(
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 

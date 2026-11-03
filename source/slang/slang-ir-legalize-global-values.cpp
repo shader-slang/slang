@@ -1,5 +1,6 @@
 #include "slang-ir-legalize-global-values.h"
 
+#include "slang-compiler.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"
 
@@ -248,22 +249,36 @@ IRInst* GlobalInstInliningContextGeneric::maybeInlineGlobalValue(
 
 struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextGeneric
 {
+    // True if the target can emit the initializer of a global constant of a type that
+    // contains `half`. CUDA cannot: it emits a `half` literal as a `__half(...)`
+    // constructor call, which NVRTC rejects as the dynamic initializer of a `__device__`
+    // variable.
+    bool targetCanEmitGlobalInitializerForHalf;
+
+    explicit GlobalInstLegalizationInliningContext(CodeGenTarget target)
+        : targetCanEmitGlobalInitializerForHalf(target != CodeGenTarget::CUDASource)
+    {
+    }
+
     // Return true if a value of `type` can stay a global constant. A simple type is a
     // scalar, a vector, a matrix, an array of a simple type, or a struct whose fields
     // are all simple types.
     //
-    // A struct with a resource, pointer, or other opaque field is not simple. Returning
-    // false is always safe: the value is then inlined into the functions that use it.
-    static bool isSimpleConstantType(IRType* type)
+    // A struct with a resource, pointer, or other opaque field is not simple. A type
+    // that contains `half` is not simple when `targetCanEmitGlobalInitializerForHalf` is
+    // false: CUDA emits a `half` literal as a `__half(...)` constructor call, which is a
+    // dynamic initializer that NVRTC rejects. Returning false is always safe: the value
+    // is then inlined into the functions that use it.
+    bool isSimpleConstantType(IRType* type)
     {
         if (!type)
             return true;
         if (as<IRBasicType>(type))
-            return true;
-        if (as<IRVectorType>(type))
-            return true;
-        if (as<IRMatrixType>(type))
-            return true;
+            return targetCanEmitGlobalInitializerForHalf || type->getOp() != kIROp_HalfType;
+        if (auto vectorType = as<IRVectorType>(type))
+            return isSimpleConstantType(vectorType->getElementType());
+        if (auto matrixType = as<IRMatrixType>(type))
+            return isSimpleConstantType(matrixType->getElementType());
         if (auto arrayType = as<IRArrayTypeBase>(type))
             return isSimpleConstantType(arrayType->getElementType());
         if (auto structType = as<IRStructType>(type))
@@ -319,7 +334,9 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
 // function that uses it. After this function folds the calls, the table is
 // `makeArray(makeStruct(1,2), makeStruct(3,4))` and can stay global. Inside a
 // function body the call stays a call, because a local struct is built at run time.
-static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(IRCall* call)
+static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(
+    GlobalInstLegalizationInliningContext& context,
+    IRCall* call)
 {
     auto callee = as<IRFunc>(getResolvedInstForDecorations(call->getCallee()));
     if (!callee)
@@ -333,7 +350,7 @@ static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(IRCall* call)
         return nullptr;
 
     // Fold only a struct that is a simple constant. Other structs are inlined.
-    if (!GlobalInstLegalizationInliningContext::isSimpleConstantType(structType))
+    if (!context.isSimpleConstantType(structType))
         return nullptr;
 
     // A member-wise constructor has one block.
@@ -438,8 +455,10 @@ static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(IRCall* call)
 // Calls inside function bodies are not changed, because a local struct is built at
 // run time. Only a module-scope value must be a compile-time constant. See
 // `tryBuildMakeStructFromSynthesizedConstructorCall` for an example.
-void legalizeConstantConstructorCallsForGlobalScope(IRModule* module)
+void legalizeConstantConstructorCallsForGlobalScope(IRModule* module, CodeGenTarget target)
 {
+    GlobalInstLegalizationInliningContext context(target);
+
     // The calls in a `static const` initializer are direct children of the module.
     // Collect them first, because the loop below changes the list of global insts.
     List<IRCall*> globalCalls;
@@ -450,7 +469,7 @@ void legalizeConstantConstructorCallsForGlobalScope(IRModule* module)
     }
     for (auto call : globalCalls)
     {
-        if (auto makeStruct = tryBuildMakeStructFromSynthesizedConstructorCall(call))
+        if (auto makeStruct = tryBuildMakeStructFromSynthesizedConstructorCall(context, call))
         {
             call->replaceUsesWith(makeStruct);
             call->removeAndDeallocate();
@@ -458,9 +477,9 @@ void legalizeConstantConstructorCallsForGlobalScope(IRModule* module)
     }
 }
 
-void inlineGlobalConstantsForLegalization(IRModule* module)
+void inlineGlobalConstantsForLegalization(IRModule* module, CodeGenTarget target)
 {
-    GlobalInstLegalizationInliningContext context;
+    GlobalInstLegalizationInliningContext context(target);
 
     context.wrapReferences = false;
     context.inlineGlobalValuesAndRemoveIfUnused(module);
