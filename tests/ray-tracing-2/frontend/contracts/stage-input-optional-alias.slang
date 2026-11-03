@@ -28,15 +28,15 @@ void wrapExistingInput(in Input input)
 {
     Optional<Input> maybe = input;
 /*DECLARATION:
-             ^^^^^ ray-tracing stage input cannot be used as a generic type argument
-             ^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' cannot be used as a generic type argument
+    ^^^^^^^^ 'Optional<T>' cannot wrap a resource or opaque type
+    ^^^^^^^^ 'rt.MissInput<Context>' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'.
 */
 }
 #elif defined(TEST_NESTED)
 Optional<Optional<Input>> nested;
 /*NESTED:
-                  ^^^^^ ray-tracing stage input cannot be used as a generic type argument
-                  ^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' cannot be used as a generic type argument
+                          ^^^^^^ storage of a structural ray-tracing stage input
+                          ^^^^^^ ray-tracing stage input type 'Optional<Optional<rt.MissInput<Context>>>' may only be used as an 'in' parameter or an initialized local copy
 */
 #elif defined(TEST_GENERIC_CONTEXT)
 // The context may remain generic, but this is already known to be a stage input type.
@@ -44,8 +44,8 @@ void wrapGenericContext<C : rt::IPayloadContext>(in rt::MissInput<C> input)
 {
     Optional<rt::MissInput<C>> maybe = input;
 /*GENERIC_CONTEXT:
-                 ^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
-                 ^^^^^^^^^ cannot be used as a generic type argument
+    ^^^^^^^^ 'Optional<T>' cannot wrap a resource or opaque type
+    ^^^^^^^^ 'rt.MissInput<C>' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'.
 */
 }
 #elif defined(TEST_CAST)
@@ -74,11 +74,11 @@ typealias Maybe<T : IInputCarrier> = Optional<T.Item>;
 
 void aliasConstructor(in Input input)
 {
-    // The alias hides Input while declaring Maybe, but the constructor sees its concrete type.
+    // The alias can name Optional<T.Item>; the local still cannot store Optional<Input>.
     let maybe = Maybe<InputCarrier>(input);
 /*CONSTRUCTOR:
-                                    ^^^^^ ray-tracing stage input cannot be used as a generic type argument
-                                    ^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' cannot be used as a generic type argument
+        ^^^^^ storage of a structural ray-tracing stage input
+        ^^^^^ ray-tracing stage input type 'Optional<rt.MissInput<Context>>' may only be used as an 'in' parameter or an initialized local copy
 */
 }
 #else

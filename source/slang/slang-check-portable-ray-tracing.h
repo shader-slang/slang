@@ -48,14 +48,6 @@ void diagnoseInvalidReturnType(DiagnosticSink* sink, CallableDecl* decl);
 /// Diagnoses restricted RT types used as property results.
 void diagnoseInvalidPropertyType(DiagnosticSink* sink, PropertyDecl* decl);
 
-/// Diagnoses restricted RT types in the selected call's explicit or inferred generic arguments.
-bool diagnoseInvalidGenericArguments(DiagnosticSink* sink, InvokeExpr* invoke);
-
-/// Diagnoses restricted RT types in an explicit generic type application.
-bool diagnoseInvalidGenericTypeApplication(
-    DiagnosticSink* sink,
-    GenericAppExpr* genericApplication);
-
 /// Allows the ray-tracing stage-interface and descriptor AST types in imported library
 /// declarations.
 bool isBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl);

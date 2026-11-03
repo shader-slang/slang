@@ -3,7 +3,6 @@
 #include "slang-ast-base.h"
 #include "slang-ast-print.h"
 #include "slang-check-impl.h"
-#include "slang-check-portable-ray-tracing.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
 
@@ -4053,13 +4052,7 @@ Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
         arg = CheckTerm(arg);
     }
 
-    auto result = checkGenericAppWithCheckedArgs(genericAppExpr);
-    if (!IsErrorExpr(result) && as<TypeType>(result->type) &&
-        PortableRT::diagnoseInvalidGenericTypeApplication(getSink(), genericAppExpr))
-    {
-        return CreateErrorExpr(genericAppExpr);
-    }
-    return result;
+    return checkGenericAppWithCheckedArgs(genericAppExpr);
 }
 
 /// Check a generic application where the operands have already been checked.

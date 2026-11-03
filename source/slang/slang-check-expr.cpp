@@ -20,7 +20,6 @@
 #include "slang-ast-print.h"
 #include "slang-ast-support-types.h"
 #include "slang-ast-synthesis.h"
-#include "slang-check-portable-ray-tracing.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
@@ -4384,11 +4383,6 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         if (expr->arguments.getCount() == 1 && invoke == expr->arguments[0])
             return rs;
 
-        // Check generic arguments even when the result is void. A call to make<MissInput<C>>()
-        // could otherwise hide construction inside a generic body such as void make<T>() { T(); }.
-        if (PortableRT::diagnoseInvalidGenericArguments(getSink(), invoke))
-            return CreateErrorExpr(invoke);
-
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
         {
             if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
@@ -4407,8 +4401,6 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
             Index paramCount = funcType->getParamCount();
 
-            // Check argument requirements for the selected function. In particular, arguments
-            // passed to out and inout parameters must be writable.
             for (Index pp = 0; pp < paramCount; ++pp)
             {
                 auto paramType = funcType->getParamTypeWithModeWrapper(pp);

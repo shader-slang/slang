@@ -44,14 +44,16 @@ struct TestSchema : rt::ITraceProgramSchema
 
 void consume<T>(T value) {}
 
-// Schemas, hit groups, and shader lists use ordinary generic substitution. Neither their
-// associated types nor their type-pack arguments require constructing a shader-stage value.
+// A type argument alone does not construct or store a value. Stage inputs and stage interfaces
+// can therefore be used by fieldless generic types, just like schemas and shader lists.
 struct Phantom<T> {}
 
 typealias SchemaPhantom = Phantom<TestSchema>;
 typealias HitGroupPhantom = Phantom<TestHitGroup>;
 typealias ListPhantom = Phantom<rt::HitGroupList<TestHitGroup>>;
 typealias InterfacePhantom = Phantom<rt::ITraceProgramSchema>;
+typealias InputPhantom = Phantom<rt::ClosestHitInput<HitContext>>;
+typealias StageInterfacePhantom = Phantom<rt::IMissShader>;
 typealias LegalTracer = rt::RayTracer<TestSchema>;
 typealias LegalDescriptor = rt::TraceProgramDescriptor<TestSchema>;
 
@@ -65,13 +67,18 @@ void main()
     useType<TestSchema>();
     useTypes<rt::HitGroupList<TestHitGroup>, rt::EmptyMissShaderList,
         rt::EmptyCallableShaderList, TestSchema>();
+    useTypes<rt::ClosestHitInput<HitContext>, rt::IMissShader>();
 
     SchemaPhantom schemaTag = {};
     HitGroupPhantom hitGroupTag = {};
     ListPhantom listTag = {};
     InterfacePhantom interfaceTag = {};
+    InputPhantom inputTag = {};
+    StageInterfacePhantom stageInterfaceTag = {};
     consume(schemaTag);
     consume(hitGroupTag);
     consume(listTag);
     consume(interfaceTag);
+    consume(inputTag);
+    consume(stageInterfaceTag);
 }

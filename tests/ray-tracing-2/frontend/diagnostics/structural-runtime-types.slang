@@ -25,11 +25,6 @@ struct TestClosestHit : rt::IClosestHitShader
     static void invoke(rt::ClosestHitInput<TestHitContext> input) {}
 }
 
-struct Box<T>
-{
-    T value;
-}
-
 [require(closesthit)]
 void invalidStorage(
         TestClosestHit stage,
@@ -38,14 +33,6 @@ void invalidStorage(
     rt::ClosestHitInput<TestHitContext> localInput;
 //CHECK:                                ^^^^^^^^^^ storage of a structural ray-tracing stage input
 //CHECK:                                ^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' may only be used as an 'in' parameter or an initialized local copy
-
-    Box<rt::ClosestHitInput<TestHitContext>> wrappedInput;
-//CHECK:    ^^^^^^^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
-//CHECK:    ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' cannot be used as a generic type argument
-
-    Box<Box<rt::ClosestHitInput<TestHitContext>>> nestedWrappedInput;
-//CHECK:        ^^^^^^^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
-//CHECK:        ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' cannot be used as a generic type argument
 
     rt::ClosestHitInput<TestHitContext>();
 //CHECK:                               ^ declaration not accessible
@@ -63,9 +50,9 @@ void invalidInterfaceValue(rt::IClosestHitShader stage) {}
 //CHECK:                                         ^^^^^ runtime use of a structural ray-tracing stage type
 //CHECK:                                         ^^^^^ structural ray-tracing stage type 'rt.IClosestHitShader' has no runtime representation
 
-typealias InvalidOptionalStageInterface = Optional<rt::IMissShader>;
-//CHECK:                                               ^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
-//CHECK:                                               ^^^^^^^^^^^ structural ray-tracing stage type 'rt.IMissShader' has no runtime representation
+Optional<rt::IMissShader> invalidOptionalStage;
+//CHECK:                  ^^^^^^^^^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
+//CHECK:                  ^^^^^^^^^^^^^^^^^^^^ structural ray-tracing stage type 'Optional<rt.IMissShader>' has no runtime representation
 
 struct InvalidPropertyContainer
 {

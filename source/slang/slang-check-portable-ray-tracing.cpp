@@ -20,7 +20,7 @@ namespace PortableRT
 // Each rule below states its example and the representation or API contract it preserves.
 //
 // Schemas, lists, and hit groups are ordinary values. Empty payloads are ordinary payloads.
-// Concrete stage structs are ordinary values too; input generic uses retain the restriction below.
+// Concrete stage structs are ordinary values too. Generic type arguments follow ordinary rules.
 
 // =============================================================================
 // File-local helpers
@@ -152,14 +152,13 @@ static RestrictedTypeKind _getDirectRestrictedTypeKind(Type* type)
 }
 
 // Checks the supplied type and built-in containers without inspecting ordinary struct fields.
-// Consider `struct Box<T> { T value; }`: the field is checked when Box is checked, and writing
-// Box<MissInput<C>> is rejected by the generic-argument check. Inspecting every ordinary struct
-// here would needlessly force unfinished field declarations, e.g. Node's own `Ptr<Node> next`.
+// Consider `struct Box<T> { T value; }`: its field is checked while its type is still T.
+// Validating the field of Box<MissInput<C>> needs separate checking after substitution. Walking
+// every ordinary struct here would force unfinished declarations, e.g. Node's own `Ptr<Node> next`.
 //
-// Arrays and pointers can name an input without a generic application in source, so follow their
-// already-checked element types. Generic fields such as T.Item need validation after
-// specialization, just like T.Item() construction; that limitation is tracked in
-// shader-slang/slang#13686.
+// Arrays and pointers expose already-checked element types, so follow those types here. Fields
+// depending on T or T.Item need validation after specialization, just like constructing T() or
+// T.Item(); that limitation is tracked in shader-slang/slang#13686.
 static RestrictedTypeKind _getRestrictedTypeKind(Type* type)
 {
     type = unwrapModifiedType(type);
@@ -199,35 +198,6 @@ static bool _diagnoseInvalidBuiltinTypeUse(DiagnosticSink* sink, Type* type, Sou
         return true;
     default:
         // Ordinary types need no diagnostic from this check.
-        return false;
-    }
-}
-
-// Checks one explicit or inferred generic type argument. Consider `consume(input)` with
-// consume<T>(T value): its checked substitution names MissInput<C> even without written <...>.
-// A variadic call groups these same arguments into a ConcreteTypePack, so inspect its elements.
-// No inheritance, fields, or conformance witnesses are needed to recognize these builtin types.
-static bool _diagnoseRestrictedGenericArgument(DiagnosticSink* sink, Type* type, SourceLoc location)
-{
-    if (auto typePack = as<ConcreteTypePack>(type))
-    {
-        for (Index i = 0; i < typePack->getTypeCount(); ++i)
-        {
-            if (_diagnoseRestrictedGenericArgument(sink, typePack->getElementType(i), location))
-                return true;
-        }
-        return false;
-    }
-    switch (_getDirectRestrictedTypeKind(type))
-    {
-    case RestrictedTypeKind::StageInput:
-        sink->diagnose(Diagnostics::StructuralRayTracingInputGenericArgument{
-            .type = type,
-            .location = location});
-        return true;
-    case RestrictedTypeKind::StageInterface:
-        return _diagnoseInvalidBuiltinTypeUse(sink, type, location);
-    default:
         return false;
     }
 }
@@ -703,71 +673,6 @@ void diagnoseInvalidPropertyType(DiagnosticSink* sink, PropertyDecl* propertyDec
         sink,
         propertyDecl->type.type,
         propertyDecl->type.exp ? propertyDecl->type.exp->loc : propertyDecl->loc);
-}
-
-// Checks the type arguments of a resolved function, method, or constructor call. Consider:
-//
-//     void consume<T>(T value) { T fresh = T(); }
-//     void helper(in rt::MissInput<C> input)
-//     {
-//         consume<rt::MissInput<C>>(input);
-//         consume(input);
-//     }
-//
-// The chosen declaration's substitutions include both written and inferred arguments. Rejecting
-// Input for T prevents the generic body from constructing it after specialization. This temporary
-// restriction does not catch an associated type such as T.Item becoming Input; see issue #13686.
-bool diagnoseInvalidGenericArguments(DiagnosticSink* sink, InvokeExpr* invoke)
-{
-    auto functionDeclRef = as<DeclRefExpr>(invoke->functionExpr);
-    if (!functionDeclRef)
-        return false;
-
-    bool diagnosed = false;
-    SubstitutionSet(functionDeclRef->declRef)
-        .forEachGenericSubstitution(
-            [&](GenericDecl*, Val::OperandView<Val> arguments)
-            {
-                if (diagnosed)
-                    return;
-                for (auto argument : arguments)
-                {
-                    // Integer arguments and conformance witnesses need no type-use check.
-                    if (auto argumentType = as<Type>(argument))
-                    {
-                        if (_diagnoseRestrictedGenericArgument(
-                                sink,
-                                argumentType,
-                                invoke->functionExpr->loc))
-                        {
-                            diagnosed = true;
-                            return;
-                        }
-                    }
-                }
-            });
-    return diagnosed;
-}
-
-// Checks a generic type application even when nothing is called. Consider:
-//
-//     struct Factory<T> { static void make() { T fresh = T(); } }
-//     typealias InputFactory = Factory<rt::MissInput<C>>;
-//
-// This has the same unknown-T construction risk as a generic call. Check the written type
-// arguments once normal type resolution succeeds. A concrete stage struct is an ordinary
-// argument, so shader lists and generic helpers require no special exemption for those structs.
-bool diagnoseInvalidGenericTypeApplication(DiagnosticSink* sink, GenericAppExpr* genericApplication)
-{
-    for (auto argument : genericApplication->arguments)
-    {
-        if (auto argumentType = as<TypeType>(argument->type))
-        {
-            if (_diagnoseRestrictedGenericArgument(sink, argumentType->getType(), argument->loc))
-                return true;
-        }
-    }
-    return false;
 }
 
 } // namespace PortableRT
