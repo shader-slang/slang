@@ -2384,8 +2384,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // on a sibling EmptyDecl rather than via [numthreads] on the entry point
     // itself. GLSL allows each axis to be specified in a separate declaration,
     // so we merge all GLSLLayoutLocalSizeAttribute values into a single
-    // NumThreadsAttribute. Like the other GLSL layout lifts, this one depends on the linker's
-    // extra-decoration list for entry points validated after lowering (see above).
+    // NumThreadsAttribute.
     // Node shaders in thread-launch mode do not require [numthreads].
     bool isThreadLaunchNode = false;
     bool hasUncheckedNodeLaunchAttr = false;
