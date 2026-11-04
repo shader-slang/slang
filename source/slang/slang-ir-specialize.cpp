@@ -1155,8 +1155,9 @@ struct SpecializationContext
         }
 
         // The operand count is the element count only once no element can still turn into a
-        // different number of elements: a pack parameter, an unspecialized `expand` or a trimmed
-        // pack has an unknown size, and a nested type pack is flattened into the tuple later.
+        // different number of elements. A generic parameter (possibly a pack), an `Expand` (or
+        // `ExpandTypeOrVal`, its form before `lowerExpandType`) and a trimmed pack can stand for
+        // any number of elements, and a nested type pack is flattened into the tuple later.
         for (UInt i = 0; i < operand->getOperandCount(); i++)
         {
             switch (operand->getOperand(i)->getOp())

@@ -3,10 +3,11 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -shaderobj -output-using-type
 
-// `countof` of a tuple type whose elements come from `expand` over a generic type is the size of
-// the pack, plus one for each plain element. The expand pattern is a type pack (`Wrap<each T>`) or a
-// value pack (`Layer<each S, each S>`), the pack can be empty or forwarded from another generic,
-// and the tuple can be named as a type or built with `makeTuple`.
+// `countof` of a tuple type counts each plain element once and each `expand` as the size of
+// its pack. The pattern expands a type pack (`Wrap<each T>`) or a value pack
+// (`Layer<each S, each S>`), the pack can be empty or forwarded from another generic, and the
+// tuple can be named as a type or built with `makeTuple`. The cases whose result differs from the
+// number of tuple operands check that an `expand` is not counted as a single element.
 
 struct Wrap<T>
 {
