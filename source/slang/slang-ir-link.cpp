@@ -1273,11 +1273,13 @@ IRFunc* specializeIRForEntryPoint(
         context->builder->addDecoration(clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
     }
 
-    // We will also go on and attach layout information
-    // to the function parameters, so that we have it
-    // available directly on the parameters, rather
-    // than having to look it up on the original entry-point layout.
-    maybeCopyLayoutInformationToParameters(clonedFunc, context->builder);
+    // Make layout directly available on native entry-point parameters. A structural `invoke`
+    // still takes its logical Input<Context> parameter, while its parameter layout is empty.
+    // Its native adapter and corresponding layout have not been generated yet.
+    if (!entryPoint->isStructuralRayTracingEntryPoint())
+    {
+        maybeCopyLayoutInformationToParameters(clonedFunc, context->builder);
+    }
 
     return clonedFunc;
 }

@@ -1,6 +1,7 @@
 #include "slang-signal.h"
 
 #include "slang-exception.h"
+#include "slang-test-tool-util.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -177,8 +178,8 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
 
     SLANG_BREAKPOINT(0);
 
-    // 'panic'. Exit with an error code as we can't throw or catch.
-    exit(-1);
+    // 'panic'. Exit with the internal-compiler-error code as we can't throw or catch.
+    exit(int(ToolReturnCode::InternalCompilerError));
 #endif
 }
 
