@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -no-codegen
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -no-codegen
 
 interface IFoo
 {

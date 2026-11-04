@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK): -std 2026 -target host-cpp -whole-program -DCTOR_KIND=0
-//TEST:SIMPLE(filecheck=CHECK): -std 2026 -target host-cpp -whole-program -DCTOR_KIND=1
-//TEST:SIMPLE(filecheck=CHECK): -std 202c -target host-cpp -whole-program -DCTOR_KIND=1
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -std 2026 -target host-cpp -whole-program -DCTOR_KIND=0
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -std 2026 -target host-cpp -whole-program -DCTOR_KIND=1
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -std 202c -target host-cpp -whole-program -DCTOR_KIND=1
 
 [COM("BE18F5D2-4522-4AB0-A6EE-1D157FA2B083")]
 public interface IFoo {}
