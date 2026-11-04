@@ -15,6 +15,7 @@
 //TEST:SIMPLE(filecheck=LARGE):-target spirv -stage compute -entry main -DLARGE
 //TEST:SIMPLE(filecheck=SIZE_FIRST):-target spirv -stage compute -entry main -DSIZE_FIRST
 //TEST:SIMPLE(filecheck=SIZE_LAST):-target spirv -stage compute -entry main -DSIZE_LAST
+//TEST:SIMPLE(filecheck=SIZE_SPEC):-target spirv -stage compute -entry main -DSIZE_SPEC
 
 #version 450
 
@@ -142,6 +143,18 @@ layout(local_size_z_id = 19) in;
 const int SIZE = 16;
 layout(local_size_x_id = 18) in;
 layout(local_size_x = SIZE) in;
+
+#elif defined(SIZE_SPEC)
+
+// A size given by a specialization constant is accepted when another statement names an id
+// for the same axis; it has no compile-time value to use as the implicit constant's default.
+// SIZE_SPEC-NOT: error[E
+// SIZE_SPEC: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %int_1 %int_1
+// SIZE_SPEC-DAG: OpDecorate %[[X]] SpecId 18
+
+layout(constant_id = 3) const int SPEC_SIZE = 8;
+layout(local_size_x = SPEC_SIZE) in;
+layout(local_size_x_id = 18) in;
 
 #endif
 

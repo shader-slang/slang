@@ -1961,6 +1961,11 @@ static IntegerLiteralValue findGLSLLocalSizeDefault(
         if (!attr || !attr->args[axis] || attr->axisIsSpecConstId[axis])
             continue;
 
+        // A size given by a specialization constant has no compile-time value, so it does not
+        // set the default; the size statement's own check accepts it the same way.
+        if (visitor->tryGetIntOrEnumSpecializationConstant(attr->args[axis]))
+            continue;
+
         // A size statement later in the file is not checked yet, so this check may be the
         // first one, and it reports any error in the size expression.
         if (auto size = visitor->checkConstantIntVal(attr->args[axis]))

@@ -1,7 +1,5 @@
 // An explicit `local_size_x` is the unspecialized size of an axis that a separate
-// `local_size_x_id` statement makes specializable, as in GL_KHR_vulkan_glsl. There is no
-// `-emit-spirv-via-glsl` run because glslang takes that size from `local_size_x` in our GLSL
-// output, which names only the id, and not from the `constant_id` declaration.
+// `local_size_x_id` statement makes specializable, as in GL_KHR_vulkan_glsl.
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl
 
