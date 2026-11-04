@@ -10,7 +10,7 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
-    // METAL-DAG: ulong2(
+    // METAL-DAG: ulong2(uint64_t(2)
     // METAL-DAG: long3(
     // METAL-NOT: {{[^_a-z0-9]}}ulong(uint64_t(2)
     vector<uintptr_t, 2> c = vector<uintptr_t, 2>(2uz) + vector<uintptr_t, 2>(tid.xy);
