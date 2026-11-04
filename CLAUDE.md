@@ -270,6 +270,35 @@ change.)
   inputs, `SLANG_RELEASE_ASSERT` on anything outside that set instead of silently returning a default
   — e.g. `substituteElementOfCompositeType` asserts its operand is a builtin scalar/vector/matrix.
 
+- **Keep process out of source comments.** No issue or PR numbers, dates, or history ("before this
+  change", "fixes #N") in a comment: a comment documents the code as it stands, and references
+  belong in the commit message and the PR description. A documentation comment on a declaration
+  states what the thing is and its contract; an implementation comment states the approach. Neither
+  records what the code is not, what it used to be, or which other design was rejected.
+
+- **Name booleans as propositions, and initialize them.** A `bool` reads as a proposition or
+  predicate (`shouldForwardAddresses`, `isEntryPointParam`, `hasLayout`), never as an imperative
+  verb phrase that looks like a procedure (`forwardAddress`). Every `bool` member carries a default
+  initializer at its declaration, so a new or edited constructor cannot leave it unset.
+
+- **Every non-obvious assertion states its reason; an unexplained early-out is a defect.** When a
+  function returns a default for a shape it must never see, assert the shape instead, or explain in
+  the comment why the shape arises and why that handling is right. Asserting one condition without
+  saying why invites the question "why this one, of all things?".
+
+- **A pass's policy lives in the pass.** A predicate whose criteria are specific to one pass (which
+  types count as aggregates for it, which parameters it rewrites) belongs next to that pass, not in
+  `slang-ir-util.h`. A helper in a shared header does exactly what its name says.
+
+- **Use current terminology, and rename when you already touch every call site.** `ConstRef` and
+  "const ref" are deprecated spellings: the concept is an immutable borrow (`borrow in`,
+  `IRBorrowInParamType`), and new code uses the borrow terms. A change that already touches a
+  misnamed declaration and all of its callers renames it.
+
+- **Parameter-passing behavior is a pointer-type opcode, not an address space.** How a parameter is
+  declared or emitted is modeled by a distinct IR pointer type, as the `borrow in`, `borrow out` and
+  `ref` parameter types are, never by an `AddressSpace` value that the emitter inspects.
+
 ### PR Workflow
 
 1. **Format your code**: Run `./extras/formatting.sh` before committing
