@@ -1931,9 +1931,11 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
         // ensure bindinig is checked first.
         if (!as<GLSLOffsetLayoutAttribute>(attr))
         {
-            // We drop an attribute whose arguments fail to check, as `checkAttribute` does, so
-            // that a checked attribute such as `VkConstantIdAttribute` always has a constant id.
-            if (!validateAttribute(attr, nullptr, attrTarget))
+            // We drop a `constant_id` whose id fails to check, so that the `local_size_*_id`
+            // lookup in `checkModifier` sees only ids that fold. Other qualifiers stay attached
+            // because later checks look for them: the deferred `atomic_uint` offset check, for
+            // example, reports a missing `binding` when it finds none.
+            if (!validateAttribute(attr, nullptr, attrTarget) && as<VkConstantIdAttribute>(attr))
                 attr = nullptr;
         }
     }
