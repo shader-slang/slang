@@ -2309,8 +2309,20 @@ Modifier* SemanticsVisitor::checkModifier(
                         // specialization constant with this ID.
                         Int specConstId = cintVal->getValue();
 
-                        for (auto member : decl->parentDecl->getDirectMemberDecls())
+                        // Sibling declarations reach `ModifiersChecked` in source order,
+                        // so a `constant_id` declared after this `layout(...) in;` still
+                        // holds an unchecked attribute unless we check it here. Checking
+                        // a declaration can add members, so we iterate by index.
+                        auto parentDecl = decl->parentDecl;
+                        for (Index memberIndex = 0;
+                             memberIndex < parentDecl->getDirectMemberDeclCount();
+                             ++memberIndex)
                         {
+                            auto member =
+                                as<VarDeclBase>(parentDecl->getDirectMemberDecl(memberIndex));
+                            if (!member)
+                                continue;
+                            ensureDecl(member, DeclCheckState::ModifiersChecked);
                             auto constantId = member->findModifier<VkConstantIdAttribute>();
                             if (constantId)
                             {
@@ -2346,7 +2358,7 @@ Modifier* SemanticsVisitor::checkModifier(
                             constantIdModifier->location = (int32_t)specConstId;
                             specConstVarDecl->type.type = getASTBuilder()->getIntType();
                             addModifier(specConstVarDecl, constantIdModifier);
-                            decl->parentDecl->addMember(specConstVarDecl);
+                            parentDecl->addMember(specConstVarDecl);
                             attr->specConstExtents[i] =
                                 DeclRef<VarDeclBase>(specConstVarDecl->getDefaultDeclRef());
                         }
