@@ -3146,10 +3146,20 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             // `double` infinity as the `float` macro `SLANG_INFINITY` and a `float` NaN as the
             // `double` expression `(0.0 / 0.0)`.
             //
+            // DXC rejects explicit template arguments on the methods of
+            // `RasterizerOrderedByteAddressBuffer`, so a store to one calls the untemplated
+            // `Store` and converts a scalar, vector or matrix value to its own type instead, as in
+            // `Store(0U,double(42.0))`. Array and struct values are passed unchanged, because
+            // their spelling already has their type.
+            //
             auto store = cast<IRByteAddressBufferStore>(inst);
             auto valueType = store->getValue()->getDataType();
             auto scalarType = getIRVectorBaseType(valueType);
             bool isUIntValue = scalarType->getOp() == kIROp_UIntType;
+            bool canNameValueType = !as<IRHLSLRasterizerOrderedByteAddressBufferType>(
+                store->getBuffer()->getDataType());
+            bool convertValue = !isUIntValue && !canNameValueType &&
+                                (as<IRBasicType>(scalarType) || as<IRMatrixType>(valueType));
 
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
@@ -3164,7 +3174,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
                     m_writer->emit(elementCount);
                 }
             }
-            else
+            else if (canNameValueType)
             {
                 m_writer->emit("<");
                 emitType(valueType);
@@ -3173,7 +3183,16 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("(");
             emitOperand(store->getOffset(), getInfo(EmitOp::General));
             m_writer->emit(",");
+            if (convertValue)
+            {
+                emitType(valueType);
+                m_writer->emit("(");
+            }
             emitOperand(store->getValue(), getInfo(EmitOp::General));
+            if (convertValue)
+            {
+                m_writer->emit(")");
+            }
             m_writer->emit(")");
             break;
         }
