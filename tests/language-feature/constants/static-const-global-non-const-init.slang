@@ -22,8 +22,8 @@ static const int minVal = min(int(foo), 5);
 //CHECK:         ^^^^^^ static const global initializer must be a compile-time constant
 //CHECK:         ^^^^^^ initializer of static const global 'minVal' does not evaluate to a compile-time constant
 
-// A specialization constant is not a runtime value, but it does not hide a mutable global
-// in the same initializer.
+// A specialization constant in one element does not stop E31226 for a mutable global in
+// another element of the same initializer.
 [vk::constant_id(0)]
 const int specN = 4;
 // CHECK: error[E31226]
