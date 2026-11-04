@@ -85,6 +85,21 @@ void subtractFromTemporary(S3 y)
 // CHECK: error[E39999]: no overload for '-=' applicable to arguments of type (S3, S3)
 // CHECK-NOT: E40026
 
+// No note when the right operand cannot be passed to the binary operator's `inout` or `out`
+// parameter: `x = x & makeS3()` and `x = x | makeS3()` would not compile either.
+S3 operator&(S3 x, inout S3 y) { return x; }
+S3 operator|(S3 x, out S3 y) { y = x; return x; }
+
+void combineWithTemporary(inout S3 x)
+{
+    x &= makeS3();
+    x |= makeS3();
+}
+// CHECK: error[E39999]: no overload for '&=' applicable to arguments of type (S3, S3)
+// CHECK-NOT: E40026
+// CHECK: error[E39999]: no overload for '|=' applicable to arguments of type (S3, S3)
+// CHECK-NOT: E40026
+
 // Generics: the note follows overload resolution of the binary operator, including generic
 // operators and their constraints.
 interface ISubtractable

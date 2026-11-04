@@ -3547,14 +3547,15 @@ bool SemanticsVisitor::findBinaryOperatorForCompoundAssignment(
     binaryExpr->arguments.add(left);
     binaryExpr->arguments.add(right);
 
-    // Resolve it against a temporary sink: it is only a probe, and any error (no applicable
-    // overload, an ambiguous call) means no note.
+    // Check it against a temporary sink: it is only a probe, and any error (no applicable
+    // overload, an ambiguous call, an argument that an `out` or `inout` parameter cannot take)
+    // means no note.
     DiagnosticSink tempSink(getSourceManager(), nullptr);
     SemanticsVisitor subVisitor(withSink(&tempSink));
     binaryExpr->functionExpr = subVisitor.CheckTerm(binaryOpExpr);
     if (tempSink.getErrorCount() != 0 || IsErrorExpr(binaryExpr->functionExpr))
         return false;
-    Expr* resolved = subVisitor.ResolveInvoke(binaryExpr);
+    Expr* resolved = subVisitor.CheckInvokeExprWithCheckedOperands(binaryExpr);
     if (tempSink.getErrorCount() != 0 || !resolved || IsErrorExpr(resolved) || !resolved->type.type)
         return false;
 
