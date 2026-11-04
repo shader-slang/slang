@@ -2330,8 +2330,19 @@ Modifier* SemanticsVisitor::checkModifier(
                         if (!attr->specConstExtents[i])
                         {
                             auto specConstVarDecl = getASTBuilder()->create<VarDecl>();
+                            specConstVarDecl->loc = attr->loc;
+                            specConstVarDecl->nameAndLoc.loc = attr->loc;
+                            // We name each implicit constant after its id because the
+                            // name feeds the global's mangled name, and two unnamed
+                            // constants would be linked as one symbol. The `$` prefix
+                            // keeps the name out of reach of user code.
+                            specConstVarDecl->nameAndLoc.name =
+                                getName("$local_size_id_" + String(specConstId));
+                            // The implicit attribute has the same shape as a checked
+                            // `layout(constant_id = N)`: the id expression plus its value.
                             auto constantIdModifier =
                                 getASTBuilder()->create<VkConstantIdAttribute>();
+                            constantIdModifier->args.add(arg);
                             constantIdModifier->location = (int32_t)specConstId;
                             specConstVarDecl->type.type = getASTBuilder()->getIntType();
                             addModifier(specConstVarDecl, constantIdModifier);
