@@ -1948,18 +1948,25 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
     return attr;
 }
 
-// Return the size that a `layout(local_size_<axis> = N) in;` in `parentDecl` gives `axis`, or 1
-// when no statement does. GLSL declares a size and its specialization-constant id independently,
-// so `layout(local_size_x = 32) in; layout(local_size_x_id = 18) in;` makes x specializable with
-// a default of 32, in either statement order.
+// Return the size that the `layout(local_size_<axis> = N) in;` statements in `parentDecl` give
+// `axis`, or 1 when none does. GLSL declares a size and its specialization-constant id in
+// independent statements, so `layout(local_size_x = 32) in; layout(local_size_x_id = 18) in;`
+// makes x specializable with a default of 32, in either statement order. When several
+// statements size the axis, the last size other than 1 wins, as in the thread-group merge in
+// `validateEntryPoint`.
 static IntegerLiteralValue findGLSLLocalSizeDefault(
     SemanticsVisitor* visitor,
     ContainerDecl* parentDecl,
     int axis)
 {
-    for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+    IntegerLiteralValue size = 1;
+
+    // Checking a size expression can add members to `parentDecl`, for example when it names a
+    // user-defined attribute struct, so we iterate by index.
+    for (Index memberIndex = 0; memberIndex < parentDecl->getDirectMemberDeclCount(); ++memberIndex)
     {
-        auto attr = emptyDecl->findModifier<GLSLLayoutLocalSizeAttribute>();
+        auto emptyDecl = as<EmptyDecl>(parentDecl->getDirectMemberDecl(memberIndex));
+        auto attr = emptyDecl ? emptyDecl->findModifier<GLSLLayoutLocalSizeAttribute>() : nullptr;
         if (!attr || !attr->args[axis] || attr->axisIsSpecConstId[axis])
             continue;
 
@@ -1968,12 +1975,18 @@ static IntegerLiteralValue findGLSLLocalSizeDefault(
         if (visitor->tryGetIntOrEnumSpecializationConstant(attr->args[axis]))
             continue;
 
-        // A size statement later in the file is not checked yet, so this check may be the
-        // first one, and it reports any error in the size expression.
-        if (auto size = visitor->checkConstantIntVal(attr->args[axis]))
-            return size->getValue();
+        // The size statement reports a size that is not constant when its own modifiers are
+        // checked, so we fold without a sink here.
+        auto value = as<ConstantIntVal>(visitor->CheckIntegerConstantExpression(
+            visitor->CheckExpr(attr->args[axis]),
+            SemanticsVisitor::IntegerConstantExpressionCoercionType::AnyInteger,
+            nullptr,
+            SemanticsVisitor::ConstantFoldingKind::CompileTime,
+            nullptr));
+        if (value && value->getValue() != 1)
+            size = value->getValue();
     }
-    return 1;
+    return size;
 }
 
 Modifier* SemanticsVisitor::checkModifier(
@@ -2400,7 +2413,8 @@ Modifier* SemanticsVisitor::checkModifier(
                             constantIdModifier->args.add(arg);
                             constantIdModifier->location = (int32_t)specConstId;
                             specConstVarDecl->type.type = getASTBuilder()->getIntType();
-                            // The default is the size an unspecialized dispatch must see.
+                            // The default is the size an unspecialized dispatch must see. Axes
+                            // that repeat an id share this constant, so the first one sets it.
                             auto defaultSize = getASTBuilder()->create<IntegerLiteralExpr>();
                             defaultSize->type = QualType(specConstVarDecl->type.type);
                             defaultSize->value = findGLSLLocalSizeDefault(this, parentDecl, i);

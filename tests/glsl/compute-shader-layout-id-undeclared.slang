@@ -151,6 +151,7 @@ layout(local_size_x = SIZE) in;
 // SIZE_SPEC-NOT: error[E
 // SIZE_SPEC: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %int_1 %int_1
 // SIZE_SPEC-DAG: OpDecorate %[[X]] SpecId 18
+// SIZE_SPEC-DAG: %[[X]] = OpSpecConstant %int 1
 
 layout(constant_id = 3) const int SPEC_SIZE = 8;
 layout(local_size_x = SPEC_SIZE) in;
