@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=FRAG): -target metal -entry fragMain -stage fragment
 //TEST:SIMPLE(filecheck=FRAGLIB): -target metallib -entry fragMain -stage fragment
+//TEST:SIMPLE(filecheck=BOTH): -target metal -entry computeMain -stage compute -entry fragMain -stage fragment
 
 // Metal accepts `[[raster_order_group]]` on the parameters of a fragment function only; on a
 // kernel parameter it is an error ("invalid 'raster_order_group' attribute for input
@@ -25,6 +26,11 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 }
 
 // FRAG: {{\[\[}}fragment{{\]\]}} {{.*}} fragMain({{.*}}raster_order_group(0){{.*}}raster_order_group(0)
+
+// In one module with both entry points, only the fragment parameters keep the attribute.
+// BOTH: {{\[\[}}kernel{{\]\]}} void computeMain(
+// BOTH-NOT: raster_order_group
+// BOTH: {{\[\[}}fragment{{\]\]}} {{.*}} fragMain({{.*}}raster_order_group(0){{.*}}raster_order_group(0)
 // FRAGLIB: @fragMain
 [shader("fragment")]
 float4 fragMain(float4 pos: SV_Position) : SV_Target
