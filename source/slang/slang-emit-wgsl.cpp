@@ -841,6 +841,10 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
+    // A spec-const-rate value, such as an `override` declaration or an expression over one, is
+    // known only at pipeline creation, and a WGSL `const` cannot depend on it.
+    if (isSpecConstRateType(inst->getFullType()))
+        return false;
     if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
