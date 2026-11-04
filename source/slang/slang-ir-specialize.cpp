@@ -1154,13 +1154,16 @@ struct SpecializationContext
             return false;
         }
 
-        // If none of the element type is a TypePack, we can just return the count.
+        // The operand count is the element count only once no element can still turn into a
+        // different number of elements: a pack parameter, an unspecialized `expand` or a trimmed
+        // pack has an unknown size, and a nested type pack is flattened into the tuple later.
         for (UInt i = 0; i < operand->getOperandCount(); i++)
         {
             switch (operand->getOperand(i)->getOp())
             {
             case kIROp_Param:
             case kIROp_TypePack:
+            case kIROp_Expand:
             case kIROp_ExpandTypeOrVal:
             case kIROp_TrimFirstOfPack:
             case kIROp_TrimLastOfPack:
