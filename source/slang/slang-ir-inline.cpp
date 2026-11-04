@@ -636,15 +636,8 @@ struct InliningPassBase
         //
         IRInst* returnVal = nullptr;
         List<IRDebugInlinedAt*> debugInlinedInsts;
-        // Module scope has no debug scope, source line or local variables, so the debug
-        // information of a body inlined there describes nothing. A `DebugValue` cloned there
-        // would also keep a use of its operand, such as a uniform parameter, outside of any
-        // function, where no target can evaluate it.
-        bool isCallAtModuleScope = !as<IRBlock>(call->getParent());
         for (auto inst : firstBlock->getChildren())
         {
-            if (isCallAtModuleScope && isDebugInfoInst(inst))
-                continue;
             switch (inst->getOp())
             {
             default:
