@@ -638,8 +638,16 @@ struct InliningPassBase
         //
         IRInst* returnVal = nullptr;
         List<IRDebugInlinedAt*> debugInlinedInsts;
+        // A call outside any function, such as a `static const` initializer at module scope or
+        // in the body of a generic struct, has no caller debug scope, so the debug information
+        // of a body inlined there describes nothing. A `DebugValue` cloned there would also keep
+        // a use of its operand, such as a uniform parameter, outside of any function, which the
+        // C++, CPU and Metal targets cannot lower.
+        bool isCallOutsideFunction = !getParentFunc(call);
         for (auto inst : firstBlock->getChildren())
         {
+            if (isCallOutsideFunction && isDebugInfoInst(inst))
+                continue;
             switch (inst->getOp())
             {
             default:
