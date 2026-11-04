@@ -175,12 +175,12 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
             {
                 opIntInfo.isSigned = false;
                 shiftAmountType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
-                // A spec-const-rate shift such as `N << 1` keeps its rate when its operand is
-                // replaced, so the new amount must again be a constant or a spec-const-rate
-                // value. A cast of a spec-const amount acquires that rate, but a cast of a
-                // literal is neither, and global-value inlining would then move the shift into
-                // every function that uses it. A literal amount therefore becomes an unsigned
-                // literal; `getIntValue` truncates it to that type as the cast would.
+                // A literal amount becomes an unsigned literal. `getIntValue` truncates it to that
+                // type exactly as a cast would, so the rewrite is valid for any shift by a signed
+                // literal. It matters for a spec-const-rate shift such as `N << 1`, which keeps
+                // its rate when its operand is replaced: a cast of the literal is neither a
+                // constant nor a spec-const value, so global-value inlining would move the shift
+                // into each function that uses it, and WGSL would lose the folded `N_0 << u32(1)`.
                 auto literalAmount = as<IRIntLit>(shiftAmount);
                 IRInst* newShiftAmount =
                     literalAmount ? builder.getIntValue(shiftAmountType, literalAmount->getValue())
