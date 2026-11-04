@@ -2,7 +2,7 @@
 //
 // First parser pass checks
 //
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry computeMain
 
 //CHECK: E30102
 //CHECK: bad-declaration-placement-1.slang:[[# @LINE+1]]:

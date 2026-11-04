@@ -15,12 +15,12 @@ const int globalIntConst = 42;                // OK in GLSL - real constant
 uniform float uniformFloat;                   // OK - uniform without const
 uniform vec4 uniformVec;                     // OK - uniform without const
 
-// CHK-NOT: error 31224
+// CHK-NOT: E31224
 // CHK: void main()
 
 out vec4 fragColor;
 
-void main() 
+void main()
 {
     fragColor = vec4(globalConstWithInit, globalVecConst.x, globalIntConst, 1.0);
 }

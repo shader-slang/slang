@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv
 
 struct Light
 {

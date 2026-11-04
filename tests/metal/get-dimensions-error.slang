@@ -1,11 +1,11 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry cmain -DTEST=0 -DBUFFER_TYPE=StructuredBuffer
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry cmain -DTEST=0 -DBUFFER_TYPE=RWStructuredBuffer
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry cmain -DTEST=0 -DBUFFER_TYPE=AppendStructuredBuffer
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry cmain -DTEST=0 -DBUFFER_TYPE=ConsumeStructuredBuffer
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry cmain -DTEST=0 -DBUFFER_TYPE=RasterizerOrderedStructuredBuffer
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry cmain -DTEST=1 -DBUFFER_TYPE=ByteAddressBuffer
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry cmain -DTEST=1 -DBUFFER_TYPE=RWByteAddressBuffer
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry cmain -DTEST=1 -DBUFFER_TYPE=RasterizerOrderedByteAddressBuffer
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -stage compute -entry cmain -DTEST=0 -DBUFFER_TYPE=StructuredBuffer
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -stage compute -entry cmain -DTEST=0 -DBUFFER_TYPE=RWStructuredBuffer
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -stage compute -entry cmain -DTEST=0 -DBUFFER_TYPE=AppendStructuredBuffer
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -stage compute -entry cmain -DTEST=0 -DBUFFER_TYPE=ConsumeStructuredBuffer
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -stage compute -entry cmain -DTEST=0 -DBUFFER_TYPE=RasterizerOrderedStructuredBuffer
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -stage compute -entry cmain -DTEST=1 -DBUFFER_TYPE=ByteAddressBuffer
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -stage compute -entry cmain -DTEST=1 -DBUFFER_TYPE=RWByteAddressBuffer
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -stage compute -entry cmain -DTEST=1 -DBUFFER_TYPE=RasterizerOrderedByteAddressBuffer
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

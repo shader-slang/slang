@@ -1,9 +1,9 @@
 //TEST:COMPILE: tests/bugs/13306/late-link-resource.slang -no-codegen -o tests/bugs/13306/late-link-resource.slang-lib
 //TEST:COMPILE: tests/bugs/13306/late-link-data.slang -no-codegen -o tests/bugs/13306/late-link-data.slang-lib
-//TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-resource.slang-lib -target spirv -entry main -validate-ir
-//TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-resource.slang-lib -target spirv -entry main -validate-ir -DINITIALIZED_STATIC
-//TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-resource.slang-lib -target spirv -entry main -validate-ir -Gec -DUSE_SHADOW
-//TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-resource.slang-lib -target hlsl -entry main -validate-ir -Gec -DUSE_SHADOW -DDEFAULT_DATA
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-resource.slang-lib -target spirv -entry main -validate-ir
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-resource.slang-lib -target spirv -entry main -validate-ir -DINITIALIZED_STATIC
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-resource.slang-lib -target spirv -entry main -validate-ir -Gec -DUSE_SHADOW
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-resource.slang-lib -target hlsl -entry main -validate-ir -Gec -DUSE_SHADOW -DDEFAULT_DATA
 //TEST:COMPILE: tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-data.slang-lib -target spirv -entry main -validate-ir
 //TEST:COMPILE: tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-data.slang-lib -target spirv -entry main -validate-ir -DINITIALIZED_STATIC
 //TEST:COMPILE: tests/bugs/13306/late-link-types.hlsl -r tests/bugs/13306/late-link-data.slang-lib -target spirv -entry main -validate-ir -Gec -DUSE_SHADOW -DDEFAULT_DATA

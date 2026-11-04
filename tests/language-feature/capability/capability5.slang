@@ -2,7 +2,7 @@
 //TEST:SIMPLE_EX(filecheck=PASS): -lang glsl tests/language-feature/capability/capability5.slang -target glsl -entry main -stage compute -capability shader5_sm_5_0
 //TEST:SIMPLE_EX(filecheck=PASS): -lang glsl tests/language-feature/capability/capability5.slang -target glsl -entry main -stage compute -profile sm_6_0
 //TEST:SIMPLE_EX(filecheck=WARN): -lang glsl tests/language-feature/capability/capability5.slang -target glsl -entry main -stage compute -capability GLSL_130
-//TEST:SIMPLE_EX(filecheck=ERROR): -lang glsl tests/language-feature/capability/capability5.slang -target glsl -entry main -stage compute -capability GLSL_130 -restrictive-capability-check
+//TEST:SIMPLE_EX(filecheck=ERROR,exit-code=-1): -lang glsl tests/language-feature/capability/capability5.slang -target glsl -entry main -stage compute -capability GLSL_130 -restrictive-capability-check
 // CHECK_IGNORE_CAPS-NOT: E41012
 
 // Check that a non-static member method implictly requires capabilities

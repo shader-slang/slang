@@ -1,7 +1,7 @@
 // After E39033 on GLSL, the GLSL is not passed on to glslang, so glslang's own
 // push-constant error does not appear (shader-slang/slang#13713).
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-via-glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -emit-spirv-via-glsl -entry main -stage compute
 
 struct PC { float4 a; }
 

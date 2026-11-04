@@ -7,18 +7,18 @@
 // proves the process ran to completion.
 
 // Bare SV_Position/SV_Target result -> system-value path.
-//TEST:SIMPLE(filecheck=GFX_VS): -target cpp -entry vertexMain
-//TEST:SIMPLE(filecheck=GFX_VS): -target hpp -entry vertexMain
-//TEST:SIMPLE(filecheck=GFX_VS): -target host-callable -entry vertexMain
-//TEST:SIMPLE(filecheck=GFX_FS): -target cpp -entry fragmentMain
+//TEST:SIMPLE(filecheck=GFX_VS,exit-code=-1): -target cpp -entry vertexMain
+//TEST:SIMPLE(filecheck=GFX_VS,exit-code=-1): -target hpp -entry vertexMain
+//TEST:SIMPLE(filecheck=GFX_VS,exit-code=-1): -target host-callable -entry vertexMain
+//TEST:SIMPLE(filecheck=GFX_FS,exit-code=-1): -target cpp -entry fragmentMain
 
 // Struct result (the original repro) -> user-varying path.
-//TEST:SIMPLE(filecheck=GFX_USER): -target cpp -entry structOutMain
+//TEST:SIMPLE(filecheck=GFX_USER,exit-code=-1): -target cpp -entry structOutMain
 
 // Two entry points: the compute entry point sets and frees `m_param`, then the
 // vertex entry point's result legalization must not read it. Exercises the
 // per-entry-point reset in `processEntryPoint`.
-//TEST:SIMPLE(filecheck=GFX_VS): -target cpp -entry computeMain -stage compute -entry vertexMain -stage vertex
+//TEST:SIMPLE(filecheck=GFX_VS,exit-code=-1): -target cpp -entry computeMain -stage compute -entry vertexMain -stage vertex
 
 // GFX_VS: this target doesn't support this system-defined varying parameter
 // GFX_VS: vertexMain

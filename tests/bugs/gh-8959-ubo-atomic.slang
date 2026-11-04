@@ -5,7 +5,7 @@
 // This test confirms the fix in gh-8959 (which accepts Uniform+BufferBlock for SSBOs)
 // does not accidentally allow atomics on read-only UBOs.
 // See https://github.com/shader-slang/slang/issues/8959
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-profile glsl_460 -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-profile glsl_460 -target spirv
 #version 460
 
 layout(std140, binding = 0) uniform uboBuffer
