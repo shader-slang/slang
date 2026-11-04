@@ -1,15 +1,18 @@
 // gh-14259-byte-address-store-typed.slang
 
-// A byte-address buffer store names its value type in the emitted HLSL, C++ and CUDA. Each of
-// those compilers deduces the template argument of `Store` from the spelling of the value, and
-// some constants are spelled as `float`: HLSL writes a `double` or `half` constant as a bare
-// literal such as `42.0`, and C++ and CUDA write a `double` infinity as `SLANG_INFINITY`. The
-// explicit `Store<T >` writes those values with their own width. A `uint` or `uintN` value uses
-// the untemplated `Store`/`StoreN` methods, which FXC also accepts.
+// A byte-address buffer store names its value type in the emitted HLSL, C++ and CUDA. Without
+// the explicit type, each of those compilers would deduce the template argument of `Store` from
+// the spelling of the value, and some constants are spelled with another type: HLSL writes a
+// `double` or `half` constant as a bare literal such as `42.0`, which dxc deduces as `float`, and
+// C++ and CUDA write a `double` infinity as the `float` macro `SLANG_INFINITY` and a `float` NaN
+// as the `double` expression `(0.0 / 0.0)`. A `uint` or `uintN` value uses the untemplated
+// `Store`/`StoreN` methods, which FXC also accepts.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-asm -entry computeMain -stage compute -profile cs_6_6
 //TEST:SIMPLE(filecheck=FXC):-target hlsl -entry fxcMain -stage compute -profile cs_5_0
+//TEST:SIMPLE(filecheck=SM50):-target hlsl -entry sm5Main -stage compute -profile cs_5_0
+//TEST:SIMPLE(filecheck=SM51):-target hlsl -entry sm5Main -stage compute -profile cs_5_1
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -profile cs_6_6 -render-features half -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -render-features half -shaderobj
@@ -30,7 +33,10 @@ void computeMain()
     // HLSL: output_0.Store2(24U,{{.*}});
     // HLSL: output_0.Store<float >(32U,2.5f);
     // HLSL: output_0.Store<int >(36U,int(-5));
+    // HLSL: output_0.Store<float >(40U,{{.*}});
     // HLSL: output_0.Store4(48U,{{.*}});
+    // HLSL: output_0.Store2(64U,{{.*}});
+    // HLSL: output_0.Store(72U,31U);
 
     // DXIL: rawBufferStore.f64({{.*}}, i32 0, i32 undef, double 4.200000e+01,
     // DXIL: rawBufferStore.f64({{.*}}, i32 8, i32 undef, double 0x7FF0000000000000,
@@ -47,11 +53,17 @@ void computeMain()
     output.Store<uint2>(24, uint2(6, 7));
     output.Store<float>(32, 2.5f);
     output.Store<int>(36, -5);
+    output.Store<float>(40, float(0.0 / 0.0));
     output.Store<uint4>(48, uint4(11, 12, 13, 14));
-    output.Store<uint3>(64, uint3(8, 9, 10));
+    output.Store<uint3>(64, uint3(8, 9, 0x1F));
 
-    // A `double` occupies two words. A `half` writes the low two bytes of its word and leaves the
-    // high two bytes unchanged.
+    // Every word starts as the sentinel `AAAAAAAA`, so a word that a store should not reach keeps
+    // it, and a store of the wrong width shows up as a missing or an extra word. A `double`
+    // occupies two words. A `half` writes the low two bytes of its word and leaves the high two
+    // bytes unchanged. Word 11 follows the 4-byte `float` NaN and stays untouched. The `uint4` at a
+    // 16-byte multiple is stored whole; the `uint3` at 64 is split into `Store2` and `Store`. A
+    // `uint3` at a non-zero multiple of 12 would be stored whole, but on SPIR-V it lands at the
+    // wrong offset.
     // BUF: 0
     // BUF-NEXT: 40450000
     // BUF-NEXT: 0
@@ -62,7 +74,7 @@ void computeMain()
     // BUF-NEXT: 7
     // BUF-NEXT: 40200000
     // BUF-NEXT: FFFFFFFB
-    // BUF-NEXT: AAAAAAAA
+    // BUF-NEXT: {{7FC00000|FFC00000|7FFFFFFF|FFFFFFFF}}
     // BUF-NEXT: AAAAAAAA
     // BUF-NEXT: B
     // BUF-NEXT: C
@@ -70,7 +82,7 @@ void computeMain()
     // BUF-NEXT: E
     // BUF-NEXT: 8
     // BUF-NEXT: 9
-    // BUF-NEXT: A
+    // BUF-NEXT: 1F
     // BUF-NEXT: AAAAAAAA
 }
 
@@ -98,4 +110,22 @@ void fxcMain()
     output.Store<uint2>(8, uint2(6, 7));
     output.Store<uint4>(16, uint4(11, 12, 13, 14));
     output.Store<uint3>(48, uint3(8, 9, 10));
+}
+
+// With an SM 5.x profile, a store that legalization leaves non-`uint` keeps its type and uses
+// `Store<T >`, as the loads at these profiles do. On SM 5.0, legalization bit-casts scalars but not
+// a vector stored whole at a multiple of its size. On SM 5.1, which is also the default HLSL
+// profile, it bit-casts nothing.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void sm5Main()
+{
+    // SM50-LABEL: void sm5Main
+    // SM50: output_0.Store(0U,4294967291U);
+    // SM50: output_0.Store<float4 >(16U,{{.*}});
+    // SM51-LABEL: void sm5Main
+    // SM51: output_0.Store<int >(0U,int(-5));
+    // SM51: output_0.Store<float4 >(16U,{{.*}});
+    output.Store<int>(0, -5);
+    output.Store<float4>(16, float4(1, 2, 3, 4));
 }
