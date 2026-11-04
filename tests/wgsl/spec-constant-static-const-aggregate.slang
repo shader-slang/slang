@@ -16,14 +16,15 @@ static const int k = 64 + N;
 
 static const int arr[2] = { k, 3 };
 
-// The struct initializer lowers to a call to the synthesized constructor `S.$init`, so `s`
-// covers that call path; no source form here reaches a module-scope `MakeStruct`.
+// Member-wise struct initializers lower to module-scope `MakeStruct`. The fields of `s` fold
+// at their uses; `ss` is indexed at run time, so its structs must be built in the function.
 struct S
 {
     int a;
     int b;
 }
 static const S s = { 1, k };
+static const S ss[2] = { { 1, k }, { 2, 3 } };
 
 // `v` and `m` are read through swizzled stores, and WGSL keeps the right-hand side of a
 // swizzled store in a temporary, which must not be a `const`.
@@ -43,7 +44,7 @@ static const int2 vb[2] = { int2(k), int2(2, 3) };
 
 // TINT: OpEntryPoint
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out,name=outputBuffer
 RWStructuredBuffer<int4> outputBuffer;
 
 [shader("compute")]
@@ -52,7 +53,8 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     // CHECK: fn computeMain
     // CHECK-DAG: array<i32, i32(2)>( i32(64) + N_0, i32(3) )
-    // CHECK-DAG: S_x24init{{.*}}(i32(1), i32(64) + N_0)
+    // CHECK-DAG: S_0( i32(1), i32(64) + N_0 )
+    // CHECK-DAG: var ss_0 : array<S_0, i32(2)> = array<S_0, i32(2)>(
     // CHECK-DAG: var {{.*}} : vec2<i32> = vec2<i32>(i32(64) + N_0, i32(1));
     // CHECK-DAG: var vecs_0 : array<vec2<i32>, i32(2)> = array<vec2<i32>, i32(2)>(
     // CHECK-DAG: var grid_0 : array<array<i32, i32(2)>, i32(2)> = array<array<i32, i32(2)>, i32(2)>(
@@ -62,6 +64,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     outputBuffer[t].zw = vecs[t];
     outputBuffer[2 + t].xy = int2(grid[t][0], grid[t][1]);
     outputBuffer[6 + t].xy = vb[t];
+    outputBuffer[8 + t].xy = int2(ss[t].a, ss[t].b);
     if (t == 0)
     {
         outputBuffer[4].xy = v;
@@ -75,7 +78,8 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 
 // One line per component of each int4 element: [0] and [1] hold arr, s and vecs for each
 // thread; [2] and [3] hold the grid rows; [4] holds v and m[1]; [5] holds m[0] and
-// int2(N, 1); [6] and [7] hold vb for each thread, with ms[1] in [6].zw.
+// int2(N, 1); [6] and [7] hold vb for each thread, with ms[1] in [6].zw; [8] and [9] hold
+// ss for each thread.
 // BUF: 68
 // BUF-NEXT: 1
 // BUF-NEXT: 68
@@ -104,6 +108,14 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // BUF-NEXT: 68
 // BUF-NEXT: 68
 // BUF-NEXT: 68
+// BUF-NEXT: 2
+// BUF-NEXT: 3
+// BUF-NEXT: 0
+// BUF-NEXT: 0
+// BUF-NEXT: 1
+// BUF-NEXT: 68
+// BUF-NEXT: 0
+// BUF-NEXT: 0
 // BUF-NEXT: 2
 // BUF-NEXT: 3
 // BUF-NEXT: 0
