@@ -4,9 +4,10 @@
 // A `static const` global array whose initializer names a specialization constant is
 // valid. The value of a specialization constant is fixed before the shader runs, so it is
 // not a mutable global, and E31226 must not fire for it. Both attribute spellings are
-// covered, alone and inside arithmetic. An integer scalar `static const` initializer
-// constant-folds and never reaches the E31226 check; an array initializer does not fold,
-// so it does.
+// covered, alone and inside arithmetic. An integer scalar initializer built only from
+// builtin operators folds to a specialization-constant value and never reaches the E31226
+// check. An array initializer, or an integer scalar call such as `min(N, 5)`, does not
+// fold, so it does.
 
 // GLSL-NOT: E31226
 // HLSL-NOT: E31226
@@ -22,18 +23,21 @@ static const int arith[2] = { N + 0, 3 };
 static const int repeated[2] = { N, N };
 static const int divided[2] = { 64 / N, 32 / N };
 static const int otherSpelling[2] = { M, 64 / M };
+static const int clamped = min(N, 5);
 
 // GLSL-DAG: direct_0[2] = int[](N_0, 3);
 // GLSL-DAG: arith_0[2] = int[](N_0, 3);
 // GLSL-DAG: repeated_0[2] = int[](N_0, N_0);
 // GLSL-DAG: divided_0[2] = int[](64 / N_0, 32 / N_0);
 // GLSL-DAG: otherSpelling_0[2] = int[](M_0, 64 / M_0);
+// GLSL-DAG: min(N_0, 5)
 
 // HLSL-DAG: direct_0[int(2)] = { globalParams_0.N_0, int(3) };
 // HLSL-DAG: arith_0[int(2)] = { globalParams_0.N_0, int(3) };
 // HLSL-DAG: repeated_0[int(2)] = { globalParams_0.N_0, globalParams_0.N_0 };
 // HLSL-DAG: divided_0[int(2)] = { int(64) / globalParams_0.N_0, int(32) / globalParams_0.N_0 };
 // HLSL-DAG: otherSpelling_0[int(2)] = { globalParams_0.M_0, int(64) / globalParams_0.M_0 };
+// HLSL-DAG: min(globalParams_0.N_0, int(5))
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -42,5 +46,5 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     uint i = tid.x & 1;
-    outputBuffer[tid.x] = direct[i] + arith[i] + repeated[i] + divided[i] + otherSpelling[i];
+    outputBuffer[tid.x] = direct[i] + arith[i] + repeated[i] + divided[i] + otherSpelling[i] + clamped;
 }

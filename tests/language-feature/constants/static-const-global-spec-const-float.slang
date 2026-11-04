@@ -1,13 +1,18 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
 
-// Only integer scalar initializers constant-fold, so a float scalar or a vector `static
-// const` global that names a specialization constant also reaches the E31226 check. The
-// specialization constant is not a mutable global, so these initializers are accepted and
-// read the constant's default value when it is not overridden.
+// Only integer scalar initializers built from builtin operators constant-fold, so a float
+// scalar or a vector `static const` global that names a specialization constant reaches
+// the E31226 check, as an array does. The specialization constant is not a mutable global,
+// so these initializers are accepted and read the constant's default value when it is not
+// overridden.
 
 // CHECK-NOT: E31226
-// CHECK: OpSpecConstant %float 1.5
+// CHECK: %F = OpSpecConstant %float 1.5
+// The initializers read the specialization constant at run time; render-test cannot
+// override it, so the buffer values alone do not show that the default was not folded in.
+// CHECK: OpFMul %float %F %float_2
+// CHECK: OpStore %{{.*}} %F
 
 [vk::constant_id(1)]
 const float F = 1.5;
