@@ -588,6 +588,8 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_Shader64BitIndexingDecoration:
         case kIROp_NumThreadsDecoration:
         case kIROp_EarlyDepthStencilDecoration:
+        case kIROp_DerivativeGroupQuadDecoration:
+        case kIROp_DerivativeGroupLinearDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {
                 cloneInst(context, builder, decoration);

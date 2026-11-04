@@ -206,3 +206,40 @@ SLANG_UNIT_TEST(glslEarlyFragmentTestsOnLateEntryPoint)
 
     SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("EarlyFragmentTests")) >= 0);
 }
+
+SLANG_UNIT_TEST(glslDerivativeGroupOnLateEntryPoint)
+{
+    // Without a mode, `inferDerivativeGroupMode` picks quads for a 4x4 group, so the
+    // generated code uses the linear mode only if `layout(derivative_group_linearNV) in;`
+    // reaches the entry point.
+    const char* source = R"(
+        #version 450
+        #extension GL_NV_compute_shader_derivatives : require
+        buffer OutputBlock { float data[]; } outputBuffer;
+        layout(local_size_x = 4, local_size_y = 4) in;
+        layout(derivative_group_linearNV) in;
+        void computeMain()
+        {
+            float v = float(gl_LocalInvocationIndex);
+            outputBuffer.data[gl_LocalInvocationIndex] = dFdx(v);
+        }
+    )";
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = unitTestContext->slangGlobalSession->findProfile("spirv_1_5");
+
+    ComPtr<slang::ISession> session;
+    ComPtr<slang::IComponentType> linkedProgram;
+    String spirvAsm = compileLateGLSLEntryPoint(
+        unitTestContext,
+        source,
+        "computeMain",
+        SLANG_STAGE_COMPUTE,
+        targetDesc,
+        session,
+        linkedProgram);
+
+    SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("DerivativeGroupLinearKHR")) >= 0);
+    SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("DerivativeGroupQuadsKHR")) < 0);
+}

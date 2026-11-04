@@ -2482,6 +2482,36 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // GLSL selects the compute derivative group with a standalone
+    // `layout(derivative_group_quadsNV) in;` or `layout(derivative_group_linearNV) in;`.
+    // `visitEmptyDecl` attaches that mode, and checks it against the thread-group size at the
+    // layout qualifier, for every entry point known when the module is lowered. An entry point
+    // validated after lowering misses that step, so for it we lift the mode onto the function
+    // as the canonical DerivativeGroupQuad/LinearAttribute. Entry points known at lowering keep
+    // the `visitEmptyDecl` path, so their diagnostics still point at the layout qualifier.
+    auto parentDecl = getParentDecl(entryPointFuncDecl);
+    if (parentDecl && entryPoint->getModule()->getIRModule())
+    {
+        for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+        {
+            if (auto quadAttr = emptyDecl->findModifier<GLSLLayoutDerivativeGroupQuadAttribute>();
+                quadAttr && !entryPointFuncDecl->findModifier<DerivativeGroupQuadAttribute>())
+            {
+                auto attr = getCurrentASTBuilder()->create<DerivativeGroupQuadAttribute>();
+                attr->loc = quadAttr->loc;
+                addModifier(entryPointFuncDecl, attr);
+            }
+            if (auto linearAttr =
+                    emptyDecl->findModifier<GLSLLayoutDerivativeGroupLinearAttribute>();
+                linearAttr && !entryPointFuncDecl->findModifier<DerivativeGroupLinearAttribute>())
+            {
+                auto attr = getCurrentASTBuilder()->create<DerivativeGroupLinearAttribute>();
+                attr->loc = linearAttr->loc;
+                addModifier(entryPointFuncDecl, attr);
+            }
+        }
+    }
+
     bool canHaveVaryingInput = false;
     bool shouldWarnOnNonUniformParam = true;
     switch (stage)
