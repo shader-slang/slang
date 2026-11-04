@@ -21,3 +21,12 @@ static const float baz = foo * 2.0f;
 static const int minVal = min(int(foo), 5);
 //CHECK:         ^^^^^^ static const global initializer must be a compile-time constant
 //CHECK:         ^^^^^^ initializer of static const global 'minVal' does not evaluate to a compile-time constant
+
+// A specialization constant is not a runtime value, but it does not hide a mutable global
+// in the same initializer.
+[vk::constant_id(0)]
+const int specN = 4;
+// CHECK: error[E31226]
+static const int mixed[2] = { specN, int(foo) };
+//CHECK:         ^^^^^ static const global initializer must be a compile-time constant
+//CHECK:         ^^^^^ initializer of static const global 'mixed' does not evaluate to a compile-time constant
