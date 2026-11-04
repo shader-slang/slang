@@ -3660,7 +3660,8 @@ static Decl* findLegacyBwdDiffFunc(SemanticsVisitor* visitor, ExtensionDecl* ext
 
 void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
-/// Returns true if `expr` is a runtime value that cannot be a compile-time constant.
+/// Returns true if `expr` is a runtime value that cannot be a compile-time or
+/// specialization-time constant.
 /// This is called only after constant folding has already failed (`varDecl->val` is null),
 /// so any surviving function call is known to be non-const-evaluable — if it were a
 /// constant-foldable intrinsic applied to constant arguments, folding would have succeeded.
@@ -3698,10 +3699,11 @@ static bool _initExprIsRuntimeValue(Expr* expr)
             // References to static const globals are fine — compile-time constants.
             if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
                 return false;
-            // A specialization constant is a shader parameter whose value is fixed when the
-            // pipeline is created. Integer scalar initializers that name one can already fold
-            // through `ConstantFoldingKind::SpecializationConstant`, so other initializers accept
-            // it too. A `groupshared` global with the attribute is still workgroup storage.
+            // Slang treats a specialization constant as a constant expression: it can size an
+            // array or set `numthreads`, and a `const` integer one folds to a `DeclRefIntVal`.
+            // A `uniform` or cbuffer value is not one, so it falls through to the case below.
+            // A `groupshared` global that carries the attribute is workgroup storage, not a
+            // shader parameter, so it does not qualify.
             if (isGlobalShaderParameter(varDecl) && isSpecializationConstant(varDecl))
                 return false;
             // Any other global variable (including plain `static float foo`) is mutable.
