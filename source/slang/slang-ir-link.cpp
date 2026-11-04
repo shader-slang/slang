@@ -541,9 +541,9 @@ IRGlobalVar* cloneGlobalVarImpl(
 /// the module's IR for `computeMain` was generated before that. `createIRModuleForLayout`
 /// lowers the entry point's declaration with `emitDeclRef` after validation, so only its copy
 /// carries `kIROp_NumThreadsDecoration`, `kIROp_EarlyDepthStencilDecoration` and the
-/// derivative-group decorations. Which function is an entry point, and for which stage, is
-/// known only once the program selects it, so these are per-program facts like
-/// `[bindExistentialSlots(...)]`. The best definition's own decoration always wins, and a lift
+/// derivative-group decorations. The AST gained these attributes after the module's IR was
+/// generated, and the layout IR is the only IR lowered from the updated declaration. The best
+/// definition's own decoration always wins, and a lift
 /// runs only when the function has no such attribute yet, so filling in a missing decoration
 /// from the layout IR cannot replace a different value.
 ///

@@ -2348,7 +2348,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     // Each GLSL layout lift below (`early_fragment_tests`, `local_size_*`, `derivative_group_*`)
     // turns a standalone `layout(...) in;` into an attribute of the entry point. For a function
-    // without `[shader]` that `findAndCheckEntryPoint` validates for the first time, this runs
+    // without `[shader]` that `findAndCheckEntryPoint` validates for the first time, the lift runs
     // after the module was lowered to IR, and the decoration for the attribute reaches the
     // linked code only from the program's layout IR. A lift whose decoration is missing from
     // `cloneExtraDecorationsFromInst` (slang-ir-link.cpp) is therefore silently dropped on that
@@ -2491,27 +2491,30 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // `visitEmptyDecl` attaches that mode, and checks it against the thread-group size at the
     // layout qualifier, for every entry point known when the module is lowered. An entry point
     // validated after lowering misses that step, so for it we lift the mode onto the function
-    // as the canonical DerivativeGroupQuad/LinearAttribute. Entry points known at lowering keep
-    // the `visitEmptyDecl` path, so their diagnostics still point at the layout qualifier.
-    auto parentDecl = getParentDecl(entryPointFuncDecl);
-    if (parentDecl && entryPoint->getModule()->getIRModule())
+    // as the canonical DerivativeGroupQuad/LinearAttribute; lowering the layout IR then checks it
+    // and reports a mismatch at the function name. The module has IR once it was lowered; a
+    // module loaded from serialized IR also has it, but that IR already carries the mode, so the
+    // linker finds nothing to copy. Entry points known at lowering keep the `visitEmptyDecl` path:
+    // lifting for them too would attach and check the mode twice, and move their diagnostics away
+    // from the layout qualifier.
+    if (auto parentDecl = getParentDecl(entryPointFuncDecl);
+        parentDecl && entryPoint->getModule()->getIRModule())
     {
         for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
         {
-            if (auto quadAttr = emptyDecl->findModifier<GLSLLayoutDerivativeGroupQuadAttribute>();
-                quadAttr && !entryPointFuncDecl->findModifier<DerivativeGroupQuadAttribute>())
+            if (emptyDecl->findModifier<GLSLLayoutDerivativeGroupQuadAttribute>() &&
+                !entryPointFuncDecl->findModifier<DerivativeGroupQuadAttribute>())
             {
-                auto attr = getCurrentASTBuilder()->create<DerivativeGroupQuadAttribute>();
-                attr->loc = quadAttr->loc;
-                addModifier(entryPointFuncDecl, attr);
+                addModifier(
+                    entryPointFuncDecl,
+                    getCurrentASTBuilder()->create<DerivativeGroupQuadAttribute>());
             }
-            if (auto linearAttr =
-                    emptyDecl->findModifier<GLSLLayoutDerivativeGroupLinearAttribute>();
-                linearAttr && !entryPointFuncDecl->findModifier<DerivativeGroupLinearAttribute>())
+            if (emptyDecl->findModifier<GLSLLayoutDerivativeGroupLinearAttribute>() &&
+                !entryPointFuncDecl->findModifier<DerivativeGroupLinearAttribute>())
             {
-                auto attr = getCurrentASTBuilder()->create<DerivativeGroupLinearAttribute>();
-                attr->loc = linearAttr->loc;
-                addModifier(entryPointFuncDecl, attr);
+                addModifier(
+                    entryPointFuncDecl,
+                    getCurrentASTBuilder()->create<DerivativeGroupLinearAttribute>());
             }
         }
     }
