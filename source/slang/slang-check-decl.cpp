@@ -12641,6 +12641,7 @@ void SemanticsVisitor::calcOverridableCompletionCandidates(
 }
 
 // Fill in inherited-interface witnesses for a generic constraint by following its canonical paths.
+//
 // We specialize each inheritance requirement in its owning interface application before selecting
 // the path, so requirements shared by different generic applications remain distinct.
 void SemanticsVisitor::_fillInGenericConstraintPathResolutionTableForInheritance(
@@ -18379,6 +18380,7 @@ Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
 }
 
 // Check whether an AST type includes an existential box over a non-COM, non-builtin interface.
+//
 // The compiler uses AnyValue packing to access the concrete payload of such a box.
 // This mirrors the IR-level `typeIncludesDynamicDispatch()` in
 // slang-ir-typeflow-specialize.cpp but operates on AST types so it

@@ -144,6 +144,11 @@ enum class RestrictedTypeKind
 static RestrictedTypeKind _getDirectRestrictedTypeKind(Type* type)
 {
     type = unwrapModifiedType(type);
+    // `CoerceToProperTypeImpl` can turn `rt::IMissShader` into `dyn rt::IMissShader` before this
+    // value-use check. We inspect the box's interface contract because a box of a stage interface
+    // has the same runtime-value restriction as the interface itself.
+    if (auto boxType = as<ExistentialBoxType>(type))
+        type = boxType->getInterfaceType();
     if (_getDirectStageInputKind(type) != Stage::Unknown)
         return RestrictedTypeKind::StageInput;
     if (as<RayTracingStageInterfaceType>(type))
@@ -397,7 +402,8 @@ DeclRef<FuncDecl> findEntryPointByName(
     *outStageType = nullptr;
     SharedSemanticsContext sharedContext(linkage, module, sink);
     SemanticsVisitor visitor(&sharedContext);
-    auto expr = module->findDeclFromString(getText(name), sink);
+    auto expr =
+        module->findDeclFromString(getText(name), ComponentType::DeclLookupPurpose::EntryPoint, sink);
     auto declRefExpr = as<DeclRefExpr>(expr);
     auto stageTypeDeclRef =
         declRefExpr ? declRefExpr->declRef.as<AggTypeDecl>() : DeclRef<AggTypeDecl>();

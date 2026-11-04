@@ -2227,6 +2227,8 @@ public:
     ///
     /// Before Slang 202c, this function converts an interface type in this context to the
     /// corresponding existential box type.
+    /// In Slang 202c and later, this function rejects an interface type rather than forming a box.
+    /// An existing box type is already proper and is accepted in every version.
     /// The checked-input, required-output, and diagnostic-sink contracts match
     /// `coerceToAliasableTypeImpl`; rejected box formation also returns false and `ErrorType`.
     bool CoerceToProperTypeImpl(
