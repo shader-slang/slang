@@ -43,6 +43,20 @@ int runtimeTrimFirstSum<let each S : int>()
     return s;
 }
 
+int localPackSum<let each S : int>()
+{
+    let p = S;
+    int s = 0;
+    expand add(s, each p);
+    return s;
+}
+
+int localTrimFirstCount<let each S : int>()
+{
+    let p = __trimFirst(S);
+    return countof(expand each p);
+}
+
 void main()
 {
     printf("layerCount=%d\n", layerCount<4, 8, 16, 32>());
@@ -68,4 +82,10 @@ void main()
 
     printf("runtimeTrimFirstSum=%d\n", runtimeTrimFirstSum<4, 8, 16, 32>());
     // CHECK-NEXT: runtimeTrimFirstSum=56
+
+    printf("localPackSum=%d\n", localPackSum<1, 2, 3>());
+    // CHECK-NEXT: localPackSum=6
+
+    printf("localTrimFirstCount=%d\n", localTrimFirstCount<1, 2, 3>());
+    // CHECK-NEXT: localTrimFirstCount=2
 }
