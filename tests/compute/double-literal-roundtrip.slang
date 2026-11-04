@@ -79,7 +79,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK: 8021
 
 // Check the complete spelling, not just the exponent: scientific notation with too
-// few significant digits would still lose bits. GLSL also needs its double suffix.
+// few significant digits would still lose bits. Both targets need their double suffix.
 // HLSL: == 1.5258789076710855e-05L;
 // HLSL: == -1.5258789076710855e-05L;
 // GLSL: == 1.5258789076710855e-05LF;

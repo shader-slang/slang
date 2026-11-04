@@ -1786,8 +1786,10 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     m_writer->emit(constantInst->value.floatVal);
                     // HLSL treats an unsuffixed floating-point literal as a 32-bit `float` by
                     // default, and dxc deduces `float` from one for a template argument such as the
-                    // `T` of `RWByteAddressBuffer.Store<T>`, so each literal names its width: `f`
-                    // for `float` and `L` for `double`.
+                    // `T` of `RWByteAddressBuffer.Store<T>`. A finite `float` literal therefore
+                    // takes `f` and a finite `double` literal takes `L`. A `half` literal stays
+                    // bare, because the `h` suffix needs 16-bit types to be enabled; that and the
+                    // `float`-typed NaN/Inf spellings above are known remaining gaps.
                     switch (constantInst->getDataType()->getOp())
                     {
                     case kIROp_FloatType:
