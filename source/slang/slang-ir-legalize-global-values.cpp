@@ -196,6 +196,11 @@ IRInst* GlobalInstInliningContextGeneric::inlineInst(
         maybeInlineGlobalValue(operandBuilder, inst, operand, cloneEnv);
     }
     result = cloneInstAndOperands(&cloneEnv, &builder, inst);
+    // A hoistable clone can deduplicate to the original instruction (see `cloneInst`), and
+    // copying its decorations into itself below would never terminate. Inlining is not chosen
+    // for such an instruction (spec-const-rate instructions are legal globals), so a self-clone
+    // here means a legality rule is missing.
+    SLANG_RELEASE_ASSERT(result != inst);
     cloneEnv.mapOldValToNew[inst] = result;
     IRBuilder subBuilder(builder);
     subBuilder.setInsertInto(result);
