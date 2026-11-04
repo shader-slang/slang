@@ -115,6 +115,14 @@ struct LValueCastLoweringContext
         return false;
     }
 
+    /// Return true if the pointer types `a` and `b` point to the same value type.
+    bool _hasSameValueType(IRType* a, IRType* b)
+    {
+        auto ptrA = as<IRPtrTypeBase>(a);
+        auto ptrB = as<IRPtrTypeBase>(b);
+        return ptrA && ptrB && ptrA->getValueType() == ptrB->getValueType();
+    }
+
     /// True if for HLSL the cast can be removed entirely
     bool _canRemoveCastForHLSL(IRType* a, IRType* b)
     {
@@ -128,6 +136,16 @@ struct LValueCastLoweringContext
         auto castOperand = castInst->getOperand(0);
         auto fromType = castOperand->getDataType();
         auto toType = castInst->getDataType();
+
+        // A cast between identical value types needs no conversion on any target. For example,
+        // a `row_major` field passed to a plain `inout` parameter is such a cast once
+        // `specializeMatrixLayout` has resolved the parameter to a row-major default.
+        if (_hasSameValueType(fromType, toType))
+        {
+            castInst->replaceUsesWith(castOperand);
+            castInst->removeAndDeallocate();
+            return;
+        }
 
         switch (m_intermediateSourceLanguage)
         {
