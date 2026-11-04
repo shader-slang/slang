@@ -53,6 +53,12 @@ bool GlobalInstInliningContextGeneric::isLegalGlobalInst(IRInst* inst)
 {
     if (as<IRConstant>(inst))
         return true;
+    // `IRBuilder` hoists and deduplicates every instruction with a spec-const-rate result (see
+    // `shouldHaveSpecConstRate`), so cloning one at a use site yields the original instead of a
+    // function-local copy. SPIR-V also requires `OpSpecConstantOp` results to be outside
+    // function bodies.
+    if (isSpecConstRateType(inst->getFullType()))
+        return true;
     if (isLegalGlobalInstForTarget(inst))
         return true;
     return false;
