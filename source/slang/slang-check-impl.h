@@ -4264,16 +4264,26 @@ public:
     Expr* checkBaseForMemberExpr(
         Expr* baseExpr,
         CheckBaseContext checkBaseContext,
-        bool& outNeedDeref);
+        List<Expr*>& outDerefBases);
 
-    Expr* maybeDereference(Expr* inExpr, CheckBaseContext checkBaseContext);
+    /// Implicitly dereference `inExpr` through each pointer-like type that it can be
+    /// dereferenced through, and return the result. A `PtrType` is not dereferenced in a
+    /// subscript context, so that `p[i]` indexes the pointer. Each expression that gets
+    /// dereferenced is appended to `outDerefBases`, outermost first: for `pp : Ptr<Ptr<int>>`,
+    /// the result is `**pp` and `outDerefBases` receives `pp` and `*pp`.
+    Expr* maybeDereference(
+        Expr* inExpr,
+        CheckBaseContext checkBaseContext,
+        List<Expr*>& outDerefBases);
 
     /// Prepare baseExpr for use as the base of a member expr.
     /// This include inserting implicit open-existential operations as needed.
+    /// The expressions that get implicitly dereferenced are appended to `outDerefBases`, as
+    /// for `maybeDereference`.
     Expr* maybeInsertImplicitOpForMemberBase(
         Expr* baseExpr,
         CheckBaseContext checkBaseContext,
-        bool& outNeedDeref);
+        List<Expr*>& outDerefBases);
 
     Expr* lookupMemberResultFailure(
         DeclRefExpr* expr,

@@ -3608,7 +3608,7 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
-    bool needDeref = false;
+    List<Expr*> derefBases;
     Expr* baseExpr = nullptr;
     {
         // As in `visitInvokeExpr`, an enclosing `try` covers the subscript call but not its
@@ -3618,7 +3618,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         baseExpr = checkBaseForMemberExpr(
             subscriptExpr->baseExpression,
             CheckBaseContext::Subscript,
-            needDeref);
+            derefBases);
 
         // If the base expression is a type, it means that this is an array declaration,
         // then we should disable short-circuit in case there is logical expression in
@@ -5365,11 +5365,11 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         // call that instead.
         auto operatorName = getName("()");
 
-        bool needDeref = false;
+        List<Expr*> derefBases;
         expr->functionExpr = maybeInsertImplicitOpForMemberBase(
             expr->functionExpr,
             CheckBaseContext::Member,
-            needDeref);
+            derefBases);
 
         LookupResult lookupResult = lookUpMember(
             m_astBuilder,
@@ -8414,7 +8414,10 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
     }
 }
 
-Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBaseContext)
+Expr* SemanticsVisitor::maybeDereference(
+    Expr* inExpr,
+    CheckBaseContext checkBaseContext,
+    List<Expr*>& outDerefBases)
 {
     Expr* expr = inExpr;
     for (;;)
@@ -8428,6 +8431,7 @@ Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBas
         auto elementType = getPointedToTypeIfCanImplicitDeref(baseType);
         if (!elementType)
             return expr;
+        outDerefBases.add(expr);
         expr = constructDerefExpr(expr, elementType, inExpr->loc);
     }
 }
@@ -9093,7 +9097,9 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     expr->baseExpression = CheckTerm(expr->baseExpression);
 
     // Not sure this is needed -> but guess someone could do
-    expr->baseExpression = maybeDereference(expr->baseExpression, CheckBaseContext::Member);
+    List<Expr*> derefBases;
+    expr->baseExpression =
+        maybeDereference(expr->baseExpression, CheckBaseContext::Member, derefBases);
 
     // If the base of the member lookup has an interface type
     // *without* a suitable this-type substitution, then we are
@@ -9323,7 +9329,7 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
 Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     Expr* baseExpr,
     CheckBaseContext checkBaseContext,
-    bool& outNeedDeref)
+    List<Expr*>& outDerefBases)
 {
     // In case our base expression is still overloaded, we can perform
     // some more refinement.
@@ -9364,10 +9370,7 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
 
     // Dereference after resolving overloaded expressions, so that the
     // concrete type is available for pointer-like dereferences.
-    auto derefExpr = maybeDereference(baseExpr, checkBaseContext);
-    if (derefExpr != baseExpr)
-        outNeedDeref = true;
-    baseExpr = derefExpr;
+    baseExpr = maybeDereference(baseExpr, checkBaseContext, outDerefBases);
 
     // If the base of the member lookup has an interface type
     // *without* a suitable this-type substitution, then we are
@@ -9384,13 +9387,13 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
 Expr* SemanticsVisitor::checkBaseForMemberExpr(
     Expr* inBaseExpr,
     CheckBaseContext checkBaseContext,
-    bool& outNeedDeref)
+    List<Expr*>& outDerefBases)
 {
     auto baseExpr = inBaseExpr;
     baseExpr = CheckTerm(baseExpr);
 
     auto resultBaseExpr =
-        maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outNeedDeref);
+        maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outDerefBases);
 
     // We might want to register differentiability on any implicit ops that we add in.
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
@@ -9466,11 +9469,12 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
 
 Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
 {
-    bool needDeref = false;
+    List<Expr*> derefBases;
     expr->baseExpression =
-        checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, needDeref);
+        checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, derefBases);
 
-    if (!needDeref && as<DerefMemberExpr>(expr) && !as<PtrType>(expr->baseExpression->type))
+    if (derefBases.getCount() == 0 && as<DerefMemberExpr>(expr) &&
+        !as<PtrType>(expr->baseExpression->type))
     {
         // The user is trying to use the `->` operator on something that can't be
         // dereferenced, so we should diagnose that.
