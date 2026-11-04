@@ -1,7 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK): -std legacy -no-codegen
-//TEST:SIMPLE(filecheck=CHECK): -std 2025 -no-codegen
-//TEST:SIMPLE(filecheck=CHECK): -std 2026 -no-codegen
-//TEST:SIMPLE(filecheck=CHECK): -std 202c -no-codegen
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -std legacy -no-codegen
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -std 2025 -no-codegen
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -std 2026 -no-codegen
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -std 202c -no-codegen
 
 interface IFoo
 {

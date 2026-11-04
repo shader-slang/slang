@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -std 202c -no-codegen
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -std 202c -no-codegen
 
 interface IFoo
 {
