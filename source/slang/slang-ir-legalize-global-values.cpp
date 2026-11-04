@@ -1,5 +1,6 @@
 #include "slang-ir-legalize-global-values.h"
 
+#include "slang-compiler.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"
 
@@ -248,30 +249,59 @@ IRInst* GlobalInstInliningContextGeneric::maybeInlineGlobalValue(
 
 struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextGeneric
 {
-    static bool isSimpleConstantType(IRType* type)
+    // True if the target can emit the initializer of a global constant of a type that
+    // contains `half`. CUDA cannot: it emits a `half` literal as a `__half(...)`
+    // constructor call, which NVRTC rejects as the dynamic initializer of a `__device__`
+    // variable.
+    bool targetCanEmitGlobalInitializerForHalf;
+
+    explicit GlobalInstLegalizationInliningContext(CodeGenTarget target)
+        : targetCanEmitGlobalInitializerForHalf(target != CodeGenTarget::CUDASource)
     {
-        for (;;)
+    }
+
+    // Return true if a value of `type` can stay a global constant. A simple type is a
+    // scalar, a vector, a matrix, an array of a simple type, or a struct whose fields
+    // are all simple types.
+    //
+    // A struct with a resource, pointer, or other opaque field is not simple. A type
+    // that contains `half` is not simple when `targetCanEmitGlobalInitializerForHalf` is
+    // false: CUDA emits a `half` literal as a `__half(...)` constructor call, which is a
+    // dynamic initializer that NVRTC rejects. Returning false is always safe: the value
+    // is then inlined into the functions that use it.
+    bool isSimpleConstantType(IRType* type)
+    {
+        if (!type)
+            return true;
+        if (as<IRBasicType>(type))
+            return targetCanEmitGlobalInitializerForHalf || type->getOp() != kIROp_HalfType;
+        if (auto vectorType = as<IRVectorType>(type))
+            return isSimpleConstantType(vectorType->getElementType());
+        if (auto matrixType = as<IRMatrixType>(type))
+            return isSimpleConstantType(matrixType->getElementType());
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+            return isSimpleConstantType(arrayType->getElementType());
+        if (auto structType = as<IRStructType>(type))
         {
-            if (!type)
-                return true;
-            if (as<IRBasicType>(type))
-                return true;
-            if (as<IRVectorType>(type))
-                return true;
-            if (as<IRMatrixType>(type))
-                return true;
-            if (auto arrayType = as<IRArrayTypeBase>(type))
+            for (auto field : structType->getFields())
             {
-                type = arrayType->getElementType();
-                continue;
+                if (!isSimpleConstantType(field->getFieldType()))
+                    return false;
             }
-            return false;
+            return true;
         }
+        return false;
     }
     bool isLegalGlobalInstForTarget(IRInst* inst) override
     {
-        auto type = inst->getDataType();
-        return isSimpleConstantType(type);
+        // A call is never a compile-time constant, even if its result type is simple.
+        // `legalizeConstantConstructorCallsForGlobalScope` folds some constructor
+        // calls. A call that it does not fold (for example a user-defined constructor)
+        // must be inlined. If it stayed global, CUDA would get a dynamic initializer,
+        // which NVRTC rejects.
+        if (as<IRCall>(inst))
+            return false;
+        return isSimpleConstantType(inst->getDataType());
     }
 
     bool isInlinableGlobalInstForTarget(IRInst* /* inst */) override { return false; }
@@ -281,9 +311,177 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
     IRInst* getOutsideASM(IRInst* beforeInst) override { return beforeInst; }
 };
 
-void inlineGlobalConstantsForLegalization(IRModule* module)
+// Return a `makeStruct` that is equal to `call`, or nullptr if `call` is not a call to
+// a member-wise synthesized constructor. The caller replaces the call.
+//
+// A member-wise constructor makes a temporary, stores each argument into its field,
+// and returns the temporary. This is the same as `makeStruct` of the arguments. The
+// function checks the constructor body, because the `synthesizedConstructor`
+// decoration is not enough: the constructor of a derived struct also calls the base
+// constructor, for example. Any other shape returns nullptr.
+//
+// Consider this example:
+//
+//     struct Record { uint a; uint b; }
+//     static const Record records[2] = { {1, 2}, {3, 4} };
+//
+// The checker lowers each `{1, 2}` to a constructor call, so the module has:
+//
+//     %records = globalConstant(makeArray(call Record.$init(1,2),
+//                                         call Record.$init(3,4)))
+//
+// A call is not a legal global constant, so the table would be inlined into every
+// function that uses it. After this function folds the calls, the table is
+// `makeArray(makeStruct(1,2), makeStruct(3,4))` and can stay global. Inside a
+// function body the call stays a call, because a local struct is built at run time.
+static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(
+    GlobalInstLegalizationInliningContext& context,
+    IRCall* call)
 {
-    GlobalInstLegalizationInliningContext context;
+    auto callee = as<IRFunc>(getResolvedInstForDecorations(call->getCallee()));
+    if (!callee)
+        return nullptr;
+    auto ctorDecor = callee->findDecoration<IRConstructorDecoration>();
+    if (!ctorDecor || !ctorDecor->getSynthesizedStatus())
+        return nullptr;
+
+    auto structType = as<IRStructType>(call->getDataType());
+    if (!structType)
+        return nullptr;
+
+    // Fold only a struct that is a simple constant. Other structs are inlined.
+    if (!context.isSimpleConstantType(structType))
+        return nullptr;
+
+    // A member-wise constructor has one block.
+    auto block = callee->getFirstBlock();
+    if (!block || block->getNextBlock())
+        return nullptr;
+
+    // Map each parameter to the corresponding call argument.
+    Dictionary<IRInst*, IRInst*> paramToArg;
+    UInt paramCount = 0;
+    for (auto param : block->getParams())
+    {
+        if (paramCount >= call->getArgCount())
+            return nullptr;
+        paramToArg[param] = call->getArg(paramCount);
+        paramCount++;
+    }
+    if (paramCount != call->getArgCount())
+        return nullptr;
+
+    // Record the value stored into each field. Return nullptr on any other shape.
+    IRVar* localVar = nullptr;
+    IRInst* loadedResult = nullptr;
+    Dictionary<IRInst*, IRInst*> fieldKeyToValue;
+    HashSet<IRInst*> consumedParams;
+    for (auto inst = block->getFirstOrdinaryInst(); inst; inst = inst->getNextInst())
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Var:
+            if (localVar) // Only one temporary is allowed.
+                return nullptr;
+            localVar = as<IRVar>(inst);
+            if (localVar->getDataType()->getValueType() != structType)
+                return nullptr;
+            break;
+        case kIROp_FieldAddress:
+            if (as<IRFieldAddress>(inst)->getBase() != localVar)
+                return nullptr;
+            break;
+        case kIROp_Store:
+            {
+                // A store after the load is not in the returned value.
+                if (loadedResult)
+                    return nullptr;
+                auto store = as<IRStore>(inst);
+                auto fieldAddr = as<IRFieldAddress>(store->getPtr());
+                if (!fieldAddr || fieldAddr->getBase() != localVar)
+                    return nullptr;
+                IRInst* arg = nullptr;
+                if (!paramToArg.tryGetValue(store->getVal(), arg))
+                    return nullptr; // The stored value is not a parameter.
+                if (consumedParams.contains(store->getVal()))
+                    return nullptr; // Each parameter must set one field.
+                consumedParams.add(store->getVal());
+                if (fieldKeyToValue.containsKey(fieldAddr->getField()))
+                    return nullptr; // Each field must be set once.
+                fieldKeyToValue[fieldAddr->getField()] = arg;
+                break;
+            }
+        case kIROp_Load:
+            if (as<IRLoad>(inst)->getPtr() != localVar)
+                return nullptr;
+            loadedResult = inst;
+            break;
+        case kIROp_Return:
+            if (as<IRReturn>(inst)->getVal() != loadedResult)
+                return nullptr;
+            break;
+        default:
+            return nullptr; // Any other instruction.
+        }
+    }
+
+    // Collect the operands in field order. Every field must be set.
+    List<IRInst*> args;
+    UInt fieldCount = 0;
+    for (auto field : structType->getFields())
+    {
+        IRInst* value = nullptr;
+        if (!fieldKeyToValue.tryGetValue(field->getKey(), value))
+            return nullptr; // The field is never set.
+        args.add(value);
+        fieldCount++;
+    }
+
+    // Each field must match one parameter and one argument. This also makes sure
+    // that no argument is dropped.
+    if (fieldCount != paramCount)
+        return nullptr;
+    SLANG_ASSERT((UInt)args.getCount() == fieldCount && fieldCount == call->getArgCount());
+
+    IRBuilder builder(call->getModule());
+    builder.setInsertBefore(call);
+    return builder.emitMakeStruct(structType, args);
+}
+
+// Fold module-scope calls to member-wise synthesized constructors into `makeStruct`.
+// `inlineGlobalConstantsForLegalization` runs this first, so that a `static const`
+// struct table can stay a global constant.
+//
+// Calls inside function bodies are not changed, because a local struct is built at
+// run time. Only a module-scope value must be a compile-time constant. See
+// `tryBuildMakeStructFromSynthesizedConstructorCall` for an example.
+static void legalizeConstantConstructorCallsForGlobalScope(
+    GlobalInstLegalizationInliningContext& context,
+    IRModule* module)
+{
+    // The calls in a `static const` initializer are direct children of the module.
+    // Collect them first, because the loop below changes the list of global insts.
+    List<IRCall*> globalCalls;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto call = as<IRCall>(inst))
+            globalCalls.add(call);
+    }
+    for (auto call : globalCalls)
+    {
+        if (auto makeStruct = tryBuildMakeStructFromSynthesizedConstructorCall(context, call))
+        {
+            call->replaceUsesWith(makeStruct);
+            call->removeAndDeallocate();
+        }
+    }
+}
+
+void inlineGlobalConstantsForLegalization(IRModule* module, CodeGenTarget target)
+{
+    GlobalInstLegalizationInliningContext context(target);
+
+    legalizeConstantConstructorCallsForGlobalScope(context, module);
 
     context.wrapReferences = false;
     context.inlineGlobalValuesAndRemoveIfUnused(module);

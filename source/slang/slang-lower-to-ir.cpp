@@ -15326,7 +15326,7 @@ static void lowerFrontEndEntryPointToIR(
 
     {
 
-        Name* entryPointName = entryPoint->getFuncDecl()->getName();
+        Name* entryPointName = entryPoint->getName();
         builder->addEntryPointDecoration(
             instToDecorate,
             entryPoint->getProfile(),
