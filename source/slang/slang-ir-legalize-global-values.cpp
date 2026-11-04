@@ -33,20 +33,36 @@ void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRMod
         auto val = maybeInlineGlobalValue(builder, use->getUser(), use->get(), cloneEnv);
         if (val != use->get())
         {
-            // Since certain globals that appear in the IR are considered illegal for all targets,
-            // e.g. calls to functions, we delete the globals we've inlined.
-            // Note that the inlining is done such that none of the descendants of the global will
-            // have any uses either.
+            // A global that is illegal for the target, such as a call, is removed below once
+            // every use has its own copy, together with the operands inlined with it.
             globalInstsToConsiderDeleting.add(use->usedValue);
 
             builder.replaceOperand(use, val);
         }
     }
 
+    // Inlining clones a global value together with the operands it needs, so once its uses are
+    // replaced, operands that were inlined with it may be left without uses as well. Dead code
+    // elimination would keep such an operand when it is a call whose callee might have side
+    // effects. We remove it here instead: a value at module scope is evaluated only where it is
+    // used, and each of those uses now has its own copy. An operand can be queued more than once,
+    // so we skip one that is no longer in the module.
+    List<IRInst*> workList;
     for (auto globalInst : globalInstsToConsiderDeleting)
+        workList.add(globalInst);
+    while (workList.getCount())
     {
-        if (!globalInst->hasUses())
-            globalInst->removeAndDeallocate();
+        auto globalInst = workList.getLast();
+        workList.removeLast();
+        if (!globalInst->getParent() || globalInst->hasUses())
+            continue;
+        for (UInt i = 0; i < globalInst->getOperandCount(); i++)
+        {
+            auto operand = globalInst->getOperand(i);
+            if (as<IRModuleInst>(operand->getParent()) && shouldInlineInst(operand))
+                workList.add(operand);
+        }
+        globalInst->removeAndDeallocate();
     }
 }
 
