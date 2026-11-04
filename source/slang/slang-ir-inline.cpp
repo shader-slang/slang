@@ -333,15 +333,6 @@ struct InliningPassBase
             case kIROp_Load:
             case kIROp_Store:
                 return false;
-            case kIROp_Div:
-            case kIROp_ConstexprDiv:
-            case kIROp_IRem:
-            case kIROp_ConstexprIRem:
-                // `mightHaveSideEffects()` reports an integer division whose divisor is not a
-                // nonzero literal because it might trap. Once inlined, the division is at module
-                // scope, where it is evaluated at its uses and `mightHaveSideEffects()` reports no
-                // effect, so it does not keep the body from being inlined.
-                break;
             default:
                 if (inst->mightHaveSideEffects())
                     return false;
