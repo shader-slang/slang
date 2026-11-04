@@ -402,8 +402,10 @@ DeclRef<FuncDecl> findEntryPointByName(
     *outStageType = nullptr;
     SharedSemanticsContext sharedContext(linkage, module, sink);
     SemanticsVisitor visitor(&sharedContext);
-    auto expr =
-        module->findDeclFromString(getText(name), ComponentType::DeclLookupPurpose::EntryPoint, sink);
+    auto expr = module->findDeclFromString(
+        getText(name),
+        ComponentType::DeclLookupPurpose::EntryPoint,
+        sink);
     auto declRefExpr = as<DeclRefExpr>(expr);
     auto stageTypeDeclRef =
         declRefExpr ? declRefExpr->declRef.as<AggTypeDecl>() : DeclRef<AggTypeDecl>();
