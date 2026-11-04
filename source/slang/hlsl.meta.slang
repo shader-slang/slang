@@ -6406,6 +6406,7 @@ T __atomic_decrement<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed);
 [ForceInline]
 [require(atomic_reduce)]
 __cuda_sm_version(7.0)
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_add<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -6422,6 +6423,7 @@ void __atomic_reduce_add<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_bfloat16)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_add(__ref BFloat16 val, BFloat16 value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
@@ -6434,6 +6436,7 @@ void __atomic_reduce_add(__ref BFloat16 val, BFloat16 value, MemoryOrder order =
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_bfloat16)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_add(__ref vector<BFloat16, 2> val, vector<BFloat16, 2> value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
@@ -6446,6 +6449,7 @@ void __atomic_reduce_add(__ref vector<BFloat16, 2> val, vector<BFloat16, 2> valu
 [ForceInline]
 [require(atomic_reduce)]
 __cuda_sm_version(7.0)
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -6462,6 +6466,7 @@ void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 [ForceInline]
 [require(atomic_reduce)]
 __cuda_sm_version(7.0)
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -6478,6 +6483,7 @@ void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 [ForceInline]
 [require(atomic_reduce)]
 __cuda_sm_version(7.0)
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_max<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -7221,6 +7227,7 @@ $}
     [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue)
     {
         __target_switch
@@ -7238,6 +7245,7 @@ $}
 
     [require(cuda, cuda_sm_6_0)]
     [require(spirv, spvAtomicFloat64AddEXT)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     void InterlockedAddF64(uint byteAddress, double valueToAdd, out double originalValue)
     {
         __target_switch
@@ -7287,6 +7295,7 @@ $}
     [__requiresNVAPI]
     [ForceInline]
     [require(cuda_hlsl_spirv, sm_5_0)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -7327,6 +7336,7 @@ $}
     [__requiresNVAPI]
     [ForceInline]
     [require(cuda_hlsl_spirv, sm_5_0)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     void InterlockedAddF16Emulated(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -7366,6 +7376,7 @@ $}
     [ForceInline]
     __cuda_sm_version(2.0)
     [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
         __target_switch
@@ -7509,6 +7520,7 @@ $}
     /// For CUDA, this function maps to `atomicCAS`.
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     void InterlockedCompareExchangeFloatBitwise(uint byteAddress, float compareValue, float value, out float outOriginalValue)
     {
         __target_switch
@@ -7530,6 +7542,7 @@ $}
     /// For CUDA, this function maps to `atomicExch`.
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     void InterlockedExchangeFloat(uint byteAddress, float value, out float outOriginalValue)
     {
         __target_switch
@@ -7575,6 +7588,7 @@ $}
     /// For CUDA, this function maps to `atomicCAS`.
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     void InterlockedCompareStoreFloatBitwise(uint byteAddress, float compareValue, float value)
     {
         __target_switch
@@ -12828,6 +12842,7 @@ $}
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void Interlocked$(atomicOp.slangCallSuffix)<T:$(atomicOp.interface)>(__ref T dest,  T value)
 {
     __atomic_$(atomicOp.internalCallSuffix)(dest, value);
@@ -12836,6 +12851,7 @@ void Interlocked$(atomicOp.slangCallSuffix)<T:$(atomicOp.interface)>(__ref T des
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void Interlocked$(atomicOp.slangCallSuffix)<T:$(atomicOp.interface)>(__ref T dest, T value, out T original_value)
 {
     original_value = __atomic_$(atomicOp.internalCallSuffix)(dest, value);
@@ -12844,6 +12860,7 @@ void Interlocked$(atomicOp.slangCallSuffix)<T:$(atomicOp.interface)>(__ref T des
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void Interlocked$(atomicOp.slangCallSuffix)(__ref uint dest, int value)
 {
     __atomic_$(atomicOp.internalCallSuffix)(dest, (uint)value);
@@ -12870,6 +12887,7 @@ $}
 /// @category atomic
 [ForceInline]
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void InterlockedCompareExchange<T:IAtomicable>(__ref T dest, T compare_value, T value, out T original_value)
 {
     original_value = __atomic_compare_exchange(dest, compare_value, value);
@@ -12891,12 +12909,14 @@ void InterlockedCompareExchange<T:IAtomicable>(__ref T dest, T compare_value, T 
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
 [ForceInline]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_value, float value)
 {
     __atomic_compare_exchange(dest, compare_value, value);
 }
 
 [ForceInline]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_value, float value, out float original_value)
 {
     original_value = __atomic_compare_exchange(dest, compare_value, value);
@@ -12919,6 +12939,7 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void InterlockedCompareStore<T:IAtomicable>(__ref T dest,  T compare_value,  T value)
 {
     __target_switch
@@ -12945,6 +12966,7 @@ void InterlockedCompareStore<T:IAtomicable>(__ref T dest,  T compare_value,  T v
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
 [ForceInline]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void InterlockedCompareStoreFloatBitwise<T:IAtomicable>(__ref  T dest,  T compare_value, T value)
 {
     __target_switch
@@ -28814,6 +28836,7 @@ extension _Texture<float, Shape, 0, 0, 0, $(kCoreModule_ResourceAccessReadWrite)
     [ForceInline]
     __glsl_extension(GL_EXT_shader_atomic_float)
     [require(glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)
     {
         __target_switch
@@ -28832,6 +28855,7 @@ extension _Texture<float, Shape, 0, 0, 0, $(kCoreModule_ResourceAccessReadWrite)
     }
 
     [ForceInline]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     float InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value)
     {
         float originalValue;
@@ -36580,6 +36604,7 @@ uint packHalf2x16(half2 unpackedValue)
 }
 
 [require(spirv)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void InterlockedAddF16Emulated(half* dest, half value, out half originalValue)
 {
     let buf = (half2*)(dest);
@@ -36595,6 +36620,7 @@ void InterlockedAddF16Emulated(half* dest, half value, out half originalValue)
 }
 
 [require(spirv)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void InterlockedAddF16x2(half2* dest, half2 value, out half2 originalValue)
 {
     originalValue = __atomic_add(*dest, value);

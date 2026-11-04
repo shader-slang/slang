@@ -39,3 +39,13 @@ float n(float x)
 //CHECK:   ^^^^^^^ 'no_diff' in non-differentiable function
 //CHECK:   ^^^^^^^ cannot use 'no_diff' in a non-differentiable function.
 }
+
+// A `no_diff` at the start of a statement means the same as one in expression position.
+void o(float x)
+{
+    no_diff nonDiff(x);
+/*CHECK:
+    ^^^^^^^ 'no_diff' in non-differentiable function
+    ^^^^^^^ cannot use 'no_diff' in a non-differentiable function.
+*/
+}

@@ -1,7 +1,8 @@
 // A float atomic inside a differentiated function is non-differentiable like
 // the integer ones: its value operand depends on the differentiable input,
-// but no derivative flows through the atomic. Float atomic add is not
-// available on every target, so this test compiles for targets that have it.
+// but no derivative flows through the atomic, which `no_diff` acknowledges.
+// Float atomic add is not available on every target, so this test compiles
+// for targets that have it.
 
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -stage compute -entry computeMain
@@ -12,8 +13,11 @@ RWStructuredBuffer<Atomic<float>> accumulator;
 [Differentiable]
 float f(float x)
 {
-    float original = accumulator[0].add(x * 2.0f);
-    return x * x + original;
+    float original = no_diff accumulator[0].add(x * 2.0f);
+    float interlockedOriginal;
+    no_diff InterlockedAdd(floatBuffer[3], x, interlockedOriginal);
+    accumulator[1].add(interlockedOriginal);
+    return x * x + original + interlockedOriginal;
 }
 
 [shader("compute")]

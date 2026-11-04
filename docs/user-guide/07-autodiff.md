@@ -818,6 +818,37 @@ float f(float x)
 
 However, the `no_diff` keyword is not required in a call if a non-differentiable function does not take any differentiable parameters, or if the result of the differentiable function is not dependent on the derivative being propagated through the call.
 
+### Atomic Operations in a Differentiable Function
+
+Atomic operations, such as the `Atomic<T>` methods and the `Interlocked*` functions, are non-differentiable: they read and modify memory that holds no derivative. When an atomic writes a value that carries a derivative, that derivative is lost in the same way as in an assignment to a non-differentiable location, so Slang treats it as a compile-time error unless the intention is clarified:
+
+```csharp
+RWStructuredBuffer<Atomic<float>> accumulator;
+
+[Differentiable]
+float f(float x)
+{
+    // Error: the atomic writes `x`, which carries a derivative, into non-differentiable memory.
+    accumulator[0].add(x);
+    return x * x;
+}
+```
+
+Prefix the atomic with `no_diff`, or pass the value through `detach`, to clarify that the derivative is meant to be discarded:
+
+```csharp
+[Differentiable]
+float f(float x)
+{
+    // OK: the intention to discard the derivative is clarified.
+    no_diff accumulator[0].add(x);
+    accumulator[1].add(detach(x));
+    return x * x;
+}
+```
+
+No clarification is needed when the written values carry no derivative, as with an integer counter such as `counters[0].add(1u)`. The value an atomic returns carries no derivative either, so it can be used like a value read from a buffer.
+
 ### Treat Non-Differentiable Functions as Differentiable
 
 Slang allows functions to be marked with a `[TreatAsDifferentiable]` attribute for them to be considered as differentiable functions by the type-system. When a function is marked as `[TreatAsDifferentiable]`, the compiler will not generate derivative propagation code from the original function body or perform any additional checking on the function definition. Instead, it will generate trivial forward and backward propagation functions that return 0.
@@ -871,7 +902,7 @@ User-defined higher-order derivative functions can be specified by using `[Forwa
 
 The compiler can generate forward derivative and backward propagation implementations for most uses of array and struct types, including arbitrary read and write access at dynamic array indices, and supports uses of all types of control flows, mutable parameters, generics, and interfaces. This covers the set of operations that is sufficient for a lot of functions. However, the user needs to be aware of the following restrictions when using automatic differentiation:
 
-- All operations to global resources, global variables and shader parameters, including texture reads or atomic writes, are treated as a non-differentiable operation. Slang provides support for special data-structures (such as `Tensor`) through libraries such as `SlangPy`, which come with custom derivative implementations.
+- All operations to global resources, global variables and shader parameters, including texture reads or atomic writes, are treated as a non-differentiable operation. An atomic that writes a value carrying a derivative must be marked `no_diff` (see [Atomic Operations in a Differentiable Function](#atomic-operations-in-a-differentiable-function)). Slang provides support for special data-structures (such as `Tensor`) through libraries such as `SlangPy`, which come with custom derivative implementations.
 - If a differentiable function contains calls that cause side-effects such as updates to global memory, there is currently no guarantee on how many times side-effects will occur during the resulting derivative function or back-propagation function.
 - Loops: Loops must have a bounded number of iterations. If this cannot be inferred statically from the loop structure, the attribute `[MaxIters(<count>)]` can be used to specify a maximum number of iterations. This will be used by the compiler to allocate space to store intermediate data. If the actual number of iterations exceeds the provided maximum, the behavior is undefined. You can always mark a loop with the `[ForceUnroll]` attribute to instruct the Slang compiler to unroll the loop before generating derivative propagation functions. Unrolled loops will be treated the same way as ordinary code and are not subject to any additional restrictions.
 - Double backward derivatives (higher-order differentiation): The compiler does not currently support differentiating a function that itself calls `bwd_diff`, because the code produced by `bwd_diff` is not further differentiable. This includes both `bwd_diff(bwd_diff(fn))` and `fwd_diff` of a function that calls `bwd_diff`; both are rejected with a diagnostic. The vast majority of higher-order derivative applications can be achieved more efficiently via multiple forward-derivative calls or a single layer of `bwd_diff` on functions that use one or more `fwd_diff` passes.
