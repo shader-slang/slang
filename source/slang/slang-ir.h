@@ -775,8 +775,6 @@ struct IRInst
     /// It is possible that this instruction has side effects?
     ///
     /// This is a conservative test, and will return `true` if an exact answer can't be determined.
-    /// The answer can depend on where the instruction is: an integer division that might trap has
-    /// a side effect inside a function body, but not at module scope.
     bool mightHaveSideEffects(
         SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None,
         Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);

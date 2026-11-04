@@ -316,9 +316,7 @@ struct InliningPassBase
         return true;
     }
 
-    /// Determine whether the body of `callee` can be inlined at the global scope. The body must be
-    /// a single block ending in `return`, with no local storage and no instruction that would have
-    /// a side effect at the global scope.
+    /// Determine whether the body of `callee` can be inlined at the global scope.
     static bool isInlinableAtGlobalScope(IRFunc* callee)
     {
         auto firstBlock = callee->getFirstBlock();
@@ -339,9 +337,10 @@ struct InliningPassBase
             case kIROp_ConstexprDiv:
             case kIROp_IRem:
             case kIROp_ConstexprIRem:
-                // An integer division whose divisor is not a nonzero literal might trap, so
-                // `mightHaveSideEffects()` reports it inside the callee's body. Once inlined at the
-                // global scope, the division is evaluated at its uses and reports no effect there.
+                // `mightHaveSideEffects()` reports an integer division whose divisor is not a
+                // nonzero literal because it might trap. Once inlined, the division is at module
+                // scope, where it is evaluated at its uses and `mightHaveSideEffects()` reports no
+                // effect, so it does not keep the body from being inlined.
                 break;
             default:
                 if (inst->mightHaveSideEffects())
@@ -646,15 +645,14 @@ struct InliningPassBase
         //
         IRInst* returnVal = nullptr;
         List<IRDebugInlinedAt*> debugInlinedInsts;
-        // The global scope has no debug scope, source line or local variables, so the debug
-        // information of a body inlined there describes nothing, and `isInlinableAtGlobalScope`
-        // ignores it. It would also be left behind: an inlined value is carried into the functions
-        // that use it, but a `DebugValue` has no users, so it keeps a use of its operand, such as a
-        // uniform parameter, at the global scope, which the C++ and Metal targets cannot lower.
-        bool isCallAtGlobalScope = !as<IRBlock>(call->getParent());
+        // Module scope has no debug scope, source line or local variables, so the debug
+        // information of a body inlined there describes nothing. A `DebugValue` cloned there
+        // would also keep a use of its operand, such as a uniform parameter, outside of any
+        // function, where no target can evaluate it.
+        bool isCallAtModuleScope = !as<IRBlock>(call->getParent());
         for (auto inst : firstBlock->getChildren())
         {
-            if (isCallAtGlobalScope && isDebugInfoInst(inst))
+            if (isCallAtModuleScope && isDebugInfoInst(inst))
                 continue;
             switch (inst->getOp())
             {

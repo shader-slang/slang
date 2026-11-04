@@ -9807,12 +9807,9 @@ bool IRInst::mightHaveSideEffects(
                 if (intLit->getValue() != 0)
                     return false;
             }
-            // A possible trap is undefined behavior that depends only on the operands, unlike a
-            // write, so a division may be evaluated once per use or dropped when it is unused.
-            // A module-scope instruction does not run on its own: global value legalization
-            // copies it into the functions that use it, and the emitters fold a module-scope
-            // instruction without side effects into its uses. A division at module scope, such
-            // as one a `static const` initializer is built from, is therefore a value.
+            // A module-scope instruction does not run on its own; it is evaluated where it is
+            // used, so a possible trap belongs to the use site. A division at module scope,
+            // such as one a `static const` initializer is built from, is therefore a value.
             if (as<IRModuleInst>(getParent()))
                 return false;
             return true;
