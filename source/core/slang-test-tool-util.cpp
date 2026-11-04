@@ -14,6 +14,8 @@ namespace Slang
     {
     case SLANG_OK:
         return ToolReturnCode::Success;
+    case SLANG_E_ABORT:
+        return ToolReturnCode::InternalCompilerError;
     case SLANG_E_INTERNAL_FAIL:
         return ToolReturnCode::CompilationFailed;
     case SLANG_FAIL:

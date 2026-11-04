@@ -1627,6 +1627,7 @@ struct OptionsParser
     }
 
     void _appendUsageTitle(StringBuilder& out);
+    void _appendExitCodes(StringBuilder& out);
     void _appendMinimalUsage(StringBuilder& out);
     void _outputMinimalUsage();
 
@@ -2394,6 +2395,20 @@ void OptionsParser::_appendUsageTitle(StringBuilder& out)
     out << "Usage: slangc [options...] [--] <input files>\n\n";
 }
 
+// Describes the exit code of `slangc`. The values come from `ToolReturnCode` in
+// `slang-test-tool-util.h`, which `slangc` returns from `main`.
+void OptionsParser::_appendExitCodes(StringBuilder& out)
+{
+    out << "Exit codes:\n";
+    out << "  0   Success.\n";
+    out << "  1   The command line was invalid, or the tool failed to run.\n";
+    out << "  -1  The compilation failed because of errors in the input.\n";
+    out << "  -2  The compiler hit an unexpected failure: an internal compiler error, an\n";
+    out << "      assertion, an exception or an abort. This is a bug in the compiler.\n";
+    out << "Where the exit status has only 8 bits (for example on Linux and macOS), -1 is\n";
+    out << "reported as 255 and -2 as 254.\n";
+}
+
 void OptionsParser::_outputMinimalUsage()
 {
     // Output usage info
@@ -2743,6 +2758,8 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
         if (m_helpStyle == CommandOptionsWriter::Style::Text)
         {
             _appendUsageTitle(buf);
+            _appendExitCodes(buf);
+            buf << "\n";
         }
         else
         {
@@ -2757,6 +2774,10 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
             buf << "slangc -h\n\n";
             buf << "# To generate this file\n";
             buf << "slangc -help-style markdown -h\n";
+            buf << "```\n";
+            buf << "\n";
+            buf << "```\n";
+            _appendExitCodes(buf);
             buf << "```\n";
         }
 
