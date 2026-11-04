@@ -70,7 +70,8 @@ struct LValueCastLoweringContext
             {
                 auto matB = static_cast<IRMatrixType*>(b);
 
-                if (getIntVal(matA->getColumnCount()) != getIntVal(matB->getColumnCount()))
+                if (getIntVal(matA->getColumnCount()) != getIntVal(matB->getColumnCount()) ||
+                    getIntVal(matA->getLayout()) != getIntVal(matB->getLayout()))
                 {
                     return false;
                 }
