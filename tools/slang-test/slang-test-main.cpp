@@ -105,25 +105,6 @@ struct TestOptions
     }
     bool isNonExhaustiveDiagTest() const { return commandOptions.containsKey("non-exhaustive"); }
 
-    /// Gets the exit code that the tool under test is expected to return.
-    ///
-    /// A test expects exit code 0 unless it says otherwise, for example
-    /// `//TEST:SIMPLE(filecheck=CHECK, exit-code=1): ...` for a test that expects the compilation
-    /// to fail. Returns false if the value of `exit-code` is not an integer.
-    bool getExpectedExitCode(int& outExitCode) const
-    {
-        outExitCode = 0;
-        String value;
-        if (!commandOptions.tryGetValue("exit-code", value))
-            return true;
-
-        Int parsed = 0;
-        if (SLANG_FAILED(StringUtil::parseInt(value.getUnownedSlice(), parsed)))
-            return false;
-        outExitCode = int(parsed);
-        return true;
-    }
-
     Type type = Type::Normal;
 
     String command;
@@ -3532,11 +3513,8 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
 
-    // A FileCheck test only looks at the text of the output, so it does not notice when the tool
-    // fails. We check the exit code here. A test that expects a failure says so with
-    // `exit-code=N`. Tests that compare with an `.expected` file already check the result code,
-    // because it is a part of the text they compare. Diagnostic tests (`diag=`) do not check it
-    // yet (#14266).
+    // FileCheck only sees the output text, so check the exit code here. The expected code is 0
+    // unless the test sets `exit-code=N`. Diagnostic tests (`diag=`) are not checked yet (#14266).
     bool exitCodeMismatch = false;
     String fileCheckPrefix;
     if (!input.testOptions->getDiagTestPrefix(diagPrefix) &&
@@ -3545,12 +3523,19 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         auto reporter = context->getTestReporter();
 
         int expectedExitCode = 0;
-        if (!input.testOptions->getExpectedExitCode(expectedExitCode))
+        String exitCodeOption;
+        if (input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
         {
-            reporter->message(
-                TestMessageType::TestFailure,
-                "the value of `exit-code` must be an integer");
-            return TestResult::Fail;
+            Int parsedExitCode = 0;
+            if (SLANG_FAILED(
+                    StringUtil::parseInt(exitCodeOption.getUnownedSlice(), parsedExitCode)))
+            {
+                reporter->message(
+                    TestMessageType::TestFailure,
+                    "the value of `exit-code` must be an integer");
+                return TestResult::Fail;
+            }
+            expectedExitCode = int(parsedExitCode);
         }
 
         if (exeRes.resultCode != expectedExitCode)
