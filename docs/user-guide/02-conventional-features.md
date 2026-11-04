@@ -540,7 +540,7 @@ While the call is in progress, nothing else should read or write the argument's 
 Slang has additional parameter modifiers for borrows and references:
 
 * `__borrow` (also spelled `__constref`) indicates an _immutable borrow_: the function may read the argument but not modify it, and nothing should modify the argument while the call is in progress
-* `__ref` indicates a _reference_: the parameter does not have exclusive access to its argument, so other code may read or write the argument's memory while the call is in progress, and the function observes those accesses
+* `__ref` indicates a _reference_: the parameter does not have exclusive access to its argument, so other code may read or write the argument's memory while the call is in progress, and the function reads and writes that memory directly
 
 > #### Note ####
 > These modifiers exist mainly to support the Slang core module. Their spelling and their implementation are subject to change, so we recommend that user code avoid them, with the exception of `groupshared` described below.

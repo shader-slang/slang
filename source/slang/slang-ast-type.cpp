@@ -900,11 +900,6 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                     // The derivative takes a reference parameter of the primal as is, with the
                     // same access, and does not differentiate the storage it refers to.
                     //
-                    // TODO: A function that is differentiated or has a user-defined derivative
-                    // cannot currently have a reference parameter (see
-                    // `checkDifferentiableCallableSignature`). Once it can, the parameter should
-                    // be treated as `no_diff` here.
-                    //
                     if (diffWitness)
                         SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
                     newParamTypes.add(getParamTypeWithModeWrapper(

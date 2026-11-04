@@ -16130,10 +16130,8 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
             // times and in a different order than the function does. We do not support one here
             // at all, so no derivative signature is ever built for the function.
             //
-            // TODO: Once we support a reference parameter here, it should be treated as
-            // `no_diff`, both in the function's derivative signatures and when a user-defined
-            // derivative is matched with its primal. We do not check whether a reference
-            // parameter is marked `no_diff` for now, because every one is rejected.
+            // TODO: Once supported, a reference parameter should be treated as `no_diff`. We do not
+            // check for `no_diff` on one now, since every one is rejected.
             //
             if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
                 getSink()->diagnose(
@@ -21191,9 +21189,6 @@ static void checkDerivativeAttribute(
 
     // A primal with a reference parameter cannot be differentiated, so it has no derivative
     // signature to check its derivative against.
-    //
-    // TODO: Once a primal can have a reference parameter, its derivative should take the same
-    // reference, treated as `no_diff` on both sides.
     //
     if (hasReferenceParameter(funcDecl))
         return;
