@@ -1,5 +1,5 @@
 //TEST:SIMPLE_EX(filecheck=PRESERVE): tests/bugs/13306/qualified-resource-shadow.hlsl -Gec -target hlsl -entry main
-//TEST:SIMPLE_EX(filecheck=REBIND): tests/bugs/13306/qualified-resource-shadow.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_REBIND
+//TEST:SIMPLE_EX(filecheck=REBIND,exit-code=-1): tests/bugs/13306/qualified-resource-shadow.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_REBIND
 
 // A memory qualifier constrains operations on the resource supplied by the application. `-Gec`
 // must therefore keep the parameter as an immutable alias instead of copying the resource value

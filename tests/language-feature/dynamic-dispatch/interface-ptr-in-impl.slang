@@ -21,7 +21,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-llvm -compute -shaderobj -output-using-type
 
 // Verify dynamic dispatch is actually generated (not optimized away)
-//TEST:SIMPLE(filecheck=DISPATCH):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
+//TEST:SIMPLE(filecheck=DISPATCH):-target spirv -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 // Input buffer to control which type is selected at runtime
 // This forces TRUE dynamic dispatch - compiler cannot optimize it away
@@ -62,7 +62,7 @@ struct SimpleImpl : IFoo
 float callThroughInterface(uint typeId, float inputValue)
 {
     IFoo obj;
-    
+
     // Runtime type selection - compiler CANNOT know which branch is taken
     if (typeId == 1)
     {
@@ -77,7 +77,7 @@ float callThroughInterface(uint typeId, float inputValue)
         s.value = inputValue;
         obj = s;
     }
-    
+
     // TRUE dynamic dispatch - compiler must emit switch on type tag
     return obj.foo();
     // DISPATCH-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
@@ -90,15 +90,15 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Test 1: GoodImpl (with IFoo* field) through dynamic dispatch
     // typeSelector[0] = 1 → GoodImpl, value = 42.0
     outputBuffer[0] = callThroughInterface(typeSelector[0], 42.0);  // CHECK: 42.0
-    
-    // Test 2: SimpleImpl through dynamic dispatch  
+
+    // Test 2: SimpleImpl through dynamic dispatch
     // typeSelector[1] = 2 → SimpleImpl, value = 25.0, result = 25.0 * 2.0 = 50.0
     outputBuffer[1] = callThroughInterface(typeSelector[1], 25.0);  // CHECK: 50.0
-    
+
     // Test 3: GoodImpl again to verify consistency
     // typeSelector[2] = 1 → GoodImpl, value = 10.0
     outputBuffer[2] = callThroughInterface(typeSelector[2], 10.0);  // CHECK: 10.0
-    
+
     // Test 4: SimpleImpl again
     // typeSelector[3] = 2 → SimpleImpl, value = 4.0, result = 4.0 * 2.0 = 8.0
     outputBuffer[3] = callThroughInterface(typeSelector[3], 4.0);   // CHECK: 8.0

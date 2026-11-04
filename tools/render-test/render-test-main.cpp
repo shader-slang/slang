@@ -3,6 +3,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "core/slang-io.h"
+#include "core/slang-platform.h"
 #include "core/slang-std-writers.h"
 #include "core/slang-string-util.h"
 #include "core/slang-test-tool-util.h"
@@ -1670,6 +1671,33 @@ static void renderDocBeginFrame() {}
 static void renderDocEndFrame() {}
 #endif
 
+/// Stops the Vulkan validation layer from also writing its messages to stdout.
+///
+/// The Khronos validation layer logs every message to stdout by itself, in addition to calling
+/// the debug messenger that the device registers. That messenger already collects the messages in
+/// `CoreDebugCallback`, and slang-test appends them to the output of the test. The text on stdout
+/// is therefore redundant, and it breaks the reply of a test server when it contains a blank line,
+/// because the server sends its JSON-RPC replies on stdout. We set `debug_action` to
+/// `VK_DBG_LAYER_ACTION_CALLBACK`, which keeps only the callbacks that the application registers.
+/// A value that the user has already set is left as it is. The layer reads the variable when
+/// the Vulkan instance is created, so this runs before the first device is created.
+static void _routeVulkanValidationMessagesToDebugCallback()
+{
+    const char* const name = "VK_KHRONOS_VALIDATION_DEBUG_ACTION";
+
+    Slang::StringBuilder existingValue;
+    if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
+            Slang::UnownedStringSlice(name),
+            existingValue)))
+        return;
+
+#if SLANG_WINDOWS_FAMILY
+    ::SetEnvironmentVariableA(name, "VK_DBG_LAYER_ACTION_CALLBACK");
+#else
+    ::setenv(name, "VK_DBG_LAYER_ACTION_CALLBACK", 0);
+#endif
+}
+
 static SlangResult _innerMain(
     Slang::StdWriters* stdWriters,
     SlangSession* session,
@@ -1986,6 +2014,7 @@ static SlangResult _innerMain(
         {
             if (options.enableDebugLayers)
             {
+                _routeVulkanValidationMessagesToDebugCallback();
                 getRHI()->enableDebugLayers();
             }
             Slang::ComPtr<rhi::IDevice> rhiDevice;

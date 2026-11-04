@@ -1,6 +1,6 @@
 // Test that Optional<T> with a resource/opaque type T produces a diagnostic.
 // Regression test for https://github.com/shader-slang/slang/issues/8277
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_NEG): -target spirv -DNEGATIVE
 
 #ifndef NEGATIVE

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv
 [require(hlsl)]
 struct MyType
 {}
@@ -15,5 +15,5 @@ ConstantBuffer<MyType> t2;
 [numthreads(1,1,1)]
 void f2()  // compile to spirv should result error here.
 {
-    ConstantBuffer<MyType> t3 = t2; 
+    ConstantBuffer<MyType> t3 = t2;
 }

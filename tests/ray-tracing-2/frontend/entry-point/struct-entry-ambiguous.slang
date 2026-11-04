@@ -1,0 +1,36 @@
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry MultiStage -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry MultiStage.invoke -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry MultiStage -stage closesthit -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry MultiStage -stage anyhit -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry MultiStage.invoke -stage closesthit -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry MultiStage.invoke -stage anyhit -no-codegen
+
+import slang.raytracing.portable;
+
+struct TestPayload {}
+struct TestRecord {}
+
+struct TestTraceContext : rt::ITraceContext
+{
+    typealias AccelerationStructure = rt::AccelerationStructure;
+    typealias Motion = rt::NoMotion;
+}
+
+struct HitContext : rt::IHitContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Payload = TestPayload;
+    typealias Primitive = rt::TrianglePrimitive;
+    typealias Record = TestRecord;
+}
+
+struct MultiStage : rt::IClosestHitShader, rt::IAnyHitShader
+/*CHECK:
+       ^^^^^^^^^^ ambiguous structural ray-tracing entry point stage
+       ^^^^^^^^^^ struct 'MultiStage' implements more than one executable ray-tracing stage; use '-stage <name>' to select one
+*/
+{
+    typealias Context = HitContext;
+    static void invoke(rt::ClosestHitInput<HitContext> input) {}
+    static void invoke(rt::AnyHitInput<HitContext> input) {}
+}

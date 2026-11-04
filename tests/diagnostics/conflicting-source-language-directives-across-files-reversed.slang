@@ -2,7 +2,7 @@
 // rather than being anchored to a particular file or diagnostic traversal order. E00120 is
 // intentionally suppressed because the first directive's extension mismatch is not under test.
 
-//TEST:SIMPLE_EX(filecheck=CHECK): tests/diagnostics/conflicting-source-language-directives-across-files-helper.slang tests/diagnostics/conflicting-source-language-directives-across-files.slang -no-codegen -Wno-120
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): tests/diagnostics/conflicting-source-language-directives-across-files-helper.slang tests/diagnostics/conflicting-source-language-directives-across-files.slang -no-codegen -Wno-120
 
 // CHECK: conflicting-source-language-directives-across-files.slang:14:2
 // CHECK: 14 | #version 450

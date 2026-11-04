@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 // A conversion to a type other than the one a throwing call returns is a call of its own, so a
 // `try` on it does not cover the throwing call in its operand (#13489). The checks match only the

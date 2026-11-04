@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -entry main -stage compute -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -entry main -stage compute -target hlsl
 
 // Mismatched vector extents are not broadcast-compatible: `getBuiltinArithmeticCommonType`
 // returns null, so the fast path bails and overload resolution reports "no overload" -- rather

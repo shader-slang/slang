@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -profile sm_5_0
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -entry main -profile sm_5_0
 //TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS): -target hlsl -entry main -profile sm_5_0 -ignore-capabilities
 
 // CHECK: error[E36107]

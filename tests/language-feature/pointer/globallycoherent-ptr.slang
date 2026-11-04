@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-stage compute -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-stage compute -entry computeMain -target spirv
 
 // Tests for invalid use of `globallycoherent` with Ptr/T*
 

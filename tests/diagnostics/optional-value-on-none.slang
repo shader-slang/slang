@@ -1,11 +1,11 @@
 // Test that accessing .value on both Optional and Conditional that are always 'none' produces errors
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_OPT): -target spirv -DTEST_OPT
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_COND): -target spirv -DTEST_COND
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_CONDTEX): -target spirv -DTEST_CONDTEX
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_OPT,exit-code=-1): -target spirv -DTEST_OPT
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_COND,exit-code=-1): -target spirv -DTEST_COND
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_CONDTEX,exit-code=-1): -target spirv -DTEST_CONDTEX
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_IFLET): -target spirv -DTEST_IFLET
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_VALUE): -target spirv -DTEST_VALUE
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_NESTED): -target spirv -DTEST_NESTED
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_INLINE): -target spirv -DTEST_INLINE
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_NESTED,exit-code=-1): -target spirv -DTEST_NESTED
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_INLINE,exit-code=-1): -target spirv -DTEST_INLINE
 
 #if defined(TEST_CONDTEX) || defined(TEST_IFLET)
 uniform Conditional<Texture2D, false> Tex;

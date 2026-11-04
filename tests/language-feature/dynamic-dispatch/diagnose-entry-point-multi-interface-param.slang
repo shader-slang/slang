@@ -4,9 +4,9 @@
 // which skips that pass, the typeflow pass's diagnoseEntryPointInterfaceParamIfNeeded
 // catches the missing conformances directly.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cuda -stage compute -entry computeMain
 
 [anyValueSize(16)]
 interface IFoo

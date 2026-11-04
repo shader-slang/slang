@@ -6,14 +6,14 @@
 // The supported controls below and the RWTexture surface path must stay clean.
 // Real half-texel fetch is deferred to the maintainer-linked refactoring (#10024).
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H1): -target cuda -entry eHalf -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H2): -target cuda -entry eHalf2 -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H3): -target cuda -entry eHalf3 -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H4): -target cuda -entry eHalf4 -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H3D): -target cuda -entry eHalf4_3D -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H1D): -target cuda -entry eHalf_1D -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H1DA): -target cuda -entry eHalf_1DArr -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H2DA): -target cuda -entry eHalf4_2DArr -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H1,exit-code=-1): -target cuda -entry eHalf -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H2,exit-code=-1): -target cuda -entry eHalf2 -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H3,exit-code=-1): -target cuda -entry eHalf3 -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H4,exit-code=-1): -target cuda -entry eHalf4 -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H3D,exit-code=-1): -target cuda -entry eHalf4_3D -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H1D,exit-code=-1): -target cuda -entry eHalf_1D -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H1DA,exit-code=-1): -target cuda -entry eHalf_1DArr -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H2DA,exit-code=-1): -target cuda -entry eHalf4_2DArr -stage compute
 
 //TEST:SIMPLE(filecheck=FLOAT): -target cuda -entry eFloat -stage compute
 //TEST:SIMPLE(filecheck=UINT): -target cuda -entry eUint -stage compute

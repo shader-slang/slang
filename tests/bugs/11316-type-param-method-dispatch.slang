@@ -24,7 +24,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv-asm -entry main -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKU,non-exhaustive):-target spirv-asm -entry mainUnconstrained -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKV,non-exhaustive):-target spirv-asm -entry mainValueParam -stage compute
-//TEST:SIMPLE(filecheck=CHECKC):-target spirv-asm -entry mainConjunction -stage compute
+//TEST:SIMPLE(filecheck=CHECKC,exit-code=-1):-target spirv-asm -entry mainConjunction -stage compute
 
 interface IFoo
 {

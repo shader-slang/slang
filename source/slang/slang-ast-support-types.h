@@ -222,7 +222,7 @@ FIDDLE() namespace Slang
 
     char const* getGLSLNameForImageFormat(ImageFormat format);
 
-    /// Enum for known built-in function names to replace string-based comparisons
+    /// Identifies declarations with compiler-defined meaning independently of their source names.
     enum class KnownBuiltinDeclName : uint32_t
     {
         GeometryStreamAppend,
@@ -241,11 +241,19 @@ FIDDLE() namespace Slang
         WaveIsFirstLane,
         WaveReadLaneFirst,
         CallShader,
-        ReportHit = 16,
+        ReportHit,
+        RayTracingClosestHitInput,
+        RayTracingAnyHitInput,
+        RayTracingIntersectionInput,
+        RayTracingMissInput,
+        RayTracingCallableInput,
+        RayTracingProgramHitGroups,
+        RayTracingProgramMissShaders,
+        RayTracingProgramCallableShaders = 24,
         COUNT
     };
 
-    /// Convert string name to KnownBuiltinDeclName enum
+    /// Returns the builtin identified by an exact name, or COUNT if the name is unknown.
     KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name);
 
     /// Returns true if `name` identifies one of the differentiable builtin

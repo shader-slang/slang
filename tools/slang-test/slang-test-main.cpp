@@ -3513,11 +3513,46 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
 
+    // FileCheck only sees the output text, so check the exit code here. The expected code is 0
+    // unless the test sets `exit-code=N`. Diagnostic tests (`diag=`) are not checked yet (#14266).
+    bool exitCodeMismatch = false;
+    String fileCheckPrefix;
+    if (!input.testOptions->getDiagTestPrefix(diagPrefix) &&
+        input.testOptions->getFileCheckPrefix(fileCheckPrefix))
+    {
+        auto reporter = context->getTestReporter();
+
+        int expectedExitCode = 0;
+        String exitCodeOption;
+        if (input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
+        {
+            Int parsedExitCode = 0;
+            if (SLANG_FAILED(
+                    StringUtil::parseInt(exitCodeOption.getUnownedSlice(), parsedExitCode)))
+            {
+                reporter->message(
+                    TestMessageType::TestFailure,
+                    "the value of `exit-code` must be an integer");
+                return TestResult::Fail;
+            }
+            expectedExitCode = int(parsedExitCode);
+        }
+
+        if (exeRes.resultCode != expectedExitCode)
+        {
+            StringBuilder message;
+            message << "expected exit code " << expectedExitCode << ", but the exit code is "
+                    << exeRes.resultCode;
+            reporter->message(TestMessageType::TestFailure, message.getBuffer());
+            exitCodeMismatch = true;
+        }
+    }
+
     return _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
