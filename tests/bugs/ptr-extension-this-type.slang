@@ -23,6 +23,6 @@ void main()
     Ptr<int> other;
     int result = p.f(other);
     
-    // CHECK: 1
-    printf("%d\n", result);
+    // CHECK: result=1
+    printf("result=%d\n", result);
 }
