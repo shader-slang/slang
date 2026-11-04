@@ -4269,6 +4269,15 @@ public:
         List<Expr*> const& derefBases,
         LookupResult& outLookupResult);
 
+    /// Return whether the member named by `memberExpr` is missing from the opened value of the
+    /// interface-typed `baseExpr` but found on one of the pointer levels in `derefBases`.
+    /// Consider `IFoo* p` with `extension<T> Ptr<T> { int tag() }`: `p.tag()` is called on `p`,
+    /// so its base must not open the existential `*p`.
+    bool isMemberOnlyOnDerefedPtrTypes(
+        MemberExpr* memberExpr,
+        Expr* baseExpr,
+        List<Expr*> const& derefBases);
+
     /// Perform semantic checking of an assignment where the operands have already been checked.
     Expr* checkAssignWithCheckedOperands(AssignExpr* expr);
 
@@ -4289,7 +4298,8 @@ public:
     Expr* checkBaseForMemberExpr(
         Expr* baseExpr,
         CheckBaseContext checkBaseContext,
-        List<Expr*>& outDerefBases);
+        List<Expr*>& outDerefBases,
+        MemberExpr* memberExpr);
 
     /// Implicitly dereference `inExpr` through each pointer-like type that it can be
     /// dereferenced through, and return the result. A `PtrType` is not dereferenced in a
@@ -4304,11 +4314,15 @@ public:
     /// Prepare baseExpr for use as the base of a member expr.
     /// This include inserting implicit open-existential operations as needed.
     /// The expressions that get implicitly dereferenced are appended to `outDerefBases`, as
-    /// for `maybeDereference`.
+    /// for `maybeDereference`. `memberExpr` is the member expression whose base this is, or
+    /// null for a subscript or call base. When its member is found only on a
+    /// pointer level (see `isMemberOnlyOnDerefedPtrTypes`), the dereferenced base is returned
+    /// without opening its existential, because the member is called on that pointer level.
     Expr* maybeInsertImplicitOpForMemberBase(
         Expr* baseExpr,
         CheckBaseContext checkBaseContext,
-        List<Expr*>& outDerefBases);
+        List<Expr*>& outDerefBases,
+        MemberExpr* memberExpr);
 
     Expr* lookupMemberResultFailure(
         DeclRefExpr* expr,

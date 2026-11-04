@@ -3618,7 +3618,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         baseExpr = checkBaseForMemberExpr(
             subscriptExpr->baseExpression,
             CheckBaseContext::Subscript,
-            derefBases);
+            derefBases,
+            nullptr);
 
         // If the base expression is a type, it means that this is an array declaration,
         // then we should disable short-circuit in case there is logical expression in
@@ -5369,7 +5370,8 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         expr->functionExpr = maybeInsertImplicitOpForMemberBase(
             expr->functionExpr,
             CheckBaseContext::Member,
-            derefBases);
+            derefBases,
+            nullptr);
 
         LookupResult lookupResult = lookUpMember(
             m_astBuilder,
@@ -9332,7 +9334,8 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
 Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     Expr* baseExpr,
     CheckBaseContext checkBaseContext,
-    List<Expr*>& outDerefBases)
+    List<Expr*>& outDerefBases,
+    MemberExpr* memberExpr)
 {
     // In case our base expression is still overloaded, we can perform
     // some more refinement.
@@ -9375,6 +9378,11 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     // concrete type is available for pointer-like dereferences.
     baseExpr = maybeDereference(baseExpr, checkBaseContext, outDerefBases);
 
+    // A member that only a pointer level has is called on that level, so we leave the
+    // existential closed: opening it would bind `*p` to a temporary and evaluate `p` twice.
+    if (memberExpr && isMemberOnlyOnDerefedPtrTypes(memberExpr, baseExpr, outDerefBases))
+        return baseExpr;
+
     // If the base of the member lookup has an interface type
     // *without* a suitable this-type substitution, then we are
     // trying to perform lookup on a value of existential type,
@@ -9387,16 +9395,48 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     return baseExpr;
 }
 
+bool SemanticsVisitor::isMemberOnlyOnDerefedPtrTypes(
+    MemberExpr* memberExpr,
+    Expr* baseExpr,
+    List<Expr*> const& derefBases)
+{
+    auto interfaceType = unwrapModifiedType(baseExpr->type.type);
+    auto declRefType = as<DeclRefType>(interfaceType);
+    if (!declRefType)
+        return false;
+    auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>();
+    if (!interfaceDeclRef)
+        return false;
+
+    LookupResult ptrResult;
+    if (!lookUpMemberInDerefedPtrTypes(memberExpr, derefBases, ptrResult))
+        return false;
+
+    // We look the member up on a stand-in for the opened value, so that members that apply
+    // to every conforming type, such as those of `extension<T : IFoo> T`, are found exactly
+    // as they would be after `openExistential`.
+    VarDecl* standInDecl = m_astBuilder->create<VarDecl>();
+    standInDecl->type.type = baseExpr->type.type;
+    auto openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
+        makeDeclRef(standInDecl),
+        interfaceType,
+        interfaceDeclRef);
+    LookupResult pointeeResult =
+        lookUpMember(m_astBuilder, this, memberExpr->name, openedType, m_outerScope);
+    return !pointeeResult.isValid();
+}
+
 Expr* SemanticsVisitor::checkBaseForMemberExpr(
     Expr* inBaseExpr,
     CheckBaseContext checkBaseContext,
-    List<Expr*>& outDerefBases)
+    List<Expr*>& outDerefBases,
+    MemberExpr* memberExpr)
 {
     auto baseExpr = inBaseExpr;
     baseExpr = CheckTerm(baseExpr);
 
     auto resultBaseExpr =
-        maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outDerefBases);
+        maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outDerefBases, memberExpr);
 
     // We might want to register differentiability on any implicit ops that we add in.
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
@@ -9528,7 +9568,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
 {
     List<Expr*> derefBases;
     expr->baseExpression =
-        checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, derefBases);
+        checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, derefBases, expr);
 
     if (derefBases.getCount() == 0 && as<DerefMemberExpr>(expr) &&
         !as<PtrType>(expr->baseExpression->type))
