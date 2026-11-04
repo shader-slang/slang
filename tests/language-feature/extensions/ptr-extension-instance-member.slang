@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4);
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4);
 RWStructuredBuffer<int> outputBuffer;
 
 //TEST_INPUT: set intPtr = ubuffer(data=[10 20 30 40], stride=4);
@@ -74,6 +74,24 @@ extension Ptr<Shadow>
     int get() { return -1; }
 }
 
+// When several pointer levels have the member, the innermost one wins, as in `lookUpMember`.
+extension Ptr<int>
+{
+    int level() { return 1; }
+    property int plusTen { get { return *this + 10; } }
+}
+
+extension Ptr<Ptr<int>>
+{
+    int level() { return 2; }
+    int outerOnly() { return **this + 100; }
+}
+
+int pointeeOfGeneric<T>(Ptr<T> pt)
+{
+    return int(sizeof(pt.loadGeneric()));
+}
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
@@ -105,7 +123,7 @@ void computeMain()
     // CHECK-NEXT: 20
     outputBuffer[6] = *cursor;
 
-    // A member found on an inner pointer type is called on the dereferenced base.
+    // A member found on an inner pointer level is called with that level, `*pp`, as `this`.
     *ptrSlot = intPtr + 2;
     Ptr<Ptr<int>> pp = ptrSlot;
     // CHECK-NEXT: 31
@@ -118,4 +136,20 @@ void computeMain()
     Ptr<Tuple<int, int>> pTuple = tuplePtr;
     // CHECK-NEXT: 4
     outputBuffer[10] = pTuple.loadGeneric()._1;
+
+    // CHECK-NEXT: 1
+    outputBuffer[11] = pp.level();
+    // CHECK-NEXT: 130
+    outputBuffer[12] = pp.outerOnly();
+    // CHECK-NEXT: 30
+    outputBuffer[13] = pp.loadGeneric();
+    // CHECK-NEXT: 20
+    outputBuffer[14] = p.plusTen;
+    // CHECK-NEXT: 4
+    outputBuffer[15] = pointeeOfGeneric(p);
+
+    // A mutating member found on the inner level writes the pointer stored at `*pp`.
+    pp.advance();
+    // CHECK-NEXT: 40
+    outputBuffer[16] = **ptrSlot;
 }
