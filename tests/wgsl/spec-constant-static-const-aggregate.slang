@@ -29,7 +29,8 @@ static const S s = { 1, k };
 // swizzled store in a temporary, which must not be a `const`.
 static const int2 v = int2(k, 1);
 static const int2x2 m = int2x2(k, 1, 2, 3);
-// Broadcasts build the vector or matrix from one scalar.
+// `ms` reaches MakeMatrixFromScalar directly, and `vb` below reaches MakeVectorFromScalar
+// inside an array that must be inlined with it.
 static const int2x2 ms = int2x2(k);
 
 // An inner vector or array that is inlined must make the array that holds it inline too.
