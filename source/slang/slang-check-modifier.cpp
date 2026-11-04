@@ -2337,8 +2337,10 @@ Modifier* SemanticsVisitor::checkModifier(
 
                         // Sibling declarations reach `ModifiersChecked` in source order,
                         // so a `constant_id` declared after this `layout(...) in;` still
-                        // holds an unchecked attribute unless we check it here. Checking
-                        // a declaration can add members, so we iterate by index.
+                        // holds an unchecked attribute unless we check it here. We bring
+                        // only variables to that state: `constant_id` applies only to
+                        // variables, and the `EmptyDecl` being checked here is itself a
+                        // sibling, which `ensureDecl` would report as a cyclic reference.
                         auto parentDecl = decl->parentDecl;
                         for (Index memberIndex = 0;
                              memberIndex < parentDecl->getDirectMemberDeclCount();
@@ -2373,11 +2375,19 @@ Modifier* SemanticsVisitor::checkModifier(
                             // We name each implicit constant after its id because the
                             // name feeds the global's mangled name, and two unnamed
                             // constants would be linked as one symbol. The `$` prefix
-                            // keeps the name out of reach of user code.
+                            // keeps the name out of reach of user code. Reflection reports
+                            // this name, but its spelling is not a stable interface, and
+                            // `SynthesizedModifier` keeps the decl out of tooling such as
+                            // the language-server outline.
                             specConstVarDecl->nameAndLoc.name =
                                 getName("$local_size_id_" + String(specConstId));
-                            // The implicit attribute has the same shape as a checked
-                            // `layout(constant_id = N)`: the id expression plus its value.
+                            addModifier(
+                                specConstVarDecl,
+                                getASTBuilder()->create<SynthesizedModifier>());
+                            // The lookup above re-checks `args[0]` of each sibling
+                            // `VkConstantIdAttribute`, and it reaches this implicit one when
+                            // a later axis or another `layout(...) in;` repeats the id, so the
+                            // attribute carries the id expression as well as `location`.
                             auto constantIdModifier =
                                 getASTBuilder()->create<VkConstantIdAttribute>();
                             constantIdModifier->args.add(arg);
