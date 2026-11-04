@@ -4228,7 +4228,10 @@ public:
         IntVal* baseElementRowCount,
         IntVal* baseElementColCount);
 
-    Expr* checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType* baseTupleType);
+    Expr* checkTupleSwizzleExpr(
+        MemberExpr* memberExpr,
+        TupleType* baseTupleType,
+        List<Expr*> const& derefBases);
 
     Expr* CheckSwizzleExpr(
         MemberExpr* memberRefExpr,
@@ -4242,7 +4245,29 @@ public:
 
     // Check a member expr as a general member lookup.
     // This is the default/fallback behavior if the base type isn't swizzlable.
-    Expr* checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType);
+    // `derefBases` holds the expressions that the base of `expr` was implicitly dereferenced
+    // through, as reported by `checkBaseForMemberExpr`.
+    Expr* checkGeneralMemberLookupExpr(
+        MemberExpr* expr,
+        Type* baseType,
+        List<Expr*> const& derefBases);
+
+    /// Look up the member named by `expr` in the pointer types that the base of `expr` was
+    /// implicitly dereferenced through, given as `derefBases` (outermost first). Return the
+    /// base at the innermost level whose pointer type has the member, with the lookup result in
+    /// `outLookupResult`, or null when no level has it. Consider:
+    ///
+    ///     extension Ptr<int> { int g() { return *this + 1; } }
+    ///     Ptr<Ptr<int>> pp = ...;
+    ///     pp.g();
+    ///
+    /// The base of `pp.g` is dereferenced to `**pp : int`, which has no member `g`. The
+    /// innermost pointer level is `*pp : Ptr<int>`, which has `g`, so `pp.g()` calls `g` with
+    /// `*pp` as `this`.
+    Expr* lookUpMemberInDerefedPtrTypes(
+        MemberExpr* expr,
+        List<Expr*> const& derefBases,
+        LookupResult& outLookupResult);
 
     /// Perform semantic checking of an assignment where the operands have already been checked.
     Expr* checkAssignWithCheckedOperands(AssignExpr* expr);

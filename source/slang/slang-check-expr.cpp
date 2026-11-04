@@ -8594,11 +8594,14 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     return nullptr;
 }
 
-Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType* baseTupleType)
+Expr* SemanticsVisitor::checkTupleSwizzleExpr(
+    MemberExpr* memberExpr,
+    TupleType* baseTupleType,
+    List<Expr*> const& derefBases)
 {
     UInt tupleElementCount = (UInt)baseTupleType->getMemberCount();
     if (tupleElementCount == 0)
-        return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+        return checkGeneralMemberLookupExpr(memberExpr, baseTupleType, derefBases);
 
     String swizzleText = getText(memberExpr->name);
     auto span = swizzleText.getUnownedSlice();
@@ -8617,7 +8620,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         // Check for the preceding underscore
         if (span[pos] != '_')
         {
-            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType, derefBases);
         }
         pos++;
 
@@ -8626,7 +8629,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         {
             // Unexpected end of swizzle string, fallback to
             // member lookup.
-            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType, derefBases);
         }
 
         auto ch = span[pos];
@@ -8635,7 +8638,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         {
             // An invalid character in the swizzle is an error, fallback to
             // member lookup.
-            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType, derefBases);
         }
         elementCoord = (uint32_t)StringUtil::parseIntAndAdvancePos(span, pos);
 
@@ -9405,10 +9408,64 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
     return resultBaseExpr;
 }
 
-Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType)
+Expr* SemanticsVisitor::lookUpMemberInDerefedPtrTypes(
+    MemberExpr* expr,
+    List<Expr*> const& derefBases,
+    LookupResult& outLookupResult)
+{
+    // `p->m` names a member of `*p`, so the pointer that `->` dereferences, and any level
+    // outside it, does not contribute members.
+    Index outermostLevel = 0;
+    if (as<DerefMemberExpr>(expr))
+    {
+        while (outermostLevel < derefBases.getCount() &&
+               !as<PtrType>(derefBases[outermostLevel]->type))
+            outermostLevel++;
+        outermostLevel++;
+    }
+
+    for (Index level = derefBases.getCount() - 1; level >= outermostLevel; level--)
+    {
+        // Only a `PtrType` has members of its own here. Other pointer-like types, such as
+        // `DescriptorHandle<T>` and `ConstantBuffer<T>`, forward all member lookup to `T`.
+        Expr* ptrBase = derefBases[level];
+        if (!as<PtrType>(ptrBase->type))
+            continue;
+
+        LookupResult lookupResult = lookUpMember(
+            m_astBuilder,
+            this,
+            expr->name,
+            ptrBase->type,
+            m_outerScope,
+            LookupMask::Default,
+            LookupOptions::NoDeref);
+        if (lookupResult.isValid())
+        {
+            outLookupResult = lookupResult;
+            return ptrBase;
+        }
+    }
+    return nullptr;
+}
+
+Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(
+    MemberExpr* expr,
+    Type* baseType,
+    List<Expr*> const& derefBases)
 {
     LookupResult lookupResult =
         lookUpMember(m_astBuilder, this, expr->name, baseType, m_outerScope);
+    if (!lookupResult.isValid())
+    {
+        // Members of the dereferenced base win; only when it has none do we look in the
+        // pointer types that it was dereferenced through.
+        if (auto ptrBase = lookUpMemberInDerefedPtrTypes(expr, derefBases, lookupResult))
+        {
+            expr->baseExpression = ptrBase;
+            baseType = ptrBase->type;
+        }
+    }
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
     lookupResult =
@@ -9538,7 +9595,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     }
     else if (auto baseTupleType = as<TupleType>(baseType))
     {
-        return checkTupleSwizzleExpr(expr, baseTupleType);
+        return checkTupleSwizzleExpr(expr, baseTupleType, derefBases);
     }
     else if (as<ErrorType>(baseType))
     {
@@ -9560,7 +9617,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     }
     else
     {
-        return checkGeneralMemberLookupExpr(expr, baseType);
+        return checkGeneralMemberLookupExpr(expr, baseType, derefBases);
     }
 }
 
