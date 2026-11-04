@@ -4,9 +4,10 @@
 // and in a different order than the function does. We therefore reject one on a function with any
 // differentiability or derivative attribute. The error applies whatever the parameter's type,
 // whether or not it is marked `no_diff`, and to interface requirements and methods. A function
-// without an attribute is rejected in the same way when a `[ForwardDerivativeOf]` or
-// `[BackwardDerivativeOf]` attribute names it as a primal, and its derivative is then not checked
-// against it. A function that is neither differentiated nor given a derivative may take one.
+// without an attribute is rejected in the same way when `fwd_diff` or `bwd_diff` names it, or when
+// a `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute names it as a primal, and its
+// derivative is then not checked against it. A function that is neither differentiated nor given a
+// derivative may take one.
 //
 // Before, backward differentiation of a caller of a user-defined backward derivative with a
 // reference parameter could fail SPIR-V validation or report an internal compiler error, because
@@ -214,6 +215,22 @@ struct Scaler
     }
 }
 
+// --- Rejected: a function without an attribute, named by `fwd_diff` or `bwd_diff` ---
+
+float forwardDifferentiated(__ref float a, float x)
+//CHECK:                                ^ error E38038
+//CHECK:                                ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return a * x;
+}
+
+float backwardDifferentiated(__ref float a, float x)
+//CHECK:                                 ^ error E38038
+//CHECK:                                 ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return a * x;
+}
+
 // --- Accepted: a function that is not differentiable ---
 
 float notDifferentiable(__ref float a, groupshared float s[N], uint tid)
@@ -226,4 +243,12 @@ float notDifferentiable(__ref float a, groupshared float s[N], uint tid)
 void computeMain(uint3 tid : SV_GroupThreadID)
 {
     sharedFloats[tid.x] = float(tid.x);
+
+    // Naming a function with a reference parameter in `fwd_diff` or `bwd_diff` reports the
+    // parameter once, at its declaration, whether or not the function has an attribute.
+    float a = 1.0;
+    fwd_diff(forwardDifferentiated)(a, diffPair(1.0, 1.0));
+    var x = diffPair(1.0, 0.0);
+    bwd_diff(backwardDifferentiated)(a, x, 1.0);
+    fwd_diff(refParam)(a, diffPair(1.0, 1.0));
 }
