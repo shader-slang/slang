@@ -2357,6 +2357,13 @@ Modifier* SemanticsVisitor::checkModifier(
                             constantIdModifier->args.add(arg);
                             constantIdModifier->location = (int32_t)specConstId;
                             specConstVarDecl->type.type = getASTBuilder()->getIntType();
+                            // A workgroup-size axis without an explicit size is 1, and that
+                            // is the size an unspecialized dispatch must see.
+                            auto defaultSize = getASTBuilder()->create<IntegerLiteralExpr>();
+                            defaultSize->type = QualType(specConstVarDecl->type.type);
+                            defaultSize->value = 1;
+                            defaultSize->loc = attr->loc;
+                            specConstVarDecl->initExpr = defaultSize;
                             addModifier(specConstVarDecl, constantIdModifier);
                             parentDecl->addMember(specConstVarDecl);
                             attr->specConstExtents[i] =
