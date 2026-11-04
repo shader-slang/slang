@@ -9807,11 +9807,6 @@ bool IRInst::mightHaveSideEffects(
                 if (intLit->getValue() != 0)
                     return false;
             }
-            // A module-scope instruction does not run on its own; it is evaluated where it is
-            // used, so a possible trap belongs to the use site. A division at module scope,
-            // such as one a `static const` initializer is built from, is therefore a value.
-            if (as<IRModuleInst>(getParent()))
-                return false;
             return true;
         }
         return false;
