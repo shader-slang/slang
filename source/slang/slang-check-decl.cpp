@@ -3698,9 +3698,11 @@ static bool _initExprIsRuntimeValue(Expr* expr)
             // References to static const globals are fine — compile-time constants.
             if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
                 return false;
-            // A specialization constant is a global, but its value is fixed before the shader
-            // runs, so it is not a mutable global.
-            if (isSpecializationConstant(varDecl))
+            // A specialization constant is a shader parameter whose value is fixed when the
+            // pipeline is created. Integer scalar initializers that name one can already fold
+            // through `ConstantFoldingKind::SpecializationConstant`, so other initializers accept
+            // it too. A `groupshared` global with the attribute is still workgroup storage.
+            if (isGlobalShaderParameter(varDecl) && isSpecializationConstant(varDecl))
                 return false;
             // Any other global variable (including plain `static float foo`) is mutable.
             if (isGlobalDecl(varDecl))
