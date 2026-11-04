@@ -6,7 +6,9 @@
 //
 // `kDiv` and `kRem` divide by a parameter, `Holder.arr` uses a helper without `[__readNone]`,
 // `Holder.plain` uses a helper that is not inlined, and `kScalar` is a scalar. `kLiteralDivisor`
-// divides by a literal. `kSafe` and `kHandWritten` divide by `max(4, 1)`.
+// divides by a literal. `kSafe` and `kHandWritten` divide by `max(4, 1)`. `Holder.arr` and
+// `Holder.plain` are the cases whose calls are left at module scope unless legalization removes the
+// operands it copied; the other constants are controls.
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none -g

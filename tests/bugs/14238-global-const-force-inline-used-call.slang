@@ -1,6 +1,7 @@
 // A module-scope `static const` built by a `[ForceInline]` helper that divides the result of a
 // call that is not inlined is evaluated where the constant is used, with or without debug
-// information.
+// information. The execution lanes run with debug information, which render-test enables by
+// default.
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute -line-directive-mode none
