@@ -1,18 +1,21 @@
-// A `[ForceInline]` helper whose body performs an atomic add is not inlined into a module-scope
-// `static const` initializer, because the global scope cannot perform the effect. The call stays a
-// call, and global value legalization moves it into the function that uses the constant, where it
-// is inlined, so the effect runs once.
+// A module-scope `static const` whose initializer calls a helper with an effect, here an atomic
+// add, is evaluated in the function that uses it. Global value legalization copies the initializer
+// there and removes the original at module scope. CUDA, C++, GLSL, Metal and WGSL cannot initialize
+// a global with a call, and HLSL would run the effect again when it initializes the global.
 //
-// A helper that divides by a value that does not fold, without using the quotient, is inlined.
-// Inside a function, an unused division is kept because it might trap. At module scope it has no
-// effect of its own, so dead code elimination removes it. The divisor `max(4, 1)` stays a call,
-// which constant propagation does not fold, so it is not a literal.
+// `Holder.kPair` is a struct built by one call. `Holder.arr` is an array whose elements are calls,
+// so each element call is an operand of the array. Both are read once, so each call runs once.
+// `Unused.kUnused` is never read, so its call never runs.
 
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute -line-directive-mode none
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -line-directive-mode none
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -line-directive-mode none
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute -line-directive-mode none
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -output-using-type
 
-//TEST_INPUT: set counters = out ubuffer(data=[5], stride=4)
+//TEST_INPUT: set counters = out ubuffer(data=[5 10], stride=4)
 RWStructuredBuffer<Atomic<int>> counters;
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
@@ -31,36 +34,51 @@ Pair snapshot()
     return p;
 }
 
-[__readNone]
 [ForceInline]
-int incrementIgnoringQuotient(int a, int b)
+int bump()
 {
-    int quotient = a / b;
-    return a + 1;
+    return counters[1].add(1);
 }
 
 struct Holder
 {
     static const Pair kPair = snapshot();
-    static const int kIncremented = incrementIgnoringQuotient(10, max(4, 1));
+    static const int arr[2] = { bump(), bump() };
+}
+
+struct Unused
+{
+    static const int kUnused = bump();
 }
 
 // GLSL-NOT: atomicAdd
-// GLSL-NOT: max(
 // GLSL: void main(
 // GLSL: atomicAdd
-// GLSL-NOT: max(
+// CUDA-NOT: atomicAdd
+// CUDA: void computeMain(
+// CUDA: atomicAdd
+// HLSL-NOT: InterlockedAdd
+// HLSL: void computeMain(
+// HLSL: InterlockedAdd
+// METAL-NOT: atomic_fetch_add
+// METAL: void computeMain(
+// METAL: atomic_fetch_add
+// WGSL-NOT: atomicAdd
+// WGSL: fn computeMain(
+// WGSL: atomicAdd
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     outputBuffer[tid.x] = Holder.kPair.a;
-    outputBuffer[tid.x + 1] = Holder.kIncremented;
-    // The atomic add runs once: the counter goes from 5 to 6, and the result is the old value.
+    outputBuffer[tid.x + 1] = Holder.arr[tid.x];
+    // The first counter goes from 5 to 6 and the second from 10 to 12; the results are the old
+    // values of the first atomic add of each.
     // BUF: type: int32_t
     // BUF-NEXT: 6
+    // BUF-NEXT: 12
     // BUF: type: int32_t
     // BUF-NEXT: 5
-    // BUF-NEXT: 11
+    // BUF-NEXT: 10
 }

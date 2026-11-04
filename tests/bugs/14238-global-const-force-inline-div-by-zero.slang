@@ -1,6 +1,6 @@
 // A `[ForceInline]` helper that divides by a literal zero in a module-scope `static const`
-// initializer is inlined at the global scope, where constant propagation reports the division by
-// zero at the call, as it does when the same helper is inlined into a function.
+// initializer is evaluated in the function that uses the constant, where constant propagation
+// reports the division by zero at the call.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -entry computeMain -stage compute
 
