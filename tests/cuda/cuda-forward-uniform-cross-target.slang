@@ -1,16 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute -line-directive-mode none
 
-// The address-forward (#11774) is gated to CUDA, but `transformParamsToConstRef` itself also runs
-// for CPU. This is the non-CUDA side of that boundary: the same `uniform Big` -> `[noinline]` helper
-// shape as cuda-forward-uniform-struct-forward.slang, emitted for CPU, must keep its normal
-// collected-parameter codegen and must never fire the CUDA-only `ConstRef<T, CudaKernelParam>`
-// forward.
-//
-// On CPU the uniform aggregate is gathered into an `EntryPointParams` block and reached through the
-// `entryPointParams` pointer, so the callee already receives an address (`&(...)->big`) - there is
-// no per-thread by-value copy to eliminate, and the CUDA forward is a structural no-op here. The
-// positive checks below are the discriminator: they pin that `big` is reached through the collected
-// `EntryPointParams` block, not handed to the helper as a forwarded by-value kernel parameter.
+// `transformByValueParamsToBorrows` also runs for CPU, but only CUDA targets retype entry-point
+// uniform parameters. On CPU the uniform aggregate is already gathered into an `EntryPointParams`
+// block reached through the `entryPointParams` pointer, so the helper receives an address without
+// the retype. The checks pin that ordinary CPU codegen.
 
 struct Big
 {

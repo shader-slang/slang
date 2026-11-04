@@ -1,18 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute -line-directive-mode none
 
-// Metal is the third target family that runs `transformParamsToConstRef` (the guard in
-// `slang-emit.cpp` admits CPU, CUDA and Metal), but the #11774 address-forward is gated to the CUDA
-// family by `forwardEntryPointUniformAddress`. This pins the Metal side of that boundary, which was
-// otherwise the only pass-running target with no test at all.
+// `transformByValueParamsToBorrows` also runs for Metal, but only CUDA targets retype entry-point
+// uniform parameters. On Metal, `moveEntryPointUniformParamsToGlobalScope` has already collected
+// `big` into an `EntryPointParams_0` block reached through a `constant*` pointer, so there is no
+// by-value parameter to retype. The emit checks pin that output.
 //
-// The forward is a structural no-op here, not merely a gated one.
-// `moveEntryPointUniformParamsToGlobalScope` has already collected `big` into an
-// `EntryPointParams_0` block reached through a `constant*` pointer, so by the time the pass runs
-// there is no by-value kernel parameter whose address could be forwarded;
-// `isEntryPointByValueUniformAggregateParam` rejects it on shape. The emit checks below make that
-// observable rather than assumed.
-//
-// Companion to cuda-forward-uniform-cross-target.slang, which pins the same boundary for CPU.
+// Companion to cuda-forward-uniform-cross-target.slang, which covers CPU.
 
 struct Big
 {

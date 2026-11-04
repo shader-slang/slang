@@ -58,7 +58,7 @@ return {
 	["Type.Kind.Generic"] = 56,
 	["Type.PtrTypeBase.Ptr"] = 57,
 	["Type.PtrTypeBase.RefParam"] = 58,
-	["Type.PtrTypeBase.BorrowInParam"] = 59,
+	["Type.PtrTypeBase.BorrowInParamBase.BorrowInParam"] = 59,
 	["Type.PtrTypeBase.PseudoPtr"] = 60,
 	["Type.PtrTypeBase.OutParamTypeBase.OutParam"] = 61,
 	["Type.PtrTypeBase.OutParamTypeBase.BorrowInOutParam"] = 62,
@@ -882,5 +882,6 @@ return {
 	["DebugLexicalBlock"] = 906,
 	["Decoration.fileOrNamespaceScopeMutableVar"] = 907,
 	["Decoration.uninitializedGlobalCheckFoundPossibleWrite"] = 908,
-	["Decoration.glslPatch"] = 909
+	["Decoration.glslPatch"] = 909,
+	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 910
 }

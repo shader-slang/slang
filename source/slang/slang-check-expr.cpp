@@ -4228,8 +4228,8 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
 /// the call, rather than a copy of it.
 static bool _mayParamBeReferenceToArgumentStorage(ParamPassingMode mode)
 {
-    // An `in` parameter may become a borrow in `transformParamsToConstRef`, but that borrow is
-    // never a reference to argument storage the call can modify.
+    // An `in` parameter may become a borrow in `transformByValueParamsToBorrows`, but that borrow
+    // is never a reference to argument storage the call can modify.
     if (mode == ParamPassingMode::In)
         return false;
 

@@ -158,8 +158,8 @@
 ///    to continue specializing `f` and replace its first parameter's type to storage type. However
 ///    this implementation currently does not specialize functions whose parameter type is not a
 ///    pointer/reference type. When we target SPIRV, we will already be running the
-///    `transformParamsToConstRef` pass that would have converted `f` to take in `ConstRef<T>`.
-///    In this case, the initial IR would be in the form of
+///    `transformByValueParamsToBorrows` pass that would have converted `f` to take a `borrow in`
+///    parameter. In this case, the initial IR would be in the form of
 ///    ```
 ///       ptr : StorageType* = ...
 ///       lptr : LogicalType* = CastStorageToLogical(ptr);
@@ -169,7 +169,7 @@
 ///       store tmpVar, m
 ///       call f, tmpVar
 ///    ```
-///    To allow us to remove the `tmpVar` store introduced during `transformParamsToConstRef`,
+///    To allow us to remove the `tmpVar` store introduced during `transformByValueParamsToBorrows`,
 ///    this pass also handles the propagation through temp var stores. After pushing the cast
 ///    through `m`, we will get IR to this form:
 ///    ```

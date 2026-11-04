@@ -1994,10 +1994,9 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
             m_writer->emit(getName(inst));
             return;
         case kIROp_Param:
-            // A `ConstRef<T, CudaKernelParam>` param is declared as the by-value `T p`, so like the
-            // local variable above, `*&p` is emitted as just `p`. Any other param is a real
-            // pointer.
-            if (isCudaKernelParamBorrowInType(inst->getDataType()))
+            // A by-value borrow is declared as the value `p`, so, as for the local variable above,
+            // `*&p` is emitted as just `p`. Any other param is a real pointer.
+            if (as<IRByValueBorrowInParamType>(inst->getDataType()))
             {
                 m_writer->emit(getName(inst));
                 return;

@@ -1607,6 +1607,25 @@ struct IRPtrTypeBase : IRType
     IRType* getDataLayout() { return getOperandCount() > 3 ? (IRType*)getOperand(3) : nullptr; }
 };
 
+/// A read-only `borrow in` parameter, passed by address.
+FIDDLE()
+struct IRBorrowInParamType : IRPtrTypeBase
+{
+    FIDDLE(baseInst())
+};
+
+/// A `borrow in` parameter that the C-like emitters declare as a by-value parameter.
+///
+/// The IR treats the parameter as a pointer to its value, so a callee that takes a `borrow in` can
+/// receive its address, while the emitted declaration keeps the by-value signature `T p` and
+/// references to the parameter are emitted as `&p`. An entry point uses this for a uniform
+/// aggregate parameter, whose by-value declaration is fixed by the host's launch interface.
+FIDDLE()
+struct IRByValueBorrowInParamType : IRBorrowInParamType
+{
+    FIDDLE(leafInst())
+};
+
 
 /// The base class of RawPointerType and RTTIPointerType.
 FIDDLE()
@@ -2252,7 +2271,7 @@ public:
     // Version 37 is the earliest module version with the updated AST node numbering, and with
     // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
     const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 37;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

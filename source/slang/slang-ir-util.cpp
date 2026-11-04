@@ -207,14 +207,6 @@ bool isUserPointerType(IRInst* type)
     return ptrType->getAddressSpace() == AddressSpace::UserPointer;
 }
 
-bool isCudaKernelParamBorrowInType(IRInst* type)
-{
-    auto ptrType = as<IRBorrowInParamType>(type);
-    if (!ptrType)
-        return false;
-    return ptrType->getAddressSpace() == AddressSpace::CudaKernelParam;
-}
-
 bool isAddressInst(IRInst* inst)
 {
     switch (inst->getOp())
@@ -668,6 +660,7 @@ bool isWrapperType(IRInst* inst)
     case kIROp_PtrType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
     case kIROp_HLSLStructuredBufferType:
     case kIROp_HLSLRWStructuredBufferType:
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
@@ -1616,6 +1609,7 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_PtrType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
     case kIROp_GLSLShaderStorageBufferType:
     // Work-graph output records are mutable handles, so treat them as pointer-like.
     case kIROp_ThreadNodeOutputRecordsType:
@@ -2353,6 +2347,7 @@ IRPtrTypeBase* isMutablePointerType(IRInst* inst)
     switch (inst->getOp())
     {
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
         return nullptr;
     default:
         return asRelevantPtrType(inst);
@@ -2560,41 +2555,6 @@ IRVarLayout* findVarLayout(IRInst* value)
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
         return as<IRVarLayout>(layoutDecoration->getLayout());
     return nullptr;
-}
-
-bool isEntryPointByValueUniformAggregateParam(IRParam* param)
-{
-    SLANG_ASSERT(param);
-
-    // Kernel parameters are the `IRParam`s of the entry function's first block; params of later
-    // blocks are phi params.
-    auto block = as<IRBlock>(param->getParent());
-    if (!block)
-        return false;
-    auto parentFunc = as<IRFunc>(block->getParent());
-    if (!parentFunc || block != parentFunc->getFirstBlock() ||
-        !parentFunc->findDecoration<IREntryPointDecoration>())
-        return false;
-
-    // A parameter without a layout is treated as varying, which is the conservative answer.
-    auto varLayout = findVarLayout(param);
-    if (!varLayout || isVaryingParameter(varLayout))
-        return false;
-
-    // Only fixed-size aggregates have by-value storage whose address can be forwarded, so an
-    // unsized array is excluded. Tuples are lowered to structs before this pass runs.
-    auto type = param->getDataType();
-    if (!type)
-        return false;
-    SLANG_ASSERT(type->getOp() != kIROp_TupleType);
-    switch (type->getOp())
-    {
-    case kIROp_StructType:
-    case kIROp_ArrayType:
-        return true;
-    default:
-        return false;
-    }
 }
 
 UnownedStringSlice getBuiltinFuncName(IRInst* callee)

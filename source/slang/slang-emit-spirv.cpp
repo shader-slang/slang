@@ -1665,8 +1665,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case AddressSpace::Global:
         case AddressSpace::MetalObjectData:
         case AddressSpace::SpecializationConstant:
-        // `CudaKernelParam` is produced only for CUDA targets.
-        case AddressSpace::CudaKernelParam:
+        // `transformByValueParamsToBorrows` produces `LaunchParameter` only for the CUDA family.
+        case AddressSpace::LaunchParameter:
             // msvc is limiting us from putting the UNEXPECTED macro here, so
             // just fall out
             ;

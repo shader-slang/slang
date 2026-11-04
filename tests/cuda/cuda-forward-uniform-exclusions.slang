@@ -1,10 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute -line-directive-mode none
 
-// Only an entry-point by-value uniform *aggregate* (struct / sized array) is address-forwarded. A
-// scalar (`count`), a vector (`vec`) and a matrix (`mat`) - all passed by value into helpers
-// alongside the aggregate - stay plain. The matrix matters most here: it is the composite type
-// closest to a forwardable aggregate, so it is the shape a future edit to the type switch in
-// `isEntryPointByValueUniformAggregateParam` is most likely to broaden into by accident.
+// Only a uniform parameter of a type that `shouldTransformParam` passes by borrow (a struct or
+// array) is passed to a helper by address. A scalar (`count`), a vector (`vec`) and a matrix (`mat`)
+// are passed to their helpers by value.
 
 struct Big
 {

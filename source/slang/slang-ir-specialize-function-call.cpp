@@ -761,6 +761,7 @@ struct FunctionParameterSpecializationContext
         case kIROp_OutParamType:
         case kIROp_RefParamType:
         case kIROp_BorrowInParamType:
+        case kIROp_ByValueBorrowInParamType:
             {
                 auto ptrParamType = as<IRPtrTypeBase>(paramType);
                 argType = as<IRPtrTypeBase>(argType)->getValueType();

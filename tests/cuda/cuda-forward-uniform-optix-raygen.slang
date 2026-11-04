@@ -1,12 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry rayGenMain -stage raygeneration -line-directive-mode none
 
-// The CUDA address-forward (#11774) is enabled for the whole CUDA family, which includes the PTX
-// path OptiX shaders compile through - but it only ever fires on a by-value entry-point uniform
-// aggregate. This pins the OptiX side of that boundary: a raygen entry point's uniforms are
-// collected into the SBT shader-record struct before `transformParamsToConstRef` runs, so the
-// aggregate is already reached through a pointer and there is no per-thread by-value copy to
-// eliminate. `isEntryPointByValueUniformAggregateParam` therefore declines it, and the helper
-// receives the shader-record address through the ordinary immutable-address path instead.
+// OptiX shaders compile through the CUDA path, but a raygen entry point's uniforms are collected
+// into the shader-record struct before `transformByValueParamsToBorrows` runs, so there is no
+// by-value entry-point parameter to retype. The helper receives the shader-record address through
+// the existing immutable-address path.
 
 struct Big
 {

@@ -1105,6 +1105,7 @@ struct TypeInliningPass : InliningPassBase
                 return true;
             [[fallthrough]];
         case kIROp_BorrowInParamType:
+        case kIROp_ByValueBorrowInParamType:
             {
                 if (shouldInlineBorrowRefTypesForSPIRV)
                 {

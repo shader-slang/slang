@@ -1,11 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute -line-directive-mode none
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RT):-cuda -compute -output-using-type -shaderobj
 
-// A by-value uniform struct is forwarded by address into a borrow-in helper instead of copied into
-// a per-thread temporary (the #11774 slowdown). The same shader is checked two ways: SIMPLE pins the
-// emitted CUDA (the forward is present, no whole-struct copy is spilled), and COMPARE_COMPUTE runs it
-// under NVRTC so a malformed forward the emit check cannot catch fails on the numeric result. (The
-// COMPARE_COMPUTE run is GPU-gated - `ignored` on a GPU-less runner, executed on the GPU lane.)
+// A uniform struct passed to a helper that takes it by borrow is passed by address, with no
+// per-thread copy. SIMPLE pins the emitted CUDA, and COMPARE_COMPUTE runs the kernel under NVRTC on a
+// GPU runner and checks the result.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=output
 //TEST_INPUT:set data.v = {10.0, 20.0, 30.0, 40.0}
