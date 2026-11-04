@@ -47,6 +47,13 @@ void kernel(uint x)
 {
 }
 
+// Lowering puts [CudaKernel] on the outermost generic, not on the inner function.
+[CudaKernel]
+[CudaMaxRegisters(32)]
+void genericKernel<T>(T x)
+{
+}
+
 [CudaLaunchBounds(64)]
 [numthreads(64, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)
