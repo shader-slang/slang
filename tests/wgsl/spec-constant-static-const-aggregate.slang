@@ -29,7 +29,7 @@ static const S s = { 1, k };
 static const int2 v = int2(k, 1);
 static const int2x2 m = int2x2(k, 1, 2, 3);
 
-// Only an inner vector or inner array holds the specialization-constant element.
+// An inner vector or array that is inlined must make the array that holds it inline too.
 static const int2 vecs[2] = { int2(k, 1), int2(2, 3) };
 static const int grid[2][2] = { { k, 1 }, { 2, 3 } };
 
@@ -61,7 +61,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
         outputBuffer[4].xy = v;
         outputBuffer[4].zw = m[1];
         outputBuffer[5].xy = m[0];
-        // A function-local vector over the `override` itself.
+        // A function-local vector over the `override` itself must not be declared `const`.
         outputBuffer[5].zw = int2(N, 1);
     }
 }
