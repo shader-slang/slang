@@ -59,7 +59,7 @@ void ASTPrinter::addType(Type* type)
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
             auto elementType = matrixType->getElementType();
-            if (as<BasicExpressionType>(elementType))
+            if (as<BasicExpressionType>(elementType) && !matrixType->hasSpecifiedLayout())
             {
                 matrixType->getElementType()->toText(m_builder);
                 if (as<ConstantIntVal>(matrixType->getRowCount()) &&
@@ -855,18 +855,21 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             sb << "__primal(";
         }
-        else if (const auto forwardDiffExpr = as<ForwardDifferentiateExpr>(higherOrderInvokeExpr);
-                 forwardDiffExpr)
+        else if (
+            const auto forwardDiffExpr = as<ForwardDifferentiateExpr>(higherOrderInvokeExpr);
+            forwardDiffExpr)
         {
             sb << "__fwd_diff(";
         }
-        else if (const auto backwardDiffExpr = as<BackwardDifferentiateExpr>(higherOrderInvokeExpr);
-                 backwardDiffExpr)
+        else if (
+            const auto backwardDiffExpr = as<BackwardDifferentiateExpr>(higherOrderInvokeExpr);
+            backwardDiffExpr)
         {
             sb << "__bwd_diff(";
         }
-        else if (const auto dispatchKernelExpr = as<DispatchKernelExpr>(higherOrderInvokeExpr);
-                 dispatchKernelExpr)
+        else if (
+            const auto dispatchKernelExpr = as<DispatchKernelExpr>(higherOrderInvokeExpr);
+            dispatchKernelExpr)
         {
             sb << "__dispatch_kernel(";
         }
