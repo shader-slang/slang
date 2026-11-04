@@ -1,6 +1,6 @@
-//TEST:SIMPLE_EX(filecheck=RESOURCE): tests/bugs/13306/static-type-policy.hlsl -Gec -no-codegen -DTRY_RESOURCE
-//TEST:SIMPLE_EX(filecheck=PARAMETER_BLOCK): tests/bugs/13306/static-type-policy.hlsl -Gec -no-codegen -DTRY_PARAMETER_BLOCK
-//TEST:SIMPLE_EX(filecheck=UNSIZED): tests/bugs/13306/static-type-policy.hlsl -Gec -no-codegen -DTRY_UNSIZED
+//TEST:SIMPLE_EX(filecheck=RESOURCE,exit-code=-1): tests/bugs/13306/static-type-policy.hlsl -Gec -no-codegen -DTRY_RESOURCE
+//TEST:SIMPLE_EX(filecheck=PARAMETER_BLOCK,exit-code=-1): tests/bugs/13306/static-type-policy.hlsl -Gec -no-codegen -DTRY_PARAMETER_BLOCK
+//TEST:SIMPLE_EX(filecheck=UNSIZED,exit-code=-1): tests/bugs/13306/static-type-policy.hlsl -Gec -no-codegen -DTRY_UNSIZED
 
 // Semantic checking applies the same type restrictions to ordinary mutable `static` globals
 // and compatibility shadows. A shadow remains a read-only alias when mutable storage is not

@@ -4,7 +4,7 @@
 // (only enum->its-int-tag is allowed), so the scalar overload is inapplicable
 // and a clean per-arm error names the enum type.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry computeMain -stage compute
 
 enum E : int
 {

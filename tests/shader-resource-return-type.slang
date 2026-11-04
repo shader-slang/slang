@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry test1
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -stage compute -entry test1
 
 // Test that entry points cannot return resource types
 

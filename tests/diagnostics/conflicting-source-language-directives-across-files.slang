@@ -3,7 +3,7 @@
 // the parser happens to visit. E00120 is intentionally suppressed because the test is about the
 // conflict between the two directives, not the first directive overriding the `.slang` extension.
 
-//TEST:SIMPLE_EX(filecheck=CHECK): tests/diagnostics/conflicting-source-language-directives-across-files.slang tests/diagnostics/conflicting-source-language-directives-across-files-helper.slang -no-codegen -Wno-120
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): tests/diagnostics/conflicting-source-language-directives-across-files.slang tests/diagnostics/conflicting-source-language-directives-across-files-helper.slang -no-codegen -Wno-120
 
 // CHECK: conflicting-source-language-directives-across-files-helper.slang:1:2
 // CHECK: 1 | #language 2026

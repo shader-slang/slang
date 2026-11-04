@@ -14,8 +14,8 @@
 // constructor lets that entry point compile clean and fails its directive, instead of passing on
 // the other constructor's diagnostic (which a single shared `CHECK: E36107` could not catch).
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=RES): -target metal -stage compute -entry resourceMain
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=SAMP): -target metal -stage compute -entry samplerMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=RES,exit-code=-1): -target metal -stage compute -entry resourceMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=SAMP,exit-code=-1): -target metal -stage compute -entry samplerMain
 
 RWStructuredBuffer<float> outputBuffer;
 Texture2D boundTexture;

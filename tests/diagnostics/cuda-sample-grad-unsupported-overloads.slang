@@ -3,12 +3,12 @@
 // because a CUDA texture object carries its own sampler state and cannot honour a
 // separate SamplerState, and the overloads that take a texel offset or a minimum-LOD clamp.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=SEP): -target cuda -entry eSeparate -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXSEP): -target ptx -entry eSeparate -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=OFF): -target cuda -entry eOffset -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CLAMP): -target cuda -entry eClamp -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=COMB): -target cuda -entry eCombinedOffset -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXOFF): -target ptx -entry eOffset -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=SEP,exit-code=-1): -target cuda -entry eSeparate -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXSEP,exit-code=-1): -target ptx -entry eSeparate -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=OFF,exit-code=-1): -target cuda -entry eOffset -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CLAMP,exit-code=-1): -target cuda -entry eClamp -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=COMB,exit-code=-1): -target cuda -entry eCombinedOffset -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXOFF,exit-code=-1): -target ptx -entry eOffset -stage compute
 
 Texture2D<float4> gTex;
 Sampler2D<float4> gSampler;

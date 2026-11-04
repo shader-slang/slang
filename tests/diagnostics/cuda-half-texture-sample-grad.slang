@@ -4,10 +4,10 @@
 // float/uint/int textures must still emit a `tex*Grad<...>` call, and a generic
 // float SampleGrad wrapper must compile with no diagnostic.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H1): -target cuda -entry eHalf -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H4): -target cuda -entry eHalf4 -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H3D): -target cuda -entry eHalf4_3D -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H2DA): -target cuda -entry eHalf4_2DArr -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H1,exit-code=-1): -target cuda -entry eHalf -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H4,exit-code=-1): -target cuda -entry eHalf4 -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H3D,exit-code=-1): -target cuda -entry eHalf4_3D -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H2DA,exit-code=-1): -target cuda -entry eHalf4_2DArr -stage compute
 
 // Supported texel types emit a clean call, with no diagnostic.
 //TEST:SIMPLE(filecheck=FLOAT): -target cuda -entry eFloat -stage compute

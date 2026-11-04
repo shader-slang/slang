@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -capability hlsl_nvapi
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -capability spvShaderInvocationReorderNV
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=NO_NV): -target spirv-asm
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=EXT_ONLY): -target spirv-asm -capability spvShaderInvocationReorderEXT -restrictive-capability-check
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=NO_NV,exit-code=-1): -target spirv-asm
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=EXT_ONLY,exit-code=-1): -target spirv-asm -capability spvShaderInvocationReorderEXT -restrictive-capability-check
 //HLSL: NvRtSphereObjectPositionAndRadius
 //HLSL: NvRtLssObjectPositionsAndRadii
 //HLSL: NvRtIsSphereHit
