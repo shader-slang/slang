@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
 // The NOCONST run has no positive check, so its `NOCONST-NOT` scans the whole output.
 //TEST:SIMPLE(filecheck=NOCONST): -target wgsl -entry computeMain -stage compute
-// Validate the emitted WGSL through Tint on CI (ignored where the downstream compiler is absent).
-//TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry computeMain -stage compute
+// No wgsl-spirv-asm run: the bundled slang-tint cannot compile override-expressions such as a
+// `select` condition over an `override`, so the WebGPU run validates the emitted WGSL instead.
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
 // The Vulkan run covers the SPIR-V inliner, which shares the spec-const legality rule.
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
@@ -26,8 +26,6 @@ static const int sh = (N << 1) + 3;
 
 // WGSL rejects a `const` whose value depends on an `override`.
 // NOCONST-NOT: const {{.*}}N_0
-
-// TINT: OpEntryPoint
 
 // CHECK: @id(0) override N{{.*}} : i32 = i32(4);
 // CHECK: fn f{{.*}}

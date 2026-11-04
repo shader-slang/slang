@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
 // The NOCONST run has no positive check, so its `NOCONST-NOT` scans the whole output.
 //TEST:SIMPLE(filecheck=NOCONST): -target wgsl -entry computeMain -stage compute
-// Validate the emitted WGSL through Tint on CI (ignored where the downstream compiler is absent).
-//TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry computeMain -stage compute
+// No wgsl-spirv-asm run: the bundled slang-tint cannot compile override-expressions such as a
+// `select` condition over an `override`, so the WebGPU run validates the emitted WGSL instead.
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
 
 // Aggregates with an element that depends on a specialization constant cannot be a WGSL
@@ -41,8 +41,6 @@ static const int2 vb[2] = { int2(k), int2(2, 3) };
 
 // WGSL rejects a `const` whose value depends on an `override`.
 // NOCONST-NOT: const {{.*}}N_0
-
-// TINT: OpEntryPoint
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out,name=outputBuffer
 RWStructuredBuffer<int4> outputBuffer;
