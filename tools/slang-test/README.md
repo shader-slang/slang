@@ -129,9 +129,9 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 - `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
 - `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
 
-### Exit code of `SIMPLE` tests
+### Exit code of tests
 
-A `SIMPLE` test with the `filecheck=PREFIX` option checks the exit code of the tool, in addition to the FileCheck lines. The test fails if the exit code is not the expected one. The expected exit code is 0 by default.
+A `SIMPLE`, `INTERPRET` or `REFLECTION` test with the `filecheck=PREFIX` option checks the exit code of the tool, in addition to the FileCheck lines. The test fails if the exit code is not the expected one. The expected exit code is 0 by default.
 
 A test that must fail sets the expected exit code with the `exit-code=N` option:
 
