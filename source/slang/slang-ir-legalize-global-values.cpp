@@ -7,6 +7,19 @@
 namespace Slang
 {
 
+// Return true if `user` is in code that runs: a function body, or the initializer of a global
+// variable, which runs when the variable is initialized (for kernel targets,
+// `moveGlobalVarInitializationToEntryPoints` later moves it into each entry point).
+static bool isUserInExecutableCode(IRInst* user)
+{
+    for (auto parent = user->getParent(); parent; parent = parent->getParent())
+    {
+        if (as<IRFunc>(parent) || as<IRGlobalVar>(parent))
+            return true;
+    }
+    return false;
+}
+
 void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRModule* module)
 {
     List<IRUse*> globalInstUsesToInline;
@@ -17,7 +30,7 @@ void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRMod
         {
             for (auto use = globalInst->firstUse; use; use = use->nextUse)
             {
-                if (getParentFunc(use->getUser()) != nullptr)
+                if (isUserInExecutableCode(use->getUser()))
                     globalInstUsesToInline.add(use);
             }
         }
@@ -44,9 +57,11 @@ void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRMod
     // Inlining clones a global value together with the operands it needs, so once its uses are
     // replaced, operands that were inlined with it may be left without uses as well. Dead code
     // elimination would keep such an operand when it is a call whose callee might have side
-    // effects. We remove it here instead: a value at module scope is evaluated only where it is
-    // used, and each of those uses now has its own copy. An operand can be queued more than once,
-    // so we skip one that is no longer in the module.
+    // effects, and the target would then evaluate it a second time, or reject it, as a global
+    // initializer. Each use already has its own copy, so we remove the original. Children of an
+    // inlined global are recorded as inlined too, but they go away with their parent, so only
+    // module-scope operands are queued. An operand can be queued more than once, so we skip one
+    // that is no longer in the module.
     List<IRInst*> workList;
     for (auto globalInst : globalInstsToConsiderDeleting)
         workList.add(globalInst);
