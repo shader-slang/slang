@@ -24,8 +24,10 @@ struct GlobalInstInliningContextGeneric
     // If this leaves any global unused, then remove it.
     void inlineGlobalValuesAndRemoveIfUnused(IRModule* module);
 
-    // Instructions that can exist in global scope, as long as the operands are: constants,
-    // spec-const-rate values, and the opcodes the target accepts there.
+    // Returns true for an instruction the target can keep at global scope: a constant, a
+    // spec-const-rate value, or one that `isLegalGlobalInstForTarget` accepts.
+    // `shouldInlineInstImpl` still inlines such an instruction when one of its operands must be
+    // inlined.
     bool isLegalGlobalInst(IRInst* inst);
 
     // Opcodes that can be inlined into function bodies.
