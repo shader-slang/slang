@@ -1784,10 +1784,20 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             default:
                 {
                     m_writer->emit(constantInst->value.floatVal);
-                    // Add 'f' suffix for 32-bit float literals to ensure DXC treats them as float
-                    if (constantInst->getDataType()->getOp() == kIROp_FloatType)
+                    // HLSL treats an unsuffixed floating-point literal as a 32-bit `float` by
+                    // default, and dxc deduces `float` from one for a template argument such as the
+                    // `T` of `RWByteAddressBuffer.Store<T>`, so each literal names its width: `f`
+                    // for `float` and `L` for `double`.
+                    switch (constantInst->getDataType()->getOp())
                     {
+                    case kIROp_FloatType:
                         m_writer->emit("f");
+                        break;
+                    case kIROp_DoubleType:
+                        m_writer->emit("L");
+                        break;
+                    default:
+                        break;
                     }
                     return;
                 }
