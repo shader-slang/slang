@@ -1743,7 +1743,20 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             emitOperand(inst->getOperand(0), leftSide(outerPrec, info));
             m_writer->emit(" ");
 
-            m_writer->emit(info.op);
+            // WGSL defines `^` only for integer scalars and vectors. `|` and `&` are also
+            // defined for `bool` and `vecN<bool>`, but for those types the exclusive-or is the
+            // not-equal comparison `!=`, which is component-wise on vectors.
+            // https://www.w3.org/TR/WGSL/#bit-expr
+            // https://www.w3.org/TR/WGSL/#comparison-expr
+            if (inst->getOp() == kIROp_BitXor &&
+                as<IRBoolType>(getVectorElementType(inst->getDataType())))
+            {
+                m_writer->emit(getInfo(EmitOp::Neq).op);
+            }
+            else
+            {
+                m_writer->emit(info.op);
+            }
 
             m_writer->emit(" (");
             emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
