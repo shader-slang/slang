@@ -78,8 +78,11 @@ private:
             if (entryPointDecoration->getProfile().getStage() != Stage::Callable)
                 return;
         }
-        else if (func->findDecoration<IRCudaKernelDecoration>())
+        else if (
+            func->findDecoration<IRCudaKernelDecoration>() ||
+            inst->findDecoration<IRCudaKernelDecoration>())
         {
+            // Lowering puts `[CudaKernel]` on the outermost generic of a generic function.
             return;
         }
 
