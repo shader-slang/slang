@@ -4313,9 +4313,22 @@ private:
         List<SystemValLegalizationWorkItem> systemValWorkItems =
             collectSystemValFromEntryPoint(entryPoint);
 
-        for (auto index = 0; index < systemValWorkItems.getCount(); index++)
+        // We legalize SV_GroupIndex after all other system values. Metal computes it from the
+        // entry point's SV_GroupThreadID parameter, and legalizing that parameter afterwards
+        // would narrow it to the declared type (e.g. `uint`) and redirect every use, including
+        // the group index computation, to the narrowed value.
+        for (bool isGroupIndexPass : {false, true})
         {
-            legalizeSystemValue(entryPoint, systemValWorkItems[index]);
+            for (auto& workItem : systemValWorkItems)
+            {
+                UnownedStringSlice semanticName;
+                UnownedStringSlice semanticIndex;
+                splitNameAndIndex(workItem.attrName.getUnownedSlice(), semanticName, semanticIndex);
+                bool isGroupIndex = convertSystemValueSemanticNameToEnum(String(semanticName)) ==
+                                    SystemValueSemanticName::GroupIndex;
+                if (isGroupIndex == isGroupIndexPass)
+                    legalizeSystemValue(entryPoint, workItem);
+            }
         }
         fixUpFuncType(entryPoint.entryPointFunc);
     }
