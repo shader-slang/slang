@@ -1931,7 +1931,10 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
         // ensure bindinig is checked first.
         if (!as<GLSLOffsetLayoutAttribute>(attr))
         {
-            validateAttribute(attr, nullptr, attrTarget);
+            // We drop an attribute whose arguments fail to check, as `checkAttribute` does, so
+            // that a checked attribute such as `VkConstantIdAttribute` always has a constant id.
+            if (!validateAttribute(attr, nullptr, attrTarget))
+                attr = nullptr;
         }
     }
 
