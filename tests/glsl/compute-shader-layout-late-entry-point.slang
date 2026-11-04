@@ -1,11 +1,11 @@
 // GLSL-source compute shader whose entry point has no `[shader("compute")]` attribute and
 // sets the thread-group size only through `layout(local_size_x = 16) in;`. render-test loads
-// the module first and finds the entry point afterwards, so the thread-group size has to
+// the module and then finds the entry point with `findAndCheckEntryPoint`, so the size has to
 // reach the code for the entry point even though the module was lowered before the entry
 // point was known. Each thread writes its own slot and bumps a counter, so the test only
 // passes when all 16 threads of the group run. The buffer is printed in hexadecimal.
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl
 
 #version 450
 

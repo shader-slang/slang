@@ -2346,10 +2346,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
-    // The GLSL layout lifts below can run after the entry point's module was lowered to IR (for
-    // an entry point found by `findAndCheckEntryPoint`). The linker then takes the decorations
-    // for the lifted attributes from the program's layout IR, so every decoration a lift
-    // produces is listed in `cloneExtraDecorationsFromInst` (slang-ir-link.cpp).
+    // Each GLSL layout lift below (`early_fragment_tests`, `local_size_*`, `derivative_group_*`)
+    // turns a standalone `layout(...) in;` into an attribute of the entry point. For a function
+    // without `[shader]` that `findAndCheckEntryPoint` validates for the first time, this runs
+    // after the module was lowered to IR, and the decoration for the attribute reaches the
+    // linked code only from the program's layout IR. A lift whose decoration is missing from
+    // `cloneExtraDecorationsFromInst` (slang-ir-link.cpp) is therefore silently dropped on that
+    // path.
     //
     // GLSL puts `layout(early_fragment_tests) in;` on a standalone EmptyDecl beside the entry
     // point, not on the function; lift it onto the fragment entry point as the canonical
@@ -2381,7 +2384,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // on a sibling EmptyDecl rather than via [numthreads] on the entry point
     // itself. GLSL allows each axis to be specified in a separate declaration,
     // so we merge all GLSLLayoutLocalSizeAttribute values into a single
-    // NumThreadsAttribute.
+    // NumThreadsAttribute. Like the other GLSL layout lifts, this one depends on the linker's
+    // extra-decoration list for entry points validated after lowering (see above).
     // Node shaders in thread-launch mode do not require [numthreads].
     bool isThreadLaunchNode = false;
     bool hasUncheckedNodeLaunchAttr = false;

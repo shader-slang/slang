@@ -1,5 +1,6 @@
 // unit-test-glsl-layout-late-entry-point.cpp
 
+#include "core/slang-string-util.h"
 #include "core/slang-string.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -129,6 +130,8 @@ SLANG_UNIT_TEST(glslLocalSizeOnLateEntryPoint)
 
         SLANG_CHECK(code.indexOf(UnownedStringSlice(targetCase.expectedThreadGroupSize)) >= 0);
 
+        // Reflection reads the AST; code generation reads linked IR, so assert that their
+        // thread-group sizes agree.
         auto entryPointReflection = linkedProgram->getLayout()->getEntryPointByIndex(0);
         SlangUInt sizes[3] = {};
         entryPointReflection->getComputeThreadGroupSize(3, sizes);
@@ -165,16 +168,21 @@ SLANG_UNIT_TEST(glslLocalSizeIdOnLateEntryPoint)
         session,
         linkedProgram);
 
+    // The copied decoration's operands must resolve to the module's specialization constants.
     // Expect `OpExecutionModeId %computeMain LocalSizeId %sizeX %<y> %int_2`: x is the declared
     // constant, y is the constant synthesized for `local_size_y_id = 0`, and z is the literal 2.
     Index modeIndex = spirvAsm.indexOf(UnownedStringSlice("LocalSizeId "));
     SLANG_CHECK_ABORT(modeIndex >= 0);
     UnownedStringSlice mode = spirvAsm.getUnownedSlice().tail(modeIndex);
     mode = mode.head(mode.indexOf('\n')).trim();
-    SLANG_CHECK(mode.startsWith("LocalSizeId %sizeX %"));
-    SLANG_CHECK(mode.endsWith(" %int_2"));
-    SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("SpecId 1")) >= 0);
-    SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("SpecId 0")) >= 0);
+    List<UnownedStringSlice> operands;
+    StringUtil::split(mode, ' ', operands);
+    SLANG_CHECK_ABORT(operands.getCount() == 4);
+    SLANG_CHECK(operands[1] == toSlice("%sizeX"));
+    SLANG_CHECK(operands[3] == toSlice("%int_2"));
+    SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("OpDecorate %sizeX SpecId 1")) >= 0);
+    String yDecoration = String("OpDecorate ") + operands[2] + " SpecId 0";
+    SLANG_CHECK(spirvAsm.indexOf(yDecoration.getUnownedSlice()) >= 0);
 }
 
 SLANG_UNIT_TEST(glslEarlyFragmentTestsOnLateEntryPoint)
