@@ -483,7 +483,7 @@ SLANG_UNIT_TEST(irBlob)
 // The serialized module distinguishes an interface alias from an explicit existential box alias.
 // Imported calls exercise generic packing and upcast IR. Runtime type tests and casts also
 // appear in default arguments, whose checked expression trees are serialized with the AST.
-// We first import and use the current module, then mark copies as versions 36, 37, and 38 and make
+// We first import and use the current module, then mark copies as versions 36 through 39 and make
 // their AST data unreadable. The specific version diagnostic proves rejection happens before AST
 // decode.
 SLANG_UNIT_TEST(irBlobRejectsIncompatibleASTVersions)
@@ -632,7 +632,7 @@ SLANG_UNIT_TEST(irBlobRejectsIncompatibleASTVersions)
     SLANG_CHECK_ABORT(astChunk != nullptr);
     memset(const_cast<void*>(astChunk->getPayload()), 0, astChunk->getPayloadSize());
 
-    const UInt64 olderVersions[] = {36, 37, 38};
+    const UInt64 olderVersions[] = {36, 37, 38, 39};
     for (auto olderVersion : olderVersions)
     {
         memcpy(versionAddress, &olderVersion, sizeof(olderVersion));
