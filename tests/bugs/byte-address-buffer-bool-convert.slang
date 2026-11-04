@@ -10,7 +10,8 @@
 // bit cast between `bool` and `uint`, which Metal (`as_type<bool>(uint)`) and WGSL
 // (`bitcast<bool>(u32)`) both reject. The word is converted instead.
 
-//TEST_INPUT:ubuffer(data=[1 0 0 1 0 0 0 0], stride=4):out,name=buffer
+// Words 4 and 7 start as 1, so the two scalar stores of `false` are visible in the output.
+//TEST_INPUT:ubuffer(data=[1 0 0 1 1 0 0 1], stride=4):out,name=buffer
 RWByteAddressBuffer buffer;
 
 [numthreads(1, 1, 1)]
@@ -28,11 +29,11 @@ void computeMain()
     // METALLIB: @computeMain
 }
 
-// BUF: 1
-// BUF-NEXT: 0
-// BUF-NEXT: 0
-// BUF-NEXT: 1
-// BUF-NEXT: 0
-// BUF-NEXT: 1
-// BUF-NEXT: 1
-// BUF-NEXT: 0
+// BUF: {{^}}1{{$}}
+// BUF-NEXT: {{^}}0{{$}}
+// BUF-NEXT: {{^}}0{{$}}
+// BUF-NEXT: {{^}}1{{$}}
+// BUF-NEXT: {{^}}0{{$}}
+// BUF-NEXT: {{^}}1{{$}}
+// BUF-NEXT: {{^}}1{{$}}
+// BUF-NEXT: {{^}}0{{$}}
