@@ -1946,6 +1946,29 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
     return attr;
 }
 
+// Return the size that a `layout(local_size_<axis> = N) in;` in `parentDecl` gives `axis`, or 1
+// when no statement does. GLSL declares a size and its specialization-constant id independently,
+// so `layout(local_size_x = 32) in; layout(local_size_x_id = 18) in;` makes x specializable with
+// a default of 32, in either statement order.
+static IntegerLiteralValue findGLSLLocalSizeDefault(
+    SemanticsVisitor* visitor,
+    ContainerDecl* parentDecl,
+    int axis)
+{
+    for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+    {
+        auto attr = emptyDecl->findModifier<GLSLLayoutLocalSizeAttribute>();
+        if (!attr || !attr->args[axis] || attr->axisIsSpecConstId[axis])
+            continue;
+
+        // A size statement later in the file is not checked yet, so this check may be the
+        // first one, and it reports any error in the size expression.
+        if (auto size = visitor->checkConstantIntVal(attr->args[axis]))
+            return size->getValue();
+    }
+    return 1;
+}
+
 Modifier* SemanticsVisitor::checkModifier(
     Modifier* m,
     ModifiableSyntaxNode* syntaxNode,
@@ -2360,11 +2383,10 @@ Modifier* SemanticsVisitor::checkModifier(
                             constantIdModifier->args.add(arg);
                             constantIdModifier->location = (int32_t)specConstId;
                             specConstVarDecl->type.type = getASTBuilder()->getIntType();
-                            // A workgroup-size axis without an explicit size is 1, and that
-                            // is the size an unspecialized dispatch must see.
+                            // The default is the size an unspecialized dispatch must see.
                             auto defaultSize = getASTBuilder()->create<IntegerLiteralExpr>();
                             defaultSize->type = QualType(specConstVarDecl->type.type);
-                            defaultSize->value = 1;
+                            defaultSize->value = findGLSLLocalSizeDefault(this, parentDecl, i);
                             defaultSize->loc = attr->loc;
                             specConstVarDecl->initExpr = defaultSize;
                             addModifier(specConstVarDecl, constantIdModifier);

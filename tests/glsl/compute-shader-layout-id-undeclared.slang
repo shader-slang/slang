@@ -12,6 +12,8 @@
 //TEST:SIMPLE(filecheck=AFTER_ATTR):-target spirv -stage compute -entry main -DAFTER_ATTR
 //TEST:SIMPLE(filecheck=SEPARATE):-target spirv -stage compute -entry main -DSEPARATE
 //TEST:SIMPLE(filecheck=LARGE):-target spirv -stage compute -entry main -DLARGE
+//TEST:SIMPLE(filecheck=SIZE_FIRST):-target spirv -stage compute -entry main -DSIZE_FIRST
+//TEST:SIMPLE(filecheck=SIZE_LAST):-target spirv -stage compute -entry main -DSIZE_LAST
 
 #version 450
 
@@ -104,6 +106,30 @@ layout(local_size_y_id = 5) in;
 
 layout(local_size_x_id = 3000000000, local_size_y_id = 6) in;
 layout(constant_id = 3000000000) const int declaredLarge = 7;
+
+#elif defined(SIZE_FIRST)
+
+// An explicit size for an axis is the default of that axis's implicit constant, as glslang
+// gives for the GL_KHR_vulkan_glsl example below; an axis with no size defaults to 1.
+// SIZE_FIRST: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %int_32 %[[Z:[0-9A-Za-z_]+]]
+// SIZE_FIRST-DAG: OpDecorate %[[X]] SpecId 18
+// SIZE_FIRST-DAG: OpDecorate %[[Z]] SpecId 19
+// SIZE_FIRST-DAG: %[[X]] = OpSpecConstant %int 32
+// SIZE_FIRST-DAG: %[[Z]] = OpSpecConstant %int 1
+
+layout(local_size_x = 32, local_size_y = 32) in;
+layout(local_size_x_id = 18) in;
+layout(local_size_z_id = 19) in;
+
+#elif defined(SIZE_LAST)
+
+// SIZE_LAST: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %int_1 %int_1
+// SIZE_LAST-DAG: OpDecorate %[[X]] SpecId 18
+// SIZE_LAST-DAG: %[[X]] = OpSpecConstant %int 16
+
+const int SIZE = 16;
+layout(local_size_x_id = 18) in;
+layout(local_size_x = SIZE) in;
 
 #endif
 
