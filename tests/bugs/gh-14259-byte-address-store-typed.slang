@@ -10,7 +10,7 @@
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-asm -entry computeMain -stage compute -profile cs_6_6
-//TEST:SIMPLE(filecheck=FXC):-target hlsl -entry fxcMain -stage compute -profile cs_5_0
+//TEST:SIMPLE(filecheck=SM50_UINT):-target hlsl -entry sm50UIntMain -stage compute -profile cs_5_0
 //TEST:SIMPLE(filecheck=SM50):-target hlsl -entry sm5Main -stage compute -profile cs_5_0
 //TEST:SIMPLE(filecheck=SM51):-target hlsl -entry sm5Main -stage compute -profile cs_5_1
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -shaderobj
@@ -91,20 +91,20 @@ void computeMain()
 // of `2.5f`, and `4294967291U` is that of `-5`.
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void fxcMain()
+void sm50UIntMain()
 {
-    // FXC-LABEL: void fxcMain
-    // FXC-NOT: Store<
-    // FXC: output_0.Store(0U,1075838976U);
-    // FXC-NOT: Store<
-    // FXC: output_0.Store(4U,4294967291U);
-    // FXC-NOT: Store<
-    // FXC: output_0.Store2(8U,uint2(6U, 7U));
-    // FXC-NOT: Store<
-    // FXC: output_0.Store4(16U,{{.*}});
-    // FXC-NOT: Store<
-    // FXC: output_0.Store3(48U,{{.*}});
-    // FXC-NOT: Store<
+    // SM50_UINT-LABEL: void sm50UIntMain
+    // SM50_UINT-NOT: Store<
+    // SM50_UINT: output_0.Store(0U,1075838976U);
+    // SM50_UINT-NOT: Store<
+    // SM50_UINT: output_0.Store(4U,4294967291U);
+    // SM50_UINT-NOT: Store<
+    // SM50_UINT: output_0.Store2(8U,uint2(6U, 7U));
+    // SM50_UINT-NOT: Store<
+    // SM50_UINT: output_0.Store4(16U,{{.*}});
+    // SM50_UINT-NOT: Store<
+    // SM50_UINT: output_0.Store3(48U,{{.*}});
+    // SM50_UINT-NOT: Store<
     output.Store<float>(0, 2.5f);
     output.Store<int>(4, -5);
     output.Store<uint2>(8, uint2(6, 7));
@@ -115,7 +115,8 @@ void fxcMain()
 // With an SM 5.x profile, a store that legalization leaves non-`uint` keeps its type and uses
 // `Store<T >`, as the loads at these profiles do. On SM 5.0, legalization bit-casts scalars but not
 // a vector stored whole at a multiple of its size. On SM 5.1, which is also the default HLSL
-// profile, it bit-casts nothing.
+// profile, it bit-casts nothing. FXC rejects these `Store<T >` lines, as it rejects the matching
+// `Load<T >`; the checks record that known limitation rather than a supported form.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void sm5Main()

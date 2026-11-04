@@ -3147,19 +3147,20 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             // `double` expression `(0.0 / 0.0)`.
             //
             // DXC rejects explicit template arguments on the methods of
-            // `RasterizerOrderedByteAddressBuffer`, so a store to one calls the untemplated
-            // `Store` and converts a scalar, vector or matrix value to its own type instead, as in
-            // `Store(0U,double(42.0))`. Array and struct values are passed unchanged, because
-            // their spelling already has their type.
+            // `RasterizerOrderedByteAddressBuffer`, so a store to one calls `Store` without them
+            // and DXC deduces `T` from the value. Converting a scalar or vector value to its own
+            // type, as in `Store(0U,double(42.0))`, makes that deduction match the value; array and
+            // struct values are passed unchanged, because their spelling already has their type.
+            // Legalization has split any matrix into vectors before this point. Loads from such a
+            // buffer still emit `Load<T>`, which DXC rejects in the same way.
             //
             auto store = cast<IRByteAddressBufferStore>(inst);
             auto valueType = store->getValue()->getDataType();
-            auto scalarType = getIRVectorBaseType(valueType);
-            bool isUIntValue = scalarType->getOp() == kIROp_UIntType;
+            auto valueBaseType = getIRVectorBaseType(valueType);
+            bool isUIntValue = valueBaseType->getOp() == kIROp_UIntType;
             bool canNameValueType = !as<IRHLSLRasterizerOrderedByteAddressBufferType>(
                 store->getBuffer()->getDataType());
-            bool convertValue = !isUIntValue && !canNameValueType &&
-                                (as<IRBasicType>(scalarType) || as<IRMatrixType>(valueType));
+            bool convertValue = !isUIntValue && !canNameValueType && as<IRBasicType>(valueBaseType);
 
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
