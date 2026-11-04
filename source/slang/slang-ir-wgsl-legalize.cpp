@@ -211,6 +211,14 @@ struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
         case kIROp_MakeMatrix:
         case kIROp_MakeMatrixFromScalar:
         case kIROp_MakeVectorFromScalar:
+            // A module-scope aggregate is emitted as a WGSL `const`, and a `const` cannot
+            // depend on an `override`, so an aggregate with a spec-const-rate element is
+            // inlined at its uses.
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (isSpecConstRateType(inst->getOperand(i)->getFullType()))
+                    return false;
+            }
             return true;
         default:
             break;
