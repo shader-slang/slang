@@ -4840,11 +4840,11 @@ err(
     span { loc = "modifier:Modifier", message = "cannot use 'borrow in' on a differentiable parameter." }
 )
 
-warning(
-    "reference-parameter-of-differentiable-function-treated-as-no-diff",
+err(
+    "reference-parameter-of-differentiable-function",
     38038,
-    "parameter '~param:Decl' is passed by reference, so a differentiable function treats it as 'no_diff'",
-    span { loc = "param:Decl", message = "no derivative is propagated through a reference parameter; mark it 'no_diff' to make that explicit." }
+    "parameter '~param:Decl' is passed by reference, which a differentiable function, a function with a user-defined derivative, or a user-defined derivative does not support",
+    span { loc = "param:Decl", message = "if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter" }
 )
 
 err(

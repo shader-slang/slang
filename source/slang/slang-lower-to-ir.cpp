@@ -3791,6 +3791,16 @@ AddressSpace getReferenceParamAddressSpace(ParamDecl* paramDecl)
     return AddressSpace::Generic;
 }
 
+bool hasReferenceParameter(CallableDecl* callableDecl)
+{
+    for (auto paramDecl : callableDecl->getParameters())
+    {
+        if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+            return true;
+    }
+    return false;
+}
+
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(
     IRGenContext* context,
     SemanticsVisitor* semantics,

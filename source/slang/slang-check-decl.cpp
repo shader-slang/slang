@@ -16125,6 +16125,19 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
             auto paramDecl = paramDeclRef.getDecl();
             if (!paramDecl->type.type)
                 continue;
+            // A by-reference parameter names storage that the caller, and possibly other
+            // invocations, may also access, and a derivative may access it a different number of
+            // times and in a different order than the function does. We do not support one here
+            // at all, so no derivative signature is ever built for the function.
+            //
+            // TODO: Once we support a reference parameter here, it should be treated as
+            // `no_diff`, both in the function's derivative signatures and when a user-defined
+            // derivative is matched with its primal. We do not check whether a reference
+            // parameter is marked `no_diff` for now, because every one is rejected.
+            //
+            if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+                getSink()->diagnose(
+                    Diagnostics::ReferenceParameterOfDifferentiableFunction{.param = paramDecl});
             if (!isTypeDifferentiable(paramDecl->type.type))
             {
                 if (!paramDecl->hasModifier<NoDiffModifier>())
@@ -16133,24 +16146,6 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
                     noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
                     addModifier(paramDecl, noDiffModifier);
                 }
-            }
-            // A by-reference parameter names storage that the caller, and possibly other
-            // invocations, may also access, and only the user knows where its derivative would
-            // live and how updates to it are synchronized. Automatic differentiation therefore
-            // treats the parameter as `no_diff`. A user who needs gradients through such storage
-            // passes a pointer-differentiable handle or their own pair type instead. Because a
-            // user may not expect the implicit `no_diff`, we warn when they did not write it. A
-            // parameter whose type has no derivative was already marked `no_diff` above and loses
-            // nothing, so it gets no warning.
-            if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)) &&
-                !paramDecl->hasModifier<NoDiffModifier>())
-            {
-                getSink()->diagnose(
-                    Diagnostics::ReferenceParameterOfDifferentiableFunctionTreatedAsNoDiff{
-                        .param = paramDecl});
-                auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
-                noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
-                addModifier(paramDecl, noDiffModifier);
             }
             if (!paramDecl->hasModifier<NoDiffModifier>())
             {
@@ -16255,6 +16250,12 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
             }
         }
     }
+
+    // A function with a reference parameter cannot be differentiated, so it gets no derivative
+    // signature and no conformance to the derivative interfaces.
+    //
+    if (hasReferenceParameter(decl))
+        return;
 
     if (as<FunctionDeclBase>(decl))
     {
@@ -21150,6 +21151,12 @@ static void checkDerivativeAttribute(
 {
     SLANG_RELEASE_ASSERT(attr->funcExpr && !attr->funcExpr->type.type);
 
+    // A primal with a reference parameter cannot be differentiated, so it has no derivative
+    // signature to check the derivative against.
+    //
+    if (hasReferenceParameter(primalDeclRef.getDecl()))
+        return;
+
     ArgsWithDirectionInfo imaginaryArguments =
         getImaginaryArgsToForwardDerivative(visitor, primalDeclRef, attr->loc);
     checkDerivativeAttributeImpl(
@@ -21180,6 +21187,15 @@ static void checkDerivativeAttribute(
     if (!attr->funcExpr)
         return;
     if (attr->funcExpr->type.type)
+        return;
+
+    // A primal with a reference parameter cannot be differentiated, so it has no derivative
+    // signature to check its derivative against.
+    //
+    // TODO: Once a primal can have a reference parameter, its derivative should take the same
+    // reference, treated as `no_diff` on both sides.
+    //
+    if (hasReferenceParameter(funcDecl))
         return;
 
     auto primalDeclRef = createDefaultSubstitutionsIfNeeded(
@@ -21220,6 +21236,12 @@ static void checkDerivativeAttribute(
     if (!attr->funcExpr)
         return;
     if (attr->funcExpr->type.type)
+        return;
+
+    // As for a forward derivative, a primal with a reference parameter has no backward derivative
+    // signature to check its derivative against.
+    //
+    if (hasReferenceParameter(funcDecl))
         return;
 
     auto primalDeclRef = createDefaultSubstitutionsIfNeeded(

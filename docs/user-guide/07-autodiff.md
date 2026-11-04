@@ -707,29 +707,28 @@ struct MyDifferentiableType : IDifferentiable
 }
 ```
 
-### `groupshared` Parameters
+### Reference Parameters
 
-On a parameter, `groupshared` implies a by-reference parameter that refers to storage in the thread-group-shared address space (see [Borrow and Reference Parameters](02-conventional-features.md#borrow-and-reference-parameters)).
+A differentiable function, a function with a user-defined derivative, and a user-defined derivative function cannot currently have a by-reference parameter (see [Borrow and Reference Parameters](02-conventional-features.md#borrow-and-reference-parameters)). Any other function can, and a differentiable function can call it under `no_diff`. A differentiable function or a user-defined derivative function can still access thread-group-shared memory directly, through a global `groupshared` variable rather than a `groupshared` parameter.
 
-Slang propagates no derivative through a by-reference parameter, so a `groupshared` parameter of a differentiable function is treated as `no_diff`. The compiler warns about a `groupshared` parameter of a differentiable function unless it is marked `no_diff` explicitly:
+How the derivatives of a function access thread-group-shared memory is undefined. A derivative that Slang generates may access that memory a different number of times, at different points, and in a different order than the original function does (see [Restrictions and Known Issues](#restrictions-and-known-issues)). If a program depends on exactly how its accesses to thread-group-shared memory execute, it should make those accesses in a non-differentiable function. A differentiable function calls it under `no_diff`, and a user-defined derivative function calls it directly.
+
+For example, on a parameter, `groupshared` implies a reference to storage in the thread-group-shared address space, so `load` below cannot be differentiable, but it can read `tile` for `render`. The differentiable function `render` never reads `tile` itself. It passes `tile` to `load` by reference and calls `load` under `no_diff`, so the read happens in `load`:
 
 ```csharp
 groupshared float tile[64];
 
-[Differentiable]
-float shade(no_diff groupshared float values[64], uint i, float x)
+float load(const groupshared float values[64], uint i)
 {
-    return values[i] * x;
+    return values[i];
 }
 
 [Differentiable]
 float render(uint i, float x)
 {
-    return shade(tile, i, x);
+    return no_diff(load(tile, i)) * x;
 }
 ```
-
-How the derivatives of a function access thread-group-shared memory is undefined. This applies to memory the function reaches through `groupshared` parameters and through `groupshared` variables alike. A derivative that Slang generates may access that memory a different number of times, at different points, and in a different order than the original function does (see [Restrictions and Known Issues](#restrictions-and-known-issues)). If a program depends on exactly how its accesses to thread-group-shared memory execute, it should make those accesses in a non-differentiable function. A differentiable function calls it under `no_diff`, and a user-defined derivative function calls it directly.
 
 Because the interaction between derivatives and thread-group-shared memory is subtle, we recommend accessing global `groupshared` variables only from non-differentiable functions, and calling those functions from differentiable functions or user-defined derivative functions rather than accessing the variables there directly.
 
@@ -919,7 +918,6 @@ Given an original function, the signature of its forward propagation function is
 - If a parameter has type `T` that implements `IDifferentiable`, it will be translated into a `DifferentialPair<T>` parameter in the derivative function, where the differential component of the `DifferentialPair` holds the initial derivatives of each parameter with regard to their upstream parameters.
 - If a parameter has type `T` that implements `IDifferentiablePtrType`, it will be translated into a `DifferentialPtrPair<T>` parameter where the differential component references the differential component.
 - All parameter directions are unchanged. For example, an `out` parameter in the original function will remain an `out` parameter in the derivative function.
-- A `groupshared` parameter is treated as `no_diff` and remains a `groupshared` parameter of the derivative function (see [`groupshared` Parameters](#groupshared-parameters)).
 - Differentiable methods cannot have a type implementing `IDifferentiablePtrType` as an `out` or `inout` parameter, or a return type. Types implementing `IDifferentiablePtrType` can only be used for input parameters to a differentiable method. Marking such a method as `[Differentiable]` will result in a compile-time diagnostic error.
 
 For example, given original function:
@@ -955,7 +953,6 @@ More specifically, the signature of its backward propagation function is determi
 - A non-differentiable `out` parameter of type `ND` will be removed from the parameter list of the backward propagation function.
 - A non-differentiable `inout` parameter of type `ND` will become an `in ND` parameter.
 - Types implementing `IDifferentiablePtrType` work the same way as the forward-mode case. They can only be used with `in` parameters, and are converted into `DifferentialPtrPair` types. Their directions are **not** affected.
-- A `groupshared` parameter is treated as `no_diff` and remains a `groupshared` parameter of the backward propagation function (see [`groupshared` Parameters](#groupshared-parameters)).
 
 For example consider the following original function:
 

@@ -7,8 +7,7 @@
 // copy whether or not autodiff is involved. A function with custom derivatives for both modes is
 // called by autodiff rather than rewritten, so its primal and derivative bodies may write shared
 // memory and synchronize, as long as the derivative does not depend on the primal's side effects.
-// The cases that are reported are in writes.slang, and the cases with a reference parameter on a
-// differentiable function are in reference-parameter-silent.slang.
+// The cases that are reported are in writes.slang.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
 

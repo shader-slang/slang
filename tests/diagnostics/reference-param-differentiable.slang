@@ -1,83 +1,224 @@
-// A reference parameter of a differentiable function -- `__ref`, `__ref_readonly`,
-// `__ref_writeonly`, `groupshared`, or `const groupshared` -- names storage that the caller, and
-// for `groupshared` other invocations, may also access. Autodiff propagates no derivative through
-// a reference, so the parameter is treated as `no_diff`. Because a user may not expect that, we
-// warn unless the parameter is explicitly marked `no_diff` or its type has no derivative to lose.
+// A reference parameter -- `__ref`, `__ref_readonly`, `__ref_writeonly`, `const __ref`,
+// `groupshared`, or `const groupshared` -- names storage that the caller, and for `groupshared`
+// other invocations, may also access, and a derivative may access it a different number of times
+// and in a different order than the function does. We therefore reject one on a function with any
+// differentiability or derivative attribute. The error applies whatever the parameter's type,
+// whether or not it is marked `no_diff`, and to interface requirements and methods. A function
+// without an attribute is rejected in the same way when a `[ForwardDerivativeOf]` or
+// `[BackwardDerivativeOf]` attribute names it as a primal, and its derivative is then not checked
+// against it. A function that is neither differentiated nor given a derivative may take one.
+//
+// Before, backward differentiation of a caller of a user-defined backward derivative with a
+// reference parameter could fail SPIR-V validation or report an internal compiler error, because
+// the backward context held the reference.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute -experimental-feature
 
 static const uint N = 8;
 groupshared float sharedFloats[N];
-groupshared uint sharedUInts[N];
 
-// Warned: each explicit reference keyword.
+// --- Rejected: each reference spelling ---
+
 [Differentiable]
 float refParam(__ref float a, float x)
-//CHECK:                   ^ parameter 'a' is passed by reference, so a differentiable function treats it as 'no_diff'
-//CHECK:                   ^ no derivative is propagated through a reference parameter; mark it 'no_diff' to make that explicit.
+//CHECK:                   ^ error E38038
+//CHECK:                   ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
 {
     return a * x;
 }
 
 [Differentiable]
 float refReadOnlyParam(__ref_readonly float a, float x)
-//CHECK:                                    ^ parameter 'a' is passed by reference, so a differentiable function treats it as 'no_diff'
-//CHECK:                                    ^ no derivative is propagated through a reference parameter; mark it 'no_diff' to make that explicit.
+//CHECK:                                    ^ error E38038
+//CHECK:                                    ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
 {
     return a * x;
 }
 
 [Differentiable]
 float refWriteOnlyParam(__ref_writeonly float a, float x)
-//CHECK:                                      ^ parameter 'a' is passed by reference, so a differentiable function treats it as 'no_diff'
-//CHECK:                                      ^ no derivative is propagated through a reference parameter; mark it 'no_diff' to make that explicit.
+//CHECK:                                      ^ error E38038
+//CHECK:                                      ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
 {
     a = detach(x);
     return x;
 }
 
-// Warned: `groupshared` parameters, read-write and read-only, with a differentiable element type.
 [Differentiable]
-float readWrite(uint tid, groupshared float s[N])
-//CHECK:                                    ^ parameter 's' is passed by reference, so a differentiable function treats it as 'no_diff'
-//CHECK:                                    ^ no derivative is propagated through a reference parameter; mark it 'no_diff' to make that explicit.
+float constRefParam(const __ref float a, float x)
+//CHECK:                              ^ error E38038
+//CHECK:                              ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return a * x;
+}
+
+[Differentiable]
+float groupSharedParam(uint tid, groupshared float s[N])
+//CHECK:                                           ^ error E38038
+//CHECK:                                           ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
 {
     return s[tid];
 }
 
 [Differentiable]
-float readOnly(uint tid, const groupshared float s[N])
-//CHECK:                                         ^ parameter 's' is passed by reference, so a differentiable function treats it as 'no_diff'
-//CHECK:                                         ^ no derivative is propagated through a reference parameter; mark it 'no_diff' to make that explicit.
+float constGroupSharedParam(uint tid, const groupshared float s[N])
+//CHECK:                                                      ^ error E38038
+//CHECK:                                                      ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
 {
     return s[tid];
 }
 
-// Not warned: the user already wrote `no_diff`.
+// --- Rejected: marked `no_diff`, or with a type that has no derivative ---
+
 [Differentiable]
-float noDiff(uint tid, no_diff const groupshared float s[N])
+float noDiffGroupShared(uint tid, no_diff groupshared float s[N], float x)
+//CHECK:                                                    ^ error E38038
+//CHECK:                                                    ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
 {
-    return s[tid];
+    return s[tid] * x;
 }
 
 [Differentiable]
 float noDiffRef(no_diff __ref float a, float x)
+//CHECK:                            ^ error E38038
+//CHECK:                            ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
 {
     return a * x;
 }
 
-// Not warned: a non-differentiable type has no derivative to lose -- neither `uint[N]` nor `int`
-// conforms to `IDifferentiable`.
 [Differentiable]
-float nonDifferentiableElement(uint tid, const groupshared uint s[N])
-{
-    return float(s[tid]);
-}
-
-[Differentiable]
-float nonDifferentiableRef(__ref int a, float x)
+float nonDifferentiableType(__ref int a, float x)
+//CHECK:                              ^ error E38038
+//CHECK:                              ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
 {
     return a * x;
+}
+
+// --- Rejected: each differentiability attribute, and with a user-defined derivative ---
+
+[ForwardDifferentiable]
+float forwardDifferentiable(__ref float a, float x)
+//CHECK:                                ^ error E38038
+//CHECK:                                ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return a * x;
+}
+
+[BackwardDifferentiable]
+float backwardDifferentiable(__ref float a, float x)
+//CHECK:                                 ^ error E38038
+//CHECK:                                 ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return a * x;
+}
+
+// --- Rejected: each derivative attribute, on the function that carries it ---
+
+[ForwardDerivative(forwardDerivativeOfNamed)]
+float forwardDerivativeNamed(__ref float a, float x)
+//CHECK:                                 ^ error E38038
+//CHECK:                                 ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return a * x;
+}
+
+DifferentialPair<float> forwardDerivativeOfNamed(__ref float a, DifferentialPair<float> x)
+{
+    return diffPair(a * x.p, a * x.d);
+}
+
+[BackwardDerivative(backwardDerivativeOfNamed)]
+float backwardDerivativeNamed(__ref float a, float x)
+//CHECK:                                  ^ error E38038
+//CHECK:                                  ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return a * x;
+}
+
+void backwardDerivativeOfNamed(__ref float a, inout DifferentialPair<float> x, float dOut)
+{
+    x = diffPair(x.p, a * dOut);
+}
+
+[TreatAsDifferentiable]
+float treatedAsDifferentiable(__ref float a, float x)
+//CHECK:                                  ^ error E38038
+//CHECK:                                  ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return a * x;
+}
+
+// --- Rejected: a primal named by a `...DerivativeOf` attribute, and its derivative ---
+
+float forwardPrimal(__ref float a, float x)
+//CHECK:                        ^ error E38038
+//CHECK:                        ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return a * x;
+}
+
+[ForwardDerivativeOf(forwardPrimal)]
+DifferentialPair<float> forwardDerivativeOf(__ref float a, DifferentialPair<float> x)
+//CHECK:                                                ^ error E38038
+//CHECK:                                                ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return diffPair(a * x.p, a * x.d);
+}
+
+float backwardPrimal(uint tid, const groupshared float s[N], float x)
+//CHECK:                                               ^ error E38038
+//CHECK:                                               ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return s[tid] * x;
+}
+
+[BackwardDerivativeOf(backwardPrimal)]
+void backwardDerivativeOf(uint tid, no_diff const groupshared float s[N], inout DifferentialPair<float> x, float dOut)
+//CHECK:                                                            ^ error E38038
+//CHECK:                                                            ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    x = diffPair(x.p, s[tid] * dOut);
+}
+
+float byValueDerivativePrimal(__ref float a, float x)
+//CHECK:                                  ^ error E38038
+//CHECK:                                  ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+{
+    return a * x;
+}
+
+[BackwardDerivativeOf(byValueDerivativePrimal)]
+void byValueDerivativeOf(no_diff float a, inout DifferentialPair<float> x, float dOut)
+{
+    x = diffPair(x.p, a * dOut);
+}
+
+// --- Rejected: an interface requirement and a method ---
+
+interface IScale
+{
+    [Differentiable]
+    float scale(__ref float a, float x);
+//CHECK:                    ^ error E38038
+//CHECK:                    ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+}
+
+struct Scaler
+{
+    [Differentiable]
+    float scale(__ref float a, float x)
+//CHECK:                    ^ error E38038
+//CHECK:                    ^ if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter
+    {
+        return a * x;
+    }
+}
+
+// --- Accepted: a function that is not differentiable ---
+
+float notDifferentiable(__ref float a, groupshared float s[N], uint tid)
+{
+    return a * s[tid];
 }
 
 [shader("compute")]
@@ -85,5 +226,4 @@ float nonDifferentiableRef(__ref int a, float x)
 void computeMain(uint3 tid : SV_GroupThreadID)
 {
     sharedFloats[tid.x] = float(tid.x);
-    sharedUInts[tid.x] = tid.x;
 }

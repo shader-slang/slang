@@ -591,6 +591,10 @@ ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
 ///
 AddressSpace getReferenceParamAddressSpace(ParamDecl* paramDecl);
 
+/// Return whether `callableDecl` has a parameter whose effective mode is a by-reference mode.
+///
+bool hasReferenceParameter(CallableDecl* callableDecl);
+
 /// Finds the checked information for `declRef`'s effective `this` parameter.
 ///
 /// The declaration must have reached `DeclCheckState::SignatureChecked`. A declaration has a

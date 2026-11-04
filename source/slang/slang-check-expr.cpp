@@ -6066,9 +6066,14 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
         case ParamPassingMode::RefReadOnly:
         case ParamPassingMode::RefWriteOnly:
             {
-                // Automatic differentiation propagates no derivative through a reference
-                // parameter, so a reference that carries no derivative passes through as a
-                // `no_diff` reference with the same access.
+                // The derivative takes a reference parameter of the primal as is, with the same
+                // access, and does not differentiate the storage it refers to.
+                //
+                // TODO: A function that is differentiated or has a user-defined derivative cannot
+                // currently have a reference parameter (see
+                // `checkDifferentiableCallableSignature`). Once it can, the parameter should be
+                // treated as `no_diff` here.
+                //
                 if (tryGetDifferentialPairType(paramValType))
                     SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
                 paramTypes.add(getParamTypeWithModeWrapper(
@@ -6141,6 +6146,34 @@ struct HigherOrderInvokeExprCheckingActions
         return declRef.as<CallableDecl>();
     }
 
+    /// Return whether `funcExpr` names a function with a reference parameter, and report an error
+    /// on each such parameter that has not already been reported.
+    bool rejectFunctionWithReferenceParameter(SemanticsVisitor* semantics, Expr* funcExpr)
+    {
+        // A function with a reference parameter cannot be differentiated, so its derivative has no
+        // signature, and the caller gives the expression an error type instead of building one.
+        //
+        auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr);
+        if (!funcDeclRef || !hasReferenceParameter(funcDeclRef.getDecl()))
+            return false;
+
+        // `checkDifferentiableCallableSignature` reports the reference parameters of a function
+        // with a differentiability or derivative attribute, so we report only those of a function
+        // without one, which becomes differentiated by being named here.
+        //
+        if (!funcDeclRef.getDecl()->findModifier<DifferentiableAttribute>())
+        {
+            for (auto paramDecl : funcDeclRef.getDecl()->getParameters())
+            {
+                if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+                    semantics->getSink()->diagnose(
+                        Diagnostics::ReferenceParameterOfDifferentiableFunction{
+                            .param = paramDecl});
+            }
+        }
+        return true;
+    }
+
     // Extract the effective `this` parameter information for a statically referenced member method
     // (e.g. `Type::method`). Returns an empty result for declarations without that parameter and
     // for member methods referenced by name within their own type (e.g.
@@ -6181,6 +6214,11 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
+        if (rejectFunctionWithReferenceParameter(semantics, funcExpr))
+        {
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
+            return;
+        }
         auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
         resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisParamInfo);
         if (auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
@@ -6213,6 +6251,11 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
         {
             resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
+            return;
+        }
+        if (rejectFunctionWithReferenceParameter(semantics, funcExpr))
+        {
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
             return;
         }
         auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
