@@ -3683,11 +3683,15 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes);
 
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+        return TestResult::Fail;
+
     return _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }

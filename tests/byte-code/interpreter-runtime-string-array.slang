@@ -1,4 +1,4 @@
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:INTERPRET(filecheck=CHECK,exit-code=1):
 
 // An array whose element type has no HostVM layout (`String[N]`) is itself unrepresentable,
 // so a runtime value of it must be diagnosed rather than allocated a 0-byte slot (issue
@@ -15,7 +15,6 @@ void main()
     String a[2] = {"x", "y"};
     String b[2] = {"p", "q"};
     String r[2] = cmpF(1.0, 2.0) ? a : b;
-    //CHECK: result code = 1
     //CHECK-DAG: error[E52014]
     //CHECK-DAG: 'array<string,2>' has no HostVM layout
     //CHECK-NOT: error[E99999]
