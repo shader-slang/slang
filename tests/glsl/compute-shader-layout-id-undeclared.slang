@@ -1,5 +1,6 @@
 // A `local_size_{xyz}_id` that names an id with no `constant_id` declaration gets an
-// implicit specialization constant with that id and a default value of 1. A declared
+// implicit specialization constant with that id. Its default is the axis's size from a
+// `layout(local_size_<axis> = N) in;` statement, or 1 when there is none. A declared
 // `constant_id` is used instead wherever it appears in the file, before or after the
 // `layout(...) in;` statement.
 
@@ -19,6 +20,8 @@
 
 #if defined(TWO)
 
+// Two undeclared ids: the second lookup accepts the first implicit attribute, and the two
+// implicit constants stay separate symbols.
 // TWO: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %[[Y:[0-9A-Za-z_]+]] %int_2
 // TWO-DAG: OpDecorate %[[X]] SpecId 5
 // TWO-DAG: OpDecorate %[[Y]] SpecId 6
@@ -35,6 +38,7 @@ layout(local_size_x_id = 5, local_size_y_id = 6, local_size_z = 2) in;
 
 #elif defined(THREE)
 
+// Three undeclared ids: every axis gets a distinct SpecId.
 // THREE: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %[[Y:[0-9A-Za-z_]+]] %[[Z:[0-9A-Za-z_]+]]
 // THREE-DAG: OpDecorate %[[X]] SpecId 5
 // THREE-DAG: OpDecorate %[[Y]] SpecId 6
@@ -47,6 +51,7 @@ layout(local_size_x_id = 5, local_size_y_id = 6, local_size_z_id = 7) in;
 
 #elif defined(MIXED)
 
+// An implicit constant, a constant_id declared before the layout, and one declared after.
 // MIXED: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %declaredBefore %declaredAfter
 // MIXED-DAG: OpDecorate %[[X]] SpecId 5
 // MIXED-DAG: OpDecorate %declaredBefore SpecId 6
@@ -61,6 +66,7 @@ layout(constant_id = 7) const int declaredAfter = 4;
 
 #elif defined(REPEAT)
 
+// The same id on two axes of one layout shares one implicit constant.
 // REPEAT: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %[[X]] %int_1
 // REPEAT-DAG: OpDecorate %[[X]] SpecId 5
 // REPEAT-DAG: %[[X]] = OpSpecConstant %int 1
@@ -69,6 +75,7 @@ layout(local_size_x_id = 5, local_size_y_id = 5) in;
 
 #elif defined(AFTER)
 
+// A constant_id declared after the layout is used instead of an implicit constant.
 // AFTER: OpExecutionModeId %main LocalSizeId %declaredAfter %int_1 %int_1
 // AFTER-DAG: OpDecorate %declaredAfter SpecId 5
 // AFTER-DAG: %declaredAfter = OpSpecConstant %int 4
@@ -78,6 +85,7 @@ layout(constant_id = 5) const int declaredAfter = 4;
 
 #elif defined(AFTER_ATTR)
 
+// The same with a `[vk::constant_id]` attribute, which `checkAttribute` checks.
 // AFTER_ATTR: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %declaredAfter %int_1
 // AFTER_ATTR-DAG: OpDecorate %[[X]] SpecId 5
 // AFTER_ATTR-DAG: OpDecorate %declaredAfter SpecId 6
@@ -90,6 +98,7 @@ const int declaredAfter = 7;
 
 #elif defined(SEPARATE)
 
+// A second layout statement that repeats an id finds the first one's implicit constant.
 // SEPARATE: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %[[X]] %int_1
 // SEPARATE-DAG: OpDecorate %[[X]] SpecId 5
 // SEPARATE-DAG: %[[X]] = OpSpecConstant %int 1
@@ -99,6 +108,8 @@ layout(local_size_y_id = 5) in;
 
 #elif defined(LARGE)
 
+// The lookup compares the full id rather than the 32-bit `location`, so an id of 2^31 or
+// more still matches its declaration.
 // LARGE: OpExecutionModeId %main LocalSizeId %declaredLarge %[[Y:[0-9A-Za-z_]+]] %int_1
 // LARGE-DAG: OpDecorate %declaredLarge SpecId 3000000000
 // LARGE-DAG: OpDecorate %[[Y]] SpecId 6
@@ -123,6 +134,7 @@ layout(local_size_z_id = 19) in;
 
 #elif defined(SIZE_LAST)
 
+// The size statement may follow the id statement and use a named constant.
 // SIZE_LAST: OpExecutionModeId %main LocalSizeId %[[X:[0-9A-Za-z_]+]] %int_1 %int_1
 // SIZE_LAST-DAG: OpDecorate %[[X]] SpecId 18
 // SIZE_LAST-DAG: %[[X]] = OpSpecConstant %int 16
