@@ -1,0 +1,44 @@
+name: Check Source Comments
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "source/**"
+      - "include/**"
+      - "prelude/**"
+      - "tools/**"
+      - "extras/source_comment_lint.py"
+      - ".github/workflows/check-source-comments.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-comments:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # Warns by default: a finding is an annotation on the changed line, not a failed
+      # check. Setting the repository variable SOURCE_COMMENT_LINT_ENFORCE to "1" turns
+      # the findings into a failure.
+      - name: Lint added source comments
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          ENFORCE: ${{ vars.SOURCE_COMMENT_LINT_ENFORCE }}
+        run: |
+          set -euo pipefail
+          args=(--base "$BASE_SHA" --head "$HEAD_SHA")
+          if [ "${ENFORCE:-}" = "1" ]; then args+=(--enforce); fi
+          python3 extras/source_comment_lint.py "${args[@]}"
