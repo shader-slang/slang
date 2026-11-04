@@ -175,14 +175,16 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
             {
                 opIntInfo.isSigned = false;
                 shiftAmountType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
-                // A non-negative literal amount converts to a literal, so a shift of a
-                // specialization constant by a literal keeps only constant and spec-const
-                // operands and stays a valid spec-const expression at module scope.
+                // A spec-const-rate shift such as `N << 1` keeps its rate when its operand is
+                // replaced, so the new amount must again be a constant or a spec-const-rate
+                // value. A cast of a spec-const amount acquires that rate, but a cast of a
+                // literal is neither, and global-value inlining would then move the shift into
+                // every function that uses it. A literal amount therefore becomes an unsigned
+                // literal; `getIntValue` truncates it to that type as the cast would.
                 auto literalAmount = as<IRIntLit>(shiftAmount);
                 IRInst* newShiftAmount =
-                    literalAmount && literalAmount->getValue() >= 0
-                        ? builder.getIntValue(shiftAmountType, literalAmount->getValue())
-                        : builder.emitCast(shiftAmountType, shiftAmount);
+                    literalAmount ? builder.getIntValue(shiftAmountType, literalAmount->getValue())
+                                  : builder.emitCast(shiftAmountType, shiftAmount);
                 builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
             }
         }
