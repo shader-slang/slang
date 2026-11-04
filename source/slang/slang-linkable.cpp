@@ -1051,7 +1051,35 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    auto sharedSemanticsContext = linkage->getSemanticsForReflection();
+    RefPtr<SharedSemanticsContext> sharedSemanticsContext;
+    if (auto module = as<Module>(this))
+    {
+        // Include extensions from this module when resolving member entry names.
+        // Consider this example:
+        //
+        //     struct Stage {}
+        //     extension Stage { static void invoke() {} }
+        //
+        // Resolving `Stage.invoke` first finds `Stage`, then searches extensions for `invoke`.
+        // The shared reflection context searches `loadedModulesList`, which excludes the primary
+        // command-line source module. It therefore reports "member not found" when this extension
+        // is declared in that source file.
+        //
+        // A module context makes `getCandidateExtensionsForTypeDecl` use `importedModulesList`.
+        // This new context has not checked the source or its imports, so populate that list here.
+        // `getModuleDependencies()` includes this module itself as well as its imports.
+        sharedSemanticsContext = new SharedSemanticsContext(linkage, module, sink);
+        for (auto dependency : module->getModuleDependencies())
+        {
+            auto moduleDecl = dependency->getModuleDecl();
+            if (sharedSemanticsContext->importedModulesSet.add(moduleDecl))
+                sharedSemanticsContext->importedModulesList.add(moduleDecl);
+        }
+    }
+    else
+    {
+        sharedSemanticsContext = linkage->getSemanticsForReflection();
+    }
     SemanticsContext context(sharedSemanticsContext);
     context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
