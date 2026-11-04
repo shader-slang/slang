@@ -3751,11 +3751,15 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
     }
     if (paramDecl->hasModifier<InModifier>())
         return ParamPassingMode::In;
+
     // On a parameter with no passing-mode keyword, `groupshared` names the address space of a
-    // reference: it implies `__ref`, or `__ref_readonly` with `const`. Semantic checking reports a
-    // `groupshared` parameter whose written keyword gives it any other mode.
+    // reference, so it implies `__ref`. Semantic checking reports a `groupshared` parameter whose
+    // written keyword gives it any other mode.
+    //
     if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
     {
+        // As on a `__ref` parameter, `const` makes the reference read-only.
+        //
         if (paramDecl->hasModifier<ConstModifier>())
             return ParamPassingMode::RefReadOnly;
         return ParamPassingMode::RefReadWrite;
