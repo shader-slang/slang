@@ -3615,6 +3615,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         // operands.
         OperandTryCoverageRAII operandTryCoverage(this, nullptr);
 
+        // A subscript does not look in the pointer types that its base is dereferenced
+        // through, so `derefBases` is unused here.
         baseExpr = checkBaseForMemberExpr(
             subscriptExpr->baseExpression,
             CheckBaseContext::Subscript,
@@ -5366,6 +5368,8 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         // call that instead.
         auto operatorName = getName("()");
 
+        // `operator()` is looked up only in the dereferenced callee type, not in the
+        // pointer types that the callee is dereferenced through, so `derefBases` is unused.
         List<Expr*> derefBases;
         expr->functionExpr = maybeInsertImplicitOpForMemberBase(
             expr->functionExpr,
@@ -8421,6 +8425,7 @@ Expr* SemanticsVisitor::maybeDereference(
     CheckBaseContext checkBaseContext,
     List<Expr*>& outDerefBases)
 {
+    SLANG_ASSERT(outDerefBases.getCount() == 0);
     Expr* expr = inExpr;
     for (;;)
     {
@@ -9102,6 +9107,7 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     expr->baseExpression = CheckTerm(expr->baseExpression);
 
     // Not sure this is needed -> but guess someone could do
+    // A static member is looked up only in the dereferenced type, so `derefBases` is unused.
     List<Expr*> derefBases;
     expr->baseExpression =
         maybeDereference(expr->baseExpression, CheckBaseContext::Member, derefBases);
@@ -9409,7 +9415,7 @@ bool SemanticsVisitor::isMemberOnlyOnDerefedPtrTypes(
         return false;
 
     LookupResult ptrResult;
-    if (!lookUpMemberInDerefedPtrTypes(memberExpr, derefBases, ptrResult))
+    if (!findPtrLevelWithMember(memberExpr, derefBases, ptrResult))
         return false;
 
     // We look the member up on a stand-in for the opened value, so that members that apply
@@ -9448,13 +9454,14 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
     return resultBaseExpr;
 }
 
-Expr* SemanticsVisitor::lookUpMemberInDerefedPtrTypes(
+Expr* SemanticsVisitor::findPtrLevelWithMember(
     MemberExpr* expr,
     List<Expr*> const& derefBases,
     LookupResult& outLookupResult)
 {
-    // `p->m` names a member of `*p`, so the pointer that `->` dereferences, and any level
-    // outside it, does not contribute members.
+    // `p->m` names a member of `*p`, so `->` consumes the outermost `Ptr` level, together with
+    // any non-`Ptr` levels outside it (as in `ConstantBuffer<Ptr<int>>`), and those levels do
+    // not contribute members.
     Index outermostLevel = 0;
     if (as<DerefMemberExpr>(expr))
     {
@@ -9464,10 +9471,11 @@ Expr* SemanticsVisitor::lookUpMemberInDerefedPtrTypes(
         outermostLevel++;
     }
 
+    // We search innermost first, which is the order of the deref fallback in `lookUpMember`.
     for (Index level = derefBases.getCount() - 1; level >= outermostLevel; level--)
     {
-        // Only a `PtrType` has members of its own here. Other pointer-like types, such as
-        // `DescriptorHandle<T>` and `ConstantBuffer<T>`, forward all member lookup to `T`.
+        // Only `PtrType` levels are searched. A `DescriptorHandle<T>` always forwards member
+        // calls to `T` by design, and `ConstantBuffer<T>` and `Ref<T>` stand in for `T`.
         Expr* ptrBase = derefBases[level];
         if (!as<PtrType>(ptrBase->type))
             continue;
@@ -9498,13 +9506,11 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(
         lookUpMember(m_astBuilder, this, expr->name, baseType, m_outerScope);
     if (!lookupResult.isValid())
     {
-        // Members of the dereferenced base win; only when it has none do we look in the
-        // pointer types that it was dereferenced through.
-        if (auto ptrBase = lookUpMemberInDerefedPtrTypes(expr, derefBases, lookupResult))
-        {
+        // A member of that name on the fully dereferenced base hides the pointer levels,
+        // whether or not it is visible and whatever its signature. We look in the pointer
+        // levels only when lookup on the base finds nothing at all.
+        if (auto ptrBase = findPtrLevelWithMember(expr, derefBases, lookupResult))
             expr->baseExpression = ptrBase;
-            baseType = ptrBase->type;
-        }
     }
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);

@@ -4228,6 +4228,8 @@ public:
         IntVal* baseElementRowCount,
         IntVal* baseElementColCount);
 
+    /// Check `memberExpr` as a tuple swizzle such as `t._0`. When its name is not a tuple
+    /// swizzle, this falls back to `checkGeneralMemberLookupExpr`, which receives `derefBases`.
     Expr* checkTupleSwizzleExpr(
         MemberExpr* memberExpr,
         TupleType* baseTupleType,
@@ -4246,16 +4248,21 @@ public:
     // Check a member expr as a general member lookup.
     // This is the default/fallback behavior if the base type isn't swizzlable.
     // `derefBases` holds the expressions that the base of `expr` was implicitly dereferenced
-    // through, as reported by `checkBaseForMemberExpr`.
+    // through, as reported by `checkBaseForMemberExpr`. When `baseType` has no member of that
+    // name, the member may be found on one of those pointer levels (see
+    // `findPtrLevelWithMember`), and then `expr->baseExpression` is replaced by that level.
     Expr* checkGeneralMemberLookupExpr(
         MemberExpr* expr,
         Type* baseType,
         List<Expr*> const& derefBases);
 
-    /// Look up the member named by `expr` in the pointer types that the base of `expr` was
-    /// implicitly dereferenced through, given as `derefBases` (outermost first). Return the
-    /// base at the innermost level whose pointer type has the member, with the lookup result in
-    /// `outLookupResult`, or null when no level has it. Consider:
+    /// Find the pointer level of a member expression's base that has the member named by
+    /// `expr`. `derefBases` holds the expressions that the base was implicitly dereferenced
+    /// through, outermost first. Return the base at the innermost `PtrType` level whose type
+    /// has the member, with the lookup result in `outLookupResult`, or null when no level has
+    /// it. Levels that are not a `PtrType`, such as `DescriptorHandle<T>`, are not searched.
+    /// For `p->m`, the levels up to and including the outermost `PtrType` are not searched
+    /// either, because `->` names a member of `*p`. Consider:
     ///
     ///     extension Ptr<int> { int g() { return *this + 1; } }
     ///     Ptr<Ptr<int>> pp = ...;
@@ -4264,7 +4271,13 @@ public:
     /// The base of `pp.g` is dereferenced to `**pp : int`, which has no member `g`. The
     /// innermost pointer level is `*pp : Ptr<int>`, which has `g`, so `pp.g()` calls `g` with
     /// `*pp` as `this`.
-    Expr* lookUpMemberInDerefedPtrTypes(
+    ///
+    /// `lookUpMember` has its own pointee-then-pointer fallback, but it does not apply here.
+    /// A member-expr base is already fully dereferenced, because swizzles and existential
+    /// opening need that form, and the fallback looks through every pointer-like type, which
+    /// would expose members of `DescriptorHandle<T>`. Each level is therefore looked up with
+    /// `LookupOptions::NoDeref`.
+    Expr* findPtrLevelWithMember(
         MemberExpr* expr,
         List<Expr*> const& derefBases,
         LookupResult& outLookupResult);
@@ -4295,17 +4308,22 @@ public:
         Member,
         Subscript,
     };
+    /// The expressions that the base is implicitly dereferenced through are appended to
+    /// `outDerefBases` (see `maybeDereference`), and `memberExpr` is passed to
+    /// `maybeInsertImplicitOpForMemberBase`.
     Expr* checkBaseForMemberExpr(
         Expr* baseExpr,
         CheckBaseContext checkBaseContext,
         List<Expr*>& outDerefBases,
         MemberExpr* memberExpr);
 
-    /// Implicitly dereference `inExpr` through each pointer-like type that it can be
-    /// dereferenced through, and return the result. A `PtrType` is not dereferenced in a
-    /// subscript context, so that `p[i]` indexes the pointer. Each expression that gets
-    /// dereferenced is appended to `outDerefBases`, outermost first: for `pp : Ptr<Ptr<int>>`,
-    /// the result is `**pp` and `outDerefBases` receives `pp` and `*pp`.
+    /// Implicitly dereference `inExpr` through each type that
+    /// `getPointedToTypeIfCanImplicitDeref` sees through (`Ptr<T>`, `Ref<T>`, and pointer-like
+    /// types such as `DescriptorHandle<T>` and `ConstantBuffer<T>`), and return the result. A
+    /// `PtrType` is not dereferenced in a subscript context, so that `p[i]` indexes the
+    /// pointer. Each expression that gets dereferenced is appended to `outDerefBases`, which
+    /// must be empty on entry, outermost first: for `pp : Ptr<Ptr<int>>`, the result is `**pp`
+    /// and `outDerefBases` receives `pp` and `*pp`.
     Expr* maybeDereference(
         Expr* inExpr,
         CheckBaseContext checkBaseContext,
@@ -4315,9 +4333,9 @@ public:
     /// This include inserting implicit open-existential operations as needed.
     /// The expressions that get implicitly dereferenced are appended to `outDerefBases`, as
     /// for `maybeDereference`. `memberExpr` is the member expression whose base this is, or
-    /// null for a subscript or call base. When its member is found only on a
-    /// pointer level (see `isMemberOnlyOnDerefedPtrTypes`), the dereferenced base is returned
-    /// without opening its existential, because the member is called on that pointer level.
+    /// null for a subscript or call base. When its member is found only on a pointer level
+    /// (see `isMemberOnlyOnDerefedPtrTypes`), the dereferenced base is returned without
+    /// opening its existential, because the member is called on that pointer level.
     Expr* maybeInsertImplicitOpForMemberBase(
         Expr* baseExpr,
         CheckBaseContext checkBaseContext,
