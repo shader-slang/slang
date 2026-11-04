@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4);
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4);
 RWStructuredBuffer<int> outputBuffer;
 
 //TEST_INPUT: set intPtr = ubuffer(data=[10 20 30 40], stride=4);
@@ -79,6 +79,12 @@ extension Ptr<int>
 {
     int level() { return 1; }
     property int plusTen { get { return *this + 10; } }
+    property int value
+    {
+        get { return *this; }
+        [nonmutating] set { *this = newValue; }
+    }
+    static int answer() { return 77; }
 }
 
 extension Ptr<Ptr<int>>
@@ -152,4 +158,12 @@ void computeMain()
     pp.advance();
     // CHECK-NEXT: 40
     outputBuffer[16] = **ptrSlot;
+
+    // A static member is found through the instance, and a setter on the inner level writes
+    // through `*pp`, which now points at `intPtr[3]`.
+    // CHECK-NEXT: 77
+    outputBuffer[17] = p.answer();
+    pp.value = 33;
+    // CHECK-NEXT: 33
+    outputBuffer[18] = intPtr[3];
 }
