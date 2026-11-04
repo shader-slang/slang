@@ -9901,6 +9901,50 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inst->getOperand(3));
     }
 
+    static bool isSpecConstant(SpvInst* spvInst)
+    {
+        SLANG_ASSERT(spvInst);
+        switch (spvInst->opcode)
+        {
+        case SpvOpSpecConstant:
+        case SpvOpSpecConstantTrue:
+        case SpvOpSpecConstantFalse:
+        case SpvOpSpecConstantComposite:
+        case SpvOpSpecConstantOp:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /// Like `emitOperand`, this emits the global `irInst` if it has not been emitted yet.
+    bool isSpecConstant(IRInst* irInst) { return isSpecConstant(ensureInst(irInst)); }
+
+    template<typename T>
+    bool hasSpecConstantConstituent(const List<T>& constituents)
+    {
+        for (auto constituent : constituents)
+        {
+            if (isSpecConstant(constituent))
+                return true;
+        }
+        return false;
+    }
+
+    bool hasSpecConstantConstituent(OperandsOf const& operands)
+    {
+        auto irInst = operands.irInst;
+        for (UInt i = 0; i < irInst->getOperandCount(); i++)
+        {
+            if (isSpecConstant(irInst->getOperand(i)))
+                return true;
+        }
+        return false;
+    }
+
+    /// OpConstantComposite may not have specialization-constant constituents, so a
+    /// composite in the constants section that has one, directly or through an inner
+    /// composite, is emitted as OpSpecConstantComposite.
     template<typename T, typename Ts>
     SpvInst* emitCompositeConstruct(
         SpvInstParent* parent,
@@ -9909,15 +9953,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         const Ts& constituents)
     {
         if (parent == getSection(SpvLogicalSectionID::ConstantsAndTypes))
+        {
+            if (hasSpecConstantConstituent(constituents))
+                return emitOpSpecConstantComposite(parent, inst, idResultType, constituents);
             return emitOpConstantComposite(parent, inst, idResultType, constituents);
+        }
         return emitOpCompositeConstruct(parent, inst, idResultType, constituents);
     }
 
     SpvInst* emitCompositeConstruct(SpvInstParent* parent, IRInst* inst)
     {
-        if (parent == getSection(SpvLogicalSectionID::ConstantsAndTypes))
-            return emitOpConstantComposite(parent, inst, inst->getDataType(), OperandsOf(inst));
-        return emitOpCompositeConstruct(parent, inst, inst->getDataType(), OperandsOf(inst));
+        return emitCompositeConstruct(parent, inst, inst->getDataType(), OperandsOf(inst));
     }
 
     SpvInst* emitMakeArrayFromElement(SpvInstParent* parent, IRInst* inst)
