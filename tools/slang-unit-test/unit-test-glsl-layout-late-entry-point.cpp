@@ -10,10 +10,10 @@
 
 using namespace Slang;
 
-// GLSL declares a compute thread-group size or `early_fragment_tests` with a standalone
-// `layout(...) in;` beside the entry point. A module loaded through the API is lowered to IR
-// before an entry point without `[shader]` is found with `findAndCheckEntryPoint`, which is
-// where the layout becomes an attribute of the entry point. These tests compile such entry
+// GLSL declares a compute thread-group size, `early_fragment_tests` or a compute derivative
+// group with a standalone `layout(...) in;` beside the entry point. A module loaded through the API
+// is lowered to IR before an entry point without `[shader]` is found with `findAndCheckEntryPoint`,
+// which is where the layout becomes an attribute of the entry point. These tests compile such entry
 // points and check that the generated code still carries the layout.
 
 static void printDiagnostics(slang::IBlob* diagnostics)
@@ -29,9 +29,9 @@ static void printDiagnostics(slang::IBlob* diagnostics)
 }
 
 // Load `source` as a GLSL module, find `entryPointName` in it with `findAndCheckEntryPoint`,
-// link the two, and return the code generated for `targetDesc`. The session and the linked
-// program are returned as well, because reflection on the program needs the session alive.
-static String compileLateGLSLEntryPoint(
+// and link the two into `outLinkedProgram`. The session is returned as well, because the
+// linked program and its reflection need the session alive.
+static void linkLateGLSLEntryPoint(
     UnitTestContext* unitTestContext,
     const char* source,
     const char* entryPointName,
@@ -75,9 +75,28 @@ static String compileLateGLSLEntryPoint(
     SlangResult linkResult = composite->link(outLinkedProgram.writeRef(), diagnostics.writeRef());
     printDiagnostics(diagnostics);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(linkResult));
+}
+
+static String compileLateGLSLEntryPoint(
+    UnitTestContext* unitTestContext,
+    const char* source,
+    const char* entryPointName,
+    SlangStage stage,
+    slang::TargetDesc const& targetDesc,
+    ComPtr<slang::ISession>& outSession,
+    ComPtr<slang::IComponentType>& outLinkedProgram)
+{
+    linkLateGLSLEntryPoint(
+        unitTestContext,
+        source,
+        entryPointName,
+        stage,
+        targetDesc,
+        outSession,
+        outLinkedProgram);
 
     ComPtr<slang::IBlob> code;
-    diagnostics.setNull();
+    ComPtr<slang::IBlob> diagnostics;
     SlangResult codeResult =
         outLinkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
     printDiagnostics(diagnostics);
@@ -85,6 +104,40 @@ static String compileLateGLSLEntryPoint(
     return String(
         (const char*)code->getBufferPointer(),
         (const char*)code->getBufferPointer() + code->getBufferSize());
+}
+
+// Link the compute entry point `computeMain` of `source` for SPIR-V, check that generating its
+// code fails, and return the diagnostics. An entry point validated after lowering has its
+// derivative-group mode checked against its thread-group size only when its layout IR is lowered,
+// so the error comes from code generation, not from `findAndCheckEntryPoint`.
+static String getLateGLSLComputeEntryPointErrors(
+    UnitTestContext* unitTestContext,
+    const char* source)
+{
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = unitTestContext->slangGlobalSession->findProfile("spirv_1_5");
+
+    ComPtr<slang::ISession> session;
+    ComPtr<slang::IComponentType> linkedProgram;
+    linkLateGLSLEntryPoint(
+        unitTestContext,
+        source,
+        "computeMain",
+        SLANG_STAGE_COMPUTE,
+        targetDesc,
+        session,
+        linkedProgram);
+
+    ComPtr<slang::IBlob> code;
+    ComPtr<slang::IBlob> diagnostics;
+    SlangResult codeResult =
+        linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
+    SLANG_CHECK(SLANG_FAILED(codeResult));
+    SLANG_CHECK_ABORT(diagnostics != nullptr);
+    return String(
+        (const char*)diagnostics->getBufferPointer(),
+        (const char*)diagnostics->getBufferPointer() + diagnostics->getBufferSize());
 }
 
 SLANG_UNIT_TEST(glslLocalSizeOnLateEntryPoint)
@@ -250,4 +303,46 @@ SLANG_UNIT_TEST(glslDerivativeGroupOnLateEntryPoint)
 
     SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("DerivativeGroupLinearKHR")) >= 0);
     SLANG_CHECK(spirvAsm.indexOf(UnownedStringSlice("DerivativeGroupQuadsKHR")) < 0);
+}
+
+SLANG_UNIT_TEST(glslDerivativeGroupQuadsMismatchOnLateEntryPoint)
+{
+    // Quads need an even X and Y. Without the lifted mode, `inferDerivativeGroupMode` picks
+    // linear for a group with Y == 1 and the shader compiles, so only the lifted
+    // `layout(derivative_group_quadsNV) in;` produces the error that `-entry` reports.
+    const char* source = R"(
+        #version 450
+        #extension GL_NV_compute_shader_derivatives : require
+        buffer OutputBlock { float data[]; } outputBuffer;
+        layout(local_size_x = 16) in;
+        layout(derivative_group_quadsNV) in;
+        void computeMain()
+        {
+            float v = float(gl_LocalInvocationIndex);
+            outputBuffer.data[gl_LocalInvocationIndex] = dFdx(v);
+        }
+    )";
+
+    String errors = getLateGLSLComputeEntryPointErrors(unitTestContext, source);
+    SLANG_CHECK(errors.indexOf(UnownedStringSlice("E31210")) >= 0);
+}
+
+SLANG_UNIT_TEST(glslDerivativeGroupConflictOnLateEntryPoint)
+{
+    const char* source = R"(
+        #version 450
+        #extension GL_NV_compute_shader_derivatives : require
+        buffer OutputBlock { float data[]; } outputBuffer;
+        layout(local_size_x = 4, local_size_y = 4) in;
+        layout(derivative_group_quadsNV) in;
+        layout(derivative_group_linearNV) in;
+        void computeMain()
+        {
+            float v = float(gl_LocalInvocationIndex);
+            outputBuffer.data[gl_LocalInvocationIndex] = dFdx(v);
+        }
+    )";
+
+    String errors = getLateGLSLComputeEntryPointErrors(unitTestContext, source);
+    SLANG_CHECK(errors.indexOf(UnownedStringSlice("E31212")) >= 0);
 }
