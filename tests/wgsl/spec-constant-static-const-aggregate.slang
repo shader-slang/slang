@@ -16,7 +16,8 @@ static const int k = 64 + N;
 
 static const int arr[2] = { k, 3 };
 
-// The struct initializer lowers to a call to the synthesized constructor `S.$init`.
+// The struct initializer lowers to a call to the synthesized constructor `S.$init`, so `s`
+// covers that call path; no source form here reaches a module-scope `MakeStruct`.
 struct S
 {
     int a;
@@ -24,21 +25,24 @@ struct S
 }
 static const S s = { 1, k };
 
-// A vector or matrix is read through a swizzled store, whose right-hand side WGSL
-// stores in a temporary first.
+// `v` and `m` are read through swizzled stores, and WGSL keeps the right-hand side of a
+// swizzled store in a temporary, which must not be a `const`.
 static const int2 v = int2(k, 1);
 static const int2x2 m = int2x2(k, 1, 2, 3);
+// Broadcasts build the vector or matrix from one scalar.
+static const int2x2 ms = int2x2(k);
 
 // An inner vector or array that is inlined must make the array that holds it inline too.
 static const int2 vecs[2] = { int2(k, 1), int2(2, 3) };
 static const int grid[2][2] = { { k, 1 }, { 2, 3 } };
+static const int2 vb[2] = { int2(k), int2(2, 3) };
 
 // WGSL rejects a `const` whose value depends on an `override`.
 // NOCONST-NOT: const {{.*}}N_0
 
 // TINT: OpEntryPoint
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out,name=outputBuffer
 RWStructuredBuffer<int4> outputBuffer;
 
 [shader("compute")]
@@ -56,6 +60,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     outputBuffer[t].y = t == 0 ? s.a : s.b;
     outputBuffer[t].zw = vecs[t];
     outputBuffer[2 + t].xy = int2(grid[t][0], grid[t][1]);
+    outputBuffer[6 + t].xy = vb[t];
     if (t == 0)
     {
         outputBuffer[4].xy = v;
@@ -63,9 +68,13 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
         outputBuffer[5].xy = m[0];
         // A function-local vector over the `override` itself must not be declared `const`.
         outputBuffer[5].zw = int2(N, 1);
+        outputBuffer[6].zw = ms[1];
     }
 }
 
+// One line per component of each int4 element: [0] and [1] hold arr, s and vecs for each
+// thread; [2] and [3] hold the grid rows; [4] holds v and m[1]; [5] holds m[0] and
+// int2(N, 1); [6] and [7] hold vb for each thread, with ms[1] in [6].zw.
 // BUF: 68
 // BUF-NEXT: 1
 // BUF-NEXT: 68
@@ -90,3 +99,11 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // BUF-NEXT: 1
 // BUF-NEXT: 4
 // BUF-NEXT: 1
+// BUF-NEXT: 68
+// BUF-NEXT: 68
+// BUF-NEXT: 68
+// BUF-NEXT: 68
+// BUF-NEXT: 2
+// BUF-NEXT: 3
+// BUF-NEXT: 0
+// BUF-NEXT: 0

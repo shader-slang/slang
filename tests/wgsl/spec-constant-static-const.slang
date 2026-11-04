@@ -17,8 +17,8 @@ const int N = 4;
 static const int k = 64 + N;
 // The same value as `k`, so it deduplicates to the same instruction.
 static const int k2 = 64 + N;
-// The other spec-const-rate operations take the same path through the global inliner, and
-// a shift by a literal also needs its amount to stay a literal.
+// `?:`, integer casts, comparisons and shifts can each acquire a spec-const rate, so each gets
+// a case; the shift also checks that its literal amount stays a literal.
 static const int s = N > 0 ? 10 : 20;
 static const uint u = N;
 static const bool b = N > 0;
