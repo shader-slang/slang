@@ -3615,8 +3615,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         // operands.
         OperandTryCoverageRAII operandTryCoverage(this, nullptr);
 
-        // A subscript does not look in the pointer types that its base is dereferenced
-        // through, so `derefBases` is unused here.
+        // A subscript base never dereferences a `Ptr`, so only non-`Ptr` levels can be
+        // recorded here, and none of them contributes members; `derefBases` is unused.
         baseExpr = checkBaseForMemberExpr(
             subscriptExpr->baseExpression,
             CheckBaseContext::Subscript,
@@ -9106,9 +9106,9 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
 {
     expr->baseExpression = CheckTerm(expr->baseExpression);
 
-    // Not sure this is needed -> but guess someone could do
     // A static member is looked up only in the dereferenced type, so `derefBases` is unused.
     List<Expr*> derefBases;
+    // Not sure this is needed -> but guess someone could do
     expr->baseExpression =
         maybeDereference(expr->baseExpression, CheckBaseContext::Member, derefBases);
 
@@ -9386,6 +9386,9 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
 
     // A member that only a pointer level has is called on that level, so we leave the
     // existential closed: opening it would bind `*p` to a temporary and evaluate `p` twice.
+    // We skip opening only when the opened value has no member of that name. Interfaces
+    // cannot be extended directly, so the lookup on the unopened interface in
+    // `checkGeneralMemberLookupExpr` finds nothing either and falls back to the same level.
     if (memberExpr && isMemberOnlyOnDerefedPtrTypes(memberExpr, baseExpr, outDerefBases))
         return baseExpr;
 
@@ -9420,7 +9423,9 @@ bool SemanticsVisitor::isMemberOnlyOnDerefedPtrTypes(
 
     // We look the member up on a stand-in for the opened value, so that members that apply
     // to every conforming type, such as those of `extension<T : IFoo> T`, are found exactly
-    // as they would be after `openExistential`.
+    // as they would be after `openExistential`. A lookup on the interface type itself would
+    // miss those members. The stand-in only gives this one lookup the shape of the opened
+    // value; neither it nor the type built from it is used afterwards.
     VarDecl* standInDecl = m_astBuilder->create<VarDecl>();
     standInDecl->type.type = baseExpr->type.type;
     auto openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
@@ -9462,17 +9467,17 @@ Expr* SemanticsVisitor::findPtrLevelWithMember(
     // `p->m` names a member of `*p`, so `->` consumes the outermost `Ptr` level, together with
     // any non-`Ptr` levels outside it (as in `ConstantBuffer<Ptr<int>>`), and those levels do
     // not contribute members.
-    Index outermostLevel = 0;
+    Index firstSearchedLevel = 0;
     if (as<DerefMemberExpr>(expr))
     {
-        while (outermostLevel < derefBases.getCount() &&
-               !as<PtrType>(derefBases[outermostLevel]->type))
-            outermostLevel++;
-        outermostLevel++;
+        while (firstSearchedLevel < derefBases.getCount() &&
+               !as<PtrType>(derefBases[firstSearchedLevel]->type))
+            firstSearchedLevel++;
+        firstSearchedLevel++;
     }
 
     // We search innermost first, which is the order of the deref fallback in `lookUpMember`.
-    for (Index level = derefBases.getCount() - 1; level >= outermostLevel; level--)
+    for (Index level = derefBases.getCount() - 1; level >= firstSearchedLevel; level--)
     {
         // Only `PtrType` levels are searched. A `DescriptorHandle<T>` always forwards member
         // calls to `T` by design, and `ConstantBuffer<T>` and `Ref<T>` stand in for `T`.
