@@ -20,12 +20,13 @@ struct S
     row_major M rowOut;
     column_major M columnOut;
     row_major M rowArray[2];
+    column_major M columnInGeneric;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=192):name sb
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=224):name sb
 RWStructuredBuffer<S> sb;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name output
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name output
 RWStructuredBuffer<float> output;
 
 // logical values m[r][c] == base + 4*r + c
@@ -54,6 +55,9 @@ void fill(out M x) { x = make(ELEMENT(50)); }
 
 void bumpArray(inout M x[2]) { x[1][0][1] += ELEMENT(100); }
 
+// the l-value cast sits inside a generic, so it has to be lowered there too
+void bumpInGeneric<T : IInteger>(T unused) { bumpRowMajor(sb[0].columnInGeneric); }
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
@@ -61,6 +65,7 @@ void computeMain()
     sb[0].columnInOut = make(ELEMENT(1));
     sb[0].rowArray[0] = make(ELEMENT(1));
     sb[0].rowArray[1] = make(ELEMENT(1));
+    sb[0].columnInGeneric = make(ELEMENT(1));
 
     bump(sb[0].rowInOut);
     bump(sb[0].columnInOut);
@@ -110,4 +115,10 @@ void computeMain()
     bumpRowMajor(plainLocal);
     output[14] = float(plainLocal[0][1]);
     output[15] = float(plainLocal[1][2]);
+
+    // CHECK-NEXT: 102.0
+    // CHECK-NEXT: 207.0
+    bumpInGeneric(0);
+    output[16] = float(sb[0].columnInGeneric[0][1]);
+    output[17] = float(sb[0].columnInGeneric[1][2]);
 }
