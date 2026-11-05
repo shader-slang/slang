@@ -1185,8 +1185,9 @@ Earlier versions of Slang could discard the session's entire argument list for a
 
 ### Default Receiver Mode for HLSL Methods
 
-By default, methods have a nonmutating `in` receiver.
-For HLSL input, `-fhlsl-methods-mutating-by-default` selects `inout` as the default receiver mode.
+By default, methods are non-mutating; their receiver (the implicit `this` parameter) is given the `in` mode.
+In a call such as `counter.increment()`, `counter` is the object passed through that parameter.
+For HLSL input only, the `-fhlsl-methods-mutating-by-default` command-line option changes the default mode for receiver parameters to `inout`, allowing methods to modify that object.
 For example, this HLSL method can modify its receiver when the option is enabled:
 
 ```hlsl
@@ -1202,14 +1203,14 @@ struct Counter
 ```
 
 Without the option, `increment` needs an explicit `[mutating]` attribute.
-With the option, calls to unannotated methods require a writable receiver, even when the method body does not modify it.
-Methods with explicit receiver-mode attributes or trailing `const` use the specified mode regardless of the option.
-Setters keep their mutating default.
+With the option, calls to methods that do not specify a mode for `this` require a writable object, even when the method body only reads its fields.
+Explicit attributes such as `[mutating]` and `[nonmutating]`, or `const` after a method's parameter list, still select the mode for `this` regardless of this option.
+Property and subscript setters keep their mutating default.
 The option has no effect on Slang or GLSL input, including Slang modules imported by HLSL code.
 
 In the API, set `CompilerOptionName::HLSLMethodsMutatingByDefault` in `SessionDesc::compilerOptionEntries` before loading modules.
 Use `CompilerOptionValueKind::Int` with `intValue0` set to `1` to enable the option or `0` to disable it.
-Omitting the option keeps the nonmutating default.
+Omitting the option keeps methods non-mutating by default.
 
 ### Backwards Compatibility Option for Legacy HLSL
 

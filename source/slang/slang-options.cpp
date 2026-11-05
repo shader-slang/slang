@@ -1273,8 +1273,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::HLSLMethodsMutatingByDefault,
          "-fhlsl-methods-mutating-by-default",
          nullptr,
-         "Use `inout` receivers by default for HLSL methods. Has no effect on Slang or GLSL "
-         "inputs."},
+         "Use `inout` for the implicit `this` parameter of HLSL methods by default. Has no effect "
+         "on Slang or GLSL inputs."},
         {OptionKind::EnableExperimentalDynamicDispatch,
          "-enable-experimental-dynamic-dispatch",
          nullptr,
