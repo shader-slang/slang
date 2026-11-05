@@ -205,6 +205,13 @@ public:
     /// Get the name of the entry point
     Name* getName() { return m_name; }
 
+    /// Set the source-level name exposed for an entry point whose implementation uses another
+    /// declaration (for example, a structural ray-tracing stage implemented by `invoke`).
+    void setNameOverride(Name* name) { m_name = name; }
+
+    /// Set the default physical name independently of the source-level lookup name.
+    void setEntryPointNameOverride(String name) { m_entryPointNameOverride = _Move(name); }
+
     /// Get the profile associated with the entry point
     ///
     /// Note: only the stage part of the profile is expected
@@ -216,11 +223,11 @@ public:
     /// Get the stage that the entry point is for.
     Stage getStage() { return m_profile.getStage(); }
 
-    /// Get the capability requirements inferred for this entry point as a whole. These can be more
-    /// demanding than the underlying `FuncDecl`'s own requirements, because they add contributions
-    /// that only make sense once the function is validated as an entry point for a concrete stage
-    /// (e.g. the capability an `SV_` semantic on a parameter requires). Null only for pass-through
-    /// / deserialized dummies that carry no `FuncDecl`.
+    /// Get the requirements for this entry-point selection, including generic arguments already
+    /// applied to its declaration reference and stage-dependent requirements such as semantics.
+    /// A later `specialize()` operation stores its requirements in EntryPointSpecializationInfo,
+    /// preserving this base entry point for other specializations. Null only for pass-through or
+    /// deserialized dummies that carry no FuncDecl.
     CapabilitySetVal* getInferredCapabilityRequirements()
     {
         return m_inferredCapabilityRequirements;
@@ -230,6 +237,16 @@ public:
     {
         m_inferredCapabilityRequirements = caps;
     }
+
+    /// Marks an entry selected through a checked structural ray-tracing conformance.
+    void markAsStructuralRayTracingEntryPoint()
+    {
+        m_isStructuralRayTracingEntryPoint = true;
+        // Defer native parameter layout for the logical input until an adapter is generated.
+        m_shaderParams.clear();
+    }
+
+    bool isStructuralRayTracingEntryPoint() const { return m_isStructuralRayTracingEntryPoint; }
 
     /// Get the module that contains the entry point.
     Module* getModule();
@@ -300,6 +317,8 @@ public:
     {
     public:
         DeclRef<FuncDecl> specializedFuncDeclRef;
+        // Requirements for this selection, including those introduced by specialization.
+        CapabilitySetVal* inferredCapabilityRequirements = nullptr;
         List<ExpandedSpecializationArg> existentialSpecializationArgs;
     };
 
@@ -327,10 +346,15 @@ private:
     // The name of the entry point function (e.g., `main`)
     //
     Name* m_name = nullptr;
+    String m_entryPointNameOverride;
 
     // The declaration of the entry-point function itself.
     //
     DeclRef<FuncDecl> m_funcDeclRef;
+
+    // Source validation distinguishes structural selection from a native function that happens
+    // to take an RT input. The checked function signature carries all structural type information.
+    bool m_isStructuralRayTracingEntryPoint = false;
 
     /// The mangled name of the entry point function
     String m_mangledName;

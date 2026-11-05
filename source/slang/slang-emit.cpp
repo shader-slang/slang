@@ -400,9 +400,28 @@ static void reportCheckpointIntermediates(
 
 struct LinkingAndOptimizationOptions
 {
+    // Run existential and resource type legalization. It is false when the downstream
+    // compiler (C/C++, NVRTC, or LLVM) handles those types.
     bool shouldLegalizeExistentialAndResourceTypes = true;
+
+    // The target can emit a global constant's initializer. If it is false, global
+    // constants are inlined. Set it with `canTargetEmitGlobalInitializers`.
+    bool targetCanEmitGlobalInitializer = true;
+
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
+
+// Return true if the target can emit a global constant's initializer. It returns false for:
+// - CUDA: NVRTC rejects dynamic initialization of a `__device__` variable.
+// - CPU in kernel mode: a global constant can use global shader parameters, which
+//   cannot be emitted as constants. Host-style CPU targets do not have this problem.
+static bool canTargetEmitGlobalInitializers(CodeGenContext* codeGenContext)
+{
+    auto target = codeGenContext->getTargetFormat();
+    bool isUnsupported = target == CodeGenTarget::CUDASource ||
+                         (isCPUTarget(codeGenContext->getTargetReq()) && isKernelTarget(target));
+    return !isUnsupported;
+}
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
@@ -439,6 +458,13 @@ void calcRequiredLoweringPassSet(
     // location-operand role that the pass knows how to consume.
     if (isRayTracingLocationOperand(inst->getOp()))
         result.rayTracingLocationOperand = true;
+
+    // Buffer types enable the pass, not only loads and stores, because a buffer that is unused or
+    // reached only through `GetEquivalentStructuredBuffer` (as `GetDimensions` and `Interlocked*`
+    // are) still needs translating on structured-buffer targets. We match the base class so that
+    // every byte-address buffer type enables it, including rasterizer-ordered ones.
+    if (as<IRByteAddressBufferTypeBase>(inst))
+        result.byteAddressBuffer = true;
 
     switch (inst->getOp())
     {
@@ -569,8 +595,6 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_ByteAddressBufferLoad:
     case kIROp_ByteAddressBufferStore:
-    case kIROp_HLSLRWByteAddressBufferType:
-    case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
     case kIROp_HLSLAppendStructuredBufferType:
@@ -1960,18 +1984,10 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(legalizeVectorTypes, sink);
 
-    // For CUDA targets, always inline global constants to avoid dynamic initialization
-    // of __device__ variables rejected by NVRTC. This runs independently of the broader
-    // resource/existential type legalization, which remains disabled for CUDA.
-    //
-    // We also need this pass on the CPU targets in shader mode, as global
-    // constants may reference global parameters, which can't be emitted as
-    // constants.
-    if (target == CodeGenTarget::CUDASource ||
-        (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
-        options.shouldLegalizeExistentialAndResourceTypes)
+    if (options.shouldLegalizeExistentialAndResourceTypes ||
+        !options.targetCanEmitGlobalInitializer)
     {
-        SLANG_PASS(inlineGlobalConstantsForLegalization);
+        SLANG_PASS(inlineGlobalConstantsForLegalization, target);
     }
 
     // We don't need the legalize pass for C/C++ based types
@@ -2209,7 +2225,7 @@ Result linkAndOptimizeIR(
         // Depending on the target, we may decide to do
         // more aggressive translation that reduces the
         // load/store operations down to invididual scalars
-        // (splitting up vector ops).
+        // (splitting up vector and array ops).
         //
         switch (target)
         {
@@ -2218,8 +2234,9 @@ Result linkAndOptimizeIR(
             {
                 // We need to scalarize the loads on LLVM CPU targets, as
                 // ByteAddressBuffer loads & stores may only have an alignment
-                // of 4, meaning that vector loads / stores could be misaligned
-                // and cause crashes with SSE, AVX etc. SIMD instruction sets.
+                // of 4, meaning that vector or array loads / stores could be
+                // misaligned and cause crashes with SSE, AVX etc. SIMD
+                // instruction sets.
                 byteAddressBufferOptions.scalarizeVectorLoadStore = true;
             }
             break;
@@ -2276,6 +2293,7 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             byteAddressBufferOptions.useBitCastFromUInt = true;
+            byteAddressBufferOptions.minimumStoreScalarSize = 4;
             byteAddressBufferOptions.loadHalfFrom32BitWords = true;
             break;
         }
@@ -3102,6 +3120,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
+        linkingAndOptimizationOptions.targetCanEmitGlobalInitializer =
+            canTargetEmitGlobalInitializers(this);
 
         switch (sourceLanguage)
         {
@@ -3345,10 +3365,14 @@ private:
     List<SpvWord> m_headerWords;
 };
 
-// Helper function that takes an artifact populated with SPIRV instructions
-// after the spirv-opt step, and a previously created but empty
-// strippedArtifact. The artifact is unmodified, and the strippedArtifact
-// will contain all the artifact's instructions except for debug instructions.
+// Helper function that takes an artifact populated with the final SPIRV module
+// (natively emitted, linked or optimized) and a previously created but empty
+// strippedArtifact. The artifact's contents are unmodified, but it is renamed to
+// the module's debug build identifier. The strippedArtifact will contain all the
+// artifact's instructions except for debug instructions, apart from the
+// `DebugBuildIdentifier` instruction, the `OpString` it refers to and the
+// `NonSemantic.Shader.DebugInfo.100` import, which are kept so the stripped
+// module can be paired with its debug module.
 static SlangResult stripDbgSpirvFromArtifact(
     ComPtr<IArtifact>& artifact,
     ComPtr<IArtifact>& strippedArtifact)
@@ -3521,7 +3545,12 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
 }
 
 // Helper function to create an artifact from IR used internally by
-// emitSPIRVForEntryPointsDirectly.
+// emitSPIRVForEntryPointsDirectly. The caller passes in an empty `artifact` of
+// the SPIR-V target type; on success it holds the final main module, which may
+// be a replacement artifact from linking, optimization or the debug split. When
+// separate debug info is requested and the function returns SLANG_OK,
+// `dbgArtifact` holds the full module, named after its debug build identifier;
+// otherwise it is left unset.
 static SlangResult createArtifactFromIR(
     CodeGenContext* codeGenContext,
     IRModule* irModule,
@@ -3558,14 +3587,14 @@ static SlangResult createArtifactFromIR(
     // already a complete, valid module. The downstream `slang-glslang` compiler is only needed
     // to: (a) run the SPIRV-Tools optimizer when an optimization level above `None` is
     // requested; (b) link multiple SPIR-V modules together when separately compiled / embedded
-    // downstream modules are present; (c) validate the result when SPIR-V validation is enabled;
-    // or (d) emit separate debug info, which is produced as a side effect of the downstream
-    // compile step. When none of these apply -- for example a single-module `-O0 -target spirv`
-    // compile -- the natively emitted SPIR-V is the final output, so we skip loading
-    // `slang-glslang` entirely and leave the artifact as-is. This keeps a default `-O0` SPIR-V
-    // compile free of any dependency on the `slang-glslang` module (issue #11662); without this
-    // gate the load was unconditional and a build without `slang-glslang` failed with E00100
-    // even though no downstream work was needed.
+    // downstream modules are present; or (c) validate the result when SPIR-V validation is
+    // enabled. Separate debug info is not on this list: Slang splits the final module itself
+    // (`stripDbgSpirvFromArtifact`). When none of these apply -- for example a single-module
+    // `-O0 -target spirv` compile -- the natively emitted SPIR-V is the final output, so this
+    // function does not load `slang-glslang` and leaves the artifact as-is. A build without
+    // `slang-glslang` can therefore still produce `-O0` SPIR-V, with or without separate debug
+    // info (issues #11662 and #13795). (With separate debug info, the build-identifier hash may
+    // still open the library to read its version, but it does not require it.)
     bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::EmbedDownstreamIR);
 
@@ -3613,8 +3642,10 @@ static SlangResult createArtifactFromIR(
     const bool needsLink = downstreamLinkingAllowed && spirvFiles.getCount() > 1;
     // `-Xspirv-opt <flag>` selects individual optimizer passes explicitly, so it must run the
     // optimizer even at `-O0` (where the preset is empty). Detecting them here also keeps a plain
-    // `-O0` compile -- with no such flags, and no link/validation/separate-debug-info -- from
-    // loading `slang-glslang` (issue #11662).
+    // `-O0` compile -- with no such flags, and no link/validation -- from loading `slang-glslang`
+    // (issue #11662). The same flag decides whether a compiler loaded only to link or validate is
+    // asked to optimize: without it the optimizer has no passes and returns its input unchanged
+    // (`glslang_optimizeSPIRV`), so skipping the call drops no bytes and no diagnostics.
     List<String> spirvOptArgs =
         codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt");
     const bool needsOptimization =
@@ -3622,9 +3653,7 @@ static SlangResult createArtifactFromIR(
             OptimizationLevel::None ||
         spirvOptArgs.getCount() != 0;
     const bool needsValidation = shouldRunSPIRVValidation(codeGenContext);
-    const bool needsSeparateDebugInfo = targetCompilerOptions.shouldEmitSeparateDebugInfo();
-    const bool needsDownstreamCompiler =
-        needsLink || needsOptimization || needsValidation || needsSeparateDebugInfo;
+    const bool needsDownstreamCompiler = needsLink || needsOptimization || needsValidation;
 
     artifact->addRepresentationUnknown(
         needsDownstreamCompiler ? ListBlob::create(spirv) : ListBlob::moveCreate(spirv));
@@ -3696,61 +3725,73 @@ static SlangResult createArtifactFromIR(
             }
         }
 
-        ComPtr<IArtifact> optimizedArtifact;
-        DownstreamCompileOptions downstreamOptions;
-        downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
-        downstreamOptions.targetType = SLANG_SPIRV;
-        downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+        if (needsOptimization)
+        {
+            ComPtr<IArtifact> optimizedArtifact;
+            DownstreamCompileOptions downstreamOptions;
+            downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
+            downstreamOptions.targetType = SLANG_SPIRV;
+            downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
 
-        // Forward the `-Xspirv-opt` args (collected above) to the downstream optimizer, where they
-        // register on top of the `-OX` preset -- or as the only passes at `-O0`, whose preset is
-        // empty. The allocator owns the copied arg strings and slice array, so it must outlive the
-        // compile() call below.
-        SliceAllocator allocator;
-        downstreamOptions.compilerSpecificArguments = allocator.allocate(spirvOptArgs);
-        switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
-        {
-        case OptimizationLevel::None:
-            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
-            break;
-        case OptimizationLevel::Default:
-            downstreamOptions.optimizationLevel =
-                DownstreamCompileOptions::OptimizationLevel::Default;
-            break;
-        case OptimizationLevel::High:
-            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;
-            break;
-        case OptimizationLevel::Maximal:
-            downstreamOptions.optimizationLevel =
-                DownstreamCompileOptions::OptimizationLevel::Maximal;
-            break;
-        default:
-            SLANG_ASSERT(!"Unhandled optimization level");
-            break;
-        }
-        auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-        if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
-        {
-            // Check if we need to output a separate SPIRV file containing debug info. If so
-            // then strip all debug instructions from the artifact. The dbgArtifact will still
-            // contain all instructions.
-            if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+            // Forward the `-Xspirv-opt` args (collected above) to the downstream optimizer, where
+            // they register on top of the `-OX` preset -- or as the only passes at `-O0`, whose
+            // preset is empty. The allocator owns the copied arg strings and slice array, so it
+            // must outlive the compile() call below.
+            SliceAllocator allocator;
+            downstreamOptions.compilerSpecificArguments = allocator.allocate(spirvOptArgs);
+            switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
             {
-                auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
-                SLANG_RETURN_ON_FAIL(
-                    stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
-                artifact = _Move(strippedArtifact);
-                dbgArtifact = _Move(optimizedArtifact);
+            case OptimizationLevel::None:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::None;
+                break;
+            case OptimizationLevel::Default:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::Default;
+                break;
+            case OptimizationLevel::High:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::High;
+                break;
+            case OptimizationLevel::Maximal:
+                downstreamOptions.optimizationLevel =
+                    DownstreamCompileOptions::OptimizationLevel::Maximal;
+                break;
+            default:
+                SLANG_ASSERT(!"Unhandled optimization level");
+                break;
             }
-            else
+            auto downstreamStartTime = std::chrono::high_resolution_clock::now();
+            if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
+            {
                 artifact = _Move(optimizedArtifact);
-        }
-        auto downstreamElapsedTime =
-            (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
-        codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
+            }
+            auto downstreamElapsedTime =
+                (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() *
+                0.000000001;
+            codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        SLANG_RETURN_ON_FAIL(
-            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+            SLANG_RETURN_ON_FAIL(
+                passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+        }
+    }
+
+    // Separate debug info splits whichever module is final -- natively emitted, linked or
+    // optimized -- into a stripped main output and the full module as the debug output. The split
+    // is Slang's own word filter, so it needs no downstream compiler, and it runs after the
+    // optimizer's diagnostics have been reported so that a failed optimization is not masked by
+    // a failed split.
+    //
+    // If a required downstream compiler could not be loaded, E00100 is already in the sink and
+    // the natively emitted module is final. The split still runs, so a split compile ends the same
+    // way as a non-split one: the end-to-end compile fails on the reported error, and an API
+    // caller receives the unprocessed module alongside the diagnostic.
+    if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+    {
+        auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
+        SLANG_RETURN_ON_FAIL(stripDbgSpirvFromArtifact(artifact, strippedArtifact));
+        dbgArtifact = _Move(artifact);
+        artifact = _Move(strippedArtifact);
     }
 
     return SLANG_OK;
@@ -3787,6 +3828,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     // and produce a .dbg.spv file for this child artifact.
     if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
     {
+        SLANG_RELEASE_ASSERT(dbgArtifact);
         artifact->addAssociated(dbgArtifact);
 
         auto artifactPostEmitMetadata =
@@ -3858,6 +3900,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
+    linkingAndOptimizationOptions.targetCanEmitGlobalInitializer =
+        canTargetEmitGlobalInitializers(codeGenContext);
     SLANG_RETURN_ON_FAIL(
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 

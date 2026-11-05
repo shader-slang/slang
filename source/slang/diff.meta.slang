@@ -1419,6 +1419,28 @@ extension Optional<T> : IDifferentiablePtrType
     typedef Optional<T.Differential> Differential;
 }
 
+__generic<T : IDifferentiable, let hasValue : bool>
+extension Conditional<T, hasValue> : IDifferentiable
+{
+    typedef Conditional<T.Differential, hasValue> Differential;
+
+    [__unsafeForceInlineEarly]
+    [Differentiable]
+    static Differential dzero()
+    {
+        return Differential(T.dzero());
+    }
+
+    [__unsafeForceInlineEarly]
+    [Differentiable]
+    static Differential dadd(Differential a, Differential b)
+    {
+        if (hasValue)
+            return Differential(T.dadd(a.value, b.value));
+        return dzero();
+    }
+}
+
 __generic<each T : IDifferentiable>
 extension Tuple<T> : IDifferentiable
 {

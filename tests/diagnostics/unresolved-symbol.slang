@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -profile cs_6_0
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -entry main -profile cs_6_0
 interface IFoo
 {
     int doThing();

@@ -735,6 +735,19 @@ local insts = {
 				},
 			},
 			{
+				TraceProgramDescriptor = {
+					-- An opaque structural ray-tracing program descriptor. Its operands retain the
+					-- schema type argument and conformance witness without exposing any
+					-- target-specific resource representation in source or IR.
+					struct_name = "TraceProgramDescriptorType",
+					operands = {
+						{ "schema", "IRType" },
+						{ "schemaWitness" },
+					},
+					hoistable = true,
+				},
+			},
+			{
 				struct = {
 					-- A user-defined structure declaration at the IR level.
 					-- Unlike in the AST where there is a distinction between
@@ -1668,6 +1681,31 @@ local insts = {
 	-- mirroring the read side (`emitOptiXAttributeFetch`). The CUDA emitter renders this as a
 	-- single `optixReportIntersection(tHit, hitKind, a0..aN)`.
 	{ reportOptiXIntersection = { min_operands = 2 } },
+	{
+		metalTraceRay = {
+			-- The two internal Metal trace functions lower to this instruction through
+			-- ordinary __intrinsic_op calls. No time operand means no motion; a present
+			-- time, including zero, means motion. The descriptor type retains the schema
+			-- and its witness, including the selected motion model, while the payload
+			-- pointer retains its concrete type. Later Metal lowering consumes this
+			-- operation before native entry-point legalization and emission.
+			operands = {
+				{ "accelerationStructure" },
+				{ "descriptor" },
+				{ "rayFlags" },
+				{ "instanceMask" },
+				{ "sbtOffset" },
+				{ "sbtStride" },
+				{ "missIndex" },
+				{ "rayOrigin" },
+				{ "rayTMin" },
+				{ "rayDirection" },
+				{ "rayTMax" },
+				{ "payload" },
+				{ "time", optional = true },
+			},
+		},
+	},
 	{ GetVulkanRayTracingPayloadLocation = { min_operands = 1 } },
 	{ GetLegalizedSPIRVGlobalParamAddr = { min_operands = 1 } },
 	{

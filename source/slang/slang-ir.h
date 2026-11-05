@@ -2246,16 +2246,14 @@ public:
     // Adding an IR instruction requires a new writer version. Earlier modules can remain
     // supported when their AST and IR representations are compatible with the reader.
     //
-    // Adding `RefReadOnlyModifier`, `RefWriteOnlyModifier` and the reference parameter type
-    // classes shifts the sequential `ASTNodeType` values, so a version-36 module's later AST
-    // nodes would be decoded as different classes.
-    // Version 37 is the earliest module version with the updated AST node numbering, and with
-    // the `QualType::isReadOnlyMemoryLocation` field in serialized expressions.
-    // Version 38 adds `IRNoTargetCaseDecoration`. Its stable opcode is appended, so the reader can
-    // continue to load version-37 modules. It only appears in linked IR, which the host VM target
+    // The structural ray-tracing stage and descriptor AST classes shift the sequential
+    // `ASTNodeType` values, so version-37 modules would decode later nodes as different classes.
+    // Version 38 also adds the trace-program descriptor and Metal trace IR instructions.
+    // Version 39 adds `IRNoTargetCaseDecoration`. Its stable opcode is appended, so the reader can
+    // continue to load version-38 modules. It only appears in linked IR, which the host VM target
     // serializes.
-    const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 38;
+    const static UInt k_minSupportedModuleVersion = 38;
+    const static UInt k_maxSupportedModuleVersion = 39;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

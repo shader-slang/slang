@@ -1497,6 +1497,12 @@ struct DiffTransposePass
         case kIROp_GetOptionalValue:
             return transposeGetOptionalValue(builder, as<IRGetOptionalValue>(fwdInst), revValue);
 
+        case kIROp_GetConditionalValue:
+            return transposeGetConditionalValue(
+                builder,
+                as<IRGetConditionalValue>(fwdInst),
+                revValue);
+
         case kIROp_Return:
             return transposeReturn(builder, as<IRReturn>(fwdInst), revValue);
 
@@ -1545,6 +1551,11 @@ struct DiffTransposePass
             return transposeMakeArrayFromElement(builder, fwdInst, revValue);
         case kIROp_MakeOptionalValue:
             return transposeMakeOptionalValue(builder, fwdInst, revValue);
+        case kIROp_MakeConditionalValue:
+            return transposeMakeConditionalValue(
+                builder,
+                as<IRMakeConditionalValue>(fwdInst),
+                revValue);
         case kIROp_UpdateElement:
             return transposeUpdateElement(builder, fwdInst, revValue);
 
@@ -1684,6 +1695,25 @@ struct DiffTransposePass
             fwdGetOptionalValue->getOperand(0),
             builder->emitMakeOptionalValue(optionalVal->getDataType(), revValue),
             fwdGetOptionalValue)));
+    }
+
+    TranspositionResult transposeGetConditionalValue(
+        IRBuilder* builder,
+        IRGetConditionalValue* fwdGetConditionalValue,
+        IRInst* revValue)
+    {
+        // Reading a conditional's payload sends the gradient back into that same wrapper.
+        auto conditionalVal = fwdGetConditionalValue->getConditionalOperand();
+        auto gradient = builder->emitIntrinsicInst(
+            conditionalVal->getDataType(),
+            kIROp_MakeConditionalValue,
+            1,
+            &revValue);
+        return TranspositionResult(List<RevGradient>(RevGradient(
+            RevGradient::Flavor::Simple,
+            conditionalVal,
+            gradient,
+            fwdGetConditionalValue)));
     }
 
     TranspositionResult transposeMakePair(
@@ -2048,6 +2078,35 @@ struct DiffTransposePass
 
         // (A = MakeOptionalValue(F)) -> [(dF += dA.hasValue?dA.value:dzero)]
         return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMakeConditionalValue(
+        IRBuilder* builder,
+        IRMakeConditionalValue* fwdMakeConditionalValue,
+        IRInst* revValue)
+    {
+        auto value = fwdMakeConditionalValue->getValue();
+        auto conditionalType = cast<IRConditionalType>(fwdMakeConditionalValue->getDataType());
+        auto hasValue = cast<IRBoolLit>(conditionalType->getHasValue());
+        IRInst* gradient;
+        if (hasValue->getValue())
+        {
+            gradient = builder->emitIntrinsicInst(
+                value->getDataType(),
+                kIROp_GetConditionalValue,
+                1,
+                &revValue);
+        }
+        else
+        {
+            // The flag is specialized before differentiation. A disabled conditional discards
+            // its constructor argument, and its empty representation has no payload to extract.
+            gradient = diffTypeContext.emitDZeroOfDiffInstType(
+                builder,
+                tryGetPrimalTypeFromDiffInst(value));
+        }
+        return TranspositionResult(List<RevGradient>(
+            RevGradient(RevGradient::Flavor::Simple, value, gradient, fwdMakeConditionalValue)));
     }
 
     TranspositionResult transposeMakeStruct(

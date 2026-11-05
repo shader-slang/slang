@@ -27,7 +27,6 @@ jobs:
       runs-on: '["ubuntu-22.04"]'
       container: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
       build-llvm: true
-      deploy-pages: false
       server-count: 1
     secrets: inherit
 
@@ -40,7 +39,6 @@ jobs:
       config: relwithdebinfo
       runs-on: '["macos-latest"]'
       build-llvm: true
-      deploy-pages: false
       server-count: 1
     secrets: inherit
 
@@ -53,7 +51,6 @@ jobs:
       config: relwithdebinfo
       runs-on: '["windows-latest"]'
       build-llvm: true
-      deploy-pages: false
       server-count: 1
     secrets: inherit
 
@@ -295,13 +292,26 @@ jobs:
           path: coverage-reports/
           retention-days: 7
 
+      # Coverage collection can take several hours. Mint the one-hour token
+      # only when the master-only publisher is ready to access the destination.
+      - name: Create coverage publishing token
+        id: coverage-app-token
+        if: github.ref == 'refs/heads/master'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        with:
+          client-id: ${{ secrets.SLANG_COVERAGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SLANG_COVERAGE_APP_PRIVATE_KEY }}
+          owner: shader-slang
+          repositories: slang-coverage-reports
+          permission-contents: write
+
       - name: Checkout Coverage Reports Repository
         if: github.ref == 'refs/heads/master'
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: "shader-slang/slang-coverage-reports"
           path: "coverage-repo"
-          token: ${{ secrets.SLANG_COVERAGE_REPORTS_PAT }}
+          token: ${{ steps.coverage-app-token.outputs.token }}
 
       - name: Publish Multi-Platform Coverage
         id: publish-coverage

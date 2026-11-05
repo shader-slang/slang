@@ -10,6 +10,8 @@ class DiagnosticSink;
 
 struct ByteAddressBufferLegalizationOptions
 {
+    /// Split every constant-size vector and array load/store into per-element accesses, even when
+    /// the access is known to be aligned to its whole size.
     bool scalarizeVectorLoadStore = false;
     bool useBitCastFromUInt = false;
     bool translateToStructuredBufferOps = false;
@@ -29,6 +31,13 @@ struct ByteAddressBufferLegalizationOptions
     /// define `ByteAddressBuffer`/`StructuredBuffer` and introduce operations which prevent DCE
     /// from destroying old definitions of `ByteAddressBuffer` after variable replacement.
     bool treatGetEquivalentStructuredBufferAsGetThis = false;
+
+    /// The smallest scalar size, in bytes, that the target can store to a byte-address buffer
+    /// on its own. A store of a value with a smaller (non-`bool`) scalar is reported as an
+    /// error, because the target would have to read-modify-write the larger unit and could lose
+    /// a concurrent write to its other bytes. 0 means there is no minimum. WGSL uses 4, because
+    /// its byte-address buffers are arrays of 32-bit words.
+    int minimumStoreScalarSize = 0;
 };
 
 /// Legalize byte-address buffer `Load()` and `Store()` operations.
@@ -36,6 +45,12 @@ struct ByteAddressBufferLegalizationOptions
 /// This function translates load/store operations that involve
 /// aggregate types into primitive load-store operations on
 /// scalar or vector types.
+///
+/// When `translateToStructuredBufferOps` is set, it also replaces each global
+/// byte-address buffer parameter, including one that nothing uses, with an
+/// equivalent structured-buffer parameter, so that no byte-address buffer
+/// parameter reaches the emitter unless it still has a use this pass does not
+/// translate.
 ///
 void legalizeByteAddressBufferOps(
     IRModule* module,
