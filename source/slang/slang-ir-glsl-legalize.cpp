@@ -317,15 +317,6 @@ struct GLSLLegalizationContext
     IRFunc* entryPointFunc;
     Dictionary<IRTargetBuiltinVarName, IRInst*> builtinVarMap;
 
-    /// This dictionary stores all bindings of 'VaryingIn/VaryingOut'. We assume 'space' is 0.
-    Dictionary<LayoutResourceKind, UIntSet> usedBindingIndex;
-
-    GLSLLegalizationContext()
-    {
-        // Reserve for VaryingInput VaryingOutput
-        usedBindingIndex.reserve(2);
-    }
-
     struct SystemSemanticGlobal
     {
         void addIndex(Index index) { maxIndex = (index > maxIndex) ? index : maxIndex; }
@@ -1046,8 +1037,6 @@ void createVarLayoutForLegalizedGlobalParam(
     OuterParamInfoLink* outerParamInfo,
     GLSLSystemValueInfo* systemValueInfo)
 {
-    context->usedBindingIndex[kind].add(bindingIndex);
-
     // We need to construct a fresh layout for the variable, even
     // if the original had its own layout, because it might be
     // an `inout` parameter, and we only want to deal with the case
@@ -1200,10 +1189,9 @@ IRInst* getOrCreateBuiltinParamForHullShader(
 
 /// Builds the `IRTypeLayout` for a patch constant function's result type.
 ///
-/// Field offsets are relative to the enclosing struct, not absolute locations, and no locations
-/// are reserved here. The caller (`invokePatchConstantFuncInHullShader`) captures the first free
-/// slot before calling, stores it as the result offset, and reserves `[base, base + span)` from
-/// the layout's `VaryingOutput` size afterwards.
+/// Field offsets are relative to the enclosing struct, not absolute locations. The caller
+/// (`invokePatchConstantFuncInHullShader`) sets the result's offset to the first Location after
+/// the hull's output control point.
 ///
 /// TODO: there is a more general issue with nested arrayed structs in (#13330);
 /// take this case into account when fixing it as well.
@@ -1312,9 +1300,23 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     IRFunc* func,
     IRVarLayout* resultLayout);
 
+/// Returns one past the last `VaryingOutput` Location that `varLayout` occupies in the front-end
+/// layout, or 0 when it occupies none (for example, a builtin such as `SV_Position`).
+static UInt getVaryingOutputLocationEnd(IRVarLayout* varLayout)
+{
+    if (!varLayout)
+        return 0;
+    auto offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+    auto sizeAttr = varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::VaryingOutput);
+    if (!offsetAttr || !sizeAttr)
+        return 0;
+    return offsetAttr->getOffset() + sizeAttr->getFiniteSize();
+}
+
 void invokePatchConstantFuncInHullShader(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
+    IRVarLayout* entryPointResultLayout,
     ScalarizedVal outputPatchVal)
 {
     auto entryPoint = context->entryPointFunc;
@@ -1435,25 +1437,23 @@ void invokePatchConstantFuncInHullShader(
     builder.setInsertBefore(constantFunc->getFirstBlock()->getFirstOrdinaryInst());
 
     auto constantOutputType = constantFunc->getResultType();
-    // Struct field offsets are relative to this base (see createPatchConstantFuncResultTypeLayout).
-    auto constantOutputBase =
-        context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
+    // The patch-constant outputs start after the Locations that the front-end layout gives the
+    // hull's output control point. The domain stage lays out its `OutputPatch<ControlPoint, N>`
+    // input with the same rules, so a control point made only of builtins such as `SV_Position`
+    // occupies no Location and the patch-constant outputs start at 0 on both stages. Struct field
+    // offsets are relative to this base (see createPatchConstantFuncResultTypeLayout).
+    UInt constantOutputBase = getVaryingOutputLocationEnd(entryPointResultLayout);
     IRTypeLayout* constantOutputLayout =
         createPatchConstantFuncResultTypeLayout(codeGenContext, builder, constantOutputType);
     IRVarLayout::Builder resultVarLayoutBuilder(&builder, constantOutputLayout);
     if (auto semanticDecor = constantFunc->findDecoration<IRSemanticDecoration>())
         resultVarLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), 0);
-    if (auto sizeAttr = constantOutputLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
+    if (constantOutputLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
     {
         auto resultVarInfo =
             resultVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
-        resultVarInfo->offset = (UInt)constantOutputBase;
+        resultVarInfo->offset = constantOutputBase;
         resultVarInfo->space = 0;
-        for (UInt i = 0; i < sizeAttr->getFiniteSize(); ++i)
-        {
-            context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(
-                constantOutputBase + (Index)i);
-        }
     }
 
     context->entryPointFunc = constantFunc;
@@ -5029,7 +5029,11 @@ void legalizeEntryPointForGLSL(
     // at the end of the entrypoint now.
     if (stage == Stage::Hull)
     {
-        invokePatchConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
+        invokePatchConstantFuncInHullShader(
+            &context,
+            codeGenContext,
+            entryPointLayout->getResultLayout(),
+            scalarizedGlobalOutput);
     }
 
     // Special handling for ray tracing shaders
