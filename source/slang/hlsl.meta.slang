@@ -9781,16 +9781,10 @@ vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
     {
     case metal: __intrinsic_asm "copysign";
     case wgsl:
-    {
-        // WGSL has no `double` (see the `fp64` capability), so `T` is `half` or `float` here.
-        if (T is half)
-            return __real_cast<T>(copysign_half(
-                    __real_cast<half>(x),
-                    __real_cast<half>(y)));
-        return __real_cast<T>(copysign_float(
-                __real_cast<float>(x),
-                __real_cast<float>(y)));
-    }
+        // The `default` case calls `copysign_double`, which requires `fp64`, so WGSL needs its own
+        // case. WGSL has neither `double` nor 16-bit integers, so `half` and `float` both compute
+        // through `float`; the `half` to `float` round trip is exact and keeps the sign of `-0.0`.
+        return __real_cast<T>(copysign_float(__real_cast<float>(x), __real_cast<float>(y)));
     default:
     {
         // sign of -0.0 needs to be respected.

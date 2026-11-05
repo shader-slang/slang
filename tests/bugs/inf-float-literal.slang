@@ -4,6 +4,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -slang -compute -shaderobj
 
 
+// Targets with `double` set SUPPORT_DOUBLE to 1; Slang's `-D` without a value defines an empty
+// macro, which `#if` cannot evaluate. Elsewhere index 2 falls through to `default:`, which also
+// stores +inf, so every target produces the same expected output.
 #ifndef SUPPORT_DOUBLE
 #define SUPPORT_DOUBLE 0
 #endif

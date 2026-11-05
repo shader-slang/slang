@@ -1243,8 +1243,10 @@ Compound Capabilities
 > Collection of shader stages
 
 `fp64`
-> Targets that support the 64-bit floating-point type `double`, the same set as
-> `cpp_cuda_glsl_hlsl_spirv_llvm`. WGSL and Metal have no such type and no extension that adds one.
+> Code-generation targets on which Slang supports the 64-bit floating-point type `double`: C++,
+> CUDA, GLSL, HLSL, SPIR-V and LLVM. WGSL and Metal have no such type and no extension that adds
+> one. The builtin `double` type requires this capability, so a declaration that uses `double`
+> should require `fp64` rather than an equivalent target list.
 
 `fragmentprocessing`
 > Capabilities required to use fragment derivative operations (without GLSL derivativecontrol)
