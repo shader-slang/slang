@@ -399,9 +399,28 @@ static void reportCheckpointIntermediates(
 
 struct LinkingAndOptimizationOptions
 {
+    // Run existential and resource type legalization. It is false when the downstream
+    // compiler (C/C++, NVRTC, or LLVM) handles those types.
     bool shouldLegalizeExistentialAndResourceTypes = true;
+
+    // The target can emit a global constant's initializer. If it is false, global
+    // constants are inlined. Set it with `canTargetEmitGlobalInitializers`.
+    bool targetCanEmitGlobalInitializer = true;
+
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
+
+// Return true if the target can emit a global constant's initializer. It returns false for:
+// - CUDA: NVRTC rejects dynamic initialization of a `__device__` variable.
+// - CPU in kernel mode: a global constant can use global shader parameters, which
+//   cannot be emitted as constants. Host-style CPU targets do not have this problem.
+static bool canTargetEmitGlobalInitializers(CodeGenContext* codeGenContext)
+{
+    auto target = codeGenContext->getTargetFormat();
+    bool isUnsupported = target == CodeGenTarget::CUDASource ||
+                         (isCPUTarget(codeGenContext->getTargetReq()) && isKernelTarget(target));
+    return !isUnsupported;
+}
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
@@ -1964,18 +1983,10 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(legalizeVectorTypes, sink);
 
-    // For CUDA targets, always inline global constants to avoid dynamic initialization
-    // of __device__ variables rejected by NVRTC. This runs independently of the broader
-    // resource/existential type legalization, which remains disabled for CUDA.
-    //
-    // We also need this pass on the CPU targets in shader mode, as global
-    // constants may reference global parameters, which can't be emitted as
-    // constants.
-    if (target == CodeGenTarget::CUDASource ||
-        (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
-        options.shouldLegalizeExistentialAndResourceTypes)
+    if (options.shouldLegalizeExistentialAndResourceTypes ||
+        !options.targetCanEmitGlobalInitializer)
     {
-        SLANG_PASS(inlineGlobalConstantsForLegalization);
+        SLANG_PASS(inlineGlobalConstantsForLegalization, target);
     }
 
     // We don't need the legalize pass for C/C++ based types
@@ -2213,7 +2224,7 @@ Result linkAndOptimizeIR(
         // Depending on the target, we may decide to do
         // more aggressive translation that reduces the
         // load/store operations down to invididual scalars
-        // (splitting up vector ops).
+        // (splitting up vector and array ops).
         //
         switch (target)
         {
@@ -2222,8 +2233,9 @@ Result linkAndOptimizeIR(
             {
                 // We need to scalarize the loads on LLVM CPU targets, as
                 // ByteAddressBuffer loads & stores may only have an alignment
-                // of 4, meaning that vector loads / stores could be misaligned
-                // and cause crashes with SSE, AVX etc. SIMD instruction sets.
+                // of 4, meaning that vector or array loads / stores could be
+                // misaligned and cause crashes with SSE, AVX etc. SIMD
+                // instruction sets.
                 byteAddressBufferOptions.scalarizeVectorLoadStore = true;
             }
             break;
@@ -3101,6 +3113,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
+        linkingAndOptimizationOptions.targetCanEmitGlobalInitializer =
+            canTargetEmitGlobalInitializers(this);
 
         switch (sourceLanguage)
         {
@@ -3879,6 +3893,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
+    linkingAndOptimizationOptions.targetCanEmitGlobalInitializer =
+        canTargetEmitGlobalInitializers(codeGenContext);
     SLANG_RETURN_ON_FAIL(
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 

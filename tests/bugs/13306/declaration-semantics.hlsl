@@ -1,15 +1,15 @@
-//TEST:SIMPLE_EX(filecheck=REMOVED): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_REMOVED
-//TEST:SIMPLE_EX(filecheck=REMOVED): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_REMOVED
+//TEST:SIMPLE_EX(filecheck=REMOVED,exit-code=-1): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_REMOVED
+//TEST:SIMPLE_EX(filecheck=REMOVED,exit-code=-1): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_REMOVED
 //TEST:SIMPLE_EX(filecheck=DEPRECATED): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_DEPRECATED
 //TEST:SIMPLE_EX(filecheck=DEPRECATED): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_DEPRECATED
-//TEST:SIMPLE_EX(filecheck=WRITEONLY): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_WRITEONLY
-//TEST:SIMPLE_EX(filecheck=WRITEONLY): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_WRITEONLY
-//TEST:SIMPLE_EX(filecheck=WRITEONLY_NUMERIC): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_WRITEONLY_NUMERIC
-//TEST:SIMPLE_EX(filecheck=WRITEONLY_NUMERIC): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_WRITEONLY_NUMERIC
-//TEST:SIMPLE_EX(filecheck=READONLY_NUMERIC): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_READONLY_NUMERIC
-//TEST:SIMPLE_EX(filecheck=READONLY_NUMERIC): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_READONLY_NUMERIC
-//TEST:SIMPLE_EX(filecheck=READONLY_BUFFER): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_READONLY_BUFFER
-//TEST:SIMPLE_EX(filecheck=READONLY_BUFFER): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_READONLY_BUFFER
+//TEST:SIMPLE_EX(filecheck=WRITEONLY,exit-code=-1): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_WRITEONLY
+//TEST:SIMPLE_EX(filecheck=WRITEONLY,exit-code=-1): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_WRITEONLY
+//TEST:SIMPLE_EX(filecheck=WRITEONLY_NUMERIC,exit-code=-1): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_WRITEONLY_NUMERIC
+//TEST:SIMPLE_EX(filecheck=WRITEONLY_NUMERIC,exit-code=-1): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_WRITEONLY_NUMERIC
+//TEST:SIMPLE_EX(filecheck=READONLY_NUMERIC,exit-code=-1): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_READONLY_NUMERIC
+//TEST:SIMPLE_EX(filecheck=READONLY_NUMERIC,exit-code=-1): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_READONLY_NUMERIC
+//TEST:SIMPLE_EX(filecheck=READONLY_BUFFER,exit-code=-1): tests/bugs/13306/declaration-semantics.hlsl -target hlsl -entry main -no-codegen -DTRY_READONLY_BUFFER
+//TEST:SIMPLE_EX(filecheck=READONLY_BUFFER,exit-code=-1): tests/bugs/13306/declaration-semantics.hlsl -Gec -target hlsl -entry main -no-codegen -DTRY_READONLY_BUFFER
 
 // Usage checks must read the parameter's declaration attributes after lookup finds its shadow.
 // Usage checks must still diagnose removed and deprecated declarations when a mutable copy exists.
