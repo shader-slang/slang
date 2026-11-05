@@ -35,7 +35,7 @@ SlangResult makeTempDir(const char* prefix, TempDir& out)
     // `generateTemporary` creates a placeholder file; we replace it with a directory of the same
     // unique name.
     SLANG_RETURN_ON_FAIL(File::remove(base));
-    if (!Path::createDirectoryRecursive(base))
+    if (!Path::createDirectory(base))
         return SLANG_FAIL;
     out.path = base;
     return Path::getCanonical(base, out.path);
@@ -51,7 +51,7 @@ SlangResult makeWorkingDirectoryTempDir(const char* prefix, TempDir& out)
     SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice(prefix), temporary));
     SLANG_RETURN_ON_FAIL(File::remove(temporary));
     const String path = Path::combine(Path::getCurrentPath(), Path::getFileName(temporary));
-    if (!Path::createDirectoryRecursive(path))
+    if (!Path::createDirectory(path))
         return SLANG_FAIL;
     out.path = path;
     return Path::getCanonical(path, out.path);
