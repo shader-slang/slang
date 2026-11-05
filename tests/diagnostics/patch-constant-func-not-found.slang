@@ -4,7 +4,7 @@
 // at the attribute, not also as an entry-point lookup failure (E38000) or an
 // empty "undefined identifier" (E30015).
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry hullMain -stage hull
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry hullMain -stage hull
 
 // CHECK-NOT: E30015
 // CHECK-NOT: E38000

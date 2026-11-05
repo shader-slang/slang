@@ -3,8 +3,8 @@
 // An unknown `-entry` name is reported once, as E38000 with the name and a
 // location, not also as an empty "undefined identifier" from the lookup.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv -entry mian
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target cuda -entry mian
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry mian
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target cuda -entry mian
 
 // CHECK-NOT: E30015
 // CHECK-NOT: undefined identifier
@@ -16,7 +16,7 @@
 // When the name is more than an identifier, the lookup can fail in a part that
 // E38000 does not mention (here the generic argument), so its errors are kept.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=GENERIC):-target spirv -entry genericMain<MissingType>
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=GENERIC,exit-code=-1):-target spirv -entry genericMain<MissingType>
 
 // GENERIC: error[E30015]: undefined identifier
 // GENERIC: error[E38000]: no function found matching entry point name 'genericMain<MissingType>'
