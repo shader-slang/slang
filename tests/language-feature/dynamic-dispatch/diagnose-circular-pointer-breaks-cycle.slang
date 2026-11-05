@@ -5,12 +5,12 @@
 // do not embed the pointee inline.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=NOPTR): -target hlsl
 //TEST:SIMPLE(filecheck=CHECK): -target glsl
 //TEST:SIMPLE(filecheck=CHECK): -target cuda
 //TEST:SIMPLE(filecheck=CHECK): -target cpp
 //TEST:SIMPLE(filecheck=CHECK): -target metal
-//TEST:SIMPLE(filecheck=CHECK): -target wgsl
+//TEST:SIMPLE(filecheck=NOPTR): -target wgsl
 
 [anyValueSize(16)]
 interface INode
@@ -46,6 +46,11 @@ INode createLeaf()
 RWStructuredBuffer<float> outputBuffer;
 
 // CHECK-NOT: error[E
+
+// HLSL and WGSL have no pointers to memory addresses, so the pointer field is reported there
+// instead of being emitted. That check runs after the circularity check, which passes.
+// NOPTR-NOT: error[E41003]
+// NOPTR: error[E55219]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
