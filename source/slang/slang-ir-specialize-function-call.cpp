@@ -554,10 +554,21 @@ struct FunctionParameterSpecializationContext
 
     void getCallInfoForArg(CallSpecializationInfo& ioInfo, IRInst* oldArg)
     {
+        // An undefined argument is replaced by a fresh undefined
+        // value of the same type in the callee (see
+        // `getSpecializedValueForArg`). Nothing is passed at the
+        // new call site, and the type identifies the
+        // specialization. Only a condition that overrides
+        // `isParamSuitableForSpecialization` accepts one.
+        //
+        if (auto oldUndefined = as<IRUndefined>(oldArg))
+        {
+            ioInfo.key.vals.add(oldUndefined->getFullType());
+        }
         // The base case we care about is when the original
         // argument is a global shader parameter.
         //
-        if (auto oldGlobalParam = as<IRGlobalParam>(oldArg))
+        else if (auto oldGlobalParam = as<IRGlobalParam>(oldArg))
         {
             // In this case we don't need to pass anything
             // as an argument at the new call site (the
@@ -657,6 +668,18 @@ struct FunctionParameterSpecializationContext
             // `Load`/`FieldAddress` cases above.
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
+        }
+        else if (auto oldCombined = as<IRMakeCombinedTextureSampler>(oldArg))
+        {
+            // A combined texture-sampler is rebuilt in the callee
+            // from its texture and its sampler, each of which is
+            // handled like an argument of its own. As with an
+            // undefined argument, only a condition that overrides
+            // `isParamSuitableForSpecialization` accepts one.
+            //
+            ioInfo.key.vals.add(oldCombined->getFullType());
+            getCallInfoForArg(ioInfo, oldCombined->getTexture());
+            getCallInfoForArg(ioInfo, oldCombined->getSampler());
         }
         else if (oldArg->getOp() == kIROp_CastDescriptorHandleToResource)
         {
@@ -853,6 +876,21 @@ struct FunctionParameterSpecializationContext
         // The logic here parallels `gatherCallInfoForArg`,
         // and only differs in what information it is gathering.
         //
+        // An undefined argument stands for an arbitrary value of
+        // its type, so the specialized function gets its own
+        // undefined value of that type. That value is not tied
+        // to the one at the call site, so a condition accepts an
+        // undefined argument only when nothing can observe the
+        // difference, as for an opaque handle whose every access
+        // is undefined behavior.
+        //
+        if (auto oldUndefined = as<IRUndefined>(oldArg))
+        {
+            auto builder = getBuilder();
+            builder->setInsertInto(ioInfo.newBodyInsts);
+            return builder->emitLoadFromUninitializedMemory(oldUndefined->getFullType());
+        }
+
         // As before, the base case is when we have a global
         // shader parameter.
         //
@@ -993,6 +1031,24 @@ struct FunctionParameterSpecializationContext
                 1,
                 newOperands);
             return newVal;
+        }
+        else if (auto oldCombined = as<IRMakeCombinedTextureSampler>(oldArg))
+        {
+            // We rebuild the combined texture-sampler in the
+            // specialized callee from the values that stand in for
+            // its texture and its sampler.
+            //
+            auto newTexture = getSpecializedValueForArg(ioInfo, oldCombined->getTexture());
+            auto newSampler = getSpecializedValueForArg(ioInfo, oldCombined->getSampler());
+
+            auto builder = getBuilder();
+            builder->setInsertInto(ioInfo.newBodyInsts);
+            IRInst* newOperands[] = {newTexture, newSampler};
+            return builder->emitIntrinsicInst(
+                oldArg->getFullType(),
+                kIROp_MakeCombinedTextureSampler,
+                2,
+                newOperands);
         }
         else if (auto castHandleToResource = as<IRCastDescriptorHandleToResource>(oldArg))
         {
