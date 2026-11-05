@@ -2524,7 +2524,7 @@ Result linkAndOptimizeIR(
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             SLANG_PASS(introduceExplicitGlobalContext, target);
-        SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+        SLANG_PASS(transformByValueParamsToBorrows, targetRequest, codeGenContext->getSink());
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
@@ -2685,15 +2685,16 @@ Result linkAndOptimizeIR(
     // says.
     SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
 
-    // Transform struct and array parameters to use ConstRef for better performance on Metal, C++
-    // and CUDA. This runs after `legalizeMatrixTypes`, because the pass transforms struct and
+    // Transform struct and array parameters into borrows for better performance on Metal, C++ and
+    // CUDA. This runs after `legalizeMatrixTypes`, because the pass transforms struct and
     // array parameters but not matrix parameters. A parameter of an int/uint/bool matrix type is
     // an array only after `legalizeMatrixTypes`, and Metal requires an array parameter to be
     // passed by reference. SPIR-V does the same transformation earlier, because the pass changes
-    // how `lowerBufferElementTypeToStorageType` sees array parameters.
+    // how `lowerBufferElementTypeToStorageType` sees array parameters. On the CUDA family the pass
+    // also passes entry-point uniform parameters to such callees by address.
     if ((isCPUTarget(targetRequest) && !isCPUTargetViaLLVM(targetRequest)) ||
         isCUDATarget(targetRequest) || isMetalTarget(targetRequest))
-        SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+        SLANG_PASS(transformByValueParamsToBorrows, targetRequest, codeGenContext->getSink());
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays. This runs after

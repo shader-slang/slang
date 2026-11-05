@@ -3038,6 +3038,18 @@ IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressS
         getDefaultBufferLayoutType());
 }
 
+IRByValueBorrowInParamType* IRBuilder::getByValueBorrowInParamType(
+    IRType* valueType,
+    AddressSpace addrSpace)
+{
+    return (IRByValueBorrowInParamType*)getPtrType(
+        kIROp_ByValueBorrowInParamType,
+        valueType,
+        AccessQualifier::Read,
+        addrSpace,
+        getDefaultBufferLayoutType());
+}
+
 
 IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)
 {
@@ -4232,6 +4244,7 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_RawPointerType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
     case kIROp_ComPtrType:
     case kIROp_NativePtrType:
     case kIROp_NativeStringType:
@@ -4396,6 +4409,7 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     case kIROp_RawPointerType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
         return TypeCastStyle::Ptr;
     case kIROp_EnumType:
         return TypeCastStyle::Enum;

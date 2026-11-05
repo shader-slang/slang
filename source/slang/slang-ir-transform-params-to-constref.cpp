@@ -3,6 +3,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -14,8 +15,19 @@ struct TransformParamsToConstRefContext
     IRBuilder builder;
     bool changed = false;
 
-    TransformParamsToConstRefContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink), builder(module)
+    // Whether callees may borrow an entry point's uniform parameters in place; see
+    // `retypeEntryPointUniformParams`.
+    bool shouldForwardAddressesOfEntryPointUniformParams = false;
+
+    TransformParamsToConstRefContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        bool shouldForwardAddressesOfEntryPointUniformParams)
+        : module(module)
+        , sink(sink)
+        , builder(module)
+        , shouldForwardAddressesOfEntryPointUniformParams(
+              shouldForwardAddressesOfEntryPointUniformParams)
     {
     }
 
@@ -197,6 +209,7 @@ struct TransformParamsToConstRefContext
         {
         case kIROp_ConstantBufferType:
         case kIROp_BorrowInParamType:
+        case kIROp_ByValueBorrowInParamType:
         case kIROp_ParameterBlockType:
             return addr;
         default:
@@ -397,8 +410,64 @@ struct TransformParamsToConstRefContext
         functionsToProcess.add(root);
     }
 
+    // Retype each uniform entry-point parameter of a type that this pass passes by borrow, so that
+    // a callee taking the parameter as `borrow in` can receive its address instead of a copy.
+    //
+    // Consider this example:
+    //
+    //     [noinline] float readsum(Big b, uint i);           // `b` becomes `borrow in`
+    //     [CudaDeviceExport] float exported(Big b, uint i);  // keeps its by-value signature
+    //     void computeMain(uniform Big big, ...) { readsum(big, i) + exported(big, i) + big.v[0]; }
+    //
+    // We retype `big` to `ByValueBorrowInParam<Big, LaunchParameter>` and rewrite each of its uses
+    // into a read through it. When `updateCallSites` later rebuilds the `readsum` call, the
+    // argument is a load from an immutable address, so `readsum` receives `big` itself, while
+    // `exported` keeps receiving the loaded value. The emitted kernel still declares `Big_0 big_0`
+    // and calls `readsum_0(&big_0, i)` and `exported(big_0, i)`.
+    void retypeEntryPointUniformParams()
+    {
+        for (auto inst : module->getModuleInst()->getChildren())
+        {
+            auto func = as<IRFunc>(inst);
+            if (!func || !func->findDecoration<IREntryPointDecoration>())
+                continue;
+            bool retyped = false;
+            for (auto param = func->getFirstParam(); param; param = param->getNextParam())
+            {
+                // A callee parameter of a type that `shouldTransformParam` rejects, such as a
+                // vector or matrix, stays by value, so such a uniform has no borrow to forward
+                // into.
+                if (!shouldTransformParam(param))
+                    continue;
+
+                // `legalizeEntryPointVaryingParamsForCUDA` runs before this pass and removes every
+                // varying entry-point parameter, and `collectOptiXEntryPointUniformParams` moves
+                // the uniforms of ray-tracing stages into the shader record, so each remaining
+                // parameter is a uniform with a layout.
+                auto varLayout = findVarLayout(param);
+                SLANG_ASSERT(varLayout && !isVaryingParameter(varLayout));
+
+                param->setFullType(builder.getByValueBorrowInParamType(
+                    param->getDataType(),
+                    AddressSpace::LaunchParameter));
+                rewriteValueUsesToAddrUses(param);
+                retyped = true;
+            }
+            if (retyped)
+            {
+                fixUpFuncType(func);
+                changed = true;
+            }
+        }
+    }
+
     SlangResult processModule()
     {
+        // The retype runs before any callee is processed so that `updateCallSites` sees the
+        // entry-point arguments as loads from an immutable address.
+        if (shouldForwardAddressesOfEntryPointUniformParams)
+            retypeEntryPointUniformParams();
+
         // Collect all functions that need processing.
         // Process all callee's before callers; otherwise we introduce bugs
 
@@ -422,16 +491,24 @@ struct TransformParamsToConstRefContext
     }
 };
 
-SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
+SlangResult transformByValueParamsToBorrows(
+    IRModule* module,
+    TargetRequest* targetReq,
+    DiagnosticSink* sink)
 {
-    TransformParamsToConstRefContext context(module, sink);
+    // On the CUDA family an entry point's uniform parameters are by-value kernel parameters. Other
+    // targets reach entry-point uniforms through a parameter block or context pointer instead.
+    TransformParamsToConstRefContext context(module, sink, isCUDATarget(targetReq));
     return context.processModule();
 }
 
 struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContext
 {
     EntryPointInParamToBorrowContext(IRModule* module, DiagnosticSink* sink)
-        : TransformParamsToConstRefContext(module, sink)
+        : TransformParamsToConstRefContext(
+              module,
+              sink,
+              /* shouldForwardAddressesOfEntryPointUniformParams */ false)
     {
     }
     virtual bool shouldProcessFunction(IRFunc* func) override

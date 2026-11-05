@@ -660,6 +660,7 @@ bool isWrapperType(IRInst* inst)
     case kIROp_PtrType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
     case kIROp_HLSLStructuredBufferType:
     case kIROp_HLSLRWStructuredBufferType:
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
@@ -1621,6 +1622,7 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_PtrType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
     case kIROp_GLSLShaderStorageBufferType:
     // Work-graph output records are mutable handles, so treat them as pointer-like.
     case kIROp_ThreadNodeOutputRecordsType:
@@ -2358,6 +2360,7 @@ IRPtrTypeBase* isMutablePointerType(IRInst* inst)
     switch (inst->getOp())
     {
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
         return nullptr;
     default:
         return asRelevantPtrType(inst);

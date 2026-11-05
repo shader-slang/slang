@@ -1993,6 +1993,15 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
             // resulting code.
             m_writer->emit(getName(inst));
             return;
+        case kIROp_Param:
+            // A by-value borrow is declared as the value `p`, so, as for the local variable above,
+            // `*&p` is emitted as just `p`. Any other param is a real pointer.
+            if (as<IRByValueBorrowInParamType>(inst->getDataType()))
+            {
+                m_writer->emit(getName(inst));
+                return;
+            }
+            break;
         case kIROp_FieldAddress:
             {
                 auto innerPrec = getInfo(EmitOp::Postfix);

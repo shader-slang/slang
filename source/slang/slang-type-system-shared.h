@@ -167,6 +167,9 @@ enum class AddressSpace : uint64_t
     SpecializationConstant,
     // Corresponds to SPIR-V's SpvStorageClassNodePayloadAMDX,
     NodePayloadAMDX,
+    // The storage of an entry point's by-value uniform parameters, which the host supplies when it
+    // launches the entry point.
+    LaunchParameter,
 
     // Default address space for a user-defined pointer
     UserPointer = 0x100000001ULL,

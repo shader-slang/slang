@@ -321,6 +321,8 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << "*";
             return SLANG_OK;
         }
+    case kIROp_ByValueBorrowInParamType:
+        return calcTypeName(static_cast<IRPtrTypeBase*>(type)->getValueType(), target, out);
     case kIROp_RTTIType:
         {
             out << "TypeInfo";
@@ -491,6 +493,7 @@ void CPPSourceEmitter::useType(IRType* type)
         }
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_ByValueBorrowInParamType:
         {
             type = static_cast<IRPtrTypeBase*>(type)->getValueType();
             break;
@@ -1179,6 +1182,9 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             PtrDeclaratorInfo refDeclarator(declarator);
             _emitType(ptrType->getValueType(), &refDeclarator);
         }
+        break;
+    case kIROp_ByValueBorrowInParamType:
+        _emitType(cast<IRPtrTypeBase>(type)->getValueType(), declarator);
         break;
     case kIROp_ArrayType:
         {
@@ -2097,6 +2103,14 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec
     if (shouldFoldInstIntoUseSites(inst))
     {
         emitInstExpr(inst, outerPrec);
+        return;
+    }
+
+    // A by-value borrow is declared as the value `p`, so, as for a local `Var`, the pointer it
+    // stands for in the IR is `&p`.
+    if (inst->getOp() == kIROp_Param && as<IRByValueBorrowInParamType>(inst->getDataType()))
+    {
+        emitVarExpr(inst, outerPrec);
         return;
     }
 

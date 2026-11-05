@@ -119,7 +119,7 @@ static IRType* findD3DUnsupportedLocalStorageType(IRType* type)
 // Metal rejects a texture, image, or sampler stored directly in `thread` storage. Structured and
 // byte-address buffers are represented by pointers and are not subject to this restriction. Metal
 // permits a fixed-size array with a texture, image, or sampler as its immediate element. The
-// `transformParamsToConstRef` pass
+// `transformByValueParamsToBorrows` pass
 // uses this allowed form when a caller cannot supply an immutable address for a by-value array
 // argument. It copies the argument into a local array and passes that array to the callee. An
 // unsized array has no fixed amount of local storage. The current Metal storage contract permits
