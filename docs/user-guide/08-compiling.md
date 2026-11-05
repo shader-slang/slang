@@ -1107,6 +1107,7 @@ meanings of their `CompilerOptionValue` encodings.
 | Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
 | Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
 | EnableExtendedHLSLBackwardsCompatibility | Enables [additional backwards-compatibility features for legacy HLSL](#backwards-compatibility-option-for-legacy-hlsl), such as uniform parameter temporaries. `intValue0` encodes a bool value. |
+| HLSLMethodsMutatingByDefault | Selects the [default receiver mode for HLSL methods](#default-receiver-mode-for-hlsl-methods). `intValue0` encodes a bool value; the default is false. |
 | MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | MatrixLayoutRow    | Use row major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | Profile            | Specifies the target profile. `intValue0` encodes the raw profile representation returned by `IGlobalSession::findProfile()`. |
@@ -1181,6 +1182,34 @@ The final tool invocation can still order some arguments differently, because ex
 The downstream compiler decides how repeated or conflicting arguments are handled, and that behavior can differ between tools and between versions of the same tool. Slang does not guarantee either "last one wins" or a rejection. For example, NVRTC 12.6 rejects `--fmad=true --fmad=false` with "defined more than once". NVRTC 13.0.88 has been reported to accept the same pair with a warning and use `false`, and to accept two identical `--fmad=false` arguments silently. To control a flag precisely, pass it at one level only.
 
 Earlier versions of Slang could discard the session's entire argument list for a tool when a target description or `linkWithOptions` also supplied arguments for that tool, so the session's `--gpu-architecture` was lost in the example above. Slang now passes both lists.
+
+### Default Receiver Mode for HLSL Methods
+
+By default, methods have a nonmutating `in` receiver.
+For HLSL input, `-fhlsl-methods-mutating-by-default` selects `inout` as the default receiver mode.
+For example, this HLSL method can modify its receiver when the option is enabled:
+
+```hlsl
+struct Counter
+{
+    int value;
+
+    void increment()
+    {
+        value++;
+    }
+};
+```
+
+Without the option, `increment` needs an explicit `[mutating]` attribute.
+With the option, calls to unannotated methods require a writable receiver, even when the method body does not modify it.
+Methods with explicit receiver-mode attributes or trailing `const` use the specified mode regardless of the option.
+Setters keep their mutating default.
+The option has no effect on Slang or GLSL input, including Slang modules imported by HLSL code.
+
+In the API, set `CompilerOptionName::HLSLMethodsMutatingByDefault` in `SessionDesc::compilerOptionEntries` before loading modules.
+Use `CompilerOptionValueKind::Int` with `intValue0` set to `1` to enable the option or `0` to disable it.
+Omitting the option keeps the nonmutating default.
 
 ### Backwards Compatibility Option for Legacy HLSL
 

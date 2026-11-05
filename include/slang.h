@@ -1363,6 +1363,10 @@ typedef uint32_t SlangSizeT;
         // such as using uniform parameters as mutable temporaries. Has no effect on other dialects.
         EnableExtendedHLSLBackwardsCompatibility = 163,
 
+        // `bool`: Makes HLSL methods use an `inout` receiver by default. Defaults to false.
+        // Has no effect on Slang or GLSL inputs, or methods with an explicit receiver mode.
+        HLSLMethodsMutatingByDefault = 164,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,

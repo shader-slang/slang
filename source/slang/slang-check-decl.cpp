@@ -17880,9 +17880,9 @@ ParamPassingMode SemanticsVisitor::getDefaultReceiverParamMode(Decl* decl)
     if (as<SetterDecl>(decl))
         return ParamPassingMode::BorrowInOut;
 
-    // We keep the HLSL `inout` default disabled because existing shaders call unannotated
-    // methods on immutable receivers, such as members of a `cbuffer`.
-    if (0)
+    // We require an explicit opt-in because existing shaders call unannotated methods on
+    // immutable receivers, such as members of a `cbuffer`.
+    if (getOptionSet().getBoolOption(CompilerOptionName::HLSLMethodsMutatingByDefault))
     {
         // Declarations other than `FuncDecl`s default to `in`.
         if (!as<FuncDecl>(decl))
@@ -17894,9 +17894,9 @@ ParamPassingMode SemanticsVisitor::getDefaultReceiverParamMode(Decl* decl)
         if (decl->hasModifier<SynthesizedModifier>())
             return ParamPassingMode::In;
 
-        // Imported modules finish signature checking in their own semantic context before import.
-        // Reflection and specialization read the attached mode, so this language query runs while
-        // checking a written method in its owning translation unit.
+        // The compiler checks each imported module in its own semantic context. Reflection and
+        // specialization read the attached mode, so this language query runs while checking a
+        // written method in its owning translation unit.
         if (getSourceLanguage() == SourceLanguage::HLSL)
             return ParamPassingMode::BorrowInOut;
     }

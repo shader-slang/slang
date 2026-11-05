@@ -1270,6 +1270,11 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Enable additional backwards-compatibility features for legacy HLSL inputs. See the "
          "user guide's HLSL backwards compatibility section for the supported behavior."},
+        {OptionKind::HLSLMethodsMutatingByDefault,
+         "-fhlsl-methods-mutating-by-default",
+         nullptr,
+         "Use `inout` receivers by default for HLSL methods. Has no effect on Slang or GLSL "
+         "inputs."},
         {OptionKind::EnableExperimentalDynamicDispatch,
          "-enable-experimental-dynamic-dispatch",
          nullptr,
@@ -3440,6 +3445,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ValidateUniformity:
         case OptionKind::EnableExperimentalPasses:
         case OptionKind::EnableExtendedHLSLBackwardsCompatibility:
+        case OptionKind::HLSLMethodsMutatingByDefault:
         case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
         case OptionKind::DumpIntermediates:
