@@ -225,8 +225,8 @@ public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 // GLSL's `*` and `*=` on matrices and vectors compute the algebraic product. Each overload
 // below forwards to `mul` with its operands swapped, so its target set mirrors that of the
-// `mul` overload it calls. The `double` overload also requires `fp64`, because `double` itself
-// does.
+// `mul` overload it calls. The `matrix<double, N, N>` `*=` overload also requires `fp64`,
+// because `double` itself does.
 
 [ForceInline]
 [OverloadRank(15)]
