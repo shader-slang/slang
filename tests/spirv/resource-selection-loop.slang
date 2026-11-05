@@ -7,12 +7,12 @@
 // CHECK: %[[S:[^ ]+]] = OpVariable %_ptr_Function_uint Function
 // CHECK: OpStore %[[S]] %uint_0
 // CHECK: OpLoopMerge
-// CHECK: %[[INDEX:[^ ]+]] = OpLoad %uint %[[S]]
-// CHECK: OpUntypedAccessChainKHR {{.*}} %slang_samplerHeap %[[INDEX]]
 // CHECK: %[[NEXT:[^ ]+]] = OpIAdd %uint
 // CHECK: OpStore %[[S]] %[[NEXT]]
 // CHECK: %[[TEXTURE:[^ ]+]] = OpSelect %uint
 // CHECK: OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %[[TEXTURE]]
+// CHECK: %[[INDEX:[^ ]+]] = OpLoad %uint %[[S]]
+// CHECK: OpUntypedAccessChainKHR {{.*}} %slang_samplerHeap %[[INDEX]]
 // CHECK: OpImageSampleImplicitLod
 
 cbuffer Ubo { uint x; uint i; uint j; };

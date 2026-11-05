@@ -1,8 +1,12 @@
-// Issue #10526: the opaque-local-variable check recurses into struct fields, so
-// selecting a struct that contains a resource through control flow is also
-// rejected.
+// Resource-type legalization separates `Pair` into its texture fields. Output specialization
+// exposes those fields in the caller, where selection specialization must dispatch sampling
+// without storing a selected texture in a local. The implicit sample still warrants a warning.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -O0 -validate-ir -validate-ir-detailed
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -validate-ir -validate-ir-detailed
+//CHECK: warning[E56020]
+//CHECK: OpImageSampleImplicitLod
+//CHECK: OpImageSampleImplicitLod
 
 Texture2D<float> t0, t1;
 SamplerState samp;
@@ -20,7 +24,6 @@ Pair selStruct(bool b)
     Pair p1 = {t1, t1};
     return b ? p1 : p0;
 }
-//CHECK: 56004{{.*}}opaque type in local variable
 
 [shader("fragment")]
 float main(bool b) : SV_Target

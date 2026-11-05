@@ -6335,6 +6335,20 @@ err(
     span { loc = "location", message = "mutable local storage contains an opaque value of type '~type:IRInst', which target '~target:CodeGenTarget' cannot represent; use or pass the resource value directly instead of assigning it to a mutable local or `static` variable" }
 )
 
+warning(
+    "resource-selection-introduces-conditional-derivative",
+    56020,
+    "resource selection introduces conditional execution of a derivative operation",
+    span { loc = "location", message = "Slang lowers the resource selection to branches around this operation; if invocations in a derivative group select different resources, implicit LOD or derivative results may be undefined. Use explicit LOD or compute gradients before selecting the resource when applicable" }
+)
+
+warning(
+    "resource-selection-introduces-conditional-unknown-operation",
+    56021,
+    "resource selection introduces conditional execution of an operation with unknown control-flow requirements",
+    span { loc = "location", message = "Slang lowers the resource selection to branches around this operation, but cannot determine whether the operation requires other invocations to execute the same instruction; the introduced control flow may change its behavior" }
+)
+
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 

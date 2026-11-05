@@ -1,0 +1,1429 @@
+#include "slang-ir-specialize-resource-selections.h"
+
+#include "slang-code-gen.h"
+#include "slang-ir-clone.h"
+#include "slang-ir-insts.h"
+#include "slang-ir-resource-selection-diagnostics.h"
+#include "slang-ir-util.h"
+#include "slang-ir.h"
+#include "slang-target-program.h"
+#include "slang-target.h"
+
+namespace Slang
+{
+// Resource selections are valid Slang values, but Vulkan and GLSL cannot store selected images or
+// samplers in local variables. We replace those values before phi elimination requires such
+// storage. Consider this example:
+//
+//     Texture2D<float4> textures[8];
+//     Texture2D<float4> other;
+//     SamplerState sampler;
+//     float4 f(bool useArray, uint i, float2 uv)
+//     {
+//         Texture2D<float4> t = useArray ? textures[i] : other;
+//         return t.SampleLevel(sampler, uv, 0);
+//     }
+//
+// There are two ways to construct `t`: index `textures`, or refer to `other`. A reconstruction
+// recipe records each construction, with an ordinary integer payload for the array index. The
+// selected recipe and payload replace the resource-valued SSA state. At `SampleLevel` we branch,
+// construct the selected resource, and perform the operation. Only the ordinary sample result
+// crosses the merge. In particular, we neither evaluate an unselected access nor move the sample
+// before its coordinates have been computed.
+//
+// Changing `other` to `textures[j]` leaves one recipe and one selected index. No dispatch is
+// needed: this is the same-array optimization. A heap load is another indexed recipe. Combining a
+// texture and sampler produces a recipe with two children, while a precombined binding is a
+// resource root. These descriptions preserve the actual bindings instead of inventing separate
+// bindings for a precombined resource.
+//
+// The implementation has four phases. We discover a connected graph of selections and resource
+// constructors, determine its finite recipe alternatives, replace its state with ordinary values,
+// and rewrite the terminal operations. Selects and block parameters belong to the graph, not to the
+// recipes. Consequently a loop changes ordinary state instead of recursively expanding a resource
+// expression. Replacement block parameters exist before we construct any back-edge argument.
+
+namespace
+{
+/// An operand in a resource reconstruction is a child recipe, an ordinary payload, or a fixed
+/// value.
+class ResourceRecipeOperand
+{
+public:
+    enum class Flavor
+    {
+        Resource,
+        Payload,
+        Fixed,
+    };
+
+    // `List` default-initializes storage before assigning appended operands. Factory methods
+    // supply every observable operand; an unassigned storage element has no fixed IR value.
+    ResourceRecipeOperand()
+        : m_flavor(Flavor::Fixed)
+    {
+    }
+
+    static ResourceRecipeOperand resource(Index recipe)
+    {
+        ResourceRecipeOperand result(Flavor::Resource);
+        result.m_recipe = recipe;
+        return result;
+    }
+
+    static ResourceRecipeOperand payload(IRType* type)
+    {
+        ResourceRecipeOperand result(Flavor::Payload);
+        result.m_value = type;
+        return result;
+    }
+
+    static ResourceRecipeOperand fixed(IRInst* value)
+    {
+        ResourceRecipeOperand result(Flavor::Fixed);
+        result.m_value = value;
+        return result;
+    }
+
+    Flavor getFlavor() const { return m_flavor; }
+
+    Index getRecipe() const
+    {
+        SLANG_RELEASE_ASSERT(m_flavor == Flavor::Resource);
+        return m_recipe;
+    }
+
+    IRType* getPayloadType() const
+    {
+        SLANG_RELEASE_ASSERT(m_flavor == Flavor::Payload);
+        return cast<IRType>(m_value);
+    }
+
+    IRInst* getFixedValue() const
+    {
+        SLANG_RELEASE_ASSERT(m_flavor == Flavor::Fixed);
+        SLANG_RELEASE_ASSERT(m_value);
+        return m_value;
+    }
+
+    bool operator==(const ResourceRecipeOperand& other) const
+    {
+        if (m_flavor != other.m_flavor)
+            return false;
+        if (m_flavor == Flavor::Resource)
+            return m_recipe == other.m_recipe;
+        return m_value == other.m_value;
+    }
+
+    HashCode getHashCode() const
+    {
+        if (m_flavor == Flavor::Resource)
+            return combineHash(Slang::getHashCode(Int(m_flavor)), Slang::getHashCode(m_recipe));
+        return combineHash(Slang::getHashCode(Int(m_flavor)), Slang::getHashCode(m_value));
+    }
+
+private:
+    explicit ResourceRecipeOperand(Flavor flavor)
+        : m_flavor(flavor)
+    {
+    }
+
+    Flavor m_flavor;
+    Index m_recipe = -1;
+    IRInst* m_value = nullptr;
+};
+
+/// A recipe key identifies an exact resource construction with ordinary operands replaced by types.
+//
+// Equality is deliberately structural only over the constructions owned by this pass. Roots use
+// exact IR identity. We do not compare bindings, infer resource aliasing, or redefine IR equality.
+// For example, `a[i]` and `a[j]` share a key, but `a[i]` and `b[i]` do not.
+struct ResourceRecipeKey
+{
+    IROp op = kIROp_Invalid;
+    IRType* type = nullptr;
+    List<ResourceRecipeOperand> operands;
+
+    bool operator==(const ResourceRecipeKey& other) const
+    {
+        if (op != other.op)
+            return false;
+        if (type != other.type)
+            return false;
+        if (operands.getCount() != other.operands.getCount())
+            return false;
+        for (Index i = 0; i < operands.getCount(); i++)
+            if (!(operands[i] == other.operands[i]))
+                return false;
+        return true;
+    }
+
+    HashCode getHashCode() const
+    {
+        Hasher hasher;
+        hasher.hashValue(Int(op));
+        hasher.hashValue(type);
+        for (const auto& operand : operands)
+            hasher.hashValue(operand);
+        return hasher.getResult();
+    }
+};
+
+/// A recipe describes one resource construction and the types of its flattened ordinary payload.
+//
+// `payloadTypes` follows operand order, recursively expanding each child recipe. That order is a
+// construction contract, not an ordering imposed on bindings. The per-type selector number is
+// assigned after recipe discovery; it has no meaning outside this graph rewrite.
+struct ResourceRecipe
+{
+    ResourceRecipeKey key;
+    List<IRType*> payloadTypes;
+    Index selectorNumber = -1;
+};
+
+/// A graph value associates existing resource IR with possible recipes and replacement ordinary
+/// SSA.
+//
+// For each possible recipe, `payloads` contains values meaningful when `selector` names that
+// recipe. Payloads for other recipes need not describe a valid access: they are never reconstructed
+// on that execution path. A value with one recipe has a constant selector, which DCE can remove.
+struct ResourceSelectionValue : RefObject
+{
+    IRInst* inst = nullptr;
+    List<ResourceSelectionValue*> dependencies;
+    OrderedHashSet<Index> recipes;
+    IRInst* selector = nullptr;
+    Dictionary<Index, List<IRInst*>> payloads;
+    bool isRoot = false;
+};
+
+/// A terminal operation and the resource graph values used by its operands or nested assembly.
+struct ResourceSelectionConsumer
+{
+    IRInst* inst = nullptr;
+    OrderedHashSet<ResourceSelectionValue*> arguments;
+};
+
+/// One complete resource graph rewrite, including its analysis and all temporary replacement
+/// mappings.
+struct ResourceSelectionContext
+{
+    CodeGenContext* codeGenContext;
+    IRFunc* func;
+    Dictionary<IRInst*, ResourceSelectionValue*> valueMap;
+    List<RefPtr<ResourceSelectionValue>> values;
+    Dictionary<ResourceRecipeKey, Index> recipeMap;
+    List<ResourceRecipe> recipes;
+    Dictionary<IRType*, List<Index>> recipesByType;
+    Dictionary<IRBlock*, List<IRParam*>> originalParams;
+    Dictionary<IRInst*, Index> consumerMap;
+    List<ResourceSelectionConsumer> consumers;
+    // These payload values were selected by resource control flow. When used as descriptor
+    // indices, they need `NonUniformResourceIndex` even if their incoming values were constants.
+    HashSet<IRInst*> selectedPayloads;
+    IRType* commonIndexType = nullptr;
+
+    /// Rewrite the graph containing `candidate`, leaving unsupported graphs unchanged.
+    //
+    // Analysis completes before executable IR is changed. Roots and constructor operands must
+    // be reconstructible, and every resource use must end in a supported ordinary-valued
+    // operation. Resource-returning calls remain the responsibility of output specialization,
+    // which can inline them and expose another graph on the next specialization round.
+    bool tryRewrite(IRInst* candidate)
+    {
+        if (!discoverGraph(candidate))
+            return false;
+        if (!discoverRecipes())
+            return false;
+        if (!canMaterializeConsumerRecipes())
+            return false;
+
+        // The recipe alternatives determine the ordinary values carried for each resource
+        // parameter. We allocate all parameters first because incoming loop state can be cyclic.
+        assignSelectorNumbers();
+        createReplacementParams();
+        emitReplacementValues();
+        transferSelectedStateNames();
+        rewriteBranchArguments();
+
+        // Every terminal operation still occupies its original execution point. Its ordinary
+        // arguments dominate the new dispatch, including arguments computed after a resource
+        // selection. We can therefore clone the operation without moving those calculations.
+        for (auto& consumer : consumers)
+            rewriteConsumer(consumer);
+        removeResourceGraph();
+        return true;
+    }
+
+    /// Return whether `type` is an image, sampler, or another unstorable resource, including
+    /// arrays.
+    //
+    // Storage buffers have an existing variable-pointer lowering. We leave their ordinary
+    // selections to that lowering; descriptor-heap loads remain accepted separately because
+    // replacing those loads with selected heap indices is already required for storage buffers.
+    static bool isOpaqueResourceType(IRType* type)
+    {
+        type = unwrapArray(type);
+        if (as<IRResourceTypeBase>(type))
+            return true;
+        if (as<IRSamplerStateTypeBase>(type))
+            return true;
+        if (as<IRSubpassInputType>(type))
+            return true;
+        return type->getOp() == kIROp_RaytracingAccelerationStructureType;
+    }
+
+    /// Return whether an instruction represents resource selection rather than resource storage.
+    static bool isSelection(IRInst* inst)
+    {
+        if (!isResourceType(inst->getDataType()))
+            return false;
+        // Pointer arithmetic can create unbounded paths around a loop. Native pointer choices
+        // already have their own legalization and are outside this resource-construction model.
+        if (as<IRPtrTypeBase>(unwrapArray(inst->getDataType())))
+            return false;
+        if (as<IRSelect>(inst))
+            return true;
+        auto param = as<IRParam>(inst);
+        if (!param)
+            return false;
+        auto block = cast<IRBlock>(param->getParent());
+        return block != cast<IRFunc>(block->getParent())->getFirstBlock();
+    }
+
+    /// Return whether an operation constructs a resource or an address into its contents.
+    //
+    // These operations are pure descriptions of a binding or address. Actual reads, writes,
+    // and samples are terminal consumers and execute only in the selected dispatch arm.
+    static bool isConstructor(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_GetElement:
+            return isResourceType(inst->getDataType());
+        case kIROp_SPIRVLoadDescriptorFromHeap:
+        case kIROp_MakeCombinedTextureSampler:
+        case kIROp_CombinedTextureSamplerGetTexture:
+        case kIROp_CombinedTextureSamplerGetSampler:
+        case kIROp_ImageSubscript:
+        case kIROp_ImageTexelPointer:
+        case kIROp_GetElementPtr:
+        case kIROp_FieldAddress:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /// Return which operands of a supported constructor are themselves resource descriptions.
+    static bool isResourceOperand(IRInst* inst, UInt operandIndex)
+    {
+        if (inst->getOp() == kIROp_SPIRVLoadDescriptorFromHeap)
+            return false;
+        if (inst->getOp() == kIROp_MakeCombinedTextureSampler)
+            return true;
+        return operandIndex == 0;
+    }
+
+    /// Return whether a constructor operand is an index requiring common-width conversion.
+    static bool isDescriptorIndex(IRInst* inst, UInt operandIndex)
+    {
+        if (operandIndex != 1)
+            return false;
+        if (inst->getOp() == kIROp_GetElement)
+            return true;
+        return inst->getOp() == kIROp_SPIRVLoadDescriptorFromHeap;
+    }
+
+    /// Return whether an operand names static construction metadata rather than ordinary state.
+    static bool isFixedOperand(IRInst* inst, UInt operandIndex)
+    {
+        if (inst->getOp() == kIROp_SPIRVLoadDescriptorFromHeap)
+            if (operandIndex == 0)
+                return true;
+        auto operand = inst->getOperand(operandIndex);
+        if (as<IRType>(operand))
+            return true;
+        return !operand->getDataType();
+    }
+
+    /// Add a graph value once, so shared subexpressions and back edges terminate discovery.
+    ResourceSelectionValue* addValue(IRInst* inst)
+    {
+        if (auto existing = valueMap.tryGetValue(inst))
+            return *existing;
+        RefPtr<ResourceSelectionValue> value = new ResourceSelectionValue;
+        value->inst = inst;
+        valueMap.add(inst, value);
+        values.add(value);
+        return value;
+    }
+
+    /// Return the containing block instruction, treating a SPIR-V assembly block as one operation.
+    //
+    // A resource use in `IRSPIRVAsmOperand` must cause the entire assembly block to be cloned.
+    // Cloning its operand node alone would leave an opaque selection in the assembly's parent.
+    IRInst* findBlockInstruction(IRInst* inst)
+    {
+        while (inst)
+        {
+            auto parent = inst->getParent();
+            if (as<IRBlock>(parent))
+            {
+                if (parent->getParent() == func)
+                    return inst;
+                return nullptr;
+            }
+            inst = parent;
+        }
+        return nullptr;
+    }
+
+    /// Include all opaque arguments of one terminal operation in the same component.
+    //
+    // A GLSL sample is an intrinsic call with separate texture and sampler arguments. Their
+    // choices are related through that call even without a `MakeCombinedTextureSampler` node.
+    // Discovering both arguments together lets us clone and diagnose the original call once.
+    // Assembly operands can be nested children, so we inspect the operation's owned subtree.
+    // We never traverse ordinary argument definitions, which must retain their evaluation point.
+    void includeConsumerArguments(ResourceSelectionConsumer& consumer)
+    {
+        List<IRInst*> pending;
+        pending.add(consumer.inst);
+        for (Index i = 0; i < pending.getCount(); i++)
+        {
+            auto inst = pending[i];
+            for (UInt operandIndex = 0; operandIndex < inst->getOperandCount(); operandIndex++)
+            {
+                auto value = inst->getOperand(operandIndex);
+                auto type = value->getDataType();
+                if (!type)
+                    continue;
+                // Assembly operand wrappers have the wrapped value's type, but belong to the
+                // assembly representation. We clone internal values with the operation. Only
+                // references outside its owned subtree are resource arguments of the graph.
+                if (findBlockInstruction(value) == consumer.inst)
+                    continue;
+                if (isOpaqueResourceType(type))
+                    consumer.arguments.add(addValue(value));
+            }
+            for (auto child : inst->getChildren())
+                pending.add(child);
+        }
+    }
+
+    /// Add the destination parameter for one exact resource argument use on a branch.
+    void addBranchDestination(IRUnconditionalBranch* branch, IRUse* use)
+    {
+        auto param = branch->getTargetBlock()->getFirstParam();
+        for (UInt i = 0; i < branch->getArgCount(); i++, param = param->getNextParam())
+        {
+            SLANG_RELEASE_ASSERT(param);
+            if (branch->getArgs() + i == use)
+            {
+                addValue(param);
+                return;
+            }
+        }
+        SLANG_UNEXPECTED("A resource branch use must name an argument.");
+    }
+
+    /// Record the broadest descriptor index type without narrowing existing 64-bit indices.
+    void includeIndexType(IRType* type)
+    {
+        if (!commonIndexType)
+        {
+            commonIndexType = type;
+            return;
+        }
+        auto oldInfo = getIntTypeInfo(codeGenContext->getTargetReq(), commonIndexType);
+        auto newInfo = getIntTypeInfo(codeGenContext->getTargetReq(), type);
+        if (newInfo.width > oldInfo.width)
+            commonIndexType = type;
+        else if (newInfo.width == oldInfo.width)
+            if (!newInfo.isSigned)
+                commonIndexType = type;
+    }
+
+    /// Discover all resource dependencies and uses, rejecting unsupported producers before
+    /// mutation.
+    bool discoverGraph(IRInst* candidate)
+    {
+        addValue(candidate);
+        for (Index i = 0; i < values.getCount(); i++)
+        {
+            auto value = values[i];
+            auto inst = value->inst;
+            if (auto select = as<IRSelect>(inst))
+            {
+                value->dependencies.add(addValue(select->getTrueResult()));
+                value->dependencies.add(addValue(select->getFalseResult()));
+            }
+            else if (auto param = as<IRParam>(inst))
+            {
+                auto block = cast<IRBlock>(param->getParent());
+                if (block == func->getFirstBlock())
+                {
+                    // Entry parameters dominate the entire body and can be named directly.
+                    if (!isOpaqueResourceType(param->getDataType()))
+                        return false;
+                    value->isRoot = true;
+                }
+                else
+                {
+                    if (block->getPredecessors().isEmpty())
+                        return false;
+                    if (!isSelection(param))
+                        return false;
+                    auto paramIndex = getParamIndexInBlock(param);
+                    for (auto predecessor : block->getPredecessors())
+                    {
+                        auto branch = cast<IRUnconditionalBranch>(predecessor->getTerminator());
+                        value->dependencies.add(addValue(branch->getArg((UInt)paramIndex)));
+                    }
+                    if (!originalParams.containsKey(block))
+                        for (auto originalParam : block->getParams())
+                            originalParams[block].add(originalParam);
+                }
+            }
+            else if (as<IRGlobalParam>(inst))
+            {
+                if (!isOpaqueResourceType(inst->getDataType()))
+                    return false;
+                value->isRoot = true;
+            }
+            else if (isConstructor(inst))
+            {
+                if (inst->getOp() == kIROp_SPIRVLoadDescriptorFromHeap)
+                {
+                    // A heap is fixed recipe metadata, so its declaration must be available at
+                    // every reconstruction. Built-in heap declarations have module scope. A
+                    // computed heap would need another selected payload and is not handled here.
+                    auto heap = inst->getOperand(0);
+                    if (!as<IRSPIRVResourceHeap>(heap))
+                        if (!as<IRSPIRVSamplerHeap>(heap))
+                            return false;
+                }
+                for (UInt operandIndex = 0; operandIndex < inst->getOperandCount(); operandIndex++)
+                {
+                    auto operand = inst->getOperand(operandIndex);
+                    if (isResourceOperand(inst, operandIndex))
+                        value->dependencies.add(addValue(operand));
+                    else if (isDescriptorIndex(inst, operandIndex))
+                        includeIndexType(operand->getDataType());
+                }
+            }
+            else
+            {
+                // A resource-valued call or load can require inlining or SSA simplification.
+                // The surrounding specialization fixed point retries after those transformations.
+                return false;
+            }
+
+            // We follow uses as well as dependencies. Otherwise a shared selection could be
+            // deleted while a second selection still expected its resource-valued representation.
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                auto operation = findBlockInstruction(user);
+                if (!operation)
+                    continue;
+                if (isSelection(operation))
+                    addValue(operation);
+                else if (isConstructor(operation))
+                    addValue(operation);
+                else if (auto branch = as<IRUnconditionalBranch>(operation))
+                    addBranchDestination(branch, use);
+                else
+                {
+                    // Resource returns are legalized by output specialization and its inliner.
+                    // Address-valued results also need reconstruction, not an opaque merge.
+                    if (operation->getOp() == kIROp_Return)
+                        return false;
+                    if (isResourceType(operation->getDataType()))
+                        return false;
+                    Index consumerIndex;
+                    if (auto existing = consumerMap.tryGetValue(operation))
+                        consumerIndex = *existing;
+                    else
+                    {
+                        consumerIndex = consumers.getCount();
+                        consumerMap.add(operation, consumerIndex);
+                        ResourceSelectionConsumer consumer;
+                        consumer.inst = operation;
+                        includeConsumerArguments(consumer);
+                        consumers.add(consumer);
+                    }
+                    consumers[consumerIndex].arguments.add(value);
+                }
+            }
+        }
+        return true;
+    }
+
+    /// Intern one exact construction and derive its flattened payload layout from its operands.
+    Index internRecipe(const ResourceRecipeKey& key)
+    {
+        if (auto existing = recipeMap.tryGetValue(key))
+            return *existing;
+        ResourceRecipe recipe;
+        recipe.key = key;
+        for (const auto& operand : key.operands)
+        {
+            if (operand.getFlavor() == ResourceRecipeOperand::Flavor::Resource)
+                recipe.payloadTypes.addRange(recipes[operand.getRecipe()].payloadTypes);
+            else if (operand.getFlavor() == ResourceRecipeOperand::Flavor::Payload)
+                recipe.payloadTypes.add(operand.getPayloadType());
+        }
+        auto index = recipes.getCount();
+        recipes.add(recipe);
+        recipeMap.add(key, index);
+        recipesByType[key.type].add(index);
+        return index;
+    }
+
+    /// Describe a constructor with a concrete recipe for each resource operand.
+    //
+    // Texture/sampler projections of a known pair use the corresponding child recipe. In
+    // addition to avoiding needless reconstruction, this prevents a combine/project loop from
+    // generating an endlessly deeper description of the same resource.
+    Index getConstructorRecipe(ResourceSelectionValue* value, const List<Index>& childRecipes)
+    {
+        auto inst = value->inst;
+        if (inst->getOp() == kIROp_CombinedTextureSamplerGetTexture)
+            if (recipes[childRecipes[0]].key.op == kIROp_MakeCombinedTextureSampler)
+                return recipes[childRecipes[0]].key.operands[0].getRecipe();
+        if (inst->getOp() == kIROp_CombinedTextureSamplerGetSampler)
+            if (recipes[childRecipes[0]].key.op == kIROp_MakeCombinedTextureSampler)
+                return recipes[childRecipes[0]].key.operands[1].getRecipe();
+
+        ResourceRecipeKey key;
+        key.op = inst->getOp();
+        key.type = inst->getDataType();
+        Index childIndex = 0;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            auto operand = inst->getOperand(i);
+            if (isResourceOperand(inst, i))
+                key.operands.add(ResourceRecipeOperand::resource(childRecipes[childIndex++]));
+            else if (isDescriptorIndex(inst, i))
+                key.operands.add(ResourceRecipeOperand::payload(commonIndexType));
+            else if (isFixedOperand(inst, i))
+                key.operands.add(ResourceRecipeOperand::fixed(operand));
+            else
+                key.operands.add(ResourceRecipeOperand::payload(operand->getDataType()));
+        }
+        return internRecipe(key);
+    }
+
+    /// Add the constructor recipes for all combinations of its dependencies' known alternatives.
+    bool addConstructorRecipes(
+        ResourceSelectionValue* value,
+        Index dependencyIndex,
+        List<Index>& childRecipes)
+    {
+        if (dependencyIndex == value->dependencies.getCount())
+            return value->recipes.add(getConstructorRecipe(value, childRecipes));
+        bool changed = false;
+        for (auto recipe : value->dependencies[dependencyIndex]->recipes)
+        {
+            childRecipes.add(recipe);
+            changed |= addConstructorRecipes(value, dependencyIndex + 1, childRecipes);
+            childRecipes.removeLast();
+        }
+        return changed;
+    }
+
+    /// Compute finite recipe alternatives to a fixed point, including cycles through block params.
+    //
+    // A selection only unions its incoming alternatives. Indexing descends through array types,
+    // and combination constructs one sampled-image recipe from texture and sampler recipes.
+    // Projection normalization removes the inverse construction. None of those operations adds
+    // another arbitrary access step to the same resource around a loop, so discovery terminates.
+    bool discoverRecipes()
+    {
+        bool changed = true;
+        while (changed)
+        {
+            changed = false;
+            for (auto value : values)
+            {
+                if (value->isRoot)
+                {
+                    ResourceRecipeKey key;
+                    key.type = value->inst->getDataType();
+                    key.operands.add(ResourceRecipeOperand::fixed(value->inst));
+                    changed |= value->recipes.add(internRecipe(key));
+                }
+                else if (isSelection(value->inst))
+                {
+                    for (auto dependency : value->dependencies)
+                        for (auto recipe : dependency->recipes)
+                            changed |= value->recipes.add(recipe);
+                }
+                else
+                {
+                    List<Index> childRecipes;
+                    changed |= addConstructorRecipes(value, 0, childRecipes);
+                }
+            }
+        }
+        // An unreachable loop can have only mutually dependent parameters and no resource root.
+        // No reconstruction is possible, so we leave that graph to ordinary unreachable-code DCE.
+        for (auto value : values)
+            if (value->recipes.getCount() == 0)
+                return false;
+
+        return true;
+    }
+
+    /// Return whether every construction needed by a consumer can be emitted on this target path.
+    //
+    // Normalization can remove an intermediate constructor that the target cannot emit. For
+    // example, projecting a known pair's sampler retains the actual sampler root. We therefore
+    // validate the recipes reachable from consumers, rather than rejecting every intermediate
+    // recipe discovered while analyzing the graph.
+    bool canMaterializeConsumerRecipes()
+    {
+        const bool emitsSPIRVDirectly =
+            codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly();
+        List<Index> pending;
+        HashSet<Index> visited;
+        for (const auto& consumer : consumers)
+            for (auto argument : consumer.arguments)
+                for (auto recipe : argument->recipes)
+                    pending.add(recipe);
+        for (Index i = 0; i < pending.getCount(); i++)
+        {
+            auto recipe = pending[i];
+            if (!visited.add(recipe))
+                continue;
+            const auto& key = recipes[recipe].key;
+            switch (key.op)
+            {
+            case kIROp_CombinedTextureSamplerGetSampler:
+                // Neither Khronos path can extract a separately addressable sampler from a
+                // precombined binding. Only projection normalization can support this operation.
+                return false;
+            case kIROp_MakeCombinedTextureSampler:
+            case kIROp_CombinedTextureSamplerGetTexture:
+            case kIROp_SPIRVLoadDescriptorFromHeap:
+            case kIROp_ImageTexelPointer:
+                // These are direct SPIR-V constructions. GLSL's standard library represents
+                // its combined sampling and heap fallbacks with target intrinsics and arrays.
+                // A direct call to an internal constructor can still produce this IR, so we
+                // reject that graph before mutation instead of reaching an unsupported emitter.
+                if (!emitsSPIRVDirectly)
+                    return false;
+                break;
+            default:
+                break;
+            }
+            for (const auto& operand : key.operands)
+                if (operand.getFlavor() == ResourceRecipeOperand::Flavor::Resource)
+                    pending.add(operand.getRecipe());
+        }
+        return true;
+    }
+
+    /// Assign recipe numbers within each resource type before constructing replacement selectors.
+    void assignSelectorNumbers()
+    {
+        for (auto& entry : recipesByType)
+            for (Index i = 0; i < entry.second.getCount(); i++)
+                recipes[entry.second[i]].selectorNumber = i;
+    }
+
+    /// Return the Boolean or integer carrier shared by recipes of `resourceType` in this graph.
+    IRType* getSelectorType(IRBuilder& builder, IRType* resourceType)
+    {
+        if (recipesByType.getValue(resourceType).getCount() <= 2)
+            return builder.getBoolType();
+        return builder.getUIntType();
+    }
+
+    /// Return the carrier constant identifying `recipeIndex`, with the first Boolean choice true.
+    IRInst* getSelectorConstant(IRBuilder& builder, Index recipeIndex)
+    {
+        const auto& recipe = recipes[recipeIndex];
+        auto type = getSelectorType(builder, recipe.key.type);
+        if (type == builder.getBoolType())
+            return builder.getBoolValue(recipe.selectorNumber == 0);
+        return builder.getIntValue(type, recipe.selectorNumber);
+    }
+
+    /// Negate a selector condition while eliminating a generated double negation.
+    //
+    // Recipe numbering can reverse a Boolean choice, and a consumer can reverse it again.
+    // Folding that pair here keeps the original condition even when optimization is disabled.
+    IRInst* emitConditionNot(IRBuilder& builder, IRInst* condition)
+    {
+        if (condition->getOp() == kIROp_Not)
+            return condition->getOperand(0);
+        return builder.emitNot(builder.getBoolType(), condition);
+    }
+
+    /// Build an ordinary-value select, recovering the original condition for Boolean choices.
+    //
+    // We intentionally perform these folds during construction. Existing SCCP cannot recover
+    // `c` from a nonconstant `select(c, true, false)`. Nested occurrences of the same condition
+    // also arise when a texture and sampler were selected together; their impossible cross-pairs
+    // must not force a numeric selector into an otherwise simple two-way operation.
+    IRInst* emitValueSelect(IRBuilder& builder, IRInst* condition, IRInst* onTrue, IRInst* onFalse)
+    {
+        if (auto literal = as<IRBoolLit>(condition))
+            return literal->getValue() ? onTrue : onFalse;
+        if (auto select = as<IRSelect>(onTrue))
+            if (select->getCondition() == condition)
+                onTrue = select->getTrueResult();
+        if (auto select = as<IRSelect>(onFalse))
+            if (select->getCondition() == condition)
+                onFalse = select->getFalseResult();
+        if (onTrue == onFalse)
+            return onTrue;
+        if (auto trueLiteral = as<IRBoolLit>(onTrue))
+            if (auto falseLiteral = as<IRBoolLit>(onFalse))
+            {
+                if (trueLiteral->getValue())
+                    return condition;
+                return emitConditionNot(builder, condition);
+            }
+        IRInst* operands[] = {condition, onTrue, onFalse};
+        return builder.emitIntrinsicInst(onTrue->getDataType(), kIROp_Select, 3, operands);
+    }
+
+    /// Compare a generated selector to a recipe number without hiding an existing Boolean choice.
+    IRInst* emitSelectorEquals(IRBuilder& builder, IRInst* selector, IRInst* constant)
+    {
+        if (as<IRConstant>(selector))
+            return builder.getBoolValue(selector == constant);
+        if (selector->getDataType() == builder.getBoolType())
+        {
+            if (cast<IRBoolLit>(constant)->getValue())
+                return selector;
+            return emitConditionNot(builder, selector);
+        }
+        if (auto select = as<IRSelect>(selector))
+        {
+            auto onTrue = emitSelectorEquals(builder, select->getTrueResult(), constant);
+            auto onFalse = emitSelectorEquals(builder, select->getFalseResult(), constant);
+            return emitValueSelect(builder, select->getCondition(), onTrue, onFalse);
+        }
+        return builder.emitEql(selector, constant);
+    }
+
+    /// Return one alternative's payload, using harmless ordinary defaults when that choice is
+    /// absent.
+    //
+    // The defaults are carried through SSA but never materialized as resource accesses. A
+    // reconstruction arm executes only when its recipe was actually selected.
+    IRInst* getPayloadOrDefault(
+        IRBuilder& builder,
+        ResourceSelectionValue* value,
+        Index recipe,
+        Index i)
+    {
+        if (auto payload = value->payloads.tryGetValue(recipe))
+            return (*payload)[i];
+        return builder.emitDefaultConstruct(recipes[recipe].payloadTypes[i]);
+    }
+
+    /// Allocate the complete replacement parameter layout before any incoming argument is
+    /// rewritten.
+    void createReplacementParams()
+    {
+        for (auto value : values)
+        {
+            if (value->isRoot)
+                continue;
+            auto param = as<IRParam>(value->inst);
+            if (!param)
+                continue;
+            IRBuilder builder(param);
+            if (value->recipes.getCount() == 1)
+                value->selector = getSelectorConstant(builder, *value->recipes.begin());
+            else
+            {
+                auto replacement =
+                    builder.createParam(getSelectorType(builder, param->getDataType()));
+                replacement->insertBefore(param);
+                replacement->sourceLoc = param->sourceLoc;
+                value->selector = replacement;
+            }
+            for (auto recipe : value->recipes)
+            {
+                auto& payload = value->payloads[recipe];
+                for (auto type : recipes[recipe].payloadTypes)
+                {
+                    auto replacement = builder.createParam(type);
+                    replacement->insertBefore(param);
+                    replacement->sourceLoc = param->sourceLoc;
+                    selectedPayloads.add(replacement);
+                    payload.add(replacement);
+                }
+            }
+        }
+    }
+
+    /// Build the selector decision tree for one constructor from its children's scalar selectors.
+    IRInst* emitConstructorSelector(
+        IRBuilder& builder,
+        ResourceSelectionValue* value,
+        Index dependencyIndex,
+        List<Index>& childRecipes)
+    {
+        if (dependencyIndex == value->dependencies.getCount())
+            return getSelectorConstant(builder, getConstructorRecipe(value, childRecipes));
+        auto dependency = value->dependencies[dependencyIndex];
+        IRInst* result = nullptr;
+        for (auto recipe : dependency->recipes)
+        {
+            childRecipes.add(recipe);
+            auto alternative =
+                emitConstructorSelector(builder, value, dependencyIndex + 1, childRecipes);
+            childRecipes.removeLast();
+            if (!result)
+                result = alternative;
+            else
+            {
+                auto condition = emitSelectorEquals(
+                    builder,
+                    dependency->selector,
+                    getSelectorConstant(builder, recipe));
+                result = emitValueSelect(builder, condition, alternative, result);
+            }
+        }
+        SLANG_RELEASE_ASSERT(result);
+        return result;
+    }
+
+    /// Collect one constructor alternative's payload in the same order as its recipe.
+    void addConstructorPayloads(
+        IRBuilder& builder,
+        ResourceSelectionValue* value,
+        Index dependencyIndex,
+        List<Index>& childRecipes)
+    {
+        if (dependencyIndex != value->dependencies.getCount())
+        {
+            for (auto recipe : value->dependencies[dependencyIndex]->recipes)
+            {
+                childRecipes.add(recipe);
+                addConstructorPayloads(builder, value, dependencyIndex + 1, childRecipes);
+                childRecipes.removeLast();
+            }
+            return;
+        }
+        auto recipeIndex = getConstructorRecipe(value, childRecipes);
+        List<IRInst*> payload;
+        for (Index i = 0; i < value->dependencies.getCount(); i++)
+            payload.addRange(value->dependencies[i]->payloads.getValue(childRecipes[i]));
+
+        auto inst = value->inst;
+        // Projection normalization drops the unused half of a known combined resource. Its
+        // payload must follow the projected recipe too, rather than retaining both halves.
+        bool isProjection = inst->getOp() == kIROp_CombinedTextureSamplerGetTexture;
+        if (inst->getOp() == kIROp_CombinedTextureSamplerGetSampler)
+            isProjection = true;
+        if (isProjection)
+        {
+            const auto& combined = recipes[childRecipes[0]];
+            if (combined.key.op == kIROp_MakeCombinedTextureSampler)
+            {
+                Index offset = 0;
+                if (inst->getOp() == kIROp_CombinedTextureSamplerGetSampler)
+                    offset = recipes[combined.key.operands[0].getRecipe()].payloadTypes.getCount();
+                List<IRInst*> projected;
+                for (Index i = 0; i < recipes[recipeIndex].payloadTypes.getCount(); i++)
+                    projected.add(payload[offset + i]);
+                payload = _Move(projected);
+            }
+        }
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            if (isResourceOperand(inst, i))
+                continue;
+            auto operand = inst->getOperand(i);
+            if (isDescriptorIndex(inst, i))
+                payload.add(builder.emitCast(commonIndexType, operand));
+            else if (!isFixedOperand(inst, i))
+                payload.add(operand);
+        }
+        SLANG_RELEASE_ASSERT(payload.getCount() == recipes[recipeIndex].payloadTypes.getCount());
+        if (auto existing = value->payloads.tryGetValue(recipeIndex))
+        {
+            // Projecting two combined choices can produce one array recipe with different
+            // indices. Consider this example:
+            //
+            //     Texture2D<float4> textures[8];
+            //     SamplerState s0, s1;
+            //     float4 loadPair(bool c, uint i, uint j)
+            //     {
+            //         Sampler2D<float4> p = select(c,
+            //             __makeCombinedTextureSampler(textures[i], s0),
+            //             __makeCombinedTextureSampler(textures[j], s1));
+            //         return p.Load(int3(0));
+            //     }
+            //
+            // The SPIR-V implementation of combined `Load` extracts the image with
+            // `CombinedTextureSamplerGetTexture`. Normalization finds the same texture-array
+            // recipe in both alternatives, but their index payloads still differ. We merge those
+            // payloads with the combined selector so the fetch uses the selected `i` or `j`.
+            SLANG_RELEASE_ASSERT(isProjection);
+            auto condition = emitSelectorEquals(
+                builder,
+                value->dependencies[0]->selector,
+                getSelectorConstant(builder, childRecipes[0]));
+            for (Index i = 0; i < payload.getCount(); i++)
+            {
+                auto replacement = emitValueSelect(builder, condition, payload[i], (*existing)[i]);
+                selectedPayloads.add(replacement);
+                (*existing)[i] = replacement;
+            }
+        }
+        else
+            value->payloads.add(recipeIndex, payload);
+    }
+
+    /// Emit acyclic replacement calculations after all parameter replacements have been allocated.
+    void emitReplacementValues()
+    {
+        Index remaining = 0;
+        for (auto value : values)
+            if (!value->selector)
+                remaining++;
+        while (remaining)
+        {
+            Index previousRemaining = remaining;
+            for (auto value : values)
+            {
+                if (value->selector)
+                    continue;
+                bool dependenciesReady = true;
+                for (auto dependency : value->dependencies)
+                    if (!dependency->selector)
+                        dependenciesReady = false;
+                if (!dependenciesReady)
+                    continue;
+
+                IRBuilder builder(value->inst);
+                if (!value->isRoot)
+                    builder.setInsertBefore(value->inst);
+                if (value->isRoot)
+                {
+                    auto recipe = *value->recipes.begin();
+                    value->selector = getSelectorConstant(builder, recipe);
+                    value->payloads[recipe] = List<IRInst*>();
+                }
+                else if (auto select = as<IRSelect>(value->inst))
+                {
+                    auto onTrue = value->dependencies[0];
+                    auto onFalse = value->dependencies[1];
+                    value->selector = emitValueSelect(
+                        builder,
+                        select->getCondition(),
+                        onTrue->selector,
+                        onFalse->selector);
+                    for (auto recipe : value->recipes)
+                    {
+                        auto& payload = value->payloads[recipe];
+                        for (Index i = 0; i < recipes[recipe].payloadTypes.getCount(); i++)
+                        {
+                            auto truePayload = getPayloadOrDefault(builder, onTrue, recipe, i);
+                            auto falsePayload = getPayloadOrDefault(builder, onFalse, recipe, i);
+                            auto replacement = emitValueSelect(
+                                builder,
+                                select->getCondition(),
+                                truePayload,
+                                falsePayload);
+                            if (replacement != truePayload)
+                                if (replacement != falsePayload)
+                                    selectedPayloads.add(replacement);
+                            payload.add(replacement);
+                        }
+                    }
+                }
+                else
+                {
+                    List<Index> childRecipes;
+                    value->selector = emitConstructorSelector(builder, value, 0, childRecipes);
+                    addConstructorPayloads(builder, value, 0, childRecipes);
+                }
+                remaining--;
+            }
+            // Only parameter edges can close a resource-value cycle. Their replacement values were
+            // allocated before this loop, so every remaining acyclic dependency must progress.
+            SLANG_RELEASE_ASSERT(remaining < previousRemaining);
+        }
+    }
+
+    /// Move a selected resource's name to its ordinary state without naming constants or roots.
+    //
+    // One-recipe array selections store their state in the first payload. Other choices
+    // store it in the selector. Keeping those names makes loop state identifiable in IR dumps
+    // and preserves the existing same-array pass's correspondence with programmer variables.
+    void transferSelectedStateNames()
+    {
+        for (auto value : values)
+        {
+            if (value->isRoot)
+                continue;
+            auto nameHint = value->inst->findDecoration<IRNameHintDecoration>();
+            if (!nameHint)
+                continue;
+            auto replacement = value->selector;
+            if (value->recipes.getCount() == 1)
+            {
+                auto recipe = *value->recipes.begin();
+                const auto& payload = value->payloads.getValue(recipe);
+                if (payload.getCount())
+                    replacement = payload[0];
+            }
+            if (as<IRConstant>(replacement))
+                continue;
+            if (replacement->findDecoration<IRNameHintDecoration>())
+                continue;
+            nameHint->removeFromParent();
+            nameHint->insertAtStart(replacement);
+        }
+    }
+
+    /// Replace each resource parameter's argument slot with its selector and payload arguments.
+    //
+    // We rebuild complete branch argument lists from the saved parameter lists. That preserves
+    // ordinary arguments and structural loop operands while expanding each resource slot exactly
+    // once, even when two parameters received the same incoming resource value.
+    void rewriteBranchArguments()
+    {
+        for (auto& entry : originalParams)
+        {
+            List<IRBlock*> predecessors;
+            for (auto predecessor : entry.first->getPredecessors())
+                predecessors.add(predecessor);
+            for (auto predecessor : predecessors)
+            {
+                auto branch = cast<IRUnconditionalBranch>(predecessor->getTerminator());
+                IRBuilder builder(branch);
+                builder.setInsertBefore(branch);
+                List<IRInst*> arguments;
+                for (Index i = 0; i < entry.second.getCount(); i++)
+                {
+                    auto mapped = valueMap.tryGetValue(entry.second[i]);
+                    if (!mapped)
+                    {
+                        arguments.add(branch->getArg((UInt)i));
+                        continue;
+                    }
+                    auto destination = *mapped;
+                    auto incoming = valueMap.getValue(branch->getArg((UInt)i));
+                    if (destination->recipes.getCount() > 1)
+                        arguments.add(incoming->selector);
+                    for (auto recipe : destination->recipes)
+                        for (Index j = 0; j < recipes[recipe].payloadTypes.getCount(); j++)
+                            arguments.add(getPayloadOrDefault(builder, incoming, recipe, j));
+                }
+                List<IRInst*> operands;
+                auto fixedCount = branch->getOperandCount() - branch->getArgCount();
+                for (UInt i = 0; i < fixedCount; i++)
+                    operands.add(branch->getOperand(i));
+                operands.addRange(arguments);
+                auto replacement = builder.emitIntrinsicInst(
+                    branch->getFullType(),
+                    branch->getOp(),
+                    (UInt)operands.getCount(),
+                    operands.getBuffer());
+                replacement->sourceLoc = branch->sourceLoc;
+                branch->transferDecorationsTo(replacement);
+                branch->removeAndDeallocate();
+            }
+        }
+    }
+
+    /// Reconstruct a resource in a selected arm, consuming only that recipe's ordinary payload.
+    IRInst* materializeRecipe(
+        IRBuilder& builder,
+        Index recipeIndex,
+        const List<IRInst*>& payload,
+        Index& payloadIndex)
+    {
+        // Recipe discovery has finished, so recursive materialization cannot invalidate the key.
+        const auto& key = recipes[recipeIndex].key;
+        if (key.op == kIROp_Invalid)
+            return key.operands[0].getFixedValue();
+        List<IRInst*> operands;
+        for (const auto& operand : key.operands)
+        {
+            switch (operand.getFlavor())
+            {
+            case ResourceRecipeOperand::Flavor::Resource:
+                operands.add(
+                    materializeRecipe(builder, operand.getRecipe(), payload, payloadIndex));
+                break;
+            case ResourceRecipeOperand::Flavor::Payload:
+                operands.add(payload[payloadIndex++]);
+                break;
+            case ResourceRecipeOperand::Flavor::Fixed:
+                operands.add(operand.getFixedValue());
+                break;
+            }
+        }
+        if (key.op == kIROp_GetElement)
+        {
+            // Selecting between array indices can introduce nonuniform indexing even when
+            // each original index was constant. Unselected ordinary accesses keep their marker
+            // policy; visiting a shared array root does not add capabilities to every access.
+            if (selectedPayloads.contains(operands[1]))
+                operands[1] = builder.emitNonUniformResourceIndexInst(operands[1]);
+        }
+        return builder
+            .emitIntrinsicInst(key.type, key.op, (UInt)operands.getCount(), operands.getBuffer());
+    }
+
+    /// Return the recipe identified by one constant selector in a graph value's alternative set.
+    Index findRecipeForConstant(IRBuilder& builder, ResourceSelectionValue* value, IRInst* constant)
+    {
+        for (auto recipe : value->recipes)
+            if (getSelectorConstant(builder, recipe) == constant)
+                return recipe;
+        SLANG_UNEXPECTED("A resource selector must name one of its analyzed alternatives.");
+    }
+
+    /// Clone an operation with concrete resource arguments, dispatching each independent choice.
+    //
+    // Each recursive level handles one resource argument, not another path through the original
+    // selection graph. A repeated argument is registered only once. Multiple independently
+    // selected arguments can require a Cartesian product, but a selected combined pair remains
+    // one argument and therefore preserves its joint choice.
+    IRInst* emitConsumer(
+        IRBuilder& builder,
+        ResourceSelectionConsumer& consumer,
+        const List<ResourceSelectionValue*>& arguments,
+        Index argumentIndex,
+        IRCloneEnv& environment)
+    {
+        if (argumentIndex == arguments.getCount())
+            return cloneInst(&environment, &builder, consumer.inst);
+        auto value = arguments[argumentIndex];
+        if (value->recipes.getCount() == 1)
+        {
+            auto recipe = *value->recipes.begin();
+            Index payloadIndex = 0;
+            auto resource =
+                materializeRecipe(builder, recipe, value->payloads.getValue(recipe), payloadIndex);
+            environment.mapOldValToNew[value->inst] = resource;
+            return emitConsumer(builder, consumer, arguments, argumentIndex + 1, environment);
+        }
+
+        List<Index> alternatives;
+        IRInst* condition = nullptr;
+        // A constructed pair can have a larger abstract alternative set but only two reachable
+        // choices when both components used the same condition. Scalar-select construction has
+        // already removed the impossible combinations; we dispatch its two constant arms directly.
+        if (auto select = as<IRSelect>(value->selector))
+        {
+            if (as<IRConstant>(select->getTrueResult()))
+                if (as<IRConstant>(select->getFalseResult()))
+                {
+                    alternatives.add(
+                        findRecipeForConstant(builder, value, select->getTrueResult()));
+                    alternatives.add(
+                        findRecipeForConstant(builder, value, select->getFalseResult()));
+                    condition = select->getCondition();
+                }
+        }
+        if (alternatives.getCount() == 0)
+        {
+            for (auto recipe : value->recipes)
+                alternatives.add(recipe);
+            if (alternatives.getCount() == 2)
+                condition = emitSelectorEquals(
+                    builder,
+                    value->selector,
+                    getSelectorConstant(builder, alternatives[0]));
+        }
+
+        auto after = builder.createBlock();
+        func->addBlock(after);
+        List<IRBlock*> arms;
+        for (Index i = 0; i < alternatives.getCount(); i++)
+        {
+            auto arm = builder.createBlock();
+            func->addBlock(arm);
+            arms.add(arm);
+        }
+        if (condition)
+            builder.emitIfElse(condition, arms[0], arms[1], after);
+        else
+        {
+            List<IRInst*> cases;
+            for (Index i = 0; i + 1 < alternatives.getCount(); i++)
+            {
+                cases.add(getSelectorConstant(builder, alternatives[i]));
+                cases.add(arms[i]);
+            }
+            builder.emitSwitch(
+                value->selector,
+                after,
+                arms.getLast(),
+                (UInt)cases.getCount(),
+                cases.getBuffer());
+        }
+
+        auto resultType = consumer.inst->getDataType();
+        // Stores have no result type, while a void-returning call has `VoidType`. Both
+        // execute in their selected arm and reach the merge without a result argument.
+        bool hasResult = false;
+        if (resultType)
+            hasResult = resultType->getOp() != kIROp_VoidType;
+        for (Index i = 0; i < alternatives.getCount(); i++)
+        {
+            builder.setInsertInto(arms[i]);
+            auto recipe = alternatives[i];
+            Index payloadIndex = 0;
+            auto resource =
+                materializeRecipe(builder, recipe, value->payloads.getValue(recipe), payloadIndex);
+            IRCloneEnv armEnvironment;
+            armEnvironment.parent = &environment;
+            armEnvironment.mapOldValToNew[value->inst] = resource;
+            auto result =
+                emitConsumer(builder, consumer, arguments, argumentIndex + 1, armEnvironment);
+            if (hasResult)
+                builder.emitBranch(after, 1, &result);
+            else
+                builder.emitBranch(after);
+        }
+        builder.setInsertInto(after);
+        if (hasResult)
+            return builder.emitParam(resultType);
+        return nullptr;
+    }
+
+    /// Replace one terminal operation at its execution point and merge only its ordinary result.
+    void rewriteConsumer(ResourceSelectionConsumer& consumer)
+    {
+        bool requiresDispatch = false;
+        List<ResourceSelectionValue*> arguments;
+        for (auto argument : consumer.arguments)
+        {
+            arguments.add(argument);
+            if (argument->recipes.getCount() > 1)
+                requiresDispatch = true;
+        }
+        if (requiresDispatch)
+        {
+            // Introducing divergent execution can change implicit derivatives. We still perform
+            // resource legalization, including for implicit samples, and issue a targeted warning.
+            // Speculatively executing all arms would access unselected descriptors and cannot be
+            // used for writes. A future extension can compute gradients before dispatch for
+            // recognized sampling operations; bias, comparison, and LOD queries need their own
+            // semantic lowering. No purity annotation establishes derivative independence.
+            diagnoseResourceSelectionDispatch(codeGenContext, consumer.inst);
+        }
+        auto original = consumer.inst;
+        auto block = cast<IRBlock>(original->getParent());
+        IRBuilder builder(original);
+        IRBlock* temporaryContinuation = nullptr;
+        if (requiresDispatch)
+        {
+            // We split at the operation, after all ordinary argument calculations. The original
+            // continuation remains shared by all arms, so no unrelated work is duplicated.
+            auto continuation = builder.createBlock();
+            func->addBlock(continuation);
+            temporaryContinuation = continuation;
+            for (auto inst = original; inst;)
+            {
+                auto next = inst->getNextInst();
+                inst->insertAtEnd(continuation);
+                inst = next;
+            }
+            builder.setInsertInto(block);
+            IRCloneEnv environment;
+            auto replacement = emitConsumer(builder, consumer, arguments, 0, environment);
+            if (replacement)
+                original->replaceUsesWith(replacement);
+
+            // The final dispatch merge already dominates the continuation. We append the
+            // remaining instructions to that merge rather than adding an empty forwarding
+            // block and branch, so the simple case matches a hand-written conditional at -O0.
+            auto merge = builder.getBlock();
+            for (auto inst = original->getNextInst(); inst;)
+            {
+                auto next = inst->getNextInst();
+                inst->insertAtEnd(merge);
+                inst = next;
+            }
+        }
+        else
+        {
+            builder.setInsertBefore(original);
+            IRCloneEnv environment;
+            auto replacement = emitConsumer(builder, consumer, arguments, 0, environment);
+            if (replacement)
+                original->replaceUsesWith(replacement);
+        }
+        original->removeAndDeallocate();
+        if (temporaryContinuation)
+            temporaryContinuation->removeAndDeallocate();
+    }
+
+    /// Delete the replaced resource graph after every external use has been rewritten.
+    void removeResourceGraph()
+    {
+        // Selection cycles can still reference each other even after all executable consumers
+        // have been replaced. We unlink operands for the whole graph before deallocating any
+        // node, so deleting a loop parameter cannot leave a dangling use in another graph node.
+        for (auto value : values)
+        {
+            if (value->isRoot)
+                continue;
+            for (UInt i = 0; i < value->inst->getOperandCount(); i++)
+                value->inst->setOperand(i, nullptr);
+        }
+        for (auto value : values)
+            if (!value->isRoot)
+                value->inst->removeAndDeallocate();
+    }
+};
+} // namespace
+
+bool specializeResourceSelections(CodeGenContext* codeGenContext, IRModule* module)
+{
+    // Resource-array indexing and the emitted reconstruction operations obey Khronos rules.
+    // WGSL requires separate validation of its resource-array and uniformity restrictions.
+    if (!isKhronosTarget(codeGenContext->getTargetReq()))
+        return false;
+    bool changed = false;
+    for (auto global : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(global);
+        if (!func)
+            continue;
+        // Generic assembly replaces the emitted function implementation. Ordinary dispatch
+        // blocks inserted into such a function would not define the behavior of that assembly.
+        // Its selections remain intact for the existing specialization and diagnostic paths.
+        if (hasGenericAssemblyImplementation(func))
+            continue;
+        OrderedHashSet<IRInst*> candidates;
+        for (auto block : func->getBlocks())
+            for (auto inst : block->getChildren())
+                if (ResourceSelectionContext::isSelection(inst))
+                    candidates.add(inst);
+        while (candidates.getCount())
+        {
+            auto candidate = *candidates.begin();
+            candidates.remove(candidate);
+            ResourceSelectionContext context;
+            context.codeGenContext = codeGenContext;
+            context.func = func;
+            if (!context.tryRewrite(candidate))
+                continue;
+            // The component rewrite can remove several saved candidates. We erase their
+            // addresses before the next iteration; no later candidate dereferences deleted IR.
+            for (auto value : context.values)
+                candidates.remove(value->inst);
+            changed = true;
+        }
+    }
+    return changed;
+}
+} // namespace Slang
