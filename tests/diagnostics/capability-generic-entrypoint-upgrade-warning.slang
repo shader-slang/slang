@@ -5,11 +5,11 @@
 
 // Requirements first introduced by specialization must still warn, or error in restrictive mode.
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=WARN): -target hlsl -profile sm_6_0 -entry argumentMain -specialize Needs66 -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR): -target hlsl -profile sm_6_0 -entry argumentMain -specialize Needs66 -no-codegen -restrictive-capability-check
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR,exit-code=-1): -target hlsl -profile sm_6_0 -entry argumentMain -specialize Needs66 -no-codegen -restrictive-capability-check
 
 // A body upgrade and a further argument upgrade each need their own diagnostic.
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=ADDITIONAL): -target hlsl -profile sm_6_0 -entry bodyMain -specialize Needs67 -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR67): -target hlsl -profile sm_6_6 -entry bodyMain -specialize Needs67 -no-codegen -restrictive-capability-check
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR67,exit-code=-1): -target hlsl -profile sm_6_6 -entry bodyMain -specialize Needs67 -no-codegen -restrictive-capability-check
 
 // Match exactly one warning, including its profile upgrade, rather than only its presence.
 //WARN: warning[E41012]

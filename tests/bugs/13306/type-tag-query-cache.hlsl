@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -Gec -no-codegen -DDEEP_FIRST
-//TEST:SIMPLE(filecheck=CHECK): -Gec -no-codegen
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -Gec -no-codegen -DDEEP_FIRST
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -Gec -no-codegen
 
 // Semantic checking must recognize resource fields in either declaration order and reject
 // writes to the parameter's private struct value. The same resource-containing type occurs

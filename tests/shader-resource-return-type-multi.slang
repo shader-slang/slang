@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry testRWTexture
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -stage compute -entry testRWTexture
 
 // Test multiple resource types that should be rejected
 

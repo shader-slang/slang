@@ -14537,9 +14537,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
                 subContext->irBuilder->setInsertBefore(irFunc);
-                getBuilder()->addWaveSizeDecoration(
+                auto waveSizeDecor = getBuilder()->addWaveSizeDecoration(
                     irFunc,
                     getSimpleVal(subContext, lowerVal(subContext, waveSizeAttr->numLanes)));
+                waveSizeDecor->sourceLoc = waveSizeAttr->loc;
             }
             else if (auto nodeLaunchAttr = as<NodeLaunchAttribute>(modifier))
             {
@@ -15325,7 +15326,7 @@ static void lowerFrontEndEntryPointToIR(
 
     {
 
-        Name* entryPointName = entryPoint->getFuncDecl()->getName();
+        Name* entryPointName = entryPoint->getName();
         builder->addEntryPointDecoration(
             instToDecorate,
             entryPoint->getProfile(),

@@ -59,6 +59,17 @@ bool isUniformParameterType(Type* type);
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
+/// How `checkRedeclaration` reports two declarations of the same name that cannot coexist.
+enum class RedeclarationSeverity
+{
+    /// An error in every language version.
+    Error,
+    /// A warning in every language version. Earlier compiler releases did not diagnose these
+    /// conflicts, so we keep code that they accepted compiling; Slang 202c may make them errors
+    /// (shader-slang/slang#13956).
+    Warning,
+};
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -2589,7 +2600,8 @@ public:
     bool doesTypeSatisfyAssociatedTypeRequirement(
         Type* satisfyingType,
         DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
-        RefPtr<WitnessTable> witnessTable);
+        RefPtr<WitnessTable> witnessTable,
+        SourceLoc satisfyingDeclLoc);
 
     // Does the given `memberDecl` work as an implementation
     // to satisfy the requirement `requiredMemberDeclRef`
@@ -3120,9 +3132,10 @@ public:
     // of overload resolution.
     bool doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd);
 
-    Result checkRedeclaration(Decl* newDecl, Decl* oldDecl);
+    Result checkRedeclaration(Decl* newDecl, Decl* oldDecl, RedeclarationSeverity severity);
     Result checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* oldDecl);
-    void checkForRedeclaration(Decl* decl);
+    void checkForRedeclaration(Decl* decl, RedeclarationSeverity severity);
+    void checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl);
 
     Expr* checkPredicateExpr(Expr* expr);
 
@@ -4339,7 +4352,6 @@ public:
     SubtypeWitness* isFuncForwardDifferentiable(DeclRef<CallableDecl> declRef);
     SubtypeWitness* isFuncBackwardDifferentiable(DeclRef<CallableDecl> declRef);
 };
-
 
 inline void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)
 {
