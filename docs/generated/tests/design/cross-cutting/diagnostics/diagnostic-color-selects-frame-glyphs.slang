@@ -35,7 +35,9 @@ void main(uint3 tid : SV_DispatchThreadID)
 // ASCII-NOT: {{╭╼}}
 // ASCII-DAG: --> {{.*}}diagnostic-color-selects-frame-glyphs.slang
 // ASCII-DAG: {{\^\^\^\^}}
+// ASCII-DAG: [E30015]
 
 // UNICODE-NOT: -->
 // UNICODE-DAG: {{╭╼}}{{.*}}diagnostic-color-selects-frame-glyphs.slang
 // UNICODE-DAG: {{━━━━}}
+// UNICODE-DAG: [E30015]
