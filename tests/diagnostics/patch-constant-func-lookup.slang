@@ -3,8 +3,8 @@
 // function (shader-slang/slang#14053).
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry hullMain -stage hull
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=MISSPELLED):-target hlsl -entry hullMain -stage hull -DMISSPELLED
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=AMBIGUOUS):-target hlsl -entry hullMain -stage hull -DAMBIGUOUS
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=MISSPELLED,exit-code=-1):-target hlsl -entry hullMain -stage hull -DMISSPELLED
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=AMBIGUOUS,exit-code=-1):-target hlsl -entry hullMain -stage hull -DAMBIGUOUS
 
 // HLSL-NOT: error[
 // HLSL: patchconstantfunc("constants

@@ -8,9 +8,9 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -whole-program
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=VIA_GLSL):-target spirv-asm -emit-spirv-via-glsl -whole-program
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=VIA_GLSL,exit-code=-1):-target spirv-asm -emit-spirv-via-glsl -whole-program
 //TEST:SIMPLE(filecheck=LLVM):-target llvm-ir -whole-program
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=AMBIG):-target spirv -entry Main -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=AMBIG,exit-code=-1):-target spirv -entry Main -stage fragment
 
 // SPIRV-DAG: OpEntryPoint Vertex %{{.*}} "Main"
 // SPIRV-DAG: OpEntryPoint Fragment %{{.*}} "Main"
