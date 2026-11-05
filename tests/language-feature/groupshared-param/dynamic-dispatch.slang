@@ -40,10 +40,12 @@ void computeMain(uint i : SV_GroupIndex, uniform IFill filler)
     outputBuffer[i] = groupSharedData[(i + 1) % N];
 }
 
+// The dispatch function's cases may be emitted in either order.
 // HLSL: groupshared uint [[SHARED:[A-Za-z0-9_]+]][
 // HLSL-NOT: uint {{[A-Za-z0-9_]+}}[int(8)] = [[SHARED]]
-// HLSL: [[SHARED]][{{.*}}] = {{.*}} +
-// HLSL: [[SHARED]][{{.*}}] = {{.*}} *
+// HLSL-DAG: [[SHARED]][{{.*}}] = {{.*}} +
+// HLSL-DAG: [[SHARED]][{{.*}}] = {{.*}} *
+// HLSL-NOT: uint {{[A-Za-z0-9_]+}}[int(8)] = [[SHARED]]
 // SPIRV: OpEntryPoint
 // GLSL: void main()
 // MTL: void computeMain
