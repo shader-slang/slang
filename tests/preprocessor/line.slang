@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 // #line support
 // Foo* is not defined so expect diagnostics for each function
 

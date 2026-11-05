@@ -1,5 +1,6 @@
 #include "slang-metal-compiler.h"
 
+#include "core/slang-string-util.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-representation.h"
 #include "slang-artifact-util.h"
@@ -68,9 +69,37 @@ static SlangResult locateMetalCompiler(const String& path, DownstreamCompilerSet
 {
     ComPtr<IDownstreamCompiler> innerCppCompiler;
 
-    ExecutableLocation metalcLocation = ExecutableLocation(path, "metal");
-
     String metalSDKPath = path;
+
+#if SLANG_WINDOWS_FAMILY
+    if (metalSDKPath.getLength() == 0)
+    {
+        // Search PATH for metal.exe, as xcrun does on Apple platforms. The Metal Developer Tools
+        // locate their toolchain from the path they were started with. Started as the bare name
+        // `metal`, they fail with "cannot execute tool 'metal' due to missing Metal Toolchain",
+        // while the full path to `metal.exe` runs correctly. Setting metalSDKPath also lets
+        // `metal-objdump` be started from the same directory.
+        StringBuilder pathVariable;
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice::fromLiteral("PATH"),
+                pathVariable)))
+        {
+            List<UnownedStringSlice> directories;
+            StringUtil::split(pathVariable.getUnownedSlice(), ';', directories);
+            for (const auto& directory : directories)
+            {
+                if (directory.getLength() != 0 &&
+                    File::exists(Path::combine(String(directory), "metal.exe")))
+                {
+                    metalSDKPath = String(directory);
+                    break;
+                }
+            }
+        }
+    }
+#endif
+
+    ExecutableLocation metalcLocation = ExecutableLocation(metalSDKPath, "metal");
 
 #if SLANG_APPLE_FAMILY
     if (metalSDKPath.getLength() == 0)

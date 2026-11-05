@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 // #ifdef support
 
 int64_t GetValue();

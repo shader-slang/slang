@@ -3,7 +3,7 @@
 // declaration order); the compiler now errors (E39021) and points at
 // `[[vk::binding]]`. Non-exhaustive FileCheck on `-target spirv`.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry main
 
 struct Matrices
 {

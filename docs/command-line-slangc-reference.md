@@ -10,6 +10,17 @@ slangc -h
 # To generate this file
 slangc -help-style markdown -h
 ```
+
+```
+Exit codes:
+  0   Success.
+  1   The command line was invalid, or the tool failed to run.
+  -1  The compilation failed because of errors in the input.
+  -2  The compiler hit an unexpected failure: an internal compiler error, an
+      assertion, an exception or an abort. This is a bug in the compiler.
+Where the exit status has only 8 bits (for example on Linux and macOS), -1 is
+reported as 255 and -2 as 254.
+```
 ### Quick Links
 
 * [General](#general)
@@ -1551,6 +1562,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cpp_cuda_spirv_llvm` 
 * `cpp_cuda_metal_spirv` 
 * `cpp_cuda_metal_spirv_llvm` 
+* `cpp_cuda_metal_wgsl` 
 * `cuda_spirv` 
 * `cuda_metal_spirv` 
 * `cpp_cuda_glsl_spirv` 
@@ -1710,6 +1722,7 @@ A capability describes an optional feature that a target may or may not support.
 * `closesthit` 
 * `callable` 
 * `miss` 
+* `portable_raytracing_call_shader` 
 * `mesh` 
 * `task` 
 * `amplification` 
@@ -1720,6 +1733,8 @@ A capability describes an optional feature that a target may or may not support.
 * `anyhit_closesthit` 
 * `anyhit_intersection` 
 * `raygen_closesthit_miss` 
+* `portable_raytracing_trace` 
+* `portable_raytracing_instance_motion` 
 * `anyhit_closesthit_intersection` 
 * `anyhit_closesthit_intersection_miss` 
 * `raygen_closesthit_miss_callable` 

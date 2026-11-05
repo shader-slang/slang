@@ -1364,6 +1364,16 @@ void __wgsl_check_texture_type()
         , "WGSL: unhandled texture access type");
 }
 
+// WGSL's comparison sampling builtins (textureSampleCompare*, textureGatherCompare) take only
+// texture_depth_* textures, so the texture must be declared as a depth texture.
+[require(wgsl)]
+__generic<let isShadow:int>
+void __wgsl_check_compare_texture()
+{
+    static_assert(isShadow == 1,
+        "WGSL comparison sampling (SampleCmp, GatherCmp) needs a depth texture: declare the texture as DepthTexture2D, DepthTexture2DArray, DepthTextureCube or DepthTextureCubeArray");
+}
+
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 void __wgsl_check_texture_type_texel_offset()
 {
@@ -1371,6 +1381,16 @@ void __wgsl_check_texture_type_texel_offset()
 
      static_assert(Shape.flavor != $(SLANG_TEXTURE_2D) || Shape.flavor != $(SLANG_TEXTURE_3D)
          , "WGSL texture shape must be 2D or 3D when sampling with texel offsets");
+}
+
+// WGSL's sampling builtins (textureSample, textureSampleLevel, textureSampleGrad,
+// textureSampleBias) take only f32 textures; an integer texture is read with Load.
+[require(wgsl)]
+__generic<T:ITexelElement>
+void __wgsl_check_sample_texture()
+{
+    static_assert(T.Element is float,
+        "WGSL can only sample (Sample, SampleLevel, SampleGrad, SampleBias) a float texture: use Load to read an integer texture");
 }
 
 //@public:
@@ -3080,6 +3100,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3148,6 +3169,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<
                     T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3297,6 +3319,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3361,6 +3384,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -3445,6 +3469,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             };
         case wgsl:
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -3476,6 +3501,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpLevelZero";
         case wgsl:
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -3528,6 +3554,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             };
         case wgsl:
             __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -3588,6 +3615,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpLevelZero";
         case wgsl:
             __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+            __wgsl_check_compare_texture<isShadow>();
 
             if (isArray == 1)
             {
@@ -4025,6 +4053,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4090,6 +4119,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4318,6 +4348,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4383,6 +4414,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+                __wgsl_check_sample_texture<T>();
 
                 if (isArray == 1)
                 {
@@ -4759,6 +4791,7 @@ vector<T.Element,4> __texture_gatherCmp(
         };
     case wgsl:
         __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        __wgsl_check_compare_texture<isShadow>();
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
             , "WGSL texture gather is supported only on 2D and Cube textures");
 
@@ -4833,6 +4866,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
         };
     case wgsl:
         __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        __wgsl_check_compare_texture<isShadow>();
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
             , "WGSL texture gather with offset is supported only on 2D textures");
 
@@ -4957,9 +4991,20 @@ ${
         const char* componentArgString[] = { ", 0", ", 0", ", 1", ", 2", ", 3" };
         const char* componentFunc = componentFuncString[componentId];
         const char* componentArg = (isShadow ? "" : componentArgString[componentId]);
+
+        // The combined form has no sampler parameter, so its location is argument 1. CUDA keeps a
+        // combined texture-sampler as one texture object, so its `$0` goes to tex2Dgather as is.
+        const char* locationArg = isCombined ? "$1" : "$2";
+
+        // CUDA has no depth-compare gather: tex2Dgather takes no compare value and a
+        // SamplerComparisonState is a no-op placeholder there, so GatherCmp* is unavailable on
+        // CUDA, as SampleCmp* is. `isShadow` here selects the GatherCmp* overloads, not shadow
+        // textures. The `case cuda:` arms below are emitted only when `!isShadow`, because a
+        // `__target_switch` case that the `[require]` excludes is a capability error (E36101).
+        const char* gatherTargets = isShadow ? "glsl_hlsl_metal_spirv_wgsl" : "cuda_glsl_hlsl_metal_spirv_wgsl";
 $}
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require($(gatherTargets), texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -4971,10 +5016,12 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        ${ if (!isShadow) { $}
         case cuda:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($(locationArg)).x, ($(locationArg)).y$(componentArg))";
+        ${ } $}
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -5006,7 +5053,7 @@ $}
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require($(gatherTargets), texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -5019,11 +5066,14 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        ${ if (!isShadow) { $}
         case cuda:
-            // CUDA tex2Dgather doesn't support offset - ignore offset parameter
+            // tex2Dgather has no offset parameter, so CUDA ignores `offset` here. The Sample*
+            // offset overloads leave CUDA out of [require] instead.
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($(locationArg)).x, ($(locationArg)).y$(componentArg))";
+        ${ } $}
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -8068,7 +8118,7 @@ struct TriangleStream
 [require(cpp_hlsl)]
 void abort();
 
-/// The abs function returns the absolute value of x.
+/// The abs function returns the absolute value of x. For an unsigned x, the result is x.
 /// @param x The input value.
 /// @return The absolute value of x.
 /// @category math
@@ -8077,18 +8127,34 @@ __generic<T : __BuiltinIntegerType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T abs(T x)
 {
+    // `abs` of an unsigned value is the value itself, as in DXC and WGSL. The hlsl, metal and wgsl
+    // `abs` and the cpp/cuda prelude `U32_abs`/`U64_abs` already return it. The spirv and llvm
+    // cases lower to GLSL.std.450 `SAbs` and `llvm.abs`, which read their operand as signed, and
+    // GLSL has no unsigned `abs`, so the glsl, spirv and llvm cases return an unsigned `x` directly.
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
-    case glsl: __intrinsic_asm "abs";
+    case glsl:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
     case cuda: __intrinsic_asm "$P_abs($0)";
     case cpp: __intrinsic_asm "$P_abs($0)";
-    case spirv: return spirv_asm {
-        result:$$T = OpExtInst glsl450 SAbs $x
-    };
+    case spirv:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 SAbs $x
+            };
     case wgsl: __intrinsic_asm "abs";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
+    case llvm:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     //default:
     // Note: this simple definition may not be appropriate for floating-point inputs
     // return x < 0 ? -x : x;
@@ -8100,16 +8166,30 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> abs(vector<T, N> x)
 {
+    // The glsl, spirv and llvm cases handle an unsigned `x` as in the scalar `abs` above; the
+    // matrix `abs` relies on them for its rows.
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
-    case glsl: __intrinsic_asm "abs";
+    case glsl:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
-    case spirv: return spirv_asm {
-        result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
-    };
+    case spirv:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
+            };
     case wgsl: __intrinsic_asm "abs";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
+    case llvm:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
@@ -12743,10 +12823,14 @@ $}
 /// HLSL does not allow atomic operations on floating point types. For `InterlockedAdd`, consider using
 /// `RWByteAddressBuffer.InterlockedAddF32` or `RWByteAddressBuffer.InterlockedAddF16` instead when NVAPI is available.
 /// On SPIR-V (Vulkan), all integer and floating point types are supported.
-/// On Metal and WGSL, all floating-point types are not supported.
+/// On Metal, `InterlockedAdd` and `InterlockedExchange` are the only functions in this family that
+/// accept a floating-point `T`, and only a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
 /// On Metal, a 64-bit integer `T` is supported only by `InterlockedMin` and `InterlockedMax` on an
 /// unsigned type in device memory or a texture, when `original_value` is not used; any other
 /// 64-bit integer use reports error E55204.
+/// On WGSL, floating-point types are not supported.
 /// @category atomic Atomic functions
 [ForceInline]
 __glsl_version(430)
@@ -12787,8 +12871,10 @@ $}
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, all floating-point types are not supported. On Metal, 64-bit integer types
-/// are not supported either and report error E55204.
+/// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory. A 64-bit integer `T` is not supported on Metal and reports error E55204.
+/// On WGSL, floating-point types are not supported.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12810,7 +12896,9 @@ void InterlockedCompareExchange<T:IAtomicable>(__ref T dest, T compare_value, T 
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, this function is not available.
+/// On Metal, `dest` must be in device memory, such as a `RWStructuredBuffer` element or a device
+/// pointer, not a texture, a `RWBuffer` or `groupshared` memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12836,7 +12924,10 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, this function is not available.
+/// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12864,7 +12955,10 @@ void InterlockedCompareStore<T:IAtomicable>(__ref T dest,  T compare_value,  T v
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, this function is not available.
+/// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -15024,7 +15118,8 @@ T __copyObject<T>(T v)
 /// divergent, and ensure scalarization happens correctly for each divergent lane.
 __generic<T:__BuiltinArithmeticType>
 __intrinsic_op($(kIROp_NonUniformResourceIndex))
-[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
+[require(glsl_hlsl_spirv, nonuniformqualifier)]
+[require(cpp_cuda_metal_wgsl)]
 T NonUniformResourceIndex(T index);
 
 /// HLSL allows NonUniformResourceIndex around non int/uint types.
@@ -35688,6 +35783,22 @@ T workgroupUniformLoad<T>(__ref T v)
         __intrinsic_asm "workgroupUniformLoad(&($0))";
     default:
         return v;
+    }
+}
+
+/// Load a workgroup atomic as a workgroup-uniform value.
+/// @param v The workgroup (groupshared) atomic to load.
+/// @return The value of `v`, the same for every invocation of the workgroup.
+/// @remarks Maps to `workgroupUniformLoad` on an `atomic<T>` when targeting WGSL (a workgroup
+/// barrier, then the load); on other targets it is an atomic load.
+T workgroupUniformLoad<T : IAtomicable>(__ref Atomic<T> v)
+{
+    __target_switch
+    {
+    case wgsl:
+        __intrinsic_asm "workgroupUniformLoad(&($0))";
+    default:
+        return v.load();
     }
 }
 

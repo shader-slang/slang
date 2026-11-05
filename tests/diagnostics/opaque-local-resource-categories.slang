@@ -4,7 +4,7 @@
 // `opaque-local-resource-select.slang` test (which covers a single `Texture1D`
 // via `?:`).
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry main -stage fragment
 
 Texture2D<float> t0, t1;
 SamplerState s0, s1;
