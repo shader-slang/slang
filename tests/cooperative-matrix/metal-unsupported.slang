@@ -3,8 +3,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_LENGTH,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_GETLENGTH
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SCALAR_MUL,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_SCALAR_MUL
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_BAD_DIM,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_BAD_DIM
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_BAD_DIM,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_BAD_DIM -minimum-slang-optimization
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_BAD_TYPE,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_BAD_TYPE
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_BAD_TYPE,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_BAD_TYPE -minimum-slang-optimization
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SAT_ACCUM,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_SAT_ACCUM
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SAT_ACCUM,non-exhaustive): -target metal -stage compute -entry computeMain -DTEST_SAT_ACCUM -minimum-slang-optimization
 
 // Verify the compiler rejects unsupported CoopMat operations on Metal.
 // Metal's simdgroup_matrix only supports fill, Load, Store, and coopMatMulAdd.

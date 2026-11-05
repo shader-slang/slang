@@ -492,14 +492,63 @@ static void checkUnsupportedMetalTextureAtomic(IRImageSubscript* subscript, Diag
     }
 }
 
-// Diagnose the atomic operations in `module` that MSL cannot express. We visit only top-level
-// functions because those are the bodies that the Metal emitter emits: a generic that remains at
-// this point is not emitted, and its body can still hold pointers whose address space was never
-// specialized.
-static void checkUnsupportedMetalAtomics(IRModule* module, DiagnosticSink* sink)
+// Diagnose a cooperative matrix type that the Metal emitter cannot express. The emitter writes a
+// cooperative matrix as a `simdgroup_matrix`, which it supports only as an 8x8 matrix of `half` or
+// `float` with subgroup scope.
+static void checkUnsupportedMetalCoopMatrixType(IRCoopMatrixType* coopType, DiagnosticSink* sink)
+{
+    auto rows = getIntVal(coopType->getRowCount());
+    auto cols = getIntVal(coopType->getColumnCount());
+    if (rows != 8 || cols != 8)
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
+            .location = coopType->sourceLoc});
+    }
+    auto scope = getIntVal(coopType->getScope());
+    if (scope != (IRIntegerValue)MemoryScope::Subgroup)
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices (simdgroup_matrix) only support Subgroup scope",
+            .location = coopType->sourceLoc});
+    }
+    auto elementType = coopType->getElementType();
+    if (elementType->getOp() != kIROp_HalfType && elementType->getOp() != kIROp_FloatType)
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices only support half and float element types",
+            .location = coopType->sourceLoc});
+    }
+}
+
+// Diagnose a cooperative matrix multiply-add that requests saturating accumulation, which the
+// Metal emitter's `simdgroup_multiply_accumulate` cannot express.
+static void checkUnsupportedMetalCoopMatMulAdd(IRCoopMatMulAdd* mulAdd, DiagnosticSink* sink)
+{
+    auto saturatingLit = as<IRBoolLit>(mulAdd->getSaturatingAccumulation());
+    if (saturatingLit && saturatingLit->getValue())
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "saturating accumulation for Metal cooperative matrices (simdgroup_matrix)",
+            .location = mulAdd->sourceLoc});
+    }
+}
+
+// Diagnose the instructions in `module` that the Metal emitter cannot express: unsupported atomic
+// operations, cooperative matrix types, and saturating cooperative matrix multiply-adds. We visit
+// only top-level functions because those are the bodies that the Metal emitter emits: a generic
+// that remains at this point is not emitted, and its body can still hold pointers whose address
+// space was never specialized. Cooperative matrix types are hoisted, deduplicated global
+// instructions, so each one is checked once.
+static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
+        if (auto coopType = as<IRCoopMatrixType>(globalInst))
+        {
+            checkUnsupportedMetalCoopMatrixType(coopType, sink);
+            continue;
+        }
         auto func = as<IRFunc>(globalInst);
         if (!func)
             continue;
@@ -507,6 +556,11 @@ static void checkUnsupportedMetalAtomics(IRModule* module, DiagnosticSink* sink)
         {
             for (auto inst : block->getChildren())
             {
+                if (auto mulAdd = as<IRCoopMatMulAdd>(inst))
+                {
+                    checkUnsupportedMetalCoopMatMulAdd(mulAdd, sink);
+                    continue;
+                }
                 auto atomic = as<IRAtomicOperation>(inst);
                 if (!atomic)
                     continue;
@@ -530,7 +584,7 @@ void checkUnsupportedInst(
     DiagnosticSink* sink)
 {
     if (isMetalTarget(target))
-        checkUnsupportedMetalAtomics(module, sink);
+        checkUnsupportedMetalInsts(module, sink);
     if (checkSet == UnsupportedInstCheckSet::EmitterContract)
         return;
 
