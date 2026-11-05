@@ -947,15 +947,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         name = "gl_BaryCoordEXT";
 
-        // Search for nointerpolation keyword to use no-perspective variant of BaryCoord
         for (auto paramInfo = outerParamInfo; paramInfo; paramInfo = paramInfo->next)
         {
             auto outerParam = paramInfo->outerParam;
             auto decorParent = outerParam;
             if (auto field = as<IRStructField>(decorParent))
                 decorParent = field->getKey();
-            auto interpolation = decorParent->findDecoration<IRInterpolationModeDecoration>();
-            if (!interpolation || interpolation->getMode() != IRInterpolationMode::NoPerspective)
+            if (!hasInterpolationMode(decorParent, IRInterpolationMode::NoPerspective))
                 continue;
             name = "gl_BaryCoordNoPerspEXT";
             break;
