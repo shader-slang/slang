@@ -1856,8 +1856,9 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             {
                 // Lower every vector/matrix negation and unsigned scalar negation uniformly to
                 // "(type(0) - op0)". (WGSL has a native unary '-' only for signed float/int
-                // scalars and vectors; matrices and unsigned types have none, and the subtraction
-                // matches '-x' for the signed cases and gives unsigned wrap-around for unsigned.)
+                // scalars and vectors; matrices and unsigned types have none. For unsigned
+                // scalars, this produces valid WGSL with standard two's complement wrap-around;
+                // note that float vectors lose signed-zero distinction under this lowering.)
                 // The explicit parentheses wrap the whole subtraction, so its outer context is
                 // effectively lowest-precedence: pass EmitOp::General (not the incoming outerPrec)
                 // and emit op0 as the subtraction's right-hand side. This wraps an operand that
