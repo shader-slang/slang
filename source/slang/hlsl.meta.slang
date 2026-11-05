@@ -17584,10 +17584,9 @@ WaveMask WaveMaskMatch(WaveMask mask, T value)
     case cuda: __intrinsic_asm "_waveMatchScalar($0, $1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
     case spirv:
+        __spirvSubgroupPartitionedPreamble();
         return (spirv_asm
         {
-            OpCapability GroupNonUniformPartitionedNV;
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
             OpGroupNonUniformPartitionNV $$uint4 result $value
         }).x;
     }
@@ -17605,10 +17604,9 @@ WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value)
     case cuda: __intrinsic_asm "_waveMatchMultiple($0, $1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
     case spirv:
+        __spirvSubgroupPartitionedPreamble();
         return (spirv_asm
         {
-            OpCapability GroupNonUniformPartitionedNV;
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
             OpGroupNonUniformPartitionNV $$uint4 result $value
         }).x;
     }
@@ -19596,10 +19594,9 @@ uint4 WaveMatch(T value)
     case hlsl: __intrinsic_asm "WaveMatch";
     case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
     case spirv:
+        __spirvSubgroupPartitionedPreamble();
         return spirv_asm
         {
-            OpCapability GroupNonUniformPartitionedNV;
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
             OpGroupNonUniformPartitionNV $$uint4 result $value
         };
     default:
@@ -19616,10 +19613,9 @@ uint4 WaveMatch(vector<T,N> value)
     case hlsl: __intrinsic_asm "WaveMatch";
     case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
     case spirv:
+        __spirvSubgroupPartitionedPreamble();
         return spirv_asm
         {
-            OpCapability GroupNonUniformPartitionedNV;
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
             OpGroupNonUniformPartitionNV $$uint4 result $value
         };
     default:
@@ -19844,6 +19840,34 @@ vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint 
 // are emulated by performing an additional operation to the inclusive scan result. Reductions are not supported.
 //
 
+// Declares the SPIR-V extension and capability of the partitioned subgroup operations: EXT when
+// the target requests spvGroupNonUniformPartitionedEXT, NV otherwise (the NV and EXT enumerants
+// are aliases, see that atom in slang-capabilities.capdef). A target with the EXT atom matches
+// both cases, and `__target_switch` takes the most specific one, so exactly one block is emitted.
+// Every SPIR-V partitioned operation declares its extension through this helper, directly or via
+// `__shaderSubgroupPartitionedPreamble`, because an `OpExtension` in its own `spirv_asm` would
+// declare NV even when the target requested EXT.
+[ForceInline]
+[require(spirv)]
+void __spirvSubgroupPartitionedPreamble()
+{
+    __target_switch
+    {
+    case spvGroupNonUniformPartitionedEXT:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_subgroup_partitioned";
+            OpCapability GroupNonUniformPartitionedEXT;
+        };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpCapability GroupNonUniformPartitionedNV;
+        };
+    }
+}
+
 __generic<T : __BuiltinType>
 [ForceInline]
 void __shaderSubgroupPartitionedPreamble()
@@ -19854,11 +19878,7 @@ void __shaderSubgroupPartitionedPreamble()
     case glsl:
         __requireTargetExtension("GL_NV_shader_subgroup_partitioned");
     case spirv:
-        spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-        };
+        __spirvSubgroupPartitionedPreamble();
     default:
         return;
     }
