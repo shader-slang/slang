@@ -373,6 +373,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility:
         case CompilerOptionName::TrackLiveness:
         case CompilerOptionName::LoopInversion:
+        case CompilerOptionName::InlineSingleCallFunctions:
         case CompilerOptionName::AllowGLSL:
             if (option.value.getCount() && option.value[0].intValue != 0)
                 sb << " " << name;
