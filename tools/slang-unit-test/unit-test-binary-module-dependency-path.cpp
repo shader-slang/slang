@@ -276,12 +276,27 @@ SLANG_UNIT_TEST(binaryModuleDependencyResolvesRelativeToModuleSource)
         SLANG_CHECK_ABORT(base != nullptr);
         SLANG_CHECK(UnownedStringSlice(base->getFilePath()).endsWith(".slang"));
     }
+
+    // Nor does the copy stand in for the real helper once that is deleted: with the original
+    // contents restored the binary is up to date, and without the file it is stale.
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeFile(prodHelper, helperSource)));
+    {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(createSession(globalSession, root.path, session)));
+        SLANG_CHECK(session->isBinaryModuleUpToDate(cachedBaseModule.getBuffer(), baseModuleBlob));
+    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::remove(prodHelper)));
+    {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(createSession(globalSession, root.path, session)));
+        SLANG_CHECK(!session->isBinaryModuleUpToDate(cachedBaseModule.getBuffer(), baseModuleBlob));
+    }
 }
 
 // A module that is not under any search directory records its own source file relative to the
 // working directory, and the up-to-date check finds it there, so an edit to one of its includes
 // makes the cached binary stale rather than letting it pass as a standalone module. Loading the
-// module again by the same path finds that source file the same way.
+// binary finds that source file the same way, so the module depends on its source and include.
 SLANG_UNIT_TEST(binaryModuleSourceOutsideSearchPathsIsChecked)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
@@ -316,6 +331,25 @@ SLANG_UNIT_TEST(binaryModuleSourceOutsideSearchPathsIsChecked)
         ComPtr<slang::ISession> session;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(createSession(globalSession, root.path, session)));
         SLANG_CHECK(session->isBinaryModuleUpToDate(cachedModule.getBuffer(), moduleBlob));
+    }
+
+    // `loadModule` with the source path prefers a `.slang-module` beside it. The recorded source
+    // path is relative to the working directory, so only the working-directory step finds it.
+    const String binaryBesideSource = Path::combine(root.path, "src/foo.slang-module");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllBytes(
+        binaryBesideSource,
+        moduleBlob->getBufferPointer(),
+        moduleBlob->getBufferSize())));
+    {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(createSession(globalSession, root.path, session)));
+        ComPtr<slang::IBlob> diagnostics;
+        ComPtr<slang::IModule> module(
+            session->loadModule(moduleSource.getBuffer(), diagnostics.writeRef()));
+        SLANG_CHECK_ABORT(module != nullptr);
+        SLANG_CHECK_ABORT(UnownedStringSlice(module->getFilePath()).endsWith(".slang-module"));
+        SLANG_CHECK(dependsOnFile(module, moduleSource));
+        SLANG_CHECK(dependsOnFile(module, include));
     }
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeFile(include, "static const int K = 8;\n")));

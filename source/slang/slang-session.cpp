@@ -2150,16 +2150,22 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
 //
 // The recorded paths are the ones `encodeModuleDependencyPaths` writes. The first is the module's
 // own source file, relative to the first search directory that contains it, or else to the working
-// directory, so we look it up the way an `#include` from `binaryModulePath` would be found and then
-// in the working directory. Every later path is relative to the directory of that source file, so
-// once the source file is found we resolve the later paths against that directory alone.
-// Searching the include directories for them would accept any file with the same relative
-// spelling under another search root, and the module would then be checked against, and depend
-// on, a file it was not compiled from.
+// directory. The recorded path does not say which of these it is relative to, so we look it up the
+// way an `#include` from `binaryModulePath` would be found and then in the working directory, and
+// take the first match. A file at the same relative path under an earlier base is therefore taken
+// as the module's source: a module distributed without its sources is checked against, and depends
+// on, a `pkg/base.slang` that happens to exist under the working directory.
 //
-// When the module's own source file can't be found, as for a precompiled module distributed
-// without its sources, there is no directory to resolve against, so we look up the later paths the
-// same way as the first.
+// Every later path is relative to the directory of that source file, so once the source file is
+// found we resolve the later paths against that directory alone. Searching the include directories
+// for them would accept any file with the same relative spelling under another search root, and
+// the module would then be checked against, and depend on, a file it was not compiled from.
+//
+// When the module's own source file can't be found, there is no directory to resolve against, and
+// we look up the later paths the way an `#include` from `binaryModulePath` would be found, without
+// the working-directory step. That lookup can match a namesake under another search root, but only
+// `loadSerializedModuleContents` uses its results: `isBinaryModuleUpToDate` accepts such a module
+// without looking at its later dependencies.
 void Linkage::loadSerializedModuleFileDependencies(
     String const& binaryModulePath,
     ModuleChunk const* moduleChunk,
