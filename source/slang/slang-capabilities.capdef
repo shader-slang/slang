@@ -337,6 +337,11 @@ alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv;
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_spirv_llvm = cpp | cuda | glsl | hlsl | spirv | llvm;
 
+/// Targets that support the 64-bit floating-point type `double`, the same set as
+/// `cpp_cuda_glsl_hlsl_spirv_llvm`. WGSL and Metal have no such type and no extension that adds one.
+/// [Compound]
+alias fp64 = cpp | cuda | glsl | hlsl | spirv | llvm;
+
 /// CPP, CUDA, GLSL, HLSL, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_spirv_wgsl = cpp | cuda | glsl | hlsl | spirv | wgsl;

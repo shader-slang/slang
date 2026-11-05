@@ -1242,6 +1242,10 @@ Compound Capabilities
 `domain_hull`
 > Collection of shader stages
 
+`fp64`
+> Targets that support the 64-bit floating-point type `double`, the same set as
+> `cpp_cuda_glsl_hlsl_spirv_llvm`. WGSL and Metal have no such type and no extension that adds one.
+
 `fragmentprocessing`
 > Capabilities required to use fragment derivative operations (without GLSL derivativecontrol)
 
