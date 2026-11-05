@@ -12,7 +12,7 @@
 // reject the optimization in that case so that storing the call result
 // into a `no_diff` slot is diagnosed.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry main
 
 // CHECK: error[E41031]
 // CHECK: derivative is lost

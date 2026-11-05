@@ -4991,9 +4991,20 @@ ${
         const char* componentArgString[] = { ", 0", ", 0", ", 1", ", 2", ", 3" };
         const char* componentFunc = componentFuncString[componentId];
         const char* componentArg = (isShadow ? "" : componentArgString[componentId]);
+
+        // The combined form has no sampler parameter, so its location is argument 1. CUDA keeps a
+        // combined texture-sampler as one texture object, so its `$0` goes to tex2Dgather as is.
+        const char* locationArg = isCombined ? "$1" : "$2";
+
+        // CUDA has no depth-compare gather: tex2Dgather takes no compare value and a
+        // SamplerComparisonState is a no-op placeholder there, so GatherCmp* is unavailable on
+        // CUDA, as SampleCmp* is. `isShadow` here selects the GatherCmp* overloads, not shadow
+        // textures. The `case cuda:` arms below are emitted only when `!isShadow`, because a
+        // `__target_switch` case that the `[require]` excludes is a capability error (E36101).
+        const char* gatherTargets = isShadow ? "glsl_hlsl_metal_spirv_wgsl" : "cuda_glsl_hlsl_metal_spirv_wgsl";
 $}
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require($(gatherTargets), texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -5005,10 +5016,12 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        ${ if (!isShadow) { $}
         case cuda:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($(locationArg)).x, ($(locationArg)).y$(componentArg))";
+        ${ } $}
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -5040,7 +5053,7 @@ $}
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require($(gatherTargets), texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -5053,11 +5066,14 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        ${ if (!isShadow) { $}
         case cuda:
-            // CUDA tex2Dgather doesn't support offset - ignore offset parameter
+            // tex2Dgather has no offset parameter, so CUDA ignores `offset` here. The Sample*
+            // offset overloads leave CUDA out of [require] instead.
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($(locationArg)).x, ($(locationArg)).y$(componentArg))";
+        ${ } $}
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -8102,7 +8118,7 @@ struct TriangleStream
 [require(cpp_hlsl)]
 void abort();
 
-/// The abs function returns the absolute value of x.
+/// The abs function returns the absolute value of x. For an unsigned x, the result is x.
 /// @param x The input value.
 /// @return The absolute value of x.
 /// @category math
@@ -8111,18 +8127,34 @@ __generic<T : __BuiltinIntegerType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T abs(T x)
 {
+    // `abs` of an unsigned value is the value itself, as in DXC and WGSL. The hlsl, metal and wgsl
+    // `abs` and the cpp/cuda prelude `U32_abs`/`U64_abs` already return it. The spirv and llvm
+    // cases lower to GLSL.std.450 `SAbs` and `llvm.abs`, which read their operand as signed, and
+    // GLSL has no unsigned `abs`, so the glsl, spirv and llvm cases return an unsigned `x` directly.
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
-    case glsl: __intrinsic_asm "abs";
+    case glsl:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
     case cuda: __intrinsic_asm "$P_abs($0)";
     case cpp: __intrinsic_asm "$P_abs($0)";
-    case spirv: return spirv_asm {
-        result:$$T = OpExtInst glsl450 SAbs $x
-    };
+    case spirv:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 SAbs $x
+            };
     case wgsl: __intrinsic_asm "abs";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
+    case llvm:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     //default:
     // Note: this simple definition may not be appropriate for floating-point inputs
     // return x < 0 ? -x : x;
@@ -8134,16 +8166,30 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> abs(vector<T, N> x)
 {
+    // The glsl, spirv and llvm cases handle an unsigned `x` as in the scalar `abs` above; the
+    // matrix `abs` relies on them for its rows.
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
-    case glsl: __intrinsic_asm "abs";
+    case glsl:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
-    case spirv: return spirv_asm {
-        result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
-    };
+    case spirv:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
+            };
     case wgsl: __intrinsic_asm "abs";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
+    case llvm:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
@@ -15054,7 +15100,8 @@ T __copyObject<T>(T v)
 /// divergent, and ensure scalarization happens correctly for each divergent lane.
 __generic<T:__BuiltinArithmeticType>
 __intrinsic_op($(kIROp_NonUniformResourceIndex))
-[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
+[require(glsl_hlsl_spirv, nonuniformqualifier)]
+[require(cpp_cuda_metal_wgsl)]
 T NonUniformResourceIndex(T index);
 
 /// HLSL allows NonUniformResourceIndex around non int/uint types.

@@ -2250,8 +2250,8 @@ public:
     // module the nodes whose classes come after that class in `ASTNodeType` order would be
     // decoded as different classes. Such a change therefore raises the minimum supported version
     // along with the writer version.
-    const static UInt k_minSupportedModuleVersion = 38;
-    const static UInt k_maxSupportedModuleVersion = 38;
+    const static UInt k_minSupportedModuleVersion = 39;
+    const static UInt k_maxSupportedModuleVersion = 39;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.
