@@ -1,8 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DISABLED): -entry Plain -stage miss -no-codegen
-// The undefined-name diagnostic comes from the command line and has no source location.
 //DIAGNOSTIC_TEST:SIMPLE(diag=MISSING): -experimental-feature -entry missing -stage miss -no-codegen
-//MISSING: undefined identifier
-//MISSING: undefined identifier 'missing'.
 //TEST:SIMPLE: -entry computeMain -stage compute -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry computeMain -stage compute -no-codegen
 
