@@ -2,6 +2,7 @@
 // Regression test for https://github.com/shader-slang/slang/issues/14060.
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain -minimum-slang-optimization
 //TEST:SIMPLE(filecheck=LIB): -target metallib -stage compute -entry computeMain
 
 struct Args

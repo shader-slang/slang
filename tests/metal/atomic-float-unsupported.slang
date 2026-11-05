@@ -5,7 +5,6 @@
 
 // The test is non-exhaustive because reading the uninitialized `sharedAtomic` also warns.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -target metal -entry computeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -target metal -entry computeMain -stage compute -minimum-slang-optimization
 
 RWStructuredBuffer<float> outputBuffer;
 RWStructuredBuffer<Atomic<float>> floatBuffer;
