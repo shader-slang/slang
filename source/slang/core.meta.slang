@@ -1184,6 +1184,14 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 {
 $}
 
+${
+    if (kBaseTypes[tt].tag == BaseType::Double)
+    {
+$}
+[require(fp64)]
+${
+    }
+$}
 __builtin_type($(int(kBaseTypes[tt].tag)))
 struct $(kBaseTypes[tt].name)
     : __BuiltinType
@@ -1379,8 +1387,11 @@ $}
          __intrinsic_op($(kIROp_Neg))  [Differentiable] This neg();
          __intrinsic_op($(kIROp_FloatCast)) [Differentiable] float toFloat();
          [__unsafeForceInlineEarly] [Differentiable] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
-         [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
-         [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
+${
+    const char* minMaxRequire = kBaseTypes[tt].tag == BaseType::Double ? "[require(fp64, sm_4_0_version)]" : "";
+$}
+         $(minMaxRequire) [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+         $(minMaxRequire) [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
         typedef $(kBaseTypes[tt].name) Differential;
 
         [__unsafeForceInlineEarly]
