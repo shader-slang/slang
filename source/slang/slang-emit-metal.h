@@ -124,8 +124,6 @@ protected:
     void emitAtomicImageCoord(IRImageSubscript* subscript);
     void emitAtomicDestOperand(IRInst* operand);
     void emitAtomicSrcOperand(bool isImage, IRInst* operand);
-    bool is64BitIntegerAtomic(IRInst* inst);
-    const char* getUnsupported64BitAtomicReason(IRInst* inst);
     void emitAtomicSemanticOperand(IRInst* inst);
 
     static const char* kMetalBuiltinPreludeMatrixCompMult;

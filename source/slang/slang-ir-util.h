@@ -481,6 +481,11 @@ IRImageSubscript* getAtomicImageSubscript(IRAtomicOperation* atomic);
 /// the image, or nullptr when the image is not a resource.
 IRResourceTypeBase* getImageSubscriptResourceType(IRImageSubscript* subscript);
 
+/// Return true if the atomic operation `atomic` reads or writes a 64-bit integer value, such as
+/// `InterlockedAdd` on a `uint64_t` or any method of `Atomic<int64_t>`. `target` determines the
+/// width of `intptr_t` and `uintptr_t`.
+bool is64BitIntegerAtomic(IRAtomicOperation* atomic, TargetRequest* target);
+
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
 bool canAddressesPotentiallyAlias(

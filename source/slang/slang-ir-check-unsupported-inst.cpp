@@ -466,6 +466,40 @@ static const char* getUnsupportedMetalFloatAtomicReason(IRAtomicOperation* atomi
     }
 }
 
+const char* getUnsupportedMetal64BitAtomicReason(IRAtomicOperation* atomic)
+{
+    if (atomic->getOp() != kIROp_AtomicMin && atomic->getOp() != kIROp_AtomicMax)
+        return "64-bit integer atomic other than min or max";
+    if (getIntTypeSigned(atomic->getDataType()))
+        return "64-bit signed integer atomic min or max";
+    // "Used" means a non-debug user of the result in the IR at the end of `linkAndOptimizeIR`,
+    // which is also the IR the emitter receives, so the answer depends on earlier dead-code
+    // removal: `-minimum-slang-optimization` keeps the never-read `original` local of
+    // `InterlockedMin(dest, value, original)`. Debug-info users do not count, because the Metal
+    // emitter skips debug instructions and so never names the result for them.
+    for (auto use = atomic->firstUse; use; use = use->nextUse)
+    {
+        if (!isDebugInfoInst(use->getUser()))
+            return "64-bit integer atomic min or max whose original value is used";
+    }
+    // Texture atomics take no memory order and are not limited to an address space.
+    if (getAtomicImageSubscript(atomic))
+        return nullptr;
+    auto destPtrType = cast<IRPtrTypeBase>(atomic->getPtr()->getDataType());
+    switch (destPtrType->getAddressSpace())
+    {
+    case AddressSpace::Global:
+    case AddressSpace::UserPointer:
+        break;
+    default:
+        return "64-bit integer atomic min or max outside device memory";
+    }
+    auto memoryOrder = (IRMemoryOrder)getIntVal(atomic->getOperand(atomic->getOperandCount() - 1));
+    if (memoryOrder != kIRMemoryOrder_Relaxed)
+        return "64-bit integer atomic min or max with a memory order other than relaxed";
+    return nullptr;
+}
+
 // Diagnose an atomic operation on the texture element `subscript` that MSL cannot express. The
 // MSL texture atomic members operate on one scalar texel, so a texture with a vector element type
 // has none. An array texture takes its array index from the last component of the coordinate, so
@@ -540,7 +574,10 @@ static void checkUnsupportedMetalCoopMatMulAdd(IRCoopMatMulAdd* mulAdd, Diagnost
 // that remains at this point is not emitted, and its body can still hold pointers whose address
 // space was never specialized. Cooperative matrix types are hoisted, deduplicated global
 // instructions, so each one is checked once.
-static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
+static void checkUnsupportedMetalInsts(
+    IRModule* module,
+    TargetRequest* target,
+    DiagnosticSink* sink)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -570,6 +607,15 @@ static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
                         .operation = reason,
                         .location = atomic->sourceLoc});
                 }
+                if (is64BitIntegerAtomic(atomic, target))
+                {
+                    if (auto reason = getUnsupportedMetal64BitAtomicReason(atomic))
+                    {
+                        sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                            .operation = reason,
+                            .location = atomic->sourceLoc});
+                    }
+                }
                 if (auto subscript = getAtomicImageSubscript(atomic))
                     checkUnsupportedMetalTextureAtomic(subscript, sink);
             }
@@ -580,7 +626,7 @@ static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     if (isMetalTarget(target))
-        checkUnsupportedMetalInsts(module, sink);
+        checkUnsupportedMetalInsts(module, target, sink);
 
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
     // the host C++ emitter does.
