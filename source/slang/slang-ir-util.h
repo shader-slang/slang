@@ -286,6 +286,15 @@ bool hasGenericAssemblyImplementation(IRFunc* func);
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 
+/// Return the texture or sampler element of a sized, one-dimensional array that Metal can bind
+/// directly as an entry-point argument. Descriptor-handle elements have their resource's layout.
+/// Nested/unsized arrays and buffer arrays require an argument-buffer representation instead.
+IRType* getMetalResourceArrayElementType(IRType* type);
+
+/// Return whether an entry-point parameter names the physical storage of a by-value Metal
+/// resource array. A helper may also borrow this storage, but receives an ordinary pointer.
+bool isMetalByValueResourceArrayParam(IRInst* inst);
+
 /// Test for opaque values or invalid recursion in the by-value storage of `type`.
 ///
 /// Examines struct fields, array elements, and tuple elements. On a match, assigns the
