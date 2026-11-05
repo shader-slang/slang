@@ -14658,6 +14658,66 @@ matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
     }
 }
 
+/// Split into an `int` whole part and a floating-point fractional part.
+///
+/// Nonzero fractional parts have the same sign as `x`.
+/// The whole part must be representable as `int`.
+/// @param x The input value.
+/// @param[out] ip The whole part of `x`, truncated toward zero.
+/// @return The fractional part of `x`.
+/// @category math
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T modf(T x, out int ip)
+{
+    // We split in the input type before converting the whole part, so the fractional part
+    // follows the floating-point `modf` semantics on each target, including for negative inputs.
+    T wholePart;
+    T fractionalPart = modf(x, wholePart);
+    ip = __builtin_cast<int>(wholePart);
+    return fractionalPart;
+}
+
+/// Split each component into an `int` whole part and a floating-point fractional part.
+///
+/// Each whole part must be representable as `int`.
+/// @param x The input vector.
+/// @param[out] ip The whole parts of `x`, truncated toward zero.
+/// @return The fractional parts of `x`.
+/// @category math
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T,N> modf(vector<T,N> x, out vector<int,N> ip)
+{
+    vector<T,N> wholePart;
+    vector<T,N> fractionalPart = modf(x, wholePart);
+    ip = __builtin_cast<vector<int,N>>(wholePart);
+    return fractionalPart;
+}
+
+/// Split each element into an `int` whole part and a floating-point fractional part.
+///
+/// Each whole part must be representable as `int`.
+/// @param x The input matrix.
+/// @param[out] ip The whole parts of `x`, truncated toward zero.
+/// @return The fractional parts of `x`.
+/// @category math
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<int,N,M,L> ip)
+{
+    matrix<T,N,M,L> wholePart;
+    matrix<T,N,M> fractionalPart = modf(x, wholePart);
+    ip = __builtin_cast<matrix<int,N,M,L>>(wholePart);
+    return fractionalPart;
+}
+
 /// Masked sum of absolute differences of byte alignments.
 /// This function computes the absolute differences of the byte alignments of the reference and source values, and adds them to the accumulated differences.
 /// @param reference The reference 4 bytes packed in a uint.
