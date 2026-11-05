@@ -1,16 +1,15 @@
 //TEST:SIMPLE_EX(filecheck=CHECK): -lang hlsl tests/language-feature/hlsl-default-this-param-mode.slang -target spirv-asm -stage compute -entry computeMain -dump-ir -O0 -o -
 
-// Methods written in HLSL use `inout` for `this` by default. Each explicit receiver-mode spelling
+// Methods written in HLSL use `in` for `this` by default. Each explicit receiver-mode spelling
 // below selects its corresponding mode, and trailing `const` requests a nonmutating receiver.
-// `replaceWithDefault` also checks lookup of a mutating member in a default argument.
+// `replaceWithDefault` also checks member lookup in a default argument.
 
 struct Counter
 {
     int value;
 
-    int defaultMutating()
+    int defaultNonmutating()
     {
-        value++;
         return value;
     }
 
@@ -43,27 +42,28 @@ struct Counter
         value++;
     }
 
-    void replaceWithDefault(int replacement = defaultMutating())
+    [mutating]
+    void replaceWithDefault(int replacement = defaultNonmutating())
     {
         value = replacement;
     }
 };
 
-// A default HLSL requirement has the same mutating receiver as an explicitly mutating
+// A default HLSL requirement has the same nonmutating receiver as an explicitly nonmutating
 // implementation.
-interface IMutatingReceiver
+interface INonmutatingReceiver
 {
-    void mutate();
+    int read();
 };
 
-struct MutatingReceiverImplementation : IMutatingReceiver
+struct NonmutatingReceiverImplementation : INonmutatingReceiver
 {
     int value;
 
-    [mutating]
-    void mutate()
+    [nonmutating]
+    int read()
     {
-        value++;
+        return value;
     }
 };
 
@@ -71,7 +71,7 @@ struct MutatingReceiverImplementation : IMutatingReceiver
 void computeMain()
 {
     Counter counter = {0};
-    int result = counter.defaultMutating();
+    int result = counter.defaultNonmutating();
     counter.explicitMutating();
     result += counter.explicitNonmutating();
     result += counter.trailingConst();
@@ -79,12 +79,12 @@ void computeMain()
     counter.explicitReference();
     counter.replaceWithDefault(result);
 
-    MutatingReceiverImplementation implementation = {result};
-    implementation.mutate();
+    NonmutatingReceiverImplementation implementation = {result};
+    result += implementation.read();
 }
 
-// CHECK-LABEL: [nameHint("Counter.defaultMutating")]
-// CHECK-NEXT: func {{.*}} : Func(Int, BorrowInOutParam(%Counter))
+// CHECK-LABEL: [nameHint("Counter.defaultNonmutating")]
+// CHECK-NEXT: func {{.*}} : Func(Int, %Counter)
 // CHECK-LABEL: [nameHint("Counter.explicitMutating")]
 // CHECK-NEXT: func {{.*}} : Func(Void, BorrowInOutParam(%Counter))
 // CHECK-LABEL: [nameHint("Counter.explicitNonmutating")]
@@ -97,5 +97,5 @@ void computeMain()
 // CHECK-NEXT: func {{.*}} : Func(Void, RefParam(%Counter{{.*}}))
 // CHECK-LABEL: [nameHint("Counter.replaceWithDefault")]
 // CHECK-NEXT: func {{.*}} : Func(Void, BorrowInOutParam(%Counter), Int)
-// CHECK-LABEL: [nameHint("MutatingReceiverImplementation.mutate")]
-// CHECK-NEXT: func {{.*}} : Func(Void, BorrowInOutParam(%MutatingReceiverImplementation))
+// CHECK-LABEL: [nameHint("NonmutatingReceiverImplementation.read")]
+// CHECK-NEXT: func {{.*}} : Func(Int, %NonmutatingReceiverImplementation)
