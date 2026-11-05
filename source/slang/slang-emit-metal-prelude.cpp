@@ -91,9 +91,9 @@ const char* MetalSourceEmitter::kMetalBuiltinPreludeLogging = R"(
 // call is made on a non-const object.
 const char* MetalSourceEmitter::kMetalBuiltinPreludeTextureFence = R"(
 template<typename T>
-void _slang_textureFence(T texture)
+void _slang_textureFence(T textureAsNonConst)
 {
-    texture.fence();
+    textureAsNonConst.fence();
 }
 )";
 
