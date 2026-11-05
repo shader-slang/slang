@@ -2246,13 +2246,11 @@ public:
     // Adding an IR instruction requires a new writer version. Earlier modules can remain
     // supported when their AST and IR representations are compatible with the reader.
     //
-    // Adding `UniformParameterShadowVarDecl` shifts the sequential `ASTNodeType` values.
-    // A version-33 `LetDecl` would therefore be decoded as a shadow declaration.
-    // Version 34 is the earliest module version with the updated AST node numbering.
-    // Version 35 adds `IRUninitializedGlobalCheckFoundPossibleWriteDecoration`. Its stable opcode
-    // is appended, so the reader can continue to load version-34 modules.
-    const static UInt k_minSupportedModuleVersion = 34;
-    const static UInt k_maxSupportedModuleVersion = 36;
+    // The structural ray-tracing stage and descriptor AST classes shift the sequential
+    // `ASTNodeType` values, so version-37 modules would decode later nodes as different classes.
+    // Version 38 also adds the trace-program descriptor and Metal trace IR instructions.
+    const static UInt k_minSupportedModuleVersion = 38;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

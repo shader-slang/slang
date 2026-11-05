@@ -3,6 +3,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "core/slang-io.h"
+#include "core/slang-platform.h"
 #include "core/slang-std-writers.h"
 #include "core/slang-string-util.h"
 #include "core/slang-test-tool-util.h"
@@ -822,8 +823,18 @@ struct AssignValsFromLayoutContext
                 slangTypeLayout = slangTypeLayout->getElementTypeLayout();
                 break;
             }
+            // Create the object in the session the program was compiled in, as
+            // the typed branch above does. `createShaderObjectFromTypeLayout`
+            // would use slang-rhi's own device session, which numbers type
+            // conformances independently of the program, so an interface-typed
+            // field would get a conformance ID the shader does not use.
+            //
             auto slangType = slangTypeLayout->getType();
-            device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
+            device->createShaderObject(
+                slangSession(),
+                slangType,
+                rhi::ShaderObjectContainerType::None,
+                shaderObject.writeRef());
         }
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
@@ -1177,21 +1188,15 @@ void RenderTestApp::_initializeRenderPass()
 
 void RenderTestApp::_initializeAccelerationStructure()
 {
-    if (!m_device->hasFeature("ray-tracing"))
+    // Inline ray queries need the acceleration structure too. Metal supports them without
+    // ray-tracing pipelines.
+    if (!m_device->hasFeature("ray-tracing") && !m_device->hasFeature("ray-query"))
         return;
     BufferDesc vertexBufferDesc = {};
     vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
     vertexBufferDesc.usage = BufferUsage::AccelerationStructureBuildInput;
     vertexBufferDesc.defaultState = ResourceState::AccelerationStructureBuildInput;
     ComPtr<IBuffer> vertexBuffer = m_device->createBuffer(vertexBufferDesc, &kVertexData[0]);
-
-    BufferDesc transformBufferDesc = {};
-    transformBufferDesc.size = sizeof(float) * 12;
-    transformBufferDesc.usage = BufferUsage::AccelerationStructureBuildInput;
-    transformBufferDesc.defaultState = ResourceState::AccelerationStructureBuildInput;
-    float transformData[12] =
-        {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-    ComPtr<IBuffer> transformBuffer = m_device->createBuffer(transformBufferDesc, &transformData);
 
     // Build bottom level acceleration structure.
     {
@@ -1202,7 +1207,6 @@ void RenderTestApp::_initializeAccelerationStructure()
         buildInput.triangles.vertexFormat = Format::RGB32Float;
         buildInput.triangles.vertexCount = kVertexCount;
         buildInput.triangles.vertexStride = sizeof(Vertex);
-        buildInput.triangles.preTransformBuffer = transformBuffer;
         buildInput.triangles.flags = AccelerationStructureGeometryFlags::Opaque;
         AccelerationStructureBuildDesc buildDesc = {};
         buildDesc.inputs = &buildInput;
@@ -1219,11 +1223,14 @@ void RenderTestApp::_initializeAccelerationStructure()
         scratchBufferDesc.size = accelerationStructureSizes.scratchSize;
         ComPtr<IBuffer> scratchBuffer = m_device->createBuffer(scratchBufferDesc);
 
+        // Compact the acceleration structure where the device can report its compacted size.
+        // Metal can't, so there the acceleration structure is used as built.
         ComPtr<IQueryPool> compactedSizeQuery;
         QueryPoolDesc queryPoolDesc = {};
         queryPoolDesc.count = 1;
         queryPoolDesc.type = QueryType::AccelerationStructureCompactedSize;
-        m_device->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef());
+        if (SLANG_FAILED(m_device->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef())))
+            compactedSizeQuery = nullptr;
 
         // Build acceleration structure.
         ComPtr<IAccelerationStructure> draftAS;
@@ -1231,37 +1238,54 @@ void RenderTestApp::_initializeAccelerationStructure()
         draftDesc.size = accelerationStructureSizes.accelerationStructureSize;
         m_device->createAccelerationStructure(draftDesc, draftAS.writeRef());
 
-        compactedSizeQuery->reset();
+        if (!compactedSizeQuery)
+        {
+            auto encoder = m_queue->createCommandEncoder();
+            encoder->buildAccelerationStructure(
+                buildDesc,
+                draftAS,
+                nullptr,
+                scratchBuffer,
+                0,
+                nullptr);
+            m_queue->submit(encoder->finish());
+            m_queue->waitOnHost();
+            m_bottomLevelAccelerationStructure = draftAS;
+        }
+        else
+        {
+            compactedSizeQuery->reset();
 
-        auto encoder = m_queue->createCommandEncoder();
-        AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
-        compactedSizeQueryDesc.queryPool = compactedSizeQuery;
-        compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
-        encoder->buildAccelerationStructure(
-            buildDesc,
-            draftAS,
-            nullptr,
-            scratchBuffer,
-            1,
-            &compactedSizeQueryDesc);
-        m_queue->submit(encoder->finish());
-        m_queue->waitOnHost();
+            auto encoder = m_queue->createCommandEncoder();
+            AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
+            compactedSizeQueryDesc.queryPool = compactedSizeQuery;
+            compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
+            encoder->buildAccelerationStructure(
+                buildDesc,
+                draftAS,
+                nullptr,
+                scratchBuffer,
+                1,
+                &compactedSizeQueryDesc);
+            m_queue->submit(encoder->finish());
+            m_queue->waitOnHost();
 
-        uint64_t compactedSize = 0;
-        compactedSizeQuery->getResult(0, 1, &compactedSize);
-        AccelerationStructureDesc finalDesc;
-        finalDesc.size = compactedSize;
-        m_device->createAccelerationStructure(
-            finalDesc,
-            m_bottomLevelAccelerationStructure.writeRef());
+            uint64_t compactedSize = 0;
+            compactedSizeQuery->getResult(0, 1, &compactedSize);
+            AccelerationStructureDesc finalDesc;
+            finalDesc.size = compactedSize;
+            m_device->createAccelerationStructure(
+                finalDesc,
+                m_bottomLevelAccelerationStructure.writeRef());
 
-        encoder = m_queue->createCommandEncoder();
-        encoder->copyAccelerationStructure(
-            m_bottomLevelAccelerationStructure,
-            draftAS,
-            AccelerationStructureCopyMode::Compact);
-        m_queue->submit(encoder->finish());
-        m_queue->waitOnHost();
+            encoder = m_queue->createCommandEncoder();
+            encoder->copyAccelerationStructure(
+                m_bottomLevelAccelerationStructure,
+                draftAS,
+                AccelerationStructureCopyMode::Compact);
+            m_queue->submit(encoder->finish());
+            m_queue->waitOnHost();
+        }
     }
 
     // Build top level acceleration structure.
@@ -1649,6 +1673,33 @@ static void renderDocBeginFrame() {}
 static void renderDocEndFrame() {}
 #endif
 
+/// Stops the Vulkan validation layer from also writing its messages to stdout.
+///
+/// The Khronos validation layer logs every message to stdout by itself, in addition to calling
+/// the debug messenger that the device registers. That messenger already collects the messages in
+/// `CoreDebugCallback`, and slang-test appends them to the output of the test. The text on stdout
+/// is therefore redundant, and it breaks the reply of a test server when it contains a blank line,
+/// because the server sends its JSON-RPC replies on stdout. We set `debug_action` to
+/// `VK_DBG_LAYER_ACTION_CALLBACK`, which keeps only the callbacks that the application registers.
+/// A value that the user has already set is left as it is. The layer reads the variable when
+/// the Vulkan instance is created, so this runs before the first device is created.
+static void _routeVulkanValidationMessagesToDebugCallback()
+{
+    const char* const name = "VK_KHRONOS_VALIDATION_DEBUG_ACTION";
+
+    Slang::StringBuilder existingValue;
+    if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
+            Slang::UnownedStringSlice(name),
+            existingValue)))
+        return;
+
+#if SLANG_WINDOWS_FAMILY
+    ::SetEnvironmentVariableA(name, "VK_DBG_LAYER_ACTION_CALLBACK");
+#else
+    ::setenv(name, "VK_DBG_LAYER_ACTION_CALLBACK", 0);
+#endif
+}
+
 static SlangResult _innerMain(
     Slang::StdWriters* stdWriters,
     SlangSession* session,
@@ -1965,6 +2016,7 @@ static SlangResult _innerMain(
         {
             if (options.enableDebugLayers)
             {
+                _routeVulkanValidationMessagesToDebugCallback();
                 getRHI()->enableDebugLayers();
             }
             Slang::ComPtr<rhi::IDevice> rhiDevice;

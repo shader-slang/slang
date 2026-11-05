@@ -1,5 +1,5 @@
 //TEST:SIMPLE(diag=CHK):-target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=FC):-target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=FC,exit-code=-1):-target hlsl -stage compute -entry computeMain
 
 // Test that diagnostics pointing to built-in modules (where source text is
 // unavailable) don't render empty source sections.

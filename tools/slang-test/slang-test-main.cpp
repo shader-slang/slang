@@ -3437,6 +3437,57 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     return result;
 }
 
+/// Checks the exit code of the tool under test for a FileCheck test.
+///
+/// A FileCheck test only looks at the text of the output, so it does not notice when the tool
+/// fails. A test that expects a failure says so with `exit-code=N`. Tests that compare with an
+/// `.expected` file already check the result code, because it is a part of the text they compare.
+/// Diagnostic tests (`diag=`) do not check it yet (#14266).
+///
+/// Returns false if the test options are invalid. Otherwise sets `outMismatch` to true when the
+/// exit code is not the expected one, after it reports the mismatch.
+static bool _checkExpectedExitCode(
+    TestContext* context,
+    const TestInput& input,
+    int resultCode,
+    bool& outMismatch)
+{
+    outMismatch = false;
+
+    String diagPrefix;
+    String fileCheckPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix) ||
+        !input.testOptions->getFileCheckPrefix(fileCheckPrefix))
+        return true;
+
+    auto reporter = context->getTestReporter();
+
+    int expectedExitCode = 0;
+    String exitCodeOption;
+    if (input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
+    {
+        Int parsedExitCode = 0;
+        if (SLANG_FAILED(StringUtil::parseInt(exitCodeOption.getUnownedSlice(), parsedExitCode)))
+        {
+            reporter->message(
+                TestMessageType::TestFailure,
+                "the value of `exit-code` must be an integer");
+            return false;
+        }
+        expectedExitCode = int(parsedExitCode);
+    }
+
+    if (resultCode != expectedExitCode)
+    {
+        StringBuilder message;
+        message << "expected exit code " << expectedExitCode << ", but the exit code is "
+                << resultCode;
+        reporter->message(TestMessageType::TestFailure, message.getBuffer());
+        outMismatch = true;
+    }
+    return true;
+}
+
 TestResult runSimpleTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we
@@ -3513,11 +3564,15 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
 
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+        return TestResult::Fail;
+
     return _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
@@ -3628,11 +3683,15 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes);
 
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+        return TestResult::Fail;
+
     return _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
@@ -3871,7 +3930,11 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
         }
     }
 
-    return _validateOutput(context, input, actualOutput);
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+        return TestResult::Fail;
+
+    return _validateOutput(context, input, actualOutput, exitCodeMismatch);
 }
 
 static String _calcSummary(IArtifactDiagnostics* inDiagnostics)

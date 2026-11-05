@@ -31,6 +31,7 @@ protected:
     void* m_module = nullptr;
 
     glslang_LinkSPIRVFunc m_linkSPIRVFunc = nullptr;
+    glslang_FreeLinkResultFunc m_freeLinkResultFunc = nullptr;
 };
 
 } // namespace gfx

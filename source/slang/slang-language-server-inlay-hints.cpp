@@ -70,14 +70,7 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
                         hint.paddingLeft = false;
                         hint.kind = LanguageServerProtocol::kInlayHintKindParameter;
                         StringBuilder lblSb;
-                        if (param->hasModifier<OutModifier>())
-                            lblSb << "out ";
-                        else if (param->hasModifier<InOutModifier>())
-                            lblSb << "inout ";
-                        else if (param->hasModifier<RefModifier>())
-                            lblSb << "ref ";
-                        else if (param->hasModifier<BorrowModifier>())
-                            lblSb << "constref ";
+                        printParamPassingModePrefix(lblSb, getParamPassingMode(param));
                         lblSb << name->text;
                         lblSb << ":";
                         hint.label = lblSb.produceString();
