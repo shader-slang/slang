@@ -321,7 +321,7 @@ struct EntryPointGlobalThreadingContext
 
     // Rewrites `globalVar` if it holds an entry-point input and all its uses have the expected
     // shape, and returns whether it did. Returning false leaves the module unchanged.
-    bool tryThread(IRGlobalVar* globalVar)
+    bool maybeRewriteInputVarAsParams(IRGlobalVar* globalVar)
     {
         // A variable with an initializer is set before the entry point runs.
         if (globalVar->getFirstBlock())
@@ -446,7 +446,7 @@ struct EntryPointGlobalThreadingContext
         {
             auto param = inputParamByEntryPoint.getValue(entryPoint);
             builder.setInsertBefore(entryPoint->getFirstBlock()->getFirstOrdinaryInst());
-            auto converted = tryConvertValue(builder, param, valueType);
+            auto converted = tryConvertSystemValueType(builder, param, valueType);
             // Varying legalization has already converted this parameter to this type.
             SLANG_ASSERT(converted && converted->getDataType() == valueType);
             if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
@@ -527,7 +527,7 @@ struct EntryPointGlobalThreadingContext
                 globalVars.add(globalVar);
         }
         for (auto globalVar : globalVars)
-            tryThread(globalVar);
+            maybeRewriteInputVarAsParams(globalVar);
     }
 };
 
