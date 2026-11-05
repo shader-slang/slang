@@ -426,12 +426,83 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     }
 }
 
+// Return why MSL cannot express the floating-point atomic load, exchange, compare-exchange, min
+// or max `atomic`, or nullptr if it can. Other atomic operations, and atomics whose value is not
+// floating-point, also return nullptr. MSL has `atomic_float` load, exchange and compare-exchange
+// on device memory only (MSL 4.1 spec, section 6.16.4), no floating-point atomic min or max, and
+// integer-only texture atomics (section 6.13). For example, `Atomic<float>.load` through a device
+// pointer fits, but the same load on a `groupshared Atomic<float>` does not. Device memory means
+// the `Global` and `UserPointer` address spaces, which the Metal emitter prints as `device`.
+static const char* getUnsupportedMetalFloatAtomicReason(IRAtomicOperation* atomic)
+{
+    switch (atomic->getOp())
+    {
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicCompareExchange:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+        break;
+    default:
+        return nullptr;
+    }
+    auto valueType = atomic->getDataType();
+    if (!isFloatingType(valueType))
+        return nullptr;
+    if (atomic->getOp() == kIROp_AtomicMin || atomic->getOp() == kIROp_AtomicMax)
+        return "floating point atomic min or max";
+    if (valueType->getOp() != kIROp_FloatType)
+        return "floating point atomic operation on a type other than 32-bit float";
+    if (getAtomicImageSubscript(atomic))
+        return "floating point atomic operation on a texture";
+    auto destPtrType = cast<IRPtrTypeBase>(atomic->getPtr()->getDataType());
+    switch (destPtrType->getAddressSpace())
+    {
+    case AddressSpace::Global:
+    case AddressSpace::UserPointer:
+        return nullptr;
+    default:
+        return "floating point atomic operation outside device memory";
+    }
+}
+
+// Diagnose the atomic operations in `module` that MSL cannot express. We visit only top-level
+// functions because those are the bodies that the Metal emitter emits: a generic that remains at
+// this point is not emitted, and its body can still hold pointers whose address space was never
+// specialized.
+static void checkUnsupportedMetalAtomics(IRModule* module, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                auto atomic = as<IRAtomicOperation>(inst);
+                if (!atomic)
+                    continue;
+                if (auto reason = getUnsupportedMetalFloatAtomicReason(atomic))
+                {
+                    sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                        .operation = reason,
+                        .location = atomic->sourceLoc});
+                }
+            }
+        }
+    }
+}
+
 void checkUnsupportedInst(
     IRModule* module,
     TargetRequest* target,
     UnsupportedInstCheckSet checkSet,
     DiagnosticSink* sink)
 {
+    if (isMetalTarget(target))
+        checkUnsupportedMetalAtomics(module, sink);
     if (checkSet == UnsupportedInstCheckSet::EmitterContract)
         return;
 
