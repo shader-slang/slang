@@ -3068,7 +3068,8 @@ local insts = {
 	{ DebugInlinedAt = { min_operands = 5 } },
 	{
 		DebugFunction = {
-			min_operands = 5,
+			-- Six required operands followed by an optional parent scope.
+			min_operands = 6,
 		},
 	},
 	{

@@ -877,6 +877,7 @@ void fixUpDebugFuncType(IRFunc* func)
             oldDebugFunc->getCol(),
             oldDebugFunc->getFile(),
             funcType,
+            oldDebugFunc->getFlags(),
             oldDebugFunc->getParentScope());
         debugFuncDecor->removeAndDeallocate();
         builder.addDecoration(func, kIROp_DebugFuncDecoration, newDebugFunc);
@@ -3689,17 +3690,19 @@ IRInst* IRBuilder::emitDebugFunction(
     IRInst* col,
     IRInst* file,
     IRInst* debugType,
+    IRDebugFlags flags,
     IRInst* parentScope)
 {
-    // The parent scope is an optional trailing operand: it is absent when no scope was recorded
-    // (Minimal debug level emits no compilation unit), so we never store a null operand.
+    auto flagsOperand = getIntValue(getUIntType(), flags);
+    // The parent scope is an optional trailing operand. Included or line-remapped sources may
+    // have no associated compilation unit, so omit the operand instead of storing null.
     if (parentScope)
     {
-        IRInst* args[] = {name, line, col, file, debugType, parentScope};
-        return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 6, args);
+        IRInst* args[] = {name, line, col, file, debugType, flagsOperand, parentScope};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 7, args);
     }
-    IRInst* args[] = {name, line, col, file, debugType};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 5, args);
+    IRInst* args[] = {name, line, col, file, debugType, flagsOperand};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 6, args);
 }
 
 IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)

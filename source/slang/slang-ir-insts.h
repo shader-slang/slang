@@ -2842,6 +2842,17 @@ struct IRDebugInlinedVariable : IRInst
     IRInst* getInlinedAt() { return getOperand(1); }
 };
 
+// Semantic debug properties. Backends translate these to their own flag encodings.
+typedef uint32_t IRDebugFlags;
+struct IRDebugFlag
+{
+    enum Enum : IRDebugFlags
+    {
+        None = 0,
+        Artificial = 1 << 0,
+    };
+};
+
 FIDDLE()
 struct IRDebugFunction : IRInst
 {
@@ -2851,14 +2862,15 @@ struct IRDebugFunction : IRInst
     IRInst* getCol() { return getOperand(2); }
     IRInst* getFile() { return getOperand(3); }
     IRInst* getDebugType() { return getOperand(4); }
+    IRDebugFlags getFlags() { return IRDebugFlags(getIntVal(getOperand(5))); }
 
     // The function's lexical parent scope, or null when its source has no compilation unit (an
-    // #include'd/#line-remapped source), or for a function from an IR blob that predates this
-    // operand. The only parent scope produced is the DebugCompilationUnit of the source file the
-    // function is defined in, so an imported function resolves to its own module's compilation unit
-    // rather than the entry point's. The operand type is a general parent scope, not specifically a
+    // #include'd/#line-remapped source). This is the only optional operand and is always last.
+    // The only parent scope produced is the DebugCompilationUnit of the source file the function
+    // is defined in, so an imported function resolves to its own module's compilation unit rather
+    // than the entry point's. The operand type is a general parent scope, not specifically a
     // compilation unit, so a lexical scope can occupy it without changing the operand's meaning.
-    IRInst* getParentScope() { return getOperandCount() > 5 ? getOperand(5) : nullptr; }
+    IRInst* getParentScope() { return getOperandCount() > 6 ? getOperand(6) : nullptr; }
 };
 
 FIDDLE()
@@ -3732,6 +3744,7 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* col,
         IRInst* file,
         IRInst* debugType,
+        IRDebugFlags flags,
         IRInst* parentScope = nullptr);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this

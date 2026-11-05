@@ -9525,29 +9525,19 @@ static HumaneSourceLoc _getDebugHumaneLoc(
     return humaneLoc;
 }
 
-// Returns true if `funcDecl` is a constructor that Slang synthesized (a default
-// or member-wise initializer) rather than one the user wrote. Such a function has
-// no user-authored body; its source locations are inherited from the struct and
-// member declarations (see `createCtor` and `synthesizeCtorBodyForMemberVar` in
-// slang-check-decl.cpp). Emitting source-level debug info for it would let a
-// debugger step into the compiler-generated initializer and walk the struct/member
-// declaration lines, so callers suppress debug info for these functions (#11550).
+// Returns true if `funcDecl` is a default or member-wise constructor whose body Slang
+// generated, rather than a user-written `__init`.
 //
-// Discriminating by flavor (not by the `$init` name) is required: a user-written
-// `__init` is also mangled to `<Type>.$init`, but carries `UserDefined` flavor and
-// must keep its debug info. The IR `IRConstructorDecoration` is attached only after
-// the function's `IRDebugLocationDecoration`, so the AST flavor is what is available in time.
+// Consider `struct Pair { float x; float y; }; Pair p = {1.0, 2.0};`. Semantic checking
+// synthesizes `Pair.$init` in `createCtor`, and `synthesizeCtorBodyForMemberVar` gives its
+// member stores the source locations of the struct and member declarations. We keep those
+// locations and mark the function's debug metadata artificial, so a debugger can tell the
+// generated constructor apart from a user-written one and apply its own stepping policy.
 //
-// The two `maybe*` call sites below (`maybeAddDebugLocationDecoration` on the IRFunc
-// and `maybeEmitDebugLine` on the body) self-gate on this predicate and are BOTH
-// load-bearing and non-redundant: a function's `IRDebugLocationDecoration` and its
-// body's `DebugLine`s are produced independently, so neither gate subsumes the other.
-// They key on `context->funcDecl`, which is the function currently being lowered (the
-// ctor's own IRFunc for the decoration, and the ctor again for the statements lowered
-// under its sub-context); module-level lowering runs with `funcDecl == nullptr`, so the
-// gate is a no-op there. A third caller, at the constructor-lowering site, gates the
-// `this` debug-variable emission (#11565); it is independently load-bearing because the
-// `addNameHint` there, unlike these two helpers, has no internal synthesized-ctor gate.
+// A user-written `__init` is also named `<Type>.$init`, so the predicate tests the
+// constructor flavor rather than the name. It does not test `SynthesizedModifier`, because
+// lambdas carry that modifier while their bodies are user-written. Other generated functions
+// are not classified here; each needs classification where it is produced.
 static bool isSynthesizedConstructorDecl(FunctionDeclBase* funcDecl)
 {
     auto ctorDecl = as<ConstructorDecl>(funcDecl);
@@ -9555,6 +9545,25 @@ static bool isSynthesizedConstructorDecl(FunctionDeclBase* funcDecl)
         return false;
     return ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault) ||
            ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
+}
+
+// Returns the debug flags for the function `funcDecl`; currently `Artificial` for a synthesized
+// constructor and none otherwise. The flags derive from the AST declaration rather than the
+// IRDebugFunction, because Minimal-level lowering consults them before the debug function
+// exists, to decide whether to emit the location that would create it.
+static IRDebugFlags getDebugFunctionFlags(FunctionDeclBase* funcDecl)
+{
+    bool isArtificial = isSynthesizedConstructorDecl(funcDecl);
+    IRDebugFlags debugFunctionFlags = IRDebugFlag::None;
+    if (isArtificial)
+        debugFunctionFlags |= IRDebugFlag::Artificial;
+    return debugFunctionFlags;
+}
+
+// Returns whether the function's debug flags mark it as compiler-generated.
+static bool isFunctionArtificial(FunctionDeclBase* funcDecl)
+{
+    return (getDebugFunctionFlags(funcDecl) & IRDebugFlag::Artificial) != 0;
 }
 
 void maybeEmitDebugLine(
@@ -9568,9 +9577,11 @@ void maybeEmitDebugLine(
     if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
 
-    // A synthesized initializer has no user-authored source, so it must not emit
-    // steppable debug lines (see isSynthesizedConstructorDecl).
-    if (isSynthesizedConstructorDecl(context->funcDecl))
+    // Minimal debug info carries only line information and cannot mark the enclosing
+    // function artificial, so we omit the lines of an artificial function; otherwise its
+    // generated member stores would appear to be user-written statements.
+    if (context->debugInfoLevel == DebugInfoLevel::Minimal &&
+        isFunctionArtificial(context->funcDecl))
         return;
 
     if (!allowNullStmt)
@@ -9604,11 +9615,10 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
     if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
 
-    // A synthesized initializer must not receive a source-level debug location:
-    // giving its IRFunc one would produce a DebugFunction/DebugScope (and, via
-    // insertDebugValueStore, param DebugVar/DebugValue) and let a debugger step
-    // into compiler-generated code (see isSynthesizedConstructorDecl).
-    if (isSynthesizedConstructorDecl(context->funcDecl))
+    // Minimal debug info cannot mark a function artificial, so we omit the locations of an
+    // artificial function at that level, for the same reason as in maybeEmitDebugLine.
+    if (context->debugInfoLevel == DebugInfoLevel::Minimal &&
+        isFunctionArtificial(context->funcDecl))
         return;
 
     IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);
@@ -9667,12 +9677,14 @@ static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
                     parentScope);
             }
 
+            IRDebugFlags debugFunctionFlags = getDebugFunctionFlags(context->funcDecl);
             auto debugFuncCallee = builder.emitDebugFunction(
                 nameOperand,
                 locationDecor->getLine(),
                 locationDecor->getCol(),
                 locationDecor->getSource(),
                 debugType,
+                debugFunctionFlags,
                 parentScope);
 
             // Add a decoration to link the function to its debug function
@@ -14325,23 +14337,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     }
                 }
 
-                // For a user-written initializer compiled with debug info, expose the object
-                // under construction as a `this` debug variable, so a debugger stopped inside
+                // For an initializer compiled with debug info, expose the object under
+                // construction as a `this` debug variable, so a debugger stopped inside
                 // `__init` can inspect the members being initialized just as it can inside a
                 // `[mutating]` method. `thisStorage` is exactly that object (the value the
                 // initializer constructs and returns). Naming it lets the debug-var pass in
                 // slang-ir-insert-debug-value-store.cpp surface it: a return-destination
                 // parameter is emitted by that pass's parameter loop, whereas a fresh local is
                 // emitted by its local-var loop only if it also carries an
-                // IRDebugLocationDecoration, which we add below. Synthesized initializers are
-                // excluded via the shared isSynthesizedConstructorDecl() predicate: they have no
-                // user-authored body, so a steppable `this` would only expose compiler-generated
-                // code (the same rationale that suppresses their debug lines for #11550). Unlike
-                // maybeAddDebugLocationDecoration/maybeEmitDebugLine, addNameHint has no internal
-                // synthesized-ctor gate, so this outer check is the only thing keeping a
-                // synthesized initializer's object from being named `this`.
-                if (thisStorage && !isSynthesizedConstructorDecl(constructorDecl) &&
-                    subContext->debugInfoLevel != DebugInfoLevel::None)
+                // IRDebugLocationDecoration, which we add below.
+                if (thisStorage && subContext->debugInfoLevel != DebugInfoLevel::None)
                 {
                     addNameHint(subContext, thisStorage, "this");
 
