@@ -15,7 +15,6 @@ static IRType* replaceImageElementType(IRInst* originalType, IRInst* newElementT
     case kIROp_OutParamType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
-    case kIROp_ByValueBorrowInParamType:
     case kIROp_BorrowInOutParamType:
         {
             auto newInnerType =

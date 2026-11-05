@@ -55,7 +55,6 @@ void _findDependenciesOfTypeInSet(
     case kIROp_BorrowInOutParamType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
-    case kIROp_ByValueBorrowInParamType:
     case kIROp_NativeStringType:
     case kIROp_FuncType:
         // Pointer-like and fixed-size types don't embed their pointee/operand,
