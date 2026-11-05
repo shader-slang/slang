@@ -334,7 +334,8 @@ void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
     bool isArray = resourceType && getIntVal(resourceType->getIsArrayInst()) != 0;
     if (isArray)
     {
-        // `checkUnsupportedInst` rejects an array-texture atomic whose coordinate is not a vector.
+        // An array-texture subscript takes a vector coordinate whose last component is the array
+        // index.
         auto coordType = as<IRVectorType>(inst->getCoord()->getDataType());
         SLANG_RELEASE_ASSERT(coordType);
         emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));

@@ -2969,13 +2969,8 @@ Result linkAndOptimizeIR(
     // We check D3D and Metal resource locals after all passes that can create mutable storage.
     // Minimum-optimization mode must still reject storage that its target cannot represent.
     SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
-    SLANG_PASS(
-        checkUnsupportedInst,
-        codeGenContext->getTargetReq(),
-        targetProgram->getOptionSet().shouldPerformMinimumOptimizations()
-            ? UnsupportedInstCheckSet::EmitterContract
-            : UnsupportedInstCheckSet::All,
-        sink);
+    if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
+        SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 
