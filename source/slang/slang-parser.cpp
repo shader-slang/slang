@@ -245,6 +245,8 @@ public:
     Stmt* ParseStatement(
         Stmt* parentStmt = nullptr,
         AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
+    /// Parse a control-flow body, including the implicit scope of an unbraced HLSL body.
+    Stmt* parseControlFlowBody(Stmt* parentStmt = nullptr);
     Stmt* parseBlockStatement(
         AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
     // Test whether lookahead is a declaration keyword allowed in statement contexts.
@@ -7770,6 +7772,29 @@ Stmt* Parser::parseIfLetStatement()
     return newBody;
 }
 
+Stmt* Parser::parseControlFlowBody(Stmt* parentStmt)
+{
+    if (getSourceLanguage() != SourceLanguage::HLSL)
+        return ParseStatement(parentStmt);
+    if (LookAheadToken(TokenType::LBrace))
+        return ParseStatement(parentStmt);
+
+    // Consider `for (int i = 0; i < 2; ++i) for (int i = 0; i < 3; ++i) {}`.
+    // HLSL places each initializer in the containing scope. The outer loop's body has an
+    // implicit scope even without braces, so the inner initializer must belong to that body,
+    // not the block containing the outer loop. We represent the body with an ordinary
+    // `BlockStmt` so checking and debug lowering use the same ownership as a braced body.
+    auto blockStmt = astBuilder->create<BlockStmt>();
+    FillPosition(blockStmt);
+    blockStmt->scopeDecl = astBuilder->create<ScopeDecl>();
+    pushScopeAndSetParent(blockStmt->scopeDecl);
+    blockStmt->body = ParseStatement(parentStmt);
+    // The next token bounds the implicit body for language-server AST searches.
+    blockStmt->closingSourceLoc = tokenReader.peekLoc();
+    PopScope();
+    return blockStmt;
+}
+
 IfStmt* Parser::parseIfStatement()
 {
     IfStmt* ifStatement = astBuilder->create<IfStmt>();
@@ -7778,15 +7803,33 @@ IfStmt* Parser::parseIfStatement()
     ReadToken(TokenType::LParent);
     ifStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
-    ifStatement->positiveStatement = ParseStatement(ifStatement);
+    ifStatement->positiveStatement = parseControlFlowBody(ifStatement);
     if (LookAheadToken("else"))
     {
         ReadToken("else");
-        ifStatement->negativeStatement = ParseStatement(ifStatement);
+        ifStatement->negativeStatement = parseControlFlowBody(ifStatement);
     }
     ifStatement->afterLoc = tokenReader.peekLoc();
 
     return ifStatement;
+}
+
+/// Mark the variables declared by an HLSL `for` initializer.
+///
+/// The initializer is either one declaration or a declaration group, as in
+/// `for (int i = 0, j = i; ... )`. We record the role on each variable so that semantic
+/// checking can distinguish permitted loop-variable shadowing from ordinary redeclarations.
+static void markHLSLForLoopInitializerVariables(DeclBase* declBase)
+{
+    if (auto declGroup = as<DeclGroup>(declBase))
+    {
+        for (auto decl : declGroup->decls)
+            markHLSLForLoopInitializerVariables(decl);
+    }
+    else if (auto varDecl = as<VarDecl>(declBase))
+    {
+        varDecl->isHLSLForLoopInitializer = true;
+    }
 }
 
 ForStmt* Parser::ParseForStatement()
@@ -7824,6 +7867,11 @@ ForStmt* Parser::ParseForStatement()
     if (!LookAheadToken(TokenType::Semicolon))
     {
         stmt->initialStatement = ParseStatement();
+        if (brokenScoping)
+        {
+            if (auto declStmt = as<DeclStmt>(stmt->initialStatement))
+                markHLSLForLoopInitializerVariables(declStmt->decl);
+        }
         if (as<DeclStmt>(stmt->initialStatement) || as<ExpressionStmt>(stmt->initialStatement))
         {
             // These are the only allowed form of initial statements of a for loop.
@@ -7846,7 +7894,7 @@ ForStmt* Parser::ParseForStatement()
     if (!LookAheadToken(TokenType::RParent))
         stmt->sideEffectExpression = ParseExpression();
     ReadToken(TokenType::RParent);
-    stmt->statement = ParseStatement();
+    stmt->statement = parseControlFlowBody();
 
     if (!brokenScoping)
         PopScope();
@@ -7862,7 +7910,7 @@ WhileStmt* Parser::ParseWhileStatement()
     ReadToken(TokenType::LParent);
     whileStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
-    whileStatement->statement = ParseStatement();
+    whileStatement->statement = parseControlFlowBody();
     return whileStatement;
 }
 
@@ -7917,7 +7965,7 @@ Stmt* Parser::ParseDoStatement()
 {
     SourceLoc position = tokenReader.peekLoc();
     ReadToken("do");
-    Stmt* statement = ParseStatement();
+    Stmt* statement = parseControlFlowBody();
     if (LookAheadToken("while"))
     {
         Stmt* whileStatement = ParseDoWhileStatement(statement);

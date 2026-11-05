@@ -4610,9 +4610,11 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitDeclStmt(DeclStmt* stmt);
 
-    /// Check `decl`, a local declaration whose statement has been reached, make it
-    /// visible to the code that follows its declarator, and register the lambda
-    /// captures in its initializer.
+    /// Check `decl` and its initializer, make the local declaration visible afterward,
+    /// and register the lambda captures in its initializer.
+    ///
+    /// Earlier bindings remain available while the initializer is checked.
+    /// An HLSL loop initializer also hides earlier locals of the same name in its own scope.
     void checkDeclAtDeclarationPoint(Decl* decl);
 
     void visitBlockStmt(BlockStmt* stmt);

@@ -339,6 +339,11 @@ FIDDLE()
 class VarDecl : public VarDeclBase
 {
     FIDDLE(...)
+
+    // Whether the parser declared this variable in an HLSL `for` initializer. After checking
+    // its initializer, we make the variable visible and hide earlier locals of the same name
+    // in its enclosing scope.
+    bool isHLSLForLoopInitializer = false;
 };
 
 // A variable introduced by the parser to implement uniform parameter temporaries in legacy HLSL.
