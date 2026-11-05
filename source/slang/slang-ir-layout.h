@@ -89,6 +89,7 @@ public:
     static IRTypeLayoutRules* getCUDA();
     static IRTypeLayoutRules* getConstantBuffer();
     static IRTypeLayoutRules* getLLVM();
+    static IRTypeLayoutRules* getMetalConstantBuffer();
     static IRTypeLayoutRules* get(IRTypeLayoutRuleName name);
 };
 
