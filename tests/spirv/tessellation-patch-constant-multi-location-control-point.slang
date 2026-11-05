@@ -6,7 +6,9 @@
 // The hull numbers its patch-constant outputs after the Locations that the front-end layout gives
 // its output control point, and the domain lays out `OutputPatch<ControlPoint, N>` with the same
 // rules. A `float4x4` takes 4 Locations, and explicit Locations 0 and 2 take 3 (the gap at 1 is
-// not reused), so both stages agree on where the patch-constant fields start.
+// not reused), so both stages agree on where the patch-constant fields start. Both domains
+// declare `OutputPatch` before `PatchData`; a domain that declares `PatchData` first numbers the
+// patch-constant fields from 0 and does not match these hulls.
 
 //WIDE-DAG: OpDecorate %{{[A-Za-z_]*}}color Location 4
 //WIDE-DAG: OpDecorate %{{[A-Za-z_]*}}color Patch

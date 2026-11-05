@@ -1301,18 +1301,23 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     IRVarLayout* resultLayout);
 
 /// Returns one past the last `VaryingOutput` Location that `varLayout` occupies in the front-end
-/// layout, or 0 when it occupies none (for example, a builtin such as `SV_Position`).
+/// layout, or 0 when it occupies none (for example, a builtin such as `SV_Position`, or the empty
+/// layout that `lowerEntryPointResultLayout` builds for a `void` result).
 static UInt getVaryingOutputLocationEnd(IRVarLayout* varLayout)
 {
-    if (!varLayout)
-        return 0;
+    SLANG_RELEASE_ASSERT(varLayout);
     auto offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput);
     auto sizeAttr = varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::VaryingOutput);
-    if (!offsetAttr || !sizeAttr)
+    // The front end gives a var layout an offset for every resource kind its type layout uses.
+    SLANG_RELEASE_ASSERT(!offsetAttr == !sizeAttr);
+    if (!sizeAttr)
         return 0;
     return offsetAttr->getOffset() + sizeAttr->getFiniteSize();
 }
 
+/// Calls the hull's patch-constant function at the end of the hull entry point and gives its
+/// result outputs `Patch` Locations. `entryPointResultLayout` is the hull's front-end result
+/// layout, the one that placed `outputPatchVal`; the patch-constant outputs start where it ends.
 void invokePatchConstantFuncInHullShader(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
@@ -1438,10 +1443,13 @@ void invokePatchConstantFuncInHullShader(
 
     auto constantOutputType = constantFunc->getResultType();
     // The patch-constant outputs start after the Locations that the front-end layout gives the
-    // hull's output control point. The domain stage lays out its `OutputPatch<ControlPoint, N>`
-    // input with the same rules, so a control point made only of builtins such as `SV_Position`
-    // occupies no Location and the patch-constant outputs start at 0 on both stages. Struct field
-    // offsets are relative to this base (see createPatchConstantFuncResultTypeLayout).
+    // hull's output control point. The domain numbers its varying inputs in declaration order, so
+    // the two stages agree only when the domain declares `OutputPatch<ControlPoint, N>` before
+    // its patch-constant parameter, or when the control point occupies no Location (only
+    // builtins such as `SV_Position`). A domain that declares the patch constants first, or no
+    // `OutputPatch` at all, numbers them from 0 and disagrees with a hull whose control point has
+    // user fields. Struct field offsets are relative to this base (see
+    // createPatchConstantFuncResultTypeLayout).
     UInt constantOutputBase = getVaryingOutputLocationEnd(entryPointResultLayout);
     IRTypeLayout* constantOutputLayout =
         createPatchConstantFuncResultTypeLayout(codeGenContext, builder, constantOutputType);

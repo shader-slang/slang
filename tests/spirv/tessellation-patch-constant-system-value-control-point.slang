@@ -5,6 +5,8 @@
 // A control-point output made only of system values (gl_Position, gl_ClipDistance) occupies no
 // Location, so the hull numbers its patch-constant outputs from 0. The domain stage gives the
 // same patch-constant fields the same Locations, which the two stages must agree on.
+// `domainMain` declares `PatchData` before `OutputPatch` on purpose: with no Location in the
+// control point, the order does not change where the patch-constant fields start.
 
 //HULL-DAG: OpDecorate %entryPointParam_constants_color Location 0
 //HULL-DAG: OpDecorate %entryPointParam_constants_color Patch

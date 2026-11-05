@@ -6,7 +6,9 @@
 // The hull numbers its `patch` outputs after the locations that the front-end layout gives its
 // output control point, and the domain lays out `OutputPatch<ControlPoint, N>` with the same
 // rules. A `float4x4` takes 4 locations, and explicit locations 0 and 2 take 3 (the gap at 1 is
-// not reused), so both stages agree on where the patch-constant fields start.
+// not reused), so both stages agree on where the patch-constant fields start. Both domains
+// declare `OutputPatch` before `PatchData`; a domain that declares `PatchData` first numbers the
+// patch-constant fields from 0 and does not match these hulls.
 
 //WIDE: {{^}}patch{{$}}
 //WIDE-NEXT: layout(location = 4)

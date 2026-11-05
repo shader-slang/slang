@@ -5,6 +5,8 @@
 // A control-point output made only of system values (gl_Position, gl_ClipDistance) occupies no
 // location, so the hull numbers its `patch` outputs from 0. The domain stage gives the same
 // patch-constant fields the same locations, which the two stages must agree on.
+// `domainMain` declares `PatchData` before `OutputPatch` on purpose: with no location in the
+// control point, the order does not change where the patch-constant fields start.
 
 //HULL: {{^}}patch{{$}}
 //HULL-NEXT: layout(location = 0)
