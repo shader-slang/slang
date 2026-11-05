@@ -1689,7 +1689,7 @@ CLikeSourceEmitter::FoldPolicy CLikeSourceEmitter::getFoldPolicy(IRInst* inst)
     //
     if (as<IRModuleInst>(inst->getParent()))
     {
-        if (!inst->mightHaveSideEffects())
+        if (!inst->mightHaveSideEffects(SideEffectAnalysisOptions::None, &m_calleeSideEffectCache))
             return FoldPolicy::Always;
     }
 
@@ -1753,7 +1753,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         return false;
 
     // Don't fold something that might have side effects:
-    if (inst->mightHaveSideEffects())
+    if (inst->mightHaveSideEffects(SideEffectAnalysisOptions::None, &m_calleeSideEffectCache))
         return false;
 
     // Don't fold instructions that are marked `[precise]`.
@@ -1970,7 +1970,7 @@ bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesUncached(IRInst* inst)
                 return true;
         }
 
-        if (ii->mightHaveSideEffects())
+        if (ii->mightHaveSideEffects(SideEffectAnalysisOptions::None, &m_calleeSideEffectCache))
             return false;
     }
 }
