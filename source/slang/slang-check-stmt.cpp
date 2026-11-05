@@ -72,26 +72,6 @@ void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
     checkDeclAtDeclarationPoint(decl);
 }
 
-/// Hide earlier locals shadowed by `varDecl`, an HLSL loop-initializer variable.
-///
-/// Consider `for (int i = 0; i < 2; ++i) {} for (int i = 0; i < 3; ++i) {}`.
-/// Both variables belong to one scope in HLSL. After checking the second initializer,
-/// we hide the earlier variable so lookup selects only the new one. Requires the caller
-/// to have checked `varDecl` before changing lookup visibility. The change affects only
-/// the variable's own scope, so a loop in an inner block cannot hide an enclosing block's
-/// variable after we leave the inner block.
-static void hideEarlierLocalVariables(VarDecl* varDecl)
-{
-    SLANG_RELEASE_ASSERT(varDecl->findModifier<HLSLForLoopInitializerAttribute>());
-    auto parentDecl = varDecl->parentDecl;
-    for (auto previousDecl = parentDecl->getPrevDirectMemberDeclWithSameName(varDecl); previousDecl;
-         previousDecl = parentDecl->getPrevDirectMemberDeclWithSameName(previousDecl))
-    {
-        if (isLocalVar(previousDecl))
-            previousDecl->hiddenFromLookup = true;
-    }
-}
-
 void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
 {
     // When we encounter a declaration during statement checking,
@@ -104,14 +84,6 @@ void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
     // that need to be recursively checked.
     //
     ensureDecl(decl, DeclCheckState::DefinitionChecked, this);
-
-    if (auto varDecl = as<VarDecl>(decl))
-    {
-        // We use the existing local-initializer lookup rules while checking `initExpr`.
-        // Once checking finishes, the new loop variable replaces earlier locals of its name.
-        if (varDecl->findModifier<HLSLForLoopInitializerAttribute>())
-            hideEarlierLocalVariables(varDecl);
-    }
     decl->hiddenFromLookup = false;
     if (auto varDecl = as<VarDeclBase>(decl))
     {

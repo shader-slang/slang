@@ -4,7 +4,7 @@
 // HLSL loop initializers become visible in declaration order and remain visible after their
 // loops. Each result distinguishes which declaration was selected before and after a loop.
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 static const int globalIndex = 23;
@@ -136,6 +136,39 @@ int repeatedInitializerDeclarator()
     return sum * 10 + i;
 }
 
+// A comparison on a vector member can require type lookup while parsing `<`. Both loop headers
+// must select their own declaration, and the post-loop reference must select the later variable.
+int memberPredicates()
+{
+    int sum = 0;
+    for (int2 value = 0; value.x < 3; ++value.x)
+        sum += value.x;
+    for (int2 value = 5; value.x < 7; ++value.x)
+        sum += value.x;
+    return sum * 10 + value.x;
+}
+
+// A completed declarator must shadow the earlier local before a later initializer in the
+// same group needs parser-time type lookup for a comparison on that declarator's member.
+int groupedMemberInitializer()
+{
+    int2 value = 9;
+    for (int2 value = 1, comparison = int2(value.x < 2 ? 1 : 0, 0); value.x < 4; ++value.x)
+    {}
+    return value.x * 10 + comparison.x;
+}
+
+// Excluding the variable being initialized must leave the earlier binding available, even
+// when parser-time type lookup checks the new declaration before statement checking reaches it.
+int initializerReadsEarlierBinding()
+{
+    int2 value = 3;
+    int digits = 0;
+    for (int2 value = value + 1; value.x < 6; ++value.x)
+        digits = digits * 10 + value.x;
+    return digits * 10 + value.x;
+}
+
 // We store each result separately so an incorrect binding cannot be hidden by combining outputs.
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -151,6 +184,9 @@ void computeMain()
     outputBuffer[8] = continueLoop();
     outputBuffer[9] = controlBodyScopes();
     outputBuffer[10] = repeatedInitializerDeclarator();
+    outputBuffer[11] = memberPredicates();
+    outputBuffer[12] = groupedMemberInitializer();
+    outputBuffer[13] = initializerReadsEarlierBinding();
 }
 
 // CHECK: 105
@@ -164,3 +200,6 @@ void computeMain()
 // CHECK-NEXT: 64
 // CHECK-NEXT: 315
 // CHECK-NEXT: 54
+// CHECK-NEXT: 147
+// CHECK-NEXT: 41
+// CHECK-NEXT: 456

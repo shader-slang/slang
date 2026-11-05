@@ -14864,14 +14864,7 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     return SLANG_FAIL;
 }
 
-/// Return whether `newDecl` may shadow `oldDecl` as an HLSL loop initializer.
-///
-/// HLSL loop initializers belong to the enclosing scope, so successive loops can declare the
-/// same name. The permission applies to each variable in an initializer, including repeated
-/// names in `for (int i = 0, i = 1; ... )`. Only a new loop initializer has this permission:
-/// an ordinary `int i;` following `for (int i = 0; ... ) {}` remains a redeclaration error.
-/// Other declaration kinds and declarations from different containers do not participate.
-static bool isHLSLForLoopInitializerRedeclaration(Decl* newDecl, Decl* oldDecl)
+bool isHLSLForLoopInitializerRedeclaration(Decl* newDecl, Decl* oldDecl)
 {
     auto newVarDecl = as<VarDecl>(newDecl);
     if (!newVarDecl)
@@ -14922,8 +14915,8 @@ Result SemanticsVisitor::checkRedeclaration(
         return SLANG_OK;
     }
 
-    // We allow HLSL loop-initializer variables to shadow earlier locals. Statement checking
-    // hides each earlier variable after checking the new initializer, so lookup is unambiguous.
+    // We allow HLSL loop-initializer variables to shadow earlier locals. Lookup uses this same
+    // rule to omit an older candidate after finding a visible initializer of the same name.
     if (isHLSLForLoopInitializerRedeclaration(newDecl, oldDecl))
         return SLANG_OK;
 

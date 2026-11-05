@@ -141,6 +141,10 @@ public:
     SourceLoc lastErrorLoc;
     ParserOptions options;
     Modifiers* pendingModifiers = nullptr;
+
+    // The container receiving variables from the current HLSL `for` initializer, or null
+    // outside an initializer. Declarations in nested containers are excluded.
+    ContainerDecl* hlslForLoopInitializerContainer = nullptr;
     int genericDepth = 0;
 
     // Is the parser in a "recovering" state?
@@ -6019,6 +6023,27 @@ static UniformParameterShadowVarDecl* createUniformParameterShadowVarIfNeeded(
     return shadowVar;
 }
 
+/// Attach an `HLSLForLoopInitializerAttribute` to a variable in the current initializer.
+///
+/// We record the initializer's container in `Parser::hlslForLoopInitializerContainer`.
+/// A type or lambda inside an initializer can introduce declarations in nested containers.
+/// We exclude those declarations by requiring the variable's parent to be the recorded container.
+static void addHLSLForLoopInitializerAttributeIfNeeded(Parser* parser, Decl* decl)
+{
+    auto initializerContainer = parser->hlslForLoopInitializerContainer;
+    if (!initializerContainer)
+        return;
+    if (decl->parentDecl != initializerContainer)
+        return;
+    auto varDecl = as<VarDecl>(decl);
+    if (!varDecl)
+        return;
+
+    auto attribute = parser->astBuilder->create<HLSLForLoopInitializerAttribute>();
+    attribute->loc = varDecl->loc;
+    addModifier(varDecl, attribute);
+}
+
 // Finish up work on a declaration that was parsed.
 static void CompleteDecl(
     Parser* parser,
@@ -6159,6 +6184,12 @@ static void CompleteDecl(
             }
         }
     }
+
+    // Consider `for (int2 v = 0, w = int2(v.x < 2, 0); false;) {}`.
+    // Parsing `w` can check `v.x` to distinguish comparison from generic application.
+    // We attach the attribute before setting `ReadyForParserLookup` so that lookup can select
+    // the new `v` over an earlier local with the same name.
+    addHLSLForLoopInitializerAttributeIfNeeded(parser, decl);
 
     if (parser->semanticsVisitor && parser->getStage() == ParsingStage::Body)
     {
@@ -7814,26 +7845,6 @@ IfStmt* Parser::parseIfStatement()
     return ifStatement;
 }
 
-/// Mark the variables declared by an HLSL `for` initializer.
-///
-/// The initializer is either one declaration or a declaration group, as in
-/// `for (int i = 0, j = i; ... )`. We attach an `HLSLForLoopInitializerAttribute` to each
-/// variable so that checking can distinguish loop-variable shadowing from ordinary redeclarations.
-static void markHLSLForLoopInitializerVariables(ASTBuilder* astBuilder, DeclBase* declBase)
-{
-    if (auto declGroup = as<DeclGroup>(declBase))
-    {
-        for (auto decl : declGroup->decls)
-            markHLSLForLoopInitializerVariables(astBuilder, decl);
-    }
-    else if (auto varDecl = as<VarDecl>(declBase))
-    {
-        auto attribute = astBuilder->create<HLSLForLoopInitializerAttribute>();
-        attribute->loc = varDecl->loc;
-        addModifier(varDecl, attribute);
-    }
-}
-
 ForStmt* Parser::ParseForStatement()
 {
     ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
@@ -7868,12 +7879,12 @@ ForStmt* Parser::ParseForStatement()
     ReadToken(TokenType::LParent);
     if (!LookAheadToken(TokenType::Semicolon))
     {
+        // Only variables completed for this initializer's own container receive the attribute.
+        // Saving the previous container also keeps nested initializer parsing independent.
+        auto previousInitializerContainer = hlslForLoopInitializerContainer;
+        hlslForLoopInitializerContainer = brokenScoping ? currentScope->containerDecl : nullptr;
         stmt->initialStatement = ParseStatement();
-        if (brokenScoping)
-        {
-            if (auto declStmt = as<DeclStmt>(stmt->initialStatement))
-                markHLSLForLoopInitializerVariables(astBuilder, declStmt->decl);
-        }
+        hlslForLoopInitializerContainer = previousInitializerContainer;
         if (as<DeclStmt>(stmt->initialStatement) || as<ExpressionStmt>(stmt->initialStatement))
         {
             // These are the only allowed form of initial statements of a for loop.

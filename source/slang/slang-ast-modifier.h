@@ -919,8 +919,8 @@ class Attribute : public AttributeBase
 
 /// A synthesized marker for a variable declared in an HLSL `for` initializer.
 ///
-/// The parser attaches this attribute only to initializer variables. After checking an
-/// initializer, semantic checking permits its variable to shadow earlier locals in the
+/// The parser attaches this attribute only to initializer variables. Semantic checking and
+/// name lookup use it to allow a new initializer variable to shadow earlier locals in the
 /// same scope. This attribute has no spelling in shader code.
 FIDDLE()
 class HLSLForLoopInitializerAttribute : public Attribute

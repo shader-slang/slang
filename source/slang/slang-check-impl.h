@@ -59,6 +59,16 @@ bool isUniformParameterType(Type* type);
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
+/// Return whether `newDecl` may shadow the same-named `oldDecl` as an HLSL loop initializer.
+///
+/// HLSL loop initializers belong to the enclosing scope, so successive loops can declare the
+/// same name. The permission applies to each variable in an initializer, including repeated
+/// names in `for (int i = 0, i = 1; ... )`. Only a new loop initializer has this permission:
+/// an ordinary `int i;` following `for (int i = 0; ... ) {}` remains a redeclaration error.
+/// Other declaration kinds and declarations from different containers do not participate.
+/// Checking and lookup use the same rule to permit the declarations and select their bindings.
+bool isHLSLForLoopInitializerRedeclaration(Decl* newDecl, Decl* oldDecl);
+
 /// How `checkRedeclaration` reports two declarations of the same name that cannot coexist.
 enum class RedeclarationSeverity
 {
@@ -4614,7 +4624,8 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     /// and register the lambda captures in its initializer.
     ///
     /// Earlier bindings remain available while the initializer is checked.
-    /// An HLSL loop initializer also hides earlier locals of the same name in its own scope.
+    /// Once an HLSL loop variable is visible, lookup selects it over earlier locals of the same
+    /// name in its scope.
     void checkDeclAtDeclarationPoint(Decl* decl);
 
     void visitBlockStmt(BlockStmt* stmt);
