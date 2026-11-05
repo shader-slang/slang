@@ -35,7 +35,7 @@
 
 // We check the returned fractions and integer outputs independently, using negative values
 // to distinguish truncation toward zero from flooring. The matrix outputs also check both
-// explicit layouts, and floating-point outputs check that the original overloads still resolve.
+// explicit layouts, and floating-point outputs check that the floating-output overloads resolve.
 #ifndef TEST_FLOAT
 #define TEST_FLOAT float
 #endif

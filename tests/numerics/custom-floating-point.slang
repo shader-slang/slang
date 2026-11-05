@@ -3,8 +3,28 @@
 
 //TEST:SIMPLE: -target hlsl -entry main -stage compute -o numeric-interfaces-custom-floating-point.hlsl -experimental-feature
 //TEST:SIMPLE: -target spirv -entry main -stage compute -o numeric-interfaces-custom-floating-point.spv -experimental-feature
+//TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-custom-integer-part.hlsl -experimental-feature -DTEST_INTEGER_PART
+//TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-custom-integer-part.spv -experimental-feature -DTEST_INTEGER_PART
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=INTEGER): -cpu -output-using-type -Xslang -experimental-feature -Xslang -DTEST_INTEGER_PART
 
 import slang.numerics;
+
+#ifdef TEST_INTEGER_PART
+// The variants without `TEST_INTEGER_PART` require only the floating-output capability.
+// Defining `TEST_INTEGER_PART` opts the same type into integer outputs and also checks its
+// floating-output split.
+//TEST_INPUT:ubuffer(data=[-2.75 0.0], stride=4):name=inputBuffer
+StructuredBuffer<float> inputBuffer;
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+// INTEGER: type: float
+// INTEGER-NEXT: {{^}}1.000000{{$}}
+// INTEGER-NEXT: {{^}}1.000000{{$}}
+// INTEGER-NEXT: {{^}}1.000000{{$}}
+// INTEGER-NEXT: {{^}}1.000000{{$}}
+// INTEGER-NEXT: {{^}}1.000000{{$}}
+// INTEGER-NEXT: {{^}}1.000000{{$}}
+// INTEGER-NEXT: {{^}}1.000000{{$}}
+#endif
 
 RWStructuredBuffer<float> outputBuffer;
 
@@ -141,6 +161,31 @@ struct FloatingPointOnly : IScalarFloatingPoint
 
 }
 
+#ifdef TEST_INTEGER_PART
+extension FloatingPointOnly : IScalarFloatingPointWithIntegerPart
+{
+    typealias IntegerPart = int;
+
+    /// Split the wrapped value into its fractional part and integer whole part.
+    This fractionalPart(out int integralPart)
+    {
+        return {modf(value, integralPart)};
+    }
+}
+
+/// Split an opaque custom shape through its associated integer-output type.
+T splitIntegerShape<T : IFloatingPointWithIntegerPart>(T value, out T.IntegerPart integralPart)
+{
+    return modf(value, integralPart);
+}
+
+/// Split an opaque custom scalar through a plain `int` output.
+T splitIntegerScalar<T : IScalarFloatingPointWithIntegerPart>(T value, out int integralPart)
+{
+    return modf(value, integralPart);
+}
+#endif
+
 [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T classifyAndRound<T : IFloatingPoint>(
     T value,
@@ -199,10 +244,38 @@ T constructFromBuiltinTypes<
     return T(integerValue) + T(floatingValue);
 }
 
+// The test harness runs `computeMain`; the floating-output variants explicitly compile `main`.
 [shader("compute")]
 [numthreads(1, 1, 1)]
+#ifdef TEST_INTEGER_PART
+void computeMain()
+#else
 void main()
+#endif
 {
+#ifdef TEST_INTEGER_PART
+    int integerPart;
+    FloatingPointOnly shapeFraction =
+        splitIntegerShape(FloatingPointOnly(inputBuffer[0]), integerPart);
+    outputBuffer[0] = float(shapeFraction.value == -0.75);
+    outputBuffer[1] = float(integerPart == -2);
+    FloatingPointOnly scalarFraction =
+        splitIntegerScalar(FloatingPointOnly(-inputBuffer[0]), integerPart);
+    outputBuffer[2] = float(scalarFraction.value == 0.75);
+    outputBuffer[3] = float(integerPart == 2);
+
+    FloatingPointOnly floatingPart;
+    FloatingPointOnly floatingFraction =
+        splitRepresentation(FloatingPointOnly(inputBuffer[0]), floatingPart);
+    outputBuffer[4] = float(floatingFraction.value == -0.75);
+    outputBuffer[5] = float(floatingPart.value == -2.0);
+
+    // We compare bits because the sign of a zero fraction is not observed by numeric equality.
+    FloatingPointOnly negativeZero = FloatingPointOnly(-inputBuffer[1]);
+    scalarFraction = splitIntegerScalar(negativeZero, integerPart);
+    floatingFraction = splitRepresentation(negativeZero, floatingPart);
+    outputBuffer[6] = float(asuint(scalarFraction.value) == asuint(floatingFraction.value));
+#else
     bool finite;
     bool infinite;
     bool notANumber;
@@ -221,4 +294,5 @@ void main()
     outputBuffer[0] = rounded.value + fractional.value + binary.value + compound.value +
         incremented.value + integralPart.value + splitFractional.value + constructed.value +
         float(finite) + float(infinite) + float(notANumber);
+#endif
 }

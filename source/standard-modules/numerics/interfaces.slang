@@ -368,6 +368,31 @@ public interface IScalarFloatingPoint : IFloatingPoint, IScalarFractional
 {
 }
 
+/// Supports splitting floating-point values with same-shape `int` outputs.
+///
+/// Conformances provide an integer type with the same logical shape as the floating-point type.
+/// Matrix conformances preserve the layout of both the fractional and integer results.
+public interface IFloatingPointWithIntegerPart : IFloatingPoint
+{
+    /// The integer output type, with the same logical shape and layout as `This`.
+    associatedtype IntegerPart : INumericShapedType;
+    __constraint IntegerPart.Scalar == int;
+
+    /// Splits this value into component-wise integer and fractional parts.
+    ///
+    /// Each whole part must be representable as `int`. The whole parts are truncated toward
+    /// zero and written to `integralPart`. The returned fractions follow
+    /// `fractionalPart(out This)` semantics, including the target's treatment of signed zero.
+    This fractionalPart(out IntegerPart integralPart);
+}
+
+/// Scalar refinement of `IFloatingPointWithIntegerPart` with a plain `int` output.
+public interface IScalarFloatingPointWithIntegerPart
+    : IFloatingPointWithIntegerPart, IScalarFloatingPoint
+{
+    __constraint IntegerPart == int;
+}
+
 /// Supports exponential, logarithmic, and power functions without implying arithmetic or ordering.
 public interface IExponentialFunctions
 {

@@ -295,6 +295,7 @@ The typical arithmetic operations are divided as follows:
 - `IFractional` refines `INumeric`, and provides division and reciprocal operations.
   It does not imply floating-point representation, elementary functions, ordering, or differentiability.
 - `IFloatingPoint` refines `IFractional`, and provides operations tied to a floating-point representation, including rounding, floating-point remainder, splitting, sign copying, and classification.
+- `IFloatingPointWithIntegerPart` refines `IFloatingPoint` with splitting into a floating-point fraction and a same-shape `int` output.
 
 The separation between `IFractional` and `IFloatingPoint` allows developers to introduce custom fixed-point, ratio, dual-number, and interval types without forcing them to provide the illusion of an IEEE-like representation.
 
@@ -322,6 +323,36 @@ When a generic algorithm only works with scalar types, then one of the scalar-sp
 - `IScalarUnsignedIntegerType`
 - `IScalarFractional`
 - `IScalarFloatingPoint`
+- `IScalarFloatingPointWithIntegerPart`
+
+### Splitting Floating-Point Values
+
+`IFloatingPoint` supports `modf(value, integralPart)` with both arguments of the same type.
+For an integer output, `IFloatingPointWithIntegerPart` provides the associated type `IntegerPart`:
+
+```slang
+T split<T : IFloatingPointWithIntegerPart>(T value, out T.IntegerPart whole)
+{
+    return modf(value, whole);
+}
+```
+
+For built-in floating-point scalars, `IntegerPart` is `int`.
+For vectors and matrices, it has the same dimensions and `int` components; matrices preserve their layout in both results.
+The whole parts truncate toward zero and must be representable as `int`.
+The returned fractions preserve the behavior of the floating-point-output operation, including its treatment of signed zero on each target.
+
+`IScalarFloatingPointWithIntegerPart` fixes `IntegerPart` to `int`, so scalar algorithms can declare a plain integer output:
+
+```slang
+T splitScalar<T : IScalarFloatingPointWithIntegerPart>(T value, out int whole)
+{
+    return modf(value, whole);
+}
+```
+
+A user-defined floating-point type opts in by implementing the applicable refinement, defining `IntegerPart`, and providing `fractionalPart(out IntegerPart)`.
+Types implementing `IFloatingPoint` alone continue to support floating-point outputs.
 
 ### Elementary-Function Capabilities
 
@@ -522,7 +553,8 @@ Importing `slang.numerics.differentiable` adds the corresponding differentiable 
 
 Known limitations include:
 
-- Matrices of built-in integer types currently conform only to `INumericExtrema`, rather than to the full integer interface hierarchy.
+- Matrices of built-in integer types provide `INumericExtrema`.
+  Matrices with `int` components also provide `INumericShapedType` for integer-output splitting, but do not implement the full integer arithmetic interface hierarchy.
 - Cooperative vectors of built-in floating-point types satisfy `IReal`, but do not currently conform to `IFloatingPoint`.
 - Dot-product conformances currently cover built-in numeric scalars and ordinary vectors, but not matrices or cooperative vectors.
 - Cooperative matrices do not currently conform to the numeric interfaces.
