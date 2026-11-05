@@ -225,7 +225,8 @@ public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 // GLSL's `*` and `*=` on matrices and vectors compute the algebraic product. Each overload
 // below forwards to `mul` with its operands swapped, so its target set mirrors that of the
-// `mul` overload it calls; whether `double` can be emitted on a target is not modelled here (#10232).
+// `mul` overload it calls. The `double` overload also requires `fp64`, because `double` itself
+// does.
 
 [ForceInline]
 [OverloadRank(15)]
@@ -271,7 +272,7 @@ public matrix<half, N, N> operator*=<let N:int>(inout matrix<half, N, N> m1, mat
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(fp64, sm_4_0_version)]
 public matrix<double, N, N> operator*=<let N:int>(inout matrix<double, N, N> m1, matrix<double, N, N> m2)
 {
     m1 = mul(m2, m1);
