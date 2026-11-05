@@ -1,4 +1,4 @@
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:INTERPRET(filecheck=CHECK,exit-code=1):
 
 // A *runtime* `String` value has no representation on the slangi CPU interpreter:
 // `String` is a host-only managed object with no HostVM byte layout, so the value
@@ -18,7 +18,6 @@ bool cmpF(float a, float b)
 
 void main()
 {
-    //CHECK: result code = 1
     //CHECK-NOT: error[E99999]
     //CHECK-NOT: error[E99997]
     // Two E52014 diagnostics fire, order-independent: one for the runtime `string`

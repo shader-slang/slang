@@ -73,7 +73,8 @@ target_include_directories(
 # Skip optimization in MSVC Debug builds to avoid /RTC1 conflicts.
 # GCC/Clang don't have this issue, so they get size optimization in all configs.
 string(
-    CONCAT RICH_DIAG_SIZE_OPT_FLAGS
+    CONCAT
+    RICH_DIAG_SIZE_OPT_FLAGS
     "$<$<NOT:"
     "$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>"
     ">:"
@@ -86,6 +87,26 @@ set_source_files_properties(
     PROPERTIES
         SKIP_PRECOMPILE_HEADERS ON
         COMPILE_OPTIONS "${RICH_DIAG_SIZE_OPT_FLAGS}"
+)
+
+# MSVC can exceed the COFF section limit for this translation unit in optimized
+# ARM64 builds. Use the extended object format to accommodate its generated code.
+set_property(
+    SOURCE slang-check-decl.cpp
+    APPEND
+    PROPERTY COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/bigobj>"
+)
+
+# mimalloc-new-delete.h defines the aligned operator new/delete overloads only when __cplusplus
+# reports C++17 or later, which MSVC does only with /Zc:__cplusplus. We set the option on this file
+# alone because it changes the __cplusplus checks in every header a file includes, such as
+# slang-common.h. The file also skips the precompiled header, which is built without the option,
+# because MSVC expects a file that uses a precompiled header to be compiled with consistent options.
+set_source_files_properties(
+    slang-mimalloc.cpp
+    PROPERTIES
+        SKIP_PRECOMPILE_HEADERS ON
+        COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>"
 )
 
 #
@@ -438,7 +459,8 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED" AND SLANG_ENABLE_SLANG_PROXY)
     # Create a minimal C++ source file (some linkers require at least one source)
     set(SLANG_PROXY_STUB_CPP "${CMAKE_CURRENT_BINARY_DIR}/slang-proxy-stub.cpp")
     file(
-        WRITE "${SLANG_PROXY_STUB_CPP}"
+        WRITE
+        "${SLANG_PROXY_STUB_CPP}"
         "// Minimal stub file for slang.dll proxy\n"
         "// All exports are forwarded to slang-compiler.dll via the .def file\n"
     )
@@ -452,7 +474,8 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED" AND SLANG_ENABLE_SLANG_PROXY)
         "${CMAKE_CURRENT_BINARY_DIR}/generate-def-wrapper-$<CONFIG>.cmake"
     )
     file(
-        GENERATE OUTPUT "${DEF_GEN_WRAPPER}"
+        GENERATE OUTPUT
+        "${DEF_GEN_WRAPPER}"
         CONTENT
             "
 set(DLL_PATH \"$<TARGET_FILE:slang>\")

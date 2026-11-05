@@ -29,8 +29,7 @@ struct [__NonCopyableType] TestType
 #endif
 
 // No diagnostics expected before Slang 2025
-//CHECK: result code = 0
-//CHECK-NEXT: standard error = {
+//CHECK: standard error = {
 //CHECK-NEXT: }
 
 [numthreads(1, 1, 1)]

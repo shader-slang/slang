@@ -53,3 +53,24 @@ SLANG_UNIT_TEST(testToolUtilBareArgv0)
     SLANG_CHECK(existingResult.getLength() > 0);
     SLANG_CHECK(existingResult == Path::getParentDirectory(selfPath));
 }
+
+// Verify the mapping from a tool's `SlangResult` to its process return code. In particular, an
+// ordinary compilation failure (-1) must stay distinguishable from an internal compiler error (-2).
+SLANG_UNIT_TEST(testToolUtilReturnCode)
+{
+    SLANG_CHECK(TestToolUtil::getReturnCode(SLANG_OK) == ToolReturnCode::Success);
+    SLANG_CHECK(TestToolUtil::getReturnCode(SLANG_FAIL) == ToolReturnCode::Failed);
+    SLANG_CHECK(TestToolUtil::getReturnCode(SLANG_E_NOT_AVAILABLE) == ToolReturnCode::Ignored);
+    SLANG_CHECK(
+        TestToolUtil::getReturnCode(SLANG_E_INTERNAL_FAIL) == ToolReturnCode::CompilationFailed);
+    SLANG_CHECK(
+        TestToolUtil::getReturnCode(SLANG_E_ABORT) == ToolReturnCode::InternalCompilerError);
+
+    SLANG_CHECK(int(ToolReturnCode::CompilationFailed) == -1);
+    SLANG_CHECK(int(ToolReturnCode::InternalCompilerError) == -2);
+
+    // The new code is a valid value when a tool's exit code is read back.
+    SLANG_CHECK(TestToolUtil::getReturnCodeFromInt(-2) == ToolReturnCode::InternalCompilerError);
+    SLANG_CHECK(TestToolUtil::getReturnCodeFromInt(-1) == ToolReturnCode::CompilationFailed);
+    SLANG_CHECK(!TestToolUtil::isDone(ToolReturnCode::InternalCompilerError));
+}

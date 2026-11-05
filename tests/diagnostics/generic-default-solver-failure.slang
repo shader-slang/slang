@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 // A generic default argument whose substituted type does not satisfy a source
 // constraint now reports the focused non-conformance diagnostic instead of the

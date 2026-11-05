@@ -883,5 +883,7 @@ return {
 	["Decoration.fileOrNamespaceScopeMutableVar"] = 907,
 	["Decoration.uninitializedGlobalCheckFoundPossibleWrite"] = 908,
 	["Decoration.glslPatch"] = 909,
-	["Type.MetalConstantBufferLayout"] = 910
+	["Type.MetalConstantBufferLayout"] = 910,
+	["Type.TraceProgramDescriptor"] = 911,
+	["metalTraceRay"] = 912
 }

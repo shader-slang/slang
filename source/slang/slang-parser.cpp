@@ -6126,10 +6126,19 @@ static void CompleteDecl(
             {
                 for (auto enumCase : enumDecl->getMembersOfType<EnumCaseDecl>())
                 {
+                    // We add one alias per distinct case name. The redeclaration check of the
+                    // `EnumCaseDecl` reports a repeated case, and an alias for it would be
+                    // reported again at the same location.
+                    if (enumDecl->getPrevDirectMemberDeclWithSameName(enumCase))
+                        continue;
                     auto staticConstDecl = parser->astBuilder->create<LetDecl>();
                     staticConstDecl->nameAndLoc = enumCase->nameAndLoc;
                     addModifier(staticConstDecl, parser->astBuilder->create<HLSLStaticModifier>());
                     addModifier(staticConstDecl, parser->astBuilder->create<ConstModifier>());
+                    auto aliasModifier =
+                        parser->astBuilder->create<UnscopedEnumCaseAliasModifier>();
+                    aliasModifier->enumCaseDecl = enumCase;
+                    addModifier(staticConstDecl, aliasModifier);
 
                     // Copy visibility modifiers from the enum declaration
                     if (auto visibilityModifier = modifiers.findModifier<VisibilityModifier>())

@@ -2,7 +2,7 @@
 // selecting a struct that contains a resource through control flow is also
 // rejected.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry main -stage fragment
 
 Texture2D<float> t0, t1;
 SamplerState samp;

@@ -1795,26 +1795,6 @@ void MetalSourceEmitter::emitPostDeclarationAttributesForType(IRInst* type)
     }
 }
 
-static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)
-{
-    switch (mode)
-    {
-    case IRInterpolationMode::PerVertex:
-    case IRInterpolationMode::NoInterpolation:
-        return UnownedStringSlice::fromLiteral("[[flat]]");
-    case IRInterpolationMode::NoPerspective:
-        return UnownedStringSlice::fromLiteral("[[center_no_perspective]]");
-    case IRInterpolationMode::Linear:
-        return UnownedStringSlice::fromLiteral("[[sample_no_perspective]]");
-    case IRInterpolationMode::Sample:
-        return UnownedStringSlice::fromLiteral("[[sample_perspective]]");
-    case IRInterpolationMode::Centroid:
-        return UnownedStringSlice::fromLiteral("[[center_perspective]]");
-    default:
-        return UnownedStringSlice();
-    }
-}
-
 void MetalSourceEmitter::emitInterpolationModifiersImpl(
     IRInst* varInst,
     IRType* valueType,
@@ -1823,20 +1803,59 @@ void MetalSourceEmitter::emitInterpolationModifiersImpl(
     SLANG_UNUSED(layout);
     SLANG_UNUSED(valueType);
 
+    // MSL takes one interpolation attribute that combines the sampling (center, centroid,
+    // sample) and the perspective correction: [[center_perspective]] (the default),
+    // [[centroid_no_perspective]], ..., or [[flat]]. HLSL `linear` is perspective-correct
+    // interpolation; HLSL `noperspective` is the no_perspective one.
+    bool isFlat = false;
+    bool hasInterpolation = false;
+    bool noPerspective = false;
+    const char* sampling = "center";
     for (auto dd : varInst->getDecorations())
     {
         if (dd->getOp() != kIROp_InterpolationModeDecoration)
             continue;
 
         auto decoration = (IRInterpolationModeDecoration*)dd;
-
-        UnownedStringSlice modeText = _getInterpolationModifierText(decoration->getMode());
-        if (modeText.getLength() > 0)
+        switch (decoration->getMode())
         {
-            m_writer->emit(modeText);
-            m_writer->emitChar(' ');
+        case IRInterpolationMode::PerVertex:
+        case IRInterpolationMode::NoInterpolation:
+            isFlat = true;
+            break;
+        case IRInterpolationMode::NoPerspective:
+            noPerspective = true;
+            hasInterpolation = true;
+            break;
+        case IRInterpolationMode::Linear:
+            hasInterpolation = true;
+            break;
+        case IRInterpolationMode::Sample:
+            sampling = "sample";
+            hasInterpolation = true;
+            break;
+        case IRInterpolationMode::Centroid:
+            sampling = "centroid";
+            hasInterpolation = true;
+            break;
+        default:
+            break;
         }
     }
+
+    if (isFlat)
+    {
+        m_writer->emit("[[flat]] ");
+        return;
+    }
+    // Perspective-correct center interpolation is the default.
+    if (!hasInterpolation || (!noPerspective && strcmp(sampling, "center") == 0))
+        return;
+
+    m_writer->emit("[[");
+    m_writer->emit(sampling);
+    m_writer->emit(noPerspective ? "_no_perspective" : "_perspective");
+    m_writer->emit("]] ");
 }
 
 void MetalSourceEmitter::emitPackOffsetModifier(

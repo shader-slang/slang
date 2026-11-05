@@ -1,7 +1,7 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: model=claude-sonnet-5-5
+//META: generated_at=2026-11-02T10:45:10+00:00
+//META: source_commit=6815ed82d5e8c95b0e1258ca2eba0ca9c7825d86
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizebyteaddressbufferops-for-hlsl
 //META: doc_section_digest=d093c1c0ef8904739d27d771cab4511d30ca9bc27fc503dd95a0f9d725162773
 //META: purpose=legalizeByteAddressBufferOps uses default HLSL options so Load<T> survives as a templated method call.
@@ -28,5 +28,5 @@ void main(uint3 tid : SV_DispatchThreadID)
     outBuf.Store<int>(tid.x * 4, x * 2);
 }
 
-// CHECK: Load<int{{.*}}>(
 // CHECK: .Store(
+// CHECK-SAME: Load<int{{.*}}>(
