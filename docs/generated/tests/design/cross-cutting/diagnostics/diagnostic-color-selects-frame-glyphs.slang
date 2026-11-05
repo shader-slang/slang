@@ -18,7 +18,12 @@
 // always` the assertions swap: the `-->` arrow must be gone and the
 // `╭╼` / `│` / `━` box-drawing forms must be present. Asserting each
 // mode's absence as well as its presence is what makes this a test of
-// the selection rather than of one rendering.
+// the selection rather than of one rendering. The `[E30015]` lines pin
+// the failure to the undefined identifier, so that `exit-code=-1` cannot
+// pass on an unrelated error. They match only the bracketed code because
+// `always` mode wraps the severity word in colour escapes, and they are
+// plain CHECK lines ahead of the `-NOT` lines because a `-DAG` match on
+// the header line would shrink each `-NOT` region to the text before it.
 
 //TEST:SIMPLE(filecheck=ASCII,exit-code=-1):-target hlsl -entry main -stage compute -diagnostic-color never
 //TEST:SIMPLE(filecheck=UNICODE,exit-code=-1):-target hlsl -entry main -stage compute -diagnostic-color always
@@ -32,12 +37,12 @@ void main(uint3 tid : SV_DispatchThreadID)
     outBuf[tid.x] = notDeclaredAnywhere;
 }
 
+// ASCII: [E30015]
 // ASCII-NOT: {{╭╼}}
 // ASCII-DAG: --> {{.*}}diagnostic-color-selects-frame-glyphs.slang
 // ASCII-DAG: {{\^\^\^\^}}
-// ASCII-DAG: [E30015]
 
+// UNICODE: [E30015]
 // UNICODE-NOT: -->
 // UNICODE-DAG: {{╭╼}}{{.*}}diagnostic-color-selects-frame-glyphs.slang
 // UNICODE-DAG: {{━━━━}}
-// UNICODE-DAG: [E30015]
