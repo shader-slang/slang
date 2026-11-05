@@ -2144,15 +2144,59 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
     return nullptr;
 }
 
-SourceFile* Linkage::loadSourceFile(String pathFrom, String path)
+// Find and load the source files that a serialized module records as its file dependencies,
+// adding one entry to `outSourceFiles` for each recorded path: the loaded file, or `nullptr` if it
+// can't be found.
+//
+// The recorded paths are the ones `encodeModuleDependencyPaths` writes. The first is the module's
+// own source file, relative to the first search directory that contains it, or else to the working
+// directory, so we look it up the way an `#include` from `binaryModulePath` would be found and then
+// in the working directory. Every later path is relative to the directory of that source file, so
+// once the source file is found we resolve the later paths against that directory alone.
+// Searching the include directories for them would accept any file with the same relative
+// spelling under another search root, and the module would then be checked against, and depend
+// on, a file it was not compiled from.
+//
+// When the module's own source file can't be found, as for a precompiled module distributed
+// without its sources, there is no directory to resolve against, so we look up the later paths the
+// same way as the first.
+void Linkage::loadSerializedModuleFileDependencies(
+    String const& binaryModulePath,
+    ModuleChunk const* moduleChunk,
+    List<SourceFile*>& outSourceFiles)
 {
     IncludeSystem includeSystem(&getSearchDirectories(), getFileSystemExt(), getSourceManager());
-    ComPtr<slang::IBlob> blob;
-    PathInfo pathInfo;
-    SLANG_RETURN_NULL_ON_FAIL(includeSystem.findFile(path, pathFrom, pathInfo));
-    SourceFile* sourceFile = nullptr;
-    SLANG_RETURN_NULL_ON_FAIL(includeSystem.loadFile(pathInfo, blob, sourceFile));
-    return sourceFile;
+
+    bool isModuleSourceFile = true;
+    String moduleSourcePath;
+    for (auto dependencyChunk : moduleChunk->getFileDependencies())
+    {
+        String dependencyPath = dependencyChunk->getValue();
+
+        PathInfo pathInfo;
+        SlangResult findResult =
+            moduleSourcePath.getLength()
+                ? includeSystem
+                      .findFile(SLANG_PATH_TYPE_FILE, moduleSourcePath, dependencyPath, pathInfo)
+                : includeSystem.findFile(dependencyPath, binaryModulePath, pathInfo);
+        if (isModuleSourceFile && SLANG_FAILED(findResult))
+            findResult = includeSystem.findFile(
+                SLANG_PATH_TYPE_DIRECTORY,
+                String(),
+                dependencyPath,
+                pathInfo);
+
+        SourceFile* sourceFile = nullptr;
+        ComPtr<ISlangBlob> blob;
+        if (SLANG_FAILED(findResult) ||
+            SLANG_FAILED(includeSystem.loadFile(pathInfo, blob, sourceFile)))
+            sourceFile = nullptr;
+        outSourceFiles.add(sourceFile);
+
+        if (isModuleSourceFile && SLANG_SUCCEEDED(findResult))
+            moduleSourcePath = pathInfo.foundPath;
+        isModuleSourceFile = false;
+    }
 }
 
 // Check if a serialized module is up-to-date with current compiler options and source files.
@@ -2169,59 +2213,19 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
     digestBuilder.append(version);
     m_optionSet.buildHash(digestBuilder);
 
-    // Find the canonical path of the directory containing the module source file.
-    String moduleSrcPath = "";
-
-    auto dependencyChunks = moduleChunk->getFileDependencies();
-    // The first dependency is the module's own source file. We still check it like the rest of
-    // the dependencies, but if that primary source is unavailable we accept the standalone
-    // precompiled module instead of treating it as stale. Missing later dependencies still
-    // indicate a stale source-backed module cache.
-    auto firstDependencyChunk = dependencyChunks.getFirst();
-    if (firstDependencyChunk)
+    List<SourceFile*> dependencyFiles;
+    loadSerializedModuleFileDependencies(fromPath, moduleChunk, dependencyFiles);
+    for (Index i = 0; i < dependencyFiles.getCount(); i++)
     {
-        moduleSrcPath = firstDependencyChunk->getValue();
-
-        IncludeSystem includeSystem(
-            &getSearchDirectories(),
-            getFileSystemExt(),
-            getSourceManager());
-        PathInfo modulePathInfo;
-        if (SLANG_SUCCEEDED(includeSystem.findFile(moduleSrcPath, fromPath, modulePathInfo)))
-        {
-            moduleSrcPath = modulePathInfo.foundPath;
-            Path::getCanonical(moduleSrcPath, moduleSrcPath);
-        }
-    }
-
-    Index dependencyIndex = 0;
-    for (auto dependencyChunk : dependencyChunks)
-    {
-        auto file = dependencyChunk->getValue();
-        auto sourceFile = loadSourceFile(fromPath, file);
+        auto sourceFile = dependencyFiles[i];
         if (!sourceFile)
         {
-            // If we cannot find the source file from `fromPath`,
-            // try again from the module's source file path.
-            if (dependencyChunks.getFirst())
-                sourceFile = loadSourceFile(moduleSrcPath, file);
-        }
-        if (!sourceFile)
-        {
-            if (dependencyIndex == 0)
-            {
-                // If the module's own source file is unavailable, we can't prove staleness, so
-                // fall back to accepting the standalone precompiled module. Missing later
-                // dependencies still indicate a stale source-backed module cache.
-                return true;
-            }
-            else
-            {
-                return false;
-            }
+            // If the module's own source file is unavailable, we can't prove staleness, so
+            // fall back to accepting the standalone precompiled module. Missing later
+            // dependencies still indicate a stale source-backed module cache.
+            return i == 0;
         }
         digestBuilder.append(sourceFile->getDigest());
-        dependencyIndex++;
     }
     return digestBuilder.finalize() == existingDigest;
 }
@@ -2602,40 +2606,16 @@ SlangResult Linkage::loadSerializedModuleContents(
     SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule));
     module->setIRModule(irModule);
 
-    // The handling of file dependencies is complicated, because of
-    // the way that the encoding logic tried to make all of the
-    // paths be relative to the primary source file for the module.
-    //
-    // We end up needing to undo some amount of that work here.
-    //
-
     module->clearFileDependency();
-    String moduleSourcePath = moduleFilePathInfo.foundPath;
-    bool isFirst = true;
-    for (auto depenencyFileChunk : moduleChunk->getFileDependencies())
+    List<SourceFile*> dependencyFiles;
+    loadSerializedModuleFileDependencies(
+        moduleFilePathInfo.foundPath,
+        moduleChunk,
+        dependencyFiles);
+    for (auto sourceFile : dependencyFiles)
     {
-        auto encodedDependencyFilePath = depenencyFileChunk->getValue();
-
-        auto sourceFile = loadSourceFile(moduleFilePathInfo.foundPath, encodedDependencyFilePath);
-        if (isFirst)
-        {
-            // The first file is the source for the main module file.
-            // We store the module path as the basis for finding the remaining
-            // dependent files.
-            if (sourceFile)
-                moduleSourcePath = sourceFile->getPathInfo().foundPath;
-            isFirst = false;
-        }
-        // If we cannot find the dependent file directly, try to find
-        // it relative to the module source path.
-        if (!sourceFile)
-        {
-            sourceFile = loadSourceFile(moduleSourcePath, encodedDependencyFilePath);
-        }
         if (sourceFile)
-        {
             module->addFileDependency(sourceFile);
-        }
     }
     module->setPathInfo(moduleFilePathInfo);
     module->setDigest(moduleChunk->getDigest());
