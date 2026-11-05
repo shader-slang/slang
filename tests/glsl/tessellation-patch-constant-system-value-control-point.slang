@@ -1,10 +1,13 @@
 //TEST:SIMPLE(filecheck=HULL):-target glsl -entry hullMain -stage hull
 //TEST:SIMPLE(filecheck=HULL):-target glsl -entry hullStruct -stage hull
+//TEST:SIMPLE(filecheck=HULL):-target glsl -entry hullGlobal -stage hull
 //TEST:SIMPLE(filecheck=DOMAIN):-target glsl -entry domainMain -stage domain
 
 // A control-point output made only of system values (gl_Position, gl_ClipDistance) occupies no
 // location, so the hull numbers its `patch` outputs from 0. The domain stage gives the same
-// patch-constant fields the same locations, which the two stages must agree on.
+// patch-constant fields the same locations.
+// `hullGlobal` writes its control point through a global `out` with `SV_Position`, which
+// also occupies no location.
 // `domainMain` declares `PatchData` before `OutputPatch` on purpose: with no location in the
 // control point, the order does not change where the patch-constant fields start.
 
@@ -66,6 +69,19 @@ float4 hullMain(InputPatch<float4, 3> input, uint id : SV_OutputControlPointID) 
 ControlPoint hullStruct(InputPatch<ControlPoint, 3> input, uint id : SV_OutputControlPointID)
 {
     return input[id];
+}
+
+out float4 gPos : SV_Position;
+
+[shader("hull")]
+[domain("tri")]
+[partitioning("integer")]
+[outputtopology("triangle_cw")]
+[outputcontrolpoints(3)]
+[patchconstantfunc("constants")]
+void hullGlobal(InputPatch<ControlPoint, 3> input, uint id : SV_OutputControlPointID)
+{
+    gPos = input[id].pos;
 }
 
 [shader("domain")]

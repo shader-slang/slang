@@ -12,6 +12,8 @@
 //HULL: {{^}}patch{{$}}
 //HULL-NEXT: layout(location = 2)
 //HULL-NEXT: out vec4 {{.*}}extra
+//HULL: layout(location = 0)
+//HULL-NEXT: out vec3 {{.*}}gNormal
 
 //DOMAIN: {{^}}patch{{$}}
 //DOMAIN-NEXT: layout(location = 1)

@@ -1300,24 +1300,27 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     IRFunc* func,
     IRVarLayout* resultLayout);
 
-/// Returns one past the last `VaryingOutput` Location that `varLayout` occupies in the front-end
-/// layout, or 0 when it occupies none (for example, a builtin such as `SV_Position`, or the empty
-/// layout that `lowerEntryPointResultLayout` builds for a `void` result).
+/// Returns one past the last `VaryingOutput` Location that the entry-point result layout
+/// `varLayout` occupies, or 0 when it occupies none (for example, a builtin such as `SV_Position`,
+/// or the empty layout that `lowerEntryPointResultLayout` builds for a `void` result). The layout
+/// comes from the front end, or from `translateGlobalVaryingVar` when the entry point writes
+/// global `out` variables; both give it an absolute `VaryingOutput` offset.
 static UInt getVaryingOutputLocationEnd(IRVarLayout* varLayout)
 {
     SLANG_RELEASE_ASSERT(varLayout);
     auto offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput);
     auto sizeAttr = varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::VaryingOutput);
-    // The front end gives a var layout an offset for every resource kind its type layout uses.
+    // Both producers give the result an offset for every resource kind its type layout uses.
     SLANG_RELEASE_ASSERT(!offsetAttr == !sizeAttr);
     if (!sizeAttr)
         return 0;
     return offsetAttr->getOffset() + sizeAttr->getFiniteSize();
 }
 
-/// Calls the hull's patch-constant function at the end of the hull entry point and gives its
-/// result outputs `Patch` Locations. `entryPointResultLayout` is the hull's front-end result
-/// layout, the one that placed `outputPatchVal`; the patch-constant outputs start where it ends.
+/// Calls the hull's patch-constant function at the end of the hull entry point and numbers its
+/// result outputs. `entryPointResultLayout` is the layout that
+/// `legalizeEntryPointReturnValueForGLSL` used to create the globals behind `outputPatchVal`; the
+/// patch-constant outputs start at its `VaryingOutput` end.
 void invokePatchConstantFuncInHullShader(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
