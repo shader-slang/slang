@@ -37,6 +37,25 @@ float readPtrThenSync(Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p
     return t;
 }
 
+// Redundant store removal must keep the first store: other threads read `*p` after the
+// barrier, so the barrier call has to count as an access to `*p`.
+// METAL-LABEL: void writeTwiceAcrossSync_0(
+// METAL-SAME: * [[Q:p_[0-9]+]])
+// METAL: *[[Q]] = 1.0f;
+// METAL-NEXT: threadgroup_barrier(mem_flags::mem_threadgroup);
+// METAL-NEXT: *[[Q]] = 2.0f;
+// CUDA-LABEL: void writeTwiceAcrossSync_0(
+// CUDA-SAME: * [[Q:p_[0-9]+]])
+// CUDA: *[[Q]] = 1.0f;
+// CUDA-NEXT: __syncthreads();
+// CUDA-NEXT: *[[Q]] = 2.0f;
+void writeTwiceAcrossSync(Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p)
+{
+    *p = 1.0f;
+    GroupMemoryBarrierWithGroupSync(); // other threads read `*p` here
+    *p = 2.0f;
+}
+
 RWStructuredBuffer<float> io;
 
 [shader("compute")]
@@ -50,5 +69,8 @@ void main(uint3 gtid: SV_GroupThreadID)
     GroupMemoryBarrierWithGroupSync();
     float b = readPtrThenSync(__getAddress(sh[0]));
     sh[gtid.x] = b + 2.0f;
+    GroupMemoryBarrierWithGroupSync();
+    writeTwiceAcrossSync(__getAddress(sh[1]));
+    b += sh[1];
     io[gtid.x] = a + b;
 }
