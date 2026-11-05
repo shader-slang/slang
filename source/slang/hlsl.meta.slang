@@ -12826,7 +12826,8 @@ $}
 /// On Metal, `InterlockedAdd` and `InterlockedExchange` are the only functions in this family that
 /// accept a floating-point `T`, and only a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
-/// memory. On WGSL, floating-point types are not supported.
+/// memory.
+/// On WGSL, floating-point types are not supported.
 /// @category atomic Atomic functions
 [ForceInline]
 __glsl_version(430)
@@ -12869,7 +12870,8 @@ $}
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
-/// memory. On WGSL, floating-point types are not supported.
+/// memory.
+/// On WGSL, floating-point types are not supported.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12892,8 +12894,8 @@ void InterlockedCompareExchange<T:IAtomicable>(__ref T dest, T compare_value, T 
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
 /// On Metal, `dest` must be in device memory, such as a `RWStructuredBuffer` element or a device
-/// pointer, not a texture, a `RWBuffer` or `groupshared` memory. On WGSL, this function is not
-/// available.
+/// pointer, not a texture, a `RWBuffer` or `groupshared` memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12921,7 +12923,8 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
-/// memory. On WGSL, this function is not available.
+/// memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12951,7 +12954,8 @@ void InterlockedCompareStore<T:IAtomicable>(__ref T dest,  T compare_value,  T v
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
-/// memory. On WGSL, this function is not available.
+/// memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
