@@ -6,6 +6,9 @@
 //TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-custom-integer-part.hlsl -experimental-feature -DTEST_INTEGER_PART
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-custom-integer-part.spv -experimental-feature -DTEST_INTEGER_PART
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=INTEGER): -cpu -output-using-type -Xslang -experimental-feature -Xslang -DTEST_INTEGER_PART
+//TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-custom-wide-integer-part.hlsl -experimental-feature -DTEST_INTEGER_PART -DTEST_WIDE_INTEGER_PART
+//TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-custom-wide-integer-part.spv -experimental-feature -DTEST_INTEGER_PART -DTEST_WIDE_INTEGER_PART
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=INTEGER): -cpu -output-using-type -Xslang -experimental-feature -Xslang -DTEST_INTEGER_PART -Xslang -DTEST_WIDE_INTEGER_PART
 
 import slang.numerics;
 
@@ -13,7 +16,7 @@ import slang.numerics;
 // The variants without `TEST_INTEGER_PART` require only the floating-output capability.
 // Defining `TEST_INTEGER_PART` opts the same type into integer outputs and also checks its
 // floating-output split.
-//TEST_INPUT:ubuffer(data=[-2.75 0.0], stride=4):name=inputBuffer
+//TEST_INPUT:ubuffer(data=[-2.75 0.0 4294967296.0], stride=4):name=inputBuffer
 StructuredBuffer<float> inputBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 // INTEGER: type: float
@@ -164,12 +167,20 @@ struct FloatingPointOnly : IScalarFloatingPoint
 #ifdef TEST_INTEGER_PART
 extension FloatingPointOnly : IScalarFloatingPointWithIntegerPart
 {
+#ifdef TEST_WIDE_INTEGER_PART
+    typealias IntegerPart = int64_t;
+#else
     typealias IntegerPart = int;
+#endif
 
     /// Split the wrapped value into its fractional part and integer whole part.
-    This fractionalPart(out int integralPart)
+    This fractionalPart(out IntegerPart integralPart)
     {
-        return {modf(value, integralPart)};
+        // We preserve the wrapped `float` split and convert only its whole part to `IntegerPart`.
+        float wholeValue;
+        float fractionalValue = modf(value, wholeValue);
+        integralPart = IntegerPart(wholeValue);
+        return {fractionalValue};
     }
 }
 
@@ -179,8 +190,10 @@ T splitIntegerShape<T : IFloatingPointWithIntegerPart>(T value, out T.IntegerPar
     return modf(value, integralPart);
 }
 
-/// Split an opaque custom scalar through a plain `int` output.
-T splitIntegerScalar<T : IScalarFloatingPointWithIntegerPart>(T value, out int integralPart)
+/// Split an opaque custom scalar through its chosen scalar integer-output type.
+T splitIntegerScalar<T : IScalarFloatingPointWithIntegerPart>(
+    T value,
+    out T.IntegerPart integralPart)
 {
     return modf(value, integralPart);
 }
@@ -254,15 +267,26 @@ void main()
 #endif
 {
 #ifdef TEST_INTEGER_PART
-    int integerPart;
+    FloatingPointOnly.IntegerPart integerPart;
+#ifdef TEST_WIDE_INTEGER_PART
+    // We use both signs of 2^32 to prove that neither generic split narrows its integer output
+    // through `int`. Integer comparisons occur before the Boolean results are stored as floats.
+    float inputValue = -inputBuffer[2];
+    float expectedFraction = 0.0;
+    FloatingPointOnly.IntegerPart expectedWhole = -int64_t(4294967296);
+#else
+    float inputValue = inputBuffer[0];
+    float expectedFraction = -0.75;
+    FloatingPointOnly.IntegerPart expectedWhole = -2;
+#endif
     FloatingPointOnly shapeFraction =
-        splitIntegerShape(FloatingPointOnly(inputBuffer[0]), integerPart);
-    outputBuffer[0] = float(shapeFraction.value == -0.75);
-    outputBuffer[1] = float(integerPart == -2);
+        splitIntegerShape(FloatingPointOnly(inputValue), integerPart);
+    outputBuffer[0] = float(shapeFraction.value == expectedFraction);
+    outputBuffer[1] = float(integerPart == expectedWhole);
     FloatingPointOnly scalarFraction =
-        splitIntegerScalar(FloatingPointOnly(-inputBuffer[0]), integerPart);
-    outputBuffer[2] = float(scalarFraction.value == 0.75);
-    outputBuffer[3] = float(integerPart == 2);
+        splitIntegerScalar(FloatingPointOnly(-inputValue), integerPart);
+    outputBuffer[2] = float(scalarFraction.value == -expectedFraction);
+    outputBuffer[3] = float(integerPart == -expectedWhole);
 
     FloatingPointOnly floatingPart;
     FloatingPointOnly floatingFraction =

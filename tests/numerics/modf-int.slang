@@ -61,8 +61,8 @@ T splitShape<T : IFloatingPointWithIntegerPart>(T value, out T.IntegerPart whole
     return modf(value, wholePart);
 }
 
-/// Split an opaque scalar using a plain `int` output.
-T splitScalar<T : IScalarFloatingPointWithIntegerPart>(T value, out int wholePart)
+/// Split an opaque scalar using its associated scalar integer output.
+T splitScalar<T : IScalarFloatingPointWithIntegerPart>(T value, out T.IntegerPart wholePart)
 {
     return modf(value, wholePart);
 }
@@ -100,7 +100,7 @@ matrix<T, R, C, L> splitBuiltinMatrix<
 /// Fill the associated integer-output shape with a scalar value.
 T.IntegerPart integerPartFromScalar<T : IFloatingPointWithIntegerPart>(int value)
 {
-    return T.IntegerPart.fromScalar(value);
+    return T.IntegerPart.fromScalar(T.IntegerPart.Scalar(value));
 }
 
 /// Require the associated integer output to be exactly the expected type, including layout.
