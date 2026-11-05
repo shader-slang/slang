@@ -57,7 +57,7 @@ that **the identifier is in fact bound to its documented role**.
      reaches the corresponding parse path (`if (c) { ... } else { ... }`,
      `for (...) { break; }`, `do { ... } while (c)`, `switch / case /
 default`, etc.) and observe the runtime effect. Negative form:
-     `//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):` to verify the
+     `//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):` to verify the
      keyword's misuse is rejected (e.g. `let x = ...; x = ...;` for
      immutability).
    - **decl keywords** — declare a `typealias`, `typedef`,
@@ -144,7 +144,7 @@ by the type of claim:
   `groupshared` becomes `groupshared` in HLSL and `shared` in GLSL),
   add one `//TEST:SIMPLE` line per feasible text-emit target with
   distinct `CHECK_<TARGET>` blocks.
-- `//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):` — use for "the
+- `//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):` — use for "the
   keyword's misuse is rejected" claims (e.g. `let` immutability,
   `private` member of a `public` struct).
 - `//TEST:SIMPLE(filecheck=CHECK):-target cpp -entry main -stage compute` —

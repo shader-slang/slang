@@ -555,6 +555,28 @@ matcher will consume. A `//TEST` directive with no corresponding
 CHECK pattern is rejected by lint — such a test runs but verifies
 nothing.
 
+**Exit code of a `filecheck=` directive.** A `SIMPLE`, `INTERPRET` or
+`REFLECTION` directive with `filecheck=` also checks the exit code of
+the tool, and the expected code is 0 unless the directive sets
+`exit-code=N`. A directive whose compile must fail sets `exit-code=-1`
+when the source gets an error diagnostic, and `exit-code=1` when
+`slangc` rejects the command line (an unknown option value, a missing
+`-get-module-info` file):
+
+```
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
+// CHECK: E30015
+```
+
+The directive also pins the error code of the diagnostic, so that it
+cannot pass on an unrelated error (`tools/slang-test/README.md`,
+"Exit code of tests"). A directive that expects a good compile, such
+as a `-dump-ir` test, keeps the default of 0: the IR dump is written
+before a later stage fails, so its CHECK lines can match a compile
+that failed, and only the exit code shows the failure.
+`DIAGNOSTIC_TEST:SIMPLE(diag=...)` does not check the exit code yet
+(#14266).
+
 ### FileCheck / CHECK pattern hygiene (READ — most CHECK failures come from these)
 
 You are writing a pattern that must match the compiler's _actual_
