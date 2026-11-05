@@ -1,7 +1,7 @@
 // A force-inlined helper called from a `static` global variable initializer keeps the debug
 // information of its locals. The initializer block is moved into the entry point that reads the
 // variable, so the inlined locals belong to a function there, unlike a `static const` initializer
-// that is inlined at module scope (see tests/bugs/14321-*).
+// that is inlined at module scope.
 
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute -g3
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute -g2

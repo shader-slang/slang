@@ -1,8 +1,8 @@
-// A force-inlined helper given a uniform argument in a struct `static const` initializer
-// compiles with debug information. The helper is inlined outside of any function, and its
-// debug information is not, because there is no debug scope there. A debug value left there
-// would keep a use of the uniform outside of any function, which the C++, CPU and Metal
-// targets cannot lower. The generic struct covers a helper that is inlined early, while the
+// With debug information, a force-inlined helper given a uniform argument in a struct
+// `static const` initializer compiles for C++ and Metal, and the initializers evaluate to 3, 5
+// and 9 on CPU and CUDA. The SIMPLE lanes check only that the compile completes. The helper is
+// inlined outside any function, where its debug instructions are not cloned. `GenericHolder`
+// uses `[__unsafeForceInlineEarly]` because that inlines before specialization, while the
 // initializer is still in the body of the generic.
 
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute -line-directive-mode none -g
