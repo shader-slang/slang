@@ -339,8 +339,9 @@ alias cpp_cuda_glsl_hlsl_spirv_llvm = cpp | cuda | glsl | hlsl | spirv | llvm;
 
 /// Code-generation targets on which Slang supports the 64-bit floating-point type `double`: C++,
 /// CUDA, GLSL, HLSL, SPIR-V and LLVM. WGSL and Metal have no such type and no extension that adds
-/// one. The builtin `double` type requires this capability, so a declaration that uses `double`
-/// should require `fp64` rather than an equivalent target list.
+/// one. The C source target (`c`) is not included. The builtin `double` type requires this
+/// capability, so a declaration that uses `double` should require `fp64` rather than an equivalent
+/// target list.
 /// [Compound]
 alias fp64 = cpp_cuda_glsl_hlsl_spirv_llvm;
 

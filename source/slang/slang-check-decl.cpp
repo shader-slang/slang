@@ -22345,8 +22345,10 @@ struct CapabilityDeclReferenceVisitor
     // rather than into the struct's own `inferredCapabilityRequirements`, because
     // `getDeclaredCapabilitySet` treats that set as the declared set of the struct's member
     // functions. Walking the specialized type also covers generic structs (`G<double>`), nested
-    // structs (`G<int>.Inner`) and base structs, and only a type that is used as a value takes
-    // part: a generic struct that only qualifies a name, as in `G<float>.f()`, adds nothing.
+    // structs (`G<int>.Inner`) and base structs. Every struct type the walk reaches takes part,
+    // including one named only as a generic argument, just as naming `double` there does; a
+    // generic struct that only qualifies a name, as in `G<float>.f()`, is not a type here and adds
+    // nothing.
     void visitDeclRefType(DeclRefType* type)
     {
         if (this->visitedVals.contains(type))
@@ -22359,16 +22361,20 @@ struct CapabilityDeclReferenceVisitor
     //
     // A field whose type is a resource, sampler or other opaque handle is skipped: type
     // legalization moves such fields out of the struct, so declaring the struct does not declare
-    // them, and code that reads one reaches its type through the member access instead.
+    // them, and code that reads one reaches its type through the member access instead. Metal
+    // parameter blocks are the exception, because Metal keeps their resource fields in the
+    // argument buffer, so an unused `RWStructuredBuffer<double>` field there is not caught here.
     //
-    // We walk the fields of each struct declaration once per walk, for the first specialization we
-    // meet. A recursive generic struct such as `struct LoopField<each T> { LoopField<T, int> next;
-    // }` otherwise produces a new specialization at every level. The generic arguments of every
-    // other specialization are operands of its type, which `visitVal` already visits.
+    // Each specialized struct type is walked once, because `visitDeclRefType` records it in
+    // `visitedVals`; two specializations of one generic struct can have different field types, as
+    // in `Box<A>` and `Box<B>` where a field is `T.Assoc`. A recursive generic struct such as
+    // `struct LoopField<each T> { LoopField<T, int> next; }` produces a new specialization at every
+    // level, so we stop at `kMaxTypeNestingDepth`, the depth at which lowering reports that type.
     void joinStructFieldRequirements(DeclRef<StructDecl> structDeclRef)
     {
-        if (!visitedStructDecls.add(structDeclRef.getDecl()))
+        if (structFieldNestingDepth >= kMaxTypeNestingDepth)
             return;
+        ++structFieldNestingDepth;
         auto astBuilder = this->getASTBuilder();
         for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
         {
@@ -22385,8 +22391,9 @@ struct CapabilityDeclReferenceVisitor
         }
         if (auto baseStructType = findBaseStructType(astBuilder, structDeclRef))
             this->dispatchIfNotNull(baseStructType);
+        --structFieldNestingDepth;
     }
-    HashSet<StructDecl*> visitedStructDecls;
+    UInt structFieldNestingDepth = 0;
     // Visit the default value of each parameter that a call leaves out, because code generation
     // evaluates that value at the call site. Consider this example:
     //
