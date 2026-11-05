@@ -291,9 +291,6 @@ buffer[j] = original;
 
 Slang decides whether the original value is used after its own optimizations,
 so an `original_value` argument that is never read normally counts as unused.
-With `-g` and `-minimum-slang-optimization`, Slang keeps that variable and the
-call reports error E55204; the two-argument `InterlockedMin(dest, value)` form
-does not have this limit.
 
 Every other 64-bit integer atomic, including any `int64_t` atomic, a
 `groupshared` destination, a memory order other than `MemoryOrder.Relaxed`, and
@@ -302,6 +299,13 @@ Every other 64-bit integer atomic, including any `int64_t` atomic, a
 only on some GPU families (see the Metal Feature Set Tables). Slang does not
 check the GPU family, so on other GPUs the failure comes from Metal, not from
 Slang.
+
+`-minimum-slang-optimization` skips these checks, as it skips Metal's other
+unsupported-operation checks. A supported 64-bit min or max is still emitted in
+the `void` form, but an unsupported 64-bit atomic is then emitted as an MSL call
+that the Metal compiler rejects instead of reporting E55204. With `-g` as well,
+Slang keeps a never-read `original_value` variable, so such a call also takes
+that path.
 
 ## Conservative Rasterization
 
