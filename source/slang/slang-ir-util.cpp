@@ -1643,9 +1643,16 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
-            // If addr is a global variable, calling a function may change its value.
-            // So we need to return true here to be conservative.
-            if (!isChildInstOf(getRootAddr(addr), func))
+            // Unless addr is in a local variable of `func`, calling a function may change the
+            // value at addr even when no argument points to it. This covers global variables,
+            // and also memory reached through a pointer, such as a pointer parameter or a
+            // pointer loaded from a struct. That memory may be groupshared or device memory,
+            // which other threads can write, and a barrier call orders the access against
+            // those writes. Metal, for example, reaches groupshared variables through a
+            // pointer in the kernel context, so the root of such an address is a load or a
+            // parameter in `func`, not a global.
+            auto rootAddr = getRootAddr(addr);
+            if (!(as<IRVar>(rootAddr) && isChildInstOf(rootAddr, func)))
             {
                 auto callee = call->getCallee();
                 if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
