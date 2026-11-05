@@ -89,38 +89,41 @@ Resource types are translated with appropriate Metal qualifiers:
 | `StructuredBuffer<T>` | `device* T`        |
 | `ConstantBuffer<T>`   | `constant* T`      |
 
-| Slang Type                        | Metal Translation                                                                         |
-| --------------------------------- | ----------------------------------------------------------------------------------------- |
-| `Texture1D`                       | `texture1d`                                                                               |
-| `Texture1DArray`                  | `texture1d_array`                                                                         |
-| `RWTexture1D`                     | `texture1d`                                                                               |
-| `RWTexture1DArray`                | `texture1d_array`                                                                         |
-| `Texture2D`                       | `texture2d`                                                                               |
-| `Texture2DArray`                  | `texture2d_array`                                                                         |
-| `RWTexture2D`                     | `texture2d`                                                                               |
-| `RWTexture2DArray`                | `texture2d_array`                                                                         |
-| `Texture3D`                       | `texture3d`                                                                               |
-| `RWTexture3D`                     | `texture3d`                                                                               |
-| `TextureCube`                     | `texturecube`                                                                             |
-| `TextureCubeArray`                | `texturecube_array`                                                                       |
-| `Buffer<T>`                       | `texture_buffer<T, access::read>`                                                         |
-| `RWBuffer<T>`                     | `texture_buffer<T, access::read_write>`                                                   |
-| `ByteAddressBuffer`               | `device* uint32_t`                                                                        |
-| `RWByteAddressBuffer`             | `device* uint32_t`                                                                        |
-| `StructuredBuffer<T>`             | `device* T`                                                                               |
-| `RWStructuredBuffer<T>`           | `device* T`                                                                               |
-| `AppendStructuredBuffer<T>`       | `device* T`                                                                               |
-| `ConsumeStructuredBuffer<T>`      | `device* T`                                                                               |
-| `ConstantBuffer<T>`               | `constant* T`                                                                             |
-| `SamplerState`                    | `sampler`                                                                                 |
-| `SamplerComparisonState`          | `sampler`                                                                                 |
-| `RaytracingAccelerationStructure` | `(Not supported)`                                                                         |
-| `RasterizerOrderedTexture2D`      | `texture2d [[raster_order_group(0)]]`                                                     |
-| `RasterizerOrderedBuffer<T>`      | `texture_buffer<T, access::write>` (no `raster_order_group` and no fence yet; see #13796) |
+| Slang Type                        | Metal Translation                       |
+| --------------------------------- | --------------------------------------- |
+| `Texture1D`                       | `texture1d`                             |
+| `Texture1DArray`                  | `texture1d_array`                       |
+| `RWTexture1D`                     | `texture1d`                             |
+| `RWTexture1DArray`                | `texture1d_array`                       |
+| `Texture2D`                       | `texture2d`                             |
+| `Texture2DArray`                  | `texture2d_array`                       |
+| `RWTexture2D`                     | `texture2d`                             |
+| `RWTexture2DArray`                | `texture2d_array`                       |
+| `Texture3D`                       | `texture3d`                             |
+| `RWTexture3D`                     | `texture3d`                             |
+| `TextureCube`                     | `texturecube`                           |
+| `TextureCubeArray`                | `texturecube_array`                     |
+| `Buffer<T>`                       | `texture_buffer<T, access::read>`       |
+| `RWBuffer<T>`                     | `texture_buffer<T, access::read_write>` |
+| `ByteAddressBuffer`               | `device* uint32_t`                      |
+| `RWByteAddressBuffer`             | `device* uint32_t`                      |
+| `StructuredBuffer<T>`             | `device* T`                             |
+| `RWStructuredBuffer<T>`           | `device* T`                             |
+| `AppendStructuredBuffer<T>`       | `device* T`                             |
+| `ConsumeStructuredBuffer<T>`      | `device* T`                             |
+| `ConstantBuffer<T>`               | `constant* T`                           |
+| `SamplerState`                    | `sampler`                               |
+| `SamplerComparisonState`          | `sampler`                               |
+| `RaytracingAccelerationStructure` | `(Not supported)`                       |
+| `RasterizerOrderedTexture2D`      | `texture2d [[raster_order_group(0)]]`   |
+| `RasterizerOrderedBuffer<T>`      | `texture_buffer<T, access::write>`      |
 
 `RasterizerOrderedTexture2D` resources receive the `[[raster_order_group(0)]]`
 attribute, for example `texture2d<float, access::read_write> tex
 [[raster_order_group(0)]]`.
+`RasterizerOrderedBuffer<T>` is currently emitted as a write-only
+`texture_buffer` without that attribute, so it is not raster-ordered and gets no
+fence; #13796 tracks restoring its `read_write` access.
 
 Metal makes a thread's write to an `access::read_write` texture visible to
 that thread's later reads only after a `fence()` on the texture. HLSL, SPIR-V
@@ -132,6 +135,13 @@ fence. Dawn observed on Apple M1 hardware that the leading fence is needed to
 prevent a write from moving ahead of an earlier read of the same texel
 (crbug.com/417296309). A write-only texture (`WTexture*`, `access::write`) has
 no `fence()` and gets none.
+
+The fence applies to the Slang texture types that Metal declares
+`access::read_write`: `RWTexture1D`, `RWTexture2D` and `RWTexture3D` and their
+array forms, `RWBuffer<T>`, and the `RasterizerOrderedTexture*` types. Buffers
+that Metal reaches through a `device` pointer, such as `RWStructuredBuffer<T>`
+and `RWByteAddressBuffer`, do not need a fence, because MSL defines `fence()`
+only for textures.
 
 The fence orders only the writing thread's own accesses. To make one thread's
 texture write visible to other threads in the same threadgroup, use `DeviceMemoryBarrier` or
