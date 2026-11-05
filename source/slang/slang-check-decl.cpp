@@ -22331,77 +22331,103 @@ struct CapabilityDeclReferenceVisitor
         if (Base::sourceLocStack.getCount())
             loc = Base::sourceLocStack.getLast();
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
-
-        // A generic struct such as `G<float>` is referenced through its generic declaration.
-        auto structDecl = as<StructDecl>(decl);
-        if (auto genericDecl = as<GenericDecl>(decl))
-            structDecl = as<StructDecl>(genericDecl->inner);
-        if (structDecl)
-            processInstanceFieldsOfStruct(structDecl, loc);
     }
-    // Join the capability requirements of a struct's instance fields, including those inherited
-    // from a base struct, into the code that uses the struct, because emitting a use of
-    // `struct S { float a; double b; }` declares `b` even when only `a` is read. The requirements
-    // apply at use sites rather than to the struct's own `inferredCapabilityRequirements`, because
+    // Visit a type that names a declaration, and join the requirements of a struct type's fields.
+    //
+    // Consider this example:
+    //
+    //     struct S { float a; double b; }
+    //     RWStructuredBuffer<S> sb;
+    //     void main() { output[0] = sb[0].a; }
+    //
+    // `main` never names `b`, but emitting a value of type `S` declares `b`, so `main` requires
+    // what `double` requires. We join the field requirements wherever the struct type is used,
+    // rather than into the struct's own `inferredCapabilityRequirements`, because
     // `getDeclaredCapabilitySet` treats that set as the declared set of the struct's member
-    // functions.
-    void processInstanceFieldsOfStruct(StructDecl* structDecl, SourceLoc loc)
+    // functions. Walking the specialized type also covers generic structs (`G<double>`), nested
+    // structs (`G<int>.Inner`) and base structs, and only a type that is used as a value takes
+    // part: a generic struct that only qualifies a name, as in `G<float>.f()`, adds nothing.
+    void visitDeclRefType(DeclRefType* type)
     {
-        if (!visitedStructDecls.add(structDecl))
+        if (this->visitedVals.contains(type))
             return;
-        for (auto field : structDecl->getFields())
+        Base::visitVal(type);
+        if (auto structDeclRef = type->getDeclRef().template as<StructDecl>())
+            joinStructFieldRequirements(structDeclRef);
+    }
+    // Visit the specialized type of each instance field of `structDeclRef` and of its base struct.
+    //
+    // A field whose type is a resource, sampler or other opaque handle is skipped: type
+    // legalization moves such fields out of the struct, so declaring the struct does not declare
+    // them, and code that reads one reaches its type through the member access instead.
+    //
+    // We walk the fields of each struct declaration once per walk, for the first specialization we
+    // meet. A recursive generic struct such as `struct LoopField<each T> { LoopField<T, int> next;
+    // }` otherwise produces a new specialization at every level. The generic arguments of every
+    // other specialization are operands of its type, which `visitVal` already visits.
+    void joinStructFieldRequirements(DeclRef<StructDecl> structDeclRef)
+    {
+        if (!visitedStructDecls.add(structDeclRef.getDecl()))
+            return;
+        auto astBuilder = this->getASTBuilder();
+        for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
         {
-            if (isEffectivelyStatic(field) || field->checkState.isBeingChecked())
+            auto fieldType = getType(astBuilder, fieldDeclRef);
+            Type* elementType = fieldType;
+            while (auto arrayType = as<ArrayExpressionType>(elementType))
+                elementType = arrayType->getElementType();
+            if (isOpaqueHandleType(elementType))
                 continue;
-            this->ensureDecl(field, DeclCheckState::CapabilityChecked);
-            handleProcessFunc(field, field->inferredCapabilityRequirements, loc);
+            typename Base::PushSourceLocRAII fieldLoc(
+                this->sourceLocStack,
+                fieldDeclRef.getDecl()->loc);
+            this->dispatchIfNotNull(fieldType);
         }
-        for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
-        {
-            auto baseDeclRefType = as<DeclRefType>(inheritanceDecl->base.type);
-            if (!baseDeclRefType)
-                continue;
-            if (auto baseStructDecl = as<StructDecl>(baseDeclRefType->getDeclRef().getDecl()))
-                processInstanceFieldsOfStruct(baseStructDecl, loc);
-        }
+        if (auto baseStructType = findBaseStructType(astBuilder, structDeclRef))
+            this->dispatchIfNotNull(baseStructType);
     }
     HashSet<StructDecl*> visitedStructDecls;
-    // Join the field requirements of a struct named through a member reference, such as `Inner` in
-    // `G<int>.Inner`. The struct is not a value operand of the reference, so the operand walk in
-    // `visitVal` never reaches it.
-    void visitMemberDeclRef(MemberDeclRef* declRef)
-    {
-        if (!this->visitedVals.add(declRef))
-            return;
-        this->dispatchIfNotNull(declRef->getParentOperand());
-        if (auto structDecl = as<StructDecl>(declRef->getDecl()))
-        {
-            SourceLoc loc;
-            if (Base::sourceLocStack.getCount())
-                loc = Base::sourceLocStack.getLast();
-            processInstanceFieldsOfStruct(structDecl, loc);
-        }
-    }
     // Visit the default value of each parameter that a call leaves out, because code generation
     // evaluates that value at the call site. Consider this example:
     //
     //     float scaled(float x = (float)(2.0LF)) { return x; }
     //     void main() { output[0] = scaled(); }
     //
-    // The checked call `scaled()` has no argument expression for `x`, but its lowering inserts
-    // the parameter's default value, so the call uses `double`. A default value can contain a call
-    // that again omits the same parameter, as in the synthesized constructor of a recursive
-    // struct, so we visit each parameter's default value once.
+    // The checked call `scaled()` has no argument expression for `x`, but its lowering
+    // (`addDirectCallArgs`) inserts the parameter's default value, so the call uses `double`.
     void visitInvokeExpr(InvokeExpr* expr)
     {
         Base::visitInvokeExpr(expr);
-        auto funcDecl = _getFuncDeclFromExpr(expr->functionExpr);
+        visitOmittedDefaultArguments(expr);
+    }
+    // A cast that resolves to a constructor, as in `(Wide)x`, is a call too, and its omitted
+    // arguments are filled in the same way.
+    void visitTypeCastExpr(TypeCastExpr* expr)
+    {
+        Base::visitTypeCastExpr(expr);
+        visitOmittedDefaultArguments(expr);
+    }
+    // Visit the default values of the parameters of `call`'s callee that follow its explicit
+    // arguments.
+    //
+    // Arguments map to parameters by position, as in `addDirectCallArgs`, so the omitted
+    // parameters are those from `arguments.getCount()` on. Joining capability sets is idempotent,
+    // so we visit each default value once per walk. That bound is also what makes the walk end:
+    // the synthesized constructor of `struct LoopField<each T> { LoopField<T, int> next; }` has a
+    // default value for `next` that calls the same constructor with the argument omitted (see
+    // tests/language-feature/generics/recursive-variadic-field-specialization-budget.slang).
+    void visitOmittedDefaultArguments(InvokeExpr* call)
+    {
+        auto funcDecl = _getFuncDeclFromExpr(call->functionExpr);
         if (!funcDecl)
             return;
+        Index argCount = call->arguments.getCount();
         Index paramIndex = 0;
         for (auto param : funcDecl->getParameters())
         {
-            if (paramIndex++ >= expr->arguments.getCount() && visitedDefaultArgParams.add(param))
+            if (paramIndex++ < argCount)
+                continue;
+            if (visitedDefaultArgParams.add(param))
                 this->dispatchIfNotNull(param->initExpr);
         }
     }
