@@ -286,6 +286,12 @@ struct GlobalVarTranslationContext
                 resultType = builder.createStructType();
                 IRStructTypeLayout::Builder typeLayoutBuilder(&builder);
                 UInt outputVarIndex = 0;
+                // One past the last `VaryingOutput` Location that any field occupies. The result
+                // layout records this extent the same way the front end records the extent of an
+                // entry point's own result, so passes that number outputs after the result (such
+                // as hull patch-constant legalization) see the Locations these globals occupy.
+                UInt varyingOutputEnd = 0;
+                bool usesVaryingOutput = false;
                 for (auto output : outputVars)
                 {
                     auto key = builder.createStructKey();
@@ -351,11 +357,32 @@ struct GlobalVarTranslationContext
                         }
                         outputVarIndex++;
                     }
-                    typeLayoutBuilder.addField(key, varLayoutBuilder.build());
+                    auto fieldVarLayout = varLayoutBuilder.build();
+                    auto fieldOffsetAttr =
+                        fieldVarLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+                    auto fieldSizeAttr =
+                        fieldTypeLayout->findSizeAttr(LayoutResourceKind::VaryingOutput);
+                    if (fieldOffsetAttr && fieldSizeAttr)
+                    {
+                        usesVaryingOutput = true;
+                        varyingOutputEnd = Math::Max(
+                            varyingOutputEnd,
+                            fieldOffsetAttr->getOffset() + fieldSizeAttr->getFiniteSize());
+                    }
+                    typeLayoutBuilder.addField(key, fieldVarLayout);
                     output->transferDecorationsTo(key);
+                }
+                if (usesVaryingOutput)
+                {
+                    typeLayoutBuilder.addResourceUsage(
+                        LayoutResourceKind::VaryingOutput,
+                        LayoutSize(varyingOutputEnd));
                 }
                 auto resultTypeLayout = typeLayoutBuilder.build();
                 IRVarLayout::Builder resultVarLayoutBuilder(&builder, resultTypeLayout);
+                if (usesVaryingOutput)
+                    resultVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)
+                        ->offset = 0;
                 resultVarLayout = resultVarLayoutBuilder.build();
 
                 for (auto block : entryPointFunc->getBlocks())
