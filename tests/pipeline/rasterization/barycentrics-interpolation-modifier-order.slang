@@ -3,8 +3,10 @@
 // An `SV_Barycentrics` input declared `noperspective` maps to the non-perspective barycentric
 // builtin. A sampling-location modifier (`centroid` or `sample`) can be written before or after
 // `noperspective`, and both orders must select the same builtin, for an entry-point parameter
-// and for a struct field. The `linear` cases check that an input with two interpolation
-// modifiers, neither of them `noperspective`, still maps to the perspective builtin.
+// and for a struct field. Direct SPIR-V chooses the builtin in `maybeEmitSystemVal`; GLSL and
+// SPIR-V via GLSL choose it in `getGLSLSystemValueInfo`. The two sites see the decorations in
+// opposite orders, so every order runs on every path. The `linear` cases check that `linear`
+// plus a sampling-location modifier still maps to the perspective builtin.
 
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry paramMain -stage fragment -DFIRST=centroid -DSECOND=noperspective
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry paramMain -stage fragment -DFIRST=noperspective -DSECOND=centroid
@@ -39,6 +41,9 @@
 //TEST:SIMPLE(filecheck=SPIRV-PERSP):-target spirv -emit-spirv-via-glsl -entry paramMain -stage fragment -DFIRST=sample -DSECOND=linear
 //TEST:SIMPLE(filecheck=GLSL-PERSP):-target glsl -entry paramMain -stage fragment -DFIRST=linear -DSECOND=centroid
 //TEST:SIMPLE(filecheck=GLSL-PERSP):-target glsl -entry paramMain -stage fragment -DFIRST=sample -DSECOND=linear
+//TEST:SIMPLE(filecheck=SPIRV-PERSP):-target spirv -entry fieldMain -stage fragment -DFIRST=centroid -DSECOND=linear
+//TEST:SIMPLE(filecheck=SPIRV-PERSP):-target spirv -emit-spirv-via-glsl -entry fieldMain -stage fragment -DFIRST=linear -DSECOND=sample
+//TEST:SIMPLE(filecheck=GLSL-PERSP):-target glsl -entry fieldMain -stage fragment -DFIRST=linear -DSECOND=sample
 
 // SPIRV-NOT: BuiltIn BaryCoordKHR
 // SPIRV: OpDecorate %{{.*}} BuiltIn BaryCoordNoPerspKHR
