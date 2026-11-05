@@ -847,13 +847,15 @@ static void insertMetalTextureFences(IRModule* module)
                 // Texture atomics other than loads also store to their texel, so they count as
                 // writes along with `ImageStore`.
                 IRInst* texture = nullptr;
+                IRImageSubscript* atomicSubscript = nullptr;
                 if (auto imageStore = as<IRImageStore>(inst))
                     texture = imageStore->getImage();
-                else if (as<IRAtomicOperation>(inst) && !as<IRAtomicLoad>(inst))
+                else if (auto atomic = as<IRAtomicOperation>(inst);
+                         atomic && !as<IRAtomicLoad>(inst))
                 {
-                    if (auto imageSubscript =
-                            as<IRImageSubscript>(getRootAddr(inst->getOperand(0))))
-                        texture = imageSubscript->getImage();
+                    atomicSubscript = getAtomicImageSubscript(atomic);
+                    if (atomicSubscript)
+                        texture = atomicSubscript->getImage();
                 }
                 if (!texture)
                     continue;
@@ -864,10 +866,7 @@ static void insertMetalTextureFences(IRModule* module)
 
                 // A texture atomic is emitted together with its `ImageSubscript` address, so its
                 // leading fence goes before that address rather than between the two.
-                if (as<IRImageStore>(inst))
-                    builder.setInsertBefore(inst);
-                else
-                    builder.setInsertBefore(getRootAddr(inst->getOperand(0)));
+                builder.setInsertBefore(atomicSubscript ? atomicSubscript : inst);
                 builder
                     .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
 

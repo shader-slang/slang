@@ -1646,8 +1646,8 @@ bool canInstHaveSideEffectAtAddress(
     // uses: on Metal, the `ImageStore` and the fences around it all name `getElement(load(arr),
     // i)`, and without this rule the emitter would copy the whole array of handles into a local.
     auto addrDataType = as<IRPtrTypeBase>(addr->getDataType());
-    if (addrDataType && as<IRAtomicOperation>(inst) &&
-        as<IRImageSubscript>(getRootAddr(inst->getOperand(0))))
+    auto atomic = as<IRAtomicOperation>(inst);
+    if (addrDataType && atomic && getAtomicImageSubscript(atomic))
     {
         if (isResourceType(addrDataType->getValueType()))
             return false;
