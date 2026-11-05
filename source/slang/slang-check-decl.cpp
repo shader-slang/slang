@@ -22331,6 +22331,56 @@ struct CapabilityDeclReferenceVisitor
         if (Base::sourceLocStack.getCount())
             loc = Base::sourceLocStack.getLast();
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
+
+        // A generic struct such as `G<float>` is referenced through its generic declaration.
+        auto structDecl = as<StructDecl>(decl);
+        if (auto genericDecl = as<GenericDecl>(decl))
+            structDecl = as<StructDecl>(genericDecl->inner);
+        if (structDecl)
+            processInstanceFieldsOfStruct(structDecl, loc);
+    }
+    // Join the capability requirements of a struct's instance fields, including those inherited
+    // from a base struct, into the code that uses the struct, because emitting a use of
+    // `struct S { float a; double b; }` declares `b` even when only `a` is read. The requirements
+    // apply at use sites rather than to the struct's own `inferredCapabilityRequirements`, because
+    // `getDeclaredCapabilitySet` treats that set as the declared set of the struct's member
+    // functions.
+    void processInstanceFieldsOfStruct(StructDecl* structDecl, SourceLoc loc)
+    {
+        if (!visitedStructDecls.add(structDecl))
+            return;
+        for (auto field : structDecl->getFields())
+        {
+            if (isEffectivelyStatic(field) || field->checkState.isBeingChecked())
+                continue;
+            this->ensureDecl(field, DeclCheckState::CapabilityChecked);
+            handleProcessFunc(field, field->inferredCapabilityRequirements, loc);
+        }
+        for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
+        {
+            auto baseDeclRefType = as<DeclRefType>(inheritanceDecl->base.type);
+            if (!baseDeclRefType)
+                continue;
+            if (auto baseStructDecl = as<StructDecl>(baseDeclRefType->getDeclRef().getDecl()))
+                processInstanceFieldsOfStruct(baseStructDecl, loc);
+        }
+    }
+    HashSet<StructDecl*> visitedStructDecls;
+    // Join the field requirements of a struct named through a member reference, such as `Inner` in
+    // `G<int>.Inner`. The struct is not a value operand of the reference, so the operand walk in
+    // `visitVal` never reaches it.
+    void visitMemberDeclRef(MemberDeclRef* declRef)
+    {
+        if (!this->visitedVals.add(declRef))
+            return;
+        this->dispatchIfNotNull(declRef->getParentOperand());
+        if (auto structDecl = as<StructDecl>(declRef->getDecl()))
+        {
+            SourceLoc loc;
+            if (Base::sourceLocStack.getCount())
+                loc = Base::sourceLocStack.getLast();
+            processInstanceFieldsOfStruct(structDecl, loc);
+        }
     }
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
     {
