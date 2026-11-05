@@ -1068,9 +1068,24 @@ ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
     }
 }
 
+bool SemanticsVisitor::canPassCopyOfImmutableReceiver(DeclRef<CallableDecl> funcDeclRef)
+{
+    if (getSourceLanguage() != SourceLanguage::HLSL)
+        return false;
+
+    // Consider `gCounter.bump()`, where `Counter` conforms to an interface requirement `bump`.
+    // Lookup also finds the requirement, and a call through it on the concrete type runs the
+    // declaration it resolves to, as in lowering. That declaration's `this` parameter receives the
+    // copy, so its mode and type decide.
+    auto calledDeclRef = DeclRef<Decl>(as<DeclRefBase>(funcDeclRef.declRefBase->resolve()));
+    auto calledThisParamInfo = findEffectiveThisParamInfo(calledDeclRef);
+    return calledThisParamInfo && calledThisParamInfo->mode == ParamPassingMode::BorrowInOut &&
+           isCopyableType(unwrapModifiedType(calledThisParamInfo->type));
+}
+
 bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     OverloadResolveContext& context,
-    OverloadCandidate const& candidate)
+    OverloadCandidate& candidate)
 {
     if (candidate.flavor != OverloadCandidate::Flavor::Func)
         return true;
@@ -1092,6 +1107,21 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
         {
             if (context.baseExpr && !context.baseExpr->type.isLeftValue)
             {
+                // Copying the receiver argument costs a conversion, so that an overload whose
+                // receiver needs no copy, such as a `[nonmutating]` one, is preferred.
+                if (canPassCopyOfImmutableReceiver(funcDeclRef))
+                {
+                    if (context.mode == OverloadResolveContext::Mode::ForReal)
+                    {
+                        getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValueWarning{
+                            .methodName = funcDeclRef.getName(),
+                            .location = context.loc});
+                    }
+                    candidate.conversionCostSum += kConversionCost_ImmutableReceiverCopy;
+                    candidate.passesImmutableReceiverCopy = true;
+                    return true;
+                }
+
                 if (context.mode == OverloadResolveContext::Mode::ForReal)
                 {
                     getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValue{
@@ -1669,6 +1699,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
 
                 callExpr->originalFunctionExpr = callExpr->functionExpr;
                 callExpr->functionExpr = baseExpr;
+                callExpr->passesImmutableReceiverCopy = candidate.passesImmutableReceiverCopy;
 
                 // `ConstructLookupResultExpr` can diagnose an invalid member reference (e.g. a
                 // non-static member named from a static function) after overload selection,

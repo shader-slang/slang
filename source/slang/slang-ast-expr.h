@@ -226,6 +226,13 @@ class AppExprBase : public ExprWithArgsBase
     // The original function expr before overload resolution.
     Expr* originalFunctionExpr = nullptr;
 
+    // Whether overload resolution accepted this call by binding a copy of its immutable receiver
+    // argument to the callee's `inout` `this` parameter (see
+    // `SemanticsVisitor::canPassCopyOfImmutableReceiver`). Lowering then passes a fresh copy
+    // instead of the receiver's storage. The flag is set while checking the call and read while
+    // lowering the same module, so it is not serialized.
+    bool passesImmutableReceiverCopy = false;
+
     // The source location of `(`, `)`, and `,` that marks the start/end of the application op and
     // each argument expr. This info is used by language server.
     List<SourceLoc> argumentDelimeterLocs;
