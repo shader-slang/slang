@@ -313,6 +313,13 @@ struct UndefinedOpaqueHandleEliminationContext
 
 void eliminateUndefinedOpaqueHandles(IRModule* module, CodeGenContext* codeGenContext)
 {
+    // A module without an undefined opaque handle has no call to specialize and no access to
+    // rewrite, so we skip the walk over every call that `specializeFunctionCalls` makes.
+    bool hasUndefinedHandle = false;
+    forEachUndefinedOpaqueHandle(module, [&](IRInst*) { hasUndefinedHandle = true; });
+    if (!hasUndefinedHandle)
+        return;
+
     UndefinedOpaqueHandleArgSpecializationCondition condition;
     UndefinedOpaqueHandleEliminationContext context(module);
 
