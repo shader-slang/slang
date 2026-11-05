@@ -608,6 +608,21 @@ struct InliningPassBase
         return clonedInst;
     }
 
+    /// Return whether `inst` is outside the body of any function, that is, at module scope or
+    /// directly in the body block of a generic. A global variable's initializer block counts
+    /// as a function body, because `moveGlobalVarInitializationToEntryPoints` later moves its
+    /// code into a function. Consider `static int g = addOne(divisor);` with a `[ForceInline]`
+    /// `addOne`: the locals of `addOne` keep their debug information in that function.
+    static bool isOutsideFunctionBody(IRInst* inst)
+    {
+        for (auto parent = inst->getParent(); parent; parent = parent->getParent())
+        {
+            if (auto code = as<IRGlobalValueWithCode>(parent))
+                return as<IRGeneric>(code) != nullptr;
+        }
+        return true;
+    }
+
     /// Inline the body of the callee for `callSite`, for a callee that has only
     /// a single basic block.
     ///
@@ -638,12 +653,12 @@ struct InliningPassBase
         //
         IRInst* returnVal = nullptr;
         List<IRDebugInlinedAt*> debugInlinedInsts;
-        // A call outside any function, such as a `static const` initializer at module scope or
-        // in the body of a generic struct, has no caller debug scope, so the debug information
+        // A call outside any function body, such as a `static const` initializer at module scope
+        // or in the body of a generic struct, has no caller debug scope, so the debug information
         // of a body inlined there describes nothing. A `DebugValue` cloned there would also keep
         // a use of its operand, such as a uniform parameter, outside of any function, which the
         // C++, CPU and Metal targets cannot lower.
-        bool isCallOutsideFunction = !getParentFunc(call);
+        bool isCallOutsideFunction = isOutsideFunctionBody(call);
         for (auto inst : firstBlock->getChildren())
         {
             if (isCallOutsideFunction && isDebugInfoInst(inst))
