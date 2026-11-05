@@ -3,7 +3,7 @@
 // whose pointer type does not match IFoo*. The address-of operation is rejected
 // because the operand's internal type differs from the declared interface type.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv
 
 interface IFoo
 {

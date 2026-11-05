@@ -18,6 +18,7 @@
         glslang_disassembleSPIRV;
         glslang_disassembleSPIRVWithResult;
         glslang_freeDisassembly;
+        glslang_freeLinkResult;
         glslang_linkSPIRV;
         glslang_validateSPIRV;
     local:

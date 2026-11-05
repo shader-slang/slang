@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-stage compute -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-stage compute -entry computeMain -target spirv
 
 // Tests pointer casting rules: Only explicit casting is allowed between pointer types.
 // All implicit conversions between pointer types should fail.

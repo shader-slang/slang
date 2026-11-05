@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-stage compute -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-stage compute -entry computeMain -target spirv
 
 // Writing with a read-only pointer should be an error
 
@@ -36,6 +36,6 @@ void computeMain(int id : SV_DispatchThreadID)
 
     // CHECK: error[E30047]
     writeToReadOnlyPointerOut(*(ptr1+2));
-    
+
     output[id] = ptr1[id];
 }

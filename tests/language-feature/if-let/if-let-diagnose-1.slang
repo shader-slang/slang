@@ -1,7 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target cpp -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cuda -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cpp -stage compute -entry computeMain
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

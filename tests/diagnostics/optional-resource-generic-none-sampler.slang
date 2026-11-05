@@ -7,7 +7,7 @@
 // optional-resource-generic-none.slang test pins the source location; here we
 // match on the message so the assertion is about the `SamplerState` category.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv
 
 struct Wrapper<T>
 {

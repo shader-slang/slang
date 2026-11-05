@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS): -target wgsl -entry Main -stage compute
 
-//CHECK_IGNORE_CAPS-NOT: error 36107
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+//CHECK_IGNORE_CAPS-NOT: E36107
+[require(cpp_glsl_hlsl_metal_spirv)]
 struct inputWrapper {
     RWBuffer<float> InputTyped;
 };

@@ -6,7 +6,7 @@
 // the value that selects the single-buffer form -- so a host asking for the
 // shared descriptor array would silently get one binding per shader instead.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-bindless-index 2147483648
+//TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-bindless-index 2147483648
 
 //CHECK: option '-trace-coverage-bindless-index' expects a value in range 0..2147483647, but got '2147483648'
 

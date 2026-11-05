@@ -1,8 +1,8 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target glsl -DSLANG
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target spirv -DSLANG
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target glsl -DSLANG
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target spirv -DSLANG
 
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target glsl -DGLSL
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target spirv -DGLSL
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target glsl -DGLSL
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): -lang glsl tests/glsl-intrinsic/compute-derivative/derivative-mode-specifying-two-modes.slang -stage compute -entry computeMain -target spirv -DGLSL
 // CHECK: error[E31212]
 
 buffer MyBlockName

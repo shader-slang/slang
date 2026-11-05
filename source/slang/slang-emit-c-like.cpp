@@ -1379,6 +1379,14 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::Int64:
                     {
+                        // `-9223372036854775808LL` is the negation of a literal that does not
+                        // fit in a `long long`, which C-family compilers warn about (or reject),
+                        // so the minimum is written as an expression of in-range literals.
+                        if (int64_t(litInst->value.intVal) == INT64_MIN)
+                        {
+                            m_writer->emit("(-9223372036854775807LL - 1LL)");
+                            break;
+                        }
                         m_writer->emitInt64(int64_t(litInst->value.intVal));
                         m_writer->emit("LL");
                         break;

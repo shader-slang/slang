@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv -entry entry_mesh -stage mesh
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -entry entry_mesh -stage mesh
 
 const static float2 positions[3] = {
     float2(0.0, -0.5),

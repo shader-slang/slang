@@ -1,7 +1,7 @@
 // Note: this is a simple test instead of a diagnostic test, since
 // some UTF-8 errors get lost in communication with the test server
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -no-codegen
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -no-codegen
 
 /* Ö */
 //CHECK: invalid UTF-8 byte sequence: 0xD6

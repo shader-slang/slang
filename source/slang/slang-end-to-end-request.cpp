@@ -221,19 +221,37 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_OK;
     }
 
+    // Parse, bind, and check the supplied generic arguments before the -no-codegen return below.
+    // For example, if MetalOnly has [require(metal)], then
+    // `-entry main -specialize MetalOnly -target hlsl -no-codegen` must reject that argument.
+    // These calls record the checked arguments in component types. The post-link IR specialization
+    // pass runs later during code generation.
+    if (m_passThrough == PassThroughMode::None)
+    {
+        m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
+        if (getSink()->getErrorCount() != 0)
+            return SLANG_FAIL;
+
+        m_specializedGlobalAndEntryPointsComponentType =
+            createSpecializedGlobalAndEntryPointsComponentType(this, m_specializedEntryPoints);
+        if (getSink()->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
     // If command line specifies to skip codegen, we exit here.
     // Note: this is a debugging option.
     //
     if (getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
     {
-        // We will use the program (and matching layout information)
-        // that was computed in the front-end for all subsequent
-        // reflection queries, etc.
-        //
-        m_specializedGlobalComponentType = getUnspecializedGlobalComponentType();
-        m_specializedGlobalAndEntryPointsComponentType =
-            getUnspecializedGlobalAndEntryPointsComponentType();
-        m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
+        // Keep the checked specialization available for reflection. Pass-through requests have
+        // no Slang specialization to check and retain their front-end components.
+        if (m_passThrough != PassThroughMode::None)
+        {
+            m_specializedGlobalComponentType = getUnspecializedGlobalComponentType();
+            m_specializedGlobalAndEntryPointsComponentType =
+                getUnspecializedGlobalAndEntryPointsComponentType();
+            m_specializedEntryPoints = getFrontEndReq()->getUnspecializedEntryPoints();
+        }
 
         SLANG_RETURN_ON_FAIL(maybeCreateContainer());
 
@@ -277,20 +295,8 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         }
     }
 
-    // If codegen is enabled, we need to move along to
-    // apply any generic specialization that the user asked for.
-    //
     if (m_passThrough == PassThroughMode::None)
     {
-        m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
-        if (getSink()->getErrorCount() != 0)
-            return SLANG_FAIL;
-
-        m_specializedGlobalAndEntryPointsComponentType =
-            createSpecializedGlobalAndEntryPointsComponentType(this, m_specializedEntryPoints);
-        if (getSink()->getErrorCount() != 0)
-            return SLANG_FAIL;
-
         // For each code generation target, we will generate specialized
         // parameter binding information (taking global generic
         // arguments into account at this time).
@@ -1963,9 +1969,16 @@ SlangResult EndToEndCompileRequest::compile()
         {
             // If for some reason we didn't output any diagnostic, something is
             // going wrong, but we want to make sure we at least output something.
+            // Aborting without any prior diagnostic means the compiler gave up on
+            // its own (for example `SLANG_ABORT_COMPILATION("unsupported stage.")`
+            // in an emitter) rather than because of a problem in the user's code,
+            // so we report it as an internal compiler error. An abort that follows
+            // a diagnostic (such as a fatal "cyclic reference" error) is an
+            // ordinary compilation failure and keeps the `SLANG_FAIL` result.
             getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
                 .exceptionType = typeid(e).name(),
                 .exceptionMessage = e.Message});
+            res = SLANG_E_ABORT;
         }
     }
     catch (const Exception& e)
@@ -1977,6 +1990,7 @@ SlangResult EndToEndCompileRequest::compile()
         getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
             .exceptionType = typeid(e).name(),
             .exceptionMessage = e.Message});
+        res = SLANG_E_ABORT;
     }
     catch (...)
     {
@@ -1985,6 +1999,7 @@ SlangResult EndToEndCompileRequest::compile()
         // let the user know that we messed up, so they know to blame Slang
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
+        res = SLANG_E_ABORT;
     }
 #endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
@@ -2384,7 +2399,17 @@ SlangResult EndToEndCompileRequest::processCommandLineArguments(
     char const* const* args,
     int argCount)
 {
-    return parseOptions(this, argCount, args);
+    // We treat a request in command-line compiler mode as a complete slangc command line, to
+    // which nothing adds targets after the parse. slangc, and slang-test's slangc tool and test
+    // server, set the mode before this call and add no targets afterwards. An API caller that sets
+    // the mode and then adds targets still gets the slangc diagnostics, such as E00044 for a
+    // floating-point mode given with no `-target`.
+    return parseOptions(
+        this,
+        argCount,
+        args,
+        m_isCommandLineCompile ? CommandLineParsePurpose::CompleteCommandLine
+                               : CommandLineParsePurpose::CompileRequest);
 }
 
 SlangReflection* EndToEndCompileRequest::getReflection()

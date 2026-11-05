@@ -7,8 +7,8 @@
 // `T`'s scalar components, and a compile-time-constant `location` must be a multiple of it.
 // Each violation is reported as a distinct diagnostic.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry computeMain -stage compute
 
 RWByteAddressBuffer buffer;
 

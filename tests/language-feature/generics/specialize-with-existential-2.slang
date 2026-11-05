@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
 
 #lang slang 2025
 

@@ -11,7 +11,7 @@ Thank you for considering contributing to the Shader-Slang project! We welcome y
 
 This document is designed to guide you in contributing to the project. It is intended to be easy to follow without sending readers to other pages and links. You can simply copy and paste the command lines described in this document.
 
-- Contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant the rights to use your contribution.
+- Contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant the rights to use your contribution. See the CLA at [https://cla-assistant.io/shader-slang/slang](https://cla-assistant.io/shader-slang/slang). The CLA for `shader-slang/spec` is different from, and longer than, the CLA for the other `shader-slang` repositories.
 - When you submit a pull request, a CLA bot will determine whether you need to sign a CLA. Simply follow the instructions provided.
 - Please read and follow the contributor [Code of Conduct](CODE_OF_CONDUCT.md).
 - Bug reports and feature requests should be submitted via the GitHub issue tracker.
@@ -51,7 +51,6 @@ By submitting a Contribution to this repository, you additionally represent that
 Navigate to the [Shader-Slang repository](https://github.com/shader-slang/slang).
 Click on the "Fork" button in the top right corner to create a copy of the repository in your GitHub account.
 This document will assume that the name of your forked repository is "slang".
-Make sure your "Actions" are enabled. Visit your forked repository, click on the "Actions" tab, and enable the actions.
 
 ### Cloning Your Fork
 
@@ -180,6 +179,29 @@ Build with the following command:
 ```
 $ cmake --build --preset release
 ```
+
+#### Installing Metal Developer Tools (Optional)
+
+Slang can generate Metal Shading Language (MSL) code on any platform. To compile the generated MSL, for example to check it with the Apple Metal compiler, install the Metal Developer Tools. This step is not required to build Slang. Apple does not provide these tools for Linux.
+
+Open [https://developer.apple.com/metal/tools/](https://developer.apple.com/metal/tools/) and go to the "Get started" section. Then follow the instructions for your platform.
+
+**Windows**
+
+1. In the "Metal Developer Tools for Windows" entry, click the "Download now" link. This opens the Apple Downloads page with a search for "metal developer tools for windows".
+2. Download the "Metal Developer Tools for Windows" package. Apple may ask you to sign in with an Apple ID.
+3. Run the downloaded installer, and follow its instructions.
+
+> Note: The package contains the Windows-hosted tools, headers, and libraries that build Metal shader programs for iOS, macOS, and tvOS.
+
+**MacOS**
+
+1. In the "Metal Developer Tools for macOS" entry, follow the link to download Xcode. If you already installed Xcode as described in the [MacOS build instructions](#macos), you can skip this step.
+2. Make sure the Metal Toolchain is installed, either using Xcode Components settings, or from the command line:
+
+   ```
+   $ xcodebuild -downloadComponent MetalToolchain
+   ```
 
 #### Building with a Local Build of slang-llvm
 

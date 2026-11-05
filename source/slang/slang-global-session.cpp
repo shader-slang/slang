@@ -388,15 +388,22 @@ SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlag
 
 void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName)
 {
+    // Without SLANG_EMBED_CORE_MODULE_SOURCE the library code getters return null; there is no
+    // source to append then, and the result is empty.
+    auto append = [&](ComPtr<ISlangBlob> code)
+    {
+        if (code)
+            sb << (const char*)code->getBufferPointer();
+    };
     switch (moduleName)
     {
     case slang::BuiltinModuleName::Core:
-        sb << (const char*)getCoreLibraryCode()->getBufferPointer()
-           << (const char*)getHLSLLibraryCode()->getBufferPointer()
-           << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+        append(getCoreLibraryCode());
+        append(getHLSLLibraryCode());
+        append(getAutodiffLibraryCode());
         break;
     case slang::BuiltinModuleName::GLSL:
-        sb << (const char*)getGLSLLibraryCode()->getBufferPointer();
+        append(getGLSLLibraryCode());
         break;
     }
 }
@@ -1149,11 +1156,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
     slang::SessionDesc* outDesc,
     ISlangUnknown** outAllocation)
 {
+    *outAllocation = nullptr;
     if (outDesc->structureSize < sizeof(slang::SessionDesc))
         return SLANG_E_BUFFER_TOO_SMALL;
     RefPtr<ParsedCommandLineData> outData = new ParsedCommandLineData();
     RefPtr<EndToEndCompileRequest> tempReq = new EndToEndCompileRequest(this);
-    tempReq->processCommandLineArguments(argv, argc);
+    SLANG_RETURN_ON_FAIL(
+        parseOptions(tempReq.Ptr(), argc, argv, CommandLineParsePurpose::SessionDescription));
 
     // OptionsParser keeps `-allow-glsl` request-local so ordinary slangc compilation cannot leak
     // it into imported modules. This API is specifically translating command-line options into a

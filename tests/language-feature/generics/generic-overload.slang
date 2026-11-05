@@ -1,4 +1,4 @@
-//TEST(compute):SIMPLE(filecheck=CHECK_EXPLICIT): -target spirv-asm -entry computeMain -stage compute -DEXPLICIT
+//TEST(compute):SIMPLE(filecheck=CHECK_EXPLICIT,exit-code=-1): -target spirv-asm -entry computeMain -stage compute -DEXPLICIT
 //TEST(compute):SIMPLE(filecheck=CHECK_OVERLOAD): -target spirv-asm -entry computeMain -stage compute -DOVERLOAD
 
 enum CoopMatMatrixLayout

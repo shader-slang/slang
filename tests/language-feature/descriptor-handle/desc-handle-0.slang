@@ -5,7 +5,7 @@
 //TEST:SIMPLE(filecheck=SPV): -target spirv
 //TEST:SIMPLE(filecheck=SPVDH): -target spirv -capability spvDescriptorHeapEXT
 //TEST:SIMPLE(filecheck=SPVDHS): -target spirv -capability spvDescriptorHeapEXT -spirv-resource-heap-stride 32 -spirv-sampler-heap-stride 64
-//TEST:SIMPLE(filecheck=SPVDHERR): -target spirv -capability spvDescriptorHeapEXT -spirv-resource-heap-stride -32
+//TEST:SIMPLE(filecheck=SPVDHERR,exit-code=1): -target spirv -capability spvDescriptorHeapEXT -spirv-resource-heap-stride -32
 
 // SPV: OpImageSample
 // HLSL: ResourceDescriptorHeap[{{.*}}]
