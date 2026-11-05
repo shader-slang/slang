@@ -2249,8 +2249,11 @@ public:
     // The structural ray-tracing stage and descriptor AST classes shift the sequential
     // `ASTNodeType` values, so version-37 modules would decode later nodes as different classes.
     // Version 38 also adds the trace-program descriptor and Metal trace IR instructions.
+    // Version 39 adds `IRNoTargetCaseDecoration`. Its stable opcode is appended, so the reader can
+    // continue to load version-38 modules. It only appears in linked IR, which the host VM target
+    // serializes.
     const static UInt k_minSupportedModuleVersion = 38;
-    const static UInt k_maxSupportedModuleVersion = 38;
+    const static UInt k_maxSupportedModuleVersion = 39;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

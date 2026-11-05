@@ -7,10 +7,10 @@ Buffer<float> InputTyped;
 RWBuffer<float> OutputTyped;
 
 //CHECK: error[E36107]
-// With -ignore-capabilities the capability error is suppressed. The buffer accessors have no WGSL
-// implementation, so their bodies end without a return, which is an error for WGSL.
+// With -ignore-capabilities the capability error is suppressed. The `__target_switch` of each
+// buffer accessor then has no WGSL case, which is an error.
 //CHECK_IGNORE_CAPS-NOT: E36107
-//CHECK_IGNORE_CAPS: error[E41009]: non-void function must return
+//CHECK_IGNORE_CAPS: error[E41037]: __target_switch has no case for the current target
 //CHECK_IGNORE_CAPS-NOT: E36107
 [numthreads(64, 1, 1)]
 void Main(uint3 DTid : SV_DispatchThreadID)

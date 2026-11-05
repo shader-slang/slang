@@ -4,6 +4,7 @@
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-specialize-target-switch.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 
@@ -32,6 +33,15 @@ static void diagnoseMissingReturnForTarget(
     CodeGenTarget target,
     bool diagnoseWarning)
 {
+    // A `missingReturn` standing for a `__target_switch` with no case for the target is reported
+    // as E41037 rather than as a missing return; see `specializeTargetSwitch` for where.
+    if (auto noTargetCase = missingReturn->findDecoration<IRNoTargetCaseDecoration>())
+    {
+        if (!doesTargetAllowMissingReturns(target))
+            diagnoseNoTargetCase(noTargetCase, target, sink);
+        return;
+    }
+
     if (languageVersion >= SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202C)
     {
         sink->diagnose(
