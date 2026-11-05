@@ -7817,18 +7817,20 @@ IfStmt* Parser::parseIfStatement()
 /// Mark the variables declared by an HLSL `for` initializer.
 ///
 /// The initializer is either one declaration or a declaration group, as in
-/// `for (int i = 0, j = i; ... )`. We record the role on each variable so that semantic
-/// checking can distinguish permitted loop-variable shadowing from ordinary redeclarations.
-static void markHLSLForLoopInitializerVariables(DeclBase* declBase)
+/// `for (int i = 0, j = i; ... )`. We attach an `HLSLForLoopInitializerAttribute` to each
+/// variable so that checking can distinguish loop-variable shadowing from ordinary redeclarations.
+static void markHLSLForLoopInitializerVariables(ASTBuilder* astBuilder, DeclBase* declBase)
 {
     if (auto declGroup = as<DeclGroup>(declBase))
     {
         for (auto decl : declGroup->decls)
-            markHLSLForLoopInitializerVariables(decl);
+            markHLSLForLoopInitializerVariables(astBuilder, decl);
     }
     else if (auto varDecl = as<VarDecl>(declBase))
     {
-        varDecl->isHLSLForLoopInitializer = true;
+        auto attribute = astBuilder->create<HLSLForLoopInitializerAttribute>();
+        attribute->loc = varDecl->loc;
+        addModifier(varDecl, attribute);
     }
 }
 
@@ -7870,7 +7872,7 @@ ForStmt* Parser::ParseForStatement()
         if (brokenScoping)
         {
             if (auto declStmt = as<DeclStmt>(stmt->initialStatement))
-                markHLSLForLoopInitializerVariables(declStmt->decl);
+                markHLSLForLoopInitializerVariables(astBuilder, declStmt->decl);
         }
         if (as<DeclStmt>(stmt->initialStatement) || as<ExpressionStmt>(stmt->initialStatement))
         {

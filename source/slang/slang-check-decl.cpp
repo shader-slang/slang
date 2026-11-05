@@ -14876,7 +14876,7 @@ static bool isHLSLForLoopInitializerRedeclaration(Decl* newDecl, Decl* oldDecl)
     auto newVarDecl = as<VarDecl>(newDecl);
     if (!newVarDecl)
         return false;
-    if (!newVarDecl->isHLSLForLoopInitializer)
+    if (!newVarDecl->findModifier<HLSLForLoopInitializerAttribute>())
         return false;
     if (newDecl->parentDecl != oldDecl->parentDecl)
         return false;

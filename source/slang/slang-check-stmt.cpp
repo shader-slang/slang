@@ -82,7 +82,7 @@ void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
 /// variable after we leave the inner block.
 static void hideEarlierLocalVariables(VarDecl* varDecl)
 {
-    SLANG_RELEASE_ASSERT(varDecl->isHLSLForLoopInitializer);
+    SLANG_RELEASE_ASSERT(varDecl->findModifier<HLSLForLoopInitializerAttribute>());
     auto parentDecl = varDecl->parentDecl;
     for (auto previousDecl = parentDecl->getPrevDirectMemberDeclWithSameName(varDecl); previousDecl;
          previousDecl = parentDecl->getPrevDirectMemberDeclWithSameName(previousDecl))
@@ -109,7 +109,7 @@ void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
     {
         // We use the existing local-initializer lookup rules while checking `initExpr`.
         // Once checking finishes, the new loop variable replaces earlier locals of its name.
-        if (varDecl->isHLSLForLoopInitializer)
+        if (varDecl->findModifier<HLSLForLoopInitializerAttribute>())
             hideEarlierLocalVariables(varDecl);
     }
     decl->hiddenFromLookup = false;

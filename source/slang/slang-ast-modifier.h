@@ -917,6 +917,17 @@ class Attribute : public AttributeBase
     FIDDLE() List<Val*> intArgVals;
 };
 
+/// A synthesized marker for a variable declared in an HLSL `for` initializer.
+///
+/// The parser attaches this attribute only to initializer variables. After checking an
+/// initializer, semantic checking permits its variable to shadow earlier locals in the
+/// same scope. This attribute has no spelling in shader code.
+FIDDLE()
+class HLSLForLoopInitializerAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class UserDefinedAttribute : public Attribute
 {
