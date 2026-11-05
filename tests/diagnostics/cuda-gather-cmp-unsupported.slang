@@ -1,17 +1,17 @@
 // tex2Dgather takes no compare value and a SamplerComparisonState is a no-op placeholder on CUDA,
 // so GatherCmp* is a capability error (E36107) there, as SampleCmp* is (#14073).
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=SEP): -target cuda -entry eSeparate -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXSEP): -target ptx -entry eSeparate -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=RED): -target cuda -entry eSeparateRed -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=GREEN): -target cuda -entry eSeparateGreen -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=BLUE): -target cuda -entry eSeparateBlue -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=ALPHA): -target cuda -entry eSeparateAlpha -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=OFF): -target cuda -entry eSeparateOffset -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXOFF): -target ptx -entry eSeparateOffset -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=COMB): -target cuda -entry eCombined -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXCOMB): -target ptx -entry eCombined -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=COMBOFF): -target cuda -entry eCombinedOffset -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=SEP,exit-code=-1): -target cuda -entry eSeparate -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXSEP,exit-code=-1): -target ptx -entry eSeparate -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=RED,exit-code=-1): -target cuda -entry eSeparateRed -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=GREEN,exit-code=-1): -target cuda -entry eSeparateGreen -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=BLUE,exit-code=-1): -target cuda -entry eSeparateBlue -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=ALPHA,exit-code=-1): -target cuda -entry eSeparateAlpha -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=OFF,exit-code=-1): -target cuda -entry eSeparateOffset -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXOFF,exit-code=-1): -target ptx -entry eSeparateOffset -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=COMB,exit-code=-1): -target cuda -entry eCombined -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXCOMB,exit-code=-1): -target ptx -entry eCombined -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=COMBOFF,exit-code=-1): -target cuda -entry eCombinedOffset -stage compute
 
 Texture2D<float> dtex;
 SamplerComparisonState csamp;

@@ -22,7 +22,7 @@ void main()
     Ptr<int> p;
     Ptr<int> other;
     int result = p.f(other);
-    
+
     // CHECK: result=1
     printf("result=%d\n", result);
 }
