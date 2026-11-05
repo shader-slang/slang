@@ -1326,6 +1326,19 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
     return root;
 }
 
+IRImageSubscript* getAtomicImageSubscript(IRAtomicOperation* atomic)
+{
+    return as<IRImageSubscript>(getRootAddr(atomic->getPtr()));
+}
+
+IRResourceTypeBase* getImageSubscriptResourceType(IRImageSubscript* subscript)
+{
+    auto imageType = subscript->getImage()->getDataType();
+    if (auto ptrType = as<IRPtrTypeBase>(imageType))
+        imageType = ptrType->getValueType();
+    return as<IRResourceTypeBase>(imageType);
+}
+
 
 IRInst* getRootBufferOrAddr(IRInst* addr)
 {
