@@ -11,8 +11,8 @@
 // (resource + buffer family) and `SampHeap` (sampler family) — and asserted independently, so the
 // gate cannot silently regress for one family while the other still rejects.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=RES): -target metal -stage compute -entry resourceMain
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=SAMP): -target metal -stage compute -entry samplerMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=RES,exit-code=-1): -target metal -stage compute -entry resourceMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=SAMP,exit-code=-1): -target metal -stage compute -entry samplerMain
 
 RWStructuredBuffer<float> outputBuffer;
 

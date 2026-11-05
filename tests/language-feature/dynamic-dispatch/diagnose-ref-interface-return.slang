@@ -212,7 +212,7 @@ struct ContainerComRef
     }
 }
 
-// CHECK-NOT: error 52012
+// CHECK-NOT: E52012
 
 IFoo factory(uint id)
 {

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -entry computeMain -target hlsl -profile cs_6_5
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -entry computeMain -target hlsl -profile cs_6_5
 
 
 RWStructuredBuffer<float> outputBuffer;
@@ -11,8 +11,8 @@ typedef float.Differential dfloat;
 float test_loop_with_continue(float y)
 {
     float t = y;
-    
-    // OOPS! No `++i`! 
+
+    // OOPS! No `++i`!
     for (int i = 0; i < 3;)
     {
         if (t > 4.0)

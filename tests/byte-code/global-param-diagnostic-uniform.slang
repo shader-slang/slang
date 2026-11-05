@@ -1,4 +1,4 @@
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:INTERPRET(filecheck=CHECK,exit-code=1):
 
 // A program that references a global shader parameter (here a plain uniform)
 // cannot be run by the slangi CPU interpreter. The interpreter should report a
@@ -15,9 +15,9 @@ uniform float gScale;
 
 void main()
 {
-    // A non-zero result code confirms the diagnostic propagated as a clean
-    // compilation failure (SLANG_FAIL) rather than producing usable bytecode.
-    //CHECK: result code = 1
+    // The test expects exit code 1 (`exit-code=1`). It confirms that the diagnostic
+    // propagated as a clean compilation failure (SLANG_FAIL) rather than producing usable
+    // bytecode.
     // The old internal-error path (E99999/E99997) must stay gone.
     //CHECK-NOT: error[E99999]
     //CHECK-NOT: error[E99997]

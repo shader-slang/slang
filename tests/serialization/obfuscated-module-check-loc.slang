@@ -1,7 +1,7 @@
-//TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.zip -g -obfuscate 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.zip 
-//TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.slang-module -g -obfuscate 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.slang-module
+//TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.zip -g -obfuscate
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.zip
+//TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.slang-module -g -obfuscate
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.slang-module
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
@@ -18,12 +18,12 @@ extern int billy(int v);
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int x = int(dispatchThreadID.x);
-    
+
     x = billy(x);
-    
+
     // Will produce an error, because silly has an error.
     int v = silly(x);
-    
+
     outputBuffer[x] = v;
 }
 
