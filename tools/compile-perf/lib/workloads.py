@@ -747,7 +747,7 @@ def gen_codegen(n):
 # ratios BETWEEN targets are the signal. One axis per workload is not a
 # stylistic choice: a mixed "kitchen sink" cross-target shader was tried first
 # and failed, because a shared super-linear front-end cost dominated it and
-# flattened a 21x cuda/spirv divergence to 1.1x. See COVERAGE-ANALYSIS.md.
+# flattened a 21x cuda/spirv divergence to 1.1x.
 # --------------------------------------------------------------------------- #
 
 def gen_resource_load_chain(n):

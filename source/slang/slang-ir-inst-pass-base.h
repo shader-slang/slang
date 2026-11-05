@@ -135,6 +135,7 @@ public:
                 switch (child->getOp())
                 {
                 case kIROp_DebugInlinedAt:
+                case kIROp_DebugLexicalBlock:
                 case kIROp_DebugFunction:
                     continue;
                 default:

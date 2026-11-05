@@ -96,8 +96,8 @@ static bool findReturnValueSemanticInfo(
     return false;
 }
 
-// Structure to hold parameter information
-struct ParamInfo
+// Structure to hold the IR rewrite state for one parameter.
+struct LoweredOutParamInfo
 {
     IRParam* origParam;       // Original parameter
     IRType* valueType;        // Parameter value type (without out/inout wrapper)
@@ -109,17 +109,17 @@ struct ParamInfo
 };
 
 // Analyze parameters and collect information
-List<ParamInfo> collectParameterInfo(
+List<LoweredOutParamInfo> collectParameterInfo(
     IRFunc* func,
     IRBuilder& builder,
     List<IRStructKey*>& outKeys,
     Dictionary<IRParam*, IRStructKey*>& paramToKeyMap)
 {
-    List<ParamInfo> paramInfos;
+    List<LoweredOutParamInfo> paramInfos;
 
     for (auto param = func->getFirstParam(); param; param = param->getNextParam())
     {
-        ParamInfo info;
+        LoweredOutParamInfo info;
         info.origParam = param;
         info.newParam = nullptr;
         info.outVar = nullptr;
@@ -184,7 +184,9 @@ static IRStructKey* createResultKey(IRFunc* func, IRBuilder& builder, List<IRStr
 }
 
 // Determine if we need to transform the function
-static bool needsTransformation(const List<ParamInfo>& paramInfos, bool alwaysUseReturnStruct)
+static bool needsTransformation(
+    const List<LoweredOutParamInfo>& paramInfos,
+    bool alwaysUseReturnStruct)
 {
     if (alwaysUseReturnStruct)
         return true;
@@ -204,7 +206,7 @@ static IRType* createReturnType(
     IRBuilder& builder,
     IRStructKey* resultKey,
     const List<IRStructKey*>& outKeys,
-    const List<ParamInfo>& paramInfos,
+    const List<LoweredOutParamInfo>& paramInfos,
     bool alwaysUseReturnStruct,
     IRStructType*& returnStruct)
 {
@@ -262,7 +264,7 @@ static IRType* createReturnType(
 // Create parameters for the new function
 static void createNewParameters(
     IRBuilder& builder,
-    List<ParamInfo>& paramInfos,
+    List<LoweredOutParamInfo>& paramInfos,
     IRCloneEnv& cloneEnv,
     Dictionary<IRParam*, IRParam*>& origToNewParamMap)
 {
@@ -302,7 +304,7 @@ static void createNewParameters(
 static IRCall* buildOriginalFunctionCall(
     IRFunc* func,
     IRBuilder& builder,
-    const List<ParamInfo>& paramInfos)
+    const List<LoweredOutParamInfo>& paramInfos)
 {
     List<IRInst*> args;
     for (auto& info : paramInfos)
@@ -328,7 +330,7 @@ static IRInst* constructReturnValue(
     IRStructKey* resultKey,
     IRStructType* returnStruct,
     const List<IRStructKey*>& outKeys,
-    const List<ParamInfo>& paramInfos)
+    const List<LoweredOutParamInfo>& paramInfos)
 {
     if (returnStruct)
     {
@@ -439,7 +441,8 @@ IRFunc* lowerOutParameters(
     IRStructKey* resultKey = createResultKey(func, builder, outKeys);
 
     // Collect parameter information
-    List<ParamInfo> paramInfos = collectParameterInfo(func, builder, outKeys, paramToKeyMap);
+    List<LoweredOutParamInfo> paramInfos =
+        collectParameterInfo(func, builder, outKeys, paramToKeyMap);
 
     // Check if transformation is needed
     if (!needsTransformation(paramInfos, alwaysUseReturnStruct))

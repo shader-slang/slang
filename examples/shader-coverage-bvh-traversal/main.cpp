@@ -1,4 +1,4 @@
-// BVH-traversal coverage demo — raw-Vulkan host driver.
+// BVH-traversal coverage demo — slang-rhi Vulkan host driver.
 //
 // Build a BVH over a procedural mesh on CPU, upload to GPU, trace
 // 256x256 rays through it via compute shader, read back coverage.
@@ -9,11 +9,11 @@
 // to keep each GPU submission short and avoid OS watchdog resets
 // (Windows TDR / VK_ERROR_DEVICE_LOST) under coverage instrumentation.
 //
-// All GPU-runtime calls go through `vk_compute_demo.h`. See its
-// file-level comment for the swap procedure when slang-rhi PR #739
-// lands.
+// The host uses slang-rhi synthetic bindings for the hidden coverage buffer.
+// For direct CPU/CUDA/Vulkan/Metal binding, see shader-coverage-backends.
 
-#include "vk_compute_demo.h"
+#include "shader-coverage-common/coverage-counters.h"
+#include "shader-coverage-common/coverage-rhi.h"
 
 #include <algorithm>
 #include <array>
@@ -27,22 +27,25 @@
 #include <iostream>
 #include <random>
 #include <slang-com-ptr.h>
+#include <slang-rhi/shader-cursor.h>
 #include <slang.h>
 #include <string>
 #include <string_view>
 #include <vector>
 
 using Slang::ComPtr;
+using coverageDemo::decodeCoverageCounters;
+using coverageDemo::createStorageBuffer;
 
 namespace
 {
 
-// ---- EXPLICIT / RAW BINDING --------------------------------------------------
+// ---- EXPLICIT PLACEMENT --------------------------------------------------
 // This demo uses the explicit binding approach: the host dictates the
 // descriptor slot for `__slang_coverage` at compile time (via
 // TraceCoverageBinding below) and then binds the buffer at exactly that
-// slot at runtime.  The slot is a compile-time constant — no post-compile
-// metadata query is needed.
+// slot at runtime. The host verifies the requested location in the compiler's
+// metadata and passes the complete resource record to slang-rhi.
 //
 // To avoid collisions with the application's own resources (set 0), the
 // coverage buffer is placed on a dedicated descriptor set (kCoverageSet=1).
@@ -147,7 +150,7 @@ uint32_t parseUnsigned(std::string_view value, const char* option)
 void checkSlang(SlangResult result, const char* what)
 {
     if (SLANG_FAILED(result))
-        fail(std::string(what) + " failed");
+        fail(std::string(what) + " failed with SlangResult " + std::to_string(result));
 }
 
 void diagnoseIfNeeded(slang::IBlob* diagnostics)
@@ -436,9 +439,13 @@ std::vector<Ray> generateRays(uint32_t gridDim)
 
 struct CompiledShader
 {
-    std::vector<uint8_t> spirv;
+    // Components borrow their session. Keep it alive while RHI queries layouts
+    // and retrieves code from the linked program after compileShader returns.
+    ComPtr<slang::ISession> session;
+    ComPtr<slang::IComponentType> linkedProgram;
     ComPtr<slang::IMetadata> metadata;
     slang::ICoverageTracingMetadata* coverageMetadata = nullptr;
+    rhi::SyntheticResourceBindingDesc coverageResource = {};
 };
 
 // Bundles the demo's compile-time choices so call sites name each
@@ -494,14 +501,12 @@ CompiledShader compileShader(const CompileOptions& options)
         pushBool(slang::CompilerOptionName::TraceFunctionCoverage);
         pushBool(slang::CompilerOptionName::TraceBranchCoverage);
 
-        // ---- EXPLICIT / RAW BINDING: tell the compiler the exact slot --------
+        // ---- EXPLICIT PLACEMENT: tell the compiler the exact slot --------
         // TraceCoverageBinding pins __slang_coverage to (set=kCoverageSet,
         // binding=kCoverageBinding). The compiler emits the matching
-        // OpDecorate Binding / DescriptorSet into the SPIR-V.  The host
-        // must then bind the counter buffer to that same slot — there is
-        // no runtime discovery step (contrast metadata-derived binding in
-        // shader-coverage-image-pipeline where this block is absent and
-        // ISyntheticResourceMetadata is queried after compilation instead).
+        // OpDecorate Binding / DescriptorSet into the SPIR-V. The host checks
+        // the resulting metadata and registers that resource with RHI below.
+        // Image-pipeline omits this option and lets the compiler choose.
         slang::CompilerOptionEntry pin = {};
         pin.name = slang::CompilerOptionName::TraceCoverageBinding;
         pin.value.kind = slang::CompilerOptionValueKind::Int;
@@ -566,20 +571,14 @@ CompiledShader compileShader(const CompileOptions& options)
     checkSlang(composed->link(linked.writeRef(), diagnostics.writeRef()), "link");
     diagnoseIfNeeded(diagnostics);
 
-    ComPtr<slang::IBlob> code;
-    diagnostics.setNull();
-    checkSlang(
-        linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()),
-        "getEntryPointCode");
-    diagnoseIfNeeded(diagnostics);
-
     CompiledShader out;
-    out.spirv.assign(
-        (const uint8_t*)code->getBufferPointer(),
-        (const uint8_t*)code->getBufferPointer() + code->getBufferSize());
+    out.session = session;
+    out.linkedProgram = linked;
 
     if (options.enableCoverage)
     {
+        // Metadata retrieval emits the shader and describes its generated resources.
+        // Without coverage, RHI requests the code when it builds the program.
         diagnostics.setNull();
         checkSlang(
             linked->getEntryPointMetadata(0, 0, out.metadata.writeRef(), diagnostics.writeRef()),
@@ -589,6 +588,14 @@ CompiledShader compileShader(const CompileOptions& options)
             slang::ICoverageTracingMetadata::getTypeGuid());
         if (!out.coverageMetadata)
             fail("expected coverage metadata");
+        checkSlang(
+            coverageDemo::getCoverageResourceDesc(out.metadata, out.coverageResource),
+            "getCoverageResourceDesc");
+        // Explicit placement is still a compiler option. RHI consumes the resulting
+        // metadata just as it does for the auto-assigned image-pipeline binding.
+        if (out.coverageResource.space != int32_t(kCoverageSet) ||
+            out.coverageResource.binding != int32_t(kCoverageBinding))
+            fail("coverage metadata does not match the requested binding");
     }
     return out;
 }
@@ -621,7 +628,6 @@ void writeCountersBinary(const std::vector<uint8_t>& rawBytes, const std::filesy
         fail("cannot open for writing: " + path.string());
     out.write(reinterpret_cast<const char*>(rawBytes.data()), (std::streamsize)rawBytes.size());
 }
-
 
 struct CoverageSummary
 {
@@ -687,12 +693,12 @@ void printSummary(const char* label, const CoverageSummary& s)
 
 } // namespace
 
-int main(int argc, char** argv)
+int exampleMain(int argc, char** argv)
 {
     // Wrap the demo body in try/catch so a Vulkan/Slang failure (no
     // device, allocation failure, shader-module rejection, ...) exits
     // with a diagnostic line instead of letting `std::terminate` fire.
-    // The `vkdemo::check` helper and various Slang call sites throw
+    // RHI buffer allocation and standard-library operations can throw
     // `std::runtime_error`, so catching `std::exception` covers both.
     try
     {
@@ -851,90 +857,95 @@ int main(int argc, char** argv)
         globalsData.triCount = (uint32_t)tris.size();
         globalsData.nodeCount = (uint32_t)nodes.size();
 
-        vkdemo::Context ctx;
-        // 64-bit counters (8-byte slots) need a device with
-        // shaderBufferInt64Atomics; request that feature so device selection
-        // skips integrated GPUs that only support a 32-bit counter buffer.
-        const bool needsInt64Atomics = enableCoverage && counterByteWidth == 8;
-        ctx.init(needsInt64Atomics);
-
-        // Set 0: application resources (5 bindings in shader order —
-        // rays, tris, nodes, globals, output). Set 1: coverage buffer
-        // at kCoverageBinding, present only when coverage is enabled.
-        // The coverage set is fixed by the TraceCoverageBinding option
-        // passed at compile time; both sides must use the same constants.
-        std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings;
-        setBindings.resize(2);
-        auto pushBinding = [](std::vector<VkDescriptorSetLayoutBinding>& v, uint32_t b)
+        coverageDemo::DiagnosticCallback diagnosticCallback;
+        rhi::DeviceDesc deviceDesc = {};
+        deviceDesc.debugCallback = &diagnosticCallback;
+        deviceDesc.deviceType = rhi::DeviceType::Vulkan;
+        const rhi::Feature atomicInt64 = rhi::Feature::AtomicInt64;
+        if (enableCoverage && counterByteWidth == 8)
         {
-            VkDescriptorSetLayoutBinding lb = {};
-            lb.binding = b;
-            lb.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            lb.descriptorCount = 1;
-            lb.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-            v.push_back(lb);
-        };
-        for (uint32_t i = 0; i < 5; ++i)
-            pushBinding(setBindings[0], i); // rays=0, tris=1, nodes=2, globals=3, output=4
-        if (enableCoverage)
-            pushBinding(setBindings[1], kCoverageBinding);
-        else
-            setBindings.pop_back(); // no coverage set when instrumentation is off
-
-        // Slang's SPIR-V emit renames the entry point to "main" by default.
-        auto pipe = ctx.createComputePipeline(
-            shader.spirv.data(),
-            shader.spirv.size(),
-            setBindings,
-            "main");
-
-        // Application buffers — must match the binding order in bvh_traverse.slang.
-        auto rayBuf =
-            ctx.createBuffer(rays.size() * sizeof(Ray), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        ctx.upload(rayBuf, rays.data(), rayBuf.size);
-        auto triBuf =
-            ctx.createBuffer(tris.size() * sizeof(Triangle), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        ctx.upload(triBuf, tris.data(), triBuf.size);
-        auto nodeBuf =
-            ctx.createBuffer(nodes.size() * sizeof(BVHNode), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        ctx.upload(nodeBuf, nodes.data(), nodeBuf.size);
-        auto globalsBuf = ctx.createBuffer(sizeof(Globals), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        ctx.upload(globalsBuf, &globalsData, sizeof(globalsData));
-        auto outputBuf =
-            ctx.createBuffer(rays.size() * 4 * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-
-        // Coverage counter buffer: counterCount slots × counterByteWidth bytes each,
-        // zero-initialised. The GPU atomically increments each slot for every
-        // covered source location reached during the dispatch.
-        vkdemo::Buffer coverageBuf = {};
-        if (enableCoverage)
-        {
-            coverageBuf = ctx.createBuffer(
-                (size_t)counterCount * counterByteWidth,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-            std::vector<uint8_t> zero((size_t)counterCount * counterByteWidth, 0u);
-            ctx.upload(coverageBuf, zero.data(), coverageBuf.size);
+            deviceDesc.requiredFeatures = &atomicInt64;
+            deviceDesc.requiredFeatureCount = 1;
         }
+        rhi::ComPtr<rhi::IDevice> device;
+        checkSlang(rhi::getRHI()->createDevice(deviceDesc, device.writeRef()), "createDevice");
 
-        // Bind application buffers to set 0 in shader binding order.
-        VkDescriptorSet set0 = ctx.allocateDescriptorSet(pipe.setLayouts[0]);
-        ctx.writeStorageBuffer(set0, 0, rayBuf);
-        ctx.writeStorageBuffer(set0, 1, triBuf);
-        ctx.writeStorageBuffer(set0, 2, nodeBuf);
-        ctx.writeStorageBuffer(set0, 3, globalsBuf);
-        ctx.writeStorageBuffer(set0, 4, outputBuf);
+        // Register the hidden resource before program creation so RHI can extend
+        // the pipeline layout. Coverage-disabled programs use the ordinary path.
+        rhi::ShaderProgramSyntheticResourcesDesc syntheticDesc = {};
+        syntheticDesc.resources = &shader.coverageResource;
+        syntheticDesc.resourceCount = 1;
+        rhi::ShaderProgramDesc programDesc = {};
+        programDesc.slangGlobalScope = shader.linkedProgram;
+        if (enableCoverage)
+            programDesc.next = &syntheticDesc;
+        rhi::ComPtr<rhi::IShaderProgram> program;
+        ComPtr<slang::IBlob> diagnostics;
+        const auto programResult =
+            device->createShaderProgram(programDesc, program.writeRef(), diagnostics.writeRef());
+        diagnoseIfNeeded(diagnostics);
+        checkSlang(programResult, "createShaderProgram");
 
-        std::vector<VkDescriptorSet> sets = {set0};
+        rhi::ComputePipelineDesc pipelineDesc = {};
+        pipelineDesc.program = program;
+        rhi::ComPtr<rhi::IComputePipeline> pipeline;
+        checkSlang(
+            device->createComputePipeline(pipelineDesc, pipeline.writeRef()),
+            "createComputePipeline");
+        rhi::ComPtr<rhi::IShaderObject> root;
+        checkSlang(
+            device->createRootShaderObject(program, root.writeRef()),
+            "createRootShaderObject");
+        rhi::ComPtr<rhi::ICommandQueue> queue;
+        checkSlang(device->getQueue(rhi::QueueType::Graphics, queue.writeRef()), "getQueue");
+
+        auto rayBuf = createStorageBuffer(
+            device,
+            "rays",
+            rays.size() * sizeof(Ray),
+            sizeof(Ray),
+            rays.data());
+        auto triBuf = createStorageBuffer(
+            device,
+            "triangles",
+            tris.size() * sizeof(Triangle),
+            sizeof(Triangle),
+            tris.data());
+        auto nodeBuf = createStorageBuffer(
+            device,
+            "nodes",
+            nodes.size() * sizeof(BVHNode),
+            sizeof(BVHNode),
+            nodes.data());
+        auto globalsBuf =
+            createStorageBuffer(device, "globals", sizeof(Globals), sizeof(Globals), &globalsData);
+        auto outputBuf = createStorageBuffer(
+            device,
+            "output",
+            rays.size() * 4 * sizeof(float),
+            4 * sizeof(float));
+        rhi::ShaderCursor cursor(root);
+        checkSlang(cursor["rays"].setBinding(rayBuf), "bind rays");
+        checkSlang(cursor["triangles"].setBinding(triBuf), "bind triangles");
+        checkSlang(cursor["nodes"].setBinding(nodeBuf), "bind nodes");
+        checkSlang(cursor["globals"].setBinding(globalsBuf), "bind globals");
+        checkSlang(cursor["output"].setBinding(outputBuf), "bind output");
+
+        // Zero once, then accumulate across all dispatches. The metadata ID is
+        // opaque; it is not the descriptor binding number or a reflected name.
+        rhi::ComPtr<rhi::IBuffer> coverageBuf;
         if (enableCoverage)
         {
-            // ---- EXPLICIT / RAW BINDING: runtime side ----------------------------
-            // Bind the coverage buffer at (set=kCoverageSet, binding=kCoverageBinding)
-            // — the same constants passed to TraceCoverageBinding at compile time.
-            // No metadata query is needed; the slot is fixed by the constants.
-            VkDescriptorSet set1 = ctx.allocateDescriptorSet(pipe.setLayouts[1]);
-            ctx.writeStorageBuffer(set1, kCoverageBinding, coverageBuf);
-            sets.push_back(set1);
-            // -----------------------------------------------------------------------
+            std::vector<uint8_t> zero(size_t(counterCount) * counterByteWidth, 0);
+            coverageBuf =
+                createStorageBuffer(device, "coverage", zero.size(), counterByteWidth, zero.data());
+            checkSlang(
+                rhi::bindSyntheticResource(
+                    program,
+                    root,
+                    shader.coverageResource.id,
+                    rhi::Binding(coverageBuf)),
+                "bindSyntheticResource");
         }
 
         // Dispatch rays in batches to avoid any single GPU submission running
@@ -968,10 +979,21 @@ int main(int argc, char** argv)
         for (uint32_t offset = 0; offset < totalRays;)
         {
             globalsData.rayBatchOffset = offset;
-            ctx.upload(globalsBuf, &globalsData, sizeof(globalsData));
+            rhi::ComPtr<rhi::ICommandEncoder> encoder;
+            checkSlang(queue->createCommandEncoder(encoder.writeRef()), "createCommandEncoder");
+            checkSlang(
+                encoder->uploadBufferData(globalsBuf, 0, sizeof(globalsData), &globalsData),
+                "upload globals");
             const uint32_t batchRays = std::min(effectiveBatchSize, totalRays - offset);
             const uint32_t groups = (batchRays + 63) / 64;
-            ctx.dispatch(pipe, sets, groups, 1, 1);
+            auto pass = encoder->beginComputePass();
+            pass->bindPipeline(pipeline, root);
+            pass->dispatchCompute(groups, 1, 1);
+            pass->end();
+            rhi::ComPtr<rhi::ICommandBuffer> commands;
+            checkSlang(encoder->finish(commands.writeRef()), "finish commands");
+            checkSlang(queue->submit(commands), "submit");
+            checkSlang(queue->waitOnHost(), "waitOnHost");
             ++batchCount;
             offset += batchRays;
         }
@@ -992,16 +1014,12 @@ int main(int argc, char** argv)
             // downstream tools that read the manifest's element_stride field see
             // a consistent layout (matches image-pipeline's readback convention).
             std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
-            ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
-            std::vector<uint64_t> hits(counterCount, 0);
-            for (uint32_t i = 0; i < counterCount; ++i)
-            {
-                uint64_t value = 0;
-                const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
-                for (uint32_t b = 0; b < counterByteWidth; ++b)
-                    value |= (uint64_t)slot[b] << (b * 8); // little-endian reassembly
-                hits[i] = value;
-            }
+            ComPtr<slang::IBlob> readback;
+            checkSlang(
+                device->readBuffer(coverageBuf, 0, rawBytes.size(), readback.writeRef()),
+                "read coverage buffer");
+            std::memcpy(rawBytes.data(), readback->getBufferPointer(), rawBytes.size());
+            auto hits = decodeCoverageCounters(rawBytes.data(), rawBytes.size(), counterByteWidth);
 
             auto summary = summarize(shader.coverageMetadata, hits);
             printSummary(mode.c_str(), summary);
@@ -1028,26 +1046,8 @@ int main(int argc, char** argv)
             std::cout << "wrote " << (outDir / (mode + ".counters.bin")) << "\n";
         }
 
-        ctx.destroyBuffer(rayBuf);
-        ctx.destroyBuffer(triBuf);
-        ctx.destroyBuffer(nodeBuf);
-        ctx.destroyBuffer(globalsBuf);
-        ctx.destroyBuffer(outputBuf);
-        if (enableCoverage)
-            ctx.destroyBuffer(coverageBuf);
-        ctx.destroyPipeline(pipe);
         std::cout << "done\n";
         return 0;
-    }
-    catch (const vkdemo::VulkanError& e)
-    {
-        std::cerr << "fatal: " << e.what() << "\n";
-        if (e.result == VK_ERROR_DEVICE_LOST)
-            std::cerr << "The GPU was likely reset by the OS watchdog (TDR) during a long "
-                         "coverage-instrumented dispatch. Rerun with a smaller --batch-size "
-                         "(e.g. --batch-size=65536), or use --coverage-mode=boolean, which "
-                         "removes the atomic-counter cost.\n";
-        return 1;
     }
     catch (const std::exception& e)
     {

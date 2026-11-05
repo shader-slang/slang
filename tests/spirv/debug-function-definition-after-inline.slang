@@ -57,8 +57,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunctionDefinition [[HC_FUNC]] %helperCaller
 
 // A pre-inline DebugVar (here helperCaller's parameter x) in a bare-cached function must scope to
-// that function's DebugFunction, not the module DebugCompilationUnit; this guards the
-// cache-hit-path registerDebugInst so the OpDebugLocalVariable Parent resolves to helperCaller.
+// that function's DebugFunction, not the module DebugCompilationUnit. The explicit declaration
+// scope on its DebugVar must resolve to helperCaller even when its metadata was emitted early.
 // CHECK-DAG: [[X_STR:%[0-9]+]] = OpString "x"
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugLocalVariable [[X_STR]] {{.*}} [[HC_FUNC]] %uint_0
 

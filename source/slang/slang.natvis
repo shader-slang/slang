@@ -312,6 +312,7 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ContainerDecl">(Slang::ContainerDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExtensionDecl">(Slang::ExtensionDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StructDecl">(Slang::StructDecl*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLClassDecl">(Slang::HLSLClassDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ClassDecl">(Slang::ClassDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EnumDecl">(Slang::EnumDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::InterfaceDecl">(Slang::InterfaceDecl*)&amp;astNodeType</ExpandedItem>
@@ -358,6 +359,7 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ContainerDecl">(Slang::ContainerDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExtensionDecl">(Slang::ExtensionDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StructDecl">(Slang::StructDecl*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLClassDecl">(Slang::HLSLClassDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ClassDecl">(Slang::ClassDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EnumDecl">(Slang::EnumDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::InterfaceDecl">(Slang::InterfaceDecl*)&amp;astNodeType</ExpandedItem>

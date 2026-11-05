@@ -900,6 +900,13 @@ These are not lint-enforced, but skip them only with a
   parameter-group lowering. A field loaded from a CUDA read-only
   buffer may instead appear inside `__ldg(&...->a_0)`. Use FileCheck
   wildcards like `a_{{[0-9]+}}` rather than literal `a_0`.
+- **WGSL spells the unconditional loop header `loop`.** Structured
+  loops lower to an unconditional header with the exit test as an
+  early `break`; HLSL, GLSL, Metal, CUDA and C++ spell that header
+  `for(;;)`, and WGSL spells it `loop` (only the header token
+  differs). Anchor a WGSL header match, either as the whole line
+  `{{^ *loop$}}` or as `loop` followed by a `-NEXT: {` check,
+  because a bare `loop` also matches identifiers that contain it.
 - **CUDA `__ldg` is memory-space-sensitive.** Top-level `uniform`
   values are fields of `SLANG_globalParams`, which CUDA emits in
   `__constant__` memory, so the immutable-load pass must leave those
@@ -1075,8 +1082,8 @@ pitfalls observed in earlier bundles:
   and the closesthit/anyhit signature emits without it.
 - **Entry-point stage capabilities are checked at type-check time.**
   If the core module excludes a target from the capability set for
-  a given intrinsic (e.g. `NonUniformResourceIndex` requires
-  `cpp_cuda_glsl_hlsl_spirv` and so excludes Metal), the test
+  a given intrinsic (e.g. one declared only
+  `[require(cpp_cuda_glsl_hlsl_spirv)]` excludes Metal and WGSL), the test
   rejects with E36107 before any emit happens. This is usually a
   doc-bug; see [Record a doc-gap](#record-a-doc-gap-when-the-doc-claims-a-surface-the-compiler-rejects)
   below.
@@ -1095,9 +1102,6 @@ we have already surfaced:
 - The SPIR-V doc names `-validate-spirv` as the CLI flag enabling
   spirv-val; no such flag exists. Only `SLANG_RUN_SPIRV_VALIDATION`
   (env var) and `-skip-spirv-validation` are real surfaces.
-- The Metal doc claims `NonUniformResourceIndex` is a pass-through;
-  the core module excludes Metal from its capability set, so the
-  intrinsic does not even compile.
 
 Recording the doc-gap is more valuable than working around the
 fabrication: the next doc regeneration consumes the row and fixes

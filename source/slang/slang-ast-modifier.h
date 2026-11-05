@@ -33,6 +33,17 @@ class ConstModifier : public Modifier
     FIDDLE(...)
 };
 
+/// A `const` modifier written after a function parameter list.
+///
+/// Specifies `ParamPassingMode::In` for the receiver parameter.
+/// Prefix `const` uses `ConstModifier`.
+/// Attribute spellings of receiver modes use `ReceiverParamModeSpecifierAttribute`.
+FIDDLE()
+class CppStyleTrailingReceiverParamConstModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class BuiltinModifier : public Modifier
 {
@@ -187,6 +198,21 @@ class SynthesizedModifier : public Modifier
     FIDDLE(...)
     FIDDLE() uint32_t op = kIROp_Nop;
     FIDDLE() List<Val*> operands;
+};
+
+/// Records the effective parameter-passing mode that a synthesized declaration must preserve.
+///
+/// Requirement-witness synthesis creates new declarations after applying substitutions to their
+/// value types. Recomputing a mode from those substituted types can change the ABI promised by the
+/// original declaration. This internal modifier makes the required mode declaration-owned on the
+/// synthesized `ParamDecl`, or on a synthesized callable for its effective `this` parameter.
+/// Signature checking consumes it before attaching any checked semantic attributes. It has no
+/// source-language spelling.
+FIDDLE()
+class SynthesizedParamPassingModeModifier : public Modifier
+{
+    FIDDLE(...)
+    FIDDLE() ParamPassingMode mode = ParamPassingMode::In;
 };
 
 // Marks that the definition of a func decl is synthesized static invoke func for
@@ -379,6 +405,22 @@ class BorrowModifier : public Modifier
     FIDDLE(...)
 };
 
+// The `__ref_readonly` modifier: pass by reference, and the callee may only read
+// through the reference.
+FIDDLE()
+class RefReadOnlyModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// The `__ref_writeonly` modifier: pass by reference, and the callee may only write
+// through the reference.
+FIDDLE()
+class RefWriteOnlyModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 // This is a special sentinel modifier that gets added
 // to the list when we have multiple variable declarations
 // all sharing the same modifiers:
@@ -472,6 +514,17 @@ FIDDLE()
 class ImplicitParameterGroupElementTypeModifier : public Modifier
 {
     FIDDLE(...)
+};
+
+// Marks the `static const` alias that an unscoped enum adds to its
+// enclosing scope for one of its cases. For `[UnscopedEnum] enum E { A }`,
+// the alias `A` refers to the case `E.A`.
+FIDDLE()
+class UnscopedEnumCaseAliasModifier : public Modifier
+{
+    FIDDLE(...)
+public:
+    FIDDLE() EnumCaseDecl* enumCaseDecl = nullptr;
 };
 
 
@@ -1398,12 +1451,21 @@ class VulkanHitObjectAttributesAttribute : public Attribute
     FIDDLE() int location;
 };
 
+/// An attribute that specifies the passing mode of a declaration's receiver parameter.
+///
+/// Trailing `const` is represented separately by `CppStyleTrailingReceiverParamConstModifier`.
+FIDDLE(abstract)
+class ReceiverParamModeSpecifierAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 // A `[mutating]` attribute, which indicates that a member
 // function is allowed to modify things through its `this`
 // argument.
 //
 FIDDLE()
-class MutatingAttribute : public Attribute
+class MutatingAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1413,7 +1475,7 @@ class MutatingAttribute : public Attribute
 // its `this` parameter.
 //
 FIDDLE()
-class NonmutatingAttribute : public Attribute
+class NonmutatingAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1435,7 +1497,7 @@ class NoDiscardAttribute : public Attribute
 // a member function should be passed by const reference.
 //
 FIDDLE()
-class ConstRefAttribute : public Attribute
+class ConstRefAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1444,9 +1506,21 @@ class ConstRefAttribute : public Attribute
 // a member function should be passed by reference.
 //
 FIDDLE()
-class RefAttribute : public Attribute
+class RefAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
+};
+
+/// Records the type and parameter-passing mode of a declaration's effective `this` parameter.
+///
+/// Signature checking attaches this attribute if and only if the declaration has an effective
+/// `this` parameter. Later compiler stages consume this checked semantic information instead of
+/// deriving it again from syntax or compilation options.
+FIDDLE()
+class ThisParamInfoAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() ParamInfo info;
 };
 
 // A `[__readNone]` attribute, which indicates that a function

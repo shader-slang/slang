@@ -91,6 +91,7 @@ public:
     TypeExp cloneTypeExp(TypeExp const& typeExp);
 
     void cloneField(QualType& dst, QualType const& src);
+    void cloneField(ParamInfo& dst, ParamInfo const& src);
     void cloneField(TypeExp& dst, TypeExp const& src);
     void cloneField(Modifiers& dst, Modifiers const& src);
     void cloneField(ValNodeOperand& dst, ValNodeOperand const& src);

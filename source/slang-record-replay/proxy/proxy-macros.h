@@ -22,17 +22,17 @@ namespace SlangRecord
         ReplayContext::get().marker(label); \
     } while (0)
 
-// Begins a recorded instance method call - locks context, records signature and 'this'
-// Uses compiler-specific macro for full signature including type name
+// Begins a recorded instance method call. The process-wide mutex is taken only when
+// the record layer is active, so the idle default path does not serialize callers.
 #define RECORD_CALL()                  \
     auto& _ctx = ReplayContext::get(); \
-    auto _lock = _ctx.lock();          \
+    auto _lock = _ctx.lockIfActive();  \
     _ctx.beginCall(SLANG_FUNC_SIG, this)
 
 // For static/free functions (no 'this' pointer)
 #define RECORD_STATIC_CALL()           \
     auto& _ctx = ReplayContext::get(); \
-    auto _lock = _ctx.lock();          \
+    auto _lock = _ctx.lockIfActive();  \
     _ctx.beginStaticCall(SLANG_FUNC_SIG)
 
 // Record an input parameter
@@ -142,7 +142,10 @@ struct BlobOutputTempReleaser
 // notePlaybackOrphanedProxy, and it keeps its note -- teardown releasing it only
 // takes the proxy from two references down to one, and m_returnedEntryPoints
 // still holds that one until the owning component proxy is destroyed. Cancelling
-// the note here would leave the creation reference with no owner at all.
+// the note here would leave the creation reference with no owner at all. A
+// replayed user release() of the proxy cancels the note instead (see
+// ProxyBase::noteUserReleaseIfPlayback), because then the user's reference is
+// gone and teardown must not release it again.
 //
 // Requires: RECORD_CALL() has been called (provides _ctx), and the class has
 //           m_returnedEntryPoints.
@@ -192,6 +195,7 @@ struct BlobOutputTempReleaser
         if (SlangRecord::isRefCountRecordingSuppressed()) \
             return ProxyBase::addRefImpl();               \
         RECORD_CALL();                                    \
+        ProxyBase::noteUserAddRefIfPlayback(_ctx);        \
         uint32_t result = ProxyBase::addRefImpl();        \
         RECORD_RETURN(result);                            \
     }
@@ -203,6 +207,7 @@ struct BlobOutputTempReleaser
         if (SlangRecord::isRefCountRecordingSuppressed())  \
             return ProxyBase::releaseImpl();               \
         RECORD_CALL();                                     \
+        ProxyBase::noteUserReleaseIfPlayback(_ctx);        \
         uint32_t result = ProxyBase::releaseImpl();        \
         RECORD_RETURN(result);                             \
     }

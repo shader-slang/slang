@@ -283,6 +283,19 @@ entry point metadata (`slang::ISyntheticResourceMetadata`: binding location;
 `slang::ICoverageTracingMetadata`: counters and source attribution) instead of a sidecar
 file.
 
+## Coverage integration options
+
+| Your host                             | Start here                                                       | Binding demonstrated                                                     |
+| ------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Uses slang-rhi                        | [Image pipeline](../../examples/shader-coverage-image-pipeline/) | Compiler-assigned placement, registered with RHI before program creation |
+| Uses slang-rhi and needs a fixed slot | [BVH traversal](../../examples/shader-coverage-bvh-traversal/)   | Explicit placement, registered and bound through the same RHI API        |
+| Owns its runtime, without slang-rhi   | [Selectable backends](../../examples/shader-coverage-backends/)  | Native CPU/CUDA/Vulkan/Metal binding from compiler metadata              |
+| Loads a precompiled CPU shader        | [CPU tutorial](../../examples/shader-coverage-tutorial/)         | Standalone host using a sidecar manifest                                 |
+
+Both RHI examples currently run on Vulkan. RHI's synthetic-resource API supports
+Vulkan and CUDA; native coverage also works on CPU and Metal. Automatic versus
+explicit placement is independent of whether the host uses RHI.
+
 For details:
 
 - [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md#trace-coverage) —
@@ -301,14 +314,14 @@ For details:
   produce identical counter values for the same inputs. The place to start when moving from
   the tutorial's CPU dispatch to your own target.
 - [`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline) —
-  Vulkan, in-process API, auto-allocated binding: the compiler picks the coverage slot and
+  Vulkan via slang-rhi, in-process API, auto-allocated binding: the compiler picks the coverage slot and
   the host reads it back from the metadata after compilation. Multi-stage image kernels
   (denoise, tone map, gamma) with many-armed switches; a smoke-vs-full run shows branch and
   function coverage catching switch arms that line coverage alone marks covered. Also
   demonstrates count vs boolean recording modes and counter-width selection.
 - [`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal) —
-  Vulkan, in-process API, explicit binding: the host pins the coverage slot up front with
-  `TraceCoverageBinding` so the pipeline layout is fixed before compilation. BVH ray
+  Vulkan via slang-rhi, in-process API, explicit binding: the host pins the coverage slot up front with
+  `TraceCoverageBinding`, then supplies the resulting metadata to RHI. BVH ray
   traversal where branch coverage surfaces input-shape gaps in the test scene: degenerate
   triangles, the traversal-stack-overflow fallback, and material-dispatch arms the default
   mesh never fires.

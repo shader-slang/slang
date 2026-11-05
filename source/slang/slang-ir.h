@@ -2242,23 +2242,15 @@ public:
     IRCompilerDictionary* getTranslationDict() { return m_translationDict; }
     void setTranslationDict(IRCompilerDictionary* dict) { m_translationDict = dict; }
 
+    // Binary module loading checks this range before decoding serialized AST and IR.
+    // Adding an IR instruction requires a new writer version. Earlier modules can remain
+    // supported when their AST and IR representations are compatible with the reader.
     //
-    // The range of module versions this compiler supports
-    //
-    // This will need to be updated if for example an instruction is removed,
-    // the max supported version should be incremented and the min supported
-    // version set to above the last version an instance of that instruction
-    // could be found
-    //
-    // Additionally this should be updated when new instructions are added,
-    // however only k_maxSupportedModuleVersion needs to be incremented in that
-    // case
-    //
-    // It represents the version of module regarding semantics and doesn't have
-    // anything to do with serialization format
-    //
-    const static UInt k_minSupportedModuleVersion = 31;
-    const static UInt k_maxSupportedModuleVersion = 32;
+    // The structural ray-tracing stage and descriptor AST classes shift the sequential
+    // `ASTNodeType` values, so version-37 modules would decode later nodes as different classes.
+    // Version 38 also adds the trace-program descriptor and Metal trace IR instructions.
+    const static UInt k_minSupportedModuleVersion = 38;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

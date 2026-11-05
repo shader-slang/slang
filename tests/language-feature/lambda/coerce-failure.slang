@@ -1,6 +1,6 @@
 // Used as example in docs/user-guide/03-convenience-features.md ("Lambda Expressions - Coercion to functype")
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv
 
 
 func test(f: functype(int, int)->float) -> float

@@ -2299,6 +2299,7 @@ struct LLVMEmitter
             }
             return nullptr;
 
+        case kIROp_DebugLexicalBlock:
         case kIROp_DebugInlinedAt:
         case kIROp_DebugInlinedVariable:
             debugInsts.add(inst);

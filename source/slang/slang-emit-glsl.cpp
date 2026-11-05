@@ -4,6 +4,7 @@
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-call-graph.h"
+#include "slang-ir-check-push-constant-blocks.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
@@ -68,12 +69,20 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
             SLANG_ASSERT(requireComputeDerivative);
             SLANG_ASSERT(m_entryPointStage == Stage::Compute);
 
-            // Compute derivatives are quad by default, add the decoration if entry point
-            // does not not explicit linear decoration.
-            bool isQuad = !entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
-            if (isQuad)
+            // Grouping may be explicit or already inferred for an earlier derivative operation.
+            if (!entryPoint->findDecoration<IRDerivativeGroupDecoration>())
             {
-                builder.addDecoration(entryPoint, kIROp_DerivativeGroupQuadDecoration);
+                switch (inferDerivativeGroupMode(entryPoint))
+                {
+                case DerivativeGroupMode::Quad:
+                    builder.addDecoration(entryPoint, kIROp_DerivativeGroupQuadDecoration);
+                    break;
+                case DerivativeGroupMode::Linear:
+                    builder.addDecoration(entryPoint, kIROp_DerivativeGroupLinearDecoration);
+                    break;
+                default:
+                    SLANG_UNEXPECTED("unexpected derivative-group mode");
+                }
             }
         }
     }
@@ -82,6 +91,24 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
 void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
 {
     buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
+
+    // glslang rejects a stage that declares more than one `layout(push_constant)` block. We report
+    // the case where an entry point's own call tree uses more than one block. A block read only by
+    // an exported function that the entry point does not call is still declared, and this check
+    // does not count it.
+    checkForMultiplePushConstantBlocksPerEntryPoint(
+        module,
+        m_referencingEntryPoints,
+        isPushConstantBlockByLayout,
+        getSink());
+
+    Index pushConstantBlockCount = 0;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (as<IRGlobalParam>(globalInst) && isPushConstantBlockByLayout(globalInst))
+            pushConstantBlockCount++;
+    }
+    m_hasMultiplePushConstantBlocks = pushConstantBlockCount > 1;
 
     IRBuilder builder(module);
     for (auto globalInst : module->getGlobalInsts())
@@ -1472,6 +1499,13 @@ void GLSLSourceEmitter::emitParameterGroupImpl(
     IRGlobalParam* varDecl,
     IRUniformParameterGroupType* type)
 {
+    // glslang allows one `layout(push_constant)` block per stage and counts every block we
+    // declare, including one that nothing reads. `-preserve-params` keeps such unused blocks, so
+    // a module with one used block and one unused block would be rejected. We therefore omit a
+    // push-constant block with no uses when the module has more than one push-constant block.
+    if (m_hasMultiplePushConstantBlocks && isPushConstantBlockByLayout(varDecl) &&
+        !varDecl->hasUses())
+        return;
     _emitGLSLParameterGroup(varDecl, type);
 }
 
@@ -1817,6 +1851,32 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     // parameters/results, local variables, etc. Additional legalization
     // steps are required to guarantee these conditions.
     //
+    // When emitting unbounded-size resource arrays with GLSL we need
+    // to use the `GL_EXT_nonuniform_qualifier` extension to ensure
+    // that they are not treated as "implicitly-sized arrays" which
+    // are arrays that have a fixed size that just isn't specified
+    // at the declaration site (instead being inferred from use sites).
+    //
+    // While the extension primarily introduces the `nonuniformEXT`
+    // qualifier that we use to implement `NonUniformResourceIndex`,
+    // it also changes the GLSL language semantics around (resource) array
+    // declarations that don't specify a size.
+    //
+    // This must run before the specialized buffer / parameter-group
+    // declarations below, which `return` early: without it, an unsized
+    // (bindless) array of the resource kinds those branches handle --
+    // structured and byte-address buffers, parameter groups, SSBOs -- would
+    // skip the request, while textures and samplers (which fall through to
+    // the tail) would still reach it.
+    //
+    if (as<IRUnsizedArrayType>(varType))
+    {
+        if (isResourceType(unwrapArray(varType)))
+        {
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_nonuniform_qualifier"));
+        }
+    }
+
     if (auto paramBlockType = as<IRUniformParameterGroupType>(unwrapArray(varType)))
     {
         _emitGLSLParameterGroup(varDecl, paramBlockType);
@@ -1858,25 +1918,6 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
         {
             _maybeEmitGLSLBuiltin(varDecl, name);
             return true;
-        }
-    }
-
-    // When emitting unbounded-size resource arrays with GLSL we need
-    // to use the `GL_EXT_nonuniform_qualifier` extension to ensure
-    // that they are not treated as "implicitly-sized arrays" which
-    // are arrays that have a fixed size that just isn't specified
-    // at the declaration site (instead being inferred from use sites).
-    //
-    // While the extension primarily introduces the `nonuniformEXT`
-    // qualifier that we use to implement `NonUniformResourceIndex`,
-    // it also changes the GLSL language semantics around (resource) array
-    // declarations that don't specify a size.
-    //
-    if (as<IRUnsizedArrayType>(varType))
-    {
-        if (isResourceType(unwrapArray(varType)))
-        {
-            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_nonuniform_qualifier"));
         }
     }
 
@@ -3989,6 +4030,15 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         {
             _requireGLSLExtension(toSlice("GL_EXT_fragment_shader_barycentric"));
             prefix = toSlice("pervertex");
+        }
+        else if (as<IRGLSLPatchDecoration>(decoration))
+        {
+            prefix = toSlice("patch");
+            // `patch` is a core GLSL keyword, no need for suffix like EXT
+            postfix = toSlice("");
+            // Unlike the payload branches below, no `layout(location = ...)` here: a patch
+            // variable is an ordinary varying, so its location comes from the normal varying
+            // layout path (`emitLayoutQualifiersImpl`), and emitting one here would duplicate it.
         }
         else
         {

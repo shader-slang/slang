@@ -4,16 +4,18 @@
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debug-info-family
 //META: doc_section_digest=3616dae83508b4ffad03f364c704966c745acf49fe621c5856bbbe38e68899eb
-//META: purpose=Debug level Minimal (-g1) produces no DebugCompilationUnit and no DebugVar or DebugValue, all three of which the Standard level adds.
+//META: purpose=Debug level Minimal (-g1) produces no DebugVar or DebugValue, both of which the Standard level adds; the DebugCompilationUnit is built at every level above None.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies the Minimal/Standard split, which is the fact a reader needs before
 // concluding a record is missing from the compiler rather than from the chosen
-// level. The `MIN` run anchors on the dump banner and then forbids the three
+// level. The `MIN` run anchors on the dump banner and then forbids the two
 // variable-level records through to end of input; the `STD` run compiles the
-// identical shader one level up and finds all three. Every `STD` pattern
+// identical shader one level up and finds them along with the compilation
+// unit, which Minimal also builds so that a module serialized at `-g1` can be
+// compiled at `-g2` later. Every `STD` pattern
 // carries a `{{...}}` regex on purpose: at Standard the source record embeds a
 // verbatim copy of this file, so a pattern spelled as plain text would match
 // its own CHECK line in the echoed source instead of a real record.
@@ -31,7 +33,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // MIN: {{^}}### LOWER-TO-IR:
-// MIN-NOT: = DebugCompilationUnit(
 // MIN-NOT: = DebugVar(
 // MIN-NOT: DebugValue(
 

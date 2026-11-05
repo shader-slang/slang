@@ -26,5 +26,5 @@ void main(uint3 tid : SV_DispatchThreadID)
     buf[0] = local;
 }
 
-// CHECK: %[[V:[a-zA-Z0-9_]+]]{{.*}}= DebugVar(%{{[0-9]+}}, {{[0-9]+}} : UInt, {{[0-9]+}} : UInt)
+// CHECK: %[[V:[a-zA-Z0-9_]+]]{{.*}}= DebugVar(%{{[0-9]+}}, {{[0-9]+}} : UInt, {{[0-9]+}} : UInt, %{{[A-Za-z0-9_]+}})
 // CHECK: DebugValue(%[[V]], %{{[a-zA-Z0-9_]+}})

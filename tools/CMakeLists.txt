@@ -115,8 +115,10 @@ else()
     )
 endif()
 generator(slang-embed)
+generator(slang-generate-monolithic-standard-module-library)
 generator(slang-core-module-cache)
 generator(slang-generate USE_FEWER_WARNINGS)
+
 generator(slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
 generator(slang-capability-generator LINK_WITH_PRIVATE compiler-core)
 generator(slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
@@ -361,7 +363,13 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
-    add_dependencies(slang-test slang-neural-module slang-workgraph-module)
+    add_dependencies(
+        slang-test
+        slang-neural-module
+        slang-portable-raytracing-module
+        slang-workgraph-module
+    )
+    add_dependencies(slang-test slang-numerics-modules)
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
@@ -473,6 +481,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             # The record-replay unit tests call into the record-replay subsystem, which is compiled
             # out when SLANG_ENABLE_RECORD_REPLAY is OFF; the tests guard their bodies on this macro.
             SLANG_ENABLE_RECORD_REPLAY=$<BOOL:${SLANG_ENABLE_RECORD_REPLAY}>
+            # The library-unload test needs to know whether slang-glslang links mimalloc (whether
+            # slang-compiler does comes from core's SLANG_ENABLE_MIMALLOC).
+            $<$<BOOL:${SLANG_GLSLANG_USES_MIMALLOC}>:SLANG_GLSLANG_USES_MIMALLOC=1>
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
             core
@@ -482,7 +493,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             metal-cpp
             Threads::Threads
         LINK_WITH_FRAMEWORK Foundation Metal
-        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
+            ${slang_SOURCE_DIR}/examples
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools

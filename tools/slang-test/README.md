@@ -117,7 +117,7 @@ Available test types:
 - `COMPARE_COMPUTE`: Runs render-test to execute a compute shader and writes the result to a text file. The test passes if the output matches the expected content
 - `COMPARE_COMPUTE_EX`: Same as COMPARE_COMPUTE, but supports additional parameter specifications
 - `COMPARE_RENDER_COMPUTE`: Runs render-test with "-slang -gcompute" options and compares text file outputs
-- `LANG_SERVER`: Tests Language Server Protocol features by sending requests (like completion, hover, signatures) and comparing responses with expected outputs
+- `LANG_SERVER`: Tests Language Server Protocol features by sending requests (like completion, hover, signatures) and comparing responses with expected outputs. See [Language server tests](#language-server-tests)
 
 Deprecated test types (do not create new tests of these kinds, and we need to slowly migrate existing tests to use SIMPLE, COMPARE_COMPUTE(\_EX) or COMPARE_RENDER_COMPUTE instead):
 
@@ -128,6 +128,44 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 - `COMPARE_GLSL`: Runs the slangc compiler both through Slang and directly, then compares the SPIR-V assembly output
 - `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
 - `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
+
+### Exit code of `SIMPLE` tests
+
+A `SIMPLE` test with the `filecheck=PREFIX` option checks the exit code of the tool, in addition to the FileCheck lines. The test fails if the exit code is not the expected one. The expected exit code is 0 by default.
+
+A test that must fail sets the expected exit code with the `exit-code=N` option:
+
+```
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -entry main -stage compute
+```
+
+The common exit codes of `slangc` are:
+
+- `-1`: the compilation failed, for example because of an error diagnostic.
+- `1`: the command line is not valid, for example an unknown or malformed option.
+
+A test with an expected failure should also have a `CHECK` line for the diagnostic that it wants to see, for example `// CHECK: error[E30015]`. Without it, the test can pass for an unrelated error. A `CHECK-NOT` line alone cannot detect a failed compilation, because the error output does not contain the text that it rejects. Use the diagnostic code, such as `E36107`, and not only the word `error`. The word `error` is also part of the header `standard error` in the FileCheck input.
+
+The `diag=PREFIX` option of `DIAGNOSTIC_TEST` does not check the exit code yet (#14266). See [diagnostics](../../docs/diagnostics.md).
+
+## Language server tests
+
+A `LANG_SERVER` test opens the test file in `slangd` and runs the `//` directives in the file from top to bottom. Every `LANG_SERVER` test shares one `slangd` process. `initialize` replaces the workspace, but formatting, inlay-hint, commit-character and trace options carry over, so a test that changes one of them sets it back to its default before it ends.
+
+Request directives print a `--------` separator followed by the result:
+
+- `//COMPLETE:<line>,<col>`, `//SIGNATURE:<line>,<col>`, `//HOVER:<line>,<col>` (1-based) print the completion items, signature help or hover, or `null`.
+- `//INLAY` prints every inlay hint in the document as `<line>,<col> <label>`.
+- `//ON_TYPE_FORMAT:<line>,<col>` prints whether on-type formatting is `enabled` or `disabled`.
+- `//DIAGNOSTICS` prints the diagnostics published for the document.
+
+Configuration directives:
+
+- `//CONFIG:<key>=<json>` sends `workspace/didChangeConfiguration` with one flat key, for example `//CONFIG:slang.inlayHints.deducedTypes=true` or `=null`, and prints `config: <key>=<json>`.
+- `//CONFIG_REPULL` sends `workspace/didChangeConfiguration` with `settings: null`, which makes `slangd` request its settings again, and answers that request from the `//CONFIG_REPLY:` lines.
+- `//CONFIG_REPLY:<section>=<json>` declares the value the test client returns for one section when `slangd` sends `workspace/configuration`. These lines are collected before the test runs, so their position does not matter. Every other section is answered with JSON null, which is what LSP requires from a client that cannot provide a setting.
+
+Options in the `LANG_SERVER(...)` list choose the `initialize` handshake. `config-pull` sends `initialized` after `initialize` and answers the configuration request that follows. It is required by `//CONFIG_REPLY:` and `//CONFIG_REPULL`.
 
 ## Compiler Optimization in Tests
 
