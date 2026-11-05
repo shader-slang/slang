@@ -378,6 +378,18 @@ static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(
     HashSet<IRInst*> consumedParams;
     for (auto inst = block->getFirstOrdinaryInst(); inst; inst = inst->getNextInst())
     {
+        // Debug records describe the constructor without changing its returned value.
+        // Folding replaces only the call, so the callee keeps its debug records.
+        if (isDebugInfoInst(inst))
+            continue;
+
+        // A DebugValue update for `this.a` refers to a FieldAddress rooted at the
+        // `this` DebugVar. FieldAddress is not a debug opcode, so we check the root of the
+        // address to tell these apart from addresses into the runtime temporary. A real
+        // store or load through such an address still reaches the strict checks below.
+        if (isDebugInfoInst(getRootAddr(inst)))
+            continue;
+
         switch (inst->getOp())
         {
         case kIROp_Var:
