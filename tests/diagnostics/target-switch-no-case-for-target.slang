@@ -32,14 +32,14 @@
 // The annotations above are shared by several targets, so the target named in the message is
 // pinned separately for each target family. PTX is generated from CUDA source and reports 'cuda';
 // its lane is a FileCheck test so that it only runs where NVRTC is available.
-//TEST:SIMPLE(filecheck=PIN_CUDA):-target cuda -entry userFunc -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=PIN_CUDA):-target ptx -entry userFunc -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=PIN_CPP):-target cpp -entry userVoidFunc -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=PIN_METAL):-target metal -entry userFunc -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=PIN_HLSL):-target hlsl -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=PIN_SPIRV):-target spirv -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=PIN_GLSL):-target glsl -entry resourceFunc -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=PIN_WGSL):-target wgsl -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_CUDA,exit-code=-1):-target cuda -entry userFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_CUDA,exit-code=-1):-target ptx -entry userFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_CPP,exit-code=-1):-target cpp -entry userVoidFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_METAL,exit-code=-1):-target metal -entry userFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_HLSL,exit-code=-1):-target hlsl -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_SPIRV,exit-code=-1):-target spirv -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_GLSL,exit-code=-1):-target glsl -entry resourceFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_WGSL,exit-code=-1):-target wgsl -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
 // PIN_CUDA: 'twice' contains a __target_switch with no case for target 'cuda'
 // PIN_CPP: 'setToTwo' contains a __target_switch with no case for target 'cpp'
 // PIN_METAL: 'twice' contains a __target_switch with no case for target 'metal'

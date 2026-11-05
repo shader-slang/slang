@@ -3,17 +3,17 @@
 // the core module, so we check the text rather than the position. PTX is generated from CUDA
 // source, so PTX lanes report the target as 'cuda'.
 
-//TEST:SIMPLE(filecheck=SAMPLE):-target cuda -entry sampleLevelWithOffset -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=SAMPLE):-target ptx -entry sampleLevelWithOffset -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=SAMPLE):-target cuda -entry sampleLevelInLoop -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=SAMPLE):-target ptx -entry sampleLevelInLoop -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=LOAD):-target cuda -entry typedBufferLoad -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=LOAD):-target ptx -entry typedBufferLoad -stage compute -ignore-capabilities
-//TEST:SIMPLE(filecheck=LOAD_CPP):-target cpp -entry typedBufferLoad -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=SAMPLE,exit-code=-1):-target cuda -entry sampleLevelWithOffset -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=SAMPLE,exit-code=-1):-target ptx -entry sampleLevelWithOffset -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=SAMPLE,exit-code=-1):-target cuda -entry sampleLevelInLoop -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=SAMPLE,exit-code=-1):-target ptx -entry sampleLevelInLoop -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=LOAD,exit-code=-1):-target cuda -entry typedBufferLoad -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=LOAD,exit-code=-1):-target ptx -entry typedBufferLoad -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=LOAD_CPP,exit-code=-1):-target cpp -entry typedBufferLoad -stage compute -ignore-capabilities
 
 // cpp has no capability diagnostic for `Buffer<T>.Load`; this lane checks E41037 without
 // `-ignore-capabilities`.
-//TEST:SIMPLE(filecheck=LOAD_CPP):-target cpp -entry typedBufferLoad -stage compute
+//TEST:SIMPLE(filecheck=LOAD_CPP,exit-code=-1):-target cpp -entry typedBufferLoad -stage compute
 
 // `sincos` links `__sincos_metal` from its `metal` case, and `pickTwice` links `metalOnlyTwice`
 // from its `metal` case. Both helpers have no case for the other targets, but DCE removes them
