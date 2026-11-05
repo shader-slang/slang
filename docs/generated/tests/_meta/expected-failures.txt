@@ -173,3 +173,11 @@ docs/generated/tests/design/ir-reference/differentiation/builtin-requirement-dec
 # the diagnostic sorts the list, which would make the text order-stable by
 # construction rather than a reflection of the merge order.
 docs/generated/tests/design/pipeline/05-ir-passes/typeflow-report-dynamic-dispatch-sites.slang
+
+# Intended behavior change rather than a compiler bug:
+# https://github.com/shader-slang/slang/pull/13546 (for issue #13545) makes
+# `#if` evaluate in signed 64 bits, so `(2147483647 + 1) < 0` no longer wraps
+# and is false; the test pins the old 32-bit wraparound. Remove once the
+# 01-lex-preprocess bundle (and docs/generated/design/pipeline/01-lex-preprocess.md,
+# which still describes a 32-bit `int` evaluator) is regenerated.
+docs/generated/tests/design/pipeline/01-lex-preprocess/if-expression-signed-overflow-wraps.slang
