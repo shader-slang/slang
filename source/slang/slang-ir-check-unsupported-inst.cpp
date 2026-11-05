@@ -426,8 +426,15 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     }
 }
 
-void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+void checkUnsupportedInst(
+    IRModule* module,
+    TargetRequest* target,
+    UnsupportedInstCheckSet checkSet,
+    DiagnosticSink* sink)
 {
+    if (checkSet == UnsupportedInstCheckSet::EmitterContract)
+        return;
+
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
     // the host C++ emitter does.
     const bool supportsMultisampledTexture = !isCUDATarget(target);
