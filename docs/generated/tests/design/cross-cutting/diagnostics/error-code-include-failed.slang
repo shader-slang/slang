@@ -13,7 +13,7 @@
 // path that does not exist on disk. The diag is preprocessor-stage
 // and has its own id distinct from cyclic-include (15302).
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
 #include "this-file-does-not-exist-anywhere-12345.slang"
 void main() {}
 

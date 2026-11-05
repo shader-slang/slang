@@ -13,7 +13,7 @@
 // A subscript without an explicit return type must trigger E30901; CHECK-DAG asserts
 // both the error severity and the diagnostic code.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 struct Bad
 {

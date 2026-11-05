@@ -17,7 +17,7 @@
 // indexing expression — the location the gate is documented to
 // diagnose.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target metal -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target metal -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> outputBuffer;
 

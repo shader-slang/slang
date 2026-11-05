@@ -15,7 +15,7 @@
 // each of the two signatures, which only happens if the variadic list is expanded
 // at render time.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<int> buf;
 

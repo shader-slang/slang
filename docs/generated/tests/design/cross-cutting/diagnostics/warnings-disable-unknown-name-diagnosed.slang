@@ -17,7 +17,7 @@
 // Machine-readable rendering is used because the interpolated span text of a
 // locationless diagnostic is not shown by the caret renderer.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -enable-machine-readable-diagnostics -warnings-disable no-such-diagnostic-name
+//TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target hlsl -entry main -stage compute -enable-machine-readable-diagnostics -warnings-disable no-such-diagnostic-name
 
 RWStructuredBuffer<int> buf;
 

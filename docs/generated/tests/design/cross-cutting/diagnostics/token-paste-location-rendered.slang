@@ -15,7 +15,7 @@
 // location names the token-paste view and that the pasted spelling appears in
 // the message, so the sink resolved a SourceLoc that has no on-disk backing.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 #define CAT(a, b) a##b
 

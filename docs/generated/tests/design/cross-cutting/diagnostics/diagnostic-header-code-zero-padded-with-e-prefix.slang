@@ -17,7 +17,7 @@
 // rules out the unpadded spelling. It also pins the message so the row
 // is anchored to a specific entry rather than to any five-digit code.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -profile bogusProfileName
+//TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target hlsl -entry main -stage compute -profile bogusProfileName
 
 RWStructuredBuffer<int> outBuf;
 

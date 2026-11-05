@@ -13,7 +13,7 @@
 // Extensions cannot change a type's in-memory layout; declaring `extraField` inside
 // `extension MyVec` must trigger E31400, confirmed by CHECK-DAG.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 struct MyVec { float x, y; }
 

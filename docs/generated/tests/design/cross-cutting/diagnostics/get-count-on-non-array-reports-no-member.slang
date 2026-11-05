@@ -19,7 +19,7 @@
 // E30020 does not; the CHECK-NOT is the load-bearing half, since without
 // it the test would pass on either code.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 struct NotAnArray
 {

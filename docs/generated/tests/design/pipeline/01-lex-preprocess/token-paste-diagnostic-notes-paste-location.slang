@@ -17,7 +17,7 @@
 // synthetic "token paste" file rather than to any line of this file,
 // and the initiating-location walk must add the paste-location note.
 
-//TEST:SIMPLE(filecheck=CHECK):-target cpp -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target cpp -entry main -stage compute
 
 #define CAT_(a, b) a##b
 #define CAT(a, b) CAT_(a, b)

@@ -17,7 +17,7 @@
 // part of the message; the shader body is irrelevant because the
 // option is rejected before any compilation happens.
 
-//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute -trace-coverage -trace-coverage-counter-width 16
+//TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target cuda -entry main -stage compute -trace-coverage -trace-coverage-counter-width 16
 
 RWStructuredBuffer<int> outputBuffer;
 

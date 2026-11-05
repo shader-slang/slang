@@ -20,8 +20,8 @@
 // mode's absence as well as its presence is what makes this a test of
 // the selection rather than of one rendering.
 
-//TEST:SIMPLE(filecheck=ASCII):-target hlsl -entry main -stage compute -diagnostic-color never
-//TEST:SIMPLE(filecheck=UNICODE):-target hlsl -entry main -stage compute -diagnostic-color always
+//TEST:SIMPLE(filecheck=ASCII,exit-code=-1):-target hlsl -entry main -stage compute -diagnostic-color never
+//TEST:SIMPLE(filecheck=UNICODE,exit-code=-1):-target hlsl -entry main -stage compute -diagnostic-color always
 
 RWStructuredBuffer<int> outBuf;
 

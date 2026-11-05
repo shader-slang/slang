@@ -13,7 +13,7 @@
 // Placing it inside a `struct` must trigger E30102; CHECK-DAG confirms both the
 // error severity and the exact diagnostic code.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 struct Foo
 {

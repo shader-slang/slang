@@ -14,7 +14,7 @@
 // CHECK asserts every one of the eight messages appears, so a cap or
 // dedup that silently discarded later records would fail the test.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)

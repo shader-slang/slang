@@ -15,7 +15,7 @@
 // correct file:line:column triple naming the actual offending
 // line, not the outer entry-point line.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)

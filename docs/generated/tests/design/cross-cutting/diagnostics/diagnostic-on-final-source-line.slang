@@ -14,7 +14,7 @@
 // last line of the file. The renderer must still locate the
 // source file and emit a caret-aligned diagnostic.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
 void main() {}
 struct EndingStruct {
 // CHECK: E20001

@@ -16,7 +16,7 @@
 // confirming the line-number boundary is correctly carried through
 // SourceManager.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 #line 1
 int g = nonexistentGlobal;
