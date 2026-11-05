@@ -271,7 +271,7 @@ TypeLayout* TargetRequest::getTypeLayout(Type* type, slang::LayoutRules rules)
     // parameter instead (leaving the user to figure out how that
     // maps to the ordering via some API on the program layout).
     //
-    auto layoutContext = getInitialLayoutContextForTarget(this, nullptr, rules);
+    auto layoutContext = getInitialLayoutContextForTarget(this, getOptionSet(), nullptr, rules);
 
     RefPtr<TypeLayout> result;
     auto key = TypeLayoutKey{type, rules};
