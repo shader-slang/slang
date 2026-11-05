@@ -1,9 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute -line-directive-mode none
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RT):-cuda -compute -output-using-type -shaderobj
 
-// A uniform struct passed to a helper that takes it by borrow is passed by address, with no
-// per-thread copy. SIMPLE pins the emitted CUDA, and COMPARE_COMPUTE runs the kernel under NVRTC on a
-// GPU runner and checks the result.
+// A uniform struct passed to a helper that takes it by borrow is passed by address, and Slang
+// emits no per-thread copy of it. SIMPLE pins the emitted CUDA, and COMPARE_COMPUTE runs the
+// kernel under NVRTC on a GPU runner and checks the result.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=output
 //TEST_INPUT:set data.v = {10.0, 20.0, 30.0, 40.0}

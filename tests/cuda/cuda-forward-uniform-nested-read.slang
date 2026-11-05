@@ -41,8 +41,8 @@ void computeMain(
 // Kernel ABI unchanged: still a by-value aggregate parameter.
 // CHECK: __global__ void computeMain(Big_0 [[BIG:data_0]], RWStructuredBuffer<float>
 
-// The read in the nested block loads through the parameter in place, so no whole-struct copy is
-// made anywhere in the kernel.
+// The read in the nested block loads through the parameter in place, so Slang emits no
+// whole-struct copy anywhere in the kernel.
 // CHECK-NOT: Big_0 {{.*}}= [[BIG]]
 // CHECK: readsum_0(&[[BIG]]
 // CHECK-NOT: Big_0 {{.*}}= [[BIG]]

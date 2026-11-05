@@ -440,9 +440,10 @@ struct TransformParamsToConstRefContext
                 if (!shouldTransformParam(param))
                     continue;
 
-                // Varying-parameter legalization rejects a user-defined varying parameter on CUDA,
-                // and ray-tracing stages have no entry-point parameters left at this point, so a
-                // remaining parameter of such a type is a uniform with a layout.
+                // `legalizeEntryPointVaryingParamsForCUDA` runs before this pass and removes every
+                // varying entry-point parameter, and `collectOptiXEntryPointUniformParams` moves
+                // the uniforms of ray-tracing stages into the shader record, so each remaining
+                // parameter is a uniform with a layout.
                 auto varLayout = findVarLayout(param);
                 SLANG_ASSERT(varLayout && !isVaryingParameter(varLayout));
 

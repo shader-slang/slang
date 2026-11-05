@@ -3,7 +3,7 @@
 
 // A helper that takes a field of the entry-point uniform, not the whole aggregate. The argument is a
 // load of `FieldAddress(big, a)`, an immutable address rooted at the forwarded parameter, so the
-// field's address is passed through and `big.a` is not copied into a per-thread temporary.
+// field's address is passed through and Slang emits no per-thread temporary for `big.a`.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=output
 //TEST_INPUT:set big.a.v = {1.0, 2.0, 3.0, 4.0}

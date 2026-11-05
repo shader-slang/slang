@@ -2,8 +2,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RT):-cuda -compute -output-using-type -shaderobj
 
 // The same uniform aggregate passed to two rewritten helpers and also read inline. Both helpers
-// receive the parameter's address and the inline read reads the parameter in place; no
-// whole-struct copy is made.
+// receive the parameter's address and the inline read reads the parameter in place; Slang
+// emits no whole-struct copy.
 //
 // The same shader is also run under NVRTC (COMPARE_COMPUTE), so a wrong address or a pointer read
 // as a value fails on the numeric result. (GPU-gated: `ignored` on a GPU-less runner.)
@@ -48,7 +48,7 @@ void computeMain(
 // Kernel ABI unchanged: the aggregate is still a plain by-value kernel argument.
 // CHECK: __global__ void computeMain(Big_0 [[BIG:big_[0-9]*]], RWStructuredBuffer<float>
 
-// No whole-struct copy is made for either helper or for the inline read.
+// Slang emits no whole-struct copy for either helper or for the inline read.
 // CHECK-NOT: Big_0 {{.*}}= [[BIG]]
 
 // CHECK-DAG: readsum_0(&[[BIG]]

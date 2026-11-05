@@ -21,7 +21,7 @@ void computeMain(
 }
 
 // CHECK: gather{{[A-Za-z0-9_]*}}(Array<float>{{.*}}*
-// CHECK: __global__ void computeMain(Array<float>{{.*}}[[TENSORS:tensors_[0-9]+]], RWStructuredBuffer<float>
+// CHECK: __global__ void computeMain(Array<float>{{ +}}[[TENSORS:tensors_[0-9]+]], RWStructuredBuffer<float>
 
 // CHECK-NOT: Array<float>{{.*}}= [[TENSORS]]
 // CHECK: gather{{[A-Za-z0-9_]*}}(&[[TENSORS]]

@@ -48,7 +48,7 @@ void computeMain(
 // CHECK: {{.*}}float exported_read(Big_0 {{[A-Za-z0-9_]+}}, uint
 
 // CHECK: __global__ void computeMain(Big_0 [[BIG:[A-Za-z0-9_]+]], RWStructuredBuffer<float>
-// The rewritten callee receives the parameter's address, with no per-thread copy.
+// The rewritten callee receives the parameter's address, and Slang emits no per-thread copy.
 // CHECK-NOT: Big_0 {{.*}}= [[BIG]]
 // CHECK: normal_read_0(&[[BIG]],
 // And the declined callee must receive a value. `exported_read(&[[BIG]],` here would be the

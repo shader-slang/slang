@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RT):-cuda -compute -output-using-type -shaderobj
 
 // The only helper is one the pass does not rewrite, so no call site is rebuilt and the aggregate
-// reaches it by value, as on master, with no per-thread temporary.
+// reaches it by value, as on master, with no Slang-emitted temporary.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=output
 //TEST_INPUT:set big.v = {10.0, 20.0, 30.0, 40.0}

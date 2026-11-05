@@ -54,8 +54,8 @@ void computeMain(
 // CHECK: (&[[LOCAL]])->v_0[int(0)] = 999.0f;
 
 // CHECK: __global__ void computeMain(Big_0 [[BIG:[A-Za-z0-9_]+]], RWStructuredBuffer<float>
-// The rewritten callee receives the parameter's address, with no per-thread copy, even though
-// another callee keeps its by-value signature.
+// The rewritten callee receives the parameter's address, and Slang emits no per-thread copy,
+// even though another callee keeps its by-value signature.
 // CHECK-NOT: Big_0 {{.*}}= [[BIG]]
 // CHECK: normal_read_0(&[[BIG]],
 // The declined callee receives a value. `exported_mutate(&[[BIG]],` here would be the miscompile.
