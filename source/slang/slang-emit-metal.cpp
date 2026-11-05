@@ -313,11 +313,6 @@ void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
     }
 }
 
-static IRImageSubscript* isTextureAccess(IRInst* inst)
-{
-    return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
-}
-
 // Return why MSL cannot express the floating-point atomic load, exchange, compare-exchange, min
 // or max `inst`, or nullptr if it can or if the value of `inst` is not floating-point. MSL has
 // `atomic_float` load, exchange and compare-exchange on device memory only (MSL 4.1 spec,
@@ -334,7 +329,7 @@ static const char* getUnsupportedFloatAtomicReason(IRInst* inst)
         return "floating point atomic min or max";
     if (valueType->getOp() != kIROp_FloatType)
         return "floating point atomic operation on a type other than 32-bit float";
-    if (isTextureAccess(inst))
+    if (getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
         return "floating point atomic operation on a texture";
     auto destPtrType = cast<IRPtrTypeBase>(inst->getOperand(0)->getDataType());
     switch (destPtrType->getAddressSpace())
@@ -364,17 +359,7 @@ void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
 
 void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
 {
-    auto imageDataType = inst->getImage()->getDataType();
-    auto resourceType = as<IRResourceTypeBase>(imageDataType);
-
-    // If the image data type is a pointer, get the value type
-    if (!resourceType)
-    {
-        if (auto ptrType = as<IRPtrTypeBase>(imageDataType))
-        {
-            resourceType = as<IRResourceTypeBase>(ptrType->getValueType());
-        }
-    }
+    auto resourceType = getImageSubscriptResourceType(inst);
 
     if (auto textureType = as<IRTextureType>(resourceType))
     {
@@ -454,7 +439,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitInstResultDecl(inst);
         bool isImageOp = false;
-        if (auto imageSubscript = isTextureAccess(inst))
+        if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
         {
             emitImageOperandWithAccessor(imageSubscript->getImage());
             m_writer->emit(imageFunc);
@@ -522,7 +507,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 
             emitInstResultDecl(inst);
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_load(");
@@ -548,7 +533,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicStore:
         {
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_store(");
@@ -582,7 +567,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             diagnoseIfUnsupportedFloatAtomic();
 
             bool isImageOp = false;
-            auto imageSubscript = isTextureAccess(inst);
+            auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst));
             isImageOp = (imageSubscript != nullptr);
 
             emitType(inst->getDataType(), getName(inst));
@@ -667,7 +652,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitInstResultDecl(inst);
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_fetch_add(");
@@ -695,7 +680,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitInstResultDecl(inst);
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_fetch_sub(");
