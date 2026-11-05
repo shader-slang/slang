@@ -1363,6 +1363,14 @@ typedef uint32_t SlangSizeT;
         // such as using uniform parameters as mutable temporaries. Has no effect on other dialects.
         EnableExtendedHLSLBackwardsCompatibility = 163,
 
+        // WGSL only. stringValue0: diagnostic rule name: an identifier, or two separated by a
+        // period (e.g. `subgroup_uniformity`); stringValue1: severity (`error`, `warning`, `info`
+        // or `off`). Invalid values are reported as errors. Repeatable. Emits a
+        // `diagnostic(<severity>, <rule>);` global directive. The rule is the key, as the name is
+        // for MacroDefine: for a repeated rule the last one wins, and a target's entry overrides
+        // the session's for the same rule. CLI spelling: `-wgsl-diagnostic <severity>:<rule>`.
+        WGSLDiagnostic = 164,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
