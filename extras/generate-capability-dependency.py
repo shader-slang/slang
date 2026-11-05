@@ -24,15 +24,17 @@ An arrow `A --> B` means "A requires B".
   the arrows to it are removed, because it exists only for readability.
 
 A Mermaid diagram on GitHub accepts at most 500 edges, and a large diagram is too small to read.
-So the atoms of each group are split into several diagrams. Atoms with the same first word in
-the name (`sm_6_0`, `sm_6_1`, ...) are kept together and sorted in natural order. An atom that is used by a diagram but defined in another
-diagram is drawn as a dashed "external" node.
+So the atoms of each group are split into several diagrams. Atoms with the same first word in the
+name (`sm_6_0`, `sm_6_1`, ...) are kept together and sorted in natural order. An atom that is used
+by a diagram but defined in another diagram is drawn as a dashed "external" node.
 """
+
+from __future__ import annotations
 
 import argparse
 import re
 import sys
-from collections import OrderedDict
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -61,14 +63,7 @@ SPLIT_BY_KIND = {"Stage": ("keyhole and stage atoms", "aliases")}
 # The order of the diagrams in a group, and the families (see `family_of`) in each diagram.
 # A family that is not listed here is packed automatically into the diagrams after the listed ones.
 FAMILY_LAYOUT = {
-    "Version": [
-        ["hlsl", "dxil"],
-        ["spirv"],
-        ["cuda"],
-        ["metallib"],
-        ["sm"],
-        ["glsl"],
-    ],
+    "Version": [["hlsl", "dxil"], ["spirv"], ["cuda"], ["metallib"], ["sm"], ["glsl"]],
 }
 
 # Maximum number of edges in one diagram. GitHub limits a Mermaid diagram to 500 edges, but
@@ -76,57 +71,59 @@ FAMILY_LAYOUT = {
 # fitted to the page width.
 MAX_EDGES_PER_DIAGRAM = 80
 
+CLASS_DEFS = [
+    "    classDef def fill:#dbeafe,stroke:#1e40af,color:#111827",
+    "    classDef alias fill:#dcfce7,stroke:#166534,color:#111827",
+    "    classDef abstract fill:#fef9c3,stroke:#854d0e,color:#111827",
+    "    classDef helper fill:#f3f4f6,stroke:#6b7280,color:#111827",
+    "    classDef external fill:#ffffff,stroke:#6b7280,stroke-dasharray:4 3,color:#111827",
+]
 
+
+@dataclass
 class Atom:
-    def __init__(self, kind, name, group, parents):
-        self.kind = kind  # "def", "alias" or "abstract"
-        self.name = name
-        self.group = group
-        # For `def` and `abstract`: a list of names.
-        # For `alias`: a list of alternatives, each is a list of names.
-        self.parents = parents
-        self.alternatives = None
+    kind: str  # "def", "alias" or "abstract"
+    name: str
+    group: str | None
+    # A disjunction of conjunctions: each inner list is a list of atom names joined with `+`, and
+    # the inner lists are joined with `|`. A `def` has at most one inner list (its parents).
+    alternatives: list[list[str]]
+
+    @property
+    def parents(self):
+        return [name for alternative in self.alternatives for name in alternative]
+
+
+# ---------------------------------------------------------------------------------------------
+# Parsing
+# ---------------------------------------------------------------------------------------------
 
 
 def parse_capdef(text):
-    """Return an ordered dict {name: Atom} for all `def`, `alias` and `abstract` statements."""
-    atoms = OrderedDict()
-    doc_group = None  # group from the `/// [Group]` line in the current doc-comment block
-    in_doc_block = False
+    """Return a dict {name: Atom} for all `def`, `alias` and `abstract` statements."""
+    atoms = {}
+    doc_group = None  # group from the `/// [Group]` line before the statement
     statement = ""
 
     for raw_line in text.splitlines():
         line = raw_line.strip()
-
-        if not statement:
-            doc_match = re.match(r"///\s*(.*)$", line)
-            if doc_match:
-                if not in_doc_block:
-                    doc_group = None
-                in_doc_block = True
-                tag = re.fullmatch(r"\[(\w+)\]", doc_match.group(1).strip())
-                if tag:
-                    doc_group = normalize_group(tag.group(1))
-                continue
-            if line.startswith("//"):
-                continue
-            if not line:
-                in_doc_block = False
-                doc_group = None
-                continue
+        if line.startswith("///"):
+            tag = re.fullmatch(r"///\s*\[(\w+)\]", line)
+            if tag:
+                doc_group = normalize_group(tag.group(1))
+            continue
+        if line.startswith("//"):
+            continue
+        if not line:
+            doc_group = None
+            continue
 
         # Remove a trailing comment and collect the statement until `;`.
         statement += " " + re.sub(r"//.*$", "", raw_line)
         if ";" not in statement:
             continue
-        body = statement.split(";", 1)[0].strip()
-        statement = ""
-
-        atom = parse_statement(body, doc_group)
-        in_doc_block = False
-        doc_group = None
-        if atom is None:
-            continue
+        atom = parse_statement(statement.split(";", 1)[0].strip(), doc_group)
+        statement, doc_group = "", None
         if atom.name in atoms:
             raise ValueError(f"duplicate capability atom: {atom.name}")
         atoms[atom.name] = atom
@@ -146,36 +143,27 @@ def parse_statement(body, group):
     match = re.fullmatch(r"(def|alias|abstract)\s+(\w+)\s*(?:[:=]\s*(.*))?", body, re.S)
     if not match:
         raise ValueError(f"cannot parse statement: {body!r}")
-    kind, name, expr = match.group(1), match.group(2), match.group(3)
+    kind, name, expr = match.groups()
     if expr is not None and re.search(r"[^\w\s+|]", expr):
         raise ValueError(f"unsupported expression in {name!r}: {expr!r}")
+    if kind == "alias" and expr is None:
+        raise ValueError(f"alias {name} has no expression")
 
+    # Only an alias can have `|`. The other statements have at most one conjunction.
+    alternatives = [re.findall(r"\w+", term) for term in (expr or "").split("|")]
+    alternatives = [alt for alt in alternatives if alt]
     if group is None and kind != "abstract":
         group = "Internal"
-
-    if kind == "alias":
-        if expr is None:
-            raise ValueError(f"alias {name} has no expression")
-        alternatives = [re.findall(r"\w+", term) for term in expr.split("|")]
-        atom = Atom(kind, name, group, [n for alt in alternatives for n in alt])
-        atom.alternatives = alternatives
-        return atom
-
-    parents = re.findall(r"\w+", expr) if expr else []
-    return Atom(kind, name, group, parents)
+    return Atom(kind, name, group, alternatives)
 
 
 def assign_abstract_groups(atoms):
     """An abstract atom has no doc-comment. It joins the group of the first atom that uses it."""
     for atom in atoms.values():
-        if atom.kind != "abstract" or atom.group is not None:
-            continue
-        for other in atoms.values():
-            if atom.name in other.parents:
-                atom.group = other.group
-                break
-        else:
-            atom.group = "Internal"
+        if atom.kind == "abstract" and atom.group is None:
+            atom.group = next(
+                (other.group for other in atoms.values() if atom.name in other.parents), "Internal"
+            )
 
 
 def remove_target_shorthands(atoms):
@@ -185,34 +173,33 @@ def remove_target_shorthands(atoms):
     readability only. Drawing it adds a hub node with many arrows and no information. An alias is
     a shorthand when all atoms it mentions are targets or other shorthands.
 
-    Returns (remaining atoms, sorted names of the removed atoms).
+    Returns (remaining atoms, names of the removed atoms).
     """
     shorthands = set()
+
+    def is_target_or_shorthand(name):
+        return name in shorthands or (name in atoms and atoms[name].group == "Target")
+
     changed = True
     while changed:
         changed = False
         for atom in atoms.values():
-            if atom.name in shorthands or atom.kind != "alias":
-                continue
-            if all(
-                atoms[n].group == "Target" or n in shorthands if n in atoms else False
-                for n in atom.parents
-            ):
-                shorthands.add(atom.name)
-                changed = True
+            if atom.kind == "alias" and atom.name not in shorthands:
+                if all(is_target_or_shorthand(name) for name in atom.parents):
+                    shorthands.add(atom.name)
+                    changed = True
 
-    remaining = OrderedDict()
+    remaining = {}
     for atom in atoms.values():
-        if atom.name in shorthands:
-            continue
-        if atom.kind == "alias":
+        if atom.name not in shorthands:
             alternatives = [[n for n in alt if n not in shorthands] for alt in atom.alternatives]
-            atom.alternatives = [alt for alt in alternatives if alt]
-            atom.parents = [n for alt in atom.alternatives for n in alt]
-        else:
-            atom.parents = [n for n in atom.parents if n not in shorthands]
-        remaining[atom.name] = atom
+            remaining[atom.name] = replace(atom, alternatives=[alt for alt in alternatives if alt])
     return remaining, sorted(shorthands)
+
+
+# ---------------------------------------------------------------------------------------------
+# Splitting the atoms of a group into diagrams
+# ---------------------------------------------------------------------------------------------
 
 
 def node_id(name):
@@ -220,42 +207,26 @@ def node_id(name):
     return "n_" + name
 
 
-def conj_id(alias_name, index):
-    return f"c_{alias_name}_{index}"
-
-
 def atom_edges(atom):
-    """Return (nodes, edges) that one atom adds to a diagram.
+    """Return (helper node ids, edges) that one atom adds to a diagram.
 
-    `nodes` is a list of (id, label, shape-class) of helper nodes ("all of" nodes).
-    `edges` is a list of (source id, arrow, target name or helper id, is_helper_target).
+    An edge is (source node id, arrow, target node id). A helper node is an "all of" node, which
+    groups the atoms of one alternative of a disjunction.
     """
-    helpers = []
-    edges = []
     src = node_id(atom.name)
-    seen = set()
-
-    def add(arrow, target, is_helper=False):
-        key = (arrow, target)
-        if key not in seen:
-            seen.add(key)
-            edges.append((src, arrow, target, is_helper))
-
-    if atom.kind == "alias" and len(atom.alternatives) > 1:
-        for index, alt in enumerate(atom.alternatives):
-            if len(alt) == 1:
-                add("-.->", alt[0])
+    helpers, edges = [], []
+    if len(atom.alternatives) > 1:
+        for index, alternative in enumerate(atom.alternatives):
+            if len(alternative) == 1:
+                edges.append((src, "-.->", node_id(alternative[0])))
                 continue
-            cid = conj_id(atom.name, index)
-            helpers.append(cid)
-            add("-.->", cid, True)
-            for name in alt:
-                edges.append((cid, "-->", name, False))
-        return helpers, edges
-
-    for name in atom.parents:
-        add("-->", name)
-    return helpers, edges
+            helper = f"c_{atom.name}_{index}"
+            helpers.append(helper)
+            edges.append((src, "-.->", helper))
+            edges.extend((helper, "-->", node_id(name)) for name in alternative)
+    else:
+        edges = [(src, "-->", node_id(name)) for name in atom.parents]
+    return helpers, list(dict.fromkeys(edges))
 
 
 def count_edges(atoms):
@@ -264,17 +235,15 @@ def count_edges(atoms):
 
 def split_by_declaration_order(atoms):
     """Split atoms into consecutive lists with at most MAX_EDGES_PER_DIAGRAM edges each."""
-    chunks, current, count = [], [], 0
+    parts, count = [], 0
     for atom in atoms:
-        edges = len(atom_edges(atom)[1])
-        if current and count + edges > MAX_EDGES_PER_DIAGRAM:
-            chunks.append(current)
-            current, count = [], 0
-        current.append(atom)
+        edges = count_edges([atom])
+        if not parts or count + edges > MAX_EDGES_PER_DIAGRAM:
+            parts.append([])
+            count = 0
+        parts[-1].append(atom)
         count += edges
-    if current:
-        chunks.append(current)
-    return chunks
+    return parts
 
 
 def family_of(name):
@@ -288,87 +257,71 @@ def family_of(name):
     return "spv" if word.startswith("spv") else word
 
 
-def natural_key(name):
+def natural_key(atom):
     """Sort key that orders `sm_6_2` before `sm_6_10`."""
-    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", name.lower())]
+    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", atom.name.lower())]
 
 
-def split_into_chunks(atoms_in_group):
+def split_into_chunks(group, atoms_in_group):
     """Split the atoms of a group into diagrams that are small enough to read.
 
     Returns a list of (title, atoms). For a group in SPLIT_BY_KIND, the aliases and the other
     atoms are never in the same diagram. Otherwise, see `pack_families`.
     """
-    group = atoms_in_group[0].group if atoms_in_group else None
     if group not in SPLIT_BY_KIND:
         return pack_families(atoms_in_group, FAMILY_LAYOUT.get(group, []))
 
-    chunks = []
     other_title, alias_title = SPLIT_BY_KIND[group]
-    for title, subset in (
-        (other_title, [a for a in atoms_in_group if a.kind != "alias"]),
-        (alias_title, [a for a in atoms_in_group if a.kind == "alias"]),
-    ):
+    chunks = []
+    for title, is_alias in ((other_title, False), (alias_title, True)):
+        subset = [a for a in atoms_in_group if (a.kind == "alias") == is_alias]
         parts = pack_families(subset)
-        for part_title, part in parts:
-            chunks.append((title if len(parts) == 1 else f"{title}: {part_title}", part))
+        chunks += [(title if len(parts) == 1 else f"{title}: {t}", part) for t, part in parts]
     return chunks
 
 
 def pack_families(atoms_in_group, layout=()):
     """Pack the atoms into diagrams that are small enough to read.
 
-    `layout` is a list of lists of families. Each inner list makes one diagram, and the diagrams
-    are in the order of the list. The atoms of the families that are not in `layout` are packed
-    automatically after them, as described below.
-
     Returns a list of (title, atoms). Atoms of the same family (see `family_of`) are sorted in
     natural order and put in the same diagram, so that for example all `sm_*` atoms are together.
-    Families are packed into diagrams in alphabetical order. A family is split only when it is too
-    large for one diagram, and then each of its parts has a diagram of its own.
+
+    `layout` is a list of lists of families. Each inner list makes one diagram, and the diagrams
+    are in the order of the list. The other families are packed after them in alphabetical order.
+    A family that is too large for one diagram is split, and each of its parts has a diagram of
+    its own.
     """
     families = {}
     for atom in atoms_in_group:
         families.setdefault(family_of(atom.name), []).append(atom)
 
-    if layout:
-        chunks = []
-        for bundle in layout:
-            members = [a for f in bundle for a in sorted(families.pop(f, []), key=lambda a: natural_key(a.name))]
-            parts = split_by_declaration_order(members)
-            for index, part in enumerate(parts, start=1):
-                title = ", ".join(bundle) + (f" {index}/{len(parts)}" if len(parts) > 1 else "")
-                chunks.append((title, part))
-        rest = [a for members in families.values() for a in members]
-        return chunks + (pack_families(rest) if rest else [])
+    pieces = []  # (label, atoms, whether the piece must have a diagram of its own)
 
-    pieces = []  # (label, atoms, is part of a split family)
+    def add_pieces(label, atoms, own_diagram):
+        parts = split_by_declaration_order(atoms)
+        for index, part in enumerate(parts, start=1):
+            suffix = f" {index}/{len(parts)}" if len(parts) > 1 else ""
+            pieces.append((label + suffix, part, own_diagram or len(parts) > 1))
+
+    for bundle in layout:
+        members = [a for f in bundle for a in sorted(families.pop(f, []), key=natural_key)]
+        add_pieces(", ".join(bundle), members, True)
     for family in sorted(families):
-        members = sorted(families[family], key=lambda a: natural_key(a.name))
-        if count_edges(members) > MAX_EDGES_PER_DIAGRAM:
-            parts = split_by_declaration_order(members)
-            for index, part in enumerate(parts, start=1):
-                pieces.append((f"{family} {index}/{len(parts)}", part, True))
-        else:
-            pieces.append((family, members, False))
+        add_pieces(family, sorted(families[family], key=natural_key), False)
 
-    # A part of a split family always has its own diagram. The other families are packed together
-    # in alphabetical order.
-    chunks, labels, current, count = [], [], [], 0
-    for label, piece, is_split_part in pieces:
+    chunks = []  # [labels, atoms, edge count]
+    open_chunk = None
+    for label, piece, own_diagram in pieces:
         edges = count_edges(piece)
-        if current and (is_split_part or count + edges > MAX_EDGES_PER_DIAGRAM):
-            chunks.append((labels, current))
-            labels, current, count = [], [], 0
-        labels.append(label)
-        current.extend(piece)
-        count += edges
-        if is_split_part:
-            chunks.append((labels, current))
-            labels, current, count = [], [], 0
-    if current:
-        chunks.append((labels, current))
-    return [(format_labels(labels), atoms) for labels, atoms in chunks]
+        if open_chunk is None or own_diagram or open_chunk[2] + edges > MAX_EDGES_PER_DIAGRAM:
+            open_chunk = [[], [], 0]
+            chunks.append(open_chunk)
+        open_chunk[0].append(label)
+        open_chunk[1].extend(piece)
+        open_chunk[2] += edges
+        if own_diagram:
+            open_chunk = None
+    return [(format_labels(labels), atoms) for labels, atoms, _ in chunks]
 
 
 def format_labels(labels, limit=4):
@@ -377,18 +330,18 @@ def format_labels(labels, limit=4):
     return f"{labels[0]}, {labels[1]}, ..., {labels[-1]}"
 
 
-CLASS_DEFS = [
-    "    classDef def fill:#dbeafe,stroke:#1e40af,color:#111827",
-    "    classDef alias fill:#dcfce7,stroke:#166534,color:#111827",
-    "    classDef abstract fill:#fef9c3,stroke:#854d0e,color:#111827",
-    "    classDef helper fill:#f3f4f6,stroke:#6b7280,color:#111827",
-    "    classDef external fill:#ffffff,stroke:#6b7280,stroke-dasharray:4 3,color:#111827",
-]
+# ---------------------------------------------------------------------------------------------
+# Rendering
+# ---------------------------------------------------------------------------------------------
+
+
+def mermaid_label(text):
+    return text.replace('"', "&quot;")
 
 
 def render_legend():
     """Return the lines of a Mermaid flowchart that shows every shape and arrow that is used."""
-    lines = [
+    return [
         "flowchart LR",
         '    d1["def: a capability atom"]:::def',
         '    d2["def: a parent atom"]:::def',
@@ -402,49 +355,30 @@ def render_legend():
         '    a1 -.->|"one alternative of a choice"| d3',
         '    a1 -.->|"one alternative that needs several atoms"| h',
         '    h -->|"needs every atom"| d4',
+        *CLASS_DEFS,
     ]
-    return lines + CLASS_DEFS
-
-
-def mermaid_label(text):
-    return text.replace('"', "&quot;")
 
 
 def render_diagram(chunk, atoms):
     """Return the lines of one Mermaid flowchart for the atoms in `chunk`."""
-    in_chunk = {atom.name for atom in chunk}
+    shapes = {"def": ("[", "]"), "alias": ("([", "])"), "abstract": ("{{", "}}")}
     lines = ["flowchart LR"]
     edge_lines = []
-    external = OrderedDict()
 
     for atom in chunk:
-        shape_open, shape_close = {
-            "def": ("[", "]"),
-            "alias": ("([", "])"),
-            "abstract": ("{{", "}}"),
-        }[atom.kind]
-        lines.append(
-            f'    {node_id(atom.name)}{shape_open}"{mermaid_label(atom.name)}"{shape_close}:::{atom.kind}'
-        )
+        left, right = shapes[atom.kind]
+        lines.append(f'    {node_id(atom.name)}{left}"{mermaid_label(atom.name)}"{right}:::{atom.kind}')
         helpers, edges = atom_edges(atom)
-        for cid in helpers:
-            lines.append(f'    {cid}(("all of")):::helper')
-        for source, arrow, target, is_helper in edges:
-            if is_helper:
-                edge_lines.append(f"    {source} {arrow} {target}")
-                continue
-            if target not in in_chunk:
-                external[target] = True
-            edge_lines.append(f"    {source} {arrow} {node_id(target)}")
+        lines.extend(f'    {helper}(("all of")):::helper' for helper in helpers)
+        edge_lines.extend(f"    {src} {arrow} {dst}" for src, arrow, dst in edges)
 
-    for name in external:
-        known = atoms.get(name)
-        suffix = f" ({known.group})" if known else " (undefined)"
-        lines.append(f'    {node_id(name)}["{mermaid_label(name + suffix)}"]:::external')
+    # An atom that is defined in another diagram is drawn as a dashed box.
+    in_chunk = {atom.name for atom in chunk}
+    for name in dict.fromkeys(n for atom in chunk for n in atom.parents if n not in in_chunk):
+        group = atoms[name].group if name in atoms else "undefined"
+        lines.append(f'    {node_id(name)}["{mermaid_label(f"{name} ({group})")}"]:::external')
 
-    lines.extend(edge_lines)
-    lines.extend(CLASS_DEFS)
-    return lines
+    return lines + edge_lines + CLASS_DEFS
 
 
 def render_table(header, rows, right_aligned=()):
@@ -463,6 +397,9 @@ def render_table(header, rows, right_aligned=()):
 
 
 def render_document(atoms, input_display, omitted):
+    by_group = {group: [a for a in atoms.values() if a.group == group] for group in GROUP_ORDER}
+    by_group = {group: members for group, members in by_group.items() if members}
+
     out = [
         "<!-- Generated by extras/generate-capability-dependency.py. Do not edit this file. -->",
         "",
@@ -479,41 +416,35 @@ def render_document(atoms, input_display, omitted):
         "",
         "An arrow `A --> B` means that `A` requires `B`. This diagram shows all shapes and arrows:",
         "",
-    ]
-    out += ["```mermaid"] + render_legend() + ["```", ""]
-    out += [
+        "```mermaid",
+        *render_legend(),
+        "```",
+        "",
         "## Omitted atoms",
         "",
         f"The {len(omitted)} aliases that only abbreviate a list of targets are not drawn, and the",
         "arrows to them are removed. For example, `cuda_glsl_hlsl_spirv` is `cuda | glsl | hlsl | spirv`,",
         "and it exists only for readability. The atom counts below do not include them.",
         "",
+        "## Summary",
+        "",
     ]
-
-    by_group = OrderedDict((group, []) for group in GROUP_ORDER)
-    for atom in atoms.values():
-        by_group[atom.group].append(atom)
 
     rows = []
     for group, members in by_group.items():
-        if not members:
-            continue
-        counts = {kind: sum(1 for a in members if a.kind == kind) for kind in ("def", "alias", "abstract")}
-        rows.append([group, str(len(members)), str(counts["def"]), str(counts["alias"]), str(counts["abstract"])])
+        kinds = [sum(a.kind == kind for a in members) for kind in ("def", "alias", "abstract")]
+        rows.append([group, str(len(members)), *map(str, kinds)])
     rows.append(["**Total**", f"**{len(atoms)}**", "", "", ""])
-    out += ["## Summary", ""]
-    out += render_table(["Group", "Atoms", "`def`", "`alias`", "`abstract`"], rows, right_aligned={1, 2, 3, 4})
-    out.append("")
+    header = ["Group", "Atoms", "`def`", "`alias`", "`abstract`"]
+    out += render_table(header, rows, right_aligned={1, 2, 3, 4}) + [""]
 
     for group, members in by_group.items():
-        if not members:
-            continue
-        chunks = split_into_chunks(members)
+        chunks = split_into_chunks(group, members)
         out += [f"## {group}", "", f"{GROUP_DESCRIPTION[group]} ({len(members)} atoms)", ""]
         for title, chunk in chunks:
             if len(chunks) > 1:
                 out += [f"### {group}: {title}", "", f"{len(chunk)} atoms.", ""]
-            out += ["```mermaid"] + render_diagram(chunk, atoms) + ["```", ""]
+            out += ["```mermaid", *render_diagram(chunk, atoms), "```", ""]
 
     return "\n".join(out).rstrip("\n") + "\n"
 
@@ -525,12 +456,11 @@ def main():
     parser.add_argument("--check", action="store_true", help="exit with 1 if the output is out of date")
     args = parser.parse_args()
 
-    atoms = parse_capdef(args.input.read_text(encoding="utf-8"))
     try:
         input_display = args.input.resolve().relative_to(REPO_ROOT).as_posix()
     except ValueError:
         input_display = args.input.as_posix()
-    atoms, omitted = remove_target_shorthands(atoms)
+    atoms, omitted = remove_target_shorthands(parse_capdef(args.input.read_text(encoding="utf-8")))
     document = render_document(atoms, input_display, omitted)
 
     if args.check:
