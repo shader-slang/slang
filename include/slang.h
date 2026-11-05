@@ -4790,7 +4790,8 @@ struct ISession : public ISlangUnknown
     /** Checks if a precompiled binary module is up-to-date with the current compiler
      *   option settings and the source file contents.
      *
-     *   When the module's primary source file cannot be located on the search paths, the
+     *   When the module's primary source file cannot be located on the search paths (or, for a
+     *   module compiled outside them, relative to the working directory), the
      *   binary module is treated as a standalone artifact and reported as up-to-date so
      *   that callers distributing precompiled-only modules can load them. In that case the
      *   compiler-version and option-set hash carried in the binary are NOT compared. If a
