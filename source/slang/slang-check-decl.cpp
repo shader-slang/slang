@@ -22382,6 +22382,30 @@ struct CapabilityDeclReferenceVisitor
             processInstanceFieldsOfStruct(structDecl, loc);
         }
     }
+    // Visit the default value of each parameter that a call leaves out, because code generation
+    // evaluates that value at the call site. Consider this example:
+    //
+    //     float scaled(float x = (float)(2.0LF)) { return x; }
+    //     void main() { output[0] = scaled(); }
+    //
+    // The checked call `scaled()` has no argument expression for `x`, but its lowering inserts
+    // the parameter's default value, so the call uses `double`. A default value can contain a call
+    // that again omits the same parameter, as in the synthesized constructor of a recursive
+    // struct, so we visit each parameter's default value once.
+    void visitInvokeExpr(InvokeExpr* expr)
+    {
+        Base::visitInvokeExpr(expr);
+        auto funcDecl = _getFuncDeclFromExpr(expr->functionExpr);
+        if (!funcDecl)
+            return;
+        Index paramIndex = 0;
+        for (auto param : funcDecl->getParameters())
+        {
+            if (paramIndex++ >= expr->arguments.getCount() && visitedDefaultArgParams.add(param))
+                this->dispatchIfNotNull(param->initExpr);
+        }
+    }
+    HashSet<ParamDecl*> visitedDefaultArgParams;
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
     {
         if (decl)
