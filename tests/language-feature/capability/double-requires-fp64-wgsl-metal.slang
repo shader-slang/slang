@@ -2,8 +2,9 @@
 // A use of `double` reachable from an entry point is reported as a capability error at the user's
 // code. The check runs before optimization, so a `double` that would fold away is reported too.
 // A struct's instance fields count wherever a value of the struct type is used (CASE 3-4, 8-10,
-// 14), except resource fields, which type legalization moves out of the struct (CASE 16). The
-// default value of an omitted argument counts at the call (CASE 11-12). CASE 15-17 must compile.
+// 14, 18), except resource fields, which type legalization moves out of the struct outside Metal
+// parameter blocks (CASE 16). The default value of an omitted argument counts at the call
+// (CASE 11-12). CASE 15-17 must compile.
 //DIAGNOSTIC_TEST:SIMPLE(diag=BUFFER, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=BUFFER, non-exhaustive): -target metal -entry computeMain -stage compute -DCASE=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=PARAM, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=1
@@ -34,6 +35,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=GLSLMUL, non-exhaustive): -target metal -entry computeMain -stage compute -DCASE=13
 //DIAGNOSTIC_TEST:SIMPLE(diag=GATED, non-exhaustive): -target spirv -entry computeMain -stage compute -DCASE=14
 //DIAGNOSTIC_TEST:SIMPLE(diag=GATED, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=14
+//DIAGNOSTIC_TEST:SIMPLE(diag=ASSOC, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=18
+//DIAGNOSTIC_TEST:SIMPLE(diag=ASSOC, non-exhaustive): -target metal -entry computeMain -stage compute -DCASE=18
 //DIAGNOSTIC_TEST:SIMPLE(diag=EXPLICIT): -target wgsl -entry computeMain -stage compute -DCASE=15
 //DIAGNOSTIC_TEST:SIMPLE(diag=EXPLICIT): -target metal -entry computeMain -stage compute -DCASE=15
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE): -target wgsl -entry computeMain -stage compute -DCASE=16
@@ -389,7 +392,9 @@ void computeMain()
 #elif (CASE == 16)
 
 // Type legalization moves resource fields out of the struct, so declaring `G` declares neither
-// `b` nor `rw`, and their types' requirements do not apply to code that only uses `o`.
+// `b` nor `rw`, and their types' requirements do not apply to code that only uses `o`. Metal keeps
+// parameter-block resources in its argument buffer, but these element types need nothing Metal
+// lacks.
 struct G
 {
     Buffer<float> b;
@@ -425,6 +430,46 @@ RWStructuredBuffer<Outer<int>.Inner> sb;
 void computeMain()
 {
     sb[0].f = Outer<float>.one();
+}
+
+#elif (CASE == 18)
+
+// Two specializations of one generic struct can have different field types. `Box<A>` is walked
+// first and has no `double`; `Box<B>` must still be walked, because its `T.Assoc` field is `double`.
+interface IFoo
+{
+    associatedtype Assoc;
+}
+struct A : IFoo
+{
+    typedef float Assoc;
+}
+struct B : IFoo
+{
+    typedef double Assoc;
+}
+struct Box<T : IFoo>
+{
+    float a;
+    T.Assoc f;
+//ASSOC:    ^ see using of 'double'
+};
+struct Pair
+{
+    Box<A> x;
+    Box<B> y;
+};
+
+RWStructuredBuffer<Pair> sb;
+RWStructuredBuffer<float> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
+/*ASSOC:
+     ^^^^^^^^^^^ unavailable features in entry point
+*/
+{
+    outputBuffer[0] = sb[0].x.a;
 }
 
 #endif

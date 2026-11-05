@@ -1,6 +1,7 @@
 // WGSL has neither `double` nor 16-bit integers, so `copysign` computes `half` and `float`
 // arguments, scalar and vector, through `float`.
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=NOU16): -target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<float4> output;
 
@@ -15,7 +16,8 @@ void computeMain()
     output[3] = float4(copysign(v, float3(-1.0, 1.0, -1.0)), 0.0);
 }
 
-// WGSL-NOT: u16
+// A check file with only a NOT line covers the whole output.
+// NOU16-NOT: u16
 // WGSL: fn copysign_float_{{[0-9]+}}( x_{{[0-9]+}} : vec2<f32>
 // WGSL: fn copysign_float_{{[0-9]+}}( x_{{[0-9]+}} : f32
 // WGSL: : f16) -> f16
