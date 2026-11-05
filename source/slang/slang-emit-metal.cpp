@@ -331,38 +331,21 @@ void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
 void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
 {
     auto resourceType = getImageSubscriptResourceType(inst);
-
-    if (auto textureType = as<IRTextureType>(resourceType))
-    {
-        if (as<IRVectorType>(textureType->getElementType()))
-        {
-            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-                .operation = "atomic operation on non-scalar texture",
-                .location = inst->sourceLoc});
-        }
-    }
     bool isArray = resourceType && getIntVal(resourceType->getIsArrayInst()) != 0;
     if (isArray)
     {
+        // `checkUnsupportedInst` rejects an array-texture atomic whose coordinate is not a vector.
+        auto coordType = as<IRVectorType>(inst->getCoord()->getDataType());
+        SLANG_RELEASE_ASSERT(coordType);
         emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
-        if (auto coordType = as<IRVectorType>(inst->getCoord()->getDataType()))
-        {
-            m_writer->emit(".");
-            const char* elements[] = {"x", "y", "z", "w"};
-            for (IRIntegerValue i = 0; i < getIntVal(coordType->getElementCount()) - 1; i++)
-                m_writer->emit(elements[Math::Min(3, (int)i)]);
-            m_writer->emit(", ");
-            emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
-            m_writer->emit(".");
-            m_writer->emit(
-                elements[Math::Min(3, (int)getIntVal(coordType->getElementCount()) - 1)]);
-        }
-        else
-        {
-            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-                .operation = "invalid image coordinate for atomic operation",
-                .location = inst->sourceLoc});
-        }
+        m_writer->emit(".");
+        const char* elements[] = {"x", "y", "z", "w"};
+        for (IRIntegerValue i = 0; i < getIntVal(coordType->getElementCount()) - 1; i++)
+            m_writer->emit(elements[Math::Min(3, (int)i)]);
+        m_writer->emit(", ");
+        emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
+        m_writer->emit(".");
+        m_writer->emit(elements[Math::Min(3, (int)getIntVal(coordType->getElementCount()) - 1)]);
     }
     else
     {

@@ -466,6 +466,32 @@ static const char* getUnsupportedMetalFloatAtomicReason(IRAtomicOperation* atomi
     }
 }
 
+// Diagnose an atomic operation on the texture element `subscript` that MSL cannot express. The
+// MSL texture atomic members operate on one scalar texel, so a texture with a vector element type
+// has none. An array texture takes its array index from the last component of the coordinate, so
+// that coordinate must be a vector. Both diagnostics point at `subscript`, the texture access in
+// the user's code.
+static void checkUnsupportedMetalTextureAtomic(IRImageSubscript* subscript, DiagnosticSink* sink)
+{
+    auto resourceType = getImageSubscriptResourceType(subscript);
+    if (auto textureType = as<IRTextureType>(resourceType))
+    {
+        if (as<IRVectorType>(textureType->getElementType()))
+        {
+            sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "atomic operation on non-scalar texture",
+                .location = subscript->sourceLoc});
+        }
+    }
+    if (resourceType && getIntVal(resourceType->getIsArrayInst()) != 0 &&
+        !as<IRVectorType>(subscript->getCoord()->getDataType()))
+    {
+        sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "invalid image coordinate for atomic operation",
+            .location = subscript->sourceLoc});
+    }
+}
+
 // Diagnose the atomic operations in `module` that MSL cannot express. We visit only top-level
 // functions because those are the bodies that the Metal emitter emits: a generic that remains at
 // this point is not emitted, and its body can still hold pointers whose address space was never
@@ -490,6 +516,8 @@ static void checkUnsupportedMetalAtomics(IRModule* module, DiagnosticSink* sink)
                         .operation = reason,
                         .location = atomic->sourceLoc});
                 }
+                if (auto subscript = getAtomicImageSubscript(atomic))
+                    checkUnsupportedMetalTextureAtomic(subscript, sink);
             }
         }
     }

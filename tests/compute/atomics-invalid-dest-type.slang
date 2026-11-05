@@ -1,6 +1,7 @@
 // atomics-buffer.slang
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain -minimum-slang-optimization
 
 //CHECK: atomic operation on non-scalar texture
 
