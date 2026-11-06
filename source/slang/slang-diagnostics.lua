@@ -4398,7 +4398,7 @@ standalone_note(
 standalone_note(
     "compound-assignment-binary-operator-applies",
     40026,
-    "'~binaryOp:String' applies to these arguments, but '~compoundOp:String' is not derived from it: declare 'operator~compoundOp' with an 'inout' first parameter, or write 'x = x ~binaryOp y'",
+    "'~binaryOp:String' applies to these arguments, but '~compoundOp:String' is not derived from it: declare 'operator~compoundOp' with an 'inout' first parameter, or write 'x = x ~binaryOp y' if evaluating 'x' twice is safe",
     span { loc = "location" }
 )
 

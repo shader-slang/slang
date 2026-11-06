@@ -2,9 +2,9 @@
 
 // Issue #14038: Slang does not derive `x op= y` from `operator op`. When no `operator op=`
 // applies but `x = x op y` would type-check, the E39999 error gets a note (E40026) that says to
-// declare `operator op=` with an `inout` first parameter, or to write `x = x op y`. When the
-// binary operator does not apply either, or its result does not convert back to the type of
-// `x`, there is no note.
+// declare `operator op=` with an `inout` first parameter, or to write `x = x op y` if evaluating
+// `x` twice is safe. When the binary operator does not apply either, or its result does not
+// convert back to the type of `x`, there is no note.
 
 // The repro from the issue.
 struct S3
@@ -19,7 +19,7 @@ void subtractS3(inout S3 x, S3 y)
     x -= y;
 }
 // CHECK: error[E39999]: no overload for '-=' applicable to arguments of type (S3, S3)
-// CHECK: note[E40026]: '-' applies to these arguments, but '-=' is not derived from it: declare 'operator-=' with an 'inout' first parameter, or write 'x = x - y'
+// CHECK: note[E40026]: '-' applies to these arguments, but '-=' is not derived from it: declare 'operator-=' with an 'inout' first parameter, or write 'x = x - y' if evaluating 'x' twice is safe
 
 // The right operand has a different type from the left one. Here the builtin scalar `*=` is the
 // one closest candidate, so the error is its type mismatch rather than E39999; the note is the
@@ -29,7 +29,7 @@ void scale(inout S3 x, float s)
     x *= s;
 }
 // CHECK: error[E30019]: type mismatch in expression
-// CHECK: note[E40026]: '*' applies to these arguments, but '*=' is not derived from it: declare 'operator*=' with an 'inout' first parameter, or write 'x = x * y'
+// CHECK: note[E40026]: '*' applies to these arguments, but '*=' is not derived from it: declare 'operator*=' with an 'inout' first parameter, or write 'x = x * y' if evaluating 'x' twice is safe
 
 // Bitwise and shift compound operators.
 struct Flags
@@ -45,9 +45,9 @@ void setFlags(inout Flags f, Flags g)
     f <<= 2;
 }
 // CHECK: error[E39999]: no overload for '|=' applicable to arguments of type (Flags, Flags)
-// CHECK: note[E40026]: '|' applies to these arguments, but '|=' is not derived from it: declare 'operator|=' with an 'inout' first parameter, or write 'x = x | y'
+// CHECK: note[E40026]: '|' applies to these arguments, but '|=' is not derived from it: declare 'operator|=' with an 'inout' first parameter, or write 'x = x | y' if evaluating 'x' twice is safe
 // CHECK: error[E39999]: no overload for '<<=' applicable to arguments of type (Flags, int)
-// CHECK: note[E40026]: '<<' applies to these arguments, but '<<=' is not derived from it: declare 'operator<<=' with an 'inout' first parameter, or write 'x = x << y'
+// CHECK: note[E40026]: '<<' applies to these arguments, but '<<=' is not derived from it: declare 'operator<<=' with an 'inout' first parameter, or write 'x = x << y' if evaluating 'x' twice is safe
 
 // No note when the binary operator does not apply: `S3` has no `operator+` and no `operator/`.
 void addAndDivide(inout S3 x, S3 y)
