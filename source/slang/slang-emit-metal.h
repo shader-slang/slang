@@ -24,9 +24,14 @@ public:
 
     bool getRequiresLogging() const { return m_requiresLogging; }
 
+    void requirePreserveInvariance() { m_requiresPreserveInvariance = true; }
+
+    bool getRequiresPreserveInvariance() const { return m_requiresPreserveInvariance; }
+
 private:
     SemanticVersion m_metalLanguageVersion;
     bool m_requiresLogging = false;
+    bool m_requiresPreserveInvariance = false;
 };
 
 class MetalSourceEmitter : public CLikeSourceEmitter
