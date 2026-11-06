@@ -527,7 +527,9 @@ Function parameters may be marked with a _direction_ qualifier:
 * `out` indicates an output parameter
 * `inout` or `in out` indicates an input/output parameter
 
-An `out` or `inout` parameter has exclusive access to its argument for the duration of the call: an `inout` parameter is an _exclusive mutable borrow_ of its argument, and an `out` parameter is an exclusive borrow that the function writes before it returns.
+An `out` or `inout` parameter has exclusive access to its argument for the duration of the call.
+An `inout` parameter is an _exclusive mutable borrow_ of its argument.
+An `out` parameter receives uninitialized storage, to which the function writes a value; when the function returns, ownership of that value moves out of the function to the caller.
 While the call is in progress, nothing else should read or write the argument's memory, whether through another parameter, a global variable, or another invocation.
 
 > #### Note ####
