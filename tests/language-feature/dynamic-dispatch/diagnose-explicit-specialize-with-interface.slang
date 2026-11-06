@@ -1,6 +1,6 @@
 // Explicitly specializing a constrained generic function with an existential box is rejected
 // because the box itself does not conform to `IFoo`. Implicit opening of a boxed
-// argument is distinct: it specializes the function with the concrete payload type instead.
+// argument is distinct: it infers the hidden payload type and its conformance witness instead.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain

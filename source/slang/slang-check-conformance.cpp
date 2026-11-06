@@ -229,9 +229,10 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     //
     //      int x = get<IFoo>(); // This needs to be an error!!!
     //
-    // We will eventually need to clarify the distinction between the different kinds of
-    // subtype-ish relationships, *or* we will need to ensure that `interface`s are not
-    // treated as proper types (such that they can be passed as generic arguments, etc.)
+    // Proper-type checking prevents the interface contract in `get<IFoo>()` from serving
+    // as a conforming value type. Legacy, 2025, and 2026 first box that argument; 202c
+    // requires explicit `dyn`. Ordinary queries on a box use the box's own facets rather
+    // than the interface's refinements, so neither spelling satisfies the constraint.
     //
     // Note that there is one more case of a subtype-ish relationship that is not covered
     // by this function, but that is relevant if/when we do more serious type inference:
@@ -242,11 +243,6 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     //
     // For now we are continuing to conflate all the subtype-ish relationships but not
     // tangling convertibility into it.
-
-    // Proper-type checking now prevents the interface contract in `get<IFoo>()` from serving
-    // as a conforming value type. Legacy, 2025, and 2026 first box that argument; 202c requires
-    // explicit `dyn`. Ordinary queries on the box use its own facets, not the contract's
-    // refinements.
 
     SubtypeWitness* failureWitness = nullptr;
 

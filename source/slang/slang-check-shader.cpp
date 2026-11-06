@@ -748,7 +748,7 @@ static bool _collectExistentialSpecializationParamsRec(
 
     if (as<ExistentialBoxType>(type))
     {
-        // We add a specialization parameter to select the concrete type stored in this box.
+        // We add a specialization parameter to select the payload type stored in this box.
         SpecializationParam specializationParam;
         specializationParam.flavor = SpecializationParam::Flavor::ExistentialType;
         specializationParam.loc = loc;
@@ -4199,7 +4199,7 @@ Type* Linkage::specializeType(
     // We apply the session's proper-type rules before collecting payload slots in
     // `unspecializedType`. For a reflected interface type such as `IFoo`, we form `dyn IFoo`
     // in language versions through Slang 2026. In Slang 202c, we diagnose the use of `IFoo`
-    // where a proper type is expected. We check each concrete payload's conformance below.
+    // where a proper type is expected. We check each payload type's conformance below.
     unspecializedType = visitor.CoerceToProperType(TypeExp(unspecializedType)).type;
     if (as<ErrorType>(unspecializedType))
         return nullptr;

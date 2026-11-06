@@ -4725,14 +4725,14 @@ struct ISession : public ISlangUnknown
 
     /** Specialize the existential payload slots in `type`.
 
-        Payload arguments must be concrete conforming types or the dynamic-dispatch marker
-        returned by `getDynamicType`.
+        Payload arguments must identify types conforming to the boxed interface, or the
+        dynamic-dispatch marker returned by `getDynamicType`.
         This function applies the interface conversion rules of `getTypeLayout` to the
         base `type`.
         For example, specializing reflected `IFoo` with `Foo` specializes the payload of
         `dyn IFoo` through Slang 2026; in Slang 202c, the caller must supply the explicit box as
         the base.
-        An interface contract or existential box cannot itself be a concrete payload argument.
+        An interface contract or existential box cannot itself be a payload argument.
         Returns null on failure, with diagnostics in `outDiagnostics` when requested.
      */
     virtual SLANG_NO_THROW TypeReflection* SLANG_MCALL specializeType(

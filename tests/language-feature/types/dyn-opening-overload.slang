@@ -39,7 +39,8 @@ void main(uint3 threadId : SV_DispatchThreadID)
     outputBuffer[threadId.x] = select(value);
 }
 
-// Implicit opening must retain the constrained generic overload selected before box types
-// had a distinct representation. Selecting the box overload would instead return two.
+// Call checking opens `value` before overload resolution. The constrained generic overload
+// accepts the hidden payload type directly. The `dyn IFoo` overload would repack that
+// payload into a box, so its conversion cost is higher and the generic overload wins.
 // CHECK: return int(1);
 // CHECK-NOT: return int(2);

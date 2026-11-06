@@ -642,12 +642,7 @@ void test()
 ## Existential Box Types
 
 An interface defines a contract that a conforming type must satisfy.
-`dyn ITransform` is an _existential box type_.
-A box contains a value of some type that conforms to `ITransform`; this stored value is its _payload_.
-The box also includes the information the compiler needs to call `ITransform`'s methods on that value.
-Different boxes can contain values of different concrete types.
-
-Consider the difference between a generic parameter constrained by `ITransform` and a parameter of type `dyn ITransform`:
+Consider the following definitions:
 
 ```slang
 interface ITransform
@@ -664,7 +659,25 @@ int apply<TTransform : ITransform>(TTransform transform, int value)
 {
     return transform.compute(value);
 }
+```
 
+In this example, `ITransform` defines a contract requiring a `compute` method.
+`AddOne` conforms to that contract by providing an implementation of `compute`.
+The generic function `apply` uses `ITransform` as a constraint on `TTransform`, so callers can use `apply` only with types that satisfy the contract.
+A caller supplies a type argument explicitly or lets the compiler infer it.
+For `apply(AddOne(), 3)`, the caller knows the concrete type `AddOne`; the compiler infers `TTransform` to be that type and verifies its conformance to `ITransform`.
+With that static knowledge, the compiler back-end can specialize `apply` for `AddOne`.
+
+A function may need to accept values of different conforming types through a single parameter type, without requiring its caller to expose each value's concrete type.
+For that purpose, `dyn ITransform` is an _existential box type_.
+A box contains a value of some type that conforms to `ITransform`; this stored value is its _payload_.
+The box also includes the information the compiler needs to call `ITransform`'s methods on that value.
+Different boxes can contain values of different concrete types.
+The `dyn` operator forms the type of the box used to store or pass a value.
+
+Using the definitions above, `applyBox` accepts a box instead of a generic parameter:
+
+```slang
 int applyBox(dyn ITransform transform, int value)
 {
     return transform.compute(value);
@@ -680,8 +693,6 @@ int demonstrate()
 For the call to `apply`, the compiler infers `TTransform` to be `AddOne`.
 For the call to `applyBox`, the compiler converts the `AddOne` value to a box.
 Inside `applyBox`, the call `transform.compute(value)` invokes the implementation of `compute` for the box's payload.
-In `<TTransform : ITransform>` and `struct AddOne : ITransform`, `ITransform` names the interface contract.
-The `dyn` operator forms the type of the box used to store or pass a value.
 
 Boxes can also be used as local variable, field, array element, and return types.
 For example, the following function copies a box without changing its payload's type:
