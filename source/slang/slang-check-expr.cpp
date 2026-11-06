@@ -3608,17 +3608,20 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
-    bool needDeref = false;
+    List<Expr*> derefBases;
     Expr* baseExpr = nullptr;
     {
         // As in `visitInvokeExpr`, an enclosing `try` covers the subscript call but not its
         // operands.
         OperandTryCoverageRAII operandTryCoverage(this, nullptr);
 
+        // A subscript base never dereferences a `Ptr`, so only non-`Ptr` levels can be
+        // recorded here, and none of them contributes members; `derefBases` is unused.
         baseExpr = checkBaseForMemberExpr(
             subscriptExpr->baseExpression,
             CheckBaseContext::Subscript,
-            needDeref);
+            derefBases,
+            nullptr);
 
         // If the base expression is a type, it means that this is an array declaration,
         // then we should disable short-circuit in case there is logical expression in
@@ -5365,11 +5368,14 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         // call that instead.
         auto operatorName = getName("()");
 
-        bool needDeref = false;
+        // `operator()` is looked up only in the dereferenced callee type, not in the
+        // pointer types that the callee is dereferenced through, so `derefBases` is unused.
+        List<Expr*> derefBases;
         expr->functionExpr = maybeInsertImplicitOpForMemberBase(
             expr->functionExpr,
             CheckBaseContext::Member,
-            needDeref);
+            derefBases,
+            nullptr);
 
         LookupResult lookupResult = lookUpMember(
             m_astBuilder,
@@ -8414,8 +8420,12 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
     }
 }
 
-Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBaseContext)
+Expr* SemanticsVisitor::maybeDereference(
+    Expr* inExpr,
+    CheckBaseContext checkBaseContext,
+    List<Expr*>& outDerefBases)
 {
+    SLANG_ASSERT(outDerefBases.getCount() == 0);
     Expr* expr = inExpr;
     for (;;)
     {
@@ -8428,6 +8438,7 @@ Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBas
         auto elementType = getPointedToTypeIfCanImplicitDeref(baseType);
         if (!elementType)
             return expr;
+        outDerefBases.add(expr);
         expr = constructDerefExpr(expr, elementType, inExpr->loc);
     }
 }
@@ -8590,11 +8601,14 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     return nullptr;
 }
 
-Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType* baseTupleType)
+Expr* SemanticsVisitor::checkTupleSwizzleExpr(
+    MemberExpr* memberExpr,
+    TupleType* baseTupleType,
+    List<Expr*> const& derefBases)
 {
     UInt tupleElementCount = (UInt)baseTupleType->getMemberCount();
     if (tupleElementCount == 0)
-        return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+        return checkGeneralMemberLookupExpr(memberExpr, baseTupleType, derefBases);
 
     String swizzleText = getText(memberExpr->name);
     auto span = swizzleText.getUnownedSlice();
@@ -8613,7 +8627,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         // Check for the preceding underscore
         if (span[pos] != '_')
         {
-            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType, derefBases);
         }
         pos++;
 
@@ -8622,7 +8636,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         {
             // Unexpected end of swizzle string, fallback to
             // member lookup.
-            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType, derefBases);
         }
 
         auto ch = span[pos];
@@ -8631,7 +8645,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         {
             // An invalid character in the swizzle is an error, fallback to
             // member lookup.
-            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
+            return checkGeneralMemberLookupExpr(memberExpr, baseTupleType, derefBases);
         }
         elementCoord = (uint32_t)StringUtil::parseIntAndAdvancePos(span, pos);
 
@@ -9092,8 +9106,11 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
 {
     expr->baseExpression = CheckTerm(expr->baseExpression);
 
+    // A static member is looked up only in the dereferenced type, so `derefBases` is unused.
+    List<Expr*> derefBases;
     // Not sure this is needed -> but guess someone could do
-    expr->baseExpression = maybeDereference(expr->baseExpression, CheckBaseContext::Member);
+    expr->baseExpression =
+        maybeDereference(expr->baseExpression, CheckBaseContext::Member, derefBases);
 
     // If the base of the member lookup has an interface type
     // *without* a suitable this-type substitution, then we are
@@ -9323,7 +9340,8 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
 Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     Expr* baseExpr,
     CheckBaseContext checkBaseContext,
-    bool& outNeedDeref)
+    List<Expr*>& outDerefBases,
+    MemberExpr* memberExpr)
 {
     // In case our base expression is still overloaded, we can perform
     // some more refinement.
@@ -9364,10 +9382,15 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
 
     // Dereference after resolving overloaded expressions, so that the
     // concrete type is available for pointer-like dereferences.
-    auto derefExpr = maybeDereference(baseExpr, checkBaseContext);
-    if (derefExpr != baseExpr)
-        outNeedDeref = true;
-    baseExpr = derefExpr;
+    baseExpr = maybeDereference(baseExpr, checkBaseContext, outDerefBases);
+
+    // A member that only a pointer level has is called on that level, so we leave the
+    // existential closed: opening it would bind `*p` to a temporary and evaluate `p` twice.
+    // We skip opening only when the opened value has no member of that name. Interfaces
+    // cannot be extended directly, so the lookup on the unopened interface in
+    // `checkGeneralMemberLookupExpr` finds nothing either and falls back to the same level.
+    if (memberExpr && isMemberOnlyOnDerefedPtrTypes(memberExpr, baseExpr, outDerefBases))
+        return baseExpr;
 
     // If the base of the member lookup has an interface type
     // *without* a suitable this-type substitution, then we are
@@ -9381,16 +9404,50 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     return baseExpr;
 }
 
+bool SemanticsVisitor::isMemberOnlyOnDerefedPtrTypes(
+    MemberExpr* memberExpr,
+    Expr* baseExpr,
+    List<Expr*> const& derefBases)
+{
+    auto interfaceType = unwrapModifiedType(baseExpr->type.type);
+    auto declRefType = as<DeclRefType>(interfaceType);
+    if (!declRefType)
+        return false;
+    auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>();
+    if (!interfaceDeclRef)
+        return false;
+
+    LookupResult ptrResult;
+    if (!findPtrLevelWithMember(memberExpr, derefBases, ptrResult))
+        return false;
+
+    // We look the member up on a stand-in for the opened value, so that members that apply
+    // to every conforming type, such as those of `extension<T : IFoo> T`, are found exactly
+    // as they would be after `openExistential`. A lookup on the interface type itself would
+    // miss those members. The stand-in only gives this one lookup the shape of the opened
+    // value; neither it nor the type built from it is used afterwards.
+    VarDecl* standInDecl = m_astBuilder->create<VarDecl>();
+    standInDecl->type.type = baseExpr->type.type;
+    auto openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
+        makeDeclRef(standInDecl),
+        interfaceType,
+        interfaceDeclRef);
+    LookupResult pointeeResult =
+        lookUpMember(m_astBuilder, this, memberExpr->name, openedType, m_outerScope);
+    return !pointeeResult.isValid();
+}
+
 Expr* SemanticsVisitor::checkBaseForMemberExpr(
     Expr* inBaseExpr,
     CheckBaseContext checkBaseContext,
-    bool& outNeedDeref)
+    List<Expr*>& outDerefBases,
+    MemberExpr* memberExpr)
 {
     auto baseExpr = inBaseExpr;
     baseExpr = CheckTerm(baseExpr);
 
     auto resultBaseExpr =
-        maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outNeedDeref);
+        maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outDerefBases, memberExpr);
 
     // We might want to register differentiability on any implicit ops that we add in.
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
@@ -9402,10 +9459,64 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
     return resultBaseExpr;
 }
 
-Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType)
+Expr* SemanticsVisitor::findPtrLevelWithMember(
+    MemberExpr* expr,
+    List<Expr*> const& derefBases,
+    LookupResult& outLookupResult)
+{
+    // `p->m` names a member of `*p`, so `->` consumes the outermost `Ptr` level, together with
+    // any non-`Ptr` levels outside it (as in `ConstantBuffer<Ptr<int>>`), and those levels do
+    // not contribute members.
+    Index firstSearchedLevel = 0;
+    if (as<DerefMemberExpr>(expr))
+    {
+        while (firstSearchedLevel < derefBases.getCount() &&
+               !as<PtrType>(derefBases[firstSearchedLevel]->type))
+            firstSearchedLevel++;
+        firstSearchedLevel++;
+    }
+
+    // We search innermost first, which is the order of the deref fallback in `lookUpMember`.
+    for (Index level = derefBases.getCount() - 1; level >= firstSearchedLevel; level--)
+    {
+        // Only `PtrType` levels are searched. A `DescriptorHandle<T>` always forwards member
+        // calls to `T` by design, and `ConstantBuffer<T>` and `Ref<T>` stand in for `T`.
+        Expr* ptrBase = derefBases[level];
+        if (!as<PtrType>(ptrBase->type))
+            continue;
+
+        LookupResult lookupResult = lookUpMember(
+            m_astBuilder,
+            this,
+            expr->name,
+            ptrBase->type,
+            m_outerScope,
+            LookupMask::Default,
+            LookupOptions::NoDeref);
+        if (lookupResult.isValid())
+        {
+            outLookupResult = lookupResult;
+            return ptrBase;
+        }
+    }
+    return nullptr;
+}
+
+Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(
+    MemberExpr* expr,
+    Type* baseType,
+    List<Expr*> const& derefBases)
 {
     LookupResult lookupResult =
         lookUpMember(m_astBuilder, this, expr->name, baseType, m_outerScope);
+    if (!lookupResult.isValid())
+    {
+        // A member of that name on the fully dereferenced base hides the pointer levels,
+        // whether or not it is visible and whatever its signature. We look in the pointer
+        // levels only when lookup on the base finds nothing at all.
+        if (auto ptrBase = findPtrLevelWithMember(expr, derefBases, lookupResult))
+            expr->baseExpression = ptrBase;
+    }
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
     lookupResult =
@@ -9466,11 +9577,12 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
 
 Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
 {
-    bool needDeref = false;
+    List<Expr*> derefBases;
     expr->baseExpression =
-        checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, needDeref);
+        checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, derefBases, expr);
 
-    if (!needDeref && as<DerefMemberExpr>(expr) && !as<PtrType>(expr->baseExpression->type))
+    if (derefBases.getCount() == 0 && as<DerefMemberExpr>(expr) &&
+        !as<PtrType>(expr->baseExpression->type))
     {
         // The user is trying to use the `->` operator on something that can't be
         // dereferenced, so we should diagnose that.
@@ -9534,7 +9646,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     }
     else if (auto baseTupleType = as<TupleType>(baseType))
     {
-        return checkTupleSwizzleExpr(expr, baseTupleType);
+        return checkTupleSwizzleExpr(expr, baseTupleType, derefBases);
     }
     else if (as<ErrorType>(baseType))
     {
@@ -9556,7 +9668,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     }
     else
     {
-        return checkGeneralMemberLookupExpr(expr, baseType);
+        return checkGeneralMemberLookupExpr(expr, baseType, derefBases);
     }
 }
 
