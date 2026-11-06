@@ -27,7 +27,8 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     uint4 unusedBallot = WaveActiveBallot(x > 0.0);
 
     // Used outside and inside a branch. The two identical calls run with different sets of
-    // invocations, so both are kept, and the second stays inside the branch.
+    // invocations, so both are kept, and the second stays inside the branch: the checks below
+    // fail if it is hoisted above the branch or sunk past its end.
     float max0 = WaveActiveMax(x);
     outputBuffer[tid.x] = max0;
     if (x > 1.0)
@@ -43,9 +44,11 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // WGSL: subgroupMax(
 // WGSL-NOT: subgroupMax(
 // WGSL: if
+// WGSL-NOT: }
 // WGSL: subgroupMax(
 // WGSL-NOT: subgroupMax(
 // WGSL: }
+// WGSL-NEXT: return;
 
 // HLSL-LABEL: void computeMain
 // HLSL-NOT: WaveActiveSum
@@ -54,9 +57,11 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // HLSL: WaveActiveMax(
 // HLSL-NOT: WaveActiveMax(
 // HLSL: if
+// HLSL-NOT: }
 // HLSL: WaveActiveMax(
 // HLSL-NOT: WaveActiveMax(
 // HLSL: }
+// HLSL-NEXT: return;
 
 // GLSL-LABEL: void main
 // GLSL-NOT: subgroupAdd
@@ -65,18 +70,24 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // GLSL: subgroupMax(
 // GLSL-NOT: subgroupMax(
 // GLSL: if
+// GLSL-NOT: }
 // GLSL: subgroupMax(
 // GLSL-NOT: subgroupMax(
 // GLSL: }
+// GLSL-NEXT: return;
 
 // SPIRV-NOT: OpGroupNonUniformFAdd
 // SPIRV-NOT: OpGroupNonUniformBroadcastFirst
 // SPIRV-NOT: OpGroupNonUniformBallot
 // SPIRV: OpGroupNonUniformFMax
 // SPIRV-NOT: OpGroupNonUniformFMax
-// SPIRV: OpBranchConditional
+// SPIRV: OpSelectionMerge %[[MERGE:[0-9A-Za-z_]+]]
+// SPIRV-NEXT: OpBranchConditional %{{[0-9A-Za-z_]+}} %[[THEN:[0-9A-Za-z_]+]] %[[MERGE]]
+// SPIRV-NEXT: %[[THEN]] = OpLabel
+// SPIRV-NOT: OpLabel
 // SPIRV: OpGroupNonUniformFMax
 // SPIRV-NOT: OpGroupNonUniformFMax
+// SPIRV: %[[MERGE]] = OpLabel
 
 // The shape of WGSL's `QuadReadLaneAt` on #13649: every quad read runs unconditionally, and the
 // lane selects one. With a constant lane, only the selected read is used, so it is the only one
