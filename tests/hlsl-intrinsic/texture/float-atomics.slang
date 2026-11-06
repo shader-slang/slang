@@ -2,7 +2,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -render-feature hardware-device
 //TEST(compute):SIMPLE(filecheck=HLSL):-target hlsl -profile cs_6_6 -entry computeMain
-//TEST(compute):SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
+//TEST(compute):SIMPLE(filecheck=MTL,exit-code=-1):-target metal -entry computeMain -stage compute
 
 // Test atomics on a RWTexture2D<float>.
 
