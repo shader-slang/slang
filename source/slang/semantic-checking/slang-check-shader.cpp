@@ -950,12 +950,16 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
     DiagnosticSink lookupSink(sink->getSourceManager(), nullptr, sink);
     auto expr = translationUnit->findDeclFromString(getText(name), &lookupSink);
 
-    // For a plain identifier, the lookup can only report that the name is undefined,
-    // which the caller reports better. A longer expression, such as `main<MissingType>`,
-    // can fail in a part the caller does not mention, so its diagnostics are kept.
+    // When a plain identifier does not resolve, the lookup can only report that the name
+    // is undefined, which the caller reports better. Otherwise the diagnostics are kept:
+    // a resolved name can still be reported as removed or deprecated, and a longer
+    // expression, such as `main<MissingType>`, can fail in a part the caller does not
+    // mention.
     //
+    auto lookupDeclRefExpr = as<DeclRefExpr>(expr);
+    bool resolved = (lookupDeclRefExpr && lookupDeclRefExpr->declRef) || as<OverloadedExpr>(expr);
     if (lookupSink.outputBuffer.getLength() != 0 &&
-        !_isPlainIdentifier(getText(name).getUnownedSlice()))
+        (resolved || !_isPlainIdentifier(getText(name).getUnownedSlice())))
     {
         sink->diagnoseRaw(
             lookupSink.getErrorCount() ? Severity::Error : Severity::Warning,
