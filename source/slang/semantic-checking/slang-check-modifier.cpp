@@ -448,7 +448,18 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto launchBoundsAttr = as<CudaLaunchBoundsAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 2);
+        // `checkAttribute` fills in the default for a missing second argument, but it does not
+        // reject surplus arguments.
+        auto argCount = attr->args.getCount();
+        if (argCount != 2)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1...2",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
 
         auto maxThreads = checkConstantIntVal(attr->args[0]);
         if (!maxThreads)
@@ -484,7 +495,16 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto maxRegistersAttr = as<CudaMaxRegistersAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 1);
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
 
         auto maxRegisters = checkConstantIntVal(attr->args[0]);
         if (!maxRegisters)
