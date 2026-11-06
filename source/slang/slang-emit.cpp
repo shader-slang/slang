@@ -2848,6 +2848,13 @@ Result linkAndOptimizeIR(
     // The earlier void cleanup has already run, so remove these new placeholders before emit.
     SLANG_PASS(cleanUpVoidType);
 
+    // WGSL only accepts a barrier whose control flow it can prove uniform, and a groupshared read
+    // that decides whether a barrier runs (for example, a loop bound) has to be a
+    // `workgroupUniformLoad` for that. This runs after the last CFG simplification, while the IR
+    // is still in SSA form, so the pass can follow values through phis.
+    if (isWGPUTarget(targetRequest))
+        SLANG_PASS(insertWorkgroupUniformLoadsForWGSL, codeGenContext->getTargetCaps());
+
     // Most targets need block parameters lowered to explicit temporary variables before emission.
     // Direct SPIR-V retains scalar and composite parameters so their incoming values remain
     // explicit.

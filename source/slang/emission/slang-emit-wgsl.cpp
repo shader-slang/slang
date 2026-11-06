@@ -1559,6 +1559,14 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         break;
 
+    case kIROp_WorkgroupUniformLoad:
+        {
+            m_writer->emit("workgroupUniformLoad(&(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit("))");
+            return true;
+        }
+
     case kIROp_And:
     case kIROp_Or:
         {
