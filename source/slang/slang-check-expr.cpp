@@ -4419,7 +4419,13 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                         paramDecl = paramDeclRefs[pp].getDecl();
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
-                checkGroupSharedArgumentOfParam(paramDecl, argExpr);
+
+                // A parameter that takes its default value has no argument, and a call through a
+                // value of function type has no parameter declarations, so neither has a
+                // `groupshared` argument to check.
+                //
+                if (paramDecl && argExpr)
+                    checkGroupSharedArgumentOfParam(paramDecl, argExpr);
 
                 if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
@@ -7882,9 +7888,7 @@ static bool isArgumentOfFailedCheck(Expr* arg)
 // expression, so it is reused as the source of truth rather than re-deriving addressability here.
 bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 {
-    if (!arg)
-        return false;
-
+    SLANG_ASSERT(arg);
     auto addressedExpr = getBaseObjectOfProjection(arg);
     if (isTypeOnlyPlaceholderArg(addressedExpr))
         return false;
@@ -7907,8 +7911,9 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 // semantics. HLSL proposal 0043 (`groupshared` Arguments) imposes the same rule.
 void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
 {
-    if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>() ||
-        isTypeOnlyPlaceholderArg(argIn) || isArgumentOfFailedCheck(argIn))
+    SLANG_ASSERT(paramIn && argIn);
+    if (!paramIn->hasModifier<HLSLGroupSharedModifier>() || isTypeOnlyPlaceholderArg(argIn) ||
+        isArgumentOfFailedCheck(argIn))
         return;
 
     if (!argumentNamesGroupSharedStorage(argIn))
@@ -8060,7 +8065,8 @@ static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
 //     }
 void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target)
 {
-    if (!target || isArgumentOfFailedCheck(target))
+    SLANG_ASSERT(target);
+    if (isArgumentOfFailedCheck(target))
         return;
     if (!getModesDifferentiatedFromBody(getShared(), m_parentFunc).any())
         return;
