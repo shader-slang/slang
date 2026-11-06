@@ -180,6 +180,8 @@ static IRStructKey* createResultKey(IRFunc* func, IRBuilder& builder, List<IRStr
     {
         builder.addSemanticDecoration(resultKey, semanticName, semanticIndex);
     }
+    if (func->findDecoration<IRInvariantDecoration>())
+        builder.addSimpleDecoration<IRInvariantDecoration>(resultKey);
 
     outKeys.add(resultKey);
     return resultKey;

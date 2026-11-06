@@ -5,6 +5,7 @@
 //TEST:SIMPLE(filecheck=SPIRV_FIELD): -target spirv-asm -entry outputField -stage vertex
 //TEST:SIMPLE(filecheck=SPIRV_PARAM): -target spirv-asm -entry outputParameter -stage vertex
 //TEST:SIMPLE(filecheck=SPIRV_RETURN): -target spirv-asm -entry returnValue -stage vertex
+//TEST:SIMPLE(filecheck=SPIRV_RETURN_OUT): -target spirv-asm -entry returnWithOut -stage vertex
 //TEST:SIMPLE(filecheck=SPIRV_NONE): -target spirv-asm -entry plainOutput -stage vertex
 //TEST:SIMPLE(filecheck=SPIRV_FRAG): -target spirv-asm -entry fragmentInput -stage fragment
 //TEST:SIMPLE(filecheck=GLSL_FIELD): -target glsl -entry outputField -stage vertex
@@ -15,9 +16,11 @@
 //TEST:SIMPLE(filecheck=METAL_FIELD): -target metal -entry outputField -stage vertex
 //TEST:SIMPLE(filecheck=METAL_PARAM): -target metal -entry outputParameter -stage vertex
 //TEST:SIMPLE(filecheck=METAL_RETURN): -target metal -entry returnValue -stage vertex
+//TEST:SIMPLE(filecheck=METAL_RETURN_OUT): -target metal -entry returnWithOut -stage vertex
 //TEST:SIMPLE(filecheck=METAL_FRAG): -target metal -entry fragmentInput -stage fragment
 //TEST:SIMPLE(filecheck=WGSL_FIELD): -target wgsl -entry outputField -stage vertex
 //TEST:SIMPLE(filecheck=WGSL_RETURN): -target wgsl -entry returnValue -stage vertex
+//TEST:SIMPLE(filecheck=WGSL_RETURN_OUT): -target wgsl -entry returnWithOut -stage vertex
 //TEST:SIMPLE(filecheck=WGSL_FRAG): -target wgsl -entry fragmentInput -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=HLSL): -target hlsl -entry outputField -stage vertex
 
@@ -45,6 +48,12 @@ invariant float4 returnValue(float3 p : POSITION) : SV_Position
     return float4(p * 2.0 + 1.0, 1.0);
 }
 
+invariant float4 returnWithOut(float3 p : POSITION, out float2 uv : TEXCOORD0) : SV_Position
+{
+    uv = p.xy;
+    return float4(p * 2.0 + 1.0, 1.0);
+}
+
 float4 plainOutput(float3 p : POSITION) : SV_Position
 {
     return float4(p * 2.0 + 1.0, 1.0);
@@ -61,14 +70,18 @@ float4 fragmentInput(VSOut input) : SV_Target
 // SPIRV_PARAM: OpDecorate %gl_Position Invariant
 // SPIRV_RETURN: OpDecorate %gl_Position BuiltIn Position
 // SPIRV_RETURN: OpDecorate %gl_Position Invariant
+// SPIRV_RETURN_OUT: OpDecorate %gl_Position BuiltIn Position
+// SPIRV_RETURN_OUT: OpDecorate %gl_Position Invariant
 // SPIRV_NONE: OpDecorate %gl_Position BuiltIn Position
 // SPIRV_NONE-NOT: Invariant
+// SPIRV_FRAG-NOT: Invariant
 // SPIRV_FRAG: OpDecorate %gl_FragCoord BuiltIn FragCoord
 // SPIRV_FRAG-NOT: Invariant
 
 // GLSL_FIELD: invariant gl_Position;
 // GLSL_PARAM: invariant gl_Position;
 // GLSL_RETURN: invariant gl_Position;
+// GLSL_FRAG-NOT: invariant
 // GLSL_FRAG: gl_FragCoord
 // GLSL_FRAG-NOT: invariant
 
@@ -77,11 +90,15 @@ float4 fragmentInput(VSOut input) : SV_Target
 // METAL_FIELD: {{\[\[position, invariant\]\]}}
 // METAL_PARAM: {{\[\[position, invariant\]\]}}
 // METAL_RETURN: {{\[\[position, invariant\]\]}}
+// METAL_RETURN_OUT: {{\[\[position, invariant\]\]}}
+// METAL_FRAG-NOT: {{position, invariant}}
 // METAL_FRAG: {{\[\[position\]\]}}
-// METAL_FRAG-NOT: invariant
+// METAL_FRAG-NOT: {{position, invariant}}
 
 // WGSL_FIELD: @invariant @builtin(position)
 // WGSL_RETURN: @invariant @builtin(position)
+// WGSL_RETURN_OUT: @invariant @builtin(position)
+// WGSL_FRAG-NOT: invariant
 // WGSL_FRAG: @builtin(position)
 // WGSL_FRAG-NOT: invariant
 
