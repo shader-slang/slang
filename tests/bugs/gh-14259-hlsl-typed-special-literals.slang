@@ -1,14 +1,15 @@
 // gh-14259-hlsl-typed-special-literals.slang
 
 // The HLSL emitter casts a `half` literal and every NaN or infinity to its type. An unsuffixed
-// literal or a division of literals is a 32-bit `float` in HLSL, and dxc deduces `float` from one
-// for the `T` of `RWByteAddressBuffer.Store<T>`, which would store four bytes for a `half` or a
-// `double`.
+// literal, or a division of unsuffixed literals, is a 32-bit `float` in HLSL, and dxc deduces
+// `float` from one for the `T` of `RWByteAddressBuffer.Store<T>`, which would store four bytes for
+// a `half` or a `double`. The vk lane compiles to SPIR-V rather than HLSL, so it only cross-checks
+// the expected buffer words.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-asm -entry computeMain -stage compute -profile cs_6_6
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -profile cs_6_6 -render-features half,double -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -render-features half -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -render-features half,double -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA], stride=4):out,name=output
 RWByteAddressBuffer output;
@@ -54,8 +55,10 @@ void computeMain()
     // Every word starts as the sentinel `AAAAAAAA`, so a store of the wrong width shows up as a
     // word that keeps it or as a neighbour that it overwrites. Words 0-5 hold the three `double`
     // values, words 6-8 the three `float` values, word 9 the `half` 1.5 and +Inf, word 10 the
-    // `half` -Inf and NaN, and word 11 is never written. The sign and payload of a NaN are not
-    // checked.
+    // `half` -Inf and NaN, and word 11 is never written. The `float` and `double` NaNs are checked
+    // as a quiet NaN of either sign. Word 10 accepts any `half` NaN in its upper half-word, because
+    // the sign and payload of a `half` NaN differ between targets, and its lower half-word must be
+    // the -Inf `FC00`.
     // BUF: 0
     // BUF-NEXT: 7FF00000
     // BUF-NEXT: 0

@@ -1762,29 +1762,33 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     {
     case kIROp_FloatLit:
         {
-            // HLSL treats an unsuffixed floating-point literal, and a division of such literals,
-            // as a 32-bit `float`, and dxc deduces `float` from one for a template argument such
-            // as the `T` of `RWByteAddressBuffer.Store<T>`. Each `half`, `float` and `double`
-            // constant therefore names its type. A `half` literal uses a cast rather than the `h`
-            // suffix, which needs 16-bit types to be enabled. Other floating-point types have no
-            // HLSL spelling to cast to.
+            // We write each `half`, `float` and `double` constant so that its type is explicit.
+            // HLSL types an unsuffixed literal, and a division of unsuffixed literals, as a 32-bit
+            // `float`, and dxc deduces `float` from one for a template argument such as the `T` of
+            // `RWByteAddressBuffer.Store<T>`. A finite `float` or `double` takes the `f` or `L`
+            // suffix, which needs no feature; a finite `half` is cast instead, because the `h`
+            // suffix needs 16-bit types. A NaN or infinity is a division by zero in the type's own
+            // literals, wrapped in a cast to the type that also groups the division, as in
+            // `double(0.0L / 0.0L)` or `half(1.0 / 0.0)`. `BFloat16`, `FloatE4M3` and `FloatE5M2`
+            // have no HLSL type to cast to, so their constants keep the `float` spellings.
             IRConstant* constantInst = static_cast<IRConstant*>(inst);
-            const char* typeName = nullptr;
+            IROp typeOp = constantInst->getDataType()->getOp();
+            bool hasHLSLType = true;
+            bool castFiniteValue = false;
             const char* suffix = "";
-            switch (constantInst->getDataType()->getOp())
+            switch (typeOp)
             {
             case kIROp_HalfType:
-                typeName = "half";
+                castFiniteValue = true;
                 break;
             case kIROp_FloatType:
-                typeName = "float";
                 suffix = "f";
                 break;
             case kIROp_DoubleType:
-                typeName = "double";
                 suffix = "L";
                 break;
             default:
+                hasHLSLType = false;
                 break;
             }
 
@@ -1806,14 +1810,14 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
             if (specialNumerator)
             {
-                if (!typeName)
+                if (!hasHLSLType)
                 {
                     m_writer->emit("(");
                     m_writer->emit(specialNumerator);
                     m_writer->emit("f / 0.0f)");
                     return;
                 }
-                m_writer->emit(typeName);
+                m_writer->emit(getDefaultBuiltinTypeName(typeOp));
                 m_writer->emit("(");
                 m_writer->emit(specialNumerator);
                 m_writer->emit(suffix);
@@ -1823,9 +1827,10 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 return;
             }
 
-            if (constantInst->getDataType()->getOp() == kIROp_HalfType)
+            if (castFiniteValue)
             {
-                m_writer->emit("half(");
+                m_writer->emit(getDefaultBuiltinTypeName(typeOp));
+                m_writer->emit("(");
                 m_writer->emit(constantInst->value.floatVal);
                 m_writer->emit(")");
                 return;
