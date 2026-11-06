@@ -22,6 +22,9 @@ import os
 import sys
 from collections import defaultdict
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from ci_job_outcomes import APPROVAL_GATE_JOB_NAME, failed_only_because_priority_gate
+
 # Timeline constants
 PIXELS_PER_HOUR = 265
 ROW_HEIGHT = 28
@@ -340,8 +343,22 @@ def page_template(title, body, active=""):
 
 def process_jobs(jobs_data, config):
     """Process raw job data into structures needed for visualization."""
-    # Filter out skipped jobs for most analysis
-    active_jobs = [j for j in jobs_data if j.get("conclusion") != "skipped"]
+    # Approval waits are not execution time. Exclude intentional yields only
+    # when the archived marker proves the cause and no real failure occurred.
+    # Keep attempts separate so a successful retry is not hidden by its yield.
+    attempts = defaultdict(list)
+    for job in jobs_data:
+        if job.get("workflow_name") == "CI" and job.get("run_id"):
+            attempts[(job["run_id"], job.get("run_attempt", 1))].append(job)
+    yielded_attempts = {
+        key for key, jobs in attempts.items() if failed_only_because_priority_gate(jobs)
+    }
+    active_jobs = [
+        job for job in jobs_data
+        if job.get("conclusion") != "skipped"
+        and job.get("name") != APPROVAL_GATE_JOB_NAME
+        and (job.get("run_id"), job.get("run_attempt", 1)) not in yielded_attempts
+    ]
     warn_no_build_test = True
 
     # Exclude current (incomplete) day — only generate full days
@@ -742,7 +759,7 @@ def generate_index(data, output_dir):
 
     body = f"""
 <h1>Slang CI Analytics</h1>
-<p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
+<p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs, Falcor approval gates, and verified priority yields. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 <h2>Last 3 Days</h2>
 <div>
   <div class="stat-card"><div class="value">{ci_tat_3d:.0f}m{tat_delta}</div><div class="label">CI Turnaround (avg)</div></div>
@@ -1079,7 +1096,7 @@ def generate_statistics(data, config, output_dir):
 
     body = f"""
 <h1>Statistics &amp; Trends</h1>
-<p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
+<p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs, Falcor approval gates, and verified priority yields. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 
 <div style="margin-bottom:15px">
   <label>Date range: </label>
@@ -1651,7 +1668,7 @@ def main():
     # Process
     data = process_jobs(jobs_data, config)
     data["pr_merges"] = pr_data
-    print(f"Active jobs (excluding skipped): {len(data['active_jobs'])}")
+    print(f"Execution jobs (excluding skipped, approval gates, and verified yields): {len(data['active_jobs'])}")
     print(f"Date range: {data['dates'][0] if data['dates'] else 'N/A'} to {data['dates'][-1] if data['dates'] else 'N/A'}")
     print(f"Months: {len(data['months'])}")
 
