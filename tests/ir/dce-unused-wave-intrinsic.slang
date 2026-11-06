@@ -9,6 +9,9 @@
 //TEST:SIMPLE(filecheck=QUAD_WGSL): -target wgsl -entry quadMain -stage compute
 //TEST:SIMPLE(filecheck=QUAD_HLSL): -target hlsl -entry quadMain -stage compute -profile cs_6_0 -line-directive-mode none
 
+//TEST:SIMPLE(filecheck=QUADCTL_SPIRV): -target spirv-asm -entry quadControlMain -stage fragment
+//TEST:SIMPLE(filecheck=QUADCTL_GLSL): -target glsl -entry quadControlMain -stage fragment -line-directive-mode none
+
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
@@ -105,3 +108,19 @@ void quadMain(uint3 tid: SV_DispatchThreadID)
 // QUAD_HLSL: QuadReadAcrossY
 // QUAD_HLSL-NOT: QuadReadAcrossX
 // QUAD_HLSL-NOT: QuadReadAcrossDiagonal
+
+// QuadAny and QuadAll are kept even when unused: they also request the quad-derivatives and
+// maximal-reconvergence execution modes for the entry point, which change derivatives and
+// control flow elsewhere in the shader.
+float4 quadControlMain(float2 uv: TEXCOORD0) : SV_Target
+{
+    bool unusedAny = QuadAny(uv.x > 0.5);
+    bool unusedAll = QuadAll(uv.y > 0.5);
+    return float4(uv, 0.0, 1.0);
+}
+
+// QUADCTL_SPIRV-DAG: OpExecutionMode %quadControlMain MaximallyReconvergesKHR
+// QUADCTL_SPIRV-DAG: OpExecutionMode %quadControlMain QuadDerivativesKHR
+
+// QUADCTL_GLSL-DAG: layout(quad_derivatives) in;
+// QUADCTL_GLSL-DAG: [maximally_reconverges]
