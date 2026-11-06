@@ -624,6 +624,27 @@ SLANG_UNIT_TEST(irBlobRejectsIncompatibleASTVersions)
     SLANG_CHECK_ABORT(moduleFields[1].layout.get()->kind == FossilizedValKind::UInt64);
     auto versionAddress = static_cast<Byte*>(modulePointer->get()) + moduleFields[1].offset;
 
+    // The version-41 format adds a Metal fence opcode that this texture-free module does not use.
+    // Its existing AST and IR shapes also fit version 40, so importing the intact version-40 copy
+    // must preserve the aliases and checked box operations used by the importer.
+    const UInt64 compatibleVersion = 40;
+    memcpy(versionAddress, &compatibleVersion, sizeof(compatibleVersion));
+    ComPtr<slang::ISession> compatibleSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, compatibleSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(slang_loadModuleFromIRBlob(
+        compatibleSession,
+        "version_guard",
+        "version_guard.slang-module",
+        olderModuleBytes.getBuffer(),
+        olderModuleBytes.getCount(),
+        nullptr));
+    SLANG_CHECK_ABORT(compatibleSession->loadModuleFromSourceString(
+        "version_guard_importer",
+        "version_guard_importer.slang",
+        importerText,
+        nullptr));
+
     // An incompatible AST cannot be interpreted with the current node tags. We erase the AST
     // payload so attempting to decode it would fail before a module-version diagnostic appeared.
     auto astList = moduleChunk->findListChunk(PropertyKeys<Module>::ASTModule);
