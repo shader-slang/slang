@@ -5695,6 +5695,9 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::SubscriptDecl:
         case ASTNodeType::PropertyDecl:
         case ASTNodeType::AssocTypeDecl:
+        // A plain alias for use in the interface's own signatures, not a requirement.
+        case ASTNodeType::TypeAliasDecl:
+        case ASTNodeType::TypeDefDecl:
         case ASTNodeType::VarDecl:
         case ASTNodeType::LetDecl:
         case ASTNodeType::GenericDecl:
