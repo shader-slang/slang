@@ -1,5 +1,5 @@
-// Invalid [CudaLaunchBounds] / [CudaMaxRegisters] values, and both on one kernel (CUDA rejects
-// __launch_bounds__ together with __maxnreg__).
+// Invalid [CudaLaunchBounds] / [CudaMaxRegisters] values, surplus arguments, and both on one
+// kernel (CUDA rejects __launch_bounds__ together with __maxnreg__).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda
 
@@ -50,6 +50,31 @@ void zeroRegisters(uint3 tid: SV_DispatchThreadID)
 [numthreads(64, 1, 1)]
 [shader("compute")]
 void both(uint3 tid: SV_DispatchThreadID)
+{
+    outputBuffer[tid.x] = tid.x;
+}
+
+// Surplus arguments are an argument-count error, not an assertion.
+[CudaLaunchBounds(64, 2, 3)]
+/*CHECK:
+ ^^^^^^^^^^^^^^^^ wrong number of attribute arguments
+ ^^^^^^^^^^^^^^^^ attribute 'CudaLaunchBounds' expects 1...2 arguments (3 provided)
+*/
+[numthreads(64, 1, 1)]
+[shader("compute")]
+void surplusLaunchBoundsArgs(uint3 tid: SV_DispatchThreadID)
+{
+    outputBuffer[tid.x] = tid.x;
+}
+
+[CudaMaxRegisters(32, 64)]
+/*CHECK:
+ ^^^^^^^^^^^^^^^^ wrong number of attribute arguments
+ ^^^^^^^^^^^^^^^^ attribute 'CudaMaxRegisters' expects 1 arguments (2 provided)
+*/
+[numthreads(64, 1, 1)]
+[shader("compute")]
+void surplusMaxRegistersArgs(uint3 tid: SV_DispatchThreadID)
 {
     outputBuffer[tid.x] = tid.x;
 }
