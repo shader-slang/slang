@@ -121,7 +121,7 @@ protected:
     bool maybeEmitSystemSemantic(IRInst* inst);
 
     void emitImageOperandWithAccessor(IRInst* imageOperand);
-    void emitAtomicImageCoord(IRImageSubscript* subscript);
+    void emitAtomicImageCoord(IRImageSubscript* subscript, const char* coordName = nullptr);
     void emitAtomicDestOperand(IRInst* operand);
     void emitAtomicSrcOperand(bool isImage, IRInst* operand);
     void emitAtomicSemanticOperand(IRInst* inst);
