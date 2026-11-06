@@ -37,23 +37,35 @@ float readPtrThenSync(Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p
     return t;
 }
 
-// Redundant store removal must keep the first store: other threads read `*p` after the
-// barrier, so the barrier call has to count as an access to `*p`.
-// METAL-LABEL: void writeTwiceAcrossSync_0(
-// METAL-SAME: * [[Q:p_[0-9]+]])
+// The neighbouring thread reads `*p` between the two barriers, so the first store must be kept,
+// and that read must stay between the barriers: the second barrier orders it before the
+// neighbour writes `*neighbour` again.
+// METAL-LABEL: float writeTwiceAcrossSync_0(
+// METAL-SAME: * [[Q:p_[0-9]+]], {{.*}}* [[N:neighbour_[0-9]+]])
 // METAL: *[[Q]] = 1.0f;
 // METAL-NEXT: threadgroup_barrier(mem_flags::mem_threadgroup);
+// METAL-NEXT: float [[S:[A-Za-z_0-9]+]] = *[[N]];
+// METAL-NEXT: threadgroup_barrier(mem_flags::mem_threadgroup);
 // METAL-NEXT: *[[Q]] = 2.0f;
-// CUDA-LABEL: void writeTwiceAcrossSync_0(
-// CUDA-SAME: * [[Q:p_[0-9]+]])
+// METAL-NEXT: return [[S]];
+// CUDA-LABEL: float writeTwiceAcrossSync_0(
+// CUDA-SAME: * [[Q:p_[0-9]+]], {{.*}}* [[N:neighbour_[0-9]+]])
 // CUDA: *[[Q]] = 1.0f;
 // CUDA-NEXT: __syncthreads();
+// CUDA-NEXT: float [[S:[A-Za-z_0-9]+]] = *[[N]];
+// CUDA-NEXT: __syncthreads();
 // CUDA-NEXT: *[[Q]] = 2.0f;
-void writeTwiceAcrossSync(Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p)
+// CUDA-NEXT: return [[S]];
+float writeTwiceAcrossSync(
+    Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p,
+    Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> neighbour)
 {
     *p = 1.0f;
-    GroupMemoryBarrierWithGroupSync(); // other threads read `*p` here
+    GroupMemoryBarrierWithGroupSync(); // the neighbouring thread reads `*p` here
+    float seen = *neighbour;
+    GroupMemoryBarrierWithGroupSync(); // ... before it is written again
     *p = 2.0f;
+    return seen;
 }
 
 RWStructuredBuffer<float> io;
@@ -70,8 +82,8 @@ void main(uint3 gtid: SV_GroupThreadID)
     float b = readPtrThenSync(__getAddress(sh[0]));
     sh[gtid.x] = b + 2.0f;
     GroupMemoryBarrierWithGroupSync();
-    writeTwiceAcrossSync(__getAddress(sh[gtid.x]));
+    float c = writeTwiceAcrossSync(__getAddress(sh[gtid.x]), __getAddress(sh[gtid.x ^ 1]));
     GroupMemoryBarrierWithGroupSync();
     b += sh[gtid.x ^ 1];
-    io[gtid.x] = a + b;
+    io[gtid.x] = a + b + c;
 }
