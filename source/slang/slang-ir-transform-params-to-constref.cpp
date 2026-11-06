@@ -1,6 +1,7 @@
 #include "slang-ir-transform-params-to-constref.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -17,6 +18,20 @@ struct TransformParamsToConstRefContext
     TransformParamsToConstRefContext(IRModule* module, DiagnosticSink* sink)
         : module(module), sink(sink), builder(module)
     {
+    }
+
+    virtual ~TransformParamsToConstRefContext() = default;
+
+    // The address space given to the `borrow in` parameters this pass creates.
+    virtual AddressSpace getParamAddressSpace() { return AddressSpace::Generic; }
+
+    // Whether `addr`, the address a `borrow in` parameter's value was loaded from,
+    // may be passed on directly to another `borrow in` parameter, in place of
+    // a temporary copy.
+    virtual bool canForwardAddressToCall(IRInst* addr)
+    {
+        SLANG_UNUSED(addr);
+        return true;
     }
 
     // Check if a type should be transformed (struct, array, or other composite types)
@@ -153,7 +168,8 @@ struct TransformParamsToConstRefContext
 
                             if (storeInst->getValUse() == use &&
                                 storeDest->findDecorationImpl(
-                                    kIROp_TempCallArgImmutableVarDecoration))
+                                    kIROp_TempCallArgImmutableVarDecoration) &&
+                                canForwardAddressToCall(loadInst->getPtr()))
                             {
                                 storeDest->replaceUsesWith(loadInst->getPtr());
                                 userInst->removeAndDeallocate();
@@ -183,7 +199,7 @@ struct TransformParamsToConstRefContext
     }
 
     // Check if `load` is an `IRLoad(addr)` where `addr` is a immutable location.
-    IRInst* isLoadFromImmutableAddress(IRInst* load)
+    virtual IRInst* isLoadFromImmutableAddress(IRInst* load)
     {
         if (load->getOp() != kIROp_Load)
             return nullptr;
@@ -240,10 +256,7 @@ struct TransformParamsToConstRefContext
                 }
                 else
                 {
-                    auto tempVar = builder.emitVar(arg->getFullType());
-                    builder.addDecoration(tempVar, kIROp_TempCallArgImmutableVarDecoration);
-                    builder.emitStore(tempVar, arg);
-                    newArgs.add(tempVar);
+                    newArgs.add(materializeArgAsTempVar(arg));
                 }
             }
 
@@ -252,6 +265,16 @@ struct TransformParamsToConstRefContext
             call->replaceUsesWith(newCall);
             call->removeAndDeallocate();
         }
+    }
+
+    // Return a variable holding `arg`, to pass to a `borrow in` parameter.
+    // `builder` is positioned before the call.
+    virtual IRInst* materializeArgAsTempVar(IRInst* arg)
+    {
+        auto tempVar = builder.emitVar(arg->getFullType());
+        builder.addDecoration(tempVar, kIROp_TempCallArgImmutableVarDecoration);
+        builder.emitStore(tempVar, arg);
+        return tempVar;
     }
 
     // Check if function should be excluded from transformation
@@ -343,7 +366,7 @@ struct TransformParamsToConstRefContext
                 // This allows us to pass the address of variables directly into a function,
                 // giving us the choice to remove copies into a parameter.
                 auto paramType = param->getDataType();
-                auto constRefType = builder.getBorrowInParamType(paramType, AddressSpace::Generic);
+                auto constRefType = builder.getBorrowInParamType(paramType, getParamAddressSpace());
                 param->setFullType(constRefType);
 
                 changed = true;
@@ -479,6 +502,113 @@ struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContex
 SlangResult translateEntryPointInParamToBorrow(IRModule* module, DiagnosticSink* sink)
 {
     EntryPointInParamToBorrowContext context(module, sink);
+    return context.processModule();
+}
+
+// WGSL passes a struct or array parameter by value, and Tint lowers each call to a copy of
+// the whole aggregate. For large aggregates passed through many small functions (a material
+// description handed to every BSDF lobe, say) this is measurably slow on some drivers, so we
+// pass read-only aggregates above a size threshold as `ptr<function, T>` instead.
+//
+// WGSL only accepts a pointer argument whose root is a function-scope variable or a
+// pointer parameter, in the `function` address space, and (without the
+// `unrestricted_pointer_parameters` language feature) only to the whole variable. So
+// unlike the other targets, we never pass the address of a uniform buffer or a
+// sub-object: those arguments get a function-scope temporary.
+//
+struct WGSLLargeParamsToConstRefContext : public TransformParamsToConstRefContext
+{
+    TargetRequest* targetRequest;
+    IRIntegerValue minSizeInBytes;
+
+    WGSLLargeParamsToConstRefContext(
+        IRModule* module,
+        TargetRequest* targetRequest,
+        IRIntegerValue minSizeInBytes,
+        DiagnosticSink* sink)
+        : TransformParamsToConstRefContext(module, sink)
+        , targetRequest(targetRequest)
+        , minSizeInBytes(minSizeInBytes)
+    {
+    }
+
+    virtual AddressSpace getParamAddressSpace() override { return AddressSpace::Function; }
+
+    virtual bool shouldTransformParam(IRParam* param) override
+    {
+        if (!TransformParamsToConstRefContext::shouldTransformParam(param))
+            return false;
+
+        // An unsized array cannot live in the `function` address space.
+        auto type = param->getDataType();
+        if (as<IRUnsizedArrayType>(type))
+            return false;
+
+        // Small aggregates are cheaper by value than through a pointer and a temporary.
+        // A type with no natural layout (one that holds a resource, say) is left alone.
+        IRSizeAndAlignment sizeAndAlignment;
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(targetRequest, type, &sizeAndAlignment)))
+            return false;
+        if (sizeAndAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
+            return false;
+        return sizeAndAlignment.size > minSizeInBytes;
+    }
+
+    virtual IRInst* isLoadFromImmutableAddress(IRInst* load) override
+    {
+        // A pointer into a uniform buffer cannot be passed as `ptr<function, T>`.
+        SLANG_UNUSED(load);
+        return nullptr;
+    }
+
+    virtual bool canForwardAddressToCall(IRInst* addr) override
+    {
+        // Our own `borrow in` parameter can be passed on as is; the address of one
+        // of its fields or elements would be a pointer to a sub-object.
+        return as<IRParam>(addr) != nullptr;
+    }
+
+    virtual IRInst* materializeArgAsTempVar(IRInst* arg) override
+    {
+        // `arg` is an SSA value and a `borrow in` callee cannot write through its
+        // parameter, so every call that passes `arg` can share one copy of it, made
+        // where `arg` is defined. Without this, a value passed to N calls is copied N
+        // times, which is the cost this pass exists to remove.
+        auto block = as<IRBlock>(arg->getParent());
+        if (!block)
+            return TransformParamsToConstRefContext::materializeArgAsTempVar(arg);
+
+        // Reuse the copy made for an earlier call.
+        for (auto use = arg->firstUse; use; use = use->nextUse)
+        {
+            auto store = as<IRStore>(use->getUser());
+            if (!store || store->getValUse() != use)
+                continue;
+            auto dest = store->getPtr();
+            if (dest->getParent() == block &&
+                dest->findDecorationImpl(kIROp_TempCallArgImmutableVarDecoration))
+                return dest;
+        }
+
+        IRBuilder tempBuilder(module);
+        if (as<IRParam>(arg))
+            tempBuilder.setInsertBefore(block->getFirstOrdinaryInst());
+        else
+            tempBuilder.setInsertAfter(arg);
+        auto tempVar = tempBuilder.emitVar(arg->getFullType());
+        tempBuilder.addDecoration(tempVar, kIROp_TempCallArgImmutableVarDecoration);
+        tempBuilder.emitStore(tempVar, arg);
+        return tempVar;
+    }
+};
+
+SlangResult transformLargeParamsToConstRefForWGSL(
+    IRModule* module,
+    TargetRequest* targetRequest,
+    IRIntegerValue minSizeInBytes,
+    DiagnosticSink* sink)
+{
+    WGSLLargeParamsToConstRefContext context(module, targetRequest, minSizeInBytes, sink);
     return context.processModule();
 }
 
