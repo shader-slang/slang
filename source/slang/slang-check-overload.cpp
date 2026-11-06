@@ -15,7 +15,7 @@ namespace Slang
 
 /// Check whether existential box packing loses storage required by a reference-qualified parameter.
 ///
-/// Both read-only and writable reference modes require actual box-typed storage; a concrete
+/// Both read-only and writable reference modes require actual box-typed storage; a non-box
 /// argument's storage cannot serve as a reference to the temporary box produced by packing it.
 static bool doesExistentialBoxPackingLoseRequiredReferenceStorage(
     Expr* coercedArgument,
@@ -33,8 +33,8 @@ static bool doesExistentialBoxPackingLoseRequiredReferenceStorage(
     if (!parameterType.isLeftValue)
         return false;
 
-    // Passing an existing box does not pack a concrete value. For a concrete argument,
-    // coercion creates a new box, so the argument's original storage has the wrong type.
+    // We reserve this diagnostic for arguments with non-box types. Existing box
+    // arguments use the ordinary reference-argument checks, including box upcasts.
     if (as<ExistentialBoxType>(argumentType))
         return false;
     return as<ExistentialBoxType>(parameterType) != nullptr;
@@ -966,7 +966,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                         name.append(paramIndex, 10);
 
                     getSink()->diagnose(
-                        Diagnostics::ConcreteArgumentToExistentialBoxReferenceParameter{
+                        Diagnostics::ArgumentRequiresBoxPackingForReferenceParameter{
                             .paramName = name,
                             .paramType = paramType.type,
                             .argType = arg.type,

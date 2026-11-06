@@ -2445,7 +2445,8 @@ bool SemanticsVisitor::_coerce(
             {
                 *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
 
-                // A concrete base projection refers to storage in the original derived value.
+                // A struct or class base projection refers to storage in the original
+                // derived value.
                 if (fromExpr && fromExpr->type.isLeftValue)
                     (*outToExpr)->type.isLeftValue = true;
             }

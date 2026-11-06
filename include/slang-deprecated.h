@@ -1038,11 +1038,11 @@ extern "C"
 
     /** Specialize the existential payload slots in `type`.
 
-        Payload arguments must be concrete conforming types or the dynamic-dispatch marker
-        returned by `ISession::getDynamicType`.
+        Payload arguments must identify types conforming to the boxed interface, or the
+        dynamic-dispatch marker returned by `ISession::getDynamicType`.
         This function applies the interface conversion rules of `spReflection_GetTypeLayout`
         to the base.
-        Interface contracts and existential boxes cannot be concrete payload arguments.
+        Interface contracts and existential boxes cannot be payload arguments.
         Returns null on failure, with diagnostics in `outDiagnostics` when requested.
      */
     SLANG_API SlangReflectionType* spReflection_specializeType(

@@ -982,7 +982,7 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                     // Lookup constructs `Lookup(witness, method)` in `item.declRef`, using
                     // the witness that `T` conforms to `IFoo`. We keep the receiver's proper
                     // type `T`; casting it to the interface would not produce a value type.
-                    // Concrete base classes still require an explicit field projection.
+                    // Struct or class bases still require an explicit field projection.
                     if (isValidGenericConstraintType(witness->getSup()))
                     {
                         // We created no breadcrumb expression, so we also skip clearing its
@@ -9049,8 +9049,8 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                 for (auto item : lookupResult)
                 {
                     // An interface names a requirement template with an unknown `This` type.
-                    // Calling a requirement through that template has no concrete conformance
-                    // to supply its implementation, even when the requirement has a default.
+                    // Calling a requirement through that template has no conformance witness
+                    // for a proper receiver type, even when the requirement has a default.
                     auto memberDecl = item.declRef.getDecl();
                     if (isInterfaceType(type) && isInterfaceRequirement(memberDecl))
                     {

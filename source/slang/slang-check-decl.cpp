@@ -18381,7 +18381,7 @@ Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
 
 // Check whether an AST type includes an existential box over a non-COM, non-builtin interface.
 //
-// The compiler uses AnyValue packing to access the concrete payload of such a box.
+// The compiler uses `AnyValue` packing to access the concrete payload of such a box.
 // This mirrors the IR-level `typeIncludesDynamicDispatch()` in
 // slang-ir-typeflow-specialize.cpp but operates on AST types so it
 // can be used during semantic checking.

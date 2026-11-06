@@ -300,7 +300,7 @@ public:
     /// Specializes the existential payload slots in a reflected type.
     ///
     /// Forms a proper base type using the session's language-version rules before collecting slots.
-    /// Payloads must be concrete conforming types or the dynamic-dispatch marker.
+    /// Payload arguments must identify conforming types or the dynamic-dispatch marker.
     /// Returns null with diagnostics in `sink` when conversion or payload conformance fails.
     Type* specializeType(
         Type* unspecializedType,

@@ -1758,10 +1758,10 @@ err(
 )
 
 err(
-    "concrete-argument-to-existential-box-reference-parameter",
+    "argument-requires-box-packing-for-reference-parameter",
     30077,
-    "concrete type passed to an existential box reference parameter",
-    span { loc = "location", message = "parameter '~paramName' has type '~paramType:Type' and is passed by reference, but the argument has concrete storage type '~argType:QualType'. To accept concrete storage, use 'T ~paramName' with a type parameter 'T' constrained by 'where T : ~constraintInterface:Type'." }
+    "argument requires packing for an existential box reference parameter",
+    span { loc = "location", message = "parameter '~paramName' has type '~paramType:Type' and is passed by reference, but the argument of type '~argType:QualType' requires packing into a temporary box. To accept the argument without packing, use 'T ~paramName' with a type parameter 'T' constrained by 'where T : ~constraintInterface:Type'." }
 )
 
 standalone_note(
@@ -1962,7 +1962,7 @@ err(
 -- 3xxxx - Semantic analysis (continued)
 --
 
--- Restrictions on interfaces with explicit AnyValue storage sizes.
+-- Restrictions on interfaces with explicit `AnyValue` storage sizes.
 
 err(
     "cannot-have-generic-interface-with-any-value-size",
