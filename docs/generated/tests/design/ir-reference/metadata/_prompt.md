@@ -163,8 +163,17 @@ Grouped by the anchor each `doc_ref` must resolve to.
   instruction to a source range with five operands (file, start/end line,
   start/end column).
 - `DebugScope` operand 0 references the enclosing scope (a `DebugFunction` for a
-  function-level scope) and operand 1 records the inlining context.
-  `DebugNoScope` is emitted with zero operands.
+  function-level scope) and operand 1, when present, records the inlining
+  context. An inlined region is closed by a `DebugScope` that restores the scope
+  in effect at the call site, not by `DebugNoScope`, which has no producer at
+  HEAD (#13175). A restore that is not itself inside an inlined region is the
+  one-operand `DebugScope(<caller DebugFunction>)`; a restore nested inside an
+  inlined region keeps that region's `DebugInlinedAt` as operand 1. Do not
+  write a test that expects `DebugNoScope` to be emitted. The anchored
+  `metadata.md#debugscope` and `#debug-info-family` text still describes the
+  pre-#13175 behaviour; that drift is recorded in the README's
+  `## Doc gaps observed` row, and this bullet takes precedence until the doc is
+  regenerated.
 - `DebugVar` for an entry-point parameter carries the optional argument-index
   operand after source, line and column; for an ordinary local it omits that
   operand, and the variable's own type is the **pointee of the instruction's
