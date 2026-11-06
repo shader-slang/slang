@@ -70,7 +70,8 @@ void main(uint3 gtid: SV_GroupThreadID)
     float b = readPtrThenSync(__getAddress(sh[0]));
     sh[gtid.x] = b + 2.0f;
     GroupMemoryBarrierWithGroupSync();
-    writeTwiceAcrossSync(__getAddress(sh[1]));
-    b += sh[1];
+    writeTwiceAcrossSync(__getAddress(sh[gtid.x]));
+    GroupMemoryBarrierWithGroupSync();
+    b += sh[gtid.x ^ 1];
     io[gtid.x] = a + b;
 }
