@@ -10975,13 +10975,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    // Translate Slang's semantic debug flags to the NSDI bit assignments.
-    static SpvWord getSpirvDebugFlags(IRDebugFlags flags)
+    // Returns the SPIR-V debug flags corresponding to `inst`'s decorations.
+    static SpvWord getSpirvDebugFlags(IRInst* inst)
     {
-        SpvWord spirvFlags = 0;
-        if (flags & IRDebugFlag::Artificial)
-            spirvFlags |= NonSemanticShaderDebugInfo100FlagArtificial;
-        return spirvFlags;
+        SpvWord flags = 0;
+        if (isArtificialInst(inst))
+            flags |= NonSemanticShaderDebugInfo100FlagArtificial;
+        return flags;
     }
 
     SpvInst* emitDebugFunction(
@@ -11027,9 +11027,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 debugFunc->getCol(),
                 scope,
                 debugFunc->getName(),
-                builder.getIntValue(
-                    builder.getUIntType(),
-                    getSpirvDebugFlags(debugFunc->getFlags())),
+                builder.getIntValue(builder.getUIntType(), getSpirvDebugFlags(debugFunc)),
                 debugFunc->getLine());
         }
 

@@ -1,5 +1,5 @@
 // Check that generated constructors retain source locations and can be stepped into.
-// FlagArtificial supplies provenance; the debugger decides whether to skip it.
+// FlagArtificial marks compiler-generated constructors; the debugger decides whether to skip them.
 // This test uses spvdb's ordinary step-in behavior with no artificial filtering.
 //
 // Constructor entry has a location on the struct declaration.

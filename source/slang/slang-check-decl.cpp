@@ -3349,6 +3349,7 @@ ConstructorDecl* SemanticsDeclVisitorBase::createCtor(
 {
     auto ctor = m_astBuilder->create<ConstructorDecl>();
     addModifier(ctor, m_astBuilder->create<SynthesizedModifier>());
+    addModifier(ctor, m_astBuilder->create<ArtificialModifier>());
     auto ctorName = getName("$init");
     ctor->ownedScope = m_astBuilder->create<Scope>();
     ctor->ownedScope->containerDecl = ctor;

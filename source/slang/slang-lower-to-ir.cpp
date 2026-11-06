@@ -652,8 +652,9 @@ struct IRGenContext
     DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
     // Declaration scope is independent of the basic block where a variable is eventually stored.
     IRInst* currentDebugScope = nullptr;
-    // Insert lexical metadata before this function so its enclosing generic owns it.
-    IRInst* debugScopeOwner = nullptr;
+    // The IR value for the function being lowered, or null outside function lowering.
+    // Lexical debug metadata is inserted before it in the enclosing module or generic.
+    IRInst* irFunc = nullptr;
     // The function scope already covers this body; it needs no additional lexical block.
     Stmt* debugFunctionBody = nullptr;
 
@@ -9525,47 +9526,6 @@ static HumaneSourceLoc _getDebugHumaneLoc(
     return humaneLoc;
 }
 
-// Returns true if `funcDecl` is a default or member-wise constructor whose body Slang
-// generated, rather than a user-written `__init`.
-//
-// Consider `struct Pair { float x; float y; }; Pair p = {1.0, 2.0};`. Semantic checking
-// synthesizes `Pair.$init` in `createCtor`, and `synthesizeCtorBodyForMemberVar` gives its
-// member stores the source locations of the struct and member declarations. We keep those
-// locations and mark the function's debug metadata artificial, so a debugger can tell the
-// generated constructor apart from a user-written one and apply its own stepping policy.
-//
-// A user-written `__init` is also named `<Type>.$init`, so the predicate tests the
-// constructor flavor rather than the name. It does not test `SynthesizedModifier`, because
-// lambdas carry that modifier while their bodies are user-written. Other generated functions
-// are not classified here; each needs classification where it is produced.
-static bool isSynthesizedConstructorDecl(FunctionDeclBase* funcDecl)
-{
-    auto ctorDecl = as<ConstructorDecl>(funcDecl);
-    if (!ctorDecl)
-        return false;
-    return ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault) ||
-           ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
-}
-
-// Returns the debug flags for the function `funcDecl`; currently `Artificial` for a synthesized
-// constructor and none otherwise. The flags derive from the AST declaration rather than the
-// IRDebugFunction, because Minimal-level lowering consults them before the debug function
-// exists, to decide whether to emit the location that would create it.
-static IRDebugFlags getDebugFunctionFlags(FunctionDeclBase* funcDecl)
-{
-    bool isArtificial = isSynthesizedConstructorDecl(funcDecl);
-    IRDebugFlags debugFunctionFlags = IRDebugFlag::None;
-    if (isArtificial)
-        debugFunctionFlags |= IRDebugFlag::Artificial;
-    return debugFunctionFlags;
-}
-
-// Returns whether the function's debug flags mark it as compiler-generated.
-static bool isFunctionArtificial(FunctionDeclBase* funcDecl)
-{
-    return (getDebugFunctionFlags(funcDecl) & IRDebugFlag::Artificial) != 0;
-}
-
 void maybeEmitDebugLine(
     IRGenContext* context,
     StmtLoweringVisitor* visitor,
@@ -9577,11 +9537,10 @@ void maybeEmitDebugLine(
     if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
 
-    // Minimal debug info carries only line information and cannot mark the enclosing
-    // function artificial, so we omit the lines of an artificial function; otherwise its
+    // Minimal debug info carries only line information and cannot mark the function being
+    // lowered as artificial, so we omit the lines of an artificial function; otherwise its
     // generated member stores would appear to be user-written statements.
-    if (context->debugInfoLevel == DebugInfoLevel::Minimal &&
-        isFunctionArtificial(context->funcDecl))
+    if (context->debugInfoLevel == DebugInfoLevel::Minimal && isArtificialInst(context->irFunc))
         return;
 
     if (!allowNullStmt)
@@ -9615,11 +9574,19 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
     if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
 
-    // Minimal debug info cannot mark a function artificial, so we omit the locations of an
-    // artificial function at that level, for the same reason as in maybeEmitDebugLine.
-    if (context->debugInfoLevel == DebugInfoLevel::Minimal &&
-        isFunctionArtificial(context->funcDecl))
-        return;
+    // Minimal debug info carries only line information and cannot mark an entity artificial,
+    // so at that level we omit locations that would make generated code look user-written.
+    if (context->debugInfoLevel == DebugInfoLevel::Minimal)
+    {
+        // An artificial entity's own location.
+        if (isArtificialInst(inst))
+            return;
+
+        // An entity's location is also omitted when the function being lowered is artificial.
+        // Outside function lowering there is no function, and the query returns false for null.
+        if (isArtificialInst(context->irFunc))
+            return;
+    }
 
     IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);
     if (!debugSourceInst)
@@ -9677,15 +9644,17 @@ static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
                     parentScope);
             }
 
-            IRDebugFlags debugFunctionFlags = getDebugFunctionFlags(context->funcDecl);
             auto debugFuncCallee = builder.emitDebugFunction(
                 nameOperand,
                 locationDecor->getLine(),
                 locationDecor->getCol(),
                 locationDecor->getSource(),
                 debugType,
-                debugFunctionFlags,
                 parentScope);
+            // Inlining can remove the executable function while its debug scopes remain.
+            // The debug record retains the function's artificial status independently.
+            if (isArtificialInst(irFunc))
+                builder.addDecoration(debugFuncCallee, kIROp_ArtificialDecoration);
 
             // Add a decoration to link the function to its debug function
             builder.addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
@@ -9719,7 +9688,7 @@ static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
     IRBuilder builder(*context->irBuilder);
     // Keep metadata inside the generic that owns the function. Its normal clone environment
     // then remaps lexical parents and declaration scopes together with the function body.
-    builder.setInsertBefore(context->debugScopeOwner);
+    builder.setInsertBefore(context->irFunc);
     return builder.emitDebugLexicalBlock(
         source,
         builder.getIntValue(builder.getUIntType(), loc.line),
@@ -11371,7 +11340,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.catchHandler = nullptr;
             subContextStorage.funcDecl = nullptr;
             subContextStorage.currentDebugScope = nullptr;
-            subContextStorage.debugScopeOwner = nullptr;
+            subContextStorage.irFunc = nullptr;
             subContextStorage.debugFunctionBody = nullptr;
         }
 
@@ -13918,6 +13887,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInst* irFunc = subBuilder->createFunc();
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
         irFunc->sourceLoc = decl->loc;
+        subContext->irFunc = irFunc;
+        if (decl->hasModifier<ArtificialModifier>())
+            subBuilder->addDecoration(irFunc, kIROp_ArtificialDecoration);
 
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
@@ -13986,6 +13958,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             context->setGlobalValue(decl, LoweredValInfo::simple(synthOp));
 
             irFunc = synthOp;
+            subContext->irFunc = irFunc;
         }
 
         addNameHint(subContext, irFunc, decl);
@@ -14017,7 +13990,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irFunc->setFullType(irFuncType);
 
         subContext->currentDebugScope = maybeEmitDebugFunction(subContext, irFunc);
-        subContext->debugScopeOwner = irFunc;
         subContext->debugFunctionBody = decl->body;
         subBuilder->setInsertInto(irFunc);
 
@@ -14337,11 +14309,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     }
                 }
 
-                // For an initializer compiled with debug info, expose the object under
+                // For a constructor compiled with debug info, expose the object under
                 // construction as a `this` debug variable, so a debugger stopped inside
                 // `__init` can inspect the members being initialized just as it can inside a
                 // `[mutating]` method. `thisStorage` is exactly that object (the value the
-                // initializer constructs and returns). Naming it lets the debug-var pass in
+                // constructor constructs and returns). Naming it lets the debug-var pass in
                 // slang-ir-insert-debug-value-store.cpp surface it: a return-destination
                 // parameter is emitted by that pass's parameter loop, whereas a fresh local is
                 // emitted by its local-var loop only if it also carries an

@@ -13,9 +13,6 @@
 //CHECK-DAG: [[PAIR_FUNC:%[0-9]+]] = OpExtInst %void {{%[0-9]+}} DebugFunction [[PAIR]] {{.*}} [[PAIR]] [[ARTIFICIAL]]
 //CHECK-DAG: [[DEFAULT_FUNC:%[0-9]+]] = OpExtInst %void {{%[0-9]+}} DebugFunction [[DEFAULT]] {{.*}} [[DEFAULT]] [[ARTIFICIAL]]
 //CHECK-DAG: [[USER_FUNC:%[0-9]+]] = OpExtInst %void {{%[0-9]+}} DebugFunction [[USER]] {{.*}} [[USER]] %uint_0
-//CHECK-DAG: DebugFunctionDefinition [[PAIR_FUNC]]
-//CHECK-DAG: DebugFunctionDefinition [[DEFAULT_FUNC]]
-//CHECK-DAG: DebugFunctionDefinition [[USER_FUNC]]
 
 // Check that generated and user-written constructors each expose a `this` variable
 // scoped to their own debug function.
@@ -68,12 +65,19 @@ struct DefaultMade
 
 RWStructuredBuffer<float> outputBuffer;
 
+// Check that caller statements retain their debug lines around constructor calls.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
     Pair p = {1.0, 2.0};
+    //CHECK: DebugLine {{.*}} %uint_[[#@LINE-1]]
     UserMade u = UserMade(3.0);
     DefaultMade d = {};
     outputBuffer[tid.x] = p.x + p.y + u.v + d.w;
+    //CHECK: DebugLine {{.*}} %uint_[[#@LINE-1]]
 }
+
+//CHECK-DAG: DebugFunctionDefinition [[PAIR_FUNC]]
+//CHECK-DAG: DebugFunctionDefinition [[DEFAULT_FUNC]]
+//CHECK-DAG: DebugFunctionDefinition [[USER_FUNC]]

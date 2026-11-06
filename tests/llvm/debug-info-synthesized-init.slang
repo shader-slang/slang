@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target llvm-host-ir -emit-cpu-via-llvm -whole-program -g2 -O0 -validate-ir
 
 // Check that LLVM emits debug records for generated and user-written constructors.
-// An artificial flag on the Slang debug function must not suppress LLVM debug info.
+// An artificial decoration on the Slang debug function must not suppress LLVM debug info.
 //CHECK-DAG: !DISubprogram(name: "Generated.$init"
 //CHECK-DAG: !DISubprogram(name: "Authored.$init"
 //CHECK-DAG: !DISubprogram(name: "main"

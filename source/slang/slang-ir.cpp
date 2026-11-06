@@ -4,6 +4,7 @@
 #include "core/slang-basic.h"
 #include "core/slang-platform.h"
 #include "core/slang-writer.h"
+#include "slang-ir-clone.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
@@ -877,8 +878,9 @@ void fixUpDebugFuncType(IRFunc* func)
             oldDebugFunc->getCol(),
             oldDebugFunc->getFile(),
             funcType,
-            oldDebugFunc->getFlags(),
             oldDebugFunc->getParentScope());
+        for (auto decoration : oldDebugFunc->getDecorations())
+            cloneDecoration(decoration, newDebugFunc);
         debugFuncDecor->removeAndDeallocate();
         builder.addDecoration(func, kIROp_DebugFuncDecoration, newDebugFunc);
     }
@@ -3690,19 +3692,17 @@ IRInst* IRBuilder::emitDebugFunction(
     IRInst* col,
     IRInst* file,
     IRInst* debugType,
-    IRDebugFlags flags,
     IRInst* parentScope)
 {
-    auto flagsOperand = getIntValue(getUIntType(), flags);
     // The parent scope is an optional trailing operand. Included or line-remapped sources may
     // have no associated compilation unit, so omit the operand instead of storing null.
     if (parentScope)
     {
-        IRInst* args[] = {name, line, col, file, debugType, flagsOperand, parentScope};
-        return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 7, args);
+        IRInst* args[] = {name, line, col, file, debugType, parentScope};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 6, args);
     }
-    IRInst* args[] = {name, line, col, file, debugType, flagsOperand};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 6, args);
+    IRInst* args[] = {name, line, col, file, debugType};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 5, args);
 }
 
 IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
