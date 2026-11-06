@@ -1,6 +1,5 @@
-// TODO(#14296, #14297): the test does not compile (E39999), because `__trimLast` and `__trimFirst`
-// do not work inside `expand`. Even when it compiles, `countof(Tuple<expand ...>)` returns 1. The test
-// passed by accident before, because `CHECK: 3` matched `E39999`.
+// TODO(#14297): `countof(Tuple<expand ...>)` returns 1 instead of the number of expanded
+// elements, so this test prints 1 for both calls.
 //DISABLE_TEST:INTERPRET(filecheck=CHECK):
 
 struct Layer<int InSize, int OutSize>

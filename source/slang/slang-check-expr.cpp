@@ -3132,25 +3132,22 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         return as<IntVal>(m_astBuilder->getShapeReduceIntValPack(valuePack, axis));
     }
 
-    // `each D` where D is a value pack parameter produces an EachIntVal.
+    // `each P` folds to an EachIntVal over the pack that P folds to: a pack parameter, or pack
+    // queries and shape transforms over one, such as `__trimFirst(__trimLast(D))`. If P does
+    // not fold, `each P` does not fold either.
     if (auto eachExpr = expr.as<EachExpr>())
     {
         if (auto baseExpr = eachExpr.getExpr()->baseExpr)
         {
             if (auto valPackType = as<ValuePackType>(baseExpr->type))
             {
-                if (auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr))
-                {
-                    auto baseDeclRef = getDeclRef(m_astBuilder, baseDeclRefExpr);
-                    if (auto packParamRef = baseDeclRef.as<GenericValuePackParamDecl>())
-                    {
-                        auto elementType = valPackType->getElementType();
-                        auto packRef =
-                            m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, packParamRef);
-                        Val* substPackRef = packRef->substitute(m_astBuilder, expr.getSubsts());
-                        return m_astBuilder->getEachIntVal(elementType, substPackRef);
-                    }
-                }
+                auto packVal = tryConstantFoldExpr(
+                    SubstExpr<Expr>(baseExpr, expr.getSubsts()),
+                    kind,
+                    circularityInfo);
+                if (!packVal)
+                    return nullptr;
+                return m_astBuilder->getEachIntVal(valPackType->getElementType(), packVal);
             }
         }
     }
@@ -8206,19 +8203,35 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         return expr;
     }
 
-    // Check if this is a value pack parameter reference (e.g. `each D` where D is
-    // `let each D : int`).
+    // An `each` over a value pack captures the pack that its operand denotes. When the
+    // operand folds (`each D`, `each __trimFirst(D)` or `each __shapeSwap(D, 0, 1)` for
+    // `let each D : int`), we capture the folded pack, which is the same `Val` that the
+    // `EachExpr` case of `tryConstantFoldExpr` indexes; `getExpandIntValPack` relies on that
+    // identity to fold `expand each P` back to `P`. A reference to a declaration that does not
+    // fold, such as a local `let p = D;` (it has no `const` modifier), is captured as a
+    // reference to that declaration. The operand was checked above, so the fold discards its
+    // diagnostics instead of reporting them a second time.
     if (!isTypeNode)
     {
         if (auto valPackType = as<ValuePackType>(baseType))
         {
             SLANG_ASSERT(m_capturedPacks);
-            if (auto declRefExpr = as<DeclRefExpr>(expr->baseExpr))
+            DiagnosticSink foldSink(getSourceManager(), nullptr);
+            SemanticsVisitor foldVisitor(withSink(&foldSink));
+            Val* packVal = foldVisitor.tryConstantFoldExpr(
+                SubstExpr<Expr>(expr->baseExpr),
+                ConstantFoldingKind::CompileTime,
+                nullptr);
+            if (!packVal)
             {
-                auto declRef = getDeclRef(m_astBuilder, declRefExpr);
-                m_capturedPacks->add(
-                    m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, declRef));
+                if (auto declRefExpr = as<DeclRefExpr>(expr->baseExpr))
+                {
+                    auto declRef = getDeclRef(m_astBuilder, declRefExpr);
+                    packVal = m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, declRef);
+                }
             }
+            if (packVal)
+                m_capturedPacks->add(packVal);
             expr->type = QualType(valPackType->getElementType());
             return expr;
         }
