@@ -14864,6 +14864,18 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     return SLANG_FAIL;
 }
 
+bool isHLSLForLoopInitializerRedeclaration(Decl* newDecl, Decl* oldDecl)
+{
+    auto newVarDecl = as<VarDecl>(newDecl);
+    if (!newVarDecl)
+        return false;
+    if (!newVarDecl->findModifier<HLSLForLoopInitializerAttribute>())
+        return false;
+    if (newDecl->parentDecl != oldDecl->parentDecl)
+        return false;
+    return isLocalVar(oldDecl);
+}
+
 Result SemanticsVisitor::checkRedeclaration(
     Decl* newDecl,
     Decl* oldDecl,
@@ -14902,6 +14914,11 @@ Result SemanticsVisitor::checkRedeclaration(
         // It is allowed to have a decl whose name is the same as the module.
         return SLANG_OK;
     }
+
+    // We allow HLSL loop-initializer variables to shadow earlier locals. Lookup uses this same
+    // rule to omit an older candidate after finding a visible initializer of the same name.
+    if (isHLSLForLoopInitializerRedeclaration(newDecl, oldDecl))
+        return SLANG_OK;
 
     // Consider `[UnscopedEnum] enum Mode { Mode, Other }`. The alias `Mode` that the parser adds
     // for the case conflicts with the enum, but lookup tells the type and the value apart by where
