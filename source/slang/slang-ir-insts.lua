@@ -1193,6 +1193,9 @@ local insts = {
 		},
 	},
 	{ CUDA_LDG = {min_operands = 1 } },
+	-- WGSL `workgroupUniformLoad(&ptr)`: a workgroup barrier, then a load of `ptr` that WGSL's
+	-- uniformity analysis treats as uniform. Created by `insertWorkgroupUniformLoadsForWGSL`.
+	{ workgroupUniformLoad = { operands = { { "ptr" } } } },
 
 	-- Atomic Operations
 	{

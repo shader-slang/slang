@@ -2251,8 +2251,9 @@ public:
     // Version 38 also adds the trace-program descriptor and Metal trace IR instructions.
     // Version 39 appends `IRMetalTextureFence`. Its stable opcode is appended, so the reader can
     // continue to load version-38 modules.
+    // Version 40 appends `IRWorkgroupUniformLoad` the same way.
     const static UInt k_minSupportedModuleVersion = 38;
-    const static UInt k_maxSupportedModuleVersion = 39;
+    const static UInt k_maxSupportedModuleVersion = 40;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

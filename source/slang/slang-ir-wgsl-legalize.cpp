@@ -268,6 +268,418 @@ void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, Diagnosti
     GlobalInstInliningContext().inlineGlobalValuesAndRemoveIfUnused(module);
 }
 
+// WGSL's uniformity analysis rejects a workgroup barrier unless it can prove that every
+// invocation of the workgroup reaches it, and it treats every read of `var<workgroup>` memory as
+// possibly non-uniform unless the read is a `workgroupUniformLoad`. For example, a loop bounded by
+// a groupshared count fails even when one invocation writes the count before a barrier:
+//
+//     for (uint i = 0; i < gCount; ++i) { ...; GroupMemoryBarrierWithGroupSync(); }
+//
+// HLSL already requires a group-sync barrier to be reached by every thread of the group, so a
+// groupshared value that decides whether a barrier runs has to be the same for the whole group.
+// This pass finds such reads (through arithmetic, comparisons, SSA phis, local variables and
+// call arguments) and emits them as `workgroupUniformLoad`, which states that uniformity to WGSL.
+//
+// `workgroupUniformLoad` is itself a workgroup barrier followed by the load, so it must also be
+// reached in uniform control flow. The pass only rewrites reads that decide whether a barrier
+// runs, and it requires the same of the control flow around each rewritten read, so every
+// rewritten read is in control flow that the program already requires to be uniform. Reads of
+// groupshared memory elsewhere are left alone.
+struct WorkgroupUniformLoadContext
+{
+    CapabilitySet targetCaps;
+
+    // Functions whose body (or a callee's body) contains a workgroup barrier.
+    Dictionary<IRInst*, bool> barrierCallees;
+
+    // For each block, the blocks whose branch condition decides whether the block runs.
+    Dictionary<IRBlock*, List<IRBlock*>> controlDependences;
+    HashSet<IRGlobalValueWithCode*> codeWithControlDependences;
+
+    // Values that must be uniform, and blocks that must be reached in uniform control flow.
+    List<IRInst*> workList;
+    HashSet<IRInst*> required;
+
+    List<IRLoad*> loadsToReplace;
+
+    static IRInst* getBranchCondition(IRBlock* block)
+    {
+        auto terminator = block->getTerminator();
+        if (auto ifElse = as<IRIfElse>(terminator))
+            return ifElse->getCondition();
+        if (auto condBranch = as<IRConditionalBranch>(terminator))
+            return condBranch->getCondition();
+        if (auto switchInst = as<IRSwitch>(terminator))
+            return switchInst->getCondition();
+        return nullptr;
+    }
+
+    bool isBarrierCallee(IRInst* callee)
+    {
+        if (auto result = barrierCallees.tryGetValue(callee))
+            return *result;
+
+        // Treat a function as barrier-free while it is being visited, so that recursion ends.
+        barrierCallees[callee] = false;
+
+        bool hasBarrier = false;
+        UnownedStringSlice definition;
+        IRInst* definitionInst = nullptr;
+        if (findTargetIntrinsicDefinition(callee, targetCaps, definition, definitionInst))
+        {
+            hasBarrier = definition.indexOf(toSlice("workgroupBarrier")) >= 0 ||
+                         definition.indexOf(toSlice("storageBarrier")) >= 0 ||
+                         definition.indexOf(toSlice("textureBarrier")) >= 0;
+        }
+        else if (auto code = as<IRGlobalValueWithCode>(callee))
+        {
+            for (auto block : code->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    auto call = as<IRCall>(inst);
+                    if (call && isBarrierCallee(call->getCallee()))
+                    {
+                        hasBarrier = true;
+                        break;
+                    }
+                }
+                if (hasBarrier)
+                    break;
+            }
+        }
+        barrierCallees[callee] = hasBarrier;
+        return hasBarrier;
+    }
+
+    // Compute control dependences for `code` from its post-dominator tree: a block depends on
+    // a branch when it post-dominates one of the branch's successors but not the branch itself.
+    void computeControlDependences(IRGlobalValueWithCode* code)
+    {
+        if (!codeWithControlDependences.add(code))
+            return;
+
+        List<IRBlock*> blocks;
+        Dictionary<IRBlock*, Index> blockIndices;
+        for (auto block : code->getBlocks())
+        {
+            blockIndices[block] = blocks.getCount();
+            blocks.add(block);
+        }
+
+        // Blocks that leave the function branch to a virtual exit node.
+        const Index exitNode = blocks.getCount();
+        const Index nodeCount = exitNode + 1;
+        List<List<Index>> successors;
+        List<List<Index>> predecessors;
+        successors.setCount(nodeCount);
+        predecessors.setCount(nodeCount);
+        for (Index i = 0; i < exitNode; i++)
+        {
+            for (auto successor : blocks[i]->getSuccessors())
+            {
+                Index successorIndex = 0;
+                if (!blockIndices.tryGetValue(successor, successorIndex))
+                    continue;
+                successors[i].add(successorIndex);
+                predecessors[successorIndex].add(i);
+            }
+            if (successors[i].getCount() == 0)
+            {
+                successors[i].add(exitNode);
+                predecessors[exitNode].add(i);
+            }
+        }
+
+        // Post-order of the reversed CFG, starting at the exit node.
+        List<Index> postOrder;
+        List<Index> postOrderNumbers;
+        postOrderNumbers.setCount(nodeCount);
+        for (auto& number : postOrderNumbers)
+            number = -1;
+        {
+            List<bool> visited;
+            visited.setCount(nodeCount);
+            for (auto& v : visited)
+                v = false;
+            struct StackEntry
+            {
+                Index node;
+                Index nextEdge;
+            };
+            List<StackEntry> stack;
+            stack.add({exitNode, 0});
+            visited[exitNode] = true;
+            while (stack.getCount())
+            {
+                auto& top = stack.getLast();
+                if (top.nextEdge < predecessors[top.node].getCount())
+                {
+                    Index next = predecessors[top.node][top.nextEdge++];
+                    if (!visited[next])
+                    {
+                        visited[next] = true;
+                        stack.add({next, 0});
+                    }
+                    continue;
+                }
+                postOrderNumbers[top.node] = postOrder.getCount();
+                postOrder.add(top.node);
+                stack.removeLast();
+            }
+        }
+
+        // Immediate post-dominators (Cooper, Harvey and Kennedy). Blocks that cannot reach an
+        // exit get no post-dominator, and so no control dependences.
+        List<Index> postDominators;
+        postDominators.setCount(nodeCount);
+        for (auto& node : postDominators)
+            node = -1;
+        postDominators[exitNode] = exitNode;
+        auto intersect = [&](Index a, Index b)
+        {
+            while (a != b)
+            {
+                while (postOrderNumbers[a] < postOrderNumbers[b])
+                    a = postDominators[a];
+                while (postOrderNumbers[b] < postOrderNumbers[a])
+                    b = postDominators[b];
+            }
+            return a;
+        };
+        for (bool changed = true; changed;)
+        {
+            changed = false;
+            for (Index i = postOrder.getCount() - 1; i >= 0; i--)
+            {
+                Index node = postOrder[i];
+                if (node == exitNode)
+                    continue;
+                Index newPostDominator = -1;
+                for (auto successor : successors[node])
+                {
+                    if (postDominators[successor] == -1)
+                        continue;
+                    newPostDominator =
+                        newPostDominator == -1 ? successor : intersect(successor, newPostDominator);
+                }
+                if (newPostDominator != postDominators[node])
+                {
+                    postDominators[node] = newPostDominator;
+                    changed = true;
+                }
+            }
+        }
+
+        for (Index branchNode = 0; branchNode < exitNode; branchNode++)
+        {
+            if (!getBranchCondition(blocks[branchNode]))
+                continue;
+            Index stopNode = postDominators[branchNode];
+            if (stopNode == -1)
+                continue;
+            for (auto successor : successors[branchNode])
+            {
+                for (Index node = successor; node != stopNode && node != exitNode && node != -1;
+                     node = postDominators[node])
+                {
+                    auto& dependences = controlDependences[blocks[node]];
+                    if (!dependences.contains(blocks[branchNode]))
+                        dependences.add(blocks[branchNode]);
+                }
+            }
+        }
+    }
+
+    void require(IRInst* inst)
+    {
+        if (!inst)
+            return;
+        // Module-scope values (constants, uniform parameters) need nothing from us.
+        if (!as<IRBlock>(inst) && !as<IRBlock>(inst->getParent()))
+            return;
+        if (required.add(inst))
+            workList.add(inst);
+    }
+
+    template<typename F>
+    static void forEachCallOf(IRInst* callee, const F& f)
+    {
+        for (auto use = callee->firstUse; use; use = use->nextUse)
+        {
+            auto call = as<IRCall>(use->getUser());
+            if (call && call->getCallee() == callee)
+                f(call);
+        }
+    }
+
+    void requireUniformControlFlow(IRBlock* block)
+    {
+        auto code = as<IRGlobalValueWithCode>(block->getParent());
+        if (!code)
+            return;
+        computeControlDependences(code);
+        if (auto dependences = controlDependences.tryGetValue(block))
+        {
+            for (auto branchBlock : *dependences)
+            {
+                require(getBranchCondition(branchBlock));
+                require(branchBlock);
+            }
+        }
+        // The whole function runs in uniform control flow only if every call to it does.
+        if (block == code->getFirstBlock())
+        {
+            forEachCallOf(code, [&](IRCall* call) { require(call->getParent()); });
+        }
+    }
+
+    void requireUniformLoad(IRLoad* load)
+    {
+        IRInst* root = load->getPtr();
+        for (;;)
+        {
+            if (auto elementPtr = as<IRGetElementPtr>(root))
+            {
+                require(elementPtr->getIndex());
+                root = elementPtr->getBase();
+            }
+            else if (auto fieldAddress = as<IRFieldAddress>(root))
+            {
+                root = fieldAddress->getBase();
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        auto ptrType = as<IRPtrTypeBase>(load->getPtr()->getDataType());
+        bool isGroupShared = as<IRGroupSharedRate>(root->getRate()) ||
+                             (ptrType && ptrType->getAddressSpace() == AddressSpace::GroupShared);
+        if (as<IRGlobalVar>(root) && isGroupShared)
+        {
+            loadsToReplace.add(load);
+            require(load->getParent());
+            return;
+        }
+
+        // A local variable is uniform when every value stored to it is, and every store
+        // happens in uniform control flow.
+        if (as<IRVar>(root) && root == load->getPtr())
+        {
+            for (auto use = root->firstUse; use; use = use->nextUse)
+            {
+                auto store = as<IRStore>(use->getUser());
+                if (store && store->getPtr() == root)
+                {
+                    require(store->getVal());
+                    require(store->getParent());
+                }
+            }
+        }
+    }
+
+    void requireUniformValue(IRInst* inst)
+    {
+        if (auto param = as<IRParam>(inst))
+        {
+            auto block = as<IRBlock>(param->getParent());
+            auto paramIndex = (UInt)getParamIndexInBlock(param);
+            auto code = as<IRGlobalValueWithCode>(block->getParent());
+            if (code && block == code->getFirstBlock())
+            {
+                // A function parameter: every argument passed to it must be uniform.
+                forEachCallOf(
+                    code,
+                    [&](IRCall* call)
+                    {
+                        if (paramIndex < call->getArgCount())
+                            require(call->getArg(paramIndex));
+                    });
+                return;
+            }
+            // A phi: every incoming value must be uniform, and so must the choice of edge.
+            for (auto predecessor : block->getPredecessors())
+            {
+                if (auto branch = as<IRUnconditionalBranch>(predecessor->getTerminator()))
+                {
+                    if (paramIndex < branch->getArgCount())
+                        require(branch->getArg(paramIndex));
+                }
+                require(predecessor);
+            }
+            return;
+        }
+
+        if (auto load = as<IRLoad>(inst))
+        {
+            requireUniformLoad(load);
+            return;
+        }
+
+        // Anything else is uniform when it is a pure function of uniform operands.
+        if (inst->mightHaveSideEffects())
+            return;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            auto operand = inst->getOperand(i);
+            if (!as<IRBlock>(operand))
+                require(operand);
+        }
+    }
+
+    void processModule(IRModule* module)
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    auto call = as<IRCall>(inst);
+                    if (call && isBarrierCallee(call->getCallee()))
+                    {
+                        require(block);
+                        break;
+                    }
+                }
+            }
+        }
+
+        for (Index i = 0; i < workList.getCount(); i++)
+        {
+            auto inst = workList[i];
+            if (auto block = as<IRBlock>(inst))
+                requireUniformControlFlow(block);
+            else
+                requireUniformValue(inst);
+        }
+
+        for (auto load : loadsToReplace)
+        {
+            IRBuilder builder(load);
+            builder.setInsertBefore(load);
+            IRInst* ptr = load->getPtr();
+            auto uniformLoad =
+                builder.emitIntrinsicInst(load->getFullType(), kIROp_WorkgroupUniformLoad, 1, &ptr);
+            load->transferDecorationsTo(uniformLoad);
+            load->replaceUsesWith(uniformLoad);
+            load->removeAndDeallocate();
+        }
+    }
+};
+
+void insertWorkgroupUniformLoadsForWGSL(IRModule* module, CapabilitySet const& targetCaps)
+{
+    WorkgroupUniformLoadContext context;
+    context.targetCaps = targetCaps;
+    context.processModule(module);
+}
+
 struct WGSLAddressSpaceAssigner : InitialAddressSpaceAssigner
 {
     virtual bool tryAssignAddressSpace(IRInst* inst, AddressSpace& outAddressSpace) override
