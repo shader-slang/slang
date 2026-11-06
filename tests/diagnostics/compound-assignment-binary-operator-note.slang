@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv
 
 // Issue #14038: Slang does not derive `x op= y` from `operator op`. When no `operator op=`
 // applies but `x = x op y` would type-check, the E39999 error gets a note (E40026) that says to
