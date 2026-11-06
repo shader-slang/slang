@@ -3501,6 +3501,13 @@ err(
     span { loc = "modifier:Modifier", message = "only the vertex position output can be marked invariant" }
 )
 
+err(
+    "invariant-requires-output-parameter",
+    31234,
+    "'invariant' is only allowed on an 'out' or 'inout' parameter",
+    span { loc = "modifier:Modifier", message = "'~param:Decl' is an input, so it cannot be marked invariant" }
+)
+
 -- Enums (320xx)
 
 err(

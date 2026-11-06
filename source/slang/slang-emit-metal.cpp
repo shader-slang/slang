@@ -1562,9 +1562,14 @@ bool MetalSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
     {
         m_writer->emit(" [[");
         m_writer->emit(sysSemanticDecor->getSemantic());
-        if (sysSemanticDecor->getSemantic() == "position" &&
+        // Metal allows `invariant` only on vertex outputs, which are result struct fields here.
+        // A struct shared with the fragment stage also reaches its `[[position]]` input.
+        if (sysSemanticDecor->getSemantic() == "position" && as<IRStructKey>(inst) &&
             inst->findDecoration<IRInvariantDecoration>())
+        {
             m_writer->emit(", invariant");
+            m_extensionTracker->requirePreserveInvariance();
+        }
         m_writer->emit("]]");
         return true;
     }

@@ -14472,6 +14472,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
             }
+            else if (as<InvariantModifier>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRInvariantDecoration>(irFunc);
+            }
             else if (as<DerivativeGroupQuadAttribute>(modifier))
             {
                 derivativeGroupQuadDecor =

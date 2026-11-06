@@ -1,4 +1,4 @@
-// `invariant` only applies to the vertex position output.
+// `invariant` only applies to the vertex position output, so not to inputs.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage vertex
 
@@ -23,4 +23,13 @@ VSOut main(float3 p : POSITION)
     output.pos = float4(p * scale, 1.0);
     output.uv = p.xy;
     return output;
+}
+
+float4 fragmentMain(invariant float4 pos : SV_Position) : SV_Target
+/*CHECK:
+                    ^^^^^^^^^ 'invariant' is only allowed on an 'out' or 'inout' parameter
+                    ^^^^^^^^^ 'pos' is an input, so it cannot be marked invariant
+*/
+{
+    return pos;
 }

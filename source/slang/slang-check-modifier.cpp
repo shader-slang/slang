@@ -1827,7 +1827,7 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
         return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
 
     case ASTNodeType::InvariantModifier:
-        return as<VarDeclBase>(decl);
+        return as<VarDeclBase>(decl) || as<FuncDecl>(decl);
 
     case ASTNodeType::ActualGlobalModifier:
     case ASTNodeType::MatrixLayoutModifier:
@@ -2547,6 +2547,13 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         {
             getSink()->diagnose(
                 Diagnostics::InvariantRequiresPositionOutput{.modifier = invariantModifier});
+        }
+        else if (auto paramDecl = as<ParamDecl>(syntaxNode))
+        {
+            if (!paramDecl->findModifier<OutModifier>())
+                getSink()->diagnose(Diagnostics::InvariantRequiresOutputParameter{
+                    .param = paramDecl,
+                    .modifier = invariantModifier});
         }
     }
 

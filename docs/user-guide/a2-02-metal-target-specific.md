@@ -282,6 +282,20 @@ FragmentOutput main()
 }
 ```
 
+## Invariant Position
+
+An `invariant` position output is emitted as `[[position, invariant]]`, and Slang passes
+`-fpreserve-invariance` when it compiles the shader to a metallib. If your application compiles
+the generated Metal source itself, set `MTLCompileOptions.preserveInvariance` to `YES`, otherwise
+Metal does not guarantee the invariance.
+
+```slang
+struct VSOut
+{
+    invariant float4 pos : SV_Position;
+};
+```
+
 ## Value Type Conversion
 
 Metal enforces strict type requirements for certain operations. Slang
