@@ -13,8 +13,8 @@
 
 // We compare a selected sampler with the equivalent hand-written conditional.
 // Both forms must branch on the original boolean and sample only the selected resource.
-// The separate `NO-TAG` checks cover the complete module and reject unnecessary selector
-// operations, including cancelling Boolean negations, in the simple case.
+// The separate `NO-TAG` checks cover the complete module and reject switches, integer selects,
+// and cancelling Boolean negations in the simple case.
 // SPIRV: %[[CONDITION:[^ ]+]] = OpFOrdGreaterThan %bool
 // SPIRV: OpBranchConditional %[[CONDITION]]
 // SPIRV: OpImageSampleExplicitLod

@@ -12,7 +12,9 @@
 namespace Slang
 {
 
-// Resource-selection specialization introduces branches around resource operations. Consider:
+// `specializeResourceSelections` eliminates IR operations that conditionally compute resources.
+// When the possible resources come from different bindings, we branch around each operation that
+// uses the chosen resource instead. Consider this example:
 //
 //     Texture2D<float4> first, second;
 //     SamplerState sampler;
@@ -22,12 +24,16 @@ namespace Slang
 //         return texture.Sample(sampler, uv);
 //     }
 //
-// The specialization pass moves `Sample` into resource-dependent branches and merges its ordinary
-// result. When `condition` differs within a derivative group, the new control flow can make the
-// implicit derivatives undefined. We warn about that tradeoff without preventing specialization.
-// Explicit-LOD samples, explicit-gradient samples, and ordinary resource accesses do not require
-// that warning. We classify actual IR and SPIR-V instructions and inspect direct callees; an
-// unrecognized instruction or unavailable callee remains unknown rather than proving independence.
+// For this function, `specializeResourceSelections` branches on `condition`: one branch samples
+// `first`, and the other samples `second`. We merge the `float4` sample result instead of a
+// texture. If invocations in a derivative group take different branches, each sample may lack the
+// peers needed to compute implicit derivatives. We warn about that possibility without preventing
+// the resource transformation. Explicit-LOD samples, explicit-gradient samples, and recognized
+// per-invocation resource accesses do not require a derivative warning. To choose the diagnostic,
+// we classify the IR and SPIR-V instructions that will execute conditionally and follow direct
+// calls into their function bodies. Any recognized derivative requirement warrants the derivative
+// warning, even if another operation is unknown. Otherwise, an unrecognized instruction or
+// unavailable callee leaves the participation requirement unknown and warrants a separate warning.
 
 /// Whether an operation requires peer invocations to execute the same dynamic instruction.
 ///
@@ -48,15 +54,17 @@ static ResourceOperationControlFlowDependence getResourceOperationControlFlowDep
 static ResourceOperationControlFlowDependence getOrdinaryResourceOperationControlFlowDependence(
     IRInst* inst);
 
-/// Determine whether a resource operation or any directly called function depends on participation.
+/// Classify the invocation participation required by an operation and its transitive direct
+/// callees.
 static ResourceOperationControlFlowDependence calculateResourceOperationControlFlowDependence(
     CodeGenContext* codeGenContext,
     IRInst* originalConsumer);
 
 void diagnoseResourceSelectionDispatch(CodeGenContext* codeGenContext, IRInst* originalConsumer)
 {
-    // We choose the diagnostic from the original operation, before specialization creates copies.
-    // Both warnings describe a possible change: no quad-uniformity proof is available here.
+    // We choose the diagnostic before `specializeResourceSelections` copies the original operation
+    // into branches. We identify participation requirements without proving that every required
+    // invocation takes the same branch, so both warnings describe a possible change in behavior.
     auto dependence =
         calculateResourceOperationControlFlowDependence(codeGenContext, originalConsumer);
     switch (dependence)
@@ -82,9 +90,9 @@ static ResourceOperationControlFlowDependence calculateResourceOperationControlF
     CodeGenContext* codeGenContext,
     IRInst* originalConsumer)
 {
-    // We examine the operation and the bodies of its direct callees. Each instruction enters
-    // `pendingInstructions` at most once, so shared callees and recursive calls terminate without
-    // treating a recursion edge as evidence that its function is independent.
+    // We examine the operation and follow direct calls through their function bodies. Each
+    // instruction enters `pendingInstructions` at most once, so shared callees and recursive calls
+    // terminate without treating a recursion edge as evidence that its function is independent.
     List<IRInst*> pendingInstructions;
     HashSet<IRInst*> visitedInstructions;
     pendingInstructions.add(originalConsumer);

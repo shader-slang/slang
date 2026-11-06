@@ -1,6 +1,6 @@
-// Resource-output specialization exposes the choice returned by `returnHelper` in its caller.
-// Selection specialization must then dispatch the fetch and merge its ordinary result, even
-// though the programmer requested that the helper not be inlined. No opaque local is needed.
+// `specializeResourceUsage` exposes `returnHelper`'s conditional texture result at its call site,
+// even with `[noinline]`. `specializeResourceSelections` must then branch to fetch from `tex0` or
+// `tex1` and merge the float result, without storing a texture in a function-local variable.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -O0 -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -validate-ir -validate-ir-detailed

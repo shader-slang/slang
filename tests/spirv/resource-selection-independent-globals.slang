@@ -3,8 +3,8 @@
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage fragment -entry main -validate-ir -validate-ir-detailed
 
 // This is the example from issue #14101. Each conditional selects an independently declared
-// binding. We require both resource operations to survive legalization, with control flow
-// around their uses rather than a function-local texture, sampler, or typed buffer.
+// binding. We require conditional branches whose `SampleLevel` and `Load` operations refer directly
+// to those bindings, without a function-local texture, sampler, or typed buffer.
 // SPIRV-DAG: OpBranchConditional
 // SPIRV-DAG: OpImageSampleExplicitLod
 // SPIRV-DAG: OpImageFetch

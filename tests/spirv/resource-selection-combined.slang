@@ -9,8 +9,9 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage fragment -entry constructedSampler -validate-ir -validate-ir-detailed
 
 // A combined texture and sampler can come from a single declared binding or from a texture
-// and a sampler combined in the program. We preserve each complete choice through selection;
-// a single combined binding cannot be replaced with imaginary separate bindings.
+// and a sampler combined in the program. When `select` chooses between those forms, we must retain
+// the complete texture/sampler value for each alternative; a single combined binding cannot be
+// replaced with imaginary separate bindings.
 // The explicit pair constructor is the SPIR-V library intrinsic. GLSL library methods construct
 // texture/sampler pairs through textual intrinsics, which are covered by the other test files.
 // SPIRV: OpImageSampleExplicitLod
@@ -53,7 +54,7 @@ float4 projected(float2 uv : TEXCOORD) : SV_Target
 }
 
 // Extracting the sampler from a pair constructed in the program is valid: the two sampler
-// arguments already exist as separate resources. We require projection to preserve their
+// arguments already exist as separate resources. We require sampler extraction to preserve their
 // conditional choice and remove the pair construction before the sample is emitted.
 float4 constructedSampler(float2 uv : TEXCOORD) : SV_Target
 {

@@ -58,10 +58,9 @@ float4 mixedLoop(float2 uv : TEXCOORD) : SV_TARGET
     return texture.SampleLevel(s, uv, 0);
 }
 
-// The complete selection graph uses the widest index type. Both nested selections must preserve
-// that width, including indices converted before the inner choice. This checks representation
-// without assuming a device supports 2^32 descriptors or 64-bit buffer addressing. In-bounds
-// values of `wide` are 0..7.
+// Both nested `select` instructions must use the widest index type, including indices converted
+// before the inner choice. We check the generated representation without assuming a device supports
+// 2^32 descriptors or 64-bit buffer addressing. In-bounds values of `wide` are 0..7.
 // WIDE: %[[WIDE_TYPE:[^ ]+]] = OpTypeInt 64 0
 // WIDE: %[[WIDENED:[^ ]+]] = OpUConvert %[[WIDE_TYPE]]
 // WIDE: %inner = OpSelect %[[WIDE_TYPE]] {{.*}} %[[WIDENED]]

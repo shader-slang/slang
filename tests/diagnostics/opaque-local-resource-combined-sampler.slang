@@ -6,9 +6,10 @@
 //TEST:SIMPLE(filecheck=IMAGE): -target spirv-asm -stage fragment -entry imageFromBinding -validate-ir -validate-ir-detailed
 
 // A precombined binding does not expose a separately addressable sampler on Khronos targets.
-// Resource selection must remain unsupported when reconstruction would need that extraction.
+// `specializeResourceSelections` must leave conditional resource operations intact when recreating
+// their possible values would need that extraction.
 // In contrast, a texture and sampler combined by the program can be separated by retaining the
-// actual sampler value; the positive projection tests cover that normalization.
+// actual sampler value; `resource-selection-combined.slang` covers that sampler extraction.
 // CHECK: error[E56004]: opaque type in local variable
 // IMAGE: OpImage
 // IMAGE: OpImageFetch

@@ -11,7 +11,8 @@
 // Moving a resource operation into conditional arms can make implicit derivatives undefined.
 // We require one warning per original operation, even when both its texture and sampler are
 // selected. Explicit gradients and LOD need no derivative warning. Selecting an index within
-// one array needs no new control flow and therefore must not produce either dispatch warning.
+// one array needs no new control flow and therefore must not produce either warning about
+// conditional execution.
 // The GLSL library expresses these operations with textual intrinsics, so the conservative
 // classification produces the warning about unknown control-flow requirements instead.
 // WARNING-NOT: warning[E56021]

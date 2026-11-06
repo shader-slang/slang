@@ -31,8 +31,9 @@ cbuffer Parameters { uint chooseA; };
 void main()
 {
     RWBuffer<uint> selected = select(chooseA != 0, bufferA, bufferB);
-    // We compute the coordinate after the resource selection so that dispatch must remain
-    // after the atomic operation rather than move the store to the selection's definition.
+    // We compute the coordinate after choosing the buffer. When `specializeResourceSelections`
+    // branches around the store, both store instructions must follow the atomic operation so
+    // they use its result without repeating its side effect.
     uint coordinate;
     InterlockedAdd(counter[0], 1, coordinate);
     selected[coordinate] = 42;

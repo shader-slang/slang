@@ -1,6 +1,7 @@
-// Resource-type legalization separates `Pair` into its texture fields. Output specialization
-// exposes those fields in the caller, where selection specialization must dispatch sampling
-// without storing a selected texture in a local. The implicit sample still warrants a warning.
+// Resource-type legalization separates `Pair` into its texture fields. `specializeResourceUsage`
+// exposes the fields returned by `selStruct` at its call site. `specializeResourceSelections` must
+// then branch to sample `t0` or `t1`, without storing a texture in a function-local variable.
+// The implicit sample still warrants a warning about the introduced conditional execution.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -O0 -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -validate-ir -validate-ir-detailed

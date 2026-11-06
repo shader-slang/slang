@@ -20,9 +20,10 @@ namespace Slang
 // that step makes no more progress, D3D targets also try to inline a nonrecursive call when a
 // resource argument has no HLSL form that the emitter can pass directly. Each successful inlining
 // or specialization round is followed by simplification before the process repeats.
-// On Khronos targets, each round also replaces resource selections with selectors and ordinary
-// payload values.
-// Common array/heap constructions select their indices; other choices dispatch their consumers.
+// On Khronos targets, each round also calls `specializeResourceSelections` to eliminate operations
+// that conditionally compute resources. We select indices for accesses to a common array or heap;
+// for distinct resource constructions, we branch around the operations using the chosen resources
+// and merge their non-resource results.
 
 // True for the texture access modes that lower to writable surface accesses
 // (RW / write-only / rasterizer-ordered). Read-only (sampled) and sampler-feedback

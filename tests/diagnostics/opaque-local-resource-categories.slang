@@ -1,6 +1,7 @@
-// Texture and sampler selections returned by helpers can be legalized. SubpassInput resource
-// outputs are not supported by resource-output specialization, so their opaque storage must
-// still be diagnosed. The texture and sampler cases guard against restoring the old rejection.
+// `specializeResourceUsage` exposes the conditional resources returned by `selSampler` and
+// `selIfElse` in `main`. `specializeResourceSelections` then branches around their `Sample` calls,
+// so these cases must compile without opaque local storage. Neither pass can legalize the
+// `SubpassInput` result of `selSubpass`, which must still reach the opaque-storage diagnostic.
 
 //TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry main -stage fragment
 
