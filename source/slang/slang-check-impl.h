@@ -3294,9 +3294,9 @@ public:
 
     /// Return the receiver parameter mode used for `decl` when no specifier is present.
     ///
-    /// Setters and non-synthesized HLSL methods default to `ParamPassingMode::BorrowInOut`;
-    /// other declarations use `ParamPassingMode::In`.
-    /// For a non-synthesized `FuncDecl`, requires the context for its owning translation unit.
+    /// Setters default to `ParamPassingMode::BorrowInOut`. Non-synthesized HLSL methods also
+    /// use that mode when `HLSLMethodsMutatingByDefault` is enabled; other declarations use `In`.
+    /// Selecting the HLSL default requires the context for `decl`'s owning translation unit.
     ParamPassingMode getDefaultReceiverParamMode(Decl* decl);
 
     /// Compute and attach the effective `this` parameter information owned by `decl`.
