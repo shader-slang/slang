@@ -3812,7 +3812,7 @@ struct CollectParametersVisitor : ComponentTypeVisitor
     }
 
     ParameterBindingContext* m_context;
-    String m_currentEntryPointNameOverride;
+    RenamedEntryPointComponentType* m_currentRenamedEntryPoint = nullptr;
 
     void visitComposite(
         CompositeComponentType* composite,
@@ -3855,10 +3855,13 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         ParameterBindingContext contextData = *m_context;
         auto context = &contextData;
         context->stage = entryPoint->getStage();
+        // Selecting SkyMiss supplies SkyMiss_miss even without renameEntryPoint(). An explicit
+        // rename, including an empty one, takes precedence over that default target name.
         collectEntryPointParameters(
             context,
             entryPoint,
-            m_currentEntryPointNameOverride,
+            m_currentRenamedEntryPoint ? m_currentRenamedEntryPoint->getEntryPointNameOverride(0)
+                                       : entryPoint->getEntryPointNameOverride(0),
             specializationInfo);
     }
 
@@ -3866,10 +3869,10 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         RenamedEntryPointComponentType* renamedEntryPoint,
         EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
-        auto lastNameOverride = m_currentEntryPointNameOverride;
-        m_currentEntryPointNameOverride = renamedEntryPoint->getEntryPointNameOverride(0);
+        auto lastRenamedEntryPoint = m_currentRenamedEntryPoint;
+        m_currentRenamedEntryPoint = renamedEntryPoint;
         renamedEntryPoint->getBase()->acceptVisitor(this, specializationInfo);
-        m_currentEntryPointNameOverride = lastNameOverride;
+        m_currentRenamedEntryPoint = lastRenamedEntryPoint;
     }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)

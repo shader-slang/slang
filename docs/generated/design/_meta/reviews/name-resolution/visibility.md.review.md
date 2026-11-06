@@ -1,49 +1,46 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:06:30+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T06:41:36Z
 target_doc: name-resolution/visibility.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 94e3bb442f068e23a07ff33e9536a9fc2e08c2fa82513f4ca6488832ebf31946
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: a39bda949a6aee96678d87904efb315ace2ed593bf5e94a26786facff04438e6
+source_commit: c63c2fbd5115a98b2b2469f43618671653d40bf1
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: pass
+  completeness: partial
   style_consistency: pass
   source_alignment: partial
-  front_matter_validity: partial
-finding_count: 6
+  front_matter_validity: pass
+finding_count: 3
 severity_breakdown:
-  critical: 0
+  critical: 1
   major: 0
-  minor: 6
+  minor: 2
   nit: 0
 ---
 
 # Review report for name-resolution/visibility.md
 
 ## Summary
-The page is complete, well structured, and link-clean, and most claims match the recorded source commit. Six bounded inaccuracies remain; the most important workflow issue is that the recorded watched-path digest no longer matches the manifest's resolved watched files.
+
+The document substantially matches the implementation, and its line-number citations are accurate. The most important correction is that private access between extensions requires matching target types or successful generic specialization; sharing a generic type declaration alone is insufficient. Two additional findings concern an overly broad modifier description and a missing watched path.
 
 ## Items checked
-- Read the target, `_common.md`, the per-document prompt, all 12 resolved watched files, and all three dependency documents.
-- Confirmed that the target's recorded source commit is current `HEAD` and that the watched source files have no worktree differences from that commit.
-- Re-derived every line-number citation in the body across the watched files and spot-checked more than 30 factual and behavioral claims.
-- Resolved every relative link at the recorded commit, confirmed every generated peer is in the manifest, and ran the generated-doc linter successfully.
-- Verified all required front-matter fields and recomputed the watched-path digest.
+
+- Reviewed against the **current working tree**, which equals the document’s source commit for `source/`, as specified. The comparison also showed no changes to `include/slang.h`.
+- Read `_review.md`, `_common.md`, and the document-specific prompt; obtained the watched paths and dependencies with `regenerate.py show name-resolution/visibility.md`.
+- Spot-checked more than 20 behavioral claims, including keyword classification, generic parameters, accessor inheritance, language-version defaults, local-variable validation, lookup filtering, overload checks, private extension access, type visibility, import reachability, synthesized constructors, differential members, and derivative aliases.
+- Checked every explicit line-number citation in the body against the corresponding working-tree source. No misplaced line citations were found.
+- Resolved all 61 Markdown link occurrences, covering 22 distinct targets; verified target existence at the recorded source commit and manifest membership for all seven linked generated pages.
+- Consulted the three dependency documents only for cross-reference checks.
+- Checked required sections, their ordering, the flowchart, front-matter fields, relative-link syntax, and Liquid safety. The document occupies 32,639 bytes against its 32,768-byte cap.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | Front matter, line 6 | The recorded `watched_paths_digest` is `94e3bb...`, but the current manifest entry resolves to a digest of `e44865f09117c2ed040c2745cf741834f8cd6ea84e74a6d06b92d05d67002439`. | `docs/generated/design/_meta/manifest.yaml` lines 505-519 defines the resolved watched set; `python3 docs/generated/design/_meta/regenerate.py digest name-resolution/visibility.md` returns `e44865f09117c2ed040c2745cf741834f8cd6ea84e74a6d06b92d05d67002439`. | Regenerate the front matter against the current manifest so `watched_paths_digest` records `e44865f09117c2ed040c2745cf741834f8cd6ea84e74a6d06b92d05d67002439`. |
-| F-002 | minor | `## Concepts`, lines 64-82 | The page says `ModuleDecl::languageVersion` is set from the module declaration's version or a linkage default. A `module` declaration has no version; the compile request initializes the field from `CompilerOptionName::LanguageVersion`, and parsing selected modern constructs upgrades legacy to 2025. | `source/slang/slang-compile-request.cpp` lines 324-339 assigns the option-set version; `source/slang/slang-parser.cpp` lines 1221-1226 and 1376-1405 show the legacy upgrade and the versionless `module` syntax. | Describe the option-set initialization and parser upgrade accurately; add these two files to `watched_paths` if this lifecycle detail remains. |
-| F-003 | minor | `### Per-keyword semantics`, lines 118-120 | The text implies every `GenericTypeConstraintDecl` inherits the generic inner declaration's visibility. `getDeclVisibility` does so only when the constraint's parent is a `GenericDecl`; otherwise it returns `Default`. | `source/slang/slang-check-decl.cpp` lines 21258-21265 checks `as<GenericDecl>(decl->parentDecl)` and returns `Default` when it fails. | Qualify the rule as applying to generic parameters and constraints owned by a `GenericDecl`, and state that other `GenericTypeConstraintDecl` parents fall back to `Default`. |
-| F-004 | minor | `### Container-level cap`, lines 241-256 | The phrase “any generic type arguments” overstates `_getTypeVisibility`: it only recurses into arguments that cast to `DeclRefType`, not every type-valued generic argument. | `source/slang/slang-check-expr.cpp` lines 1114-1120 guards recursion with `as<DeclRefType>(arg)`. | Replace “any generic type arguments” with “declaration-reference type arguments,” or explain the exact operand shapes the helper traverses. |
-| F-005 | minor | `### Container-level cap`, lines 258-266 | The page says `checkVisibility` enforces that any declaration cannot exceed its parent container's visibility. For an aggregate declaration, the parent search starts at the declaration itself and immediately compares its visibility with itself; the stated parent-cap behavior applies to non-aggregate members. | `source/slang/slang-check-modifier.cpp` lines 2375-2388 initializes `parentDecl = decl` and stops at the first `AggTypeDeclBase`; `source/slang/slang-check-decl.cpp` lines 3100-3109 calls this function for structs and classes. | Narrow the claim to non-aggregate members, and avoid promising a parent-container check for aggregate declarations unless the implementation changes. |
-| F-006 | minor | `## Edge cases and failure modes`, lines 444-451 | The page says a `using` declaration only brings a namespace into scope, but the checker accepts any `NamespaceDeclBase`, including a module. | `source/slang/slang-check-decl.cpp` lines 17332-17338 explicitly says “namespace (or a module, since modules are namespace-like),” and lines 17360-17376 tests `NamespaceDeclBase`. | Say that `using` accepts namespace-like targets, including modules, while still rejecting individual declarations. |
-
-## No-issues notes
-- All cited modifier declarations, enum values, source line ranges, diagnostic names, and diagnostic codes match the recorded commit.
-- The lookup and overload visibility paths are correctly shown as separate branches that share `isDeclVisibleFromScope`.
-- The required rules, edge cases, Mermaid flowchart, and `## See also` links satisfy the prompt contract.
+| F-001 | critical | `## Edge cases and failure modes`, lines 558–568 | The statement that a private extension member “is reachable from an extension on a different generic instantiation of the same type” omits the required applicability condition. For example, an extension targeting `G<int>` does not gain access to private members of an extension targeting `G<float>` merely because both target `G`. | `source/slang/slang-check-expr.cpp:1281–1289` accepts target equality or successful `applyExtensionToType`. In `source/slang/slang-check-decl.cpp:18555–18645`, that helper infers arguments for generic extensions and finally rejects mismatched targets: `if (!type->equals(targetType)) return DeclRef<ExtensionDecl>();`. | State that access succeeds when target types match, or when the candidate’s generic extension can specialize successfully to the requesting container’s type. Explicitly exclude distinct concrete specializations such as `G<int>` and `G<float>`; qualify the related cross-instantiation wording at lines 308–316. |
+| F-002 | minor | `## Concepts`, lines 95–100; `### Interaction with IgnoreForLookupModifier`; lines 618–621 | Describing `IgnoreForLookupModifier` as hiding any marked declaration from lookup entirely overgeneralizes its implementation. The lookup consumer skips inheritance facets whose declared subtype witness references a marked inheritance declaration; this is not a general declaration filter. | `source/slang/slang-ast-modifier.h:276–279` documents an `InheritanceDecl` modifier. `source/slang/slang-lookup.cpp:450–462` explicitly describes the limited handling and checks the inheritance witness. `DeclPassesLookupMask` at lines 40–98 contains no general check for this modifier. | Describe the implemented behavior as excluding the enum tag-type inheritance facet from member lookup. Remove blanket claims that attaching this modifier to any declaration makes it invisible. |
+| F-003 | minor | `### Per-keyword semantics`, lines 156–160 | The document cites and describes `getParentAggTypeDecl` in `slang-syntax.cpp`, but that file is absent from this page’s watched paths. This violates the name-resolution family’s scope rule and leaves this explanation outside freshness tracking. | `source/slang/slang-syntax.cpp:1247–1256` owns the cited helper. The visibility entry in `docs/generated/design/_meta/manifest.yaml:689–714` omits this file; `_common.md` requires expanding watched paths when citing outside them and noting the expansion. | Add `source/slang/slang-syntax.cpp` to this document’s watched paths and briefly note that it supplies the ancestor-walk helper used by visibility classification. |
