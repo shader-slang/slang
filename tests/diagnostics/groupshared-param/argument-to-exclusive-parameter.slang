@@ -3,9 +3,10 @@
 // An `out` or `inout` parameter needs exclusive access to its argument during the call. Passing
 // thread-group-shared storage, which every invocation in the group can access, is warning 30709,
 // because the compiler cannot tell whether another invocation accesses that storage during the call
-// (shader-slang/slang#10641). A direct argument of a call that is always inlined is accessed in the
-// calling body, which keeps `g[i] += 1` and `g[i]++` silent; an implicitly converted argument still
-// goes through a temporary. The test is exhaustive, so the silent calls must produce no diagnostic.
+// (shader-slang/slang#10641). A direct argument of a mutating operator is read, modified and
+// written in place as the user expects, which keeps `g[i] += 1` and `g[i]++` silent. A call by
+// name warns even when it is always inlined or is a built-in. The test is exhaustive, so the
+// silent calls must produce no diagnostic.
 
 struct Counter
 {
@@ -72,6 +73,10 @@ void computeMain(uint i : SV_GroupIndex)
     setUint(g_a[i]);
     inlinedSet(g_a[i]);
 
+    // A direct argument of an inlined callee, and the `out` argument of a built-in.
+    inlinedSet(g_u[i]);
+    InterlockedAdd(g_u[0], 1u, g_u[1]);
+
     // The implicit `this` of a `[mutating]` method.
     g_c.bump();
 
@@ -79,7 +84,6 @@ void computeMain(uint i : SV_GroupIndex)
 
     g_a[i] += 1;
     g_a[i]++;
-    inlinedSet(g_u[i]);
     readIn(g_a[i]);
     share(g_a[i]);
     int local = 0;
@@ -92,7 +96,11 @@ void computeMain(uint i : SV_GroupIndex)
 //diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
 //diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
 //diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
+//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
+//diag: 'original_value' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
 //diag: 'this' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
+//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
 //diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
 //diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
 //diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'

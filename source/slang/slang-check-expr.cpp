@@ -7922,16 +7922,12 @@ void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr*
             .arg = argIn});
 }
 
-// Return whether every call to `callee` is replaced by the callee's body or by an intrinsic, so
-// that its `out`/`inout` arguments are accessed in the calling body rather than across a call
-// boundary. The core module's compound assignments and increments (`g[i] += 1`, `g[i]++`) are such
-// calls.
-static bool isCallAlwaysInlinedOrIntrinsic(CallableDecl* callee)
+// Return whether `invoke` is written as a prefix, postfix or infix operator, such as `g[i]++` or
+// `g[i] += 1`, rather than as a call by name. Whoever writes a mutating operator on a variable
+// expects it to read, modify and write that variable in place.
+static bool isOperatorInvocation(InvokeExpr* invoke)
 {
-    return callee->hasModifier<ForceInlineAttribute>() ||
-           callee->hasModifier<UnsafeForceInlineEarlyAttribute>() ||
-           callee->hasModifier<IntrinsicOpModifier>() ||
-           callee->hasModifier<TargetIntrinsicModifier>();
+    return as<OperatorExpr>(invoke) != nullptr;
 }
 
 // Warn about each argument of `invoke` that passes thread-group-shared storage to an `out` or
@@ -7945,10 +7941,11 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
     if (!calleeDeclRef)
         return;
 
-    // A call that is always inlined accesses its direct arguments in the calling body, as if the
-    // caller had accessed them itself, so only its implicitly converted arguments are checked
-    // below.
-    bool callIsInlined = isCallAlwaysInlinedOrIntrinsic(calleeDeclRef.getDecl());
+    // A mutating operator on an element of shared memory, such as `g[i] += 1`, passes the element
+    // to an `inout` parameter, but the user who wrote it already expects a read-modify-write of
+    // that element, so a warning would only be noise. Only the operator's implicitly converted
+    // arguments are checked below.
+    bool callIsOperator = isOperatorInvocation(invoke);
     Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
     for (Index i = 0; i < checkCount && i < paramDeclRefs.getCount(); ++i)
     {
@@ -7964,11 +7961,11 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
             continue;
 
         // An implicitly converted argument goes through a temporary of the parameter's type even
-        // when the call is inlined, so we look through the conversion at the storage it names.
+        // for an operator, so we look through the conversion at the storage it names.
         auto addressedExpr = argExpr;
         if (auto lValueCast = as<LValueImplicitCastExpr>(argExpr))
             addressedExpr = lValueCast->arguments[0];
-        else if (callIsInlined)
+        else if (callIsOperator)
             continue;
 
         // Every invocation in the group can access thread-group-shared storage, so the exclusive
@@ -7984,8 +7981,8 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
 
     // The implicit `this` of a method whose receiver mode is `inout` (a `[mutating]` method) is
     // an `inout` parameter too. Its argument is the base expression of the member access, which an
-    // inlined call accesses directly.
-    if (callIsInlined)
+    // operator reads and writes in place like its direct arguments.
+    if (callIsOperator)
         return;
     auto thisParamInfo = findEffectiveThisParamInfo(calleeDeclRef);
     if (!thisParamInfo || thisParamInfo->mode != ParamPassingMode::BorrowInOut)
@@ -8096,10 +8093,22 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* ta
         .target = target});
 }
 
+// Return whether every call to `callee` is replaced by the callee's body or by an intrinsic, so
+// that its `out`/`inout` arguments are written in the calling body rather than across a call
+// boundary. The core module's compound assignments and increments (`g[i] += 1`, `g[i]++`) are such
+// calls.
+static bool isCallAlwaysInlinedOrIntrinsic(CallableDecl* callee)
+{
+    return callee->hasModifier<ForceInlineAttribute>() ||
+           callee->hasModifier<UnsafeForceInlineEarlyAttribute>() ||
+           callee->hasModifier<IntrinsicOpModifier>() ||
+           callee->hasModifier<TargetIntrinsicModifier>();
+}
+
 // A call that is always inlined, or to an intrinsic, writes its `out` and `inout` arguments in
-// the calling body, so we check those arguments as writes. Compound assignments and increments,
-// such as `g[i] += 1` and `g[i]++`, are such calls. A call to any other function needs exclusive
-// access to those arguments, which `checkGroupSharedArgumentsOfExclusiveParams` already reports.
+// the calling body, where autodiff rewrites them like any other write, so we check those arguments
+// as writes. A call to any other function needs exclusive access to those arguments, which
+// `checkGroupSharedArgumentsOfExclusiveParams` already reports.
 void SemanticsVisitor::checkGroupSharedPartialWritesByInlinedCall(
     InvokeExpr* invoke,
     FuncType* funcType,
