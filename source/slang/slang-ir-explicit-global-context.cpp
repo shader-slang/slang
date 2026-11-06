@@ -3,6 +3,7 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -12,6 +13,161 @@ namespace Slang
 // that are actually scoped to a single shader thread or
 // thread-group, and wrap them up in an explicit "context"
 // type that gets passed between functions.
+//
+// WGSL can keep thread-local globals as `var<private>`, but its uniformity analysis treats
+// every read of one as possibly non-uniform. On WGSL the pass therefore moves the shadow copies
+// of workgroup-uniform built-in inputs, so that subgroup operations and barriers whose control
+// flow depends on those values still validate. It moves only those: the analysis does not track
+// struct fields separately, so a single non-uniform field, or a store under divergent control
+// flow, would make every read through the context non-uniform.
+
+// Return true when `user`, an instruction that uses an address, is known to only read the memory
+// at that address, either directly or through element and field addresses derived from it. Any
+// other use returns false, so a caller that needs a proof of read-only access stays conservative.
+static bool isReadOnlyAddressUse(IRInst* user)
+{
+    switch (user->getOp())
+    {
+    case kIROp_Load:
+        return true;
+    case kIROp_GetElementPtr:
+    case kIROp_FieldAddress:
+        for (auto use = user->firstUse; use; use = use->nextUse)
+        {
+            if (!isReadOnlyAddressUse(use->getUser()))
+                return false;
+        }
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Return whether `param`, the parameter that carries a
+// `GlobalVariableShadowingGlobalParameterDecoration`, belongs to a compute entry point and has a
+// system-value semantic whose WGSL built-in is workgroup-uniform. A copy of an entry point that
+// `fixEntryPointCallsites` makes for direct calls keeps the decoration but not the entry-point
+// decoration, so it is rejected here.
+static bool isWorkgroupUniformEntryPointInput(IRInst* param)
+{
+    auto func = getParentFunc(param);
+    auto entryPointDecor = func ? func->findDecoration<IREntryPointDecoration>() : nullptr;
+    if (!entryPointDecor)
+        return false;
+
+    // `translateGlobalVaryingVar` gives every parameter it creates for a global input a layout,
+    // and WGSL entry-point legalization rewrites such a parameter's type in place, keeping the
+    // parameter, its layout and the decoration.
+    auto varLayout = findVarLayout(param);
+    SLANG_RELEASE_ASSERT(varLayout);
+    auto semanticAttr = varLayout->findSystemValueSemanticAttr();
+    if (!semanticAttr)
+        return false;
+    return isWGSLWorkgroupUniformSystemValue(
+        convertSystemValueSemanticNameToEnum(String(semanticAttr->getName())),
+        entryPointDecor->getProfile().getStage());
+}
+
+// Return whether `func`, or any function it calls, uses `globalVar`. A call through anything other
+// than a known function counts as a use, because its callee cannot be inspected.
+static bool doesFuncReachGlobal(IRFunc* func, IRInst* globalVar, HashSet<IRFunc*>& visited)
+{
+    if (!visited.add(func))
+        return false;
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (inst->getOperand(i) == globalVar)
+                    return true;
+            }
+            if (auto call = as<IRCall>(inst))
+            {
+                auto callee = as<IRFunc>(call->getCallee());
+                if (!callee || doesFuncReachGlobal(callee, globalVar, visited))
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Return whether `globalVar` is a shadow copy that `translateGlobalVaryingVar` made of a
+// workgroup-uniform built-in input, and whether its value stays uniform.
+//
+// Consider this example:
+//
+//     in uint gLaneCount : SV_WaveLaneCount;
+//     [noinline] uint numWaves() { return 256 / gLaneCount; }
+//
+// `translateGlobalVaryingVar` gives the entry point a `gLaneCount` parameter, stores that
+// parameter into the global at the top of the entry block, and links the two with a
+// `GlobalVariableShadowingGlobalParameterDecoration` on the parameter. The global qualifies when
+// at least one such link exists, every linked parameter belongs to a compute entry point and has
+// a workgroup-uniform semantic, and the only stores are those initializations. A shader can
+// also write to a global input (`gLaneCount = 3;`), and such a write could make the value
+// non-uniform, so any other store, or any use that lets the address escape, disqualifies it.
+//
+// `translateGlobalVaryingVar` emits exactly one initialization per linked entry point, at the top
+// of its first block, so equal counts with every store in a linked entry block identify those
+// initializations without matching their values.
+//
+// An entry point that reaches a read of the global without being linked to it gets no
+// initialization in either form (shader-slang/slang#13687). Keeping the `var<private>` there leaves
+// such a module where it was: Tint rejects it whenever uniformity matters, instead of accepting a
+// context that would silently carry a wrong value.
+static bool isWorkgroupUniformInputShadow(IRInst* globalVar)
+{
+    List<IRFunc*> shadowingEntryPoints;
+    List<IRStore*> stores;
+    for (auto use = globalVar->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (user->getOp() == kIROp_GlobalVariableShadowingGlobalParameterDecoration)
+        {
+            auto param = user->getParent();
+            if (!isWorkgroupUniformEntryPointInput(param))
+                return false;
+            shadowingEntryPoints.add(getParentFunc(param));
+            continue;
+        }
+        if (as<IRDecoration>(user))
+            continue;
+        if (auto store = as<IRStore>(user))
+        {
+            if (use != store->getPtrUse())
+                return false;
+            stores.add(store);
+            continue;
+        }
+        if (!isReadOnlyAddressUse(user))
+            return false;
+    }
+
+    if (shadowingEntryPoints.getCount() == 0 ||
+        stores.getCount() != shadowingEntryPoints.getCount())
+        return false;
+    for (auto store : stores)
+    {
+        auto func = getParentFunc(store);
+        if (!shadowingEntryPoints.contains(func) || store->getParent() != func->getFirstBlock())
+            return false;
+    }
+
+    HashSet<IRFunc*> visited;
+    for (auto inst : globalVar->getModule()->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func || !func->findDecoration<IREntryPointDecoration>() ||
+            shadowingEntryPoints.contains(func))
+            continue;
+        if (doesFuncReachGlobal(func, globalVar, visited))
+            return false;
+    }
+    return true;
+}
 
 enum class GlobalObjectKind : UInt
 {
@@ -52,6 +208,21 @@ struct IntroduceExplicitGlobalContextPass
                 addressSpaceOfLocals = AddressSpace::Function;
                 hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
+            case CodeGenTarget::WGSL:
+                // WGSL keeps every thread-local global as a `var<private>` except the shadows of
+                // workgroup-uniform built-in inputs, which the filter below selects; resource
+                // bindings and `var<workgroup>` never pass it and stay at module scope. A single
+                // such value reaches the functions that read it as an ordinary parameter, so a
+                // function that needs one built-in takes just that value rather than a pointer to
+                // a one-field struct; several are combined in one context. Locals and the context
+                // pointer use the `function` address space, which WGSL requires for a pointer
+                // parameter to a function-local variable.
+                hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
+                hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
+                addressSpaceOfLocals = AddressSpace::Function;
+                hoistOnlyWorkgroupUniformInputShadows = true;
+                passSoleValueByValue = true;
+                break;
             case CodeGenTarget::CUDASource:
             case CodeGenTarget::CUDAHeader:
                 hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
@@ -70,6 +241,13 @@ struct IntroduceExplicitGlobalContextPass
                     (UInt)HoistGlobalVarOptions::RaytracingGlobal);
                 break;
             }
+
+            // A global passed by value loses writes made outside the entry point, so that option
+            // is only combined with the filter that admits globals no other function writes. It
+            // also makes every function's context a local `Var`, which the function-type fix-up
+            // in `processModule` takes to mean an entry point.
+            SLANG_ASSERT(!passSoleValueByValue || hoistOnlyWorkgroupUniformInputShadows);
+            SLANG_ASSERT(!passSoleValueByValue || !requiresFuncTypeCorrectionPass);
         }
 
         bool canHoistType(GlobalObjectKind hoistable)
@@ -79,6 +257,9 @@ struct IntroduceExplicitGlobalContextPass
 
         bool canHoistGlobalVar(IRInst* inst)
         {
+            if (hoistOnlyWorkgroupUniformInputShadows && !isWorkgroupUniformInputShadow(inst))
+                return false;
+
             if (!((UInt)hoistGlobalVarOptions & (UInt)HoistGlobalVarOptions::SharedGlobal) &&
                 as<IRGroupSharedRate>(inst->getRate()))
                 return false;
@@ -122,10 +303,19 @@ struct IntroduceExplicitGlobalContextPass
 
         AddressSpace getAddressSpaceOfLocal() { return addressSpaceOfLocals; }
 
+        bool shouldPassSoleValueByValue() { return passSoleValueByValue; }
+
     private:
         HoistGlobalVarOptions hoistGlobalVarOptions = HoistGlobalVarOptions::All;
         GlobalObjectKind hoistableGlobalObjectKind = GlobalObjectKind::All;
         bool requiresFuncTypeCorrectionPass = false;
+        bool hoistOnlyWorkgroupUniformInputShadows = false;
+
+        // When exactly one global is hoisted, the context is that global's value itself rather
+        // than a struct, and functions receive it by value. This is only correct when no
+        // function other than an entry point writes the global, so a policy that sets it must
+        // hoist only such globals.
+        bool passSoleValueByValue = false;
         AddressSpace addressSpaceOfLocals = AddressSpace::ThreadLocal;
         CodeGenTarget target;
     };
@@ -138,8 +328,15 @@ struct IntroduceExplicitGlobalContextPass
     IRModule* m_module = nullptr;
     CodeGenTarget m_target = CodeGenTarget::Unknown;
 
+    // The context is usually a `KernelContext` struct passed by pointer. When the policy passes
+    // a sole hoisted global by value, `m_contextType` is instead that global's value type, and
+    // `m_contextStructType` and `m_contextPtrType` stay null.
     IRStructType* m_contextStructType = nullptr;
-    IRPtrType* m_contextStructPtrType = nullptr;
+    IRType* m_contextType = nullptr;
+    IRPtrType* m_contextPtrType = nullptr;
+    bool m_passContextByValue = false;
+
+    UnownedStringSlice m_contextNameHint = UnownedTerminatedStringSlice("kernelContext");
 
     struct GlobalParamInfo
     {
@@ -304,57 +501,29 @@ struct IntroduceExplicitGlobalContextPass
         // Now that we've capture all the relevant global entities from the IR,
         // we can being to transform them in an appropriate order.
         //
-        // The global context will be represneted by a `struct`
-        // type with a name hint of `KernelContext`.
-        //
-        m_contextStructType = builder.createStructType();
-        if (m_target == CodeGenTarget::CPPHeader)
+        m_passContextByValue = m_options.shouldPassSoleValueByValue() &&
+                               m_globalParams.getCount() == 0 && m_globalVars.getCount() == 1;
+        if (m_passContextByValue)
         {
-            builder.addExternCppDecoration(
-                m_contextStructType,
-                UnownedTerminatedStringSlice("KernelContext"));
-        }
-        builder.addNameHintDecoration(
-            m_contextStructType,
-            UnownedTerminatedStringSlice("KernelContext"));
-
-        // The context will usually be passed around by pointer,
-        // so we get and cache that pointer type up front.
-        //
-        m_contextStructPtrType = builder.getPtrType(m_contextStructType, getAddressSpaceOfLocal());
-
-
-        // The first step will be to create fields in the `KernelContext`
-        // type to represent any global parameters or global variables.
-        //
-        // The keys for the fields that are created will be remembered
-        // in a dictionary, so that we can find them later based on
-        // the global parameter/variable.
-        //
-        for (auto globalParam : m_globalParams)
-        {
-            // For the parameter representing all the global uniform shader
-            // parameters, we create a field that exactly matches its type.
+            // A sole hoisted global is its own context: the value stands in for the global in
+            // each function, so no field key is needed to reach it.
             //
-            createContextStructField(
-                globalParam.globalParam,
-                GlobalObjectKind::GlobalParam,
-                globalParam.globalParam->getFullType());
+            auto globalVar = m_globalVars[0];
+            m_contextType = globalVar->getDataType()->getValueType();
+            // An empty entry (no field key, no dereference) keeps the lookups shared with the
+            // struct path valid.
+            m_mapInstToContextFieldInfo.add(globalVar, ContextFieldInfo{});
+            if (auto nameHint = findShadowedInputNameHint(globalVar))
+                m_contextNameHint = nameHint->getName();
         }
-        for (auto globalVar : m_globalVars)
+        else
         {
-            // A `IRGlobalVar` represents a pointer to where the variable is stored,
-            // so we need to create a field of the pointed-to type to represent it.
-            //
-            createContextStructField(
-                globalVar,
-                GlobalObjectKind::GlobalVar,
-                getGlobalVarPtrType(globalVar));
+            createContextStructType(builder);
         }
 
-        // Once all the fields have been created, we can process the entry points.
+        // Once the context type is known, we can process the entry points.
         //
-        // Each entry point will create a local `KernelContext` variable and
+        // Each entry point will create a local context variable and
         // initialize it based on the parameters passed to the entry point.
         //
         // The local variable introduced here will be registered as the representation
@@ -393,6 +562,58 @@ struct IntroduceExplicitGlobalContextPass
                     continue;
                 fixUpFuncType(pairOfFuncs.first);
             }
+        }
+    }
+
+    // Create the `KernelContext` struct and the pointer type it is passed by, add a field for
+    // every hoisted global parameter and global variable, and record each field's key in
+    // `m_mapInstToContextFieldInfo` for the later rewrites of their uses.
+    //
+    void createContextStructType(IRBuilder& builder)
+    {
+        m_contextStructType = builder.createStructType();
+        m_contextType = m_contextStructType;
+        if (m_target == CodeGenTarget::CPPHeader)
+        {
+            builder.addExternCppDecoration(
+                m_contextStructType,
+                UnownedTerminatedStringSlice("KernelContext"));
+        }
+        builder.addNameHintDecoration(
+            m_contextStructType,
+            UnownedTerminatedStringSlice("KernelContext"));
+
+        // The struct is passed around by pointer, so we get and
+        // cache that pointer type up front.
+        //
+        m_contextPtrType = builder.getPtrType(m_contextStructType, getAddressSpaceOfLocal());
+
+        // The first step will be to create fields in the `KernelContext`
+        // type to represent any global parameters or global variables.
+        //
+        // The keys for the fields that are created will be remembered
+        // in a dictionary, so that we can find them later based on
+        // the global parameter/variable.
+        //
+        for (auto globalParam : m_globalParams)
+        {
+            // For the parameter representing all the global uniform shader
+            // parameters, we create a field that exactly matches its type.
+            //
+            createContextStructField(
+                globalParam.globalParam,
+                GlobalObjectKind::GlobalParam,
+                globalParam.globalParam->getFullType());
+        }
+        for (auto globalVar : m_globalVars)
+        {
+            // A `IRGlobalVar` represents a pointer to where the variable is stored,
+            // so we need to create a field of the pointed-to type to represent it.
+            //
+            createContextStructField(
+                globalVar,
+                GlobalObjectKind::GlobalVar,
+                getGlobalVarPtrType(globalVar));
         }
     }
 
@@ -520,10 +741,11 @@ struct IntroduceExplicitGlobalContextPass
             placeholderParam->insertBefore(firstOrdinary);
         }
 
-        // The `KernelContext` to use inside the entry point
-        // will be a local variable declared in the first block.
+        // The context to use inside the entry point (a `KernelContext`,
+        // or the sole hoisted global's value) will be a local variable
+        // declared in the first block.
         //
-        auto contextVarPtr = builder.emitVar(m_contextStructType);
+        auto contextVarPtr = builder.emitVar(m_contextType);
         addKernelContextNameHint(contextVarPtr);
         m_mapFuncToContextPtr.add(entryPointFunc, contextVarPtr);
 
@@ -697,14 +919,18 @@ struct IntroduceExplicitGlobalContextPass
             // At each use site, we need to look up the context
             // pointer that is appropriate for that use.
             //
-            auto contextParam = findOrCreateContextPtrForInst(user);
+            auto contextPtr = findOrCreateContextPtrForInst(user);
             builder.setInsertBefore(user);
 
             // The address of the variable can be produced by
             // taking the address of the corresponding field
-            // in the context struct.
+            // in the context struct. When a sole global is passed
+            // by value, the function's local copy of that value
+            // already stands in for the global.
             //
-            auto ptr = builder.emitFieldAddress(ptrType, contextParam, fieldInfo.key);
+            IRInst* ptr = contextPtr;
+            if (!m_passContextByValue)
+                ptr = builder.emitFieldAddress(ptrType, contextPtr, fieldInfo.key);
             if (fieldInfo.needDereference)
                 ptr = builder.emitLoad(ptr);
             use->set(ptr);
@@ -766,11 +992,23 @@ struct IntroduceExplicitGlobalContextPass
         SLANG_ASSERT(firstBlock);
 
         // We create a new parameter at the end of the parameter
-        // list for `func`, with a type of `KernelContext*`.
+        // list for `func`. It points to the `KernelContext` struct, or, in
+        // by-value mode, has the hoisted global's value type; `func` then copies
+        // it into a local variable whose address stands in for the global.
         //
-        IRParam* contextParam = builder.createParam(m_contextStructPtrType);
+        auto firstOrdinary = firstBlock->getFirstOrdinaryInst();
+        IRParam* contextParam =
+            builder.createParam(m_passContextByValue ? m_contextType : m_contextPtrType);
         addKernelContextNameHint(contextParam);
-        contextParam->insertBefore(firstBlock->getFirstOrdinaryInst());
+        contextParam->insertBefore(firstOrdinary);
+        IRInst* contextPtr = contextParam;
+        if (m_passContextByValue)
+        {
+            builder.setInsertBefore(firstOrdinary);
+            contextPtr = builder.emitVar(m_contextType);
+            addKernelContextNameHint(contextPtr);
+            builder.emitStore(contextPtr, contextParam);
+        }
 
         // Update the type of the function to reflect this new parameter.
         fixUpFuncType(func);
@@ -782,7 +1020,7 @@ struct IntroduceExplicitGlobalContextPass
         // that call `func` to protect against a possible infinite-recursion
         // situation if `func` is recursive along some path.
         //
-        m_mapFuncToContextPtr.add(func, contextParam);
+        m_mapFuncToContextPtr.add(func, contextPtr);
 
         // Any code that calls `func` now needs to be updated to pass
         // the context parameter.
@@ -827,24 +1065,45 @@ struct IntroduceExplicitGlobalContextPass
             }
 
             // ... plus an additional argument representing
-            // the context pointer at the call site (note that
+            // the context at the call site, by value or pointer (note that
             // this step leads to a potential for recursion in this pass;
             // the maximum depth of the recursion is bounded by the
             // maximum length of a cycle-free path through the call
             // graph of the program).
             //
-            args.add(findOrCreateContextPtrForInst(call));
+            auto callerContextPtr = findOrCreateContextPtrForInst(call);
 
             // The new call will be emitted right before the old one,
             // then used to replace it.
             //
             builder.setInsertBefore(call);
+            args.add(m_passContextByValue ? builder.emitLoad(callerContextPtr) : callerContextPtr);
             auto newCall = builder.emitCallInst(call->getFullType(), call->getCallee(), args);
             call->replaceUsesWith(newCall);
             call->removeAndDeallocate();
         }
 
-        return contextParam;
+        return contextPtr;
+    }
+
+    // Return the name hint of the input that `globalVar` shadows, or null. A sole global passed
+    // by value is named after it, so that `fn f(laneCount : u32)` reads as the value it holds.
+    // `translateGlobalVaryingVar` moves the global's own decorations to the entry-point parameter
+    // that shadows it, so the name is found there.
+    //
+    static IRNameHintDecoration* findShadowedInputNameHint(IRInst* globalVar)
+    {
+        if (auto nameHint = globalVar->findDecoration<IRNameHintDecoration>())
+            return nameHint;
+        for (auto use = globalVar->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (user->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
+                continue;
+            if (auto nameHint = user->getParent()->findDecoration<IRNameHintDecoration>())
+                return nameHint;
+        }
+        return nullptr;
     }
 
     // Because we have multiple places where instructions representing
@@ -854,7 +1113,7 @@ struct IntroduceExplicitGlobalContextPass
     void addKernelContextNameHint(IRInst* inst)
     {
         IRBuilder builder(m_module);
-        builder.addNameHintDecoration(inst, UnownedTerminatedStringSlice("kernelContext"));
+        builder.addNameHintDecoration(inst, m_contextNameHint);
     }
 };
 
