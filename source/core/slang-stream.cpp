@@ -300,8 +300,7 @@ SlangResult FileStream::flush()
 {
     if (m_handle && canWrite())
     {
-        fflush(m_handle);
-        return SLANG_OK;
+        return (fflush(m_handle) == 0) ? SLANG_OK : SLANG_FAIL;
     }
     return SLANG_E_NOT_AVAILABLE;
 }
