@@ -3121,20 +3121,15 @@ void Module::_collectShaderParams(DiagnosticSink* sink)
                 // that don't represents shader parameters. This includes
                 // things like `static` globals and `groupshared` variables.
                 //
-                if (!isGlobalShaderParameter(globalVar))
-                {
-                    bool isVarying = false;
-                    for (auto m : globalVar->modifiers)
-                    {
-                        if (as<InModifier>(m) || as<OutModifier>(m))
-                        {
-                            isVarying = true;
-                            break;
-                        }
-                    }
-                    if (!isVarying)
-                        continue;
-                }
+                const bool isGlobalVarying = isGlobalVaryingVar(globalVar);
+                if (!isGlobalShaderParameter(globalVar) && !isGlobalVarying)
+                    continue;
+
+                // The varyings that the core and GLSL modules declare (such as `gl_Position`)
+                // are builtins rather than inputs and outputs of user entry points, so they do
+                // not belong to any entry point.
+                if (isGlobalVarying && !m_moduleDecl->hasModifier<FromCoreModuleModifier>())
+                    m_globalVaryings.add(globalVar);
 
                 // At this point we know we have a global shader parameter.
 

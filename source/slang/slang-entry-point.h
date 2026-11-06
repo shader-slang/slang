@@ -238,6 +238,12 @@ public:
         m_inferredCapabilityRequirements = caps;
     }
 
+    /// Get the module-scope varyings that belong to this entry point, in declaration order. They
+    /// are inputs and outputs of the entry point just as its varying parameters are. An entry
+    /// point owns every module-scope varying declared in the module of its function, whether or
+    /// not the function uses it.
+    List<VarDeclBase*> const& getGlobalVaryings() { return m_globalVaryings; }
+
     /// Marks an entry selected through a checked structural ray-tracing conformance.
     void markAsStructuralRayTracingEntryPoint()
     {
@@ -381,6 +387,8 @@ private:
     // `getInferredCapabilityRequirements`). Seeded from the function declaration's own
     // requirements and finalized during `validateEntryPoint`.
     CapabilitySetVal* m_inferredCapabilityRequirements = nullptr;
+
+    List<VarDeclBase*> m_globalVaryings;
 };
 
 } // namespace Slang

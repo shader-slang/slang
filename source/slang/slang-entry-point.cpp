@@ -32,6 +32,7 @@ RefPtr<EntryPoint> EntryPoint::create(
     // capabilities). The seed keeps the field non-null for paths that skip validation.
     entryPoint->m_inferredCapabilityRequirements =
         funcDeclRef.getDecl()->inferredCapabilityRequirements;
+    entryPoint->m_globalVaryings = Slang::getModule(funcDeclRef.getDecl())->getGlobalVaryings();
     return entryPoint;
 }
 

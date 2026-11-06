@@ -1609,6 +1609,18 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
     return funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>();
 }
 
+/// Is `decl` a module-scope varying, that is, a global or namespace-scope variable declared `in`,
+/// `out` or `inout`?
+///
+/// GLSL-style shaders read their inputs and write their outputs through such variables instead of
+/// through entry-point parameters.
+bool isGlobalVaryingVar(VarDeclBase* decl)
+{
+    if (!isGlobalDecl(decl))
+        return false;
+    return decl->hasModifier<InModifier>() || decl->hasModifier<OutModifier>();
+}
+
 /// Is `decl` a global shader parameter declaration?
 bool isGlobalShaderParameter(VarDeclBase* decl)
 {
