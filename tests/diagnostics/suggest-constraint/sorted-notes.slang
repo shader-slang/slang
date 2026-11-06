@@ -2,7 +2,7 @@
 // are emitted sorted by interface name, not in declaration or scope-walk order. `IZeta` is
 // declared before `IAlpha`, and the notes still list `IAlpha` first.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv
 
 interface IZeta
 {

@@ -95,6 +95,9 @@ struct ParameterDirectionInfo
     // For Ref and BorrowInOut
     AddressSpace addressSpace;
 
+    // For Ref: the callee's access through the reference.
+    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+
     ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
         : kind(kind), addressSpace(addressSpace)
     {
@@ -107,7 +110,8 @@ struct ParameterDirectionInfo
 
     bool operator==(const ParameterDirectionInfo& other) const
     {
-        return kind == other.kind && addressSpace == other.addressSpace;
+        return kind == other.kind && addressSpace == other.addressSpace &&
+               accessQualifier == other.accessQualifier;
     }
 };
 
@@ -467,6 +471,16 @@ IRInst* getRootAddr(
     List<IRInst*>& outAccessChain,
     List<IRInst*>* outTypes = nullptr);
 
+/// Return the texture element that the atomic operation `atomic` reads or writes, or nullptr when
+/// `atomic` addresses ordinary memory. For example, `InterlockedAdd(tex[uint2(0, 0)], 1)` on a
+/// `RWTexture2D<uint>` returns the `ImageSubscript` for `tex[uint2(0, 0)]`, while the same call on
+/// a `RWStructuredBuffer<uint>` element returns nullptr.
+IRImageSubscript* getAtomicImageSubscript(IRAtomicOperation* atomic);
+
+/// Return the resource type of the image that `subscript` indexes, looking through a pointer to
+/// the image, or nullptr when the image is not a resource.
+IRResourceTypeBase* getImageSubscriptResourceType(IRImageSubscript* subscript);
+
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
 bool canAddressesPotentiallyAlias(
@@ -545,6 +559,13 @@ void sortBlocksInFunc(IRGlobalValueWithCode* func);
 
 // Remove all linkage decorations from func.
 void removeLinkageDecorations(IRInst* inst);
+
+/// Return whether `inst` carries an `IRInterpolationModeDecoration` with the given `mode`.
+/// Each interpolation modifier lowers to its own decoration, and a declaration can combine one
+/// interpolation mode with one sampling location (`noperspective centroid`). The order of those
+/// decorations carries no meaning, so `findDecoration` followed by `getMode()` cannot answer
+/// this query.
+bool hasInterpolationMode(IRInst* inst, IRInterpolationMode mode);
 
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 

@@ -3437,6 +3437,57 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     return result;
 }
 
+/// Checks the exit code of the tool under test for a FileCheck test.
+///
+/// A FileCheck test only looks at the text of the output, so it does not notice when the tool
+/// fails. A test that expects a failure says so with `exit-code=N`. Tests that compare with an
+/// `.expected` file already check the result code, because it is a part of the text they compare.
+/// Diagnostic tests (`diag=`) do not check it yet (#14266).
+///
+/// Returns false if the test options are invalid. Otherwise sets `outMismatch` to true when the
+/// exit code is not the expected one, after it reports the mismatch.
+static bool _checkExpectedExitCode(
+    TestContext* context,
+    const TestInput& input,
+    int resultCode,
+    bool& outMismatch)
+{
+    outMismatch = false;
+
+    String diagPrefix;
+    String fileCheckPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix) ||
+        !input.testOptions->getFileCheckPrefix(fileCheckPrefix))
+        return true;
+
+    auto reporter = context->getTestReporter();
+
+    int expectedExitCode = 0;
+    String exitCodeOption;
+    if (input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
+    {
+        Int parsedExitCode = 0;
+        if (SLANG_FAILED(StringUtil::parseInt(exitCodeOption.getUnownedSlice(), parsedExitCode)))
+        {
+            reporter->message(
+                TestMessageType::TestFailure,
+                "the value of `exit-code` must be an integer");
+            return false;
+        }
+        expectedExitCode = int(parsedExitCode);
+    }
+
+    if (resultCode != expectedExitCode)
+    {
+        StringBuilder message;
+        message << "expected exit code " << expectedExitCode << ", but the exit code is "
+                << resultCode;
+        reporter->message(TestMessageType::TestFailure, message.getBuffer());
+        outMismatch = true;
+    }
+    return true;
+}
+
 TestResult runSimpleTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we
@@ -3513,11 +3564,15 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
 
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+        return TestResult::Fail;
+
     return _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
@@ -3628,11 +3683,15 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes);
 
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+        return TestResult::Fail;
+
     return _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
@@ -3871,7 +3930,11 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
         }
     }
 
-    return _validateOutput(context, input, actualOutput);
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+        return TestResult::Fail;
+
+    return _validateOutput(context, input, actualOutput, exitCodeMismatch);
 }
 
 static String _calcSummary(IArtifactDiagnostics* inDiagnostics)
@@ -6388,6 +6451,77 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
     return false;
 }
 
+// Returns true when `_validateOutput` would compare the output of a test line with a `.expected`
+// file. A line with `filecheck=` or `diag=` checks its output with FileCheck or with the
+// diagnostic annotations, and a disabled line does not run, so none of them reads the file.
+static bool _readsExpectedFile(const TestOptions& options)
+{
+    String prefix;
+    return options.isEnabled && !options.getFileCheckPrefix(prefix) &&
+           !options.getDiagTestPrefix(prefix);
+}
+
+// Returns true when a test line has both `filecheck=` and `diag=`.
+//
+// `_validateOutput` runs only the `diag=` check for such a line, so the `CHECK` lines of
+// `filecheck=` are never run. Consider a preprocessor test:
+//
+//     //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,diag=diag):-E
+//
+// The `diag=` check looks only at the diagnostics in the standard error. The text that `-E` writes
+// to the standard output is never checked, and a wrong `CHECK` line stays unnoticed. We report the
+// line as an error. A test that needs both checks uses one test line for each of them.
+static bool _hasBothFileCheckAndDiag(const TestOptions& options)
+{
+    String prefix;
+    return options.getFileCheckPrefix(prefix) && options.getDiagTestPrefix(prefix);
+}
+
+// Returns the path of the `.expected` file that belongs to the test line `subTestIndex` of
+// `filePath`, when that line has `filecheck=` or `diag=` and so never reads the file.
+// Returns an empty string when there is no such file.
+//
+// Consider a file with two test lines:
+//
+//     //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//     //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
+//
+// Output of line 1 is checked with the annotations, and `foo.slang.1.expected` is never read. The
+// file is dead, and it can show an old output format that misleads people.
+//
+// For line 0 the stem is `filePath` itself, so `foo.slang.expected` is also the shared file that
+// `_readTestFile` falls back to for any other line that has no file of its own. We do not report
+// the file when such a line exists, because the file is in use.
+static String _findUnusedExpectedFile(
+    const String& filePath,
+    Index subTestIndex,
+    const FileTestList& testList)
+{
+    // A disabled line may be enabled again later, and then it reads the file.
+    const TestOptions& options = testList.tests[subTestIndex].options;
+    if (!options.isEnabled || _readsExpectedFile(options))
+        return String();
+
+    StringBuilder stem;
+    stem << filePath;
+    if (subTestIndex != 0)
+        stem << "." << subTestIndex;
+    String expectedPath = stem.produceString() + ".expected";
+    if (!File::exists(expectedPath))
+        return String();
+
+    if (subTestIndex == 0)
+    {
+        for (Index i = 1; i < testList.tests.getCount(); i++)
+        {
+            if (_readsExpectedFile(testList.tests[i].options) &&
+                !File::exists(filePath + "." + String(i) + ".expected"))
+                return String();
+        }
+    }
+    return expectedPath;
+}
+
 // Insert a subtest index into a test name, after the file path but before any suffix.
 // e.g., "foo.slang (vk)" with index 0 -> "foo.slang.0 (vk)"
 static String insertSubtestIndex(const String& testName, int index)
@@ -6669,11 +6803,37 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
             TestResult testResult = TestResult::Fail;
 
+            // A `.expected` file that the test line never reads is an error, so that
+            // such files do not stay in the repository.
+            const String unusedExpectedFile =
+                testDetails.options.isSynthesized
+                    ? String()
+                    : _findUnusedExpectedFile(filePath, subTestIndex, testList);
+
             // If this test can be ignored
             if (_canIgnore(context, testDetails))
             {
                 testResult = TestResult::Ignored;
                 context->getTestReporter()->addResult(testResult);
+            }
+            else if (_hasBothFileCheckAndDiag(testDetails.options))
+            {
+                context->getTestReporter()->message(
+                    TestMessageType::TestFailure,
+                    "'filecheck=' and 'diag=' cannot be used on the same test line, because only "
+                    "the 'diag=' check runs. Use one test line for each of them.\n");
+                context->getTestReporter()->addResult(TestResult::Fail);
+                context->reportTestFailure();
+            }
+            else if (unusedExpectedFile.getLength())
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::TestFailure,
+                    "'%s' is never read, because this test line uses 'filecheck=' or 'diag='. "
+                    "Remove the file, or remove 'filecheck=' or 'diag=' from the test line.\n",
+                    unusedExpectedFile.getBuffer());
+                context->getTestReporter()->addResult(TestResult::Fail);
+                context->reportTestFailure();
             }
             else
             {

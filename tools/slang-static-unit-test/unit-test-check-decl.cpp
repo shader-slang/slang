@@ -442,7 +442,7 @@ SLANG_UNIT_TEST(synthesizedEffectiveThisManglingEncodesMode)
         {ParamPassingMode::Out, "to_"},
         {ParamPassingMode::BorrowInOut, "tio_"},
         {ParamPassingMode::BorrowIn, "tc_"},
-        {ParamPassingMode::Ref, "tr_"},
+        {ParamPassingMode::RefReadWrite, "tr_"},
     };
 
     List<String> mangledNames;
@@ -474,7 +474,9 @@ SLANG_UNIT_TEST(paramInfoWrappedTypeRoundTrips)
         ParamPassingMode::Out,
         ParamPassingMode::BorrowInOut,
         ParamPassingMode::BorrowIn,
-        ParamPassingMode::Ref,
+        ParamPassingMode::RefReadWrite,
+        ParamPassingMode::RefReadOnly,
+        ParamPassingMode::RefWriteOnly,
     };
     for (auto mode : modes)
     {

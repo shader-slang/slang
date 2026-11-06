@@ -142,7 +142,10 @@ struct BlobOutputTempReleaser
 // notePlaybackOrphanedProxy, and it keeps its note -- teardown releasing it only
 // takes the proxy from two references down to one, and m_returnedEntryPoints
 // still holds that one until the owning component proxy is destroyed. Cancelling
-// the note here would leave the creation reference with no owner at all.
+// the note here would leave the creation reference with no owner at all. A
+// replayed user release() of the proxy cancels the note instead (see
+// ProxyBase::noteUserReleaseIfPlayback), because then the user's reference is
+// gone and teardown must not release it again.
 //
 // Requires: RECORD_CALL() has been called (provides _ctx), and the class has
 //           m_returnedEntryPoints.
@@ -192,6 +195,7 @@ struct BlobOutputTempReleaser
         if (SlangRecord::isRefCountRecordingSuppressed()) \
             return ProxyBase::addRefImpl();               \
         RECORD_CALL();                                    \
+        ProxyBase::noteUserAddRefIfPlayback(_ctx);        \
         uint32_t result = ProxyBase::addRefImpl();        \
         RECORD_RETURN(result);                            \
     }
@@ -203,6 +207,7 @@ struct BlobOutputTempReleaser
         if (SlangRecord::isRefCountRecordingSuppressed())  \
             return ProxyBase::releaseImpl();               \
         RECORD_CALL();                                     \
+        ProxyBase::noteUserReleaseIfPlayback(_ctx);        \
         uint32_t result = ProxyBase::releaseImpl();        \
         RECORD_RETURN(result);                             \
     }

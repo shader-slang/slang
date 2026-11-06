@@ -7,7 +7,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=RET,non-exhaustive):-target spirv -entry matDimReturn -stage vertex
 //DIAGNOSTIC_TEST:SIMPLE(diag=FIELD,non-exhaustive):-target spirv -entry matDimField -stage vertex
 //DIAGNOSTIC_TEST:SIMPLE(diag=ZERO,non-exhaustive):-target spirv -entry matDimZero -stage vertex
-//TEST:SIMPLE(filecheck=BOUNDS): -target spirv -entry matDimBounds -stage vertex
+//TEST:SIMPLE(filecheck=BOUNDS): -target hlsl -entry matDimBounds -stage vertex
 
 // R=4, C=5 (from issue #9450 reproducer)
 [shader("vertex")]
@@ -46,7 +46,8 @@ float4 matDimZero(matrix<float, 0, 1> m : A) : SV_Position
     return float4(0);
 }
 
-// Boundary: R=1, C=4 and R=4, C=1 are valid and must not trip the rule.
+// Boundary: R=1, C=4 and R=4, C=1 are valid and must not trip the rule. This case targets HLSL
+// because SPIR-V rejects matrices with one row or column (E39999), which is a different rule.
 struct BoundsMat
 {
     matrix<float, 1, 4> rowVec;

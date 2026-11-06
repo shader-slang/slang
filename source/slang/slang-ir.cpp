@@ -3012,10 +3012,18 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
+    return getRefParamType(valueType, AccessQualifier::ReadWrite, addrSpace);
+}
+
+IRRefParamType* IRBuilder::getRefParamType(
+    IRType* valueType,
+    AccessQualifier accessQualifier,
+    AddressSpace addrSpace)
+{
     return (IRRefParamType*)getPtrType(
         kIROp_RefParamType,
         valueType,
-        AccessQualifier::ReadWrite,
+        accessQualifier,
         addrSpace,
         getDefaultBufferLayoutType());
 }
@@ -6106,6 +6114,7 @@ IRInst* IRBuilder::emitSwizzle(
     UInt elementCount,
     IRInst* const* elementIndices)
 {
+    SLANG_RELEASE_ASSERT(type);
     auto inst = createInstWithTrailingArgs<IRSwizzle>(
         this,
         kIROp_Swizzle,
@@ -9626,6 +9635,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_GetTupleElement:
     case kIROp_StructuredBufferLoad:
     case kIROp_RWStructuredBufferLoad:
+    case kIROp_ByteAddressBufferLoad:
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_CombinedTextureSamplerGetSampler:
     case kIROp_CombinedTextureSamplerGetTexture:
