@@ -1,15 +1,15 @@
 ---
 gap_intake_report: true
-intake_model: "claude-opus-5[1m]"
-intake_at: 2026-08-11T16:30:18Z
+intake_model: claude-sonnet-5-5
+intake_at: 2026-11-03T00:00:00Z
 target_doc: syntax-reference/keywords-and-builtins.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+target_doc_source_commit_before: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 gap_count: 11
 actions:
-  fixed: 11
+  fixed: 10
   rejected_bogus: 0
-  rejected_out_of_scope: 0
+  rejected_out_of_scope: 1
   deferred: 0
   escalated_to_finding: 0
 ---
@@ -18,65 +18,42 @@ actions:
 
 ## Summary
 
-Nothing was escalated: no observation in this queue contradicted the
-watched source, and every gap turned out to be the document omitting a
-form the parser or a meta-module states outright. All eleven were fixed,
-none rejected and none deferred. The queue was dominated by one shape of
-complaint — a table cell naming a parse callback and nothing else — so
-most fixes are a single paragraph or bullet list appended to the table
-that gives the form each callback actually reads, derived from the
-callback bodies in `source/slang/slang-parser.cpp` and cross-checked
-against real usages in the `*.meta.slang` sources. Two
-fixes are deliberately narrower than the gap asked: `1d8770e795d5`
-(which targets accept `SV_WaveIndex`) and `9a1a7ad263e3` (a
-user-observable-effect column for the simple modifiers) both hinge on
-files outside `watched_paths`, so the document now states the part the
-watched source proves and routes the rest to the page that owns it
-rather than asserting an unbacked target list.
+Nothing was escalated. All eleven gaps were REOPENED: an earlier intake
+recorded them as fixed, yet regenerated bundles still report them. They
+were re-decided against `source/slang/slang-parser.cpp` and the other
+watched files at `2518a942d59b1228fc8cc70a37739baab82b6002`, in the
+same pass as a refresh that re-derived every line citation (the parser
+moved by several hundred lines). Ten are `fixed` again, with the doc now
+stating the behaviour more concretely; one (`9a1a7ad263e3`) is
+`rejected-out-of-scope`, because the effect it asks for is decided
+outside the watched paths.
 
-Operator follow-ups, none blocking:
-
-1. `source/slang/slang-ir-legalize-varying-params.cpp` is the single
-   source of truth for which targets accept a system-value semantic
-   (`SystemValueSemanticName::WaveIndex` at `:4333` for Metal and
-   `:4970` for WGSL). Adding it to `watched_paths` would let the
-   `SV_WaveIndex` bullet name the accepting targets outright instead of
-   linking the pass. Same file would settle any future `SV_*` gap.
-2. Possible compiler enhancement, not a defect: `WaveGetWaveIndex()`
-   lowers to `SubgroupId` on SPIR-V
-   (`source/slang/hlsl.meta.slang:17320-17325`), yet the `SV_WaveIndex`
-   semantic has no GLSL/SPIR-V case in the varying-param legalizer, so
-   the entry-point spelling is rejected there while the function form
-   works. Nothing in the watched source promises the semantic on those
-   targets, so this is a missing mapping rather than drift; recorded
-   here in case the tests side wants it as an enhancement request.
-3. The document's line-number citations are stale by roughly +8 in the
-   `slang-parser.cpp` regions below line ~7000 and +19 above line
-   ~9600, measured against the watched files at
-   `ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e` (identical to `HEAD` for
-   all seven watched paths). This intake deliberately left every
-   existing number untouched and added no new ones, so `mark-fresh`
-   will bless the drift; re-deriving the table is a remediation-pass
-   job, not a gap-intake one.
-4. The `-experimental-feature` half of `0ff3440b9c31` needed no edit:
-   `source/slang/slang-options.cpp:1222-1225` declares the option with
-   a `nullptr` value spec, so it is a plain on/off flag and the
-   document's existing "gated by `-experimental-feature`" already is
-   the exact invocation. The fact was left out of the document because
-   `slang-options.cpp` is outside `watched_paths`.
+Notes for the operator, none blocking. (1) `slang-ir-legalize-varying-params.cpp`
+is now watched, which let `1d8770e795d5` name the targets that map
+`SV_WaveIndex`; the GLSL / SPIR-V legalizer is a different, unwatched
+file and the doc only says this file has no arm for it. (2) The `functype`
+callability observation in `80abe4cc4205` (a local of function type
+rejected on call) is a semantic-check matter outside the watched paths;
+the doc states the spelling and says nothing about callability, and no
+finding was opened because the watched source neither promises nor
+denies it. (3) Source facts the refresh changed in this doc: `class` in
+HLSL source now parses through `ParseStruct` as `HLSLClassDecl`;
+`allowGLSLInput` was replaced by `getSourceLanguage()`; `$for` is
+deprecated from language version 2025 and removed in 202c; new simple
+modifiers `__ref_readonly`, `__ref_writeonly`, `__borrow`.
 
 ## Actions
 
 | Gap ID | Action | Evidence | Fix summary |
 | --- | --- | --- | --- |
-| f848c4fac6e9 | fixed | `source/slang/slang-parser.cpp:10281-10383` — `shared` / `volatile` / `coherent` / `restrict` / `readonly` / `writeonly` read no tokens (`shared` branches on `allowGLSLInput` at `:10287`, `volatile` builds both nodes and diagnoses by language version at `:10302-10318`); `:10545-10550` `hitAttributeEXT` likewise; `:10385-10501` `layout` reads a parenthesized `name` / `name = expr` list; `:10104-10279` and `:10552-10680` give the per-modifier argument shapes, with optional parentheses at `:10123`, `:10138`, `:10178`, `:10641`. Spellings cross-checked in `source/slang/glsl.meta.slang:7630`, `:10018`, `source/slang/hlsl.meta.slang:17302-17303`, `:26138`, `source/slang/core.meta.slang:4160`. | added two paragraphs after the table: the six keywords that take no arguments and why their callbacks exist, then the argument shape of every row that does, including the four whose parentheses are optional |
-| 1b40bd3f3dc7 | fixed | `source/slang/hlsl.meta.slang:27609-27610` declares `static const __ResourceDescriptorHeapType ResourceDescriptorHeap = {};` and the sampler equivalent; `:27591-27607` the two `__subscript`s; `:27450-27456` the generated `__implicit_conversion __init(UntypedResourceHandle h)` on every heap-castable resource type (`:27384-27390` for textures). Bundle test `builtin-resource-descriptor-heap-multitarget.slang:36` uses `RWStructuredBuffer<uint> heapBuf = ResourceDescriptorHeap[0];`. | split the descriptor-heap material into its own bullet naming `ResourceDescriptorHeap` / `SamplerDescriptorHeap` as the `static const` globals, and gave the assignment form that recovers the concrete resource type |
-| 1d8770e795d5 | fixed | `source/slang/hlsl.meta.slang:15-16` declares `SV_WaveIndex` / `SV_GroupIndex` as semantics on the hidden `in` globals `__builtinWaveIndex` / `__builtinGroupIndex`, with no `[require(...)]`; `:17302-17351` declares `WaveGetWaveIndex()` with `[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_workgroup_index)]` and a `__target_switch` arm per target. The accept/reject list per target lives in `source/slang/slang-ir-legalize-varying-params.cpp` (`:4333`, `:4970`), outside `watched_paths`, so it is linked rather than asserted. | rewrote the wave-builtin sentence to separate the capability-gated function from the two ungated system-value semantics, named varying-param legalization as what decides their per-target availability, and pointed at `WaveGetWaveIndex()` as the portable spelling |
-| 0ff3440b9c31 | fixed | `source/slang/slang-parser.cpp:4329-4367` documents and implements both `__constraint` forms (`== ` equality, `:` subtype) plus the `interface IDerived : IBase { __constraint DataType == This; }` example; `:4370-4382` shows `__associatedfunc` is a type expression followed by a decl name; `:4244-4298` shows `__func_extension` reads a syntax-decl-dispatched target expression, a modern param list, an optional `throws`, an optional `->`, and a body. Usages: `source/slang/core.meta.slang:724` and `source/slang/hlsl.meta.slang:31682-31688`. | added a three-bullet list after the decl table giving the written form of each, each anchored to a real core-module usage |
-| 80abe4cc4205 | fixed | `source/slang/slang-parser.cpp:3255-3269` reads `(`, comma-separated `ParseTypeExp` list, `)`, a mandatory `->`, and a result type; `:3470-3474` is the type-specifier lookahead; `:1662-1670` accepts `functype F` as a generic parameter. Usage `source/slang/hlsl.meta.slang:28710`. Bundle test `decl-functype-type-specifier.slang` passes `addOne` to a `functype(int) -> int` parameter. | gave the `functype(<parameter types>) -> <result type>` spelling, a core-module usage, the fact that such a parameter accepts a function name, and the `functype F` generic-parameter form; callability of a function-typed value is decided in the checker and is deliberately not claimed |
-| bbc3d4c97d7b | fixed | `source/slang/slang-parser.cpp:6441-6455` — `ParseClass` reads a required name, an optional inheritance clause, and a body, and nothing else; `:6370-6439` — `ParseStruct` additionally handles a synthesized name for the anonymous form (`:6400-6408`), `parseOptGenericDecl` (`:6409`), the `= T` alias form (`:6416-6429`), and the body-less form (`:6430-6434`). | added a paragraph contrasting the two at the parse level, noting that a generic aggregate must be a `struct`, and that the parser leaves every other consequence of the choice to later stages |
-| 131453a3ff0f | fixed | `source/slang/slang-parser.cpp:3141-3236` (`fwd_diff` / `bwd_diff` / `__apply` / `__func_as_type` one operand, `__dispatch_kernel` three), `:7996-8001` (`__return_val` none), `:8030-8090` (`sizeof` / `alignof` one plus optional data layout, `countof` exactly one), `:8092-8168` (pack queries one, `__shapePermute` / `__shapeReduce` two, `__shapeConcat` / `__shapeSwap` / `__packBranch` three), `:8170-8194` (`__getAddress`, `__floatAsInt`), `:8196-8212` (`try` / `no_diff` take a bare leaf expression), `:9705-9720` (`new` over a postfix expression). `Std140DataLayout` exists at `source/slang/hlsl.meta.slang:45`. | added a bullet list after the table giving the operand count and parenthesization of every row, grouped so the rows that share a shape share a line |
-| a2d9ef39a8a4 | fixed | `source/slang/slang-parser.cpp:5205-5285` gives the `syntax <name> [: <class>] [= <existing>];` grammar and the alias behaviour (`:5249-5259`); `:5543-5609` gives the `attribute_syntax [<Name>(<param> : <Type>...)] : <class>;` grammar. Both resolve the class through `ASTBuilder::findSyntaxClass` (`:5227`, `:5587`; declared `source/slang/slang-ast-builder.h:847-855`). Real declarations at `source/slang/core.meta.slang:28` and `:128`; a tree-wide search for the `syntax X = Y;` alias form over `*.slang` finds no use. | added a paragraph giving both grammars with core-module examples, and the reason redefinition is core-module-only in practice: the class name must already exist in the compiler, so the extension point is a spelling, not a node |
-| aa48d92eed58 | fixed | `source/slang/slang-parser.cpp:2505-2546` — `isReservedKeywordName` covers exactly `struct`, `class`, `enum`, `typealias`, `typedef` and only warns; its comment states that almost every other keyword is contextual and shadowable. `:5890` is the parser's one inspection of `gl_` (GLSL interface-block redeclaration, replaced with an `EmptyDecl`); no occurrence of `SV_` anywhere in the parser. `:10733-10742` registers only the `__`-prefixed `__init` / `__subscript` / `__include`. `source/slang/glsl.meta.slang:117` shows `gl_Position` is an ordinary declaration. Bundle test `reserved-init-subscript-include-plain-identifiers.slang` calls user functions named `init` / `subscript` / `include`. | replaced the one-line closing with the actual enforcement story: prefixes are advisory with no diagnostic, the single `gl_` special case, the `KeywordUsedAsName` warning and its five spellings, and the bare `init` / `subscript` / `include` illustration |
-| 9a1a7ad263e3 | fixed | `source/slang/slang-parser.cpp:10698-10708` — every simple-modifier row uses the `getSyntaxClass<...>()` overload whose callback is `parseSimpleSyntax` (`:5198-5202`), which constructs the node and reads nothing. The user-observable effects the gap asks for are owned by `docs/generated/design/ast-reference/modifiers.md` (its `### Matrix layout modifiers` at `:201-214` covers `row_major` / `column_major`) and would otherwise require `slang-check-*.cpp` / `slang-emit-*.cpp`, none of which are in this page's `watched_paths`. | stated that the table is a parse-time binding only, and routed the user-observable effect of each node class to `../ast-reference/modifiers.md`, which owns it; the effect column itself is intentionally not duplicated here |
-| fb6c0e3e7b12 | fixed | `source/slang/slang-parser.cpp:6862-6906` — `parseCompileTimeForStmt` reads the loop variable, the literal tokens `in` and `Range`, and one or two range expressions; `:6611-6717` `__stage_switch` shares `parseTargetSwitchStmtImpl` with `__target_switch` and resolves case labels via `findCapabilityName`; `:6719-6735` `__intrinsic_asm "<text>"` plus optional args; `:6737-6760` `__GPU_FOREACH` with the literal `LAMBDA` token (the source states the form verbatim at `:6739-6741`); `:7620-7650` `__requireCapability(<cap>, ...);`. Bundle test `statement-compile-time-for.slang` uses `$for(i in Range(4))`; `source/slang/hlsl.meta.slang:17312` and `:17330-17337` show the `__intrinsic_asm` and `__stage_switch` forms in use. | put the `$for(i in Range(N))` header (including the two-argument `Range(begin, end)`) in the `for` row, and added a bullet list giving the fixed form of each compiler-internal statement keyword |
+| f848c4fac6e9 | fixed | `source/slang/slang-parser.cpp:10661-10760` (`shared`, `volatile`, `coherent`, `restrict`, `readonly`, `writeonly` read no tokens), `:10932-10937` (`hitAttributeEXT`), `:10764` (`layout` reads `(` then names or `name = expr`), `:10484-10600` and `:10940-11040` (the `__`-prefixed argument forms, optional parentheses for `__intrinsic_op`, `__target_intrinsic`, `__specialized_for_target`, `__implicit_conversion`). Callbacks construct nodes only; declaration applicability is not checked there. | added a "Written as" column giving one usage form per row, marked the bare rows, and stated that the parser does not check the declaration kind |
+| 1b40bd3f3dc7 | fixed | `source/slang/hlsl.meta.slang:29254-29298` (handle types, the two heap types with `[require(glsl_hlsl_spirv_wgsl, descriptor_handle)]` subscripts, and `static const ... ResourceDescriptorHeap` / `SamplerDescriptorHeap`), `:29095-29135` (`__implicit_conversion` constructor taking the untyped handle on each castable type, including `RWStructuredBuffer<T, L>` at `:29081`). | kept the `ResourceDescriptorHeap[i]` form and the `RWStructuredBuffer<uint> buf = ResourceDescriptorHeap[0];` example, and added line citations for each declaration |
+| 1d8770e795d5 | fixed | `source/slang/hlsl.meta.slang:15-17` (semantics on hidden `in` globals, no `[require]`), `:18430` (`WaveGetWaveIndex()` with a `__target_switch` arm per target); `source/slang/slang-ir-legalize-varying-params.cpp:4608` (Metal context maps `WaveIndex` to `simdgroup_index_in_threadgroup`) and `:5380` (WGSL context maps it to `subgroup_id`); no other `WaveIndex` arm in that file. | named Metal and WGSL as the targets this legalizer maps `SV_WaveIndex` for, noted the GLSL / SPIR-V path is not in this file, and kept `WaveGetWaveIndex()` as the portable spelling |
+| 0ff3440b9c31 | fixed | `source/slang/slang-parser.cpp:4593-4617` (`__constraint`, equality or subtype), `:4620-4632` (`__associatedfunc`: type expression then name), `:4494-4548` (`__func_extension`: target via syntax-decl lookup, optional `throws`, optional `->`, body); `source/slang/slang-check-decl.cpp:17466-17470` rejects it unless `CompilerOptionName::ExperimentalFeature` is set (declared flag-only in `slang-options.cpp`, per the earlier intake); examples at `source/slang/core.meta.slang:771` and `source/slang/hlsl.meta.slang:33606`. | refreshed the line citations and stated that `-experimental-feature` takes no value and is checked in semantic checking |
+| 80abe4cc4205 | fixed | `source/slang/slang-parser.cpp:3705-3708` (`functype` lookahead), `:3403-3417` (`(`, comma-separated type list, mandatory `->`, result type), `:1731` (`functype F` generic parameter); usage `source/slang/hlsl.meta.slang:30554`. No parser code states whether a value of the type is callable. | refreshed citations, kept the `functype(<parameter types>) -> <result type>` spelling, and added an explicit statement that callability is not specified by the parser |
+| bbc3d4c97d7b | fixed | `source/slang/slang-parser.cpp:3669-3677` (HLSL source: `ParseStruct(HLSLClassDecl)`, with the comment "HLSL `class` declarations have value semantics"; otherwise `ParseClass`, "reference-type `ClassDecl`"), `:6719-6786` (`ParseStruct`: anonymous name, `parseOptGenericDecl`, `S;`, `S = T;`), `:6789-6800` (`ParseClass`: name, inheritance, body), `:7507-7518` (`class` routed to declarations in blocks only for HLSL). | rewrote the `class` versus `struct` paragraph around the source-language split and the grammar difference |
+| 131453a3ff0f | fixed | `source/slang/slang-parser.cpp:8412-8475` (`sizeof`, `alignof`, `countof`), `:8552-8575` (`__floatAsInt(expr)`, `__getAddress(expr)`), `:8578-8590` (`try`, `no_diff` leaf expressions), `:3289-3365` (`fwd_diff`, `bwd_diff`, `__apply`, `__func_as_type`, `__dispatch_kernel`), `:10093` (`new`). | added `__func_as_type(f)`, `__getAddress(v)`, `__floatAsInt(x)` to the one-operand examples next to the existing per-row forms and refreshed the `new` citation |
+| a2d9ef39a8a4 | fixed | `source/slang/slang-parser.cpp:5475-5560` (`syntax <name> [: <class>] [= <existing>];`, class resolved via `findSyntaxClass` at `:5497`), `:5830-5900` (`attribute_syntax [<Name>(...)] : <class>;`); `source/slang/slang-ast-builder.h:884-891`; core uses at `source/slang/core.meta.slang:28` and `:164`. | stated that no user-level example exists in the tree and gave the two declaration shapes taken from the grammar |
+| aa48d92eed58 | fixed | `source/slang/slang-parser.cpp:2607-2622` (`isReservedKeywordName`: only `struct`, `class`, `enum`, `typealias`, `typedef`), `:6252` (the one `gl_` inspection), no `SV_` test in the file, `:11120-11129` (only `__init`, `__subscript`, `__include` registered; bare spellings are not), `:9828-9831` (core-module `%__` register assert). | stated that both prefixes are advisory naming policy with no parser diagnostic, used a local named `SV_userVar` as the example, added line citations, and noted the one `__` check on SPIR-V registers |
+| 9a1a7ad263e3 | rejected-out-of-scope | Every simple-modifier row uses the `getSyntaxClass<...>()` overload whose callback `parseSimpleSyntax` (`source/slang/slang-parser.cpp:5468`, registered at `:11085-11094`) constructs the node and reads nothing, so the parse-time meaning is the node. Emitted-code and runtime effects (matrix layout rewriting, interpolation, geometry stages) are decided in layout and emit code outside `watched_paths`; the owning page is `docs/generated/design/ast-reference/modifiers.md` (see its matrix-layout rows around lines 201-214). The doc already links there and says so. | — |
+| fb6c0e3e7b12 | fixed | `source/slang/slang-parser.cpp:7210-7265` (`parseCompileTimeForStmt`: `$for(i in Range(N))`, version checks at `:7218-7227`), `:6959-7064` (`__stage_switch` / `__target_switch`), `:7067-7083` (`__intrinsic_asm`), `:7085-7110` (`__GPU_FOREACH`, literal `LAMBDA`), `:8002-8030` (`__requireCapability`), `:7342` (`$` entry). | refreshed every statement line citation and added the `$for` deprecation (2025) and removal (202c) diagnostics to the `for` row; the per-keyword forms already in the bullets below the table were kept |

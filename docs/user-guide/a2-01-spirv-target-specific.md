@@ -125,14 +125,14 @@ void myVertexShader(
 ## Behavior of `discard` after SPIR-V 1.6
 
 `discard` is translated to OpKill in SPIR-V 1.5 and earlier. But it is translated to OpDemoteToHelperInvocation in SPIR-V 1.6.
-You can use OpDemoteToHelperInvocation by explicitly specifying the capability, "SPV_EXT_demote_to_helper_invocation".
+You can use OpDemoteToHelperInvocation by explicitly specifying the capability, "spvDemoteToHelperInvocationEXT".
 
 As an example, the following command-line arguments can control the behavior of `discard` when targeting SPIR-V.
 
 ```
 slangc.exe test.slang -target spirv -profile spirv_1_5 # emits OpKill
 slangc.exe test.slang -target spirv -profile spirv_1_6 # emits OpDemoteToHelperInvocation
-slangc.exe test.slang -target spirv -capability SPV_EXT_demote_to_helper_invocation -profile spirv_1_5 # emits OpDemoteToHelperInvocation
+slangc.exe test.slang -target spirv -capability spvDemoteToHelperInvocationEXT -profile spirv_1_5 # emits OpDemoteToHelperInvocation
 ```
 
 ## Supported HLSL features when targeting SPIR-V
@@ -206,6 +206,12 @@ When both ordinary data fields and resource typed fields exist in a parameter bl
 By default, a `uniform` parameter defined in the parameter list of an entrypoint function is translated to a push constant in SPIR-V, if the type of the parameter is ordinary data type (no resources/textures).
 All `uniform` parameters defined in global scope are grouped together and placed in a default constant buffer. You can make a global uniform parameter laid out as a push constant by using the `[vk::push_constant]` attribute
 on the uniform parameter. All push constants follow the std430 layout by default.
+
+Vulkan allows an entry point to statically use at most one push-constant block.
+The compiler reports error 39033 when an entry point uses more than one, for example when a compute or rasterization entry point reads both a global `[vk::push_constant]` parameter and its own `uniform` parameters.
+The check applies to SPIR-V and to GLSL output, including `-emit-spirv-via-glsl`.
+A block counts as used when the entry point, or a function it calls, refers to it in code that Slang's own dead-code elimination keeps. A read inside a branch that a constant condition removes does not count, but a read in a function called with an argument that makes the read unreachable still counts. With `-g`, an entry point's `uniform` parameters count even when the code never reads them, because Slang loads their values so that a debugger can show them.
+For GLSL output with `-preserve-params`, a module with two or more push-constant blocks omits the blocks that no code uses, because glslang counts every declared block; a module with a single push-constant block keeps it.
 
 ## Specialization Constants
 

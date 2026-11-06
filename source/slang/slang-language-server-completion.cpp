@@ -952,7 +952,11 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
         {
             item.kind = LanguageServerProtocol::kCompletionItemKindClass;
         }
-        item.data = String(i);
+        // The item data carries the completion version that the candidate index refers to, so that
+        // completionItem/resolve can tell when the item comes from an earlier completion request.
+        item.data =
+            (StringBuilder() << server->m_workspace->getCompletionVersionSerial() << ":" << i)
+                .produceString();
 
         Index sortOrder = determineCompletionItemSortOrder(member, expectedTypes);
         if (sortOrder != -1)

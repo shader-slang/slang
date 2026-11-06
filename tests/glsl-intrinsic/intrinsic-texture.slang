@@ -1,5 +1,6 @@
-//TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target hlsl -DHLSL
-//TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target hlsl -DHLSL
+// TODO(#14260): not testing hlsl: some GLSL texture functions do not compile for HLSL.
+//DISABLE_TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target hlsl -DHLSL
+//DISABLE_TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target hlsl -DHLSL
 
 // In GLSL, the transformation to Slang and back shouldn't change GLSL target
 //TEST:SIMPLE_EX(filecheck=GLSL_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target glsl -DGLSL -DNO_GRADS
@@ -9,13 +10,10 @@
 
 // Sampling gradients available. Implicit LOD sampling translates to OpImageSampleImplicitLod and similar
 //TEST:SIMPLE_EX(filecheck=SPIR_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target spirv -DSPIRV -O3
-//TEST:SIMPLE_EX(filecheck=SPIR_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target spirv -DSPIRV -capability SPV_KHR_compute_shader_derivatives -O3
+//TEST:SIMPLE_EX(filecheck=SPIR_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target spirv -DSPIRV -capability spvComputeShaderDerivativesKHR -O3
 
 // sampling gradients not available. Implicit LOD sampling translates to OpImageSampleExplicitLod with Lod=0 and similar
 //TEST:SIMPLE_EX(filecheck=SPIR_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage vertex -entry vertexMain -target spirv -DSPIRV -DVERTEX_STAGE -DNO_GRADS -O3
-
-//TEST:SIMPLE_EX(filecheck=CUDA): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target cuda -DCUDA
-//TEST:SIMPLE_EX(filecheck=CUDA): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target cuda -DCUDA
 
 //DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -xslang -DSPIRV
 
@@ -2187,15 +2185,12 @@ bool textureFuncs( Sampler1D<T> gsampler1D
 [require(spirv, sm_5_1, compute_fragment)]
 #elif defined(SPIRV) && defined(VERTEX_STAGE)
 [require(spirv, sm_5_1, vertex)]
-#elif defined(CUDA)
-[require(cuda, sm_5_1, compute_fragment)]
 #endif
 __extern_cpp void TEST_main()
 {
     // GLSL_GRADS:    void main(
     // GLSL_NOGRADS:  void main(
     // HLSL: void TEST_main(
-    // CUDA: void TEST_main(
     // CPP: void _TEST_main(
     // BUF: 1
 

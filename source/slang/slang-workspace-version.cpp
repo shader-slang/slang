@@ -591,6 +591,7 @@ WorkspaceVersion* Workspace::getCurrentVersion()
 WorkspaceVersion* Workspace::createVersionForCompletion()
 {
     currentCompletionVersion = createWorkspaceVersion();
+    completionVersionSerial++;
     currentCompletionVersion->linkage->contentAssistInfo.checkingMode =
         ContentAssistCheckingMode::Completion;
     return currentCompletionVersion.Ptr();

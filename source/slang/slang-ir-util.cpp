@@ -455,12 +455,14 @@ std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRTyp
         return {
             ParameterDirectionInfo(ParameterDirectionInfo::Kind::BorrowInOut),
             as<IRBorrowInOutParamType>(paramType)->getValueType()};
-    else if (as<IRRefParamType>(paramType))
-        return {
-            ParameterDirectionInfo(
-                ParameterDirectionInfo::Kind::Ref,
-                as<IRRefParamType>(paramType)->getAddressSpace()),
-            as<IRRefParamType>(paramType)->getValueType()};
+    else if (auto refParamType = as<IRRefParamType>(paramType))
+    {
+        ParameterDirectionInfo info(
+            ParameterDirectionInfo::Kind::Ref,
+            refParamType->getAddressSpace());
+        info.accessQualifier = refParamType->getAccessQualifier();
+        return {info, refParamType->getValueType()};
+    }
     else if (as<IRBorrowInParamType>(paramType))
         return {
             ParameterDirectionInfo(
@@ -485,7 +487,7 @@ IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IR
     case ParameterDirectionInfo::Kind::BorrowIn:
         return builder->getBorrowInParamType(type, info.addressSpace);
     case ParameterDirectionInfo::Kind::Ref:
-        return builder->getRefParamType(type, info.addressSpace);
+        return builder->getRefParamType(type, info.accessQualifier, info.addressSpace);
     default:
         SLANG_UNEXPECTED("Unhandled parameter info in fromDirectionAndType");
     }
@@ -1324,6 +1326,19 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
     return root;
 }
 
+IRImageSubscript* getAtomicImageSubscript(IRAtomicOperation* atomic)
+{
+    return as<IRImageSubscript>(getRootAddr(atomic->getPtr()));
+}
+
+IRResourceTypeBase* getImageSubscriptResourceType(IRImageSubscript* subscript)
+{
+    auto imageType = subscript->getImage()->getDataType();
+    if (auto ptrType = as<IRPtrTypeBase>(imageType))
+        imageType = ptrType->getValueType();
+    return as<IRResourceTypeBase>(imageType);
+}
+
 
 IRInst* getRootBufferOrAddr(IRInst* addr)
 {
@@ -1625,8 +1640,32 @@ bool canInstHaveSideEffectAtAddress(
     IRInst* addr,
     Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
+    // A texel holds scalar or vector data, never a resource handle, on every target, so an
+    // instruction that touches only texel memory cannot change a location that holds resources.
+    // `simplifyForEmit` relies on this to re-load a texture-array element next to each of its
+    // uses: on Metal, the `ImageStore` and the fences around it all name `getElement(load(arr),
+    // i)`, and without this rule the emitter would copy the whole array of handles into a local.
+    auto addrDataType = as<IRPtrTypeBase>(addr->getDataType());
+    auto atomic = as<IRAtomicOperation>(inst);
+    if (addrDataType && atomic && getAtomicImageSubscript(atomic))
+    {
+        if (isResourceType(addrDataType->getValueType()))
+            return false;
+    }
+
     switch (inst->getOp())
     {
+    case kIROp_ImageStore:
+    case kIROp_MetalTextureFence:
+        {
+            if (addrDataType && isResourceType(addrDataType->getValueType()))
+                return false;
+
+            // Any other address may be texel memory reached through an `ImageSubscript`.
+            if (inst->mightHaveSideEffects())
+                return true;
+        }
+        break;
     case kIROp_Store:
         // If the target of the store inst may overlap addr, return true.
         if (canAddressesPotentiallyAlias(func, as<IRStore>(inst)->getPtr(), addr))
@@ -1709,6 +1748,12 @@ bool canInstHaveSideEffectAtAddress(
                 return true;
             }
         }
+        break;
+    case kIROp_RequireTargetExtension:
+        // A target-extension requirement is consumed only when code is emitted and neither reads
+        // nor writes memory, so loads and stores can be forwarded across it. It still reports a
+        // side effect through `mightHaveSideEffects`, which is what keeps the otherwise unused
+        // requirement alive through DCE.
         break;
     default:
         // Default behavior is that any insts that have side effect may affect `addr`.
@@ -1811,6 +1856,17 @@ void removeLinkageDecorations(IRInst* inst)
     }
     for (auto decoration : toRemove)
         decoration->removeAndDeallocate();
+}
+
+bool hasInterpolationMode(IRInst* inst, IRInterpolationMode mode)
+{
+    for (auto decoration : inst->getDecorations())
+    {
+        auto interpolationModeDecor = as<IRInterpolationModeDecoration>(decoration);
+        if (interpolationModeDecor && interpolationModeDecor->getMode() == mode)
+            return true;
+    }
+    return false;
 }
 
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)

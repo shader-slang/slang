@@ -1,10 +1,10 @@
 // byte-address-buffer-align-error.slang
 
-//TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -emit-spirv-directly -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target cuda -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=LOC,non-exhaustive):-target spirv -entry computeMain -stage compute
 
 // Confirm that a non-power-of-two `alignment` for `(RW)ByteAddressBuffer` aligned load / stores is

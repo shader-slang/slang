@@ -1,7 +1,7 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: model=claude-sonnet-5-5
+//META: generated_at=2026-11-02T10:45:10+00:00
+//META: source_commit=6815ed82d5e8c95b0e1258ca2eba0ca9c7825d86
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#auto-generated-reference
 //META: doc_section_digest=418ce1f2520f3059548c0ca48faf237bfd1b12c09f7325b1c5ce28d43e4bfef2
 //META: purpose=The `subgroup_workgroup_index` compound alias admits `WaveGetWaveIndex` / `WaveGetNumWaves` in a compute entry point; the queries compile and surface subgroup constructs in the emitted HLSL, GLSL, SPIR-V assembly, Metal and WGSL.
@@ -51,4 +51,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // WGSL: enable subgroups;
 // WGSL-DAG: @builtin(subgroup_id)
-// WGSL-DAG: @builtin(subgroup_size)
+// WGSL-DAG: @builtin(num_subgroups)

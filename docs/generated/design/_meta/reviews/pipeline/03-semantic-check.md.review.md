@@ -1,23 +1,23 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:18:50+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T21:20:35Z
 target_doc: pipeline/03-semantic-check.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: a244dfa19ecf6d79ea826d9b14c775491f6a2445e1ddbc0c633a710605a2aec3
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: cd6860f053b52ab46cc0816a230dc20093e248da0db8a4bb4c551e2dee5c5a14
+source_commit: be3c344414f6541ba6731813b36591a94cd05482
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 4
+finding_count: 2
 severity_breakdown:
   critical: 0
   major: 0
-  minor: 4
+  minor: 2
   nit: 0
 ---
 
@@ -25,27 +25,22 @@ severity_breakdown:
 
 ## Summary
 
-The page is structurally complete, all links resolve, and most implementation claims agree with the source at the recorded commit. Four minor findings remain: two source-ownership descriptions are inaccurate, the generic section exceeds its overview-only contract, the binding-modifier gating description overgeneralizes one gate to four diagnostics, and the closing statement invents an errored declaration state.
+The document substantially matches the source and satisfies the required structure. Two localized behavior summaries need correction: the differentiability section conflates forward and backward function-extension transformations, and the semantic compatibility section overlooks scalar/one-element-vector compatibility. All 36 line-number citations match the current source.
 
 ## Items checked
 
-- Verified the front matter and recomputed the watched-path digest; it matches `a244dfa19ecf6d79ea826d9b14c775491f6a2445e1ddbc0c633a710605a2aec3`.
-- Verified every relative link target at `53b76e6d3009b8e6434d41573524c7ce5c499d23` and confirmed all generated-document references are manifest entries.
-- Verified all 11 line-number citation passages, covering 15 cited source line numbers.
-- Spot-checked more than 25 factual claims, including checker orchestration, deferred body parsing, constraint solving, witness lookup, inheritance linearization, differentiability synthesis, shader checks, and diagnostic recovery.
-- Checked every required section and confirmed every watched `slang-check-*.cpp` file is mentioned.
+- Read `_review.md`, `_common.md`, and the document-specific prompt; ran `regenerate.py show pipeline/03-semantic-check.md`.
+- Verified against the **current working tree**. The source comparison against `2518a942d59b1228fc8cc70a37739baab82b6002` produced no differences under `source/`; HEAD matches the supplied review commit.
+- Checked all 36 explicit source line-number citations across nine files.
+- Spot-checked more than 20 behavioral claims, including checker entry and dispatch, deferred body parsing, generic solver fallback, conformance witnesses, differentiability synthesis, modifier conflicts, GLSL allowances, visibility, dynamic-interface restrictions, generic entry points, capability collection, depth-output collection, semantic type matching, name suggestions, and discarded-result diagnostics.
+- Resolved all 61 Markdown links, covering 31 distinct targets including the local heading anchor. Confirmed all four linked generated pages appear in the manifest; consulted the parsing dependency only for cross-reference consistency.
+- Checked source filenames and simple backticked identifiers; confirmed diagnostic numbers exist in `slang-diagnostics.lua`.
+- Verified required sections, watched-file coverage, front-matter fields, relative-link style, and absence of raw Liquid openers. The document is 32,702 bytes, below its 32,768-byte cap.
+- No files were written.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## SemanticsVisitor`, lines 65-68 | Two responsibility rows misstate source ownership: `slang-check-inheritance.cpp` is said to own “member visibility,” and `slang-check-resolve-val.cpp` is said to validate substitutions. The former implements inheritance and extension-facet computation; visibility filtering is implemented in expression/overload checking. The latter resolves and canonicalizes types and decl refs rather than validating substitutions. | `source/slang/slang-check-inheritance.cpp:139-207` and `source/slang/slang-check-inheritance.cpp:608-615`; `source/slang/slang-check-expr.cpp:1136-1275`; `source/slang/slang-check-overload.cpp:272-278`; `source/slang/slang-check-resolve-val.cpp:1-59`. | Remove “member visibility” from the inheritance row, and describe `slang-check-resolve-val.cpp` as resolving/canonicalizing `Type`, `DeclRef`, and witness values. |
-| F-002 | minor | `## Generic specialization and constraints`, lines 101-247 | The prompt requires an overview only, but this section devotes roughly 140 lines to solver fallback mechanics, associated-type constraint representation, inheritance-cache cycle handling, generic-inference failure payloads, and differentiability synthesis internals. | `docs/generated/design/_meta/prompts/pipeline-03-semantic-check.md:42-44` says “overview only”; the target's detailed implementation treatment spans lines 113-247. | Condense this section to a short architectural overview and retain links to `docs/design/interfaces.md` and the relevant source files for details. |
-| F-003 | minor | `## Shader-specific checks`, lines 329-338 | The text says all four ignored binding modifiers are gated by `_allTargetsSupportVkBindingOnEntryPointParameters` and `isVkBindingCompatibleEntryPointParameterType`. Those predicates gate only `[[vk::binding(...)]]`; `[[vk::push_constant]]`, `register()`, and `packoffset()` are diagnosed unconditionally when present on an entry-point parameter. | `source/slang/slang-check-shader.cpp:2331-2366` applies `supportsVkBindingOnParameter` only in the `GLSLBindingAttribute` branch, followed by three unconditional modifier branches. | Restrict the gate explanation to `[[vk::binding(...)]]` and state separately that the other three modifiers are always diagnosed in this entry-point-parameter check. |
-| F-004 | minor | `## Failure modes`, lines 383-385 | The claim that every declaration is “either fully checked or marked errored” describes a state the checker does not have. `checkModule` drives every declaration through the ordinary check-state sequence, including `DefinitionChecked` and `CapabilityChecked`; errors are represented by diagnostics and error-valued AST nodes, not an alternate errored declaration state. | `source/slang/slang-check-decl.cpp:5187-5246` and `source/slang/slang-check-decl.cpp:5298-5322`; `source/slang/slang-ast-support-types.h:474-580`. | Say that `checkModule` drives declarations through `CapabilityChecked`, while recovery records diagnostics and substitutes error types/expressions where needed. |
-
-## No-issues notes
-
-- Every recorded line citation points at the named symbol or declaration.
-- Deferred `UnparsedStmt` handling and parser callbacks match `maybeParseStmt` and `parseUnparsedStmt`.
-- The detailed constraint-solver, inheritance-cycle, differentiability, and generic-entry-point claims were source-supported despite the section-scope finding.
+| F-001 | minor | Differentiability as interface conformance, lines 307–312 | The sentence names `_funcExtensionForwardDiff` / `_funcExtensionBackwardDiff` together and says they rewrite the extension into `IForwardDifferentiable<foo>` with a `fwd_diff` member. That describes only the forward helper; the backward helper constructs a different conformance and members. | `source/slang/slang-check-decl.cpp:17207` implements the forward transformation. At `:17240`, the backward helper uses `getBackwardDiffFuncInterfaceType(baseFuncAsType)` and synthesizes `bwd_diff` with `kIROp_FunctionCopy`, followed by backward context machinery. | Restrict the existing explanation to `_funcExtensionForwardDiff`. Describe `_funcExtensionBackwardDiff` separately as creating an `IBackwardDifferentiable` conformance with a synthesized `bwd_diff` copying the user function and the required backward context members. |
+| F-002 | minor | Shader-specific checks, lines 487–492 | The compatibility rule says types must be `both scalar, or both vectors of equal element count`. The implementation compares element counts without retaining the scalar/vector distinction, so a scalar and a one-element vector can also match. | `source/slang/slang-check-shader.cpp:150` implements `getScalarElementType`, assigning scalars count 1 and vectors their declared count. `isSemanticTypeCompatible` at `:175` compares those counts and scalar categories, without checking that both inputs have the same scalar/vector classification. | State that both types must be scalar or vector, with equal element counts—counting a scalar as one element—and matching scalar categories. Explicitly note that this admits scalar/one-element-vector pairs. |

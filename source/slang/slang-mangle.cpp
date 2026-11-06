@@ -133,8 +133,14 @@ void emitParamPassingMode(ManglingContext* context, ParamPassingMode mode)
 {
     switch (mode)
     {
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
         emitRaw(context, "r_");
+        break;
+    case ParamPassingMode::RefReadOnly:
+        emitRaw(context, "ro_");
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        emitRaw(context, "wo_");
         break;
     case ParamPassingMode::BorrowIn:
         emitRaw(context, "c_");
