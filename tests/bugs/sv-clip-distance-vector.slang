@@ -335,7 +335,7 @@ struct GSArrayOut
     float clip[2] : SV_ClipDistance0;
 };
 
-//GS2-NOT: E55220
+//GS2-NOT: E55225
 //GS2: %gl_ClipDistance = OpVariable %_ptr_Output__arr_float_int_2 Output
 
 [maxvertexcount(1)]
