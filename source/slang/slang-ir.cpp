@@ -102,6 +102,7 @@ bool isSimpleDecoration(IROp op)
     case kIROp_DerivativeGroupLinearDecoration:
     case kIROp_PointInputPrimitiveTypeDecoration:
     case kIROp_PreciseDecoration:
+    case kIROp_InvariantDecoration:
     case kIROp_PublicDecoration:
     case kIROp_HLSLExportDecoration:
     case kIROp_ReadNoneDecoration:

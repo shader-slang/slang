@@ -2000,6 +2000,7 @@ local insts = {
 			{ glslFragDepthLess = { struct_name = "GLSLFragDepthLessDecoration" } },
 			{ shader64BitIndexing = { struct_name = "Shader64BitIndexingDecoration" } },
 			{ precise = { struct_name = "PreciseDecoration" } },
+			{ invariant = { struct_name = "InvariantDecoration" } },
 			{ public = { struct_name = "PublicDecoration" } },
 			{ hlslExport = { struct_name = "HLSLExportDecoration" } },
 			{ downstreamModuleExport = { struct_name = "DownstreamModuleExportDecoration" } },

@@ -991,6 +991,11 @@ static SlangResult _parseGCCFamilyLine(
         {
             cmdLine.addArg("-fmetal-enable-logging");
         }
+
+        if (options.flags & CompileOptions::Flag::PreserveInvariance)
+        {
+            cmdLine.addArg("-fpreserve-invariance");
+        }
     }
 
     // Our generated code very often casts between dissimilar types with the

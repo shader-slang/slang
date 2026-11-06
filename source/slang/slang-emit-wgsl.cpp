@@ -314,6 +314,9 @@ bool WGSLSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
 {
     if (auto sysSemanticDecor = inst->findDecoration<IRTargetSystemValueDecoration>())
     {
+        if (sysSemanticDecor->getSemantic() == "position" &&
+            inst->findDecoration<IRInvariantDecoration>())
+            m_writer->emit("@invariant ");
         m_writer->emit("@builtin(");
         m_writer->emit(sysSemanticDecor->getSemantic());
         m_writer->emit(")");

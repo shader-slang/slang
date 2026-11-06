@@ -1626,6 +1626,7 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::RayPayloadWriteSemantic:
     case ASTNodeType::GloballyCoherentModifier:
     case ASTNodeType::PreciseModifier:
+    case ASTNodeType::InvariantModifier:
     case ASTNodeType::IntrinsicOpModifier:
     case ASTNodeType::InlineModifier:
     case ASTNodeType::HLSLExportModifier:
@@ -1824,6 +1825,9 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::ConstExprModifier:
     case ASTNodeType::PreciseModifier:
         return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
+
+    case ASTNodeType::InvariantModifier:
+        return as<VarDeclBase>(decl) || as<FuncDecl>(decl);
 
     case ASTNodeType::ActualGlobalModifier:
     case ASTNodeType::MatrixLayoutModifier:
@@ -2531,6 +2535,25 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
                 getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = ceM});
                 removeModifier(syntaxNode, ceM);
             }
+        }
+    }
+
+    // `invariant` needs the declaration's semantic, which the main loop below hides by
+    // unlinking each modifier before checking it, so we validate it here.
+    if (auto invariantModifier = syntaxNode->findModifier<InvariantModifier>())
+    {
+        auto semantic = syntaxNode->findModifier<HLSLSimpleSemantic>();
+        if (!semantic || !semantic->name.getContent().caseInsensitiveEquals(toSlice("SV_Position")))
+        {
+            getSink()->diagnose(
+                Diagnostics::InvariantRequiresPositionOutput{.modifier = invariantModifier});
+        }
+        else if (auto paramDecl = as<ParamDecl>(syntaxNode))
+        {
+            if (!paramDecl->findModifier<OutModifier>())
+                getSink()->diagnose(Diagnostics::InvariantRequiresOutputParameter{
+                    .param = paramDecl,
+                    .modifier = invariantModifier});
         }
     }
 
