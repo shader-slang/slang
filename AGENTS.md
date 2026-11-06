@@ -31,7 +31,7 @@ describe.
 
 Review-related skills:
 
-- `slang-review-clarity-workflow`: coordinate the end-to-end clarity review workflow.
+- `slang-review-clarity-workflow`: apply authoring acceptance requirements and coordinate the end-to-end clarity review workflow.
 - `slang-review-clarity`: generate high-level clarity and explainability review candidates.
 - `slang-review-fine-grained-clarity`: generate line-by-line name/comment/type/function
   consistency review candidates.
@@ -42,6 +42,19 @@ Review-related skills:
 - `slang-review-resolve-judgment-calls`: resolve uncertain candidates with focused follow-up
   analysis before posting.
 - `slang-review-post-github`: post filtered candidates as one proper GitHub PR review.
+
+## Authoring and Self-Review
+
+When authoring or revising Slang code, tests, comments, or documentation, follow the [authoring and self-review procedure](.claude/skills/slang-review-clarity-workflow/SKILL.md#authoring-and-self-review).
+Apply both clarity review perspectives from the outset and examine every in-scope declaration, name, expression, condition, and sentence in comments and documentation.
+Review the complete cumulative change, including earlier commits and review fixes, and keep a compact record of coverage tied to the reviewed revision.
+These are acceptance requirements for authored work; passing tests or filtering review candidates does not establish that they are satisfied.
+
+Review feedback about clarity, quality, or style reopens the application of the relevant expectation throughout the assigned change before the concern is accepted or dismissed.
+A demonstrated violation of an already applicable requirement means the previous self-review was insufficient and requires correcting all applicable violations, followed by fresh high-level and fine-grained reviews of the cumulative change.
+Apply a genuinely new requirement throughout the current assignment without treating it as evidence of prior noncompliance.
+Complete that reassessment before reporting the feedback addressed or the work ready.
+Preserve the original responsibility boundary; exhaustive review does not authorize cleanup of unrelated existing code.
 
 ## WSL and Windows Tooling
 
@@ -181,8 +194,9 @@ Follow the principled path, not the minimal-edit-distance path.
 
 - Fix root causes, not symptoms. A bug surfacing in emit/codegen is usually caused upstream (an IR
   pass, lowering, type legalization, specialization, or the AST/IR representation). Trace it there.
-- Question every change. If you cannot name a test that fails without a change, it probably should
-  not exist. Ask whether the problem is telling you the direction/representation is flawed.
+- Question every change. For a behavioral implementation change, if you cannot name a test that fails without it, the change probably should not exist.
+  Ask whether the problem is telling you the direction or representation is flawed.
+  A naming, contract, decomposition, or explanation correction can be necessary without changing runtime behavior; justify it by the clarity requirement the current code fails to satisfy.
 - Do not mask. A guard, null-check, or special case that papers over malformed AST/IR/witness-table
   data is a band-aid hiding a representation bug. Make the representation correct so consumers stay
   simple.
