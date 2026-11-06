@@ -301,3 +301,158 @@ We do not currently have a setup for extracting documentation from comments, but
 
 When writing comments, please be aware that your words could be read by many people, from a variety of cultures and backgrounds.
 Default to a plain-spoken and professional tone and avoid using slang, idiom, profanity, etc.
+
+The rest of this section describes the standard we hold new code to.
+The clarity review skills under `.claude/skills/` (`slang-review-clarity` and `slang-review-fine-grained-clarity`) check changes against the same standard.
+As with the rest of this document, these guidelines apply to new files and significant additions; a change to an existing file should respect that file's organization and must not make its clarity worse, but it need not rewrite untouched code.
+
+### The Goal: Code That Obviously Has No Bugs
+
+The aim of our comments is that a reader can confidently understand why every line of code exists and why it is correct as written.
+We want code that obviously has no bugs, rather than code that merely has no obvious bugs.
+If a careful reader has to spend a long time reconstructing the author's intent, the code is not yet clear enough to be trusted, even if it happens to be correct.
+
+This is not a requirement for any particular density of comments.
+Sometimes one clear comment justifies ten straightforward lines that follow it; sometimes one subtle line needs a paragraph.
+Code without comments is held to the highest standard of clarity: if it is not manifestly obvious why a line is both correct and necessary, there should be a comment that speaks to it.
+
+### Documentation Comments and Implementation Comments
+
+We distinguish two kinds of comments:
+
+* *Documentation comments* are attached to declarations, files, or modules, and explain an API contract, concept, or abstraction to a *user* of that API.
+  They should not surface implementation details that a client does not need.
+
+* *Implementation comments* are all other comments.
+  They explain the intent, approach, and correctness argument of an implementation to a future *maintainer*, and may discuss details that would be inappropriate in a documentation comment.
+
+Code that has good documentation comments may still lack the implementation comments a maintainer needs, and vice versa.
+
+### Literate (Narrative) Style
+
+We write implementation comments in a *literate programming*, or narrative, style.
+A source file should tell a story: what problem it addresses, how that problem is decomposed, and how each piece of code fits into that decomposition.
+
+Concretely:
+
+* Every source file, including headers, should begin with a file-level comment that explains the concern the file addresses (a problem, a task, a data structure, etc.) and the overall approach or decomposition used to address it.
+
+* Declarations and definitions should be ordered to follow the story told by the file-level comment, as far as C++ language rules allow.
+
+* Sections of a file should be marked with Markdown-style headings (for example, `// ## Phase 1: Collecting candidates`) rather than banners of punctuation or other ad hoc conventions.
+
+* New terms of art should be defined before (or, if that is impossible, forward-referenced at) their first use.
+
+A useful test is to imagine "flipping" a file, so that its implementation comments become ordinary Markdown text and the remaining code becomes interspersed code blocks.
+The resulting document should read like a well-written chapter of a textbook, explaining the problem domain and the chosen solution in a way that teaches the reader.
+
+The same narrative continues inside each function body, where it matters most: the explanation is threaded through the code, step by step, as described under "Functions" below.
+Narrative style does not mean narrating each line in prose; a comment that restates what the next statement does, without explaining the decomposition that motivates it, adds length without adding understanding.
+
+### Functions
+
+Every non-trivial function should have a caller-visible contract.
+For simple accessors and similar routines, such as `float Circle::getRadius()`, the name and signature may be enough.
+Otherwise, a declaration-level comment should state what the function does, returns, requires, preserves, mutates, or may fail to do.
+A definition in a `.cpp` file may rely on a commented declaration in a header, but the contract must exist somewhere.
+
+A declaration comment should directly state what the function does or computes.
+If some part of that behavior would surprise a caller, the comment should also explain why the function behaves that way.
+Avoid describing its role or the reason it was written (for example, "Helper function used by X to ..."), because that tells the caller how it is used today rather than what it guarantees.
+
+Within a function body, the comments should read like the key steps of a proof that the function is correct.
+Those steps are threaded through the body: each comment sits immediately before the code it explains and justifies, so that a reader meets each part of the argument at the point where it applies.
+We avoid gathering the whole explanation into one block comment above the function or at the top of its body, because a reader then has to hold the entire argument in their head and match it back to the code by hand, and because such blocks drift out of date as the code beneath them changes.
+
+Consider a function documented with a single up-front block (the IR operations here are illustrative, not the actual API):
+
+```c++
+// Removes blocks that cannot be reached from the entry block. We first find the
+// reachable blocks with a depth-first walk from the entry block. Then we remove
+// every other block, but we must detach each one from its successors before
+// removing any of them, since an unreachable block may branch to another
+// unreachable block, and removing them in order would leave dangling uses.
+void removeUnreachableBlocks(IRFunc* func)
+{
+    HashSet<IRBlock*> reachableBlocks;
+    collectReachableBlocks(func->getFirstBlock(), reachableBlocks);
+
+    List<IRBlock*> unreachableBlocks;
+    for (auto block : func->getBlocks())
+    {
+        if (!reachableBlocks.contains(block))
+            unreachableBlocks.add(block);
+    }
+    for (auto block : unreachableBlocks)
+        block->removeAndDetachFromSuccessors();
+    for (auto block : unreachableBlocks)
+        block->removeAndDeallocate();
+}
+```
+
+The same function with its explanation threaded through the body keeps the contract on the declaration and places each step of the argument beside the code that carries it out:
+
+```c++
+// Removes every block of `func` that cannot be reached from its entry block.
+void removeUnreachableBlocks(IRFunc* func)
+{
+    // A block is reachable if some path of branches leads to it from the entry
+    // block, so a depth-first walk from the entry block finds exactly the blocks
+    // we keep.
+    HashSet<IRBlock*> reachableBlocks;
+    collectReachableBlocks(func->getFirstBlock(), reachableBlocks);
+
+    // We collect the blocks to remove before changing anything, so that the walk
+    // over `func->getBlocks()` is not invalidated by the removals below.
+    List<IRBlock*> unreachableBlocks;
+    for (auto block : func->getBlocks())
+    {
+        if (!reachableBlocks.contains(block))
+            unreachableBlocks.add(block);
+    }
+
+    // An unreachable block may branch to another unreachable block, so we
+    // detach all of them from their successors before deallocating any; this
+    // way no deallocated block is still referenced by a branch.
+    for (auto block : unreachableBlocks)
+        block->removeAndDetachFromSuccessors();
+    for (auto block : unreachableBlocks)
+        block->removeAndDeallocate();
+}
+```
+
+The threaded version also makes gaps visible: the up-front block never explained why the blocks are collected into a list first, and in the threaded form the missing step stands out as uncommented code.
+
+Some further guidance for function bodies:
+
+* A non-trivial body may open with a short comment that names its overall strategy (for example, a case analysis, or iteration to a fixed point), but the details of each step belong beside that step.
+
+* The code following a comment should clearly implement what the comment describes.
+  If it does not, prefer refactoring the code (extracting a well-named helper, naming an intermediate value, reducing nesting) over writing a more complicated comment.
+
+* Branches, loops, and early exits carry more of the correctness argument than straight-line code, so they deserve closer explanation.
+  A branch that handles a corner case should say when that case can actually arise, ideally with an example input or a test that exercises it, and why the chosen handling is right.
+  An opaque condition is usually better expressed as a call to a predicate with a clear name than explained by a comment.
+
+* Stateful logic (work lists, caches, state machines, fixed-point iteration) should state its invariants and why it terminates or converges.
+
+* A run of five or more uncommented lines is a cue to check whether each line's purpose is really obvious from context; it is not automatically a problem.
+
+### Types
+
+Every `struct`, `class`, and `enum` should have a type-level comment that defines the abstraction it represents and the invariants it maintains, rather than merely listing its fields.
+It should be possible to complete the sentence "A `TypeName` is a ..." with a crisp definition; if that is hard to write, or if the code uses the type inconsistently with that definition, the factoring of the code may be worth revisiting.
+
+### Terminology and Prose
+
+Use terms consistently across comments and code, and consistently with established usage in the Slang codebase and the compiler literature.
+For example, keep the distinctions between "argument" (at a call site) and "parameter" (at a declaration), and between "declaration" and "declaration reference."
+
+Prefer the vocabulary of the problem domain over the vocabulary of the implementation.
+Names and comments built around terms like "visitor," "callback," or "helper" often indicate that the code is describing its mechanism rather than the problem it solves.
+
+Every sentence in a comment should advance the reader's understanding of the problem, the solution, or why the solution is correct.
+Remove or rewrite prose that is circular, evasive, or decorative.
+
+Comments should describe the present-tense design of the system, not the history of how it came to be.
+Known issues and technical debt are part of the current design and are worth recording; the sequence of attempts or review rounds that produced the code belongs in the commit message or pull request.

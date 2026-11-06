@@ -199,10 +199,15 @@ Recurring review feedback distilled into rules — following them avoids review 
 govern how code reads and is structured; the Problem-Solving Methodology above governs _what_ to
 change.)
 
+- **Thread comments through function bodies (literate style).** Put each step of the explanation
+  immediately before the code it justifies, not in one block above the function, even if nearby
+  code is sparse. See "Comments and Documentation" in `docs/design/coding-conventions.md`.
+  Use the `slang-review-fine-grained-clarity` skill to specifically review comments.
+
 - **Write function comments as complete sentences: what, then why.** State what the function does
-  first; then, if the reason it exists isn't obvious from that description, add a brief summary of
-  why. For non-trivial behavior, include a concrete example. Avoid terse fragment- or bullet-only
-  comments on a function. For instance, `substituteElementOfCompositeType` should read like _"Return
+  first; then, if any of that behavior is surprising, why. Don't describe its role ("Helper used by
+  X to ..."). For non-trivial behavior, include a concrete example. Avoid terse fragment- or
+  bullet-only comments on a function. For instance, `substituteElementOfCompositeType` should read like _"Return
   `target` with its element type replaced by `newElementType`, preserving shape: scalar →
   newElementType, `vector<T,N>` → `vector<newElementType,N>`, `matrix<T,R,C>` → `matrix<newElementType,R,C>`."_
   — not _"element coerce target"_.
