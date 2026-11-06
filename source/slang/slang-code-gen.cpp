@@ -768,11 +768,15 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     // The `-std` handed to the metal compiler must cover the newest syntax the emitter used, which
     // the target capability alone does not describe: `printf` emits `<metal_logging>` (metal3.2)
     // even though no metallib atom is present. Leaving it unset keeps the historical default.
+    // A `metallib_3_2` target gets at least metal3.2, because the core module selects MSL 3.2
+    // code for it (for example the device-scope fence of `DeviceMemoryBarrier`).
     if (compilerType == PassThroughMode::MetalC)
     {
         SemanticVersion metalLanguageVersion;
         if (getTargetCaps().implies(CapabilityAtom::metallib_4_0))
             metalLanguageVersion = SemanticVersion(4, 0);
+        else if (getTargetCaps().implies(CapabilityAtom::metallib_3_2))
+            metalLanguageVersion = SemanticVersion(3, 2);
 
         if (auto metalTracker = as<MetalExtensionTracker>(extensionTracker))
         {

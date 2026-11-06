@@ -8543,6 +8543,12 @@ void AllMemoryBarrier()
     case hlsl: __intrinsic_asm "AllMemoryBarrier";
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__threadfence()";
+    // `threadgroup_barrier` orders memory only within a threadgroup, and is an execution barrier.
+    // Device scope needs a fence, which MSL has from 3.2, so a target below `metallib_3_2` keeps
+    // the threadgroup barrier. The fence does not widen a buffer's coherence scope beyond the
+    // threadgroup; that needs `coherent(device)`, which is not emitted (see the Metal page of the
+    // user guide).
+    case metallib_3_2: __intrinsic_asm "atomic_thread_fence(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture, memory_order_seq_cst, thread_scope_device)";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -8563,6 +8569,8 @@ void AllMemoryBarrierWithGroupSync()
     case hlsl: __intrinsic_asm "AllMemoryBarrierWithGroupSync";
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__syncthreads()";
+    // The barrier synchronizes the threadgroup; the fence makes writes visible device-wide.
+    case metallib_3_2: __intrinsic_asm "atomic_thread_fence(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture, memory_order_seq_cst, thread_scope_device); threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -10704,6 +10712,12 @@ void DeviceMemoryBarrier()
     case hlsl: __intrinsic_asm "DeviceMemoryBarrier";
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__threadfence()";
+    // `threadgroup_barrier` orders memory only within a threadgroup, and is an execution barrier.
+    // Device scope needs a fence, which MSL has from 3.2, so a target below `metallib_3_2` keeps
+    // the threadgroup barrier. The fence does not widen a buffer's coherence scope beyond the
+    // threadgroup; that needs `coherent(device)`, which is not emitted (see the Metal page of the
+    // user guide).
+    case metallib_3_2: __intrinsic_asm "atomic_thread_fence(mem_flags::mem_device | mem_flags::mem_texture, memory_order_seq_cst, thread_scope_device)";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -10724,6 +10738,8 @@ void DeviceMemoryBarrierWithGroupSync()
     case hlsl: __intrinsic_asm "DeviceMemoryBarrierWithGroupSync";
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
     case cuda: __intrinsic_asm "__syncthreads()";
+    // The barrier synchronizes the threadgroup; the fence makes writes visible device-wide.
+    case metallib_3_2: __intrinsic_asm "atomic_thread_fence(mem_flags::mem_device | mem_flags::mem_texture, memory_order_seq_cst, thread_scope_device); threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
