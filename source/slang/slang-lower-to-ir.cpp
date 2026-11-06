@@ -3226,6 +3226,10 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         {
             builder->addSimpleDecoration<IRPreciseDecoration>(inst);
         }
+        else if (as<InvariantModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRInvariantDecoration>(inst);
+        }
         else if (auto formatAttr = as<FormatAttribute>(mod))
         {
             builder->addFormatDecoration(inst, formatAttr->format);

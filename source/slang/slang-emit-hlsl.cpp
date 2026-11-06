@@ -1,6 +1,7 @@
 // slang-emit-hlsl.cpp
 #include "slang-emit-hlsl.h"
 
+#include "core/slang-type-text-util.h"
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-util-hlsl.h"
@@ -2236,6 +2237,13 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
 {
     if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
     {
+        // HLSL has no equivalent of `invariant`, so the qualifier is dropped.
+        if (inst->findDecoration<IRInvariantDecoration>())
+        {
+            getSink()->diagnose(Diagnostics::InvariantQualifierUnsupportedOnTarget{
+                .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+                .location = inst->sourceLoc});
+        }
         m_writer->emit(" : ");
         auto semanticName = semanticDecoration->getSemanticName();
         m_writer->emit(semanticName);

@@ -11246,6 +11246,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("sample", getSyntaxClass<HLSLSampleModifier>()),
     _makeParseModifier("centroid", getSyntaxClass<HLSLCentroidModifier>()),
     _makeParseModifier("precise", getSyntaxClass<PreciseModifier>()),
+    _makeParseModifier("invariant", getSyntaxClass<InvariantModifier>()),
     _makeParseModifier("shared", parseSharedModifier),
     _makeParseModifier("groupshared", getSyntaxClass<HLSLGroupSharedModifier>()),
     _makeParseModifier("static", getSyntaxClass<HLSLStaticModifier>()),

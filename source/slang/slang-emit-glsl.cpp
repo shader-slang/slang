@@ -1279,6 +1279,12 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
             m_writer->emit(";\n\n");
         }
     }
+    else if (name == "gl_Position")
+    {
+        // GLSL marks a builtin invariant by redeclaring it with the qualifier.
+        if (var->findDecoration<IRInvariantDecoration>())
+            m_writer->emit("invariant gl_Position;\n\n");
+    }
     else if (name == "gl_ShadingRateEXT")
     {
         _requireGLSLExtension(toSlice("GL_EXT_fragment_shading_rate"));

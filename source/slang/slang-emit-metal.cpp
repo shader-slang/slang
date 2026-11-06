@@ -1562,6 +1562,9 @@ bool MetalSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
     {
         m_writer->emit(" [[");
         m_writer->emit(sysSemanticDecor->getSemantic());
+        if (sysSemanticDecor->getSemantic() == "position" &&
+            inst->findDecoration<IRInvariantDecoration>())
+            m_writer->emit(", invariant");
         m_writer->emit("]]");
         return true;
     }
