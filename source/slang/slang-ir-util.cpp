@@ -1858,6 +1858,17 @@ void removeLinkageDecorations(IRInst* inst)
         decoration->removeAndDeallocate();
 }
 
+bool hasInterpolationMode(IRInst* inst, IRInterpolationMode mode)
+{
+    for (auto decoration : inst->getDecorations())
+    {
+        auto interpolationModeDecor = as<IRInterpolationModeDecoration>(decoration);
+        if (interpolationModeDecor && interpolationModeDecor->getMode() == mode)
+            return true;
+    }
+    return false;
+}
+
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
 {
     if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))

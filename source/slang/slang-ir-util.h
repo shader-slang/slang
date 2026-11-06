@@ -560,6 +560,13 @@ void sortBlocksInFunc(IRGlobalValueWithCode* func);
 // Remove all linkage decorations from func.
 void removeLinkageDecorations(IRInst* inst);
 
+/// Return whether `inst` carries an `IRInterpolationModeDecoration` with the given `mode`.
+/// Each interpolation modifier lowers to its own decoration, and a declaration can combine one
+/// interpolation mode with one sampling location (`noperspective centroid`). The order of those
+/// decorations carries no meaning, so `findDecoration` followed by `getMode()` cannot answer
+/// this query.
+bool hasInterpolationMode(IRInst* inst, IRInterpolationMode mode);
+
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
