@@ -4154,6 +4154,14 @@ public:
 
     String getCallSignatureString(OverloadResolveContext& context);
 
+    // For a compound assignment `x op= y` (`expr`), whose `operator op=` did not apply: returns
+    // true, with the two operator names, when `x` is an l-value and `x op y` resolves to the type
+    // of `x`, so `x = x op y` is a replacement. Slang does not derive `op=` from `op`.
+    bool findBinaryOperatorForCompoundAssignment(
+        InvokeExpr* expr,
+        UnownedStringSlice& outCompoundOp,
+        UnownedStringSlice& outBinaryOp);
+
     Expr* ResolveInvoke(InvokeExpr* expr);
 
     void AddGenericOverloadCandidate(LookupResultItem baseItem, OverloadResolveContext& context);
