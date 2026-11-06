@@ -61,6 +61,11 @@ QualType getTypeForDeclRef(
 
 QualType getTypeForDeclRef(ASTBuilder* astBuilder, DeclRef<Decl> declRef, SourceLoc loc);
 
+/// Return whether `decl` is a local variable that lookup does not see yet. Block statements are
+/// checked in order, so a local whose declaration has not been reached is still unchecked, being
+/// checked, or hidden from lookup.
+bool isLocalVarNotYetDeclared(const Decl* decl);
+
 /// Add a found item to a lookup result
 void AddToLookupResult(LookupResult& result, LookupResultItem item);
 void AddToLookupResult(LookupResult& result, const LookupResult& items);

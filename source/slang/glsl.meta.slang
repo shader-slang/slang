@@ -1562,9 +1562,9 @@ __generic<T:ITexelElement, let sampleCount:int>
 public ivec2 textureSize(Sampler2DMS<T,sampleCount> sampler)
 {
     vector<int,2> result;
-    int sampleCount;
+    int numberOfSamples;
     int numberOfLevels;
-    sampler.GetDimensions(result.x, result.y, sampleCount);
+    sampler.GetDimensions(result.x, result.y, numberOfSamples);
     return result;
 }
 
@@ -1574,9 +1574,9 @@ __generic<T:ITexelElement, let sampleCount:int>
 public ivec3 textureSize(Sampler2DMSArray<T,sampleCount> sampler)
 {
     vector<int,3> result;
-    int sampleCount;
+    int numberOfSamples;
     int numberOfLevels;
-    sampler.GetDimensions(result.x, result.y, result.z, sampleCount);
+    sampler.GetDimensions(result.x, result.y, result.z, numberOfSamples);
     return result;
 }
 
@@ -1805,10 +1805,10 @@ __generic<T:ITexelElement, let sampleCount:int>
 public int textureSamples(Sampler2DMS<T,sampleCount> sampler)
 {
     vector<int,2> dim;
-    int sampleCount;
+    int numberOfSamples;
     int numberOfLevels;
-    sampler.GetDimensions( dim.x, dim.y, sampleCount);
-    return sampleCount;
+    sampler.GetDimensions( dim.x, dim.y, numberOfSamples);
+    return numberOfSamples;
 }
 
 __generic<T:ITexelElement, let sampleCount:int>
@@ -1817,10 +1817,10 @@ __generic<T:ITexelElement, let sampleCount:int>
 public int textureSamples(Sampler2DMSArray<T,sampleCount> sampler)
 {
     vector<int,3> dim;
-    int sampleCount;
+    int numberOfSamples;
     int numberOfLevels;
-    sampler.GetDimensions(dim.x, dim.y, dim.z, sampleCount);
-    return sampleCount;
+    sampler.GetDimensions(dim.x, dim.y, dim.z, numberOfSamples);
+    return numberOfSamples;
 }
 
 //

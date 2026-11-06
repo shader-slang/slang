@@ -171,7 +171,7 @@ static void _lookUpMembersInValue(
     LookupResult& ioResult,
     BreadcrumbInfo* breadcrumbs);
 
-static bool _isUncheckedLocalVar(const Decl* decl)
+bool isLocalVarNotYetDeclared(const Decl* decl)
 {
     auto checkStateExt = decl->checkState;
     auto isUnchecked = checkStateExt.getState() == DeclCheckState::Unchecked ||
@@ -200,7 +200,7 @@ static void _lookUpDirectAndTransparentMembers(
         // return all the members that are available.
         for (auto member : containerDecl->getDirectMemberDecls())
         {
-            if (!request.shouldConsiderAllLocalNames() && _isUncheckedLocalVar(member))
+            if (!request.shouldConsiderAllLocalNames() && isLocalVarNotYetDeclared(member))
                 continue;
             if (!DeclPassesLookupMask(member, request.mask))
                 continue;
@@ -225,7 +225,7 @@ static void _lookUpDirectAndTransparentMembers(
             // checked yet. Because we traverse block statements in order, if
             // it's unchecked or being checked then it isn't declared yet.
             if (!request.shouldConsiderAllLocalNames() && request.semantics &&
-                _isUncheckedLocalVar(m))
+                isLocalVarNotYetDeclared(m))
                 continue;
             if (m == request.declToExclude)
                 continue;

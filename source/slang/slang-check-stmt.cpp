@@ -111,6 +111,33 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
                 ensureAllDeclsRec(genericDecl, DeclCheckState::DefinitionChecked);
         }
 
+        // A local type alias is checked only when it is used, but shadowing a generic parameter
+        // depends only on names, so we check every alias in the block and the generic
+        // parameters of every generic alias. The body of a lambda is visited twice: first by
+        // `visitLambdaExpr`, with `m_parentLambdaExpr` set, and again as the body of the
+        // synthesized `()` member of the closure type. Local variables go through the
+        // declaration-checking states, so the second visit does nothing for them, but this loop
+        // has no such gate, so it runs on the first visit only.
+        auto parentFunc = getParentFunc();
+        bool isRevisitOfLambdaBody =
+            !m_parentLambdaExpr && parentFunc && as<LambdaDecl>(parentFunc->parentDecl);
+        if (!isRevisitOfLambdaBody)
+        {
+            for (auto typeDefDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<TypeDefDecl>())
+                checkForShadowedGenericParam(typeDefDecl);
+            for (auto genericDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<GenericDecl>())
+            {
+                if (!as<TypeDefDecl>(genericDecl->inner))
+                    continue;
+                checkForShadowedGenericParam(genericDecl->inner);
+                for (auto member : genericDecl->getDirectMemberDecls())
+                {
+                    if (isGenericParam(member))
+                        checkForShadowedGenericParam(member);
+                }
+            }
+        }
+
         // Consider this code:
         // ```
         // {
