@@ -1095,6 +1095,20 @@ err(
 )
 
 err(
+    "structural-ray-tracing-stage-runtime-value",
+    20025,
+    "runtime use of a structural ray-tracing stage type",
+    span { loc = "location", message = "structural ray-tracing stage type '~type:type' has no runtime representation" }
+)
+
+err(
+    "structural-ray-tracing-input-storage",
+    20026,
+    "storage of a structural ray-tracing stage input",
+    span { loc = "location", message = "ray-tracing stage input type '~type:type' may only be used as an 'in' parameter or an initialized local copy" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -1826,6 +1840,20 @@ err(
     30202,
     "function return type mismatch",
     span { loc = "decl:Decl", message = "function '~decl' declared to return '~newReturnType:Type' was previously declared to return '~prevReturnType:Type'" }
+)
+
+warning(
+    "unscoped-enum-case-named-like-enum",
+    30203,
+    "unscoped enum case has the same name as its enum",
+    span { loc = "decl:Decl", message = "case '~decl' has the same name as its unscoped enum; the name refers to the enum type or to the case depending on where it is used" }
+)
+
+warning(
+    "redeclaration-compatibility-warning",
+    30204,
+    "conflicting declaration",
+    span { loc = "decl:Decl", message = "declaration of '~decl' conflicts with existing declaration (allowed for compatibility)" }
 )
 
 err(
@@ -2866,6 +2894,13 @@ err(
     31111,
     "unknown diagnostic",
     span { loc = "location", message = "unknown diagnostic '~diagnosticName'" }
+)
+
+err(
+    "unknown-builtin-name",
+    31166,
+    "unknown builtin name",
+    span { loc = "location", message = "unknown builtin name '~name'" }
 )
 
 err(
@@ -4357,6 +4392,16 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Attached to "no overload for 'op=' applicable" when the binary operator `op` applies to the
+-- same arguments and its result converts to the left operand's type: Slang does not derive a
+-- compound assignment from the binary operator (issue #14038).
+standalone_note(
+    "compound-assignment-binary-operator-applies",
+    40026,
+    "'~binaryOp:String' applies to these arguments, but '~compoundOp:String' is not derived from it: declare 'operator~compoundOp' with an 'inout' first parameter, or write 'x = x ~binaryOp y'",
+    span { loc = "location" }
+)
+
 warning(
     "deprecated-generic-parameter-count-overload-tie-breaker",
     40021,
@@ -4562,6 +4607,56 @@ err(
     "no stage specified for entry point",
     span { loc = "location", message = "no stage specified for entry point '~entryPoint'; use either a '[shader(\"name\")]' function attribute or the '-stage <name>' command-line option to specify a stage" }
 )
+
+err(
+    "structural-ray-tracing-entry-point-not-stage",
+    38058,
+    "invalid structural ray-tracing entry point",
+    span { loc = "stageType:Decl", message = "struct '~stageType' does not implement an executable structural ray-tracing stage interface" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-stage-mismatch",
+    38093,
+    "structural ray-tracing entry point stage mismatch",
+    span { loc = "stageType:Decl", message = "struct '~stageType' does not implement the selected '~stage' stage" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-ambiguous-stage",
+    38055,
+    "ambiguous structural ray-tracing entry point stage",
+    span { loc = "stageType:Decl", message = "struct '~stageType' implements more than one executable ray-tracing stage; use '-stage <name>' to select one" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-ambiguous-implementation",
+    38092,
+    "ambiguous structural ray-tracing stage implementation",
+    span { loc = "stageType:Decl", message = "struct '~stageType' has multiple 'invoke' implementations for the '~stage' stage" }
+)
+
+err(
+    "structural-ray-tracing-input-in-native-entry-point",
+    38057,
+    "invalid native entry point signature",
+    span { loc = "location", message = "structural ray-tracing input type '~type:Type' cannot be used in a native entry point signature" }
+)
+
+err(
+    "structural-ray-tracing-stage-implementation-must-be-struct",
+    38091,
+    "invalid structural ray-tracing stage implementation",
+    span { loc = "location", message = "structural ray-tracing stage implementation '~stageType:Type' must be declared as a struct" }
+)
+
+err(
+    "duplicate-structural-ray-tracing-entry",
+    38074,
+    "duplicate structural ray-tracing entry",
+    span { loc = "location", message = "~section entry '~entry:Type' is listed more than once in schema '~schema:Type'" }
+)
+
 
 err(
     "specialization-parameter-of-name-not-specialized",
@@ -6257,7 +6352,7 @@ err(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal or WGSL (56101-56109)
+-- Metal, WGSL or CUDA (56101-56115)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
@@ -6327,6 +6422,27 @@ err(
     56112,
     "byte-address buffer stores of 8- or 16-bit values are not supported in WGSL",
     span { loc = "location", message = "storing '~type:IRInst' to a byte-address buffer writes 8- or 16-bit values; WGSL byte-address buffers are arrays of 32-bit words, so the store would have to rewrite the whole word and could lose a concurrent write to its other bytes. Use a 'RWStructuredBuffer' of the type, pack the values into 32-bit words, or use 'Atomic<uint>' operations." }
+)
+
+warning(
+    "wave-size-unsupported-on-target",
+    56113,
+    "'WaveSize' attribute is not supported on target '~target' and will be ignored",
+    span { loc = "location", message = "the target has no way to request a wave (SIMD-group) size, so the entry point runs at the size the device chooses; WaveGetLaneCount() returns it" }
+)
+
+err(
+    "wave-size-not-divisor-of-workgroup-x",
+    56114,
+    "the workgroup's x dimension (~workgroupSizeX:int) must be a multiple of the 'WaveSize' (~waveSize:int) on target '~target'",
+    span { loc = "location", message = "WGSL's '@subgroup_size' requires the x dimension of '@workgroup_size' to be a multiple of the subgroup size; otherwise pipeline creation fails" }
+)
+
+warning(
+    "wave-size-mismatch-on-target",
+    56115,
+    "'WaveSize(~waveSize:int)' cannot be honored on target '~target', whose wave size is always ~targetWaveSize:int; the attribute will be ignored",
+    span { loc = "location", message = "the entry point runs with ~targetWaveSize:int-lane waves, so code that assumes ~waveSize:int lanes per wave computes wrong results" }
 )
 
 -- SPIRV (57001-57007)

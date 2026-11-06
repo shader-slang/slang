@@ -1,6 +1,6 @@
 //TEST:SIMPLE_EX(filecheck=SPIRV): tests/bugs/13306/specialization-constant-shadow.hlsl -Gec -target spirv -entry main -validate-ir
 //TEST:SIMPLE_EX(filecheck=SPIRV): tests/bugs/13306/specialization-constant-shadow.hlsl -target spirv -entry main -validate-ir
-//TEST:SIMPLE_EX(filecheck=WRITE): tests/bugs/13306/specialization-constant-shadow.hlsl -Gec -target spirv -entry main -no-codegen -DTRY_WRITE
+//TEST:SIMPLE_EX(filecheck=WRITE,exit-code=-1): tests/bugs/13306/specialization-constant-shadow.hlsl -Gec -target spirv -entry main -no-codegen -DTRY_WRITE
 
 // A specialization constant without a written `const` still identifies the parameter in
 // `numthreads` and arithmetic. Compatibility must preserve that identity and reject writes.

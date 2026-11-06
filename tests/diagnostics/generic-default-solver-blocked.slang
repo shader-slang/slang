@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 // CHECK: error[E39999]: could not specialize generic for arguments of type ()
 // CHECK: blockedDependentDefault();

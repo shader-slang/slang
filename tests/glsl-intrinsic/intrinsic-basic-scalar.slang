@@ -1,7 +1,7 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL_SPIRV): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl
 //TEST:SIMPLE_EX(filecheck=CHECK_SPIR): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
-//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target hlsl
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-directly
@@ -463,7 +463,8 @@ bool Test_ScalarType()
 
         // CHECK_GLSL-COUNT-3: inverse(
         // CHECK_SPIR-COUNT-3: MatrixInverse{{ }}
-#if !defined(TARGET_LLVM)
+// TODO(#14248): `inverse` has no HLSL implementation. Remove TARGET_HLSL when it has one.
+#if !defined(TARGET_LLVM) && !defined(TARGET_HLSL)
         && equals(identity2x2, inverse(identity2x2))
         && equals(identity3x3, inverse(identity3x3))
         && equals(identity4x4, inverse(identity4x4))

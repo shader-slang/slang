@@ -1,48 +1,48 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:06:23+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T19:58:29Z
 target_doc: cross-cutting/targets.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 720cbadffe0ddbcfd07c03b208f3f7cbad55f384b2abb3ca09da30eb7d155f95
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: 524db519639c68c87df847957eafdee39c8abdb2e708167900770ba6290809b5
+source_commit: f40a5af1027e6fd524a5855f77d62bddffd998c9
 checklist:
-  factual_accuracy: fail
+  factual_accuracy: partial
   cross_references: pass
-  completeness: pass
-  style_consistency: pass
-  source_alignment: fail
+  completeness: partial
+  style_consistency: partial
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 5
+finding_count: 4
 severity_breakdown:
-  critical: 2
-  major: 2
-  minor: 1
+  critical: 1
+  major: 1
+  minor: 2
   nit: 0
 ---
 
 # Review report for cross-cutting/targets.md
 
 ## Summary
-The page has the required structure, valid links, and mostly accurate capability definitions, but it contains five source-alignment issues. Most importantly, its `-target spirv -profile glsl_450` example describes an impossible mixed-target capability set, and its new-target checklist incorrectly instructs backend authors to include an embedded prelude as a header.
+
+The capability and profile explanations largely match the source, but the document needs corrections before acceptance. Most importantly, the target table describes `SLANG_C_SOURCE` as producing C/C++ through the C++ emitter, although the source-emitter dispatcher rejects it. The new-target checklist also omits required routing work.
 
 ## Items checked
-- Read the target page, `_common.md`, the per-document prompt, both dependency pages, and all 40 resolved watched files reported by `regenerate.py show`.
-- Verified source against the recorded commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`, which was also `HEAD` at review time.
-- Spot-checked more than 10 claims, including the complete public target enum, `SourceLanguage`, capability definition forms and keyholes, latest-version aliases/accessors, `CapabilitySet`, `Profile`, `TargetRequest::getTargetCaps`, explicit-capability diagnostics, target/stage specialization, emitter dispatch, prelude insertion, and Slang re-emission.
-- Ran the generated-doc structural lint successfully, checked all relative link targets and peer-doc manifest entries, and confirmed the 21,849-byte page is under its 24,576-byte cap.
-- Verified every body line-number citation: the page contains none.
+
+- Reviewed against the **current working tree**; `git diff` confirmed no differences in `source/` from the document’s source commit.
+- Read the review contract, common generation contract, document prompt, and resolved watched paths.
+- Spot-checked more than 20 claims, including public target enumeration coverage, `SourceLanguage`, profile packing and family derivation, node-stage capabilities, SPIR-V defaults, cross-family profiles, explicit-capability version checks, unknown-name diagnostics, capability aliases, subgroup restrictions, abort and ray-query declarations, LLVM dispatch, the Slang-emission stub, and prelude registration.
+- Checked target/stage specialization implementations and new-backend dispatch requirements.
+- Resolved all 84 Markdown link occurrences: 57 distinct destinations, including the local profile anchor. All eight linked peer pages have manifest entries. Dependency documents were consulted only for cross-reference checks.
+- Found zero source line-number citations in the body; none required verification.
+- Checked required sections, target-table coverage, front-matter keys and formats, source filenames, Liquid safety, and document size: 28,606 UTF-8 bytes.
+- No files were written and no compilation tests were run.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `## Profiles`, lines 258-260 | The example says ``-target spirv -profile glsl_450`` produces a `CapabilitySet` containing both `glsl_450` atoms and the `spirv` target key. Those target atoms are incompatible, and the implementation never constructs that combination: direct SPIR-V keeps only SPIR-V version/extension atoms from the profile, while the via-GLSL path selects `glsl`. | `source/slang/slang-target.cpp:99-150` implements the two SPIR-V paths; `source/slang/slang-target.cpp:209-213` joins profile capabilities only when compatible. `source/slang/slang-capabilities.capdef:162-180` shows SPIR-V versions derive from `spirv` while GLSL versions derive from `glsl`. | Replace the example with separate direct-SPIR-V and SPIR-V-via-GLSL cases, stating which target atom and compatible version family each path retains. |
-| F-002 | major | `## Profiles`, lines 239-256 | The section says profiles “bundle a target choice” and that `Profile` carries a target-language hint. `Profile` actually encodes a stage and version, derives its family from the version, and has no target-format or language-hint field; the format/profile pairing belongs to `TargetDesc`/`TargetRequest`. | `source/slang/slang-profile.h:68-115` lists every `Profile` field and accessor. `include/slang.h:4353-4367` places `format` and `profile` together in `TargetDesc`. | Define `Profile` as stage plus version (with family derived from the version), remove the language-hint claim, and attribute the format/profile pairing to `TargetDesc` or `TargetRequest`. |
-| F-003 | major | `## Targets` table, line 45 | The “Slang round-trip” row claims the internal path re-emits Slang source. At the recorded commit the only such helper is a stub that leaves the output unchanged, and there is no `CodeGenTarget::Slang`. | `source/slang/slang-emit-slang.cpp:6-14` ignores all inputs and returns success without writing output. `source/slang/slang-target.h:24-61` contains no Slang code-generation target. | Remove this from the supported-target table, or label it explicitly as an unimplemented internal stub that currently produces no source. |
-| F-004 | critical | `## Adding a new target`, step 4, lines 367-369 | The checklist instructs a backend author to emit a `#include` for a prelude header. Existing language preludes are embedded strings registered on the global session and written directly into generated source; following the instruction would create an undeployed-header dependency instead of integrating the prelude. | `source/slang/slang-global-session.cpp:125-128` registers the CUDA, C++, and HLSL prelude strings. `source/slang/slang-emit.cpp:2937-2952` writes the selected prelude string directly through `SourceWriter`. | Say to embed/register the prelude for the new `SourceLanguage` and let `emitEntryPointsSourceFromIR` write it. Mention `#include` only for a separate runtime header that is deliberately shipped with generated output. |
-| F-005 | minor | `## Targets` table, line 35 | The GLSL row calls `SLANG_GLSL_VULKAN_*` “aliases.” The API instead contains two specifically named deprecated-and-removed enum slots; they are not aliases and the wildcard spelling is not an identifier readers can search for. | `include/slang.h:687-689` declares `SLANG_GLSL_VULKAN_DEPRECATED` and `SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED` and labels them deprecated/removed. | Name both enumerators explicitly and describe them as retained deprecated enum values, not aliases. |
-
-## No-issues notes
-- All mandatory front-matter keys are present, and the recorded digest is a valid SHA-256 value.
-- The capability keyhole arithmetic, latest-version aliases/accessors, auto-doc groups, and explicit `-capability` conflict diagnostic matched source.
-- The required target, capability, profile, IR-effects, and new-target sections are all present.
+| F-001 | critical | `## Targets`, line 39 | The C++ shader row includes `SLANG_C_SOURCE` and promises `C/C++ text` from `slang-emit-cpp.cpp`. For ordinary Slang-to-target emission, this enum does not select the C++ emitter: it maps to `SourceLanguage::C`, for which the emitter dispatcher has no case. | `source/slang/slang-emit-c-like.cpp:77` returns `SourceLanguage::C`. `source/slang/slang-emit.cpp:3045–3088` constructs an emitter for `CPP`, but not `C`, then diagnoses `UnableToGenerateCodeForTarget` when no emitter was selected. | Separate `SLANG_C_SOURCE` from the working C++ targets and label it as a declared enum without an implemented source emitter on this path. Remove the promise that `slang-emit-cpp.cpp` produces C output. |
+| F-002 | major | `## Adding a new target`, lines 464–478 | The purported `full checklist` covers the public enum and source-emitter dispatch, but omits the internal target mapping and outer code-generation dispatcher. Following it leaves a new target unable to reach its emitter. It also presents the textual dispatcher as sufficient for non-textual backends. | `source/slang/slang-target.h:24` defines the separate `CodeGenTarget` mapping. `source/slang/slang-code-gen.cpp:1233–1303` explicitly routes targets and otherwise reaches `SLANG_UNEXPECTED("unhandled code generation target")`. The linked dependency `docs/generated/design/pipeline/06-emit.md:480–491` distinguishes textual and direct backend registration. | Extend the existing checklist to include `CodeGenTarget`, source-language mapping where needed, and `CodeGenContext::emitEntryPoints`. Explain that direct backends also require routing through `_emitEntryPoints`; link the dependency’s existing checklist for details. |
+| F-003 | minor | `## How target choice affects IR`, lines 393–400 | The paragraph says both specialization passes resolve `[target]` / `[stage]` paths against `TargetRequest` and identifies their syntax as `__target_switch`. Stage specialization instead handles stage-dependent IR using each referencing entry point’s stage. | `source/slang/slang-parser.cpp:7322` recognizes `__stage_switch`; `source/slang/slang-lower-to-ir.cpp:8948–8959` lowers it using `GetCurrentStage`. `source/slang/slang-ir-specialize-stage-switch.cpp:124–168` takes only an IR module and clones functions using entry-point stages. | Distinguish `__target_switch`, specialized using target capabilities, from `__stage_switch`, lowered through `GetCurrentStage` and specialized per entry-point stage. Remove the shared `TargetRequest` description. |
+| F-004 | minor | Whole document | At 28,606 bytes, the page exceeds its own prompt’s explicit `Document length under 24 KB` requirement, although it fits the manifest’s larger cap. | `docs/generated/design/_meta/prompts/cross-cutting-targets.md:63`; measured UTF-8 size of `docs/generated/design/cross-cutting/targets.md`. | Shorten the page below 24 KB while preserving required sections; condense extended examples and repeated explanations in the capability/profile discussion. |
