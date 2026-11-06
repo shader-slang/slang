@@ -1023,6 +1023,11 @@ Enable experimental compiler passes
 Enable additional backwards-compatibility features for legacy HLSL inputs. See the user guide's HLSL backwards compatibility section for the supported behavior. 
 
 
+<a id="fhlsl-methods-mutating-by-default"></a>
+### -fhlsl-methods-mutating-by-default
+Use `inout` for the implicit `this` parameter of HLSL methods by default. Has no effect on Slang or GLSL inputs. 
+
+
 <a id="enable-experimental-dynamic-dispatch"></a>
 ### -enable-experimental-dynamic-dispatch
 Enable experimental dynamic dispatch features 
