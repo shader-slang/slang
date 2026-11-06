@@ -18,7 +18,7 @@
 // reaching end of file with a conditional still open (E15000), and the
 // parent is reported for an `#endif` with nothing to close (E15001).
 
-//TEST:SIMPLE(filecheck=CHECK):-target cpp -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target cpp -entry main -stage compute
 
 #include "include-conditional-stack-is-per-file.slang.h"
 #endif

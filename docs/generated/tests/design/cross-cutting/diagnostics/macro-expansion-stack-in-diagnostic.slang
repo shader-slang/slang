@@ -15,7 +15,7 @@
 // asserts the undefined-identifier message and the expanded name, which the
 // sink can only produce by decoding the expansion's SourceLoc.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 #define USE_UNDECLARED nonexistentVar
 

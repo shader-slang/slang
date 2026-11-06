@@ -14,7 +14,7 @@
 // We use a SIMPLE FileCheck so we can match the code on a
 // non-source line (EOF position).
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
 struct S {
 
 // CHECK: E20001

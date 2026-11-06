@@ -15,7 +15,7 @@
 // CHECK asserts the rejection is reported as E31111 and CHECK-NOT asserts the
 // error was not, in fact, silenced into nothing by a partially-applied override.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -warnings-disable 30015
+//TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target hlsl -entry main -stage compute -warnings-disable 30015
 
 RWStructuredBuffer<int> buf;
 

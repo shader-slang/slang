@@ -17,7 +17,7 @@
 // code E52013 and then CHECK-NOT forbids a second occurrence. The non-zero
 // result code confirms the emitter returned a failure rather than continuing.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:INTERPRET(filecheck=CHECK,exit-code=1):
 
 RWStructuredBuffer<float> inputs;
 

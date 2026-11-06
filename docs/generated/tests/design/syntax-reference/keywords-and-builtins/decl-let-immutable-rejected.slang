@@ -13,7 +13,7 @@
 // the compiler. The diagnostic mentions that the left-hand side is
 // not an l-value.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 void main()
 {

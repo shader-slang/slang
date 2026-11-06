@@ -19,7 +19,7 @@
 // shader body compiles cleanly on its own, so the only diagnostic in the
 // stream is the command-line one.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -pass-through bogusPassThroughTarget
+//TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target hlsl -entry main -stage compute -pass-through bogusPassThroughTarget
 
 RWStructuredBuffer<int> outBuf;
 

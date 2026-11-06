@@ -110,7 +110,10 @@ claim in this bundle. Pick one directive per file:
   suppressed. The `DIAGNOSTIC_TEST` runner is exhaustive by default
   (every emitted diagnostic must be matched); a no-diagnostic test
   is cleaner expressed with a regular `//TEST:SIMPLE` directive
-  and a `CHECK-NOT` over the absence of the code.
+  and a `CHECK-NOT` over the absence of the code. A `filecheck=`
+  directive on a source that gets an error sets `exit-code=-1`, or
+  `exit-code=1` for a command-line error (`_common.md`, "Exit code of
+  a `filecheck=` directive").
 
 Do **not** add gratuitous multi-backend directives. Diagnostics fire
 pre-codegen, so the same diagnostic surfaces from every target — a

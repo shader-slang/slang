@@ -15,7 +15,7 @@
 // asserts both render under E39999, which is only possible because that id is
 // exempted from the uniqueness rule.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<int> buf;
 

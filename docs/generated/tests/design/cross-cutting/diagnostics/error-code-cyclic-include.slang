@@ -13,7 +13,7 @@
 // a self-include via the file's own name. The `~path` interpolation
 // inserts the verbatim include argument into the rendered message.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
 #include "error-code-cyclic-include.slang"
 void main() {}
 

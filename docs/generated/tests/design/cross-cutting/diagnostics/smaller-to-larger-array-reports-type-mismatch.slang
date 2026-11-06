@@ -19,7 +19,7 @@
 // that made the name-suggested entry fire here would fail rather than
 // silently pass.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<float> outBuf;
 

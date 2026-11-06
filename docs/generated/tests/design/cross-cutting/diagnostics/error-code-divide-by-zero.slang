@@ -15,7 +15,7 @@
 // message, so we FileCheck the SIMPLE compile output for both
 // the E30002 code line and the "divide by zero" header line.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {

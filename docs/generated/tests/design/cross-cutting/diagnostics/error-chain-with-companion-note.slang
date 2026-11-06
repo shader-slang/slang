@@ -15,7 +15,7 @@
 // the `error[E30200]` line and a `note:` line naming the previous declaration,
 // which only appear together if the note companion survives rendering.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 int dup;
 int dup;

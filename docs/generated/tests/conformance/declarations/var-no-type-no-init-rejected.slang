@@ -12,7 +12,7 @@
 // Verifies that `var x;` with neither a type nor an initializer is a compile error.
 // The compiler must emit E30620; CHECK-DAG lines assert the error severity and code.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 void main()
 {

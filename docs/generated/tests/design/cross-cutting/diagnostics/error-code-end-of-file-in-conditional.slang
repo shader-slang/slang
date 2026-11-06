@@ -13,7 +13,7 @@
 // rendered code. The diag chain also emits a note pointing back
 // at the originating `#if` — verify both via FileCheck.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
 
 #if 1
 void main() {}

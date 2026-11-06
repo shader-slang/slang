@@ -14,7 +14,7 @@
 // appears alongside the undefined-identifier message, which is only possible
 // if the path component of the decoded triple survives rendering.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)

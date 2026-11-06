@@ -17,8 +17,8 @@
 // matrix-dimension message; the companion test covers the D3D target
 // where the same shape is allowed.
 
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry main
+//TEST:SIMPLE(filecheck=GLSL,exit-code=-1):-target glsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=SPIRV,exit-code=-1):-target spirv-asm -stage compute -entry main
 
 uniform RWStructuredBuffer<float> buf;
 uniform matrix<float, 1, 3> gM;
