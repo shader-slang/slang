@@ -134,7 +134,8 @@ void computeMain(uint3 id: SV_DispatchThreadID)
     // A compare-exchange is emitted as a block, and the fences surround the block.
     // CHECK: _slang_textureFence({{.*}}counters
     // CHECK: counters{{.*}}.atomic_compare_exchange_weak(
-    // CHECK: }
+    // CHECK: = _metal_cas_expected.x;
+    // CHECK-NEXT: }
     // CHECK-NEXT: _slang_textureFence({{.*}}counters
     InterlockedCompareExchange(counters[p], 1, 2, previous);
 
