@@ -485,6 +485,13 @@ void sin_bwd(inout DifferentialPair<float> dpx, float dresult) { /* ... */ }
 User-defined derivatives also work for generic functions, member functions, accessors, and more.
 See the reference section for the [`[ForwardDerivative(fn)]`](https://shader-slang.org/stdlib-reference/attributes/forwardderivative-07.html) and [`[BackwardDerivative(fn)]`](https://shader-slang.org/stdlib-reference/attributes/backwardderivative-08) attributes for more.
 
+Differentiability attributes remain available through transitive imports. For example, if a library
+declares a public `[Differentiable]` method and another module exposes its receiver type through a
+public field, a caller can differentiate that method without directly importing the library.
+The compiler-generated extensions implementing these attributes follow module dependencies; ordinary
+extension declarations and namespace-level names still require the usual imports. Access checks on
+the primal and custom derivative functions continue to apply.
+
 ## Using Auto-diff with Generics
 
 Automatic differentiation works seamlessly with generically-defined types and methods.
