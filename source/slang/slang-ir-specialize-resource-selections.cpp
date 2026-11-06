@@ -456,10 +456,10 @@ struct ResourceSelectionContext
         return value;
     }
 
-    /// Find the enclosing instruction directly owned by an `IRBlock` in `func`.
+    /// Find `inst` or an ancestor instruction directly owned by an `IRBlock` in `func`.
     ///
     /// Returns null for globals and instructions in other functions.
-    IRInst* findBlockInstruction(IRInst* inst)
+    IRInst* findEnclosingInstructionInBlockOfCurrentFunc(IRInst* inst)
     {
         // An `IRSPIRVAsmOperand` is nested inside an `IRSPIRVAsm` operation. Conditional execution
         // must include that whole operation, so consumer discovery needs its enclosing block
@@ -501,7 +501,7 @@ struct ResourceSelectionContext
                 // Assembly operand wrappers have the wrapped value's type, but belong to the
                 // assembly representation. We clone internal values with the operation. Only
                 // references outside its owned subtree are resource arguments of the graph.
-                if (findBlockInstruction(value) == consumer.inst)
+                if (findEnclosingInstructionInBlockOfCurrentFunc(value) == consumer.inst)
                     continue;
                 if (isOpaqueResourceType(type))
                     consumer.arguments.add(addValue(value));
@@ -511,8 +511,10 @@ struct ResourceSelectionContext
         }
     }
 
-    /// Add the destination parameter for one exact resource argument use on a branch.
-    void addBranchDestination(IRUnconditionalBranch* branch, IRUse* use)
+    /// Include the destination parameter for one exact resource argument use on a branch.
+    ///
+    /// Requires `use` to refer to an argument of `branch`.
+    void includeBranchArgumentDestinationParam(IRUnconditionalBranch* branch, IRUse* use)
     {
         auto param = branch->getTargetBlock()->getFirstParam();
         for (UInt i = 0; i < branch->getArgCount(); i++, param = param->getNextParam())
@@ -631,7 +633,7 @@ struct ResourceSelectionContext
             for (auto use = inst->firstUse; use; use = use->nextUse)
             {
                 auto user = use->getUser();
-                auto operation = findBlockInstruction(user);
+                auto operation = findEnclosingInstructionInBlockOfCurrentFunc(user);
                 if (!operation)
                     continue;
                 if (isSelection(operation))
@@ -639,7 +641,7 @@ struct ResourceSelectionContext
                 else if (isConstructor(operation))
                     addValue(operation);
                 else if (auto branch = as<IRUnconditionalBranch>(operation))
-                    addBranchDestination(branch, use);
+                    includeBranchArgumentDestinationParam(branch, use);
                 else
                 {
                     // `specializeResourceOutputs` and the output-call inlining performed by
