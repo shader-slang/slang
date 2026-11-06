@@ -103,39 +103,52 @@ namespace
 /// distinct from the runtime selector number assigned after recipe discovery. A payload operand
 /// records its required type; a fixed operand records an existing IR value, such as a binding or
 /// a field key, that can be referenced at every reconstruction.
+///
+/// The factories create initialized operands. A default-constructed instance has `Flavor::None`
+/// and must be assigned an initialized operand before being compared, hashed, or used in a recipe.
 class ResourceRecipeOperand
 {
 public:
     enum class Flavor
     {
+        None,
         Resource,
         Payload,
         Fixed,
     };
 
-    // `List` default-initializes storage before assigning appended operands. Factory methods
-    // supply every observable operand; an unassigned storage element has no fixed IR value.
+    /// Create uninitialized storage that must be assigned an operand before use in a recipe.
     ResourceRecipeOperand()
-        : m_flavor(Flavor::Fixed)
+        : m_flavor(Flavor::None)
     {
+        // We want usable operands to be created by the named factories, which supply the value
+        // required by each flavor. However, `List` default-constructs its allocated slots before
+        // assigning elements into them. We therefore need a default constructor whose result is
+        // explicitly uninitialized, rather than pretending that it is a usable fixed operand.
     }
 
+    /// Create an operand referring to the recipe at a nonnegative analysis-list index.
     static ResourceRecipeOperand resource(Index recipe)
     {
+        SLANG_RELEASE_ASSERT(recipe >= 0);
         ResourceRecipeOperand result(Flavor::Resource);
         result.m_recipe = recipe;
         return result;
     }
 
+    /// Create an operand whose dynamic value must have the non-null payload `type`.
     static ResourceRecipeOperand payload(IRType* type)
     {
+        SLANG_RELEASE_ASSERT(type);
         ResourceRecipeOperand result(Flavor::Payload);
         result.m_value = type;
         return result;
     }
 
+    /// Create an operand referring directly to the non-null fixed IR `value`.
     static ResourceRecipeOperand fixed(IRInst* value)
     {
+        SLANG_RELEASE_ASSERT(value);
         ResourceRecipeOperand result(Flavor::Fixed);
         result.m_value = value;
         return result;
@@ -164,6 +177,8 @@ public:
 
     bool operator==(const ResourceRecipeOperand& other) const
     {
+        SLANG_RELEASE_ASSERT(m_flavor != Flavor::None);
+        SLANG_RELEASE_ASSERT(other.m_flavor != Flavor::None);
         if (m_flavor != other.m_flavor)
             return false;
         if (m_flavor == Flavor::Resource)
@@ -173,6 +188,7 @@ public:
 
     HashCode getHashCode() const
     {
+        SLANG_RELEASE_ASSERT(m_flavor != Flavor::None);
         if (m_flavor == Flavor::Resource)
             return combineHash(Slang::getHashCode(Int(m_flavor)), Slang::getHashCode(m_recipe));
         return combineHash(Slang::getHashCode(Int(m_flavor)), Slang::getHashCode(m_value));
@@ -189,15 +205,24 @@ private:
     IRInst* m_value = nullptr;
 };
 
-/// A recipe key identifies an exact resource construction with ordinary operands replaced by types.
-//
-// `op` is the constructor opcode, except that `kIROp_Invalid` denotes a root recipe whose only
-// operand is the existing root value. A root needs no emitted constructor instruction.
-//
-// Keys compare the constructor, result type, fixed IR values, child recipes, and payload types.
-// Root values use exact IR identity. We do not compare bindings, infer resource aliasing, or
-// redefine IR equality. For example, `a[i]` and `a[j]` share a key when their index payloads have
-// the same type, but `a[i]` and `b[i]` do not.
+/// A recipe key describes a resource construction's structure while leaving payload values
+/// abstract.
+///
+/// Two constructions share a key only when they agree on:
+///
+/// - The IR opcode and result type.
+/// - The number, order, and flavors of the operands.
+/// - The interned child recipe for each resource operand.
+/// - The exact IR value for each fixed operand.
+/// - The type of each payload operand.
+///
+/// For example, `a[i]` and `a[j]` share a key when their index payloads have the same type, but
+/// `a[i]` and `b[i]` do not. Key equality does not imply equality of the constructed resource
+/// values: the payloads can select different elements of the same array.
+///
+/// `op` is the constructor opcode, except that `kIROp_Invalid` denotes a root key whose sole
+/// operand is the fixed IR root value. A default key is incomplete; its type and operands must be
+/// assigned before interning.
 struct ResourceRecipeKey
 {
     IROp op = kIROp_Invalid;
@@ -246,7 +271,7 @@ struct ResourceRecipe
 //
 // For each possible recipe, `payloads` contains values meaningful when `selector` names that
 // recipe. Payloads for other recipes need not describe a valid access: they are never reconstructed
-// on that execution path. A value with one recipe has a constant selector, which DCE can remove.
+// on that execution path. A value with one recipe has a constant selector.
 struct ResourceSelectionValue : RefObject
 {
     IRInst* inst = nullptr;
@@ -284,14 +309,15 @@ struct ResourceSelectionContext
     IRType* commonIndexType = nullptr;
 
     /// Rewrite the graph containing `candidate`, leaving unsupported graphs unchanged.
-    //
-    // Analysis completes before executable IR is changed. Roots and constructor operands must
-    // be reconstructible, and every resource use must end in a supported ordinary-valued
-    // operation. The caller, `specializeResourceUsage`, also runs `specializeResourceOutputs` and
-    // tries inlining calls whose resource outputs could not be reconstructed. Its next iteration
-    // can retry a graph that this procedure could not rewrite before that inlining.
+    ///
+    /// Returns whether the graph was rewritten. On failure, no executable IR is changed.
     bool tryRewrite(IRInst* candidate)
     {
+        // We finish analysis before changing executable IR. Roots and constructor operands must
+        // be reconstructible, and every resource use must end in a supported ordinary-valued
+        // operation. The caller, `specializeResourceUsage`, also runs `specializeResourceOutputs`
+        // and tries inlining calls whose resource outputs could not be reconstructed. Its next
+        // iteration can retry a graph that could not be rewritten before that inlining.
         if (!discoverGraph(candidate))
             return false;
         if (!discoverRecipes())
@@ -318,12 +344,11 @@ struct ResourceSelectionContext
 
     /// Return whether `type` is an image, sampler, or another unstorable resource, including
     /// arrays.
-    //
-    // Storage buffers have an existing variable-pointer lowering. We leave their ordinary
-    // selections to that lowering; descriptor-heap loads remain accepted separately because
-    // replacing those loads with selected heap indices is already required for storage buffers.
     static bool isOpaqueResourceType(IRType* type)
     {
+        // Storage buffers have an existing variable-pointer lowering. We leave their ordinary
+        // selections to that lowering; descriptor-heap loads remain accepted separately because
+        // replacing those loads with selected heap indices is required for storage buffers.
         type = unwrapArray(type);
         if (as<IRResourceTypeBase>(type))
             return true;
@@ -352,14 +377,16 @@ struct ResourceSelectionContext
         return block != cast<IRFunc>(block->getParent())->getFirstBlock();
     }
 
-    /// Return whether `inst` can be reconstructed as part of a resource recipe.
-    //
-    // These opcodes describe resource values or addresses without performing the eventual
-    // resource access. `discoverGraph` also checks their dependencies: a field or element address
-    // is usable only when its base can be reconstructed from a resource root. Actual reads,
-    // writes, and samples are terminal consumers and execute only in the chosen branch.
+    /// Return whether `inst` has a resource-constructor form recognized by graph discovery.
+    ///
+    /// This classification does not validate resource dependencies or target support.
     static bool isConstructor(IRInst* inst)
     {
+        // These instructions describe resource values or addresses without performing the
+        // eventual resource access. `discoverGraph` also checks their dependencies: a field or
+        // element address is usable only when its base can be reconstructed from a resource
+        // root. Actual reads, writes, and samples are terminal consumers and execute only in
+        // the chosen branch.
         switch (inst->getOp())
         {
         case kIROp_GetElement:
@@ -399,13 +426,15 @@ struct ResourceSelectionContext
     }
 
     /// Return whether an operand names static construction metadata rather than ordinary state.
-    //
-    // For the supported constructors, types and typeless field keys identify static IR metadata,
-    // not values calculated during shader execution. A heap declaration is fixed metadata too;
-    // `discoverGraph` separately requires it to have module scope. Those operands can therefore
-    // be reused wherever `materializeRecipe` reconstructs the resource or resource-backed address.
+    ///
+    /// Requires a constructor recognized by `isConstructor`.
     static bool isFixedOperand(IRInst* inst, UInt operandIndex)
     {
+        // For the supported constructors, types and typeless field keys identify static IR
+        // metadata, not values calculated during shader execution. A heap declaration is fixed
+        // metadata too; `discoverGraph` separately requires it to have module scope. Those
+        // operands can therefore be reused wherever `materializeRecipe` reconstructs a resource
+        // or resource-backed address.
         if (inst->getOp() == kIROp_SPIRVLoadDescriptorFromHeap)
             if (operandIndex == 0)
                 return true;
@@ -428,12 +457,13 @@ struct ResourceSelectionContext
     }
 
     /// Find the enclosing instruction directly owned by an `IRBlock` in `func`.
-    //
-    // An `IRSPIRVAsmOperand` is nested inside an `IRSPIRVAsm` operation. Conditional execution
-    // must include that whole operation, so consumer discovery needs its enclosing block child,
-    // not the operand wrapper. Returns null for globals and instructions in other functions.
+    ///
+    /// Returns null for globals and instructions in other functions.
     IRInst* findBlockInstruction(IRInst* inst)
     {
+        // An `IRSPIRVAsmOperand` is nested inside an `IRSPIRVAsm` operation. Conditional execution
+        // must include that whole operation, so consumer discovery needs its enclosing block
+        // child, not the operand wrapper.
         while (inst)
         {
             auto parent = inst->getParent();
@@ -449,14 +479,14 @@ struct ResourceSelectionContext
     }
 
     /// Include all opaque arguments of one terminal operation in the same component.
-    //
-    // A GLSL sample is an intrinsic call with separate texture and sampler arguments. Their
-    // choices are related through that call even without a `MakeCombinedTextureSampler` node.
-    // Discovering both arguments together lets us clone and diagnose the original call once.
-    // Assembly operands can be nested children, so we inspect the operation's owned subtree.
-    // We never traverse ordinary argument definitions, which must retain their evaluation point.
     void includeConsumerArguments(ResourceSelectionConsumer& consumer)
     {
+        // A GLSL sample is an intrinsic call with separate texture and sampler arguments. Their
+        // choices are related through that call even without a `MakeCombinedTextureSampler`
+        // node. Discovering both arguments together lets us clone and diagnose the original call
+        // once. Assembly operands can be nested children, so we inspect the operation's owned
+        // subtree. We never traverse ordinary argument definitions, which must retain their
+        // evaluation point.
         List<IRInst*> pending;
         pending.add(consumer.inst);
         for (Index i = 0; i < pending.getCount(); i++)
@@ -498,14 +528,14 @@ struct ResourceSelectionContext
     }
 
     /// Record the broadest descriptor index type without narrowing existing 64-bit indices.
-    //
-    // A recipe has one payload type per indexing step, but incoming descriptor indices can have
-    // different integer types. We choose a common type for the graph so accesses to the same
-    // array can share one recipe and select their index payload. Valid indices are nonnegative:
-    // the widest incoming type can represent all of them when unsigned wins an equal-width tie.
-    // This preserves wider indices without introducing 64-bit state for entirely narrower input.
     void includeIndexType(IRType* type)
     {
+        // A recipe has one payload type per indexing step, but incoming descriptor indices can
+        // have different integer types. We choose a common type for the graph so accesses to the
+        // same array can share one recipe and select their index payload. Valid indices are
+        // nonnegative: the widest incoming type can represent all of them when unsigned wins an
+        // equal-width tie. This preserves wider indices without introducing 64-bit state for
+        // entirely narrower input.
         if (!commonIndexType)
         {
             commonIndexType = type;
@@ -638,9 +668,21 @@ struct ResourceSelectionContext
         return true;
     }
 
-    /// Intern one exact construction and derive its flattened payload layout from its operands.
+    /// Intern a completed construction key and compute its flattened payload layout.
+    ///
+    /// Requires a completed key with a non-null result type and initialized operands. A root key
+    /// must contain exactly one fixed operand identifying the existing root value.
     Index internRecipe(const ResourceRecipeKey& key)
     {
+        // Both producers build keys incrementally. Before interning, we assert the result type
+        // and the root's single-fixed-operand form. Operand hashing rejects uninitialized slots.
+        SLANG_RELEASE_ASSERT(key.type);
+        if (key.op == kIROp_Invalid)
+        {
+            SLANG_RELEASE_ASSERT(key.operands.getCount() == 1);
+            SLANG_RELEASE_ASSERT(
+                key.operands[0].getFlavor() == ResourceRecipeOperand::Flavor::Fixed);
+        }
         if (auto existing = recipeMap.tryGetValue(key))
             return *existing;
         ResourceRecipe recipe;
@@ -660,12 +702,14 @@ struct ResourceSelectionContext
     }
 
     /// Describe a constructor with a concrete recipe for each resource operand.
-    //
-    // Texture/sampler projections of a known pair use the corresponding child recipe. In
-    // addition to avoiding needless reconstruction, this prevents a combine/project loop from
-    // generating an endlessly deeper description of the same resource.
+    ///
+    /// Requires `childRecipes` to identify one recipe per resource dependency, in operand order.
+    /// Returns an interned recipe index, reusing the child recipe for a projection of a known pair.
     Index getConstructorRecipe(ResourceSelectionValue* value, const List<Index>& childRecipes)
     {
+        // Texture/sampler projections of a known pair use the corresponding child recipe. In
+        // addition to avoiding needless reconstruction, this prevents a combine/project loop from
+        // generating an endlessly deeper description of the same resource.
         auto inst = value->inst;
         if (inst->getOp() == kIROp_CombinedTextureSamplerGetTexture)
             if (recipes[childRecipes[0]].key.op == kIROp_MakeCombinedTextureSampler)
@@ -694,17 +738,19 @@ struct ResourceSelectionContext
     }
 
     /// Add recipes for every combination of a constructor's resource-operand alternatives.
-    //
-    // `childRecipes` contains one chosen recipe for each dependency before `dependencyIndex`.
-    // We extend that prefix with each recipe of the next dependency. Once every dependency has
-    // a chosen recipe, `getConstructorRecipe` describes the resulting constructor. Each return
-    // restores the caller's prefix, so trying one alternative cannot affect the next. Returns
-    // whether `value->recipes` gained an alternative.
+    ///
+    /// Requires `childRecipes` to contain one chosen recipe per dependency before
+    /// `dependencyIndex`. Restores that prefix on return. Returns whether `value->recipes` gained
+    /// an alternative.
     bool addConstructorRecipes(
         ResourceSelectionValue* value,
         Index dependencyIndex,
         List<Index>& childRecipes)
     {
+        // We extend the chosen prefix with each recipe of the next dependency. Once every
+        // dependency has a chosen recipe, `getConstructorRecipe` describes the resulting
+        // constructor. Removing each appended choice after recursion restores the caller's
+        // prefix, so trying one alternative cannot affect the next.
         if (dependencyIndex == value->dependencies.getCount())
             return value->recipes.add(getConstructorRecipe(value, childRecipes));
         bool changed = false;
@@ -718,17 +764,19 @@ struct ResourceSelectionContext
     }
 
     /// Compute finite recipe alternatives to a fixed point, including cycles through block params.
-    //
-    // A select or block parameter only unions the recipes of its incoming resource values.
-    // Indexing descends through finite array types. Address constructors, such as `GetElementPtr`
-    // and `FieldAddress`, can extend a recipe only along acyclic dependencies: `isSelection` and
-    // `discoverGraph` exclude pointer-valued selection state, so an address cannot be carried back
-    // around a loop to extend itself. Combination constructs one sampled-image recipe from texture
-    // and sampler recipes, and projection normalization removes the inverse construction. Thus
-    // loops can propagate alternatives but cannot keep adding access steps, so discovery
-    // terminates.
+    ///
+    /// Requires completed graph discovery. Returns false if any graph value has no recipe after
+    /// convergence; otherwise, every graph value has at least one reconstruction alternative.
     bool discoverRecipes()
     {
+        // A select or block parameter only unions the recipes of its incoming resource values.
+        // Indexing descends through finite array types. Address constructors, such as
+        // `GetElementPtr` and `FieldAddress`, can extend a recipe only along acyclic dependencies:
+        // `isSelection` and `discoverGraph` exclude pointer-valued selection state, so an address
+        // cannot be carried back around a loop to extend itself. Combination constructs one
+        // sampled-image recipe from texture and sampler recipes, and projection normalization
+        // removes the inverse construction. Thus loops can propagate alternatives but cannot keep
+        // adding access steps, so discovery terminates.
         bool changed = true;
         while (changed)
         {
@@ -768,13 +816,14 @@ struct ResourceSelectionContext
     }
 
     /// Return whether every construction needed by a consumer can be emitted on this target path.
-    //
-    // Normalization can remove an intermediate constructor that the target cannot emit. For
-    // example, projecting a known pair's sampler retains the actual sampler root. We therefore
-    // validate the recipes reachable from consumers, rather than rejecting every intermediate
-    // recipe discovered while analyzing the graph.
+    ///
+    /// Requires completed recipe discovery. Checks only recipes reachable from terminal consumers.
     bool canMaterializeConsumerRecipes()
     {
+        // Normalization can remove an intermediate constructor that the target cannot emit. For
+        // example, projecting a known pair's sampler retains the actual sampler root. We therefore
+        // validate the recipes reachable from consumers, rather than rejecting every intermediate
+        // recipe discovered while analyzing the graph.
         const bool emitsSPIRVDirectly =
             codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly();
         List<Index> pending;
@@ -843,25 +892,26 @@ struct ResourceSelectionContext
     }
 
     /// Negate a selector condition while eliminating a generated double negation.
-    //
-    // Recipe numbering can reverse a Boolean choice, and a consumer can reverse it again.
-    // Folding that pair here keeps the original condition even when optimization is disabled.
     IRInst* emitConditionNot(IRBuilder& builder, IRInst* condition)
     {
+        // Recipe numbering can reverse a Boolean choice, and a consumer can reverse it again.
+        // Folding that pair during construction keeps the original condition even when
+        // optimization is disabled.
         if (condition->getOp() == kIROp_Not)
             return condition->getOperand(0);
         return builder.emitNot(builder.getBoolType(), condition);
     }
 
     /// Build an ordinary-value select, recovering the original condition for Boolean choices.
-    //
-    // We intentionally perform these folds during construction. Existing SCCP cannot recover
-    // `c` from a nonconstant `select(c, true, false)`. A nested use of the same condition, such as
-    // `select(c, select(c, a, b), d)`, cannot choose `b` and reduces to `select(c, a, d)`.
-    // Such expressions arise when a texture and sampler are both chosen using `c`. Eliminating
-    // their unreachable combinations keeps the generated selector dependent on `c` directly.
+    ///
+    /// Requires a Boolean condition and equally typed non-resource arms.
     IRInst* emitValueSelect(IRBuilder& builder, IRInst* condition, IRInst* onTrue, IRInst* onFalse)
     {
+        // We intentionally perform these folds during construction. Existing SCCP cannot recover
+        // `c` from a nonconstant `select(c, true, false)`. A nested use of the same condition, such
+        // as `select(c, select(c, a, b), d)`, cannot choose `b` and reduces to `select(c, a, d)`.
+        // Such expressions arise when a texture and sampler are both chosen using `c`. Eliminating
+        // their unreachable combinations keeps the generated selector dependent on `c` directly.
         if (auto literal = as<IRBoolLit>(condition))
             return literal->getValue() ? onTrue : onFalse;
         if (auto select = as<IRSelect>(onTrue))
@@ -905,9 +955,9 @@ struct ResourceSelectionContext
 
     /// Return one alternative's payload, using harmless ordinary defaults when that choice is
     /// absent.
-    //
-    // The defaults are carried through SSA but never materialized as resource accesses. A
-    // reconstruction arm executes only when its recipe was actually selected.
+    ///
+    /// The caller must guard reconstruction with a selector naming `recipe`; a default for an
+    /// absent alternative is valid as ordinary SSA state, not as a resource access.
     IRInst* getPayloadOrDefault(
         IRBuilder& builder,
         ResourceSelectionValue* value,
@@ -931,6 +981,8 @@ struct ResourceSelectionContext
             if (!param)
                 continue;
             IRBuilder builder(param);
+            // One recipe needs no runtime choice. We keep a constant selector for the common
+            // replacement-state interface; later DCE can discard it after reconstruction.
             if (value->recipes.getCount() == 1)
                 value->selector = getSelectorConstant(builder, *value->recipes.begin());
             else
@@ -957,19 +1009,20 @@ struct ResourceSelectionContext
     }
 
     /// Build the selector decision tree for one constructor from its children's scalar selectors.
-    //
-    // Recipe discovery and the replacement state for every dependency must already be complete.
-    // `childRecipes` records a chosen recipe for each dependency before `dependencyIndex`. We
-    // extend that prefix to obtain each possible constructor recipe, then use the dependencies'
-    // selectors to choose its number. Each dependency selects one of its analyzed alternatives,
-    // so its first alternative can be the default while later matches override that choice.
-    // The prefix is restored on return; only ordinary selects are emitted, not resource accesses.
+    ///
+    /// Requires completed recipe discovery and dependency replacement state. `childRecipes` must
+    /// contain one chosen recipe per dependency before `dependencyIndex` and is restored on return.
+    /// Emits only ordinary selects, not resource accesses.
     IRInst* emitConstructorSelector(
         IRBuilder& builder,
         ResourceSelectionValue* value,
         Index dependencyIndex,
         List<Index>& childRecipes)
     {
+        // We extend the chosen prefix to obtain each possible constructor recipe, then use the
+        // dependencies' selectors to choose its number. Each dependency selects one of its
+        // analyzed alternatives, so its first alternative can be the default while later matches
+        // override that choice.
         if (dependencyIndex == value->dependencies.getCount())
             return getSelectorConstant(builder, getConstructorRecipe(value, childRecipes));
         auto dependency = value->dependencies[dependencyIndex];
@@ -996,20 +1049,18 @@ struct ResourceSelectionContext
     }
 
     /// Build payloads for every recipe produced by a constructor's resource-operand alternatives.
-    //
-    // As in recipe discovery, `childRecipes` is the chosen prefix of dependencies before
-    // `dependencyIndex`; recursion enumerates the remaining alternatives and restores that prefix
-    // on return. Replacement payloads for all dependencies must already exist. For a complete
-    // combination, we concatenate the child payloads in resource-operand order, then append the
-    // constructor's own ordinary operands. This agrees with the payload-type order established
-    // by `internRecipe`; fixed metadata occupies no payload slot. Projection may retain only
-    // one child's payload, and distinct combinations may need their payloads merged afterward.
+    ///
+    /// Requires completed dependency replacement state. `childRecipes` must contain one chosen
+    /// recipe per dependency before `dependencyIndex` and is restored on return. Populates
+    /// `value->payloads` using the flattened layouts from `internRecipe`.
     void addConstructorPayloads(
         IRBuilder& builder,
         ResourceSelectionValue* value,
         Index dependencyIndex,
         List<Index>& childRecipes)
     {
+        // As in recipe discovery, recursion enumerates the remaining dependency alternatives and
+        // restores the caller's chosen prefix after each alternative.
         if (dependencyIndex != value->dependencies.getCount())
         {
             for (auto recipe : value->dependencies[dependencyIndex]->recipes)
@@ -1020,6 +1071,10 @@ struct ResourceSelectionContext
             }
             return;
         }
+        // For a complete combination, we concatenate child payloads in resource-operand order,
+        // then append the constructor's own ordinary operands. This agrees with the layout from
+        // `internRecipe`; fixed metadata occupies no payload slot. A normalized projection may
+        // retain only one child's payload, which we handle before appending ordinary operands.
         auto recipeIndex = getConstructorRecipe(value, childRecipes);
         List<IRInst*> payload;
         for (Index i = 0; i < value->dependencies.getCount(); i++)
@@ -1092,19 +1147,21 @@ struct ResourceSelectionContext
     }
 
     /// Emit acyclic replacement calculations after all parameter replacements have been allocated.
-    //
-    // Discovery order need not place every dependency before its use, so we repeatedly scan the
-    // graph values and complete whichever ones have ready dependencies. Between visits to graph
-    // values, a non-null `selector` means both the selector and every recipe payload have been
-    // created. Within one visit, we may assign the selector first, but we fill all payloads before
-    // advancing to another value; no dependent visit observes that partially built state.
-    //
-    // `createReplacementParams` has already allocated the complete ordinary state for the graph's
-    // non-entry resource block parameters. Those replacements break loop dependencies. Every other
-    // value can be completed once its dependencies' states exist, justifying the progress check
-    // below.
+    ///
+    /// Requires completed recipe discovery, selector numbering, and replacement-parameter
+    /// allocation. Completes the selector and payload state for every graph value.
     void emitReplacementValues()
     {
+        // Discovery order need not place every dependency before its use, so we repeatedly scan
+        // the graph values and complete whichever ones have ready dependencies. Between visits,
+        // a non-null `selector` means both the selector and every recipe payload have been
+        // created. Within one visit, we may assign the selector first, but we fill all payloads
+        // before advancing; no dependent visit observes that partially built state.
+        //
+        // `createReplacementParams` has allocated the complete ordinary state for the graph's
+        // non-entry resource block parameters. Those replacements break loop dependencies. Every
+        // other value can be completed once its dependencies' states exist, justifying the
+        // progress check below.
         Index remaining = 0;
         for (auto value : values)
             if (!value->selector)
@@ -1175,13 +1232,13 @@ struct ResourceSelectionContext
     }
 
     /// Move a selected resource's name to its ordinary state without naming constants or roots.
-    //
-    // For the same-array optimization, the selected index is in the first payload. For choices
-    // between different recipes, the selected recipe is identified by the selector. We move the
-    // original name hint to that ordinary value so an IR dump still identifies the state that
-    // corresponds to the programmer's resource variable, including across loop iterations.
     void transferSelectedStateNames()
     {
+        // For the same-array optimization, the selected index is in the first payload. For
+        // choices between different recipes, the selected recipe is identified by the selector.
+        // We move the original name hint to that ordinary value so an IR dump still identifies
+        // the state corresponding to the programmer's resource variable, including across loop
+        // iterations.
         for (auto value : values)
         {
             if (value->isRoot)
@@ -1207,12 +1264,14 @@ struct ResourceSelectionContext
     }
 
     /// Replace each resource parameter's argument slot with its selector and payload arguments.
-    //
-    // We rebuild complete branch argument lists from the saved parameter lists. That preserves
-    // ordinary arguments and structural loop operands while expanding each resource slot exactly
-    // once, even when two parameters received the same incoming resource value.
+    ///
+    /// Requires completed replacement state. Preserves ordinary arguments and structural loop
+    /// operands.
     void rewriteBranchArguments()
     {
+        // We rebuild complete branch argument lists from the saved parameter lists. That expands
+        // each resource slot exactly once, even when two parameters received the same incoming
+        // resource value, while preserving ordinary arguments and structural loop operands.
         for (auto& entry : originalParams)
         {
             List<IRBlock*> predecessors;
@@ -1258,19 +1317,20 @@ struct ResourceSelectionContext
     }
 
     /// Emit the construction for one recipe using its ordinary payload values.
-    //
-    // `canMaterializeConsumerRecipes` must have validated the constructors for this target path.
-    // `payloadIndex` is the next unread slot in the flattened payload layout from `internRecipe`.
-    // Each recursive child consumes its slots before the following operands, so callers can pass
-    // one shared payload and offset through the recipe tree. Every payload value must dominate
-    // the builder's insertion point; the replacement calculations and block parameters establish
-    // that availability before any consumer is rewritten.
+    ///
+    /// Requires target validation by `canMaterializeConsumerRecipes` and payload values that
+    /// dominate the builder's insertion point. `payloadIndex` identifies the first unread slot
+    /// and advances by the number of payload values consumed by this recipe.
     IRInst* materializeRecipe(
         IRBuilder& builder,
         Index recipeIndex,
         const List<IRInst*>& payload,
         Index& payloadIndex)
     {
+        // Each recursive child consumes its flattened payload slots before the following
+        // operands, so we pass one shared payload and cursor through the recipe tree. Replacement
+        // calculations and block parameters establish payload availability before consumer
+        // rewriting.
         // Recipe discovery has finished, so recursive materialization cannot invalidate the key.
         const auto& key = recipes[recipeIndex].key;
         if (key.op == kIROp_Invalid)
@@ -1282,6 +1342,8 @@ struct ResourceSelectionContext
         {
             switch (operand.getFlavor())
             {
+            case ResourceRecipeOperand::Flavor::None:
+                SLANG_UNEXPECTED("A recipe operand must be initialized before materialization.");
             case ResourceRecipeOperand::Flavor::Resource:
                 operands.add(
                     materializeRecipe(builder, operand.getRecipe(), payload, payloadIndex));
@@ -1316,18 +1378,12 @@ struct ResourceSelectionContext
     }
 
     /// Clone an operation with concrete resource arguments, dispatching each independent choice.
-    //
-    // Each recursive level handles one resource argument, not another path through the original
-    // selection graph. A repeated argument is registered only once. Multiple independently
-    // selected arguments can require a Cartesian product, but a selected combined pair remains
-    // one argument and therefore preserves its joint choice.
-    //
-    // `environment` maps arguments before `argumentIndex` to their materialized resources. A
-    // branch receives a child environment so choosing a resource in one arm cannot change the
-    // mappings used by another arm. The return value is the cloned operation or the block
-    // parameter merging its result; a conditional operation without a result returns null.
-    // When dispatch is emitted, the builder is left in its final merge block. Otherwise it
-    // remains at the insertion point after the cloned operation.
+    ///
+    /// Requires completed replacement state and validated recipes. `environment` must map the
+    /// arguments before `argumentIndex` to their materialized resources. Returns the cloned
+    /// operation or the block parameter merging its result; a conditional operation without a
+    /// result returns null. Leaves the builder in the final merge block when dispatch is emitted,
+    /// or at the insertion point after the cloned operation otherwise.
     IRInst* emitConsumer(
         IRBuilder& builder,
         ResourceSelectionConsumer& consumer,
@@ -1335,6 +1391,13 @@ struct ResourceSelectionContext
         Index argumentIndex,
         IRCloneEnv& environment)
     {
+        // Each recursive level handles one resource argument, not another path through the
+        // original selection graph. A repeated argument is registered only once. Independently
+        // selected arguments can require a Cartesian product, but a selected combined pair
+        // remains one argument and therefore preserves its joint choice.
+        //
+        // Each branch receives a child clone environment so choosing a resource in one arm
+        // cannot change the mappings used by another arm.
         if (argumentIndex == arguments.getCount())
             return cloneInst(&environment, &builder, consumer.inst);
         auto value = arguments[argumentIndex];

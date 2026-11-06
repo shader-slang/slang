@@ -16,8 +16,7 @@ SamplerState selSampler(bool b)
     return b ? s1 : s0;
 }
 
-// Texture selected via `if`/`else` (a different post-phi-elimination IR shape
-// than `?:`).
+// The texture is chosen by assignments in the two arms of an `if`/`else`.
 [noinline]
 Texture2D<float> selIfElse(bool b)
 {
