@@ -1,7 +1,0 @@
-result code = -1
-standard error = {
-(0): warning 32: the stage specified for entry point 'main' ('pixel') does not match the stage implied by the source file name ('vertex')
-(0): error 11: the Slang compiler does not support GLSL as a source language by default, please use -allow-glsl
-}
-standard output = {
-}

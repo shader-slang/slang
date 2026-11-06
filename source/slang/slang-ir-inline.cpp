@@ -324,6 +324,9 @@ struct InliningPassBase
             return false;
         for (auto inst : firstBlock->getOrdinaryInsts())
         {
+            // Debug markers do not introduce runtime side effects or local storage.
+            if (isDebugInfoInst(inst))
+                continue;
             if (inst == firstBlock->getTerminator())
                 continue;
             switch (inst->getOp())

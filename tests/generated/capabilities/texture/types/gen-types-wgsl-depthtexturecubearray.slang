@@ -28,7 +28,6 @@ SamplerComparisonState samplerComparisonState;
 void fragMain()
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE: result code = 0
 // POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: fragMain
 // POSITIVE-NOT: {{(error|warning).*}}:

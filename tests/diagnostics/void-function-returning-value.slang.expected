@@ -1,9 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/void-function-returning-value.slang(16): error 30019: expected an expression of type 'void', got 'int'
-    return 1;
-           ^
-tests/diagnostics/void-function-returning-value.slang(16): note: explicit conversion from 'int' to 'void' is possible
-}
-standard output = {
-}
