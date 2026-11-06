@@ -2838,6 +2838,13 @@ Result linkAndOptimizeIR(
     // The earlier void cleanup has already run, so remove these new placeholders before emit.
     SLANG_PASS(cleanUpVoidType);
 
+    // WGSL only accepts a barrier whose control flow it can prove uniform, and a groupshared read
+    // that decides whether a barrier runs (for example, a loop bound) has to be a
+    // `workgroupUniformLoad` for that. This runs after the last CFG simplification, while the IR
+    // is still in SSA form, so the pass can follow values through phis.
+    if (isWGPUTarget(targetRequest))
+        SLANG_PASS(insertWorkgroupUniformLoadsForWGSL, codeGenContext->getTargetCaps());
+
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
     // introducing explicit temporaries instead. Doing this at the IR level
