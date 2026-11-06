@@ -7580,11 +7580,6 @@ static PtrType* getValidTypeForAddressOf(
     // block of memory we allow getting the address of.
     if (auto declRefExpr = as<DeclRefExpr>(baseExpr))
     {
-        // Error recovery for an undefined name, and the type-only arguments that
-        // `Linkage::specializeWithArgTypes` builds, are `DeclRefExpr`s that refer to no
-        // declaration. Such an expression names no storage, so it has no address.
-        if (!declRefExpr->declRef)
-            return nullptr;
         visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::DefinitionChecked);
         if (auto varDeclRef = as<VarDeclBase>(declRefExpr->declRef))
         {
@@ -7791,6 +7786,15 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
 {
     expr->arg = CheckTerm(expr->arg);
 
+    // An operand that already failed to check has been reported, so we give the expression an
+    // error type rather than also reporting that the operand is not addressable.
+    //
+    if (as<ErrorType>(expr->arg->type))
+    {
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
     // This address-of feature is purely experimental and for prototyping.
     // Only allow known expressions.
     expr->type =
@@ -7882,6 +7886,8 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
         return false;
 
     auto addressedExpr = getBaseObjectOfProjection(arg);
+    if (isTypeOnlyPlaceholderArg(addressedExpr))
+        return false;
 
     if (auto ptrType = getValidTypeForAddressOf(
             this,
