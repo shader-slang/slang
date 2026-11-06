@@ -48,6 +48,6 @@ void entry()
     f(concrete); // ERROR!
 /*diag:
      ^ argument requires packing for an existential box reference parameter
-     ^ parameter 'x' has type 'dyn IThing' and is passed by reference, but the argument of type 'MyThing' requires packing into a temporary box. To accept the argument without packing, use 'T x' with a type parameter 'T' constrained by 'where T : IThing'.
+     ^ parameter 'x' has type 'dyn IThing' and is passed by reference, but the argument of type 'MyThing' requires packing into a temporary box. To accept the argument without packing, change only the parameter type to a generic type parameter 'T' constrained by 'where T : IThing', keeping the existing parameter passing mode.
 */
 }
