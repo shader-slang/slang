@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "module": "esnext",
+        "target": "esnext",
+        "lib": ["esnext", "WebWorker", "DOM"],
+        "sourceMap": true,
+        "types": ["@webgpu/types"],
+        "moduleResolution": "bundler",
+    }
+}

@@ -1,0 +1,46 @@
+# Provides builds of slang and spirv-tools for the website
+name: Build Dependencies
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  # Build job
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Build and cache WASM dependencies
+        uses: ./.github/actions/build-wasm-deps
+        with:
+          build-artifacts-dir: ./dependencies
+
+      - name: Upload export artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependencies
+          path: |
+            ./dependencies/slang-wasm.js
+            ./dependencies/slang-wasm.d.ts
+            ./dependencies/slang-wasm.worker.js
+            ./dependencies/slang-wasm.worker.d.ts
+            ./dependencies/slang-wasm.node.js
+            ./dependencies/slang-wasm.node.d.ts
+            ./dependencies/spirv-tools.js
+            ./dependencies/spirv-tools.d.ts
+            ./dependencies/spirv-tools.worker.js
+            ./dependencies/spirv-tools.worker.d.ts
+            ./dependencies/spirv-tools.node.js
+            ./dependencies/spirv-tools.node.d.ts
+          compression-level: 1
