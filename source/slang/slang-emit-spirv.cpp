@@ -7298,6 +7298,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Builtin variables that require volatile semantics; see
     // `maybeRequireVolatileSemanticsForBuiltinVar`.
     HashSet<SpvInst*> m_volatileBuiltinVars;
+    // Builtin variables already decorated `Invariant`; see `maybeEmitInvariantForBuiltinVar`.
+    HashSet<SpvInst*> m_invariantBuiltinVars;
     struct DescriptorRuntimeArrayKey
     {
         SpvInst* descriptorElementType = nullptr;
@@ -7472,6 +7474,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 varInst,
                 SpvDecorationVolatile);
         }
+    }
+
+    // An `invariant` position output decorates the builtin variable, which is shared by every
+    // IR inst with the same key, so the decoration is added at most once.
+    void maybeEmitInvariantForBuiltinVar(SpvInst* varInst, IRInst* irInst)
+    {
+        if (!irInst->findDecoration<IRInvariantDecoration>())
+            return;
+        auto ptrType = as<IRPtrTypeBase>(irInst->getFullType());
+        if (!ptrType ||
+            addressSpaceToStorageClass(ptrType->getAddressSpace()) != SpvStorageClassOutput)
+            return;
+        if (!m_invariantBuiltinVars.add(varInst))
+            return;
+        emitOpDecorate(
+            getSection(SpvLogicalSectionID::Annotations),
+            nullptr,
+            varInst,
+            SpvDecorationInvariant);
     }
 
     SpvInst* emitDescriptorHeapBuiltinVar(IRInst* builtinVarInst)
@@ -7892,8 +7913,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     auto importDecor = inst->findDecoration<IRImportDecoration>();
                     if (importDecor->getMangledName() == "gl_FragCoord")
                         return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragCoord, inst);
-                    else
-                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPosition, inst);
+                    auto varInst =
+                        getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPosition, inst);
+                    maybeEmitInvariantForBuiltinVar(varInst, inst);
+                    return varInst;
                 }
                 else if (semanticName == "sv_target")
                 {

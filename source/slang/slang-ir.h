@@ -2251,8 +2251,11 @@ public:
     // Version 38 also adds the trace-program descriptor and Metal trace IR instructions.
     // Version 39 appends `IRMetalTextureFence`. Its stable opcode is appended, so the reader can
     // continue to load version-38 modules.
-    const static UInt k_minSupportedModuleVersion = 38;
-    const static UInt k_maxSupportedModuleVersion = 39;
+    // Version 40 adds the `InvariantModifier` AST class, which shifts the sequential
+    // `ASTNodeType` values again, so version-39 modules are no longer readable. It also appends
+    // `IRInvariantDecoration`.
+    const static UInt k_minSupportedModuleVersion = 40;
+    const static UInt k_maxSupportedModuleVersion = 40;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

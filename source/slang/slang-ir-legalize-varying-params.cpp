@@ -4669,6 +4669,9 @@ protected:
         SLANG_OVERRIDE
     {
         copyNameHintAndDebugDecorations(newKey, oldKey);
+        // The Metal emitter reads `invariant` from the flattened key to emit `[[invariant]]`.
+        if (auto invariant = oldKey->findDecoration<IRInvariantDecoration>())
+            cloneDecoration(invariant, newKey);
     }
 
     UnownedStringSlice getUserSemanticNameSlice(String& loweredName, bool isUserSemantic) const

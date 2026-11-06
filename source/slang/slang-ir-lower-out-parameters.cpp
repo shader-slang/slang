@@ -142,6 +142,8 @@ List<LoweredOutParamInfo> collectParameterInfo(
 
             // Transfer semantic decorations
             transferSemanticDecorations(param, fieldKey, builder);
+            if (param->findDecoration<IRInvariantDecoration>())
+                builder.addSimpleDecoration<IRInvariantDecoration>(fieldKey);
 
             // Store field key for layout
             info.outFieldKey = fieldKey;

@@ -1080,6 +1080,12 @@ void createVarLayoutForLegalizedGlobalParam(
         {
             builder->addSimpleDecoration<IRPreciseDecoration>(globalParam);
         }
+        if (kind == LayoutResourceKind::VaryingOutput &&
+            decorParent->findDecoration<IRInvariantDecoration>() &&
+            !globalParam->findDecoration<IRInvariantDecoration>())
+        {
+            builder->addSimpleDecoration<IRInvariantDecoration>(globalParam);
+        }
         if (!foundInterpolationMode)
         {
             // Copy every interpolation decoration of the innermost declaration that has any:
