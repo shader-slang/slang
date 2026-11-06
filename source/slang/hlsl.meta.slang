@@ -20979,11 +20979,13 @@ public vector<T,N> WaveClusteredBitXor(vector<T,N> value, constexpr uint cluster
 // QuadAny/QuadAll will map to OpGroupNonUniformQuadAny/All, and using either of these functions will
 // result in the QuadDerivativesKHR execution mode being used. If MaximallyReconvergesKHR is not already
 // specified by other means, it will be added when using either of QuadAny/QuadAll,
+// even when the result is unused. That is why they are not `[__removableIfUnused]`: lower-to-IR
+// DCE runs before force-inlining, so removing an unused call would also drop the execution modes,
+// which change derivatives and reconvergence for the whole entry point.
 //
 
 //@public:
 /// Returns true if `expr` is true in any lane of the current quad.
-[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
@@ -21010,7 +21012,6 @@ bool QuadAny(bool expr)
 
 //@public:
 /// Returns true if `expr` is true in all lanes of the current quad.
-[__removableIfUnused]
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
