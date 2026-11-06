@@ -1564,6 +1564,12 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
     }
     else if (auto vectorTypeLayout = as<VectorTypeLayout>(typeLayout))
     {
+        // A vector with more than 4 elements is laid out as an array, whose element stride can be
+        // larger than the element size (e.g. 16 bytes under std140). The layout records that
+        // decision, because its element count may only be known after link-time resolution.
+        if (vectorTypeLayout->isLaidOutAsArray && category == SLANG_PARAMETER_CATEGORY_UNIFORM)
+            return getReflectionOffset(vectorTypeLayout->uniformStride);
+
         auto resInfo =
             vectorTypeLayout->elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
         if (!resInfo)
