@@ -286,6 +286,14 @@ struct GlobalVarTranslationContext
                 resultType = builder.createStructType();
                 IRStructTypeLayout::Builder typeLayoutBuilder(&builder);
                 UInt outputVarIndex = 0;
+                // One past the last `VaryingOutput` Location that any field occupies. Each field
+                // keeps its global's absolute offset, so the result is anchored at offset 0 and
+                // its size is the largest field end. Like a front-end result layout, it then has
+                // a `VaryingOutput` offset exactly when its type layout has a `VaryingOutput`
+                // size. Hull patch-constant legalization (`getVaryingOutputLocationEnd`) reads
+                // this extent to start the patch-constant outputs after these globals.
+                UInt varyingOutputEnd = 0;
+                bool usesVaryingOutput = false;
                 for (auto output : outputVars)
                 {
                     auto key = builder.createStructKey();
@@ -351,11 +359,35 @@ struct GlobalVarTranslationContext
                         }
                         outputVarIndex++;
                     }
-                    typeLayoutBuilder.addField(key, varLayoutBuilder.build());
+                    auto fieldVarLayout = varLayoutBuilder.build();
+                    auto fieldOffsetAttr =
+                        fieldVarLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput);
+                    auto fieldSizeAttr =
+                        fieldTypeLayout->findSizeAttr(LayoutResourceKind::VaryingOutput);
+                    // A global with a semantic takes the system-value branch above and gets no
+                    // offset. On GLSL/SPIR-V a user semantic there fails with E49999, so only
+                    // builtins reach legalization, and they occupy no Location.
+                    if (fieldOffsetAttr && fieldSizeAttr)
+                    {
+                        usesVaryingOutput = true;
+                        varyingOutputEnd = Math::Max(
+                            varyingOutputEnd,
+                            fieldOffsetAttr->getOffset() + fieldSizeAttr->getFiniteSize());
+                    }
+                    typeLayoutBuilder.addField(key, fieldVarLayout);
                     output->transferDecorationsTo(key);
+                }
+                if (usesVaryingOutput)
+                {
+                    typeLayoutBuilder.addResourceUsage(
+                        LayoutResourceKind::VaryingOutput,
+                        LayoutSize(varyingOutputEnd));
                 }
                 auto resultTypeLayout = typeLayoutBuilder.build();
                 IRVarLayout::Builder resultVarLayoutBuilder(&builder, resultTypeLayout);
+                if (usesVaryingOutput)
+                    resultVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)
+                        ->offset = 0;
                 resultVarLayout = resultVarLayoutBuilder.build();
 
                 for (auto block : entryPointFunc->getBlocks())
