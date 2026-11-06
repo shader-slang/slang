@@ -1762,48 +1762,82 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     {
     case kIROp_FloatLit:
         {
+            // We write each `half`, `float` and `double` constant so that its type is explicit.
+            // HLSL types an unsuffixed literal, and a division of unsuffixed literals, as a 32-bit
+            // `float`, and dxc deduces `float` from one for a template argument such as the `T` of
+            // `RWByteAddressBuffer.Store<T>`. A finite `float` or `double` takes the `f` or `L`
+            // suffix, which needs no feature; a finite `half` is cast instead, because the `h`
+            // suffix needs 16-bit types. A NaN or infinity is a division by zero in the type's own
+            // literals, wrapped in a cast to the type that also groups the division, as in
+            // `double(0.0L / 0.0L)` or `half(1.0 / 0.0)`. `BFloat16`, `FloatE4M3` and `FloatE5M2`
+            // have no HLSL type to cast to, so their constants keep the `float` spellings.
             IRConstant* constantInst = static_cast<IRConstant*>(inst);
-            IRConstant::FloatKind kind = constantInst->getFloatKind();
-            switch (kind)
+            IROp typeOp = constantInst->getDataType()->getOp();
+            bool hasHLSLType = true;
+            bool castFiniteValue = false;
+            const char* suffix = "";
+            switch (typeOp)
+            {
+            case kIROp_HalfType:
+                castFiniteValue = true;
+                break;
+            case kIROp_FloatType:
+                suffix = "f";
+                break;
+            case kIROp_DoubleType:
+                suffix = "L";
+                break;
+            default:
+                hasHLSLType = false;
+                break;
+            }
+
+            const char* specialNumerator = nullptr;
+            switch (constantInst->getFloatKind())
             {
             case IRConstant::FloatKind::Nan:
-                {
-                    m_writer->emit("(0.0f / 0.0f)");
-                    return;
-                }
+                specialNumerator = "0.0";
+                break;
             case IRConstant::FloatKind::PositiveInfinity:
-                {
-                    m_writer->emit("(1.0f / 0.0f)");
-                    return;
-                }
+                specialNumerator = "1.0";
+                break;
             case IRConstant::FloatKind::NegativeInfinity:
-                {
-                    m_writer->emit("(-1.0f / 0.0f)");
-                    return;
-                }
+                specialNumerator = "-1.0";
+                break;
             default:
+                break;
+            }
+
+            if (specialNumerator)
+            {
+                if (!hasHLSLType)
                 {
-                    m_writer->emit(constantInst->value.floatVal);
-                    // HLSL treats an unsuffixed floating-point literal as a 32-bit `float` by
-                    // default, and dxc deduces `float` from one for a template argument such as the
-                    // `T` of `RWByteAddressBuffer.Store<T>`. A finite `float` literal therefore
-                    // takes `f` and a finite `double` literal takes `L`. A `half` literal stays
-                    // bare, because the `h` suffix needs 16-bit types to be enabled; that and the
-                    // `float`-typed NaN/Inf spellings above are known remaining gaps.
-                    switch (constantInst->getDataType()->getOp())
-                    {
-                    case kIROp_FloatType:
-                        m_writer->emit("f");
-                        break;
-                    case kIROp_DoubleType:
-                        m_writer->emit("L");
-                        break;
-                    default:
-                        break;
-                    }
+                    m_writer->emit("(");
+                    m_writer->emit(specialNumerator);
+                    m_writer->emit("f / 0.0f)");
                     return;
                 }
+                m_writer->emit(getDefaultBuiltinTypeName(typeOp));
+                m_writer->emit("(");
+                m_writer->emit(specialNumerator);
+                m_writer->emit(suffix);
+                m_writer->emit(" / 0.0");
+                m_writer->emit(suffix);
+                m_writer->emit(")");
+                return;
             }
+
+            if (castFiniteValue)
+            {
+                m_writer->emit(getDefaultBuiltinTypeName(typeOp));
+                m_writer->emit("(");
+                m_writer->emit(constantInst->value.floatVal);
+                m_writer->emit(")");
+                return;
+            }
+            m_writer->emit(constantInst->value.floatVal);
+            m_writer->emit(suffix);
+            return;
         }
 
     default:
