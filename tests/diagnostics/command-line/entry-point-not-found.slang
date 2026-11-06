@@ -21,6 +21,19 @@
 // GENERIC: error[E30015]: undefined identifier
 // GENERIC: error[E38000]: no function found matching entry point name 'genericMain<MissingType>'
 
+// A plain identifier that resolves keeps the lookup's diagnostics: a deprecated
+// entry point is a warning, and a removed one is an error.
+
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=DEPRECATED):-target spirv -entry deprecatedMain
+
+// DEPRECATED: warning[E31200]: use of deprecated declaration
+// DEPRECATED-NOT: E38000
+
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=REMOVED,exit-code=-1):-target spirv -entry removedMain
+
+// REMOVED: error[E31207]: use of removed declaration
+// REMOVED-NOT: E38000
+
 [numthreads(64, 1, 1)]
 [shader("compute")]
 void main(uint3 tid: SV_DispatchThreadID, uniform uint* o)
@@ -33,4 +46,20 @@ void main(uint3 tid: SV_DispatchThreadID, uniform uint* o)
 void genericMain<T : __BuiltinFloatingPointType>(uint3 tid: SV_DispatchThreadID, uniform T* o)
 {
     o[tid.x] = T(tid.x);
+}
+
+[deprecated("use main")]
+[numthreads(64, 1, 1)]
+[shader("compute")]
+void deprecatedMain(uint3 tid: SV_DispatchThreadID, uniform uint* o)
+{
+    o[tid.x] = tid.x;
+}
+
+[RemovedSince(-1, "use main")]
+[numthreads(64, 1, 1)]
+[shader("compute")]
+void removedMain(uint3 tid: SV_DispatchThreadID, uniform uint* o)
+{
+    o[tid.x] = tid.x;
 }
