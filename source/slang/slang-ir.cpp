@@ -106,6 +106,7 @@ bool isSimpleDecoration(IROp op)
     case kIROp_HLSLExportDecoration:
     case kIROp_ReadNoneDecoration:
     case kIROp_NoSideEffectDecoration:
+    case kIROp_RemovableIfUnusedDecoration:
     case kIROp_RequiresNVAPIDecoration:
     case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
     case kIROp_TriangleInputPrimitiveTypeDecoration:
