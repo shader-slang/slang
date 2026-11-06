@@ -1634,6 +1634,34 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
+// An address rooted at a local `var` of `func`, or at a parameter whose passing mode gives
+// `func` exclusive or immutable access to the memory for the duration of the call (`out`,
+// `inout`, `__borrow`), cannot be changed by a callee that is not given a pointer to it.
+// `__ref` parameters, plain pointers, pointers loaded from memory (such as the kernel
+// context on Metal), buffer element pointers and phi parameters carry no such guarantee:
+// the memory may be groupshared or device memory that other threads write.
+static bool isCallerExclusiveRoot(IRGlobalValueWithCode* func, IRInst* root)
+{
+    if (as<IRVar>(root))
+        return isChildInstOf(root, func);
+    if (auto param = as<IRParam>(root))
+    {
+        if (param->getParent() != func->getFirstBlock())
+            return false;
+        auto type = param->getDataType();
+        if (!type)
+            return false;
+        switch (type->getOp())
+        {
+        case kIROp_OutParamType:
+        case kIROp_BorrowInOutParamType:
+        case kIROp_BorrowInParamType:
+            return true;
+        }
+    }
+    return false;
+}
+
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
@@ -1680,9 +1708,15 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
-            // If addr is a global variable, calling a function may change its value.
-            // So we need to return true here to be conservative.
-            if (!isChildInstOf(getRootAddr(addr), func))
+            // Unless addr is rooted at memory that `func` has exclusive access to (see
+            // isCallerExclusiveRoot), calling a function may change the value at addr even
+            // when no argument points to it. This covers global variables, and also memory
+            // reached through a pointer, such as a pointer parameter or a pointer loaded from
+            // a struct. That memory may be groupshared or device memory, which other threads
+            // can write, and a barrier call orders the access against those writes. Metal, for
+            // example, reaches groupshared variables through a pointer in the kernel context,
+            // so the root of such an address is a load or a parameter in `func`, not a global.
+            if (!isCallerExclusiveRoot(func, getRootAddr(addr)))
             {
                 auto callee = call->getCallee();
                 if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
