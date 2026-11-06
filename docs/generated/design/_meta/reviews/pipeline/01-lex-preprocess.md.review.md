@@ -1,23 +1,23 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:17:55+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T21:17:02Z
 target_doc: pipeline/01-lex-preprocess.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 1ec94893dbf01f578c85e79607171f593c06c00e297add42831695b6d50bc8d0
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: 25c315302bec8a98147ed08e896ab7b882f1e7ddd78ee373f4e252ec03861394
+source_commit: be3c344414f6541ba6731813b36591a94cd05482
 checklist:
   factual_accuracy: partial
-  cross_references: pass
+  cross_references: partial
   completeness: pass
-  style_consistency: pass
-  source_alignment: fail
+  style_consistency: partial
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 8
+finding_count: 5
 severity_breakdown:
   critical: 0
-  major: 2
-  minor: 6
+  major: 1
+  minor: 4
   nit: 0
 ---
 
@@ -25,31 +25,24 @@ severity_breakdown:
 
 ## Summary
 
-The page has the required structure, valid links, valid front matter, and many accurate implementation details, but it contains two substantial source-alignment errors and six smaller inaccuracies. Most importantly, it invents a general macro expansion/spelling-location chain that the source does not implement; only token-paste source views carry an initiating-location chain for diagnostics.
+The document covers the required structure and accurately describes most checked behavior. All 33 line-number citations match the source. The principal finding is a dangling language-reference link; smaller corrections concern declaration locations, literal handling, and the prompt’s size limit.
 
 ## Items checked
 
-- Verified 32 factual claims against the nine resolved watched files at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`, including token layout, source decoding, lexer behavior, literal handling, macro ops, include handling, conditional skipping, warning tracking, and preprocessor output.
-- Re-derived all four line-number citations in the body: `_decodeStringEscape` at line 1440, `getCharLiteralValue` at lines 1660-1725, `_lexStringLiteralBody` at line 1731, and `_lexRawStringLiteralBody` at line 1782.
-- Resolved all 38 relative-link occurrences (17 unique targets) at the target source commit and confirmed every referenced generated peer is present in the manifest.
-- Swept 129 backticked identifiers and 12 whole source filenames against the recorded source tree; apparent identifier misses were syntax placeholders or methods defined inline without a qualified spelling.
-- Verified every required section, the 14,996-byte size against the 24 KB cap, the dependency page `pipeline/overview.md`, and the front-matter digest by recomputing `1ec94893dbf01f578c85e79607171f593c06c00e297add42831695b6d50bc8d0`.
+- Read `_review.md`, `_common.md`, the document-specific prompt, and the resolved watched paths returned by `regenerate.py show`.
+- Verified against the **current working tree**. The comparison against the document’s source commit showed no differences under `source/`; HEAD matches the supplied report commit.
+- Checked all **33 line-number citations**: nine in `slang-lexer.cpp`, two in `slang-parser.cpp`, one in `slang-compile-request.cpp`, and 21 in `slang-preprocessor.cpp`.
+- Spot-checked more than **20 behavioral and structural claims**, including BOM decoding, token fields, source-location representation, diagnostic suppression, UTF-8 recovery, literal suffix classification, escape decoding, macro argument replay, recursion suppression, conditional skipping, directive dispatch, language selection, include handling, warning-state persistence, macro token locations, and EOF handling.
+- Checked all **44 relative-link occurrences**, covering **19 distinct destinations**; 18 destinations exist. All three referenced generated peer pages are present in the manifest. Read the dependency overview only to check cross-reference consistency.
+- Checked required sections, front-matter keys and value formats, relative-link syntax, Liquid safety, and document size. The file is **26,969 bytes**.
+- Performed read-only inspection; no report or repository file was written.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `### Lexer flags and special-case rules`, lines 85-92; `## Failure modes`, lines 361-368 | The page says `kLexerFlag_SuppressDiagnostics` makes `Lexer::getDiagnosticSink` suppress every scan-time diagnostic. Malformed UTF-8 bypasses that accessor and diagnoses through `lexer->m_sink`, so it is still reported in an inactive conditional branch. | `source/compiler-core/slang-lexer.cpp:375-383` calls `diagnose(lexer->m_sink, ..., LexerDiagnostics::invalidUtf8ByteSequence, ...)`; the conditional suppression accessor is only `source/compiler-core/slang-lexer.h:145-150`. | State that the flag suppresses scan-time sites that use `getDiagnosticSink`, but malformed UTF-8 currently bypasses it via `m_sink`; remove the claims that suppression is universal. |
-| F-002 | minor | `### Literal scanning and value extraction`, lines 121-135; `## Failure modes`, lines 339-345 | The page calls the scan/decode split “close to absolute” and says scan-time errors are limited to invalid characters, malformed UTF-8, and unterminated literals. Scanning also diagnoses invalid digits for a numeric base, legacy octal literals, and an invalid raw-string delimiter quote. | See `source/compiler-core/slang-lexer.cpp:543-554` (`invalidDigitForBase`), `source/compiler-core/slang-lexer.cpp:1791-1798` (`quoteCannotBeDelimiter`), and `source/compiler-core/slang-lexer.cpp:2095-2099` (`octalLiteral`). | Soften the “close to absolute” and “limited to” wording, then list these scan-time syntax checks before explaining which value semantics remain deferred. |
-| F-003 | minor | `### What the lexer does not do`, lines 203-205 | The page says downstream passes “(preprocessor, parser) can decide whether to filter” whitespace and comments. Although `Lexer::lexToken` emits them, preprocessing always removes them from its output, so the parser never receives them to make that decision. | `source/compiler-core/slang-lexer.cpp:2473-2590` emits individual token kinds; `source/slang/slang-preprocessor.cpp:4895-4920` drops whitespace, newlines, comments, and invalid tokens before returning the flat `TokenList`. | Say that `lexToken` emits whitespace/comments, while `lexAllSemanticTokens` and the preprocessor filter them; remove the parser as a filtering consumer. |
-| F-004 | minor | `### Stack of input streams`, lines 231-236 | The claimed per-stream lexer “`#include` mode” does not exist. Include files have their own `InputFile` and lexer, but angle-form include syntax is parsed by the preprocessor from ordinary `OpLess`/`OpGreater` tokens. | `source/slang/slang-preprocessor.cpp:944-1008` defines per-file lexer and conditional state; `source/slang/slang-preprocessor.cpp:3613-3625` concatenates raw tokens and selects `IncludeSystem::Mode::System`. | Replace “`#include` mode” with the actual per-input-file conditional/diagnostic state, and leave angle-include handling to the later `#include` subsection. |
-| F-005 | minor | `### Macro expansion`, lines 251-255 | The inactive-branch list says only `#if`, `#else`, `#elif`, and `#endif` are evaluated, omitting `#ifdef` and `#ifndef`, which carry the same `ProcessWhenSkipping` flag. | `source/slang/slang-preprocessor.cpp:4624-4630` marks `if`, `ifdef`, `ifndef`, `else`, `elif`, and `endif` with `ProcessWhenSkipping`. | Add `#ifdef` and `#ifndef` to the parenthetical list. |
-| F-006 | minor | `### Preprocessor directives`, lines 259-265 | Calling the supported directives “the standard C / HLSL set” is inaccurate: the table also contains Slang-specific `#language`/`#lang` and GLSL `#version`/`#extension` entries. | `source/slang/slang-preprocessor.cpp:4624-4645` contains the complete static directive table, including explicitly labeled GLSL entries and the language directives. | Describe the table as C/HLSL-style directives plus Slang language-selection and GLSL directives, and replace “verify by reading” with the concrete categories. |
-| F-007 | major | `## Source-location preservation`, lines 303-335 | The page says `SourceManager` records raw macro-body tokens as part of a macro invocation and distinguishes general macro “expansion” locations from “spelling” locations so diagnostics can walk back to the call site. Raw-span expansion merely replays stored definition tokens, and no macro-invocation `SourceView` is created. Diagnostic chain walking is implemented only for `PathInfo::Type::TokenPaste` views. | `source/slang/slang-preprocessor.cpp:2440-2458` replays raw definition tokens unchanged; `source/slang/slang-preprocessor.cpp:1473-1486` stores invocation locations only on `MacroInvocation`; `source/compiler-core/slang-diagnostic-sink.cpp:456-493` follows initiating views only while their path type is `TokenPaste`. | Remove the general expansion/spelling-chain claim. State that raw body tokens keep definition locations, direct argument tokens keep call-site locations, builtins use the invocation location, and only pasted tokens create an initiating-location chain that diagnostics explicitly follow. |
-| F-008 | minor | `## Failure modes`, lines 369-372 | The claim that an unrecoverable preprocessor error “produces an `EndOfFile` token early” is unsupported. The implemented handlers generally diagnose and return or skip the rest of a directive, while `ReadAllTokens` emits EOF after the input-file stack is exhausted. | `source/slang/slang-preprocessor.cpp:4672-4723` handles directive errors and continues; `source/slang/slang-preprocessor.cpp:4785-4838` pops exhausted inputs; `source/slang/slang-preprocessor.cpp:4895-4913` appends the resulting EOF. | Replace the early-EOF claim with concrete recovery behavior: malformed directives skip/finish their line, include failures return from the handler, bad macro invocations may expand to no tokens, and unclosed conditionals are diagnosed when a file reaches EOF. |
-
-## No-issues notes
-
-- The token layout accurately matches `TokenType : uint8_t`, `TokenFlags`, the content union, and 32-bit `SourceLoc`.
-- The four explicit line-number citations are exact at the recorded commit.
-- The macro-op replay, angle-include resolution, and persisted warning-location counter descriptions match the source.
+| F-001 | major | Literal scanning and value extraction, line 206 | The link to `docs/language-reference/expressions-literal.md` is dangling: that file is absent from the working tree. | Target document line 206; filesystem check of `docs/language-reference/expressions-literal.md`. The implemented escape grammar is available in `source/compiler-core/slang-lexer.cpp:1440`. | Remove the unavailable language-reference link and cite `slang-lexer.cpp`’s `_decodeStringEscape` as the local authority for the described grammar. |
+| F-002 | minor | Lexer, lines 47–50 | The file-pointer bullet attributes `TokenList`, `TokenSpan`, and `TokenReader` to `slang-token.h` / `slang-token.cpp`, although those types belong to the lexer files. | `source/compiler-core/slang-lexer.h:13`, `:24`, and `:42` declare the three types; `source/compiler-core/slang-lexer.cpp:24` begins their implementations. | Move those three names into the `slang-lexer.h` / `.cpp` bullet. Keep `Token`, `TokenType`, and `TokenFlags` in the token-file bullet. |
+| F-003 | minor | Lexer flags and special-case rules, lines 106–108 | Literal text is described as being kept `verbatim`, without accounting for escaped-newline removal. Tokens spanning a backslash line continuation contain scrubbed text. | `source/compiler-core/slang-lexer.cpp:337` sets `ScrubbingNeeded`; `:2536–2577` removes escaped newlines before assigning token content. | Qualify the statement: literal spelling is retained without value decoding, except that backslash-newline continuations are removed from token content. |
+| F-004 | minor | Failure modes, lines 469–471 | The sentence jointly attributes out-of-range code-unit and code-point diagnostics to `getStringLiteralTokenValue` and `getCharLiteralValue`. Those range checks are specific to string decoding; character escape decoding returns the decoded 32-bit value without enforcing byte or UTF-8 representability. | `source/compiler-core/slang-lexer.cpp:1683–1686` discards the escape’s Unicode distinction. The `outOfRangeCodeUnit` and `outOfRangeCodePointForUtf8` emissions occur in string decoding at `:1915` and `:1937`. | Separate the helpers’ responsibilities: both diagnose malformed escapes; string decoding additionally checks byte/UTF-8 representability, while character decoding checks malformed bare UTF-8 and the one-character rule. |
+| F-005 | minor | Whole document | At 26,969 bytes, the document exceeds the document-specific requirement `Document length under 24 KB`, although it remains below the manifest’s 32,768-byte cap. | `docs/generated/design/_meta/prompts/pipeline-01-lex-preprocess.md`, final quality-checklist item; measured target-file size: 26,969 bytes. | Condense repeated scanning-versus-decoding and diagnostic-suppression explanations until the complete document is below 24 KB, retaining every required section. |

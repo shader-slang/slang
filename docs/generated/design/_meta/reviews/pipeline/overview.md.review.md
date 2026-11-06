@@ -1,51 +1,46 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:07:14+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T21:17:22Z
 target_doc: pipeline/overview.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: c244a6019beee1148173c93511a0ee3629fcfc32ea9a4177931dcbaec0efa2d2
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: c0c551c26b5c6b8cdcd2fff95ae01f9403452087dcb8bccb74fe55a8a5992b68
+source_commit: be3c344414f6541ba6731813b36591a94cd05482
 checklist:
   factual_accuracy: partial
   cross_references: pass
   completeness: partial
-  style_consistency: pass
+  style_consistency: partial
   source_alignment: partial
-  front_matter_validity: partial
+  front_matter_validity: pass
 finding_count: 3
 severity_breakdown:
-  critical: 0
+  critical: 1
   major: 0
-  minor: 3
-  nit: 0
+  minor: 1
+  nit: 1
 ---
 
 # Review report for pipeline/overview.md
 
 ## Summary
 
-The overview is well structured and most claims match the recorded source commit, but it still points readers at `slang-emit.cpp` rather than `slang-code-gen.cpp` for the top-level target dispatcher. Its lowering summary also overstates how statements map to IR, and its recorded watched-path digest predates the current resolved watched set. Three minor findings require remediation.
+The page provides a largely accurate pipeline map, with valid links and exact line-number citations. Its most important error is turning a translation-unit dictionary ordering limitation into an unconditional claim about `slangc` source-file ordering. The page also exceeds its roadmap remit in several passages and uses a different stage-heading level than its prompt requires.
 
 ## Items checked
 
-- Verified 17 factual claims across preprocessing, deferred body parsing, semantic checking, AST-to-IR lowering, IR-pass orchestration, emission, and compile-request sequencing at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
-- Re-derived all three line-number citations: `linkAndOptimizeIR` at `source/slang/slang-emit.cpp:970`, `emitEntryPointsSourceFromIR` at `source/slang/slang-emit.cpp:2746`, and `checkAllTranslationUnits` at `source/slang/slang-compile-request.cpp:498`.
-- Resolved all 41 Markdown links (33 unique targets) at the recorded commit and confirmed all 12 referenced generated peer pages are present in the manifest.
-- Swept 29 code identifiers and 18 cited source filenames at the recorded commit; all exist. Also confirmed 162 matching `slang-ir-*.cpp` files.
-- Verified all mandatory front-matter keys and recomputed the current resolved watched-path digest as `519fade0f73ddc2f1adb7802668653730b5be442d1722cb8f2c593b47d26d7bb`.
-- Checked the required title, flowchart, six stage subsections, driver section, five cross-cutting bullets, 7,837-byte size, and universal style rules.
+- Reviewed against the **current working tree**, which equals the document’s recorded source commit for all of `source/`, as specified; the source-tree diff reported no differences.
+- Read `_review.md`, `_common.md`, the per-document prompt, and resolved watched paths using `regenerate.py show pipeline/overview.md`.
+- Verified all three line-number citations: `linkAndOptimizeIR` at `source/slang/slang-emit.cpp:1015`, `emitEntryPointsSourceFromIR` at line 2968, and `checkAllTranslationUnits` at `source/slang/slang-compile-request.cpp:702`.
+- Spot-checked more than 10 behavioral claims: preprocessing before parsing; deferred body parsing; semantic visitor organization; conditional-expression block parameters; short-circuit lowering; mandatory SSA construction; phi elimination; SPIR-V optimizer gating; GLSL-specific legalization; Torch binding selection; textual/binary dispatch; loaded-module registration; entry-point checking; and compile-request service access.
+- Confirmed the count of 167 `slang-ir-*.cpp` files and checked thread-group emission spellings in the target emitters.
+- Resolved all 44 relative-link occurrences, covering 34 distinct destinations; confirmed all 12 linked generated pages are manifest entries. Read the architecture dependency only for cross-reference checks.
+- Checked required sections, Mermaid structure, front-matter keys and formats, and the 11,103-byte document against its 24,576-byte cap. No files were written.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | Front matter, lines 1-7 | The recorded `watched_paths_digest` is stale for the resolved watched set: the page records `c244a601...`, while the current manifest now watches `slang-code-gen.cpp` and recomputes to `519fade0...` at the same source commit. | `docs/generated/design/_meta/manifest.yaml:76-92` includes `source/slang/slang-code-gen.cpp`; `python3 docs/generated/design/_meta/regenerate.py digest pipeline/overview.md` returns `519fade0f73ddc2f1adb7802668653730b5be442d1722cb8f2c593b47d26d7bb`. | Refresh the page front matter through the generation/remediation workflow so `watched_paths_digest` records `519fade0f73ddc2f1adb7802668653730b5be442d1722cb8f2c593b47d26d7bb`. |
-| F-002 | minor | `### AST → IR lowering`, lines 92-97 | The statement that “statements become basic blocks with parameters” implies a one-shape lowering that the source contradicts. Control-flow statements may create blocks, but sequence and block statements recursively lower their children, and a return statement emits a return instruction in the current block. | `source/slang/slang-lower-to-ir.cpp:8280-8323` creates blocks for `IfStmt`; `source/slang/slang-lower-to-ir.cpp:8811-8829` recursively lowers sequence/block bodies; `source/slang/slang-lower-to-ir.cpp:8831-8849` emits return instructions. | Change the clause to say that control-flow statements create blocks and branches while ordinary statements emit instructions in the current block; mention block parameters only as the SSA representation for values crossing control-flow edges. |
-| F-003 | minor | `### Emit`, lines 124-138; `## Driver entry points`, lines 168-170 | The page correctly names `CodeGenContext::emitEntryPoints` as the per-target selector but omits its defining file from “Driven by” and later calls `slang-emit.cpp` the back-end dispatcher. The top-level and binary/non-source dispatch actually live in `slang-code-gen.cpp`; `slang-emit.cpp` owns IR orchestration and C-like source-emitter selection. | `source/slang/slang-code-gen.cpp:1114-1223` defines `_emitEntryPoints`, and `source/slang/slang-code-gen.cpp:1247-1304` defines `emitEntryPoints`; `source/slang/slang-emit.cpp:2746-2867` defines only `emitEntryPointsSourceFromIR` and its source-emitter switch. | Add a direct `slang-code-gen.cpp` link to the Emit “Driven by” list and driver section, identify it as the target dispatcher, and describe `slang-emit.cpp` as the linked-IR/pass orchestrator and source-emitter selector. |
-
-## No-issues notes
-
-- The three recorded line numbers are exact at the target document’s source commit.
-- All relative links resolve at the recorded commit, and every generated peer link names a manifest page.
-- The Mermaid diagram uses camelCase node IDs, no explicit styling, and the required left-to-right stage order.
+| F-001 | critical | `## Driver entry points`, lines 207–212 | The claim that with two command-line source files “the later file can `import` the earlier one” and “the reverse order does not resolve” incorrectly generalizes the sibling translation-unit dictionary behavior. Ordinary `.slang` command-line files share one translation unit; furthermore, missing dictionary entries do not prevent filesystem module lookup. | `source/slang/slang-options.cpp:1726`: “All of the input .slang files will be grouped into a single logical translation unit.” `source/slang/slang-session.cpp:1745` checks the supplied dictionary, while line 1881 subsequently searches for module files. `source/slang/slang-compile-request.cpp:717–725` supports only the narrower checked-sibling registration limitation. | Delete the command-line ordering conclusion. State that later translation units are unavailable **through this request-local dictionary**, while ordinary Slang CLI inputs share a translation unit and module lookup can still resolve files independently. |
+| F-002 | minor | `### AST → IR lowering`, lines 101–115; `### IR passes`, lines 135–153 | Detailed phi construction/elimination, optimizer gating, and seven target spellings go beyond the overview’s explicit roadmap scope. | `docs/generated/design/_meta/prompts/pipeline-overview.md`, “Quality checklist”: “the per-stage docs do the deep dive, this one is purely a roadmap”; required structure asks for one paragraph describing each stage’s input and output. | Reduce these passages to brief descriptions of SSA lowering and target-dependent transformations; use the existing links to `04-ast-to-ir.md`, `05-ir-passes.md`, and `06-emit.md` for implementation details. |
+| F-003 | nit | `## Stages`, lines 40, 57, 74, 92, 125, 162 | All six stage headings use level 3, whereas the per-document contract explicitly requests level-2 subsections. Stage coverage itself is complete. | `docs/generated/design/_meta/prompts/pipeline-overview.md`, required structure item 3: “a level-2 subsection per stage.” | Change the six stage headings from `###` to `##` to match the stated contract. |
