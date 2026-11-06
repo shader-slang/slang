@@ -1761,7 +1761,7 @@ err(
     "argument-requires-box-packing-for-reference-parameter",
     30077,
     "argument requires packing for an existential box reference parameter",
-    span { loc = "location", message = "parameter '~paramName' has type '~paramType:Type' and is passed by reference, but the argument of type '~argType:QualType' requires packing into a temporary box. To accept the argument without packing, use 'T ~paramName' with a type parameter 'T' constrained by 'where T : ~constraintInterface:Type'." }
+    span { loc = "location", message = "parameter '~paramName' has type '~paramType:Type' and is passed by reference, but the argument of type '~argType:QualType' requires packing into a temporary box. To accept the argument without packing, change only the parameter type to a generic type parameter 'T' constrained by 'where T : ~constraintInterface:Type', keeping the existing parameter passing mode." }
 )
 
 standalone_note(
