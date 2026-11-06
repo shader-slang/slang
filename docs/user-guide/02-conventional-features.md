@@ -548,7 +548,7 @@ Slang has additional parameter modifiers for borrows and references:
 > These modifiers exist mainly to support the Slang core module. Their spelling and their implementation are subject to change, so we recommend that user code avoid them, with the exception of `groupshared` described below.
 > As with `out` and `inout`, Slang does not check that a program respects the access rules of a borrow (there is no borrow checker); a program that violates them has undefined behavior.
 
-A parameter marked `groupshared` is a reference to thread-group-shared memory, and is the one kind of reference parameter we intend user code to use.
+A parameter marked `groupshared` is a reference to thread-group-shared memory, and is the one kind of reference parameter we expect user code to use.
 Its argument must be a `groupshared` variable, a part of one, or another `groupshared` parameter, and the function accesses that memory while other invocations in the thread group can access it too.
 A `const groupshared` parameter is a read-only reference.
 A `groupshared` parameter cannot also be marked `in`, `out`, `inout`, or `__borrow`.
