@@ -4622,7 +4622,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 funcType,
                 callableDeclRef,
                 paramDeclRefs);
-            checkGroupSharedPartialWritesByInlinedCall(invoke, funcType, callableDeclRef);
+            checkGroupSharedPartialWritesByInlinedCall(
+                invoke,
+                funcType,
+                callableDeclRef,
+                paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
             {
@@ -7930,6 +7934,78 @@ static bool isOperatorInvocation(InvokeExpr* invoke)
     return as<OperatorExpr>(invoke) != nullptr;
 }
 
+// An argument of a call that the call writes back to the caller's storage when it returns: the
+// argument of an `out` or `inout` parameter, or the receiver of a `[mutating]` method, whose
+// implicit `this` is an `inout` parameter.
+struct WrittenBackArgument
+{
+    // The argument as written in the call.
+    Expr* arg = nullptr;
+
+    // The storage that the call writes back to. An argument that is implicitly converted to the
+    // parameter's type goes through a temporary of that type, which the call writes back to the
+    // operand of the conversion, so `storage` is that operand; otherwise it is `arg` itself.
+    Expr* storage = nullptr;
+
+    // The parameter, or null for a receiver and for an argument of a call through a value of
+    // function type, which has no parameter declarations.
+    ParamDecl* param = nullptr;
+
+    bool isReceiver = false;
+
+    bool isConverted() const { return storage != arg; }
+};
+
+// Call `visit` with each argument of `invoke` that the call writes back to, other than arguments
+// that already failed to check. Warning 30709 and error 38039 judge the same set of arguments by
+// different rules, so we enumerate the set in one place.
+template<typename Visit>
+static void forEachWrittenBackArgument(
+    SemanticsVisitor* visitor,
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs,
+    Visit const& visit)
+{
+    // A `groupshared` parameter is a reference that names its argument's storage, so the call
+    // accesses that storage in place and writes nothing back.
+    //
+    Index argCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
+    for (Index i = 0; i < argCount; ++i)
+    {
+        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
+            continue;
+        WrittenBackArgument written;
+        written.arg = invoke->arguments[i];
+        if (isArgumentOfFailedCheck(written.arg))
+            continue;
+        written.storage = written.arg;
+        if (auto lValueCast = as<LValueImplicitCastExpr>(written.arg))
+            written.storage = lValueCast->arguments[0];
+        if (i < paramDeclRefs.getCount())
+            written.param = paramDeclRefs[i].getDecl();
+        visit(written);
+    }
+
+    // The receiver of a method whose receiver mode is `inout` is the base expression of the member
+    // access.
+    //
+    if (!calleeDeclRef)
+        return;
+    auto thisParamInfo = visitor->findEffectiveThisParamInfo(calleeDeclRef);
+    if (!thisParamInfo || thisParamInfo->mode != ParamPassingMode::BorrowInOut)
+        return;
+    if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
+    {
+        WrittenBackArgument written;
+        written.arg = memberExpr->baseExpression;
+        written.storage = written.arg;
+        written.isReceiver = true;
+        visit(written);
+    }
+}
+
 // Warn about each argument of `invoke` that passes thread-group-shared storage to an `out` or
 // `inout` parameter, including the implicit `this` of a `[mutating]` method.
 void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
@@ -7943,58 +8019,41 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
 
     // A mutating operator on an element of shared memory, such as `g[i] += 1`, passes the element
     // to an `inout` parameter, but the user who wrote it already expects a read-modify-write of
-    // that element, so a warning would only be noise. Only the operator's implicitly converted
-    // arguments are checked below.
+    // that element, so a warning would only be noise. An implicitly converted argument goes
+    // through a temporary of the parameter's type even for an operator, so it is still checked.
+    //
     bool callIsOperator = isOperatorInvocation(invoke);
-    Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
-    for (Index i = 0; i < checkCount && i < paramDeclRefs.getCount(); ++i)
-    {
-        // An `out` or `inout` parameter needs exclusive access to its argument for the duration
-        // of the call. A `groupshared` parameter is a reference to the shared storage instead, and
-        // does not need exclusive access, so it is not checked here.
-        auto paramDecl = paramDeclRefs[i].getDecl();
-        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
-            continue;
+    forEachWrittenBackArgument(
+        this,
+        invoke,
+        funcType,
+        calleeDeclRef,
+        paramDeclRefs,
+        [&](WrittenBackArgument const& written)
+        {
+            if (callIsOperator && !written.isConverted())
+                return;
+            if (!written.param && !written.isReceiver)
+                return;
 
-        auto argExpr = invoke->arguments[i];
-        if (isArgumentOfFailedCheck(argExpr))
-            continue;
-
-        // An implicitly converted argument goes through a temporary of the parameter's type even
-        // for an operator, so we look through the conversion at the storage it names.
-        auto addressedExpr = argExpr;
-        if (auto lValueCast = as<LValueImplicitCastExpr>(argExpr))
-            addressedExpr = lValueCast->arguments[0];
-        else if (callIsOperator)
-            continue;
-
-        // Every invocation in the group can access thread-group-shared storage, so the exclusive
-        // access holds only if no other invocation touches it during the call. The compiler does
-        // not check that, so we warn.
-        if (argumentNamesGroupSharedStorage(addressedExpr))
-            getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
-                .param = getText(paramDecl->getName()),
-                .suggestion = "; if the callee needs to see other invocations' writes, declare "
-                              "the parameter 'groupshared'",
-                .arg = argExpr});
-    }
-
-    // The implicit `this` of a method whose receiver mode is `inout` (a `[mutating]` method) is
-    // an `inout` parameter too. Its argument is the base expression of the member access, which an
-    // operator reads and writes in place like its direct arguments.
-    if (callIsOperator)
-        return;
-    auto thisParamInfo = findEffectiveThisParamInfo(calleeDeclRef);
-    if (!thisParamInfo || thisParamInfo->mode != ParamPassingMode::BorrowInOut)
-        return;
-    if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
-    {
-        if (argumentNamesGroupSharedStorage(memberExpr->baseExpression))
-            getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
-                .param = "this",
-                .suggestion = "",
-                .arg = memberExpr->baseExpression});
-    }
+            // Every invocation in the group can access thread-group-shared storage, so the
+            // exclusive access holds only if no other invocation touches it during the call. The
+            // compiler does not check that, so we warn.
+            //
+            if (!argumentNamesGroupSharedStorage(written.storage))
+                return;
+            if (written.isReceiver)
+                getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
+                    .param = "this",
+                    .suggestion = "",
+                    .arg = written.arg});
+            else
+                getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
+                    .param = getText(written.param->getName()),
+                    .suggestion = "; if the callee needs to see other invocations' writes, "
+                                  "declare the parameter 'groupshared'",
+                    .arg = written.arg});
+        });
 }
 
 // The modes in which autodiff generates a derivative of a function from its body.
@@ -8112,20 +8171,23 @@ static bool isCallAlwaysInlinedOrIntrinsic(CallableDecl* callee)
 void SemanticsVisitor::checkGroupSharedPartialWritesByInlinedCall(
     InvokeExpr* invoke,
     FuncType* funcType,
-    DeclRef<CallableDecl> calleeDeclRef)
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
 {
     if (!calleeDeclRef || !isCallAlwaysInlinedOrIntrinsic(calleeDeclRef.getDecl()))
         return;
-    Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
-    for (Index i = 0; i < checkCount; ++i)
-    {
-        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
-            continue;
-        auto argExpr = invoke->arguments[i];
-        if (as<LValueImplicitCastExpr>(argExpr))
-            continue;
-        checkGroupSharedPartialWriteInDifferentiatedBody(argExpr);
-    }
+    forEachWrittenBackArgument(
+        this,
+        invoke,
+        funcType,
+        calleeDeclRef,
+        paramDeclRefs,
+        [&](WrittenBackArgument const& written)
+        {
+            if (written.isConverted() || written.isReceiver)
+                return;
+            checkGroupSharedPartialWriteInDifferentiatedBody(written.arg);
+        });
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)

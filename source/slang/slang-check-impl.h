@@ -4200,7 +4200,8 @@ public:
     void checkGroupSharedPartialWritesByInlinedCall(
         InvokeExpr* invoke,
         FuncType* funcType,
-        DeclRef<CallableDecl> calleeDeclRef);
+        DeclRef<CallableDecl> calleeDeclRef,
+        List<DeclRef<ParamDecl>> const& paramDeclRefs);
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,
