@@ -335,6 +335,12 @@ struct IRSpecContext : IRSpecContextBase
 
 
 IRInst* cloneGlobalValue(IRSpecContext* context, IRInst* originalVal);
+static IRInst* findBestValueForTarget(IRSpecContext* context, IRSpecSymbol* sym);
+static IRSpecSymbol* findSymbolCheckedByCloning(IRSpecContext* context, IRSpecSymbol* sym);
+static void diagnoseUnresolvedSymbolCandidates(
+    IRSpecContext* context,
+    IRInst* bestVal,
+    IRSpecSymbol* sym);
 
 IRInst* cloneValue(IRSpecContextBase* context, IRInst* originalValue);
 
@@ -1238,6 +1244,20 @@ IRFunc* specializeIRForEntryPoint(
         UNREACHABLE_RETURN(nullptr);
     }
 
+    // Cloning reports a body-less function unless `isFunctionDefinedOrImported` accepts it, and it
+    // accepts an intrinsic or external binding only for a function without
+    // `IREntryPointDecoration`. An entry point that the front end did not mark while lowering its
+    // module, such as one found by `findAndCheckEntryPoint` without `[shader]` (or, outside CUDA,
+    // without `[numthreads]`), gets that decoration only below, so we report a body-less entry
+    // point that cloning accepted.
+    if (!clonedFunc->getFirstBlock())
+    {
+        IRSpecSymbol* checkedSym = findSymbolCheckedByCloning(context, sym);
+        IRInst* bestVal = findBestValueForTarget(context, checkedSym);
+        if (isFunctionDefinedOrImported(bestVal))
+            diagnoseUnresolvedSymbolCandidates(context, bestVal, checkedSym);
+    }
+
     if (!clonedFunc->findDecorationImpl(kIROp_KeepAliveDecoration))
     {
         context->builder->addKeepAliveDecoration(clonedFunc);
@@ -1596,6 +1616,59 @@ IRInst* cloneGlobalValueImpl(
     return clonedValue;
 }
 
+/// Return the declaration among `sym` and the other declarations that share its mangled name
+/// that is the best fit for the target, or null when `sym` is null. A declaration more specialized
+/// for the target is better; on a tie an export is better than an import, and then a definition is
+/// better than a declaration.
+static IRInst* findBestValueForTarget(IRSpecContext* context, IRSpecSymbol* sym)
+{
+    IRInst* bestVal = nullptr;
+    for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
+    {
+        IRInst* newVal = ss->irGlobalValue;
+        if (isBetterForTarget(context, newVal, bestVal))
+            bestVal = newVal;
+    }
+    return bestVal;
+}
+
+/// Return the symbol whose best value `cloneGlobalValueWithLinkage` checked when it cloned the
+/// value that `sym` names. That is `sym` itself, except for a specialized generic: the symbol then
+/// names an `IRSpecialize`, and cloning it checks the generic it specializes, which has its own
+/// symbol.
+static IRSpecSymbol* findSymbolCheckedByCloning(IRSpecContext* context, IRSpecSymbol* sym)
+{
+    auto specialize = as<IRSpecialize>(findBestValueForTarget(context, sym));
+    if (!specialize)
+        return sym;
+    auto genericLinkage = specialize->getBase()->findDecoration<IRLinkageDecoration>();
+    SLANG_RELEASE_ASSERT(genericLinkage);
+    auto genericSym = context->findSymbols(genericLinkage->getMangledName());
+    SLANG_RELEASE_ASSERT(genericSym);
+    return genericSym;
+}
+
+/// Report `bestVal` as an unresolved external symbol, with a note at each declaration that shares
+/// its mangled name (`sym` and the declarations that follow it).
+static void diagnoseUnresolvedSymbolCandidates(
+    IRSpecContext* context,
+    IRInst* bestVal,
+    IRSpecSymbol* sym)
+{
+    auto sink = context->shared->sink;
+    if (!sink)
+        return;
+
+    sink->diagnose(Diagnostics::UnresolvedSymbol{
+        .symbol = bestVal,
+        .location = bestVal->sourceLoc,
+    });
+    for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
+    {
+        sink->diagnose(Diagnostics::SeeDeclarationOfIr{.inst = ss->irGlobalValue});
+    }
+}
+
 /// Clone a global value, which has the given `originalLinkage`.
 ///
 /// The `originalVal` is a known global IR value with that linkage, if one is available.
@@ -1649,45 +1722,18 @@ IRInst* cloneGlobalValueWithLinkage(
         UNREACHABLE_RETURN(cloneGlobalValueImpl(context, originalVal, IROriginalValuesForClone()));
     }
 
-    // We will try to track the "best" declaration we can find.
-    //
-    // Generally, one declaration will be better than another if it is
-    // more specialized for the chosen target. Otherwise, we simply favor
-    // definitions over declarations.
-    //
-    IRInst* bestVal = nullptr;
-    for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
-    {
-        IRInst* newVal = ss->irGlobalValue;
-        if (isBetterForTarget(context, newVal, bestVal))
-            bestVal = newVal;
-    }
-
+    IRInst* bestVal = findBestValueForTarget(context, sym);
     if (!bestVal)
     {
         return nullptr;
     }
 
-    // Check that the best value we found is valid: if it's a function,
-    // it should either have a body, be an intrinsic, or be imported.
-    // This catches cases like extension methods declared without a body,
-    // which are not valid (extensions cannot define new requirements).
+    // Check that the best value we found is valid: if it's a function, it should have a body or,
+    // unless it has an `IREntryPointDecoration`, be an intrinsic, be bound to an external
+    // definition, or be imported. This catches cases like extension methods declared without a
+    // body, which are not valid (extensions cannot define new requirements).
     if (!isFunctionDefinedOrImported(bestVal))
-    {
-        if (auto sink = context->shared->sink)
-        {
-            sink->diagnose(Diagnostics::UnresolvedSymbol{
-                .symbol = bestVal,
-                .location = bestVal->sourceLoc,
-            });
-
-            // Emit notes for all available declarations of this symbol
-            for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
-            {
-                sink->diagnose(Diagnostics::SeeDeclarationOfIr{.inst = ss->irGlobalValue});
-            }
-        }
-    }
+        diagnoseUnresolvedSymbolCandidates(context, bestVal, sym);
 
     // Check if we've already cloned this value, for the case where
     // we didn't have an original value (just a name), but we've
@@ -1821,8 +1867,9 @@ static bool doesFuncHaveDefinition(IRFunc* func)
 }
 
 /// Check if a function (or generic containing a function) is properly defined or imported.
-/// Returns true if the value is not a function, or if it has a definition, is an intrinsic,
-/// or is marked as imported.
+/// Returns true if the value is not a function, or if it has a definition, or if it has no
+/// `IREntryPointDecoration` and is an intrinsic, is bound to an external definition, or is marked
+/// as imported.
 static bool isFunctionDefinedOrImported(IRInst* inst)
 {
     IRFunc* func = nullptr;
@@ -1844,6 +1891,12 @@ static bool isFunctionDefinedOrImported(IRInst* inst)
     // Check if it has a function body
     if (func->getFirstBlock() != nullptr)
         return true;
+
+    // Later passes build the target's entry point from the body of every function with an
+    // `IREntryPointDecoration`, so neither an intrinsic nor an external binding can stand in for
+    // that body.
+    if (func->findDecoration<IREntryPointDecoration>())
+        return false;
 
     // Check for decorations that indicate the function has an external/special implementation
     for (auto decor : func->getDecorations())
