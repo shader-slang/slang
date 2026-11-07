@@ -17762,7 +17762,7 @@ __generic<T : __BuiltinLogicalType, let N : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
 {
-    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
+    return WaveMultiPrefixBitXor(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
@@ -17770,7 +17770,7 @@ __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 {
-    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
+    return WaveMultiPrefixBitXor(expr, uint4(mask, 0, 0, 0));
 }
 
 //@public:
