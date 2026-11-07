@@ -5291,9 +5291,9 @@ $(type_info.return_type) $(type_info.method_name)(
     void addKeepAliveDecoration(IRInst* value) { addDecoration(value, kIROp_KeepAliveDecoration); }
 
     void addPublicDecoration(IRInst* value) { addDecoration(value, kIROp_PublicDecoration); }
-    void addHLSLExportDecoration(IRInst* value)
+    IRDecoration* addHLSLExportDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp_HLSLExportDecoration);
+        return addDecoration(value, kIROp_HLSLExportDecoration);
     }
     void addHasExplicitHLSLBindingDecoration(IRInst* value)
     {

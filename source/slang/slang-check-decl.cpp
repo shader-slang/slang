@@ -5793,6 +5793,17 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto satisfyingParamInfo = getParamInfo(m_astBuilder, satisfyingParam);
             if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
                 return false;
+
+            // Beyond matching modes exactly, two by-reference parameters match only if they refer
+            // to storage in the same address space. `groupshared` is currently the only way to
+            // spell an address space for a by-reference parameter, so this requires either both
+            // parameters or neither to be `groupshared`. When they differ, the requirement can
+            // still be satisfied by a synthesized wrapper whose call to the method type-checks.
+            //
+            if (isByReferenceParamPassingMode(requiredParamInfo.mode) &&
+                getReferenceParamAddressSpace(requiredParam.getDecl()) !=
+                    getReferenceParamAddressSpace(satisfyingParam.getDecl()))
+                return false;
         }
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
@@ -7728,6 +7739,18 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         paramType.isLeftValue = true;
         if (paramInfo.mode == ParamPassingMode::BorrowIn)
             paramType.isLeftValue = false;
+
+        // The synthesized declaration's passing mode is copied above, but a `groupshared`
+        // parameter also requires its argument to be thread-group-shared memory. The wrapper
+        // forwards its own parameter as that argument, so the parameter keeps `groupshared`;
+        // otherwise the forwarded argument would be rejected as not naming shared memory.
+        //
+        if (auto groupShared = paramDeclRef.getDecl()->findModifier<HLSLGroupSharedModifier>())
+        {
+            auto clonedModifier = m_astBuilder->create<HLSLGroupSharedModifier>();
+            clonedModifier->keywordName = groupShared->keywordName;
+            addModifier(synParamDecl, clonedModifier);
+        }
 
         // Create an expression that references the parameter for use in arguments.
         auto synArg = m_astBuilder->create<VarExpr>();
@@ -15211,6 +15234,19 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     maybeApplyLayoutModifier(paramDecl);
 
+    // A `groupshared` parameter names thread-group-shared memory that other invocations can access
+    // during the call, so it must be a reference to that memory. A written `in`, `out`, `inout`, or
+    // `__borrow` (or its alias `__constref`) gives the parameter a mode that is not a reference.
+    //
+    if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
+    {
+        auto mode = getExplicitlyDeclaredParamPassingMode(paramDecl);
+        if (!isByReferenceParamPassingMode(mode))
+            getSink()->diagnose(Diagnostics::GroupsharedParameterMustBeReference{
+                .mode = mode,
+                .modifier = groupSharedModifier});
+    }
+
     // Only texture types are allowed to have memory qualifiers on parameters
     if (!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
     {
@@ -16138,6 +16174,32 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
             auto paramDecl = paramDeclRef.getDecl();
             if (!paramDecl->type.type)
                 continue;
+            // A by-reference parameter names storage that the caller, and possibly other
+            // invocations, may also access, and a derivative may access it a different number of
+            // times and in a different order than the function does. We do not support one here
+            // at all, so no derivative signature is ever built for the function.
+            //
+            // TODO: Once supported, a reference parameter should be treated as `no_diff`. We do not
+            // check for `no_diff` on one now, since every one is rejected.
+            //
+            if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+            {
+                // A `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute declares this
+                // function as the derivative of another one rather than requesting a derivative of
+                // this one, so it gets its own wording.
+                //
+                auto attribute = decl->findModifier<DifferentiableAttribute>();
+                if (as<DerivativeOfAttribute>(attribute))
+                    getSink()->diagnose(Diagnostics::ReferenceParameterOfUserDefinedDerivative{
+                        .func = decl,
+                        .param = paramDecl,
+                        .attributeLocation = attribute->loc});
+                else
+                    getSink()->diagnose(Diagnostics::ReferenceParameterOfDifferentiableFunction{
+                        .func = decl,
+                        .param = paramDecl,
+                        .attributeLocation = attribute->loc});
+            }
             if (!isTypeDifferentiable(paramDecl->type.type))
             {
                 if (!paramDecl->hasModifier<NoDiffModifier>())
@@ -16250,6 +16312,12 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
             }
         }
     }
+
+    // A function with a reference parameter cannot be differentiated, so it gets no derivative
+    // signature and no conformance to the derivative interfaces.
+    //
+    if (hasReferenceParameter(decl))
+        return;
 
     if (as<FunctionDeclBase>(decl))
     {
@@ -21154,6 +21222,12 @@ static void checkDerivativeAttribute(
 {
     SLANG_RELEASE_ASSERT(attr->funcExpr && !attr->funcExpr->type.type);
 
+    // A primal with a reference parameter cannot be differentiated, so it has no derivative
+    // signature to check the derivative against.
+    //
+    if (hasReferenceParameter(primalDeclRef.getDecl()))
+        return;
+
     ArgsWithDirectionInfo imaginaryArguments =
         getImaginaryArgsToForwardDerivative(visitor, primalDeclRef, attr->loc);
     checkDerivativeAttributeImpl(
@@ -21184,6 +21258,12 @@ static void checkDerivativeAttribute(
     if (!attr->funcExpr)
         return;
     if (attr->funcExpr->type.type)
+        return;
+
+    // A primal with a reference parameter cannot be differentiated, so it has no derivative
+    // signature to check its derivative against.
+    //
+    if (hasReferenceParameter(funcDecl))
         return;
 
     auto primalDeclRef = createDefaultSubstitutionsIfNeeded(
@@ -21224,6 +21304,12 @@ static void checkDerivativeAttribute(
     if (!attr->funcExpr)
         return;
     if (attr->funcExpr->type.type)
+        return;
+
+    // As for a forward derivative, a primal with a reference parameter has no backward derivative
+    // signature to check its derivative against.
+    //
+    if (hasReferenceParameter(funcDecl))
         return;
 
     auto primalDeclRef = createDefaultSubstitutionsIfNeeded(

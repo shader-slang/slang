@@ -104,6 +104,20 @@ struct AddressInstEliminationContext
             return;
         }
 
+        auto calleeType = as<IRFuncType>(call->getCallee()->getDataType());
+        SLANG_RELEASE_ASSERT(calleeType);
+        auto argIndex = UInt(use - call->getArgs());
+
+        // A reference parameter names the argument's storage, so the callee accesses that storage
+        // in place and decides itself how to read, write, and synchronize it. We pass the address
+        // through rather than a copy, because a copy that is stored back after the call would
+        // overwrite writes that other invocations or aliases made during it.
+        //
+        if (as<IRRefParamType>(calleeType->getParamType(argIndex)))
+        {
+            return;
+        }
+
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
 
@@ -127,8 +141,22 @@ struct AddressInstEliminationContext
         {
             for (auto inst : block->getChildren())
             {
-                if (as<IRBorrowInParamType>(getRootAddr(inst)->getDataType()))
+                auto rootType = getRootAddr(inst)->getDataType();
+
+                // A borrow is read-only, so an access through it is a load that needs no
+                // write-back and can stay in memory.
+                //
+                if (as<IRBorrowInParamType>(rootType))
                     continue;
+
+                // A reference names storage that the caller, other aliases, or other invocations
+                // may access during the function. Rewriting a write to one element into a write of
+                // the whole storage would overwrite their changes to the other elements, so each
+                // access through a reference stays an access to just the element it names.
+                //
+                if (as<IRRefParamType>(rootType))
+                    continue;
+
                 if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
                 {
                     auto valType = unwrapAttributedType(ptrType->getValueType());

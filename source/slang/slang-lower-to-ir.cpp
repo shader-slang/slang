@@ -1459,9 +1459,13 @@ static void addLinkageDecoration(
     }
     for (auto modifier : decl->modifiers)
     {
+        // Each modifier that keeps the declaration's definition records its own location on the
+        // export decoration, so that a later diagnostic about the kept definition can point at
+        // the modifier.
+        //
         if (as<HLSLExportModifier>(modifier))
         {
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
             builder->addKeepAliveDecoration(inst);
         }
         else if (as<ExternCppModifier>(modifier))
@@ -1479,13 +1483,13 @@ static void addLinkageDecoration(
         else if (as<DllExportAttribute>(modifier))
         {
             builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
             builder->addKeepAliveDecoration(inst);
         }
         else if (as<CudaDeviceExportAttribute>(modifier))
         {
             builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addKeepAliveDecoration(inst);
         }
@@ -1502,7 +1506,7 @@ static void addLinkageDecoration(
 
             // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
         }
         else if (as<TorchEntryPointAttribute>(modifier))
         {
@@ -1512,7 +1516,7 @@ static void addLinkageDecoration(
 
             // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
         }
         else if (auto pyExportModifier = as<PyExportAttribute>(modifier))
         {
@@ -1520,7 +1524,7 @@ static void addLinkageDecoration(
                 inst,
                 pyExportModifier->name.getLength() ? pyExportModifier->name.getUnownedSlice()
                                                    : decl->getName()->text.getUnownedSlice());
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
         }
         else if (auto knownBuiltinModifier = as<KnownBuiltinAttribute>(modifier))
         {
@@ -3749,11 +3753,22 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
         else
             return ParamPassingMode::Out;
     }
-    else
-    {
-        // No direction modifier, or just `in`:
+    if (paramDecl->hasModifier<InModifier>())
         return ParamPassingMode::In;
+
+    // On a parameter with no passing-mode keyword, `groupshared` names the address space of a
+    // reference, so it implies `__ref`. Semantic checking reports a `groupshared` parameter whose
+    // written keyword gives it any other mode.
+    //
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    {
+        // As on a `__ref` parameter, `const` makes the reference read-only.
+        //
+        if (paramDecl->hasModifier<ConstModifier>())
+            return ParamPassingMode::RefReadOnly;
+        return ParamPassingMode::RefReadWrite;
     }
+    return ParamPassingMode::In;
 }
 
 
@@ -3770,6 +3785,24 @@ ParamPassingMode getParamPassingMode(ParamDecl* paramDecl)
     auto declaredMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
     auto actualMode = adjustParamPassingModeBasedOnParamType(declaredMode, paramDecl->getType());
     return actualMode;
+}
+
+AddressSpace getReferenceParamAddressSpace(ParamDecl* paramDecl)
+{
+    SLANG_RELEASE_ASSERT(isByReferenceParamPassingMode(getParamPassingMode(paramDecl)));
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+        return AddressSpace::GroupShared;
+    return AddressSpace::Generic;
+}
+
+bool hasReferenceParameter(CallableDecl* callableDecl)
+{
+    for (auto paramDecl : callableDecl->getParameters())
+    {
+        if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+            return true;
+    }
+    return false;
 }
 
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(
@@ -14492,7 +14525,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (as<NoRefInlineAttribute>(modifier))
             {
-                getBuilder()->addSimpleDecoration<IRNoRefInlineDecoration>(irFunc);
+                // Preserve the attribute's location so that a diagnostic about the call boundary
+                // it keeps can point at `[noRefInline]` itself.
+                //
+                auto decoration =
+                    getBuilder()->addSimpleDecoration<IRNoRefInlineDecoration>(irFunc);
+                decoration->sourceLoc = modifier->loc;
             }
             else if (auto instanceAttr = as<InstanceAttribute>(modifier))
             {

@@ -3876,6 +3876,10 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
             getSink()->diagnose(Diagnostics::AssignNonLvalue{.expr = expr});
         }
     }
+    else
+    {
+        checkGroupSharedPartialWriteInDifferentiatedBody(expr->left, expr->left);
+    }
     expr->type = type;
     return expr;
 }
@@ -4389,10 +4393,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 checkThrowingCallIsCovered(invoke);
 
             auto funcDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr);
+            DeclRef<CallableDecl> callableDeclRef;
             List<DeclRef<ParamDecl>> paramDeclRefs;
             if (funcDeclRefExpr)
             {
-                if (auto callableDeclRef = funcDeclRefExpr->declRef.as<CallableDecl>())
+                callableDeclRef = funcDeclRefExpr->declRef.as<CallableDecl>();
+                if (callableDeclRef)
                 {
                     paramDeclRefs =
                         getParametersForCallableSignature(m_astBuilder, callableDeclRef);
@@ -4413,6 +4419,13 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                         paramDecl = paramDeclRefs[pp].getDecl();
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
+
+                // A parameter that takes its default value has no argument, and a call through a
+                // value of function type has no parameter declarations, so neither has a
+                // `groupshared` argument to check.
+                //
+                if (paramDecl && argExpr && paramDecl->hasModifier<HLSLGroupSharedModifier>())
+                    checkArgumentOfGroupSharedParam(paramDecl, argExpr);
 
                 if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
@@ -4604,6 +4617,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // Warn when the same storage is passed to two parameters that may both be references
             // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
+            checkGroupSharedArgumentsToExclusiveParams(
+                invoke,
+                funcType,
+                callableDeclRef,
+                paramDeclRefs);
+            checkGroupSharedPartialWritesByCall(invoke, funcType, callableDeclRef, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
             {
@@ -6053,11 +6072,19 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
         case ParamPassingMode::RefReadOnly:
         case ParamPassingMode::RefWriteOnly:
             {
-                // Not allowed..
-                SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                // The derivative takes a reference parameter of the primal as is, with the same
+                // access, and does not differentiate the storage it refers to.
+                //
+                if (tryGetDifferentialPairType(paramValType))
+                    SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                paramTypes.add(getParamTypeWithModeWrapper(
+                    m_astBuilder,
+                    m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()}),
+                    paramPassingMode));
+                break;
             }
-
-            break;
         }
     }
 
@@ -6120,6 +6147,41 @@ struct HigherOrderInvokeExprCheckingActions
         return declRef.as<CallableDecl>();
     }
 
+    /// Return whether `funcExpr`, the function that `diffExpr` (a `fwd_diff` or `bwd_diff`)
+    /// differentiates, has a reference parameter and so cannot be differentiated, and report an
+    /// error on each such parameter that has not already been reported.
+    bool rejectDifferentiationOfFunctionWithReferenceParameter(
+        SemanticsVisitor* semantics,
+        HigherOrderInvokeExpr* diffExpr,
+        Expr* funcExpr)
+    {
+        // A function with a reference parameter cannot be differentiated, so its derivative has no
+        // signature, and the caller gives the expression an error type instead of building one.
+        //
+        auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr);
+        if (!funcDeclRef || !hasReferenceParameter(funcDeclRef.getDecl()))
+            return false;
+
+        // `checkDifferentiableCallableSignature` reports the reference parameters of a function
+        // with a differentiability or derivative attribute, so we report only those of a function
+        // without one. Naming such a function here is otherwise rejected only later, with a less
+        // specific error about the missing derivative.
+        //
+        if (!funcDeclRef.getDecl()->findModifier<DifferentiableAttribute>())
+        {
+            for (auto paramDecl : funcDeclRef.getDecl()->getParameters())
+            {
+                if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+                    semantics->getSink()->diagnose(
+                        Diagnostics::ReferenceParameterOfDifferentiableFunction{
+                            .func = funcDeclRef.getDecl(),
+                            .param = paramDecl,
+                            .requestLocation = diffExpr->loc});
+            }
+        }
+        return true;
+    }
+
     // Extract the effective `this` parameter information for a statically referenced member method
     // (e.g. `Type::method`). Returns an empty result for declarations without that parameter and
     // for member methods referenced by name within their own type (e.g.
@@ -6160,6 +6222,14 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
+        if (rejectDifferentiationOfFunctionWithReferenceParameter(
+                semantics,
+                resultDiffExpr,
+                funcExpr))
+        {
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
+            return;
+        }
         auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
         resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisParamInfo);
         if (auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
@@ -6192,6 +6262,14 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
         {
             resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
+            return;
+        }
+        if (rejectDifferentiationOfFunctionWithReferenceParameter(
+                semantics,
+                resultDiffExpr,
+                funcExpr))
+        {
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
             return;
         }
         auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
@@ -7724,6 +7802,15 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
 {
     expr->arg = CheckTerm(expr->arg);
 
+    // An operand that already failed to check has been reported, so we give the expression an
+    // error type rather than also reporting that the operand is not addressable.
+    //
+    if (as<ErrorType>(expr->arg->type))
+    {
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
     // This address-of feature is purely experimental and for prototyping.
     // Only allow known expressions.
     expr->type =
@@ -7734,6 +7821,425 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         expr->type = m_astBuilder->getErrorType();
     }
     return expr;
+}
+
+// Return the object whose declaration gives the address space of the storage that `expr` names,
+// such as `g` for `g[i].a.x`, by stripping `(...)`, `[i]`, `.field`, and single-component
+// swizzles. The groupshared checks use it to find the declaration that carries `groupshared`.
+static Expr* getObjectDeclaringAddressSpace(Expr* expr)
+{
+    // An address-space modifier such as `groupshared` sits on the declaration of a whole object,
+    // never on a part, so we walk out to that object. `getValidTypeForAddressOf` would walk these
+    // projections itself, but it judges a field access by the field's declaration and so loses the
+    // base object's address space (issue #14094).
+    //
+    for (;;)
+    {
+        if (auto parenExpr = as<ParenExpr>(expr))
+            expr = parenExpr->base;
+        else if (auto indexExpr = as<IndexExpr>(expr))
+            expr = indexExpr->baseExpression;
+        else if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        {
+            // A multi-element swizzle may be non-contiguous, so it has no address of its own and
+            // the caller materializes a private temporary for it. We stop, so that such an
+            // argument is judged on its own and rejected rather than inheriting the base's address
+            // space.
+            //
+            if (swizzleExpr->elementIndices.getCount() > 1)
+                return expr;
+            expr = swizzleExpr->base;
+        }
+        else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(expr))
+        {
+            if (matrixSwizzleExpr->elementCount > 1)
+                return expr;
+            expr = matrixSwizzleExpr->base;
+        }
+        else if (auto memberExpr = as<MemberExpr>(expr))
+        {
+            // We stop at a member reached through a pointer, because the pointer's own type
+            // carries the address space. We also stop at a member that is not a field of the
+            // object: a `static` field is a variable of its own, and a property or method names
+            // no part of the object's storage.
+            //
+            auto memberDecl = memberExpr->declRef.getDecl();
+            if (as<DerefMemberExpr>(memberExpr) || !as<VarDeclBase>(memberExpr->declRef) ||
+                (memberDecl && memberDecl->hasModifier<HLSLStaticModifier>()))
+                return expr;
+            expr = memberExpr->baseExpression;
+        }
+        else
+            return expr;
+    }
+}
+
+// Return whether `arg` is one of the type-only placeholder arguments that
+// `Linkage::specializeWithArgTypes` builds to resolve a call from reflected types.
+static bool isSpecializeWithArgTypesPlaceholder(Expr* arg)
+{
+    // A placeholder is a bare `VarExpr` with a checked l-value type but neither a name nor a
+    // declaration. It stands for some l-value of its type and names no storage, so a check about
+    // which storage an argument names has no answer for it.
+    //
+    auto varExpr = as<VarExpr>(arg);
+    return varExpr && varExpr->astNodeType == ASTNodeType::VarExpr && !varExpr->name &&
+           !varExpr->declRef && varExpr->type.type && varExpr->type.isLeftValue;
+}
+
+// Return whether `arg`, or the operand of an implicit cast that `arg` is, has an error type. Such
+// an argument comes from an expression that already failed to check, so a storage diagnostic for
+// it would only repeat the reported error.
+static bool isErrorTypedArgument(Expr* arg)
+{
+    if (as<ErrorType>(arg->type))
+        return true;
+
+    // Coercion wraps an error-typed operand in an implicit cast to the parameter's type, so we
+    // look through that cast.
+    //
+    auto castExpr = as<ImplicitCastExpr>(arg);
+    return castExpr && as<ErrorType>(castExpr->arguments[0]->type);
+}
+
+// Return whether `arg` names thread-group-shared storage, such as `g[i].a` for
+// `groupshared Pair g[4]`.
+bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
+{
+    SLANG_ASSERT(arg);
+
+    // A part of an object is in the address space of the whole object, so we judge the whole.
+    //
+    auto addressedExpr = getObjectDeclaringAddressSpace(arg);
+    if (isSpecializeWithArgTypesPlaceholder(addressedExpr))
+        return false;
+
+    // `getValidTypeForAddressOf` gives the pointer type of an addressable expression, and that
+    // type carries the address space, so we read the address space from it instead of deciding
+    // addressability again here.
+    //
+    if (auto ptrType = getValidTypeForAddressOf(
+            this,
+            m_astBuilder,
+            addressedExpr,
+            getType(m_astBuilder, addressedExpr)))
+    {
+        if (auto addrSpaceVal = as<ConstantIntVal>(ptrType->getAddressSpace()))
+            return (AddressSpace)addrSpaceVal->getValue() == AddressSpace::GroupShared;
+    }
+    return false;
+}
+
+// Report an error if `argIn`, passed to the `groupshared` parameter `paramIn`, does not name
+// thread-group-shared storage.
+void SemanticsVisitor::checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr* argIn)
+{
+    SLANG_ASSERT(paramIn && argIn && paramIn->hasModifier<HLSLGroupSharedModifier>());
+    if (isSpecializeWithArgTypesPlaceholder(argIn) || isErrorTypedArgument(argIn))
+        return;
+
+    // A `groupshared` parameter is a reference to a thread-group-shared location, so its argument
+    // must name such a location. A private local, a copy, or an rvalue would let the callee treat
+    // memory that no other invocation can see as shared. HLSL proposal 0043 (`groupshared`
+    // Arguments) imposes the same rule.
+    //
+    if (!argumentNamesGroupSharedStorage(argIn))
+        getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
+            .param = getText(paramIn->getName()),
+            .arg = argIn});
+}
+
+// An argument of a call that the call writes back to the caller's storage when it returns: the
+// argument of an `out` or `inout` parameter, or the receiver of a `[mutating]` method, whose
+// implicit `this` is an `inout` parameter.
+struct WrittenBackArgument
+{
+    // The argument as written in the call.
+    Expr* arg = nullptr;
+
+    // The storage that the call writes back to: the operand of an implicit conversion of `arg`,
+    // or otherwise `arg` itself.
+    Expr* storage = nullptr;
+
+    // The parameter, or null for a receiver and for an argument of a call through a value of
+    // function type, which has no parameter declarations.
+    ParamDecl* param = nullptr;
+
+    bool isReceiver = false;
+
+    bool isConverted() const { return storage != arg; }
+};
+
+// Call `visit` with each argument of `invoke` that the call writes back to, other than arguments
+// that already failed to check. Warning 30709 and error 38039 both use this set.
+template<typename Visit>
+static void forEachWrittenBackArgument(
+    SemanticsVisitor* visitor,
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs,
+    Visit const& visit)
+{
+    Index argCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
+    for (Index i = 0; i < argCount; ++i)
+    {
+        // Only an `out` or `inout` parameter is written back. A reference parameter, including a
+        // `groupshared` one, names its argument's storage, so the call accesses that storage in
+        // place and writes nothing back.
+        //
+        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
+            continue;
+        WrittenBackArgument written;
+        written.arg = invoke->arguments[i];
+        if (isErrorTypedArgument(written.arg))
+            continue;
+
+        // An implicitly converted argument goes through a temporary of the parameter's type, and
+        // the call writes the temporary back to the operand of the conversion.
+        //
+        written.storage = written.arg;
+        if (auto lValueCast = as<LValueImplicitCastExpr>(written.arg))
+            written.storage = lValueCast->arguments[0];
+        if (i < paramDeclRefs.getCount())
+            written.param = paramDeclRefs[i].getDecl();
+        visit(written);
+    }
+
+    // A `[mutating]` method's implicit `this` is an `inout` parameter, so the call also writes back
+    // its receiver: the base expression of the member access. A call through a value of function
+    // type has no declaration to tell us the receiver mode, and no receiver.
+    //
+    if (!calleeDeclRef)
+        return;
+    auto thisParamInfo = visitor->findEffectiveThisParamInfo(calleeDeclRef);
+    if (!thisParamInfo || thisParamInfo->mode != ParamPassingMode::BorrowInOut)
+        return;
+    if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
+    {
+        WrittenBackArgument written;
+        written.arg = memberExpr->baseExpression;
+        written.storage = written.arg;
+        written.isReceiver = true;
+        visit(written);
+    }
+}
+
+// Warn about each argument of `invoke` that passes thread-group-shared storage to an `out` or
+// `inout` parameter, including the implicit `this` of a `[mutating]` method.
+void SemanticsVisitor::checkGroupSharedArgumentsToExclusiveParams(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+{
+    bool callIsOperator = as<OperatorExpr>(invoke) != nullptr;
+    forEachWrittenBackArgument(
+        this,
+        invoke,
+        funcType,
+        calleeDeclRef,
+        paramDeclRefs,
+        [&](WrittenBackArgument const& written)
+        {
+            // A mutating operator on an element of shared memory, such as `g[i] += 1`, passes the
+            // element to an `inout` parameter, but the user who wrote it already expects a
+            // read-modify-write of that element, so a warning would only be noise. An implicitly
+            // converted argument goes through a temporary of the parameter's type even for an
+            // operator, so we still check it.
+            //
+            if (callIsOperator && !written.isConverted())
+                return;
+
+            // The warning names the parameter, and a call through a value of function type has no
+            // parameter declarations to name.
+            //
+            if (!written.param && !written.isReceiver)
+                return;
+
+            // Every invocation in the group can access thread-group-shared storage, so the
+            // exclusive access holds only if no other invocation touches it during the call. The
+            // compiler does not check that, so we warn.
+            //
+            if (!argumentNamesGroupSharedStorage(written.storage))
+                return;
+            // We name the thread-group-shared storage itself, which for an implicitly converted
+            // argument is the operand of the conversion rather than the conversion call.
+            //
+            ASTPrinter storagePrinter(m_astBuilder);
+            storagePrinter.addExpr(written.storage);
+            // The note points at what requires exclusive access: the parameter's `out` or `inout`
+            // keyword, or for a receiver the `[mutating]` attribute, or else the method itself,
+            // such as a `set` accessor or a method in HLSL source, where methods are mutating by
+            // default.
+            //
+            auto callee = calleeDeclRef.getDecl();
+            ParamPassingMode mode = ParamPassingMode::BorrowInOut;
+            SourceLoc modeLocation, mutatingLocation, methodLocation;
+            if (written.isReceiver)
+            {
+                if (auto mutating = callee->findModifier<MutatingAttribute>())
+                    mutatingLocation = mutating->loc;
+                else
+                    methodLocation = callee->loc;
+            }
+            else
+            {
+                mode = getParamPassingMode(written.param);
+                if (auto modeModifier = written.param->findModifier<OutModifier>())
+                    modeLocation = modeModifier->loc;
+            }
+            getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
+                .func = callee,
+                .param = written.isReceiver ? "this" : getText(written.param->getName()),
+                .storageText = storagePrinter.getString(),
+                .mode = mode,
+                .arg = written.arg,
+                .modeLocation = modeLocation,
+                .mutatingLocation = mutatingLocation,
+                .methodLocation = methodLocation});
+        });
+}
+
+// The modes in which autodiff generates a derivative of a function from its body.
+struct ModesDifferentiatedFromBody
+{
+    bool forward = false;
+    bool backward = false;
+
+    bool any() const { return forward || backward; }
+};
+
+// Return the modes in which autodiff generates a derivative of `func` from its body: those in
+// which `func` is marked differentiable and has no custom derivative.
+static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
+    SharedSemanticsContext* shared,
+    FunctionDeclBase* func)
+{
+    ModesDifferentiatedFromBody modes;
+    if (!func)
+        return modes;
+    bool isBackwardDifferentiable = func->hasModifier<BackwardDifferentiableAttribute>();
+    if (!isBackwardDifferentiable && !func->hasModifier<ForwardDifferentiableAttribute>())
+        return modes;
+
+    // A custom derivative may be attached by an attribute on `func`, or by a
+    // `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute on the derivative. We see the
+    // latter only when the derivative's module is visible from here.
+    //
+    bool hasCustomForward = func->hasModifier<ForwardDerivativeAttribute>() ||
+                            func->hasModifier<HasTrivialForwardDerivativeAttribute>();
+    bool hasCustomBackward = func->hasModifier<BackwardDerivativeAttribute>();
+    for (auto assoc : shared->getAssociatedDeclsForDecl(func))
+    {
+        if (assoc->kind == DeclAssociationKind::ForwardDerivativeFunc)
+            hasCustomForward = true;
+        else if (assoc->kind == DeclAssociationKind::BackwardDerivativeFunc)
+            hasCustomBackward = true;
+    }
+    modes.forward = !hasCustomForward;
+    modes.backward = isBackwardDifferentiable && !hasCustomBackward;
+    return modes;
+}
+
+// Report `target` if it writes part of a thread-group-shared variable in the body of a function
+// whose derivative Slang may generate from that body. `storage` is the storage that `target`
+// writes.
+void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target, Expr* storage)
+{
+    SLANG_ASSERT(target && storage);
+    if (isErrorTypedArgument(target))
+        return;
+
+    // Consider this example:
+    //
+    //     groupshared float g[4];
+    //     groupshared float4 v;
+    //     void setOne(inout float y) { y = 1.0; }
+    //
+    //     [Differentiable]
+    //     float f(uint i, float x)
+    //     {
+    //         g[i] = x;       // reported
+    //         v.yz += 1.0;    // reported
+    //         setOne(g[i]);   // reported
+    //         v = float4(0);  // not reported
+    //         return x;
+    //     }
+    //
+    // Autodiff prepares the body of `f` for differentiation by replacing the addresses it
+    // computes with values, so each reported write becomes a read of the whole variable, an
+    // update of the part, and a write of the whole variable. Each invocation then stores back
+    // stale copies of the parts that other invocations wrote.
+    //
+    // We report such a write in every function that is marked differentiable and has no visible
+    // custom derivative for some mode, whether or not any code requests that derivative. The rule
+    // is deliberately broader than the set of writes that race in a given program; we chose a
+    // rule that is easy to state over a precise one. A differentiability attribute allows any
+    // module that imports the function to request a derivative generated from its body, and only
+    // this module can check the body, so we check what the attribute allows rather than what one
+    // program requests. For the same reason, a custom derivative that another module declares
+    // does not exempt the function here. Basing the rule on the source, rather than on how
+    // lowering and autodiff currently rewrite each write, also keeps it in step as those passes
+    // change.
+    //
+    if (!getModesDifferentiatedFromBody(getShared(), m_parentFunc).any())
+        return;
+
+    Expr* wholeExpr = storage;
+    while (auto parenExpr = as<ParenExpr>(wholeExpr))
+        wholeExpr = parenExpr->base;
+
+    // A multi-element swizzle, such as `v.yz`, has no address of its own, so we judge the object
+    // it selects from.
+    //
+    Expr* addressedExpr = wholeExpr;
+    if (auto swizzleExpr = as<SwizzleExpr>(wholeExpr))
+        addressedExpr = swizzleExpr->base;
+    else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(wholeExpr))
+        addressedExpr = matrixSwizzleExpr->base;
+
+    if (!argumentNamesGroupSharedStorage(addressedExpr))
+        return;
+
+    // A write of the whole variable, such as `v = float4(0)`, stays a single store.
+    //
+    auto baseExpr = getObjectDeclaringAddressSpace(addressedExpr);
+    if (baseExpr == wholeExpr)
+        return;
+
+    // A write to part of a `groupshared` parameter stays in place, because autodiff leaves the
+    // storage behind a reference parameter in memory.
+    //
+    auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
+    if (!baseDeclRefExpr || as<ParamDecl>(baseDeclRefExpr->declRef.getDecl()))
+        return;
+
+    getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
+        .var = baseDeclRefExpr->declRef.getDecl(),
+        .target = target});
+}
+
+// Report each argument of `invoke` that the call writes back to part of thread-group-shared
+// memory in the body of a function whose derivative Slang may generate from that body.
+void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+{
+    // A call can write its `out` and `inout` arguments and its `[mutating]` receiver, whatever
+    // the callee is, so in a differentiated body each such argument that is part of shared memory
+    // races like an assignment to that part.
+    //
+    forEachWrittenBackArgument(
+        this,
+        invoke,
+        funcType,
+        calleeDeclRef,
+        paramDeclRefs,
+        [&](WrittenBackArgument const& written)
+        { checkGroupSharedPartialWriteInDifferentiatedBody(written.arg, written.storage); });
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)

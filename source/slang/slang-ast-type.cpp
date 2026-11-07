@@ -897,8 +897,15 @@ Val* BwdDiffFuncType::_resolveImplOverride()
             case ParamPassingMode::RefReadOnly:
             case ParamPassingMode::RefWriteOnly:
                 {
-                    // Ref parameters not allowed in backward diff.
-                    SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                    // The derivative takes a reference parameter of the primal as is, with the
+                    // same access, and does not differentiate the storage it refers to.
+                    //
+                    if (diffWitness)
+                        SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                    newParamTypes.add(getParamTypeWithModeWrapper(
+                        astBuilder,
+                        _getNoDiffType(astBuilder, paramInfo.type),
+                        paramInfo.mode));
                     break;
                 }
             default:
